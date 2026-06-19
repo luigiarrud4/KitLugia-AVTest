@@ -165,8 +165,9 @@ namespace KitLugia.Core
                 }
 
                 // Find the Updater.exe next to the current executable
-                string currentExePath = Assembly.GetEntryAssembly()?.Location ?? "";
-                string currentDir = Path.GetDirectoryName(currentExePath) ?? "";
+                string currentDllPath = Assembly.GetEntryAssembly()?.Location ?? "";
+                string currentExePath = Path.ChangeExtension(currentDllPath, ".exe");
+                string currentDir = Path.GetDirectoryName(currentDllPath) ?? "";
                 string updaterPath = Path.Combine(currentDir, "KitLugia.Updater.exe");
 
                 // If Updater.exe doesn't exist locally, try to find it in the extracted package

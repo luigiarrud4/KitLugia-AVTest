@@ -86,7 +86,7 @@ class Program
             Log(logPath, $"FATAL: {ex}");
             try
             {
-                Process.Start("https://github.com/luigiarrud4/KitLugia/releases/latest");
+                Process.Start("https://github.com/luigiarrud4/KitLugia-AVTest/releases/latest");
             }
             catch { }
         }
