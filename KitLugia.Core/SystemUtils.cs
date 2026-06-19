@@ -59,6 +59,16 @@ namespace KitLugia.Core
                 }
             }
             catch { }
+
+            try
+            {
+                var memStatus = default(NativeMethods.MEMORYSTATUSEX);
+                memStatus.dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>();
+                if (NativeMethods.GlobalMemoryStatusEx(ref memStatus))
+                    return memStatus.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
+            }
+            catch { }
+
             return 0;
         }
 
@@ -301,5 +311,25 @@ namespace KitLugia.Core
         #endregion
 
         #endregion
+    }
+
+    internal static class NativeMethods
+    {
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        internal struct MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
     }
 }
