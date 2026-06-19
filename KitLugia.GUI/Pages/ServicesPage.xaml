@@ -1,0 +1,618 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.ServicesPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      Title="ServicesPage"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial" d:DesignHeight="700" d:DesignWidth="950">
+
+    <Page.Resources>
+
+        <Style TargetType="TabItem">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="0,0,0,3" Margin="0,0,10,0">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentColor}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="30">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+        <TextBlock Text="Gerenciador de Processos" Foreground="White" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,20"/>
+
+        <TabControl x:Name="MainTabs" Grid.Row="1" Background="Transparent" BorderThickness="0">
+
+            <!-- ABA 1: STARTUP -->
+            <TabItem Header="Inicializa&#xE7;&#xE3;o (Startup)">
+                <Grid Margin="0,15,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="Aplicativos que iniciam com o Windows" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                        <Button Content="Recarregar Lista" Click="BtnRefreshStartup_Click" Margin="20,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="12"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="1" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
+                        <DataGrid x:Name="GridStartup" SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="250" IsReadOnly="True" SortMemberPath="Name">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <DataGridTextColumn Header="Comando / Caminho" Binding="{Binding FullCommand}" Width="*" IsReadOnly="True" SortMemberPath="FullCommand">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="Foreground" Value="#777"/>
+                                            <Setter Property="FontStyle" Value="Italic"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="ToolTip" Value="{Binding FullCommand}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <DataGridTemplateColumn Header="Status" Width="130" IsReadOnly="True" SortMemberPath="Status">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock VerticalAlignment="Center" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="{Binding Status}"/>
+                                                        <Setter Property="Foreground" Value="#777"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Enabled">
+                                                                <Setter Property="Foreground" Value="#4CAF50"/>
+                                                                <Setter Property="Text" Value="ATIVADO"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Disabled">
+                                                                <Setter Property="Foreground" Value="#C42B1C"/>
+                                                                <Setter Property="Text" Value="DESATIVADO"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Elevated">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                                                                <Setter Property="Text" Value="ELEVADO (ADM)"/>
+                                                                <Setter Property="Effect">
+                                                                    <Setter.Value>
+                                                                        <DropShadowEffect Color="#FFD700" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="TurboBoot">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                                                                <Setter Property="Text" Value="&#x1F680; KITLUGIA"/>
+                                                                <Setter Property="Effect">
+                                                                    <Setter.Value>
+                                                                        <DropShadowEffect Color="#FFD700" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Local" Binding="{Binding Location}" Width="150" IsReadOnly="True" SortMemberPath="Location">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="#999"/>
+                                            <Setter Property="ToolTip" Value="{Binding Location}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+
+                            <!-- Menu de Contexto para Startup -->
+                            <DataGrid.ContextMenu>
+                                <ContextMenu Style="{StaticResource ServiceContextMenu}">
+                                    <MenuItem Header="Habilitar / Desabilitar" Click="BtnToggleStartup_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <MenuItem Header="&#x1F680; Mover para Turbo Boot (KitLugia)" Click="MenuMoveToTurbo_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
+                                    <MenuItem Header="&#x1F6E1;&#xFE0F; Converter para Admin Elevado" Click="MenuConvertToAdmin_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
+                                    <MenuItem Header="&#x23F3; Converter para Admin Elevado (Atraso 2min)" Click="MenuConvertToAdminDelayed_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
+                                    <MenuItem Header="&#x23EA; Restaurar para Inicializa&#xE7;&#xE3;o Padr&#xE3;o" Click="MenuRestoreNormal_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <Separator Background="#333"/>
+                                    <MenuItem Header="&#x25B6; Executar Agora (Testar)" Click="MenuRunNow_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#4CAF50" FontWeight="Bold"/>
+                                    <MenuItem Header="&#x2699; Editar Argumentos..." Click="MenuEditArgs_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
+                                    <Separator Background="#333"/>
+                                    <MenuItem Header="Remover Permanentemente" Click="BtnRemoveStartup_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                        </DataGrid>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                        <Button Content="Remover" Click="BtnRemoveStartup_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Foreground="#FF6F61"/>
+                        <Button Content="Desabilitar / Habilitar Selecionado" Click="BtnToggleStartup_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0"/>
+
+                        <!-- CORRE&#xC7;&#xC3;O AQUI: Aplicado o estilo preto e amarelo no ContextMenu -->
+                        <Button x:Name="BtnAddStartup" Content="Adicionar Novo... &#x25BE;" Click="BtnAddStartup_Click" Style="{StaticResource GoldButtonStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu Style="{StaticResource ServiceContextMenu}">
+                                    <MenuItem Header="Adicionar Padr&#xE3;o (Sem Admin)" Click="MenuAddNormal_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <MenuItem Header="Adicionar como Administrador (Elevado)" Click="MenuAddAdmin_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
+                                    <MenuItem Header="Adicionar com Atraso (2 min)" Click="MenuAddDelayed_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <MenuItem Header="Adicionar como Admin + Atraso (2 min)" Click="MenuAddAdminDelayed_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Task Scheduler extra list -->
+                    <!-- In-page overlay for editing arguments -->
+                    <Grid x:Name="EditArgsOverlay" Grid.RowSpan="3" Visibility="Collapsed" Background="#CC000000" ZIndex="100">
+                        <Border Background="#1E1E1E" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="8" Width="600" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Grid Margin="20,20,20,15">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Text="&#x2699; Editar Argumentos de Inicialização" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+
+                                <TextBlock Grid.Row="1" FontSize="14" Foreground="#CCC" Margin="0,0,0,8">
+                                    <Run FontWeight="SemiBold" Foreground="#AAA" Text="Aplicativo: "/><Run x:Name="TxtEditAppName" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
+                                </TextBlock>
+
+                                <TextBlock Grid.Row="2" Text="Caminho:" FontWeight="SemiBold" Foreground="#AAA" Margin="0,0,0,3"/>
+                                <Border Grid.Row="3" BorderBrush="#444" BorderThickness="1" CornerRadius="4" Height="30" Background="#2d2d2d" Margin="0,0,0,8">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                        <TextBlock x:Name="TxtEditExePath" Foreground="#888" FontSize="12" Padding="6,5" VerticalAlignment="Center"/>
+                                    </ScrollViewer>
+                                </Border>
+
+                                <TextBlock Grid.Row="4" Text="Argumentos:" FontWeight="SemiBold" Foreground="#AAA" Margin="0,0,0,3"/>
+                                <Border Grid.Row="5" Background="#2d2d2d" CornerRadius="4" BorderBrush="#444" BorderThickness="1" Padding="6" Height="30" Margin="0,0,0,5">
+                                    <TextBox x:Name="TxtEditArgs" Background="Transparent" BorderThickness="0" Foreground="White" FontSize="13" TextChanged="TxtEditArgs_TextChanged" AcceptsReturn="False" VerticalAlignment="Center"/>
+                                </Border>
+
+                                <ItemsControl x:Name="EditSuggestionsPanel" Grid.Row="6" Visibility="Collapsed" Margin="0,0,0,6" MaxHeight="50">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding}" Margin="0,0,4,3" Padding="10,2" FontSize="11" Cursor="Hand" Foreground="{DynamicResource AccentColor}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" Background="#20FFD700" Height="24" Click="BtnSuggestion_Click"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Border Grid.Row="7" Background="#252525" CornerRadius="4" Padding="8" MinHeight="30" MaxHeight="120" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Resultado:" FontWeight="SemiBold" Foreground="#AAA" VerticalAlignment="Top" Margin="0,2,8,0"/>
+                                        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                            <TextBlock x:Name="TxtEditPreview" Foreground="{StaticResource AccentColor}" FontSize="12" FontFamily="Consolas" TextWrapping="NoWrap" Text=" "/>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <Button Content="Cancelar" Click="BtnEditArgsCancel_Click" Width="100" Height="30" Margin="0,0,10,0" Style="{StaticResource SecondaryButtonStyle}"/>
+                                    <Button x:Name="BtnEditArgsSave" Content="Salvar" Click="BtnEditArgsSave_Click" Width="100" Height="30" Style="{StaticResource GoldButtonStyle}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- In-page overlay for ADDING new startup -->
+                    <Grid x:Name="AddStartupOverlay" Grid.RowSpan="3" Visibility="Collapsed" Background="#CC000000" ZIndex="100">
+                        <Border Background="#1E1E1E" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="8" Width="600" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Grid Margin="20,20,20,15">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Text="&#x2795; Adicionar Novo Item na Inicialização" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock x:Name="TxtAddMode" Grid.Row="1" FontSize="13" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+
+                                <Grid Grid.Row="2" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border BorderBrush="#444" BorderThickness="1" CornerRadius="4" Margin="0,0,8,0" Height="30" Background="#2d2d2d">
+                                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                            <TextBlock x:Name="TxtAddExePath" Text="" Foreground="#888" FontSize="12" Padding="6,5" VerticalAlignment="Center"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                    <Button Grid.Column="1" Content="Selecionar..." Click="BtnAddPickFile_Click" Width="100" Height="30" Style="{StaticResource SecondaryButtonStyle}"/>
+                                </Grid>
+
+                                <TextBlock Grid.Row="3" Text="Argumentos:" FontWeight="SemiBold" Foreground="#AAA" Margin="0,0,0,3"/>
+                                <Border Grid.Row="4" Background="#2d2d2d" CornerRadius="4" BorderBrush="#444" BorderThickness="1" Padding="6" Height="30" Margin="0,0,0,5">
+                                    <TextBox x:Name="TxtAddArgs" Background="Transparent" BorderThickness="0" Foreground="White" FontSize="13" TextChanged="TxtAddArgs_TextChanged" AcceptsReturn="False" VerticalAlignment="Center"/>
+                                </Border>
+
+                                <ItemsControl x:Name="AddSuggestionsPanel" Grid.Row="5" Visibility="Collapsed" Margin="0,0,0,6" MaxHeight="50">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding}" Margin="0,0,4,3" Padding="10,2" FontSize="11" Cursor="Hand" Foreground="{DynamicResource AccentColor}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" Background="#20FFD700" Height="24" Click="BtnAddSuggestion_Click"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Border Grid.Row="6" Background="#252525" CornerRadius="4" Padding="8" MinHeight="30" MaxHeight="120" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Resultado:" FontWeight="SemiBold" Foreground="#AAA" VerticalAlignment="Top" Margin="0,2,8,0"/>
+                                        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                            <TextBlock x:Name="TxtAddPreview" Foreground="{StaticResource AccentColor}" FontSize="12" FontFamily="Consolas" TextWrapping="NoWrap" Text=" "/>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <Button Content="Cancelar" Click="BtnAddCancel_Click" Width="100" Height="30" Margin="0,0,10,0" Style="{StaticResource SecondaryButtonStyle}"/>
+                                    <Button x:Name="BtnAddSave" Content="Adicionar" Click="BtnAddSave_Click" Width="100" Height="30" Style="{StaticResource GoldButtonStyle}" IsEnabled="False"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ABA 2: OTIMIZA&#xC7;&#xC3;O DE SERVI&#xC7;OS -->
+            <TabItem Header="Servi&#xE7;os (Otimiza&#xE7;&#xE3;o)">
+                <Grid Margin="0,15,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- Cards -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Filtros -->
+                        <RowDefinition Height="*"/>
+                        <!-- Tabela -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- A&#xE7;&#xF5;es -->
+                    </Grid.RowDefinitions>
+
+                    <!-- PRESETS -->
+                    <Grid Grid.Row="0" Margin="0,0,0,25">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="15" BorderThickness="1" BorderBrush="{StaticResource CardBorder}" MinHeight="140">
+                            <StackPanel>
+                                <TextBlock Text="&#x1F6E1;&#xFE0F; Otimiza&#xE7;&#xE3;o Segura" Foreground="White" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="Desativa apenas servi&#xE7;os in&#xFA;teis como Fax, RetailDemo e Spooler (se n&#xE3;o usar impressora)." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <Button Content="Aplicar Seguro" Click="BtnSafeOpt_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="15" BorderThickness="1" BorderBrush="{StaticResource AccentColor}" MinHeight="140">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#FFD700" BlurRadius="10" Opacity="0.1" ShadowDepth="0"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="&#x1F3AE; Otimiza&#xE7;&#xE3;o Gamer" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="Desativa Telemetria, SysMain, Mapas, Geo-loc e outros recursos que consomem RAM e CPU." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <Button Content="Aplicar Gamer" Click="BtnGamerOpt_Click" Style="{StaticResource GoldButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="4" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="15" BorderThickness="1" BorderBrush="{StaticResource CardBorder}" MinHeight="140">
+                            <StackPanel>
+                                <TextBlock Text="&#x23EA; Restaurar" Foreground="White" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="Reverte todos os servi&#xE7;os para o padr&#xE3;o de f&#xE1;brica do Windows. Use se algo parar de funcionar." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <Button Content="Restaurar Tudo" Click="BtnRestoreServices_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- BARRA DE FERRAMENTAS -->
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Busca e Contador -->
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#20FFFFFF" CornerRadius="4" Height="30" Width="250" Margin="0,0,15,0">
+                                <Grid>
+                                    <TextBlock Text="&#x1F50D; Filtrar servi&#xE7;os..." Foreground="#888" VerticalAlignment="Center" Margin="10,0" IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtSearchService}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBox x:Name="TxtSearchService" Background="Transparent" BorderThickness="0" Foreground="White" VerticalAlignment="Center" Margin="5,0" TextChanged="TxtSearchService_TextChanged"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Contador de Servi&#xE7;os -->
+                            <TextBlock x:Name="TxtServiceCount" Text="Carregando..." Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
+                        </StackPanel>
+
+                        <!-- Toggle Perigosos -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Mostrar Servi&#xE7;os Perigosos (Sistema)" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="12"/>
+                            <CheckBox x:Name="ChkShowDangerous" Style="{StaticResource ToggleSwitchStyle}" Click="ChkShowDangerous_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- TABELA DE SERVI&#xC7;OS -->
+                    <Border Grid.Row="2" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
+                        <DataGrid x:Name="GridServices" SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <!-- Nome Amig&#xE1;vel -->
+                                <DataGridTextColumn Header="Nome" Binding="{Binding DisplayName}" Width="220" IsReadOnly="True" SortMemberPath="DisplayName">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- NOVA COLUNA: ID T&#xC9;CNICO -->
+                                <DataGridTextColumn Header="ID (T&#xE9;cnico)" Binding="{Binding Name}" Width="150" IsReadOnly="True" SortMemberPath="Name">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="#999"/>
+                                            <Setter Property="FontStyle" Value="Italic"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- Status (Cor) -->
+                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100" IsReadOnly="True" SortMemberPath="Status">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="Text" Value="Executando">
+                                                    <Setter Property="Foreground" Value="#4CAF50"/>
+                                                </Trigger>
+                                                <Trigger Property="Text" Value="Parado">
+                                                    <Setter Property="Foreground" Value="#888"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- Modo de In&#xED;cio -->
+                                <DataGridTextColumn Header="In&#xED;cio" Binding="{Binding StartMode}" Width="100" IsReadOnly="True" SortMemberPath="StartMode"/>
+
+                                <!-- N&#xED;vel de Seguran&#xE7;a (Badge Colorido) -->
+                                <DataGridTemplateColumn Header="Seguran&#xE7;a" Width="*" SortMemberPath="Safety">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="3" Padding="5,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Safety}" Value="Safe">
+                                                                <Setter Property="Background" Value="#204CAF50"/>
+                                                                <Setter Property="BorderBrush" Value="#4CAF50"/>
+                                                                <Setter Property="BorderThickness" Value="1"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Safety}" Value="Dangerous">
+                                                                <Setter Property="Background" Value="#20C42B1C"/>
+                                                                <Setter Property="BorderBrush" Value="#C42B1C"/>
+                                                                <Setter Property="BorderThickness" Value="1"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Safety}" Value="Caution">
+                                                                <Setter Property="Background" Value="#20FFD700"/>
+                                                                <Setter Property="BorderBrush" Value="#FFD700"/>
+                                                                <Setter Property="BorderThickness" Value="1"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Safety}" Value="Unknown">
+                                                                <Setter Property="Background" Value="#20FFD700"/>
+                                                                <Setter Property="BorderBrush" Value="#FFD700"/>
+                                                                <Setter Property="BorderThickness" Value="1"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding Safety}" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+
+                            <!-- Menu de Contexto (Bot&#xE3;o Direito) -->
+                            <DataGrid.ContextMenu>
+                                <ContextMenu Style="{StaticResource ServiceContextMenu}">
+                                    <MenuItem Header="Configurar: AUTOM&#xC1;TICO" Click="MenuSvcAuto_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <MenuItem Header="Configurar: MANUAL" Click="MenuSvcManual_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <MenuItem Header="Restaurar Padr&#xE3;o" Click="MenuSvcDefault_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
+                                    <Separator Background="#333"/>
+                                    <MenuItem Header="Configurar: DESATIVADO" Click="MenuSvcDisabled_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                        </DataGrid>
+                    </Border>
+                    <Button Grid.Row="3" Content="Recarregar" Click="BtnRefreshServices_Click" HorizontalAlignment="Right" Width="120" Margin="0,10,0,0" Style="{StaticResource SecondaryButtonStyle}"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ABA 3: TAREFAS AGENDADAS (NOVA) -->
+            <TabItem Header="Tarefas Agendadas">
+                <Grid Margin="0,15,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="Tarefas de Telemetria e Manuten&#xE7;&#xE3;o em Segundo Plano" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="1" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
+                        <DataGrid x:Name="GridTasks" SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Nome da Tarefa" Binding="{Binding Name}" Width="220" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="Descri&#xE7;&#xE3;o" Binding="{Binding Description}" Width="*" IsReadOnly="True"/>
+                                <DataGridTemplateColumn Header="Estado" Width="120" IsReadOnly="True">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock FontWeight="Bold" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsEnabled}" Value="True">
+                                                                <Setter Property="Text" Value="ATIVO"/>
+                                                                <Setter Property="Foreground" Value="#FF6F61"/>
+                                                                <!-- Vermelho se ativo (Telemetria) -->
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                                <Setter Property="Text" Value="OTIMIZADO"/>
+                                                                <Setter Property="Foreground" Value="#4CAF50"/>
+                                                                <!-- Verde se off -->
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                        <Button Content="Desativar Todas (Telemetria)" Click="BtnDisableAllTasks_Click" Style="{StaticResource GoldButtonStyle}" Margin="0,0,10,0"/>
+                        <Button Content="Alternar Estado" Click="BtnToggleTask_Click" Style="{StaticResource SecondaryButtonStyle}" Width="140"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- ABA 4: AN&#xC1;LISE DE BOOT (NOVA) -->
+            <TabItem Header="An&#xE1;lise de Boot">
+                <Grid Margin="0,15,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Resumo -->
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="20" Margin="0,0,0,20" BorderBrush="{StaticResource CardBorder}" BorderThickness="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="&#xDA;ltimo Tempo de Inicializa&#xE7;&#xE3;o:" Foreground="#AAA" FontSize="14"/>
+                                <TextBlock x:Name="TxtBootTime" Text="Calculando..." Foreground="White" FontSize="28" FontWeight="Bold" Margin="0,5,0,0"/>
+                                <TextBlock x:Name="TxtBootDate" Text="" Foreground="#666" FontSize="12"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Analisar Agora" Click="BtnAnalyzeBoot_Click" Height="40" Width="120" Style="{StaticResource SecondaryButtonStyle}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Detalhes -->
+                    <Grid Grid.Row="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Apps e Servi&#xE7;os que atrasaram o in&#xED;cio:" Foreground="{StaticResource AccentColor}" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                        <Border Grid.Row="1" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Background="#111">
+                            <DataGrid x:Name="GridBootItems" SelectionMode="Single">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Nome do Processo" Binding="{Binding ItemName}" Width="250" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Tipo" Binding="{Binding SubType}" Width="100" IsReadOnly="True"/>
+                                    <DataGridTemplateColumn Header="Atraso" Width="120" IsReadOnly="True">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding TimeTaken, StringFormat='{}{0:N0} ms'}" Foreground="#FF6F61" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Data" Binding="{Binding TimeOfEvent}" Width="*" IsReadOnly="True"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</Page>

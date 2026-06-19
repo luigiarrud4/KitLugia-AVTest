@@ -1,0 +1,1205 @@
+﻿{
+    "commands":  [
+                     {
+                         "className":  "ActivationManager",
+                         "methodName":  "GetWindowsActivationStatusAsync",
+                         "signature":  "GetWindowsActivationStatusAsync()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "ActivationManager",
+                         "methodName":  "IsInternetConnected",
+                         "signature":  "IsInternetConnected()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "BackgroundProcessManager",
+                         "methodName":  "DisableTelemetryTasks",
+                         "signature":  "DisableTelemetryTasks()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "BackgroundProcessManager",
+                         "methodName":  "GetAllServices",
+                         "signature":  "GetAllServices()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "BackgroundProcessManager",
+                         "methodName":  "GetScheduledTasksStatus",
+                         "signature":  "GetScheduledTasksStatus()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "BootOptimizerManager",
+                         "methodName":  "AnalyzeBootPerformance",
+                         "signature":  "AnalyzeBootPerformance()",
+                         "returnType":  "BootAnalysisResult"
+                     },
+                     {
+                         "className":  "BootOptimizerManager",
+                         "methodName":  "AnalyzeShutdownPerformance",
+                         "signature":  "AnalyzeShutdownPerformance()",
+                         "returnType":  "PerformanceEvent"
+                     },
+                     {
+                         "className":  "DisplayManager",
+                         "methodName":  "FixColorConflict",
+                         "signature":  "FixColorConflict()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "DisplayManager",
+                         "methodName":  "GetCurrentResolutionInfo",
+                         "signature":  "GetCurrentResolutionInfo()",
+                         "returnType":  "String"
+                     },
+                     {
+                         "className":  "DisplayManager",
+                         "methodName":  "OpenNvidiaControlPanel",
+                         "signature":  "OpenNvidiaControlPanel()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "DisplayManager",
+                         "methodName":  "OpenWindowsColorManagement",
+                         "signature":  "OpenWindowsColorManagement()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "DisplayManager",
+                         "methodName":  "ResetColorProfileToDefault",
+                         "signature":  "ResetColorProfileToDefault()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "DisplayManager",
+                         "methodName":  "RestartGraphicsDriver",
+                         "signature":  "RestartGraphicsDriver()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "DriverManager",
+                         "methodName":  "CheckForOutdatedDrivers",
+                         "signature":  "CheckForOutdatedDrivers()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "DriverManager",
+                         "methodName":  "OpenWindowsUpdateSettings",
+                         "signature":  "OpenWindowsUpdateSettings()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "GeneralRepairManager",
+                         "methodName":  "GetAllRepairs",
+                         "signature":  "GetAllRepairs()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "GitHubUpdater",
+                         "methodName":  "CheckForUpdatesAsync",
+                         "signature":  "CheckForUpdatesAsync()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "GitHubUpdater",
+                         "methodName":  "DownloadAndInstallUpdateAsync",
+                         "signature":  "DownloadAndInstallUpdateAsync()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "GitHubUpdater",
+                         "methodName":  "StartAutoUpdateCheck",
+                         "signature":  "StartAutoUpdateCheck()",
+                         "returnType":  "Task"
+                     },
+                     {
+                         "className":  "Guardian",
+                         "methodName":  "GetAllTweaksDefinition",
+                         "signature":  "GetAllTweaksDefinition()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "Guardian",
+                         "methodName":  "GetAppliedQuickToggles",
+                         "signature":  "GetAppliedQuickToggles()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "Guardian",
+                         "methodName":  "GetHarmfulTweaksWithStatus",
+                         "signature":  "GetHarmfulTweaksWithStatus()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "Guardian",
+                         "methodName":  "GetTweakStates",
+                         "signature":  "GetTweakStates()",
+                         "returnType":  "Dictionary`2"
+                     },
+                     {
+                         "className":  "Guardian",
+                         "methodName":  "ResetAllConfigurations",
+                         "signature":  "ResetAllConfigurations()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Guardian",
+                         "methodName":  "RestoreAllTweakStates",
+                         "signature":  "RestoreAllTweakStates()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "LocalInstallManager",
+                         "methodName":  "CheckFreeSpace",
+                         "signature":  "CheckFreeSpace()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "LocalInstallManager",
+                         "methodName":  "IsUEFI",
+                         "signature":  "IsUEFI()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "LocalInstallManager",
+                         "methodName":  "RemoveBootPartition",
+                         "signature":  "RemoveBootPartition()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "MemoryOptimizer",
+                         "methodName":  "GetMemoryStats",
+                         "signature":  "GetMemoryStats()",
+                         "returnType":  "MemoryInfo"
+                     },
+                     {
+                         "className":  "MemoryOptimizer",
+                         "methodName":  "Optimize",
+                         "signature":  "Optimize()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "OOShutUpManager",
+                         "methodName":  "GetPrivacyCategories",
+                         "signature":  "GetPrivacyCategories()",
+                         "returnType":  "Dictionary`2"
+                     },
+                     {
+                         "className":  "OOShutUpManager",
+                         "methodName":  "GetPrivacySettings",
+                         "signature":  "GetPrivacySettings()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "OOShutUpManager",
+                         "methodName":  "RestoreDefaults",
+                         "signature":  "RestoreDefaults()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "PartitionManager",
+                         "methodName":  "GetAllDisks",
+                         "signature":  "GetAllDisks()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "PartitionManager",
+                         "methodName":  "GetSessionLog",
+                         "signature":  "GetSessionLog()",
+                         "returnType":  "String"
+                     },
+                     {
+                         "className":  "SearchEngine",
+                         "methodName":  "Initialize",
+                         "signature":  "Initialize()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SmartVersionDetector",
+                         "methodName":  "ClearCache",
+                         "signature":  "ClearCache()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SmartVersionDetector",
+                         "methodName":  "GetAllVersionsAsync",
+                         "signature":  "GetAllVersionsAsync()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "StartupManager",
+                         "methodName":  "CheckAndFixStartupMethods",
+                         "signature":  "CheckAndFixStartupMethods()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "StartupManager",
+                         "methodName":  "GetElevatedStartupTaskFullNames",
+                         "signature":  "GetElevatedStartupTaskFullNames()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "StartupManager",
+                         "methodName":  "LaunchTurboApps",
+                         "signature":  "LaunchTurboApps()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "GetProcessorCount",
+                         "signature":  "GetProcessorCount()",
+                         "returnType":  "Int32"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "GetWindowsVersion",
+                         "signature":  "GetWindowsVersion()",
+                         "returnType":  "WindowsVersion"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "GetWindowsVersionString",
+                         "signature":  "GetWindowsVersionString()",
+                         "returnType":  "String"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "Is64Bit",
+                         "signature":  "Is64Bit()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "IsWindows10OrLater",
+                         "signature":  "IsWindows10OrLater()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "IsWindows11OrLater",
+                         "signature":  "IsWindows11OrLater()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "IsWindows81OrLater",
+                         "signature":  "IsWindows81OrLater()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemInfo",
+                         "methodName":  "IsWindowsServer",
+                         "signature":  "IsWindowsServer()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ApplyAutoCacheTweak",
+                         "signature":  "ApplyAutoCacheTweak()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ApplyAutomaticVramTweak",
+                         "signature":  "ApplyAutomaticVramTweak()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ApplyBingTweak",
+                         "signature":  "ApplyBingTweak()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ApplyExtremeVisuals",
+                         "signature":  "ApplyExtremeVisuals()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ApplyGamingOptimizations",
+                         "signature":  "ApplyGamingOptimizations()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ApplyLastClickTweak",
+                         "signature":  "ApplyLastClickTweak()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ApplyVerboseStatus",
+                         "signature":  "ApplyVerboseStatus()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "AutoTuneNetworkAdapter",
+                         "signature":  "AutoTuneNetworkAdapter()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "CheckGamingLatencyStatus",
+                         "signature":  "CheckGamingLatencyStatus()",
+                         "returnType":  "Dictionary`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ConfigureAppControl",
+                         "signature":  "ConfigureAppControl()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ConfigureLAPS",
+                         "signature":  "ConfigureLAPS()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "DisableCoreParking",
+                         "signature":  "DisableCoreParking()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "DisableGdiScaling",
+                         "signature":  "DisableGdiScaling()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "DisableNetworkThrottling",
+                         "signature":  "DisableNetworkThrottling()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "DisablePowerThrottling",
+                         "signature":  "DisablePowerThrottling()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "DisableTimerCoalescing",
+                         "signature":  "DisableTimerCoalescing()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "DisableUsbPowerSaving",
+                         "signature":  "DisableUsbPowerSaving()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "EnableGdiScaling",
+                         "signature":  "EnableGdiScaling()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "EnableGlobalTimerResolution",
+                         "signature":  "EnableGlobalTimerResolution()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "EnablePersonalDataEncryption",
+                         "signature":  "EnablePersonalDataEncryption()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "EnablePowerThrottling",
+                         "signature":  "EnablePowerThrottling()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "EnableProtectedPrintMode",
+                         "signature":  "EnableProtectedPrintMode()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "EnableSudo",
+                         "signature":  "EnableSudo()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "GetActiveNetworkAdapters",
+                         "signature":  "GetActiveNetworkAdapters()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "GetAllGpuNames",
+                         "signature":  "GetAllGpuNames()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "GetAllGpus",
+                         "signature":  "GetAllGpus()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "GetBloatwareAppsStatus",
+                         "signature":  "GetBloatwareAppsStatus()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "GetPrimaryGpu",
+                         "signature":  "GetPrimaryGpu()",
+                         "returnType":  "ManagementObject"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "GetWin32PrioritySeparation",
+                         "signature":  "GetWin32PrioritySeparation()",
+                         "returnType":  "Int32"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsBingDisabled",
+                         "signature":  "IsBingDisabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsBluetoothLEOptimized",
+                         "signature":  "IsBluetoothLEOptimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsExtremeVisualsApplied",
+                         "signature":  "IsExtremeVisualsApplied()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsFastShutdownEnabled",
+                         "signature":  "IsFastShutdownEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsFastStartupTweakEnabled",
+                         "signature":  "IsFastStartupTweakEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsGameDvrEnabled",
+                         "signature":  "IsGameDvrEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsGamingLatencyOptimized",
+                         "signature":  "IsGamingLatencyOptimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsGamingOptimized",
+                         "signature":  "IsGamingOptimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsGamingProfileAdvancedApplied",
+                         "signature":  "IsGamingProfileAdvancedApplied()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsGdiScalingDisabled",
+                         "signature":  "IsGdiScalingDisabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsHddFixEnabled",
+                         "signature":  "IsHddFixEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsInputLatencyOptimized",
+                         "signature":  "IsInputLatencyOptimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsLargeCacheEnabled",
+                         "signature":  "IsLargeCacheEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsLastClickInstalled",
+                         "signature":  "IsLastClickInstalled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsMemoryUsageEnabled",
+                         "signature":  "IsMemoryUsageEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsMpoDisabled",
+                         "signature":  "IsMpoDisabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsNetworkThrottlingDisabled",
+                         "signature":  "IsNetworkThrottlingDisabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsPageFileDisabled",
+                         "signature":  "IsPageFileDisabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsPersonalDataEncryptionEnabled",
+                         "signature":  "IsPersonalDataEncryptionEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsPowerThrottlingDisabled",
+                         "signature":  "IsPowerThrottlingDisabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsProtectedPrintModeEnabled",
+                         "signature":  "IsProtectedPrintModeEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsSegmentHeapEnabled",
+                         "signature":  "IsSegmentHeapEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsSHA3Supported",
+                         "signature":  "IsSHA3Supported()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsShutdownSpeedOptimized",
+                         "signature":  "IsShutdownSpeedOptimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsStartupDelayOptimized",
+                         "signature":  "IsStartupDelayOptimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsSudoEnabled",
+                         "signature":  "IsSudoEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsTcpIpLatencyTweakApplied",
+                         "signature":  "IsTcpIpLatencyTweakApplied()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsTimerResolutionOptimized",
+                         "signature":  "IsTimerResolutionOptimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsTurboBootEnabled",
+                         "signature":  "IsTurboBootEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsUsbPowerSavingDisabled",
+                         "signature":  "IsUsbPowerSavingDisabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsVbsEnabled",
+                         "signature":  "IsVbsEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsWiFi7Optimized",
+                         "signature":  "IsWiFi7Optimized()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "IsWin10ContextEnabled",
+                         "signature":  "IsWin10ContextEnabled()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeBluetoothLE",
+                         "signature":  "OptimizeBluetoothLE()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeEnergySaver",
+                         "signature":  "OptimizeEnergySaver()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeGamingLatency",
+                         "signature":  "OptimizeGamingLatency()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeGamingProfileAdvanced",
+                         "signature":  "OptimizeGamingProfileAdvanced()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeInputLatency",
+                         "signature":  "OptimizeInputLatency()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeInputQueue",
+                         "signature":  "OptimizeInputQueue()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeMemory",
+                         "signature":  "OptimizeMemory()",
+                         "returnType":  "ValueTuple`3"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeMenuDelay",
+                         "signature":  "OptimizeMenuDelay()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeNetworkForGaming",
+                         "signature":  "OptimizeNetworkForGaming()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeRustKernel",
+                         "signature":  "OptimizeRustKernel()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeShutdownSpeed",
+                         "signature":  "OptimizeShutdownSpeed()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeStartupDelay",
+                         "signature":  "OptimizeStartupDelay()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeSystemResponsiveness",
+                         "signature":  "OptimizeSystemResponsiveness()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "OptimizeWiFi7",
+                         "signature":  "OptimizeWiFi7()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "RepairNetworkIssues",
+                         "signature":  "RepairNetworkIssues()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ResetEthernetSettings",
+                         "signature":  "ResetEthernetSettings()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "RevertGamingLatency",
+                         "signature":  "RevertGamingLatency()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "RevertGamingLatencyProfile",
+                         "signature":  "RevertGamingLatencyProfile()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "RevertInputLatency",
+                         "signature":  "RevertInputLatency()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "RevertUsbPowerSaving",
+                         "signature":  "RevertUsbPowerSaving()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "RevertVramTweaks",
+                         "signature":  "RevertVramTweaks()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "RunNetworkDiagnostics",
+                         "signature":  "RunNetworkDiagnostics()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "SetSystemResponsivenessGaming",
+                         "signature":  "SetSystemResponsivenessGaming()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ToggleFastShutdown",
+                         "signature":  "ToggleFastShutdown()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ToggleFastStartupTweak",
+                         "signature":  "ToggleFastStartupTweak()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ToggleMemoryUsage",
+                         "signature":  "ToggleMemoryUsage()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ToggleMpo",
+                         "signature":  "ToggleMpo()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ToggleTcpIpLatencyTweak",
+                         "signature":  "ToggleTcpIpLatencyTweak()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ToggleTimerResolution",
+                         "signature":  "ToggleTimerResolution()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemTweaks",
+                         "methodName":  "ToggleVbs",
+                         "signature":  "ToggleVbs()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemUtils",
+                         "methodName":  "CreateRestorePoint",
+                         "signature":  "CreateRestorePoint()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "SystemUtils",
+                         "methodName":  "GetRestorePoints",
+                         "signature":  "GetRestorePoints()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "SystemUtils",
+                         "methodName":  "GetSystemUptime",
+                         "signature":  "GetSystemUptime()",
+                         "returnType":  "TimeSpan"
+                     },
+                     {
+                         "className":  "SystemUtils",
+                         "methodName":  "GetTotalSystemRamGB",
+                         "signature":  "GetTotalSystemRamGB()",
+                         "returnType":  "Double"
+                     },
+                     {
+                         "className":  "SystemUtils",
+                         "methodName":  "IsAdmin",
+                         "signature":  "IsAdmin()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "SystemUtils",
+                         "methodName":  "OpenSystemRestoreWizard",
+                         "signature":  "OpenSystemRestoreWizard()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "SystemUtils",
+                         "methodName":  "RunPreflightCheck",
+                         "signature":  "RunPreflightCheck()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "ToggleManager",
+                         "methodName":  "ClearAllSnapshots",
+                         "signature":  "ClearAllSnapshots()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "ToggleManager",
+                         "methodName":  "GetQuickToggleStates",
+                         "signature":  "GetQuickToggleStates()",
+                         "returnType":  "Dictionary`2"
+                     },
+                     {
+                         "className":  "ToggleManager",
+                         "methodName":  "RestoreAllToggles",
+                         "signature":  "RestoreAllToggles()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "ToggleManager",
+                         "methodName":  "SaveAllToggles",
+                         "signature":  "SaveAllToggles()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ApplyLatencyCongestionControl",
+                         "signature":  "ApplyLatencyCongestionControl()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ApplyPrivacyCombo",
+                         "signature":  "ApplyPrivacyCombo()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "AreExtensionsVisible",
+                         "signature":  "AreExtensionsVisible()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "AreHiddenFilesVisible",
+                         "signature":  "AreHiddenFilesVisible()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "CleanShaderCaches",
+                         "signature":  "CleanShaderCaches()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "CleanTemporaryFiles",
+                         "signature":  "CleanTemporaryFiles()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "CleanWindowsUpdateCache",
+                         "signature":  "CleanWindowsUpdateCache()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ClearPrintSpooler",
+                         "signature":  "ClearPrintSpooler()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "CompactOS",
+                         "signature":  "CompactOS()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "EnableDriverVerifier",
+                         "signature":  "EnableDriverVerifier()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "EnableGroupPolicyEditor",
+                         "signature":  "EnableGroupPolicyEditor()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "FixDiskFullUsage",
+                         "signature":  "FixDiskFullUsage()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "FlushDnsCache",
+                         "signature":  "FlushDnsCache()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetActiveDnsInfo",
+                         "signature":  "GetActiveDnsInfo()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetActivePowerPlan",
+                         "signature":  "GetActivePowerPlan()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetAllPowerPlans",
+                         "signature":  "GetAllPowerPlans()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetDriverVerifierStatus",
+                         "signature":  "GetDriverVerifierStatus()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetInstalledPrograms",
+                         "signature":  "GetInstalledPrograms()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetKnownBloatwareApps",
+                         "signature":  "GetKnownBloatwareApps()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetMsiStatus",
+                         "signature":  "GetMsiStatus()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "GetVbsStatus",
+                         "signature":  "GetVbsStatus()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ImportAndActivateBitsumPlan",
+                         "signature":  "ImportAndActivateBitsumPlan()",
+                         "returnType":  "ValueTuple`3"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "IsGPEditAvailable",
+                         "signature":  "IsGPEditAvailable()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "OpenGPEdit",
+                         "signature":  "OpenGPEdit()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ReinstallDefaultApps",
+                         "signature":  "ReinstallDefaultApps()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "RepairGamingServices",
+                         "signature":  "RepairGamingServices()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "RepairSystemComponentsDISM",
+                         "signature":  "RepairSystemComponentsDISM()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "RepairSystemComponentsSFC",
+                         "signature":  "RepairSystemComponentsSFC()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ResetDriverVerifier",
+                         "signature":  "ResetDriverVerifier()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ResetNetworkStack",
+                         "signature":  "ResetNetworkStack()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ResetStoreCache",
+                         "signature":  "ResetStoreCache()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ResetWindowsUpdateComponents",
+                         "signature":  "ResetWindowsUpdateComponents()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "RevertAllPolicies",
+                         "signature":  "RevertAllPolicies()",
+                         "returnType":  "Void"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "RunFullCleanup",
+                         "signature":  "RunFullCleanup()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ToggleCmdContext",
+                         "signature":  "ToggleCmdContext()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ToggleFileExtensions",
+                         "signature":  "ToggleFileExtensions()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ToggleGodMode",
+                         "signature":  "ToggleGodMode()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ToggleHiddenFiles",
+                         "signature":  "ToggleHiddenFiles()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ToggleTakeOwnershipContext",
+                         "signature":  "ToggleTakeOwnershipContext()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "ToggleVbs",
+                         "signature":  "ToggleVbs()",
+                         "returnType":  "ValueTuple`2"
+                     },
+                     {
+                         "className":  "Toolbox",
+                         "methodName":  "UnlockAndActivateUltimatePerformance",
+                         "signature":  "UnlockAndActivateUltimatePerformance()",
+                         "returnType":  "ValueTuple`3"
+                     },
+                     {
+                         "className":  "WinbootManager",
+                         "methodName":  "GetAutomationProfiles",
+                         "signature":  "GetAutomationProfiles()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "WinbootManager",
+                         "methodName":  "GetCurrentEditionId",
+                         "signature":  "GetCurrentEditionId()",
+                         "returnType":  "String"
+                     },
+                     {
+                         "className":  "WinbootManager",
+                         "methodName":  "GetRemovablePartitions",
+                         "signature":  "GetRemovablePartitions()",
+                         "returnType":  "List`1"
+                     },
+                     {
+                         "className":  "WinbootManager",
+                         "methodName":  "GetSessionLog",
+                         "signature":  "GetSessionLog()",
+                         "returnType":  "String"
+                     },
+                     {
+                         "className":  "WinbootManager",
+                         "methodName":  "IsEfiMode",
+                         "signature":  "IsEfiMode()",
+                         "returnType":  "Boolean"
+                     },
+                     {
+                         "className":  "WinbootManager",
+                         "methodName":  "ScanBcdEntriesAsync",
+                         "signature":  "ScanBcdEntriesAsync()",
+                         "returnType":  "Task`1"
+                     },
+                     {
+                         "className":  "WinbootManager",
+                         "methodName":  "ScanWinbootForCleanup",
+                         "signature":  "ScanWinbootForCleanup()",
+                         "returnType":  "Task`1"
+                     }
+                 ],
+    "totalCommands":  200
+}

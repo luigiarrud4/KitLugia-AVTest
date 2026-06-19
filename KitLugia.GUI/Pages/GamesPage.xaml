@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.GamesPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Jogos"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,30,30,50" MaxWidth="900">
+
+            <TextBlock Text="Central de Jogos" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Ferramentas para aumentar FPS e estabilidade." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- CARD PRINCIPAL: RAM BOOSTER -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,25" Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="&#x26A1; RAM Booster (Otimizador)" FontSize="20" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
+                        <TextBlock Text="Limpa processos em segundo plano e 'standby list' para liberar mem&#xF3;ria imediata para seu jogo." 
+                                   Foreground="#CCCCCC" TextWrapping="Wrap" Margin="0,0,20,0"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
+                            <TextBlock Text="Mem&#xF3;ria Total: " Foreground="#888"/>
+                            <TextBlock x:Name="TxtTotalRam" Text="Calculando..." Foreground="White" FontWeight="Bold"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Button Grid.Column="1" Width="140" Height="45" Content="OTIMIZAR AGORA" 
+                            Background="{StaticResource AccentColor}" Foreground="Black" FontWeight="ExtraBold"
+                            FontSize="12" Cursor="Hand" Click="BtnBoostRam_Click" Style="{StaticResource GoldButtonStyle}"/>
+                </Grid>
+            </Border>
+
+            <!-- TWEAKS DE JOGO -->
+            <TextBlock Text="Ajustes do Windows (Registry)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Coluna 1 -->
+                <StackPanel Grid.Column="0">
+                    <Border Background="#222" CornerRadius="8" Padding="15" Margin="0,0,0,10" BorderBrush="#333" BorderThickness="1">
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Modo Jogo (Registro)" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Define Prioridade GPU e Afinidade" FontSize="11" Foreground="#888"/>
+                            </StackPanel>
+                            <CheckBox x:Name="ChkGameMode" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkGameMode_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Adicione mais bot&#xF5;es aqui se necess&#xE1;rio -->
+                </StackPanel>
+
+                <!-- Coluna 2 -->
+                <StackPanel Grid.Column="2">
+                    <Border Background="#222" CornerRadius="8" Padding="15" Margin="0,0,0,10" BorderBrush="#333" BorderThickness="1">
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Xbox Game Bar (DVR)" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Grava&#xE7;&#xE3;o em 2&#xBA; plano (Causa Input Lag)" FontSize="11" Foreground="#888"/>
+                            </StackPanel>
+                            <!-- L&#xF3;gica invertida no Checkbox para facilitar UX: 'Marcado' = 'Desligado/Otimizado' -->
+                            <CheckBox x:Name="ChkDvr" Style="{StaticResource ToggleSwitchStyle}" HorizontalAlignment="Right" Click="ChkDvr_Click" Content=""/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- EXTRA TOOLS -->
+            <TextBlock Text="Extras" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,20,0,15"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F9F9;"
+                    Content="Limpar Cache de Shaders (DirectX/GL)"
+                    ToolTip="Corrige travamentos e recarrega texturas (NVIDIA/AMD)."
+                    Click="BtnClearShaders_Click"/>
+
+            <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F50B;"
+                    Content="Plano de Energia: Bitsum Highest Performance"
+                    ToolTip="Ativa o plano Bitsum Highest Performance (m&#xE1;ximo desempenho)."
+                    Click="BtnHighPerf_Click"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,150 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.ScreenPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Tela e Cores"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <Page.Resources>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,30,30,50" MaxWidth="900">
+
+            <TextBlock Text="Calibragem e Tela" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Gerencie perfis de cores e corrija resets causados por updates de driver." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- PAINEL DE INFORMA&#xC7;&#xD5;ES -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="&#x1F5A5;&#xFE0F;" FontSize="40" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Monitor Principal" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock x:Name="TxtResInfo" Text="Resolu&#xE7;&#xE3;o: Detectando..." Foreground="#CCC" Margin="0,5,0,0"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="2" Content="Painel NVIDIA" Click="BtnNvidia_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="35"/>
+                </Grid>
+            </Border>
+
+            <!-- CONTROLE DE PERFIL DE COR -->
+            <TextBlock Text="Backup de Cores (Gamma Ramp)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+            <Border Background="#1A1A1A" CornerRadius="8" Padding="20" BorderBrush="#333" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Isso salva o brilho, contraste e curvas de cor atuais. Se as cores ficarem 'lavadas', restaure. Se ficarem 'estouradas', resete." 
+                               Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,15"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Bot&#xE3;o Salvar -->
+                        <Button Grid.Column="0" Height="50" Click="BtnSaveProfile_Click" Cursor="Hand" ToolTip="Salva o estado atual">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="bdr" Background="#25FFFFFF" CornerRadius="6" BorderBrush="#555" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="&#x1F4BE;" FontSize="20" Margin="0,0,10,0"/>
+                                            <StackPanel>
+                                                <TextBlock Text="SALVAR" FontWeight="Bold" Foreground="White"/>
+                                                <TextBlock Text="Backup atual" FontSize="10" Foreground="#AAA"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bdr" Property="Background" Value="{StaticResource AccentColor}"/>
+                                            <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- Bot&#xE3;o Restaurar -->
+                        <Button Grid.Column="2" Height="50" Click="BtnLoadProfile_Click" Cursor="Hand" ToolTip="Aplica o perfil salvo">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="bdr" Background="{StaticResource AccentColor}" CornerRadius="6">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="&#x21BA;" FontSize="20" Margin="0,0,10,0" Foreground="Black" FontWeight="Bold"/>
+                                            <StackPanel>
+                                                <TextBlock Text="RESTAURAR" FontWeight="Bold" Foreground="Black"/>
+                                                <TextBlock Text="Aplicar backup" FontSize="10" Foreground="#333"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bdr" Property="Background" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- Bot&#xE3;o Resetar -->
+                        <Button Grid.Column="4" Height="50" Click="BtnResetProfile_Click" Cursor="Hand" ToolTip="Limpa qualquer altera&#xE7;&#xE3;o de cor">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="bdr" Background="#33C42B1C" CornerRadius="6" BorderBrush="#C42B1C" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="&#x1F5D1;&#xFE0F;" FontSize="20" Margin="0,0,10,0"/>
+                                            <StackPanel>
+                                                <TextBlock Text="RESETAR" FontWeight="Bold" Foreground="White"/>
+                                                <TextBlock Text="Padr&#xE3;o Windows" FontSize="10" Foreground="#FFCCCC"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bdr" Property="Background" Value="#C42B1C"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </Grid>
+
+                    <TextBlock x:Name="TxtProfileStatus" Text="Nenhum perfil carregado." HorizontalAlignment="Center" Margin="0,15,0,0" Foreground="{StaticResource TextMuted}" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+
+            <!-- FERRAMENTAS AVAN&#xC7;ADAS -->
+            <TextBlock Text="Reparo Avan&#xE7;ado" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+
+            <WrapPanel>
+                <Button Content="Corrigir Conflito de Cor (NVIDIA)" 
+                        ToolTip="Tenta destravar cores estouradas reiniciando servi&#xE7;os de calibra&#xE7;&#xE3;o."
+                        Click="BtnFixColorConflict_Click" 
+                        Width="250" Height="45" Margin="0,0,15,15"
+                        Style="{StaticResource SecondaryButtonStyle}" Tag="&#x1F527;"/>
+
+                <Button Content="Reiniciar Driver de V&#xED;deo" 
+                        ToolTip="Simula o atalho Win+Ctrl+Shift+B via software. A tela piscar&#xE1;."
+                        Click="BtnRestartDriver_Click" 
+                        Width="250" Height="45" Margin="0,0,15,15"
+                        Style="{StaticResource SecondaryButtonStyle}" Tag="&#x26A1;"/>
+
+                <Button Content="Gerenciamento de Cores (Windows)" 
+                        Click="BtnWinColor_Click" 
+                        Width="250" Height="45" Margin="0,0,15,15"
+                        Style="{StaticResource SecondaryButtonStyle}" Tag="&#x1F3A8;"/>
+            </WrapPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

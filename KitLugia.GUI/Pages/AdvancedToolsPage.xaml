@@ -1,0 +1,123 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.AdvancedToolsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Ferramentas Avan&#xE7;adas"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30" MaxWidth="1100">
+            <!-- Header -->
+            <StackPanel Margin="0,0,0,40" HorizontalAlignment="Center">
+                <TextBlock Text="FERRAMENTAS AVAN&#xC7;ADAS" FontSize="36" FontWeight="Bold" 
+                          Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#FFD700" BlurRadius="15" ShadowDepth="0" Opacity="0.5"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock Text="Winhance + Winboot: Suite Completa de Instala&#xE7;&#xE3;o e Customiza&#xE7;&#xE3;o" 
+                          Foreground="{StaticResource TextMuted}" FontSize="16" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+            </StackPanel>
+
+            <!-- Grid Principal -->
+            <Grid Margin="0,0,0,40">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- M&#xF3;dulo 1: ISO Editor (Winhance) -->
+                <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="12" Padding="25" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <TextBlock Text="&#x1F4BF;" FontSize="28" VerticalAlignment="Center"/>
+                            <TextBlock Text="WINHANCE" FontSize="22" FontWeight="Bold" 
+                                      Foreground="{StaticResource AccentColor}" Margin="10,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock Text="Editor de ISO Profissional" FontSize="16" FontWeight="SemiBold" 
+                                  Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Monte ISOs, debloat, features e redu&#xE7;&#xE3;o de tamanho." 
+                                  Foreground="{StaticResource TextMuted}" FontSize="14" TextWrapping="Wrap" Margin="0,0,0,20" Height="40"/>
+                        
+                        <Button x:Name="BtnOpenIsoEditor" Content="&#x1F4C0; ABRIR EDITOR DE ISO"
+                                Click="BtnOpenIsoEditor_Click" Style="{StaticResource GoldButtonStyle}" Height="45"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- M&#xF3;dulo 2: Gerenciador de Parti&#xE7;&#xF5;es (Full Page) -->
+                <Border Grid.Column="2" Background="{StaticResource CardBackground}" BorderBrush="#4FC3F7" BorderThickness="1" CornerRadius="12" Padding="25" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <TextBlock Text="&#x1F4BD;" FontSize="28" VerticalAlignment="Center"/>
+                            <TextBlock Text="PARTI&#xC7;&#xD5;ES" FontSize="22" FontWeight="Bold" 
+                                      Foreground="#4FC3F7" Margin="10,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock Text="Gerenciador de Discos Avan&#xE7;ado" FontSize="16" FontWeight="SemiBold" 
+                                  Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Gerencie seus discos e parti&#xE7;&#xF5;es de forma visual e profissional, substituindo o gerenciador padr&#xE3;o do Windows." 
+                                  Foreground="{StaticResource TextMuted}" FontSize="14" TextWrapping="Wrap" Margin="0,0,0,20" Height="60"/>
+                        
+                        <Button x:Name="BtnOpenPartitions" Content="&#x1F680; ABRIR GERENCIADOR" 
+                                Click="BtnOpenPartitions_Click" Style="{StaticResource GoldButtonStyle}" 
+                                Background="#4FC3F7" BorderBrush="#4FC3F7" Height="45"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- LINHA 2: WINBOOT (NO-USB) -->
+            <Border Background="#1A0505" BorderBrush="#FF4444" BorderThickness="1" CornerRadius="12" Padding="25" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="&#x1F680;" FontSize="32" VerticalAlignment="Center"/>
+                        <TextBlock Text="WINBOOT (NO-USB)" FontSize="26" FontWeight="Bold" 
+                                  Foreground="#FF4444" Margin="15,0,0,0"/>
+                        <TextBlock Text="Instala&#xE7;&#xE3;o Local" FontSize="20" FontWeight="SemiBold" 
+                                  Foreground="#FFA500" Margin="10,6,0,0"/>
+                    </StackPanel>
+                    
+                    <TextBlock Text="Crie uma parti&#xE7;&#xE3;o de boot no disco atual para formatar o PC sem m&#xED;dia externa (Pen Drive)." 
+                              Foreground="{StaticResource TextSecondary}" FontSize="14" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                    
+                    <StackPanel Margin="0,0,0,15">
+                        <TextBlock Text="&#x2705; Instala&#xE7;&#xE3;o Independente de M&#xED;dia (Sem Pen Drive)" Foreground="#88FF88" FontSize="11" Margin="0,0,0,2"/>
+                        <TextBlock Text="&#x2705; Suporte a Bypass Autom&#xE1;tico de TPM 2.0 e Secure Boot" Foreground="#88FF88" FontSize="11" Margin="0,0,0,2"/>
+                        <TextBlock Text="&#x2705; Reconhecimento Inteligente de Discos F&#xED;sicos" Foreground="#88FF88" FontSize="11" Margin="0,0,0,2"/>
+                        <TextBlock Text="&#x2705; Requer apenas 8GB de espa&#xE7;o n&#xE3;o alocado" Foreground="#88FF88" FontSize="11"/>
+                    </StackPanel>
+
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <!-- Status -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="STATUS DA ISO" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,5" FontWeight="Bold"/>
+                            <Border Background="#222" BorderBrush="#444" BorderThickness="1" CornerRadius="4" Padding="10">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="TxtIsoStatus" Text="&#x26A0;&#xFE0F; Nenhuma ISO selecionada" Foreground="#FFA500" FontWeight="Bold" FontSize="13"/>
+                                    <TextBlock x:Name="TxtDriveInfo" Text="" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="10,0,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        
+                        <!-- Bot&#xE3;o -->
+                        <StackPanel Grid.Column="2">
+                            <Button x:Name="BtnWinboot" Content="&#x1F525; ABRIR WINBOOT GUI" 
+                                    Click="BtnWinboot_Click" Style="{StaticResource GoldButtonStyle}" 
+                                    Background="#FF4444" BorderBrush="#FF4444" Height="45"/>
+
+                            <TextBlock Text="&#x26A0;&#xFE0F; REQUER BACKUP - ALTO RISCO" Foreground="#FF6666" FontSize="10" 
+                                      HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

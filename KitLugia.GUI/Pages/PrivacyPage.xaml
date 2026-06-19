@@ -1,0 +1,252 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.PrivacyPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      mc:Ignorable="d" 
+      d:DesignHeight="700" d:DesignWidth="900"
+      Title="Privacy Manager"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,30,30,50" MaxWidth="1000">
+
+            <!-- Header -->
+            <StackPanel Margin="0,0,0,30">
+                <TextBlock Text="Gerenciador de Privacidade" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10"/>
+                <TextBlock Text="Controle a telemetria, rastreamento e dados enviados para a Microsoft." Foreground="{StaticResource TextSecondary}"/>
+            </StackPanel>
+
+            <!-- Status Geral -->
+            <Border Style="{StaticResource CardStyle}" Padding="20" Margin="0,0,0,25">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="N&#xCD;VEL DE PROTE&#xC7;&#xC3;O ATUAL" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock x:Name="TxtPrivacyScore" Text="Carregando..." FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                            <TextBlock Text="Protegidos: " Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock x:Name="TxtSecureCount" Text="0" Foreground="#4CAF50" FontWeight="Bold"/>
+                            <TextBlock Text="  |  Vulner&#xE1;veis: " Foreground="{StaticResource TextSecondary}" Margin="10,0,0,0"/>
+                            <TextBlock x:Name="TxtVulnerableCount" Text="0" Foreground="#C42B1C" FontWeight="Bold"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Button Grid.Column="1" x:Name="BtnRefreshStatus" Content="&#x27F3; Atualizar" Click="BtnRefreshStatus_Click" 
+                            Style="{StaticResource SecondaryButtonStyle}" Width="120"/>
+                </Grid>
+            </Border>
+
+            <!-- A&#xE7;&#xF5;es R&#xE1;pidas (Presets) -->
+            <TextBlock Text="Presets Recomendados" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15"/>
+            
+            <Grid Margin="0,0,0,25">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Recomendado -->
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#4CAF50">
+                    <StackPanel>
+                        <TextBlock Text="&#x2705; RECOMENDADO" FontWeight="Bold" Foreground="#4CAF50" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Seguro. N&#xE3;o quebra funcionalidades do sistema." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
+                        <Button Content="Aplicar" Click="BtnApplyRecommended_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Limitado -->
+                <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#FFA500">
+                    <StackPanel>
+                        <TextBlock Text="&#x26A0;&#xFE0F; LIMITADO" FontWeight="Bold" Foreground="#FFA500" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Privacidade moderada. Pode desativar Cortana/Dicas." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
+                        <Button Content="Aplicar" Click="BtnApplyLimited_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- M&#xE1;ximo -->
+                <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#C42B1C">
+                    <StackPanel>
+                        <TextBlock Text="&#x26D4; M&#xC1;XIMO" FontWeight="Bold" Foreground="#C42B1C" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Extremo. Pode impedir updates e quebrar a Loja." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
+                        <Button Content="Aplicar" Click="BtnApplyNotRecommended_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Lista Detalhada -->
+            <StackPanel Margin="0,0,0,15">
+                <!-- T&#xED;tulo -->
+                <TextBlock Text="Configura&#xE7;&#xF5;es Detalhadas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10"/>
+
+                <!-- Bot&#xF5;es de A&#xE7;&#xE3;o -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Restaurar Padr&#xE3;o Windows" Click="BtnRestoreDefault_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="180"/>
+                    <Button Content="Salvar Configura&#xE7;&#xE3;o" Click="BtnSaveUserConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="150"/>
+                    <Button Content="Restaurar Configura&#xE7;&#xE3;o" Click="BtnRestoreUserConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="160"/>
+                    <Button x:Name="BtnExpandAll" Content="Expandir Tudo" Click="BtnExpandAll_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120"/>
+                </StackPanel>
+
+                <!-- Pesquisa e Filtros -->
+                <Grid Margin="0,5,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Caixa de Pesquisa -->
+                    <TextBox Grid.Column="0"
+                             x:Name="TxtSearch"
+                             Text="&#x1F50D; Pesquisar configura&#xE7;&#xF5;es..."
+                             Foreground="{StaticResource TextMuted}"
+                             Background="{StaticResource CardBackground}"
+                             BorderBrush="{StaticResource CardBorder}"
+                             BorderThickness="1"
+                             Padding="12,8"
+                             FontSize="13"
+                             GotFocus="TxtSearch_GotFocus"
+                             LostFocus="TxtSearch_LostFocus"
+                             TextChanged="TxtSearch_TextChanged"
+                             Margin="0,0,10,0"/>
+
+                    <!-- Bot&#xE3;o de Menu de Filtro (3 tra&#xE7;os) -->
+                    <Button x:Name="BtnFilterMenu" Grid.Column="1" Click="BtnFilterMenu_Click" Style="{StaticResource SecondaryButtonStyle}" Width="60" ToolTip="Filtrar por n&#xED;vel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#x2630;" FontSize="16" Margin="0,0,5,0"/>
+                            <Ellipse x:Name="FilterIndicator" Width="10" Height="10" Fill="#FFD700" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button.ContextMenu>
+                            <ContextMenu x:Name="FilterContextMenu" Style="{StaticResource ServiceContextMenu}">
+                                <MenuItem Header="Todos" Click="MenuItemFilter_Click" Tag="All" Style="{StaticResource ServiceMenuItem}">
+                                    <MenuItem.Icon>
+                                        <Ellipse Width="12" Height="12" Fill="#FFD700"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Recomendado" Click="MenuItemFilter_Click" Tag="Recommended" Style="{StaticResource ServiceMenuItem}" Foreground="#4CAF50">
+                                    <MenuItem.Icon>
+                                        <Ellipse Width="12" Height="12" Fill="#4CAF50"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Limitado" Click="MenuItemFilter_Click" Tag="Limited" Style="{StaticResource ServiceMenuItem}" Foreground="#FFA500">
+                                    <MenuItem.Icon>
+                                        <Ellipse Width="12" Height="12" Fill="#FFA500"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="N&#xE3;o Recomendado" Click="MenuItemFilter_Click" Tag="NotRecommended" Style="{StaticResource ServiceMenuItem}" Foreground="#C42B1C">
+                                    <MenuItem.Icon>
+                                        <Ellipse Width="12" Height="12" Fill="#C42B1C"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </Grid>
+
+                <!-- Legenda dos Indicadores -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                    <Ellipse Width="8" Height="8" Fill="#4CAF50" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Recomendado" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,15,0" VerticalAlignment="Center"/>
+
+                    <Ellipse Width="8" Height="8" Fill="#FFA500" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Limitado" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,15,0" VerticalAlignment="Center"/>
+
+                    <Ellipse Width="8" Height="8" Fill="#C42B1C" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="N&#xE3;o Recomendado" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Lista Din&#xE2;mica de Categorias (Data Binding) -->
+            <ItemsControl x:Name="CategoriesList" ItemsSource="{Binding Categories}" Margin="0,0,0,20">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15" Padding="15">
+                            <StackPanel>
+                                <!-- Cabe&#xE7;alho da Categoria -->
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="Bold"
+                                                   Foreground="{DynamicResource AccentColor}"
+                                               FontSize="16"
+                                               VerticalAlignment="Center"/>
+
+                                    <!-- Checkbox Custom para Ativar Todos da Categoria -->
+                                    <CheckBox Grid.Column="1"
+                                              x:Name="CategoryCheckBox"
+                                              IsChecked="{Binding AllEnabled, Mode=TwoWay}"
+                                              Style="{StaticResource CategoryCheckBoxStyle}"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              Margin="10,0,0,0"
+                                              Checked="CategoryCheckBox_Checked"
+                                              Unchecked="CategoryCheckBox_Unchecked"
+                                              Tag="{Binding}"/>
+                                </Grid>
+
+                                <!-- Lista de Configura&#xE7;&#xF5;es -->
+                                <ItemsControl ItemsSource="{Binding Settings}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,5,0,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Indicador de N&#xED;vel de Privacidade -->
+                                                <Ellipse Grid.Column="0"
+                                                         Width="10" Height="10"
+                                                         Margin="0,0,12,0"
+                                                         VerticalAlignment="Center">
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
+                                                            <Setter Property="Fill" Value="#4CAF50"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Level}" Value="Limited">
+                                                                    <Setter Property="Fill" Value="#FFA500"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Level}" Value="NotRecommended">
+                                                                    <Setter Property="Fill" Value="#C42B1C"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Ellipse.Style>
+                                                </Ellipse>
+
+                                                <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="White" FontSize="14"/>
+                                                    <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextMuted}" FontSize="12" TextWrapping="Wrap"/>
+                                                </StackPanel>
+
+                                                <CheckBox Grid.Column="2"
+                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                          Style="{StaticResource ToggleSwitchStyle}"
+                                                          HorizontalAlignment="Right"
+                                                          VerticalAlignment="Center"
+                                                          Command="{Binding ToggleCommand}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

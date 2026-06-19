@@ -1,0 +1,174 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.UpdatePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      d:DesignHeight="600" d:DesignWidth="900"
+      Title="Atualiza&#xE7;&#xE3;o KitLugia"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial"
+      Background="{StaticResource WindowBackground}">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="&#x1F504; Atualiza&#xE7;&#xF5;es" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+            <TextBlock Text="Verifique e instale as vers&#xF5;es mais recentes do KitLugia" 
+                       FontSize="14" Foreground="{StaticResource TextMuted}" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- Main Content -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" Style="{StaticResource CardStyle}">
+            <Grid Margin="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- COLUNA ESQUERDA: VERS&#xC3;O ATUAL -->
+                <Border Grid.Column="0" Background="#2B2B2B" CornerRadius="8" Margin="0,0,10,0" Padding="20" BorderBrush="#444444" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="&#x1F4E6; VERS&#xC3;O ATUAL" FontSize="16" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,15"/>
+                        
+                        <Border Background="#1E88E5" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock x:Name="CurrentVersionText" Text="v2.5.0" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="&#x1F550; INFORMA&#xC7;&#xD5;ES DE VERS&#xC3;O" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,15,0,10"/>
+                        <StackPanel x:Name="CurrentVersionInfoPanel" Margin="0,0,0,15">
+                            <TextBlock Text="&#x2022; Compilado: --/--/---- --:--" FontSize="12" Foreground="#E0E0E0" Margin="0,2" x:Name="CurrentBuildDateText"/>
+                            <TextBlock Text="&#x2022; Agora: --/--/---- --:--" FontSize="12" Foreground="#E0E0E0" Margin="0,2" x:Name="CurrentNowDateText"/>
+                            <TextBlock Text="&#x2022; Timezone: (UTC&#xB1;00:00) Local" FontSize="12" Foreground="#E0E0E0" Margin="0,2" x:Name="CurrentTimezoneText"/>
+                        </StackPanel>
+
+                        <TextBlock Text="&#x1F50D; INFORMA&#xC7;&#xD5;ES T&#xC9;CNICAS" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,10"/>
+                        <StackPanel x:Name="CurrentInfoPanel">
+                            <TextBlock Text="&#x2022; Build: Release" FontSize="12" Foreground="#E0E0E0" Margin="0,2"/>
+                            <TextBlock Text="&#x2022; Runtime: .NET 8.0" FontSize="12" Foreground="#E0E0E0" Margin="0,2"/>
+                            <TextBlock Text="&#x2022; Plataforma: Windows x64" FontSize="12" Foreground="#E0E0E0" Margin="0,2"/>
+                            <TextBlock Text="&#x2022; Execut&#xE1;vel: KitLugia.GUI.exe" FontSize="12" Foreground="#E0E0E0" Margin="0,2"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- COLUNDA DIREITA: VERS&#xC3;O MAIS RECENTE -->
+                <Border Grid.Column="1" Background="#2B2B2B" CornerRadius="8" Margin="10,0,0,0" Padding="20" BorderBrush="#444444" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="&#x1F680; VERS&#xC3;O MAIS RECENTE" FontSize="16" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,15"/>
+                        
+                        <Border Background="#43A047" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock x:Name="LatestVersionText" Text="Verificando..." FontSize="24" FontWeight="Bold" Foreground="#FFFFFF"/>
+                                <TextBlock x:Name="LatestDateText" Text="--/--/---- --:--" FontSize="12" Foreground="#E8F5E9" Margin="0,5,0,0"/>
+                                <TextBlock x:Name="LatestSizeText" Text="Tamanho: -- MB" FontSize="10" Foreground="#C8E6C9" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="&#x1F4DD; NOTAS DA VERS&#xC3;O" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,15,0,10"/>
+                        <ScrollViewer Height="120" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="ReleaseNotesText" Text="Carregando notas da vers&#xE3;o..." 
+                                       FontSize="11" Foreground="#E0E0E0" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+
+                        <TextBlock Text="&#x26A0;&#xFE0F; STATUS" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,15,0,10"/>
+                        <Border x:Name="StatusBorder" Background="#FFA726" CornerRadius="6" Padding="10">
+                            <TextBlock x:Name="StatusText" Text="&#x1F50D; Verificando atualiza&#xE7;&#xF5;es..." 
+                                       FontSize="12" FontWeight="Medium" Foreground="#FFFFFF"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Bottom Actions -->
+        <StackPanel Grid.Row="2" Margin="0,20,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="CheckButton" Grid.Column="0" Content="&#x1F50D; Verificar Agora" 
+                        Padding="20,12" Margin="0,0,10,0"
+                        Background="White" Foreground="Black"
+                        BorderThickness="1" BorderBrush="#CCCCCC" FontSize="14"
+                        Cursor="Hand"
+                        Click="CheckButton_Click">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="ButtonBorder" 
+                                                Background="White" 
+                                                BorderBrush="#CCCCCC" 
+                                                BorderThickness="1" 
+                                                CornerRadius="4">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ButtonBorder" Property="Background" Value="#F0F0F0"/>
+                                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#999999"/>
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="ButtonBorder" Property="Background" Value="#E0E0E0"/>
+                                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#666666"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                
+                <Button x:Name="UpdateButton" Grid.Column="1" Content="&#x1F504; Atualizar Agora"
+                        Padding="20,12" Margin="10,0,0,0"
+                        Style="{StaticResource GoldButtonStyle}"
+                        IsEnabled="False"
+                        Cursor="Hand"
+                        Click="UpdateButton_Click" />
+            </Grid>
+
+            <TextBlock x:Name="ManualDownloadLink" Text="ou baixar manualmente do GitHub"
+                       FontSize="11" Foreground="#888888"
+                       HorizontalAlignment="Center" Margin="0,6,0,0"
+                       Cursor="Hand" TextDecorations="Underline"
+                       MouseLeftButtonDown="ManualDownload_Click"
+                       Visibility="Collapsed" />
+
+            <!-- Info Box -->
+            <Border Background="#2B2B2B" CornerRadius="8" Margin="0,15,0,0" Padding="15" BorderBrush="#444444" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="&#x2139;&#xFE0F; SOBRE ATUALIZA&#xC7;&#xD5;ES" FontWeight="SemiBold" FontSize="12" Foreground="#FFFFFF" Margin="0,0,0,5"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="&#x2022; Verifica&#xE7;&#xE3;o autom&#xE1;tica do GitHub" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="&#x2022; Download manual seguro" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="&#x2022; Release notes detalhados" FontSize="10" Foreground="#E0E0E0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="&#x2022; Sem permiss&#xF5;es admin" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="&#x2022; Backup antes de atualizar" FontSize="10" Foreground="#E0E0E0"/>
+                            <TextBlock Text="&#x2022; Controle total do usu&#xE1;rio" FontSize="10" Foreground="#E0E0E0"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</Page>

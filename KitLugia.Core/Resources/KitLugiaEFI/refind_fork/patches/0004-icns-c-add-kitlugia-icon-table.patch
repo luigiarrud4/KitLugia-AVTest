@@ -1,0 +1,12 @@
+diff --git a/refind/icns.c b/refind/icns.c
+index 53a94ef..97dbf8a 100644
+--- a/refind/icns.c
++++ b/refind/icns.c
+@@ -63,6 +63,7 @@ BUILTIN_ICON BuiltinIconTable[BUILTIN_ICON_COUNT] = {
+    { NULL, L"tool_windows_rescue", ICON_SIZE_SMALL },
+    { NULL, L"tool_mok_tool", ICON_SIZE_SMALL },
+    { NULL, L"tool_memtest", ICON_SIZE_SMALL },
++   { NULL, L"tool_kitlugia", ICON_SIZE_SMALL },
+    { NULL, L"vol_internal", ICON_SIZE_BADGE },
+    { NULL, L"vol_external", ICON_SIZE_BADGE },
+    { NULL, L"vol_optical", ICON_SIZE_BADGE },

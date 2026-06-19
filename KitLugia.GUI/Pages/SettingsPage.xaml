@@ -1,0 +1,322 @@
+﻿<Page x:Class="KitLugia.GUI.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Configura&#xE7;&#xF5;es"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+    
+    <Page.Resources>
+        <Style x:Key="SettingsCard" TargetType="Border">
+            <Setter Property="Background" Value="#1a1a1a"/>
+            <Setter Property="BorderBrush" Value="#333333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#000000" BlurRadius="15" ShadowDepth="2" Opacity="0.5"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30">
+            
+            <!-- Header -->
+            <TextBlock Text="&#x2699;&#xFE0F; CONFIGURA&#xC7;&#xD5;ES" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Margin="0,0,0,20"
+                       Foreground="{StaticResource AccentColor}"/>
+            
+            <!-- Se&#xE7;&#xE3;o: Inicializa&#xE7;&#xE3;o -->
+            <Border Style="{StaticResource SettingsCard}">
+                <StackPanel>
+                    <TextBlock Text="INICIALIZA&#xC7;&#xC3;O" 
+                               FontSize="14" 
+                               FontWeight="Bold" 
+                               Foreground="{StaticResource AccentColor}"
+                               Margin="0,0,0,15"/>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Iniciar com Windows" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Inicia o Kit Lugia automaticamente" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleStartup" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Rodar em segundo plano" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Minimiza ao clicar no X (mant&#xE9;m ativo)" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleCloseToTray" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Minimizar para bandeja" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Ao fechar, minimiza para &#xED;cone na bandeja" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleTray" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Anima&#xE7;&#xE3;o de Intro" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Mostrar anima&#xE7;&#xE3;o de introdu&#xE7;&#xE3;o ao abrir" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleIntroAnimation" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Dura&#xE7;&#xE3;o da Intro" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock x:Name="IntroDurationText" Text="3.0 segundos" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <Slider x:Name="IntroDurationSlider" Grid.Column="1" Width="150" Minimum="1.0" Maximum="10.0" Value="3.0" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="10,0,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Se&#xE7;&#xE3;o: M&#xF3;dulos do Kit -->
+            <Border Style="{StaticResource SettingsCard}">
+                <StackPanel>
+                    <TextBlock Text="M&#xD3;DULOS DO KIT" 
+                               FontSize="14" 
+                               FontWeight="Bold" 
+                               Foreground="{StaticResource AccentColor}"
+                               Margin="0,0,0,15"/>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Monitor de RAM" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Monitoramento em tempo real e limpeza autom&#xE1;tica" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleRAMMonitor" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="GameBoost Pro" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Otimiza&#xE7;&#xE3;o avan&#xE7;ada para jogos" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleGameBoost" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Turbo Boot" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Ignora delay de inicializa&#xE7;&#xE3;o de apps" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleTurboBoot" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Turbo Shutdown" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Fecha apps antes de desligar" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleTurboShutdown" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Standby Clean" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Evita ac&#xFA;mulo de lixo no Windows" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleStandbyClean" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Se&#xE7;&#xE3;o: Sistema -->
+            <Border Style="{StaticResource SettingsCard}">
+                <StackPanel>
+                    <TextBlock Text="SISTEMA" 
+                               FontSize="14" 
+                               FontWeight="Bold" 
+                               Foreground="{StaticResource AccentColor}"
+                               Margin="0,0,0,15"/>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Notifica&#xE7;&#xF5;es" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Mostrar notifica&#xE7;&#xF5;es do sistema" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleNotifications" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Log Detalhado" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Grava logs detalhados para debugging" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleVerboseLogging" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Se&#xE7;&#xE3;o: Modo Desenvolvedor (DEBUG) -->
+            <Border Style="{StaticResource SettingsCard}" BorderBrush="#FF6B00">
+                <StackPanel>
+                    <Grid Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="&#x1F41B; MODO DESENVOLVEDOR" 
+                                       FontSize="14" 
+                                       FontWeight="Bold" 
+                                       Foreground="#FF6B00"/>
+                            <TextBlock Text="Mostra ferramentas de diagn&#xF3;stico e debug" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleDeveloperMode" 
+                                  Grid.Column="1" 
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  Checked="ToggleDeveloperMode_Checked"
+                                  Unchecked="ToggleDeveloperMode_Unchecked"/>
+                    </Grid>
+                    
+                    <TextBlock Text="Ferramentas vis&#xED;veis quando ativado:" 
+                               FontSize="11" 
+                               Foreground="#888888"
+                               Margin="0,0,0,10"/>
+                    <StackPanel Margin="15,0">
+                        <TextBlock Text="&#x2022; Diagn&#xF3;stico Interno (no menu lateral)" FontSize="11" Foreground="#CCCCCC"/>
+                        <TextBlock Text="&#x2022; Console de Logs (painel inferior)" FontSize="11" Foreground="#CCCCCC"/>
+                        <TextBlock Text="&#x2022; Memory Profiler (na p&#xE1;gina Diagn&#xF3;stico)" FontSize="11" Foreground="#CCCCCC"/>
+                        <TextBlock Text="&#x2022; Stack traces detalhados de erros" FontSize="11" Foreground="#CCCCCC"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            
+            <!-- Seção: Teste de Navegação -->
+            <Border Style="{StaticResource SettingsCard}" BorderBrush="#FF6B00">
+                <StackPanel>
+                    <Grid Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="&#x1F50D; TESTE DE PÁGINAS" 
+                                       FontSize="14" 
+                                       FontWeight="Bold" 
+                                       Foreground="#FF6B00"/>
+                            <TextBlock Text="Abre todas as páginas uma por uma para identificar crashes" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock x:Name="TxtTestStatus" Text="Pronto para testar" FontSize="11" Foreground="#CCCCCC" Margin="0,0,0,10"/>
+                    <Button x:Name="BtnTestPages" Content="▶ Iniciar Teste de Páginas" 
+                            Click="BtnTestPages_Click" 
+                            Height="36"
+                            Background="#FF6B00" 
+                            Foreground="White"
+                            FontWeight="SemiBold"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            HorizontalAlignment="Left"
+                            Width="220"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Seção: Desinstalação -->
+            <Border Style="{StaticResource SettingsCard}">
+                <StackPanel>
+                    <TextBlock Text="DESINSTALAÇÃO" 
+                               FontSize="14" 
+                               FontWeight="Bold" 
+                               Foreground="{StaticResource AccentColor}"
+                               Margin="0,0,0,15"/>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Criar Ponto de Restauração" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Cria um ponto de restauração antes de desinstalar programas" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleRestorePoint" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Perguntar antes de desinstalar" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Mostrar prompt perguntando se deseja criar ponto de restauração" FontSize="11" Foreground="#888888"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleAskRestorePoint" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

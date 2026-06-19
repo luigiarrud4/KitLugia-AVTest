@@ -1,0 +1,588 @@
+<Page x:Class="KitLugia.SpoofExtension.Pages.SpoofsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Spoofs Extras"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <Page.Resources>
+        <SolidColorBrush x:Key="CardBg" Color="#1A1A2A"/>
+        <SolidColorBrush x:Key="CardBdr" Color="#333333"/>
+        <SolidColorBrush x:Key="CardHover" Color="#252545"/>
+        <SolidColorBrush x:Key="Accent" Color="#FFD700"/>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,30,30,50" MaxWidth="900">
+
+            <TextBlock Text="Spoofs Extras" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Ferramentas avançadas de spoofing para bypass de bloqueios por hardware." Foreground="#A0A0A0" Margin="0,0,0,5"/>
+            <Border Background="#2A1A1A" BorderBrush="#F44336" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,0,30">
+                <TextBlock Text="⚠️  Estas ferramentas modificam identificadores do sistema. Use com cuidado. Algumas alterações exigem reinicialização." Foreground="#FF8A80" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- SPOOF ALL -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="#7E57C2" BorderThickness="2" CornerRadius="8" Margin="0,0,0,20">
+                <StackPanel Margin="20">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="⚡" FontSize="28" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                        <StackPanel>
+                            <TextBlock Text="Spoof All (TraceX-style)" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="Executa TODOS os spoofs de uma vez: HWIDs, GPU, SMBIOS, Volume Serial, MAC. Resultado permanente (reboot persiste)." FontSize="12" Foreground="#B39DDB" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Background="#2A1A2A" BorderBrush="#AB47BC" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="✅  O que faz: HWIDs, GPU, SMBIOS, Volume Serial e MAC de uma só vez. Todas as alterações persistem após reboot." Foreground="#CE93D8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <TextBlock Text="❌  O que NÃO faz: não altera o SMBIOS real do firmware (ACPI). Anti-cheats que leem direto da hardware (EAC/BattlEye via IOCTL) ainda detectam valores verdadeiros." Foreground="#F48FB1" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <TextBlock Text="⚠️  Rede será desconectada momentaneamente (MAC rotation restart). Reinicialização obrigatória para Volume Serial." Foreground="#FFAB91" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Grid Margin="0,15,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Height="50" Cursor="Hand" Click="BtnSpoofAll_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="#2A1A3A" BorderBrush="#7E57C2" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="#3A2A4A"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="#9575CD"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="🚀  Spoof All — Alterar Tudo" FontSize="15" FontWeight="Bold" Foreground="#B388FF" HorizontalAlignment="Center"/>
+                        </Button>
+                        <Button Grid.Column="2" Height="50" Cursor="Hand" Click="BtnSpoofAllLog_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="{StaticResource CardHover}"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="📋  Ver Resultado" FontSize="14" FontWeight="Bold" Foreground="{StaticResource Accent}" Margin="5,0"/>
+                        </Button>
+                    </Grid>
+                    <Border x:Name="SpoofAllResultsBox" Background="#1A1A1A" CornerRadius="4" Padding="10" Margin="0,10,0,0" Visibility="Collapsed" MaxHeight="300">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtSpoofAllResults" Text="" FontSize="10" Foreground="#A0A0A0" FontFamily="Consolas"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 1. OUI MIRROR MODE -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="OUI Mirror Mode" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Mantém os primeiros 3 bytes (fabricante) do MAC original, alterando apenas os últimos 3 bytes. Útil quando a rede ou jogo valida o OUI do fabricante." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#1A1A2A" BorderBrush="#42A5F5" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  OUI do fabricante original é preservado — parece um MAC legítimo do mesmo hardware." Foreground="#90CAF9" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  A alteração requer restart do adaptador (~3s de desconexão). Alguns drivers não aceitam NetworkAddress (verifique suporte na página de Rede)." Foreground="#FFAB91" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BtnOuiMirrorGenerate" Grid.Column="0" Height="40" Cursor="Hand" Click="BtnOuiMirrorGenerate_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="{StaticResource CardHover}"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="🔍  Gerar Mirror + Aplicar" FontSize="13" FontWeight="Bold" Foreground="{StaticResource Accent}"/>
+                        </Button>
+                        <Button x:Name="BtnOuiMirrorRestore" Grid.Column="2" Height="40" Cursor="Hand" Click="BtnOuiMirrorRestore_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="#3A1A1A" BorderBrush="#F44336" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="#4A1A1A"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="#EF5350"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="🔄  Restaurar Original" FontSize="13" FontWeight="Bold" Foreground="#EF5350"/>
+                        </Button>
+                    </Grid>
+                    <TextBlock x:Name="TxtOuiMirrorStatus" Text="" FontSize="11" Foreground="#808080" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. DHCP REFRESH -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="DHCP Refresh" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Libera e renova o IP com o roteador. Desconecta por ~5 segundos. Risco de softblock se usado repetidamente." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#1A2A3A" BorderBrush="#42A5F5" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  Obtém um novo IP do roteador (novo lease DHCP). Útil se o ban for por IP." Foreground="#90CAF9" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  ipconfig /release sem especificar adaptador libera TODOS os IPs — todas as conexões caem. /renew pode demorar até 30s. Uso repetido pode causar softblock do roteador." Foreground="#FFAB91" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Height="45" Cursor="Hand" Click="BtnDhcpRefresh_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#1A2A3A" BorderBrush="#42A5F5" BorderThickness="1" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#2A3A4A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#64B5F6"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="🌐  Renovar IP (ipconfig /release + /renew)" FontSize="13" FontWeight="Bold" Foreground="#64B5F6" HorizontalAlignment="Center"/>
+                    </Button>
+                    <TextBlock x:Name="TxtDhcpRefreshStatus" Text="" FontSize="11" Foreground="#808080" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 3. MAC ADDRESS ROTATION -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="MAC Address Rotation" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Gera e aplica um MAC aleatório em todos os adaptadores físicos. Equivalente ao botão Gerar + Aplicar na página de Rede, mas em todos os adaptadores de uma vez." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#2A1A1A" BorderBrush="#FF7043" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  MAC completamente novo com OUI de fabricante aleatório. Aplica em todos os adaptadores de uma vez." Foreground="#FFAB91" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  Remove qualquer mirror OUI existente. Todos os adaptadores serão reiniciados (rede cai ~3s por adaptador)." Foreground="#FF8A65" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Height="45" Cursor="Hand" Click="BtnRotateAllMacs_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#2A1A1A" BorderBrush="#FF7043" BorderThickness="1" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#4A2A1A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#FF8A65"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="🔄  Rotacionar MAC de Todos os Adaptadores" FontSize="13" FontWeight="Bold" Foreground="#FF8A65" HorizontalAlignment="Center"/>
+                    </Button>
+                    <TextBlock x:Name="TxtMacRotationStatus" Text="" FontSize="11" Foreground="#808080" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 4. HARDWARE IDS (ring-3) -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="Hardware IDs (ring-3)" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Rotaciona 6 identificadores: MachineGuid, HwProfileGuid, SQM MachineId, SusClientId, ProductId, InstallDate. Afeta bloqueios por software (ring-3). Não altera firmware." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#1A1A2A" BorderBrush="#7E57C2" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  Afeta qualquer jogo/software que lê HWIDs do registro (ring-3). MachineGuid é o mais usado por anti-cheats." Foreground="#CE93D8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="❌  Não afeta leituras diretas de hardware (WMI de firmware, IOCTL, EDID do monitor, serial do disco via IOCTL). Anti-cheats kernel-mode (EAC, BattlEye) ignoram registry." Foreground="#F48FB1" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  Reinicialização necessária para alguns aplicativos reconhecerem os novos GUIDs." Foreground="#FFD54F" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Height="45" Cursor="Hand" Click="BtnRotateHwids_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="#1A1A2A" BorderBrush="#7E57C2" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="#2A2A4A"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="#9575CD"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="🆔  Rotacionar HWIDs (registry)" FontSize="13" FontWeight="Bold" Foreground="#9575CD" HorizontalAlignment="Center"/>
+                        </Button>
+                        <Button Grid.Column="2" Height="45" Cursor="Hand" Click="BtnShowCurrentHwids_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="{StaticResource CardHover}"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="📋  Ver Atuais" FontSize="13" FontWeight="Bold" Foreground="{StaticResource Accent}"/>
+                        </Button>
+                    </Grid>
+                    <Border x:Name="HwidResultsBox" Background="#1A1A1A" CornerRadius="4" Padding="10" Margin="0,8,0,0" Visibility="Collapsed">
+                        <TextBlock x:Name="TxtHwidResults" Text="" FontSize="11" Foreground="#A0A0A0" FontFamily="Consolas"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 5. DISK VOLUME SERIAL -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="Disk Volume Serial" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Patch no setor de boot do disco para alterar o Volume Serial Number. Efetivo contra Device Blocking do Roblox. Requer reinicialização." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#2A1A1A" BorderBrush="#F44336" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                        <TextBlock Text="⚠️  Risco: alteração no setor de boot. Faça backup antes. Se um byte errado for escrito, a partição pode não montar." Foreground="#FF8A80" FontSize="11" TextWrapping="Wrap"/>
+                    </Border>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Serial atual:" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtCurrentVolumeSerial" Grid.Column="2" Text="---" FontSize="13" Foreground="#AAA" FontFamily="Consolas" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </Grid>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Height="45" Cursor="Hand" Click="BtnPatchVolumeSerial_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="#2A1A1A" BorderBrush="#EF5350" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="#4A1A1A"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="#F44336"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="💾  Patchear Serial (C:)" FontSize="13" FontWeight="Bold" Foreground="#EF5350" HorizontalAlignment="Center"/>
+                        </Button>
+                        <Button Grid.Column="2" Height="45" Cursor="Hand" Click="BtnRefreshVolumeSerial_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="{StaticResource CardHover}"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="🔄  Atualizar" FontSize="13" FontWeight="Bold" Foreground="{StaticResource Accent}"/>
+                        </Button>
+                    </Grid>
+                    <TextBlock x:Name="TxtVolumeSerialStatus" Text="" FontSize="11" Foreground="#808080" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 6. DISK SERIALS (registry cache) -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="Disk Serials (registry cache)" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Randomiza os números de série dos discos armazenados no registro em HKLM\Enum\IDE, STORAGE, SCSI. Engana software ring-3 que lê serial do disco via registro." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#2A1A2A" BorderBrush="#AB47BC" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  Cache do registro de discos SATA/NVMe/SCSI é alterado. WMI (Win32_DiskDrive) reflete os novos valores." Foreground="#CE93D8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="❌  Serial real do disco (firmware) não é alterado. Anti-cheats kernel-mode (IOCTL_STORAGE_QUERY) ignoram esta camada." Foreground="#F48FB1" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  O Windows pode recriar alguns valores no próximo boot. Aplica novamente se necessário." Foreground="#FFD54F" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Height="45" Cursor="Hand" Click="BtnSpoofDiskSerials_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#1A1A2A" BorderBrush="#AB47BC" BorderThickness="1" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#2A2A4A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#CE93D8"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="💿  Spoof Disk Serials" FontSize="13" FontWeight="Bold" Foreground="#CE93D8" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Border x:Name="DiskSerialsResultsBox" Background="#1A1A1A" CornerRadius="4" Padding="10" Margin="0,8,0,0" Visibility="Collapsed" MaxHeight="200">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtDiskSerialsResults" Text="" FontSize="10" Foreground="#A0A0A0" FontFamily="Consolas"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 7. USB/HID DEVICE SERIALS -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="USB / HID Device Serials" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Randomiza números de série de periféricos USB (mouse, teclado, headset) e dispositivos HID armazenados no registro. Alguns anti-cheats usam periféricos como fingerprint." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#1A2A1A" BorderBrush="#66BB6A" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  Seriais de USBSTOR, USB\VID_ e HID são randomizados. Afeta fingerprinting baseado em periféricos." Foreground="#A5D6A7" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="❌  Dispositivos conectados no momento podem re-escrever o serial no próximo enumerate. O ideal é aplicar com o periférico desconectado." Foreground="#EF9A9A" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  Windows Update pode restaurar alguns valores originais." Foreground="#FFD54F" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Height="45" Cursor="Hand" Click="BtnSpoofUsbSerials_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#1A2A1A" BorderBrush="#66BB6A" BorderThickness="1" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#2A3A2A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#81C784"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="🔌  Spoof USB/HID Serials" FontSize="13" FontWeight="Bold" Foreground="#81C784" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Border x:Name="UsbSerialsResultsBox" Background="#1A1A1A" CornerRadius="4" Padding="10" Margin="0,8,0,0" Visibility="Collapsed" MaxHeight="200">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtUsbSerialsResults" Text="" FontSize="10" Foreground="#A0A0A0" FontFamily="Consolas"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 8. GPU IDENTIFIERS -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="GPU Identifiers" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Modifica AdapterString e ChipType da placa de vídeo no registro. Afeta software que lê GPU pelo registro (alguns anti-cheats). Não altera o hardware real (VEN/DEV)." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#1A2A1A" BorderBrush="#66BB6A" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  Altera o nome visível da GPU no registro. Engana software que consulta AdapterString/ChipType (DXDiag, alguns launchers)." Foreground="#A5D6A7" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="❌  Não altera VEN_/DEV_ (IDs reais do hardware), não esconde a GPU de scanners kernel-mode. O nome real ainda está no driver e no WMI." Foreground="#EF9A9A" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  Se o jogo usa DirectX ou Vulkan para ler a GPU, o nome original ainda aparece (vem do driver, não do registro)." Foreground="#FFD54F" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Height="45" Cursor="Hand" Click="BtnSpoofGpu_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="#1A2A1A" BorderBrush="#66BB6A" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="#2A3A2A"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="#81C784"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="🎮  Spoof GPU" FontSize="13" FontWeight="Bold" Foreground="#81C784" HorizontalAlignment="Center"/>
+                        </Button>
+                        <Button Grid.Column="2" Height="45" Cursor="Hand" Click="BtnShowGpuLog_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="cardBorder" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="cardBorder" Property="Background" Value="{StaticResource CardHover}"/>
+                                            <Setter TargetName="cardBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="📋  Ver Log" FontSize="13" FontWeight="Bold" Foreground="{StaticResource Accent}"/>
+                        </Button>
+                    </Grid>
+                    <Border x:Name="GpuResultsBox" Background="#1A1A1A" CornerRadius="4" Padding="10" Margin="0,8,0,0" Visibility="Collapsed">
+                        <TextBlock x:Name="TxtGpuResults" Text="" FontSize="10" Foreground="#A0A0A0" FontFamily="Consolas"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 9. SMBIOS (registry) -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="SMBIOS Registry Mirror" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Modifica SystemSerialNumber, BaseBoardSerial, BIOSSerial, SystemUUID no registro. Afeta leituras via registro (WMI pode ainda vir do firmware). Para mudar o SMBIOS real, precisa de kernel driver." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#2A2A1A" BorderBrush="#FFA726" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                        <TextBlock Text="⚠️  Valores no HARDWARE\DESCRIPTION são recriados pelo Windows no boot em algumas configurações. O spoof persiste na sessão atual." Foreground="#FFB74D" FontSize="11" TextWrapping="Wrap"/>
+                    </Border>
+                    <Button Height="45" Cursor="Hand" Click="BtnSpoofSmbios_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#1A1A2A" BorderBrush="#42A5F5" BorderThickness="1" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#2A2A4A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#64B5F6"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="🖥️  Spoof SMBIOS Registry" FontSize="13" FontWeight="Bold" Foreground="#64B5F6" HorizontalAlignment="Center"/>
+                    </Button>
+                    <TextBlock x:Name="TxtSmbiosStatus" Text="" FontSize="11" Foreground="#808080" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 10. SYSTEM INFORMATION -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="System Information" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Modifica ComputerHardwareId (usado pelo Windows para telemetria/hardware hash) e ProcessorNameString no registro." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#1A1A2A" BorderBrush="#7E57C2" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  ComputerHardwareId é usado pelo Windows para identificar unicamente o hardware — alterá-lo quebra a correlação com instalações anteriores." Foreground="#CE93D8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="❌  ProcessorNameString é apenas cosmético no registro; o CPUID real da CPU não é alterado." Foreground="#F48FB1" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  ComputerHardwareId pode ser recalculado pelo Windows em atualizações." Foreground="#FFD54F" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Height="45" Cursor="Hand" Click="BtnSpoofSysInfo_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#1A1A2A" BorderBrush="#7E57C2" BorderThickness="1" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#2A2A4A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#9575CD"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="🖥️  Spoof System Info" FontSize="13" FontWeight="Bold" Foreground="#9575CD" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Border x:Name="SysInfoResultsBox" Background="#1A1A1A" CornerRadius="4" Padding="10" Margin="0,8,0,0" Visibility="Collapsed" MaxHeight="200">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtSysInfoResults" Text="" FontSize="10" Foreground="#A0A0A0" FontFamily="Consolas"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 11. REGISTRY TRACE CLEANER -->
+            <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBdr}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="20">
+                    <TextBlock Text="Registry Trace Cleaner" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Remove traces de spoofs anteriores: OriginalNetworkAddress (backup do MAC original), SQM MachineId, e outras chaves que podem denunciar que houve alteração." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                    <Border Background="#2A1A1A" BorderBrush="#F44336" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="✅  Remove OriginalNetworkAddress que o Windows cria automaticamente como backup antes de aplicar NetworkAddress. Sem isso, o MAC original fica exposto no registro." Foreground="#FF8A80" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="✅  Limpa também SQM MachineId antigo e chaves SusClientId órfãs." Foreground="#FFAB91" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="⚠️  Recomendado executar DEPOIS de aplicar os spoofs, não antes." Foreground="#FFD54F" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Height="45" Cursor="Hand" Click="BtnCleanTraces_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#2A1A1A" BorderBrush="#F44336" BorderThickness="1" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#4A1A1A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#EF5350"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="🧹  Limpar Traces do Registro" FontSize="13" FontWeight="Bold" Foreground="#EF5350" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Border x:Name="TraceCleanerResultsBox" Background="#1A1A1A" CornerRadius="4" Padding="10" Margin="0,8,0,0" Visibility="Collapsed" MaxHeight="200">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtTraceCleanerResults" Text="" FontSize="10" Foreground="#A0A0A0" FontFamily="Consolas" FontStyle="Italic"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- RESTORE ALL -->
+            <Separator Margin="0,10,0,20" Background="{StaticResource CardBdr}" Height="1" Opacity="0.5"/>
+            <Border Background="#1A1A2A" BorderBrush="#42A5F5" BorderThickness="1" CornerRadius="8" Margin="0,0,0,30">
+                <StackPanel Margin="25">
+                    <TextBlock Text="Restore All" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Remove NetworkAddress (MAC customizado) de todos os adaptadores, apaga a chave de spoof do registro e devolve o sistema ao estado anterior. NOTA: Volume Serial, HWIDs, SMBIOS, Disk Serials e System Information NÃO são revertidos — essas alterações precisam ser restauradas manualmente com backup." FontSize="12" Foreground="#808080" TextWrapping="Wrap" Margin="0,5,0,15"/>
+                    <Border Background="#2A1A1A" BorderBrush="#F44336" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="⚠️  ⚠️  ⚠️  ESTA AÇÃO É PARCIAL — veja abaixo o que é e NÃO é revertido." Foreground="#FF8A80" FontSize="12" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <TextBlock Text="✅  Reverte: MAC address (remove NetworkAddress de todos os adaptadores, volta ao MAC original de fábrica), Restarta adaptadores." Foreground="#A5D6A7" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            <TextBlock Text="❌  NÃO reverte: HWIDs (MachineGuid, ProductId...), Volume Serial (precisa de backup manual do setor de boot), GPU, SMBIOS, Disk Serials, System Information." Foreground="#EF9A9A" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Height="50" Cursor="Hand" Click="BtnRestoreAll_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="cardBorder" Background="#3A1A1A" BorderBrush="#F44336" BorderThickness="2" CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="cardBorder" Property="Background" Value="#5A1A1A"/>
+                                        <Setter TargetName="cardBorder" Property="BorderBrush" Value="#EF5350"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="🔁  Restore All (MAC apenas)" FontSize="15" FontWeight="Bold" Foreground="#EF5350"/>
+                        </StackPanel>
+                    </Button>
+                    <TextBlock x:Name="TxtRestoreAllStatus" Text="" FontSize="11" Foreground="#808080" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

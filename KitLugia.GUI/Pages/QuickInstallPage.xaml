@@ -1,0 +1,107 @@
+<Page x:Class="KitLugia.GUI.Pages.QuickInstallPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="QuickInstall"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
+
+            <TextBlock Text="Instalação Rápida do Windows" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="White"/>
+            <TextBlock Text="Extrai ISO com 7-Zip e aplica com DISM.&#x0a;Modo Padrão: backup+restore (preserva tudo). Modo Original: limpo como o .bat.&#x0a;Funciona no Windows atual ou WinPE." Foreground="#A0A0A0" Margin="0,0,0,30" TextWrapping="Wrap"/>
+
+            <!-- CARD 1: ISO -->
+            <TextBlock Text="1. Selecione a ISO" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,12"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <Grid Margin="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="&#x1F4BF;" FontSize="24" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <TextBox x:Name="TxtIsoPath" Grid.Column="1" IsReadOnly="True"
+                             Text="Nenhum arquivo ISO selecionado..."
+                             Background="#1A1A2E" Foreground="#808080" BorderBrush="#333" BorderThickness="1"
+                             Padding="10,8" VerticalAlignment="Center" TextWrapping="NoWrap"/>
+                    <Button x:Name="BtnBrowseIso" Grid.Column="2" Content="&#x1F4C2; Procurar ISO" 
+                            Foreground="White" Background="#2A4A6A" BorderBrush="#4A6A8A" BorderThickness="1"
+                            Padding="12,8" Margin="10,0,0,0" Cursor="Hand"
+                            Click="BtnBrowseIso_Click"/>
+                </Grid>
+            </Border>
+
+            <!-- CARD 2: DESTINO + OPÇÕES -->
+            <TextBlock Text="2. Disco de destino e opções" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,25,0,12"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel Margin="20">
+                    <ComboBox x:Name="CmbTargetDrive" Background="#1A1A2E" Foreground="White" 
+                              BorderBrush="#333" Padding="8,6"
+                              DisplayMemberPath="DisplayName"/>
+
+                    <TextBlock x:Name="TxtWinpeHint" Text="&#x26A0;&#xFE0F; Detectado WinPE. O C: real pode estar em outro drive. Escolha o que contém o Windows atual."
+                               Foreground="#FFAA00" FontSize="12" Margin="0,12,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+
+                    <Separator Background="{StaticResource CardBorder}" Margin="0,15,0,12"/>
+
+                    <Border Background="#1A1A2E" CornerRadius="6" BorderBrush="#2A5A3A" BorderThickness="1" Padding="12,8">
+                        <StackPanel>
+                            <CheckBox x:Name="ChkOriginalMode" Content="Modo Original (igual ao .bat): instalação limpa, sem backup/restore"
+                                      Foreground="#8ACE8A" FontSize="13" IsChecked="False"
+                                      Checked="ChkOriginalMode_Checked" Unchecked="ChkOriginalMode_Checked"/>
+                            <TextBlock x:Name="TxtOriginalDesc" Text="Apenas extrai ISO → DISM → bcdboot. Nada é preservado. Equivalente ao InstallWindowsWithoutUSB.bat original."
+                                       Foreground="#6AAA6A" FontSize="11" Margin="25,3,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="BdrAdvanced" Background="#0D1A2E" CornerRadius="6" BorderBrush="#2A4A6A" BorderThickness="1" Padding="12,8" Margin="0,8,0,0">
+                        <StackPanel>
+                            <CheckBox x:Name="ChkPreserveUsers" Content="Modo Avançado: backup + restore de Users/ProgramData/Registry"
+                                      Foreground="#8AB4F8" FontSize="13" IsChecked="True"/>
+                            <TextBlock Text="Move Users/ProgramData/Program Files → _SysBackup. Salva SAM/SYSTEM/SECURITY. Após DISM, restaura tudo. Preserva contas, arquivos, navegadores, AppData."
+                                       Foreground="#8090B0" FontSize="11" Margin="25,3,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Separator Background="{StaticResource CardBorder}" Margin="0,10,0,8"/>
+
+                    <CheckBox x:Name="ChkRunBcdboot" Content="Executar bcdboot (configurar bootloader)"
+                              Foreground="#CCC" FontSize="13" IsChecked="True"/>
+                    <TextBlock Text="Necessário se o destino não tiver entry no boot manager."
+                               Foreground="#808080" FontSize="11" Margin="25,3,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- CARD 3: EXECUTAR -->
+            <TextBlock Text="3. Instalar" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,25,0,12"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel Margin="20">
+                    <Button x:Name="BtnInstall" Content="&#x25B6;&#xFE0F; INICIAR INSTALAÇÃO" 
+                            Foreground="White" Background="#2A6A4A" BorderBrush="#4A9A6A" BorderThickness="1"
+                            Padding="16,12" FontSize="16" FontWeight="Bold" Cursor="Hand"
+                            IsEnabled="False" Click="BtnInstall_Click"
+                            HorizontalAlignment="Left"/>
+
+                    <Border x:Name="ProgressArea" Visibility="Collapsed" Margin="0,15,0,0">
+                        <StackPanel>
+                            <ProgressBar x:Name="InstallProgress" Height="6" Foreground="#4A9A6A" 
+                                         Background="#333" BorderThickness="0" IsIndeterminate="True"/>
+                            <TextBlock x:Name="TxtProgressStatus" Text="Preparando..." 
+                                       Foreground="#A0A0A0" FontSize="13" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#0D0D1A" CornerRadius="4" Padding="10" Margin="0,15,0,0" 
+                            MaxHeight="300" BorderBrush="#222" BorderThickness="1">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtLog" Text="Pronto. Selecione uma ISO e um disco de destino."
+                                       Foreground="#A0A0A0" FontFamily="Consolas, Courier New" FontSize="11"
+                                       TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,2373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.ExmTweaksPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="EXM Tweaks"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
+
+            <TextBlock Text="Tweaks Avan&#xE7;ados (EXM)" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Tweaks adicionais baseados no EXM Premium que n&#xE3;o est&#xE3;o no KitLugia padr&#xE3;o. Reinicializa&#xE7;&#xE3;o necess&#xE1;ria para a maioria." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <Border Background="#2D2020" BorderBrush="#503030" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,20">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#x26A0;&#xFE0F;" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="16"/>
+                    <TextBlock Text="Alguns tweaks usam BCDedit e modifica&#xE7;&#xF5;es profundas do sistema. Use com cautela." 
+                               Foreground="#FFC0C0" VerticalAlignment="Center" FontSize="13" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== REDE / TCP/IP ====== -->
+            <TextBlock Text="Rede e TCP/IP" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- TCP Initial RTO -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Aumenta o RTO (Retransmission Timeout) inicial para 2000ms, melhorando a estabilidade em conex&#xF5;es com perda de pacotes. Padr&#xE3;o Windows: 3000ms."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="TCP Initial RTO (2000ms)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Aumenta RTO inicial para 2000ms (estabilidade)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusTcpInitialRto" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTcpInitialRto" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpInitialRto_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- TCP NonBestEffortLimit -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define NonBestEffortLimit=0 para desabilitar a limita&#xE7;&#xE3;o de QoS. Permite que aplica&#xE7;&#xF5;es usem toda a largura de banda dispon&#xED;vel sem restri&#xE7;&#xF5;es."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="TCP NonBestEffortLimit (0)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa limite de QoS para melhor throughput." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusTcpNonBestEffort" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTcpNonBestEffort" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpNonBestEffort_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- TCP DefaultTTL -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define o TTL (Time To Live) padr&#xE3;o para 64. Determina quantos saltos um pacote pode percorrer antes de ser descartado. 64 &#xE9; o valor ideal para a maioria das redes."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="TCP DefaultTTL (64)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Define TTL padr&#xE3;o para 64 (otimiza&#xE7;&#xE3;o de roteamento)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusTcpDefaultTtl" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTcpDefaultTtl" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpDefaultTtl_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- TCP Timestamps + Window Scale -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Ativa TCP1323Opts=1 para habilitar Timestamps e Window Scaling. Melhora o throughput em conex&#xF5;es de alta lat&#xEA;ncia e longa dist&#xE2;ncia."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="TCP Timestamps + Window Scale" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Ativa TCP1323Opts para melhor throughput em links de alta lat&#xEA;ncia." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusTcp1323" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTcp1323" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcp1323_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- TCP MaxDupAcks -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Reduz o threshold de ACK duplicado para 2 (padr&#xE3;o &#xE9; 3). Permite recupera&#xE7;&#xE3;o mais r&#xE1;pida de pacotes perdidos, melhorando a estabilidade em jogos online."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="TCP MaxDupAcks (2)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Reduz threshold de ACK duplicado para recupera&#xE7;&#xE3;o mais r&#xE1;pida." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusTcpMaxDupAcks" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTcpMaxDupAcks" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpMaxDupAcks_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Desativar WSD -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa Web Services Discovery (WSD) no TCP/IP. Reduz tr&#xE1;fego de descoberta de rede na LAN. Recomendado para jogos online."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar WebServices Discovery" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa WSD para reduzir tr&#xE1;fego de rede." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableWsd" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableWsd" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableWsd_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Desativar mDNS -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o servi&#xE7;o multicast DNS (mDNS). Reduz tr&#xE1;fego de descoberta de dispositivos na rede local. Pode afetar descoberta de Chromecast e AirPlay."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar mDNS" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o mDNS (multicast DNS)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableMdns" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableMdns" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMdns_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Desativar LLTD -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o Link-Layer Topology Discovery (lltdsvc). Reduz tr&#xE1;fego de manuten&#xE7;&#xE3;o de mapa de rede. Recomendado para gamers."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar LLTD (lltdsvc)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Link-Layer Topology Discovery mapper service." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableLltd" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableLltd" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableLltd_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Desativar Bandwidth Throttle -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa a limita&#xE7;&#xE3;o de banda do LanmanWorkstation. Permite throughput m&#xE1;ximo em transfer&#xEA;ncias de rede SMB/CIFS."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Bandwidth Throttle" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa limita&#xE7;&#xE3;o de banda do LanmanWorkstation." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableBandwidthThrottle" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableBandwidthThrottle" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableBandwidthThrottle_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Limpar Cache de Rede -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Executa: netsh int ip delete arpcache/destinationcache/routecache/neighbors + ipconfig /flushdns /registerdns. Limpa todo o cache de rede do Windows."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Limpar Cache de Rede" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Limpa ARP, DNS, route e destination cache (netsh + ipconfig)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusFlushNetworkCache" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <Button x:Name="BtnFlushNetworkCache" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnFlushNetworkCache_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== BCDedit ====== -->
+            <TextBlock Text="Boot Configuration (BCDedit)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="#1A1500" BorderBrush="#805500" BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+
+                    <Border Background="#332000" BorderBrush="#995500" BorderThickness="1" CornerRadius="4" Padding="15" Margin="20,20,20,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#x26A0;&#xFE0F; CUIDADO:" FontWeight="Bold" Foreground="#FFAA00" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Altera&#xE7;&#xF5;es BCDedit afetam o boot do Windows. Recomendado fazer backup antes." Foreground="#DDDDDD" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- x2APIC -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Habilita suporte a x2APIC no boot. Melhora o gerenciamento de interrup&#xE7;&#xF5;es em sistemas com muitos n&#xFA;cleos de CPU. Requer reinicializa&#xE7;&#xE3;o."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="x2APIC Policy (Enable)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Habilita suporte a x2APIC para melhor gerenciamento de interrup&#xE7;&#xF5;es." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusX2Apic" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkX2Apic" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkX2Apic_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- IncreaseUserVa -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Aumenta o espa&#xE7;o de endere&#xE7;amento virtual de usu&#xE1;rio para 3072 MB (padr&#xE3;o 2048). Permite que aplica&#xE7;&#xF5;es usem mais mem&#xF3;ria virtual. Requer reinicializa&#xE7;&#xE3;o."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="IncreaseUserVa (3072)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Aumenta espa&#xE7;o de endere&#xE7;o virtual de usu&#xE1;rio para 3072 MB." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusIncreaseUserVa" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkIncreaseUserVa" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkIncreaseUserVa_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- Disable Dynamic Tick -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desliga o tick din&#xE2;mico do timer do sistema. For&#xE7;a timers mais consistentes, reduzindo micro-lat&#xEA;ncia. Requer reinicializa&#xE7;&#xE3;o."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Dynamic Tick" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desliga tick din&#xE2;mico do timer para lat&#xEA;ncia mais consistente." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableDynamicTick" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableDynamicTick" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableDynamicTick_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- TPM Boot Entropy -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa a entropia do TPM durante o boot. Pode acelerar a inicializa&#xE7;&#xE3;o do sistema em alguns hardwares. Requer reinicializa&#xE7;&#xE3;o."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar TPM Boot Entropy" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa entropia TPM no boot para inicializa&#xE7;&#xE3;o mais r&#xE1;pida." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusTpmBootEntropy" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTpmBootEntropy" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTpmBootEntropy_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- UsePhysicalDestination -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define usephysicaldestination=No no BCD. Configura o modo de destino f&#xED;sico APIC. Pode melhorar lat&#xEA;ncia de interrup&#xE7;&#xF5;es em alguns sistemas."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="UsePhysicalDestination (No)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="For&#xE7;a APIC physical destination mode." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusUsePhysicalDest" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkUsePhysicalDest" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkUsePhysicalDest_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- UseLegacyAPIC -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define uselegacyapic=No no BCD. For&#xE7;a o uso de APIC moderno em vez de legacy. Melhora gerenciamento de interrup&#xE7;&#xF5;es em hardware moderno."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="UseLegacyAPIC (No)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="For&#xE7;a uso de APIC moderno (n&#xE3;o legacy)." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusUseLegacyApic" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkUseLegacyApic" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkUseLegacyApic_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== SERVIÇOS ADICIONAIS ====== -->
+            <TextBlock Text="Servi&#xE7;os Adicionais" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- License Manager -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o servi&#xE7;o LicenseManager (Start=4). Gerencia licen&#xE7;as da Windows Store. Desativar economiza recursos sem impacto percept&#xED;vel."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar License Manager" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o de licen&#xE7;as da Windows Store." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableLicenseManager" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableLicenseManager" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableLicenseManager_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- wlidsvc -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o servi&#xE7;o wlidsvc (Microsoft Account Sign-In Assistant). Economiza recursos se voc&#xEA; usa conta local."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Microsoft Account Sign-In" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o wlidsvc (conta Microsoft)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableWlidsvc" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableWlidsvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableWlidsvc_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- shpamsvc -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o servi&#xE7;o shpamsvc (Shared PC Account Manager). Servi&#xE7;o para PCs compartilhados, desnecess&#xE1;rio em uso pessoal."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Shared PC Account" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o shpamsvc (Shared PC)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableShpamsvc" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableShpamsvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableShpamsvc_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Tablet/Touch -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa TabletInputService e TouchKeyboard. Economiza recursos em desktops sem tela touch. Recomendado para gamers."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Tablet/Touch" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa TabletInputService e TouchKeyboard." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableTablet" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableTablet" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableTablet_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== WINDOWS SETTINGS / VISUAL ====== -->
+            <TextBlock Text="Windows Settings e Visual" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Lock Screen -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove a tela de bloqueio do Windows. Vai direto para a tela de login. Requer pol&#xED;tica de grupo ou registro HKLM."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Tela de Bloqueio" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove a lock screen (vai direto para login)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableLockScreen" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableLockScreen" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableLockScreen_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Toast -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove todas as notifica&#xE7;&#xF5;es toast do sistema e desativa o centro de notifica&#xE7;&#xF5;es. Recomendado para jogos em tela cheia."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Notifica&#xE7;&#xF5;es Toast" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove todas as notifica&#xE7;&#xF5;es toast do sistema." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableToast" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableToast" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableToast_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Clipboard -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o hist&#xF3;rico de clipboard e sua sincroniza&#xE7;&#xE3;o entre dispositivos. Economiza recursos e aumenta privacidade."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Clipboard History" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede sincroniza&#xE7;&#xE3;o de clipboard entre dispositivos." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableClipboard" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableClipboard" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableClipboard_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Auto-Install -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Impede que a Windows Store reinstale automaticamente apps ap&#xF3;s atualiza&#xE7;&#xF5;es. Configura AutoDownload=2."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Auto-Install Store Apps" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede reinstala&#xE7;&#xE3;o autom&#xE1;tica de apps da Store." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableAutoInstall" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableAutoInstall" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableAutoInstall_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Biometria -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o Windows Biometric Service (WbioSrvc). Desliga impress&#xE3;o digital e reconhecimento facial. Economiza recursos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Biometria" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa Windows Biometric Service (impress&#xE3;o digital, rosto)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableBiometrics" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableBiometrics" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableBiometrics_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Sensores -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o servi&#xE7;o de sensores (SensorService). Desliga sensores de luz ambiente, proximidade, etc. Economiza recursos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Sensores" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o de sensores (luz, proximidade, etc)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableSensors" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableSensors" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableSensors_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Visual FX -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desliga composi&#xE7;&#xE3;o Aero, arrastar janelas completas e scroll suave. Aplica VisualFXSetting=2 para m&#xE1;ximo desempenho visual."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Comp. Aero/Anima&#xE7;&#xF5;es" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desliga composi&#xE7;&#xE3;o visual, arraste completo, scroll suave." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableVisualAnimations" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableVisualAnimations" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableVisualAnimations_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Menu Kill -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define AutoEndTasks=1, HungAppTimeout=1000ms, WaitToKillAppTimeout=2000ms, MenuShowDelay=0. Acelera shutdown e menus."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Acelerar Shutdown (Menu Kill)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="AutoEndTasks, HungAppTimeout 1s, WaitToKill 2s, MenuShowDelay 0." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusKillMenu" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkKillMenu" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkKillMenu_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Task View -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove o bot&#xE3;o 'Task View' (Linha do Tempo) da barra de tarefas. Economiza espa&#xE7;o e reduz distra&#xE7;&#xF5;es."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Esconder Bot&#xE3;o Task View" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove o bot&#xE3;o Task View da barra de tarefas." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusHideTaskView" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkHideTaskView" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkHideTaskView_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Mica -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desliga os efeitos Mica e de transpar&#xEA;ncia no Windows 11. Melhora performance em GPUs integradas."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Mica / Transpar&#xEA;ncia" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desliga efeitos Mica e transpar&#xEA;ncia no Windows 11." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableMica" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableMica" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMica_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Snap Assist -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desabilita Snap Assist e Snap Layouts no Windows 11. Recomendado para quem n&#xE3;o usa e quer reduzir overhead."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Snap Assist" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desabilita Snap Assist / Snap Layouts." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableSnapAssist" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableSnapAssist" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableSnapAssist_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== MOUSE / TECLADO ====== -->
+            <TextBlock Text="Mouse e Teclado" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Mouse Accel -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define MouseSpeed=0, MouseThreshold1/2=0. Remove acelera&#xE7;&#xE3;o do mouse para movimentos mais previs&#xED;veis em jogos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Acelera&#xE7;&#xE3;o do Mouse" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Define MouseSpeed=0, Threshold1/2=0 (acelera&#xE7;&#xE3;o off)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusMouseAccel" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkMouseAccel" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMouseAccel_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Keyboard -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define KeyboardSpeed=31 (m&#xE1;ximo) e KeyboardDelay=0. Resposta mais r&#xE1;pida do teclado em jogos e digita&#xE7;&#xE3;o."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Otimizar Teclado (Speed 31)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="KeyboardSpeed=31, KeyboardDelay=0 para resposta m&#xE1;xima." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusKeyboard" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkKeyboard" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkKeyboard_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Cursor Suppression -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa EnableCursorSuppression. O cursor n&#xE3;o desaparece ao digitar no teclado. &#xDA;til para streaming e grava&#xE7;&#xE3;o."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Supress&#xE3;o Cursor" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="EnableCursorSuppression=0 (cursor n&#xE3;o some ao digitar)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusCursorSuppression" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkCursorSuppression" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkCursorSuppression_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== BOOT / CRASH ====== -->
+            <TextBlock Text="Boot e Crash" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Minidumps -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define CrashDumpEnabled=0. Desliga a cria&#xE7;&#xE3;o de arquivos de minidump em caso de blue screen. Economiza espa&#xE7;o em disco."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Minidumps" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desliga cria&#xE7;&#xE3;o de minidumps de mem&#xF3;ria (CrashDumpEnabled=0)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableMinidumps" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableMinidumps" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMinidumps_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- AutoReboot Crash -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define AutoReboot=0. Impede que o Windows reinicie automaticamente ap&#xF3;s um blue screen, permitindo ver o erro."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Auto-Reboot p&#xF3;s Crash" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Evita reboot autom&#xE1;tico ap&#xF3;s blue screen (AutoReboot=0)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableAutoRebootCrash" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableAutoRebootCrash" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableAutoRebootCrash_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Zero Startup Delay -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define StartupDelayInMSec=0. Remove o atraso de inicializa&#xE7;&#xE3;o do Explorer. Acelera a &#xE1;rea de trabalho ao fazer login."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Zero Startup Delay" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove atraso de inicializa&#xE7;&#xE3;o do Explorer (StartupDelayInMSec=0)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusZeroStartupDelay" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkZeroStartupDelay" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkZeroStartupDelay_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Boot Animation -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define EnableMachineBootAnimation=0. Remove a anima&#xE7;&#xE3;o de boot do Windows. Pode acelerar a inicializa&#xE7;&#xE3;o em SSDs."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Boot Animation" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove anima&#xE7;&#xE3;o de boot do Windows." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableBootAnimation" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableBootAnimation" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableBootAnimation_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== STORAGE / MANUTENÇÃO ====== -->
+            <TextBlock Text="Manuten&#xE7;&#xE3;o e Limpeza" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- WU Cache -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove todos os arquivos da pasta SoftwareDistribution/Download. Libera espa&#xE7;o em disco sem afetar updates futuros."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Limpar Cache Windows Update" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Limpa pasta SoftwareDistribution/Download." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusCleanWuCache" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <Button x:Name="BtnCleanWuCache" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanWuCache_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Recent Items -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove a lista de arquivos recentes do usu&#xE1;rio (pasta Recent). Libera espa&#xE7;o e limpa hist&#xF3;rico de atividade."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Limpar Recent Items" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Limpa a lista de arquivos recentes do usu&#xE1;rio." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusCleanRecent" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <Button x:Name="BtnCleanRecent" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanRecent_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- IE Cache -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove todo o cache do Internet Explorer e Edge legado (INetCache). Pode liberar GBs de espa&#xE7;o."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Limpar Cache IE/Edge" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Limpa INetCache do Internet Explorer/Edge." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusCleanIeCache" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <Button x:Name="BtnCleanIeCache" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanIeCache_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Dumps/Logs -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove Minidumps, Windows Logs e WER (Windows Error Reporting) Reports. Libera espa&#xE7;o sem impacto no sistema."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Limpar Minidumps e Logs" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Limpa Minidump, Windows Logs e WER reports." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusCleanDumpsLogs" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <Button x:Name="BtnCleanDumpsLogs" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanDumpsLogs_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- SFC -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Executa sfc /scannow. Verifica e repara arquivos protegidos do Windows. Pode levar at&#xE9; 15 minutos. Requer administrador."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Executar SFC / ScanNow" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Verifica integridade de arquivos protegidos do Windows." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusSfcScan" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <StackPanel Grid.Column="3" Orientation="Vertical" HorizontalAlignment="Right">
+                            <Button x:Name="BtnSfcScan" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnSfcScan_Click"/>
+                            <ProgressBar x:Name="ProgressSfc" Height="3" Width="75" Margin="0,4,0,0" Minimum="0" Maximum="100" Visibility="Collapsed" Foreground="#FFD700" Background="#333333"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- DISM -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Executa DISM /RestoreHealth + /StartComponentCleanup /ResetBase. Repara imagem do sistema e limpa WinSxS. Pode levar at&#xE9; 30 minutos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Executar DISM + ResetBase" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Repara imagem do Windows e limpa WinSxS." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDism" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <StackPanel Grid.Column="3" Orientation="Vertical" HorizontalAlignment="Right">
+                            <Button x:Name="BtnDism" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnDism_Click"/>
+                            <ProgressBar x:Name="ProgressDism" Height="3" Width="75" Margin="0,4,0,0" Minimum="0" Maximum="100" Visibility="Collapsed" Foreground="#FFD700" Background="#333333"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== SISTEMA E MEMÓRIA ====== -->
+            <TextBlock Text="Sistema e Mem&#xF3;ria" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Disable Prefetch/Superfetch -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define EnablePrefetcher=0 e EnableSuperfetch=0. Desativa os servi&#xE7;os de pr&#xE9;-busca e superfetch, reduzindo opera&#xE7;&#xF5;es de I/O em segundo plano em SSDs."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Prefetch/Superfetch" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa pr&#xE9;-busca e superfetch (EnablePrefetcher=0)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisablePrefetch" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisablePrefetch" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisablePrefetch_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Large System Cache -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define LargeSystemCache=1. Faz o sistema usar mais mem&#xF3;ria RAM como cache de arquivos, melhorando desempenho em aplica&#xE7;&#xF5;es que acessam muitos arquivos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Large System Cache" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Aumenta cache de sistema para I/O de arquivos (LargeSystemCache=1)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusLargeSystemCache" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkLargeSystemCache" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkLargeSystemCache_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Disable Paging Executive -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define DisablePagingExecutive=1. Mant&#xE9;m os drivers e c&#xF3;digo do kernel na RAM f&#xED;sica, nunca paginados para o disco. Aumenta performance mas consome mais RAM."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Paging Executive" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Mant&#xE9;m kernel/drivers na RAM (DisablePagingExecutive=1)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisablePagingExecutive" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisablePagingExecutive" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisablePagingExecutive_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Disable Exception Chain Validation -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa a valida&#xE7;&#xE3;o de cadeia de exce&#xE7;&#xF5;es do kernel (DisableExceptionChainValidation=1). Pode causar ganho marginal de FPS, reduzindo a seguran&#xE7;a."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Exception Chain Validation" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove valida&#xE7;&#xE3;o de cadeia de exce&#xE7;&#xF5;es (ganho FPS marginal)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableExceptionChain" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableExceptionChain" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableExceptionChain_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Disable CFG -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa Control Flow Guard (EnableCfg=0). Reduz a prote&#xE7;&#xE3;o contra exploits de mem&#xF3;ria para ganho de FPS em jogos. N&#xE3;o recomendado em m&#xE1;quinas de trabalho."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar CFG (Control Flow Guard)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa CFG para ganho de FPS (reduz seguran&#xE7;a)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableCfg" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableCfg" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableCfg_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Distribute Timers -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define DistributeTimers=1. Permite que o sistema distribua timers entre n&#xFA;cleos de CPU, melhorando precis&#xE3;o de temporiza&#xE7;&#xE3;o e reduzindo lat&#xEA;ncia."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Distribuir Timers (DistributeTimers)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Distribui timers entre n&#xFA;cleos para menor lat&#xEA;ncia." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDistributeTimers" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDistributeTimers" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDistributeTimers_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== PRIVACIDADE E TELEMETRIA ====== -->
+            <TextBlock Text="Privacidade e Telemetria" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Block Cortana -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Bloqueia Cortana completamente via pol&#xED;tica de grupo (AllowCortana=0, AllowCloudSearch=0, etc). Remove assistente e busca na web."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Bloquear Cortana Completamente" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove Cortana, busca na web e nuvem via pol&#xED;tica." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusBlockCortana" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkBlockCortana" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBlockCortana_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Disable Activity Feed -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o Activity Feed do Windows (EnableActivityFeed=0). Impede que o sistema colete e compartilhe hist&#xF3;rico de atividades com a Microsoft."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Activity Feed" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede coleta de hist&#xF3;rico de atividades (EnableActivityFeed=0)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableActivityFeed" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableActivityFeed" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableActivityFeed_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Disable Windows Feeds -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa Windows Feeds (EnableFeeds=0), tamb&#xE9;m conhecido como 'News &amp; Interests'. Remove o feed de not&#xED;cias da barra de tarefas."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Windows Feeds (News)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove feed de not&#xED;cias/interesses da barra de tarefas." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableWindowsFeeds" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableWindowsFeeds" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableWindowsFeeds_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Block Advertising ID -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Bloqueia o Advertising ID do Windows (DisabledByGroupPolicy=1). Impede que apps usem seu ID para an&#xFA;ncios personalizados."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Bloquear Advertising ID" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede uso do ID de an&#xFA;ncios do Windows." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusBlockAdvertisingId" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkBlockAdvertisingId" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBlockAdvertisingId_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Disable Consumer Features -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa Windows Consumer Features (DisableWindowsConsumerFeatures=1). Bloqueia sugest&#xF5;es de apps da Store, dicas e conte&#xFA;do promocional da Microsoft."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Consumer Features" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Bloqueia sugest&#xF5;es, dicas e promo&#xE7;&#xF5;es da Microsoft." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableConsumerFeatures" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableConsumerFeatures" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableConsumerFeatures_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Disable Error Reporting -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o Windows Error Reporting (WER) via pol&#xED;tica: Disabled=1, DoReport=0, LoggingDisabled=1. Impede envio de relat&#xF3;rios de erro &#xE0; Microsoft."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Error Reporting (WER)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Bloqueia envio de relat&#xF3;rios de erro &#xE0; Microsoft." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableErrorReporting" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableErrorReporting" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableErrorReporting_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== REDE AVANÇADA ====== -->
+            <TextBlock Text="Rede Avan&#xE7;ada" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Network Throttling Index -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define NetworkThrottlingIndex=0xFFFFFFFF. Remove a limita&#xE7;&#xE3;o de rede para multim&#xED;dia, permitindo que jogos e aplicativos de tempo real usem largura de banda m&#xE1;xima."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Network Throttling (Max)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove limita&#xE7;&#xE3;o de rede para multim&#xED;dia/jogos." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusNetworkThrottlingIndex" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkNetworkThrottlingIndex" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNetworkThrottlingIndex_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== SERVIÇOS DO SISTEMA ====== -->
+            <TextBlock Text="Servi&#xE7;os do Sistema (Adicionais)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Print Spooler -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o servi&#xE7;o de impress&#xE3;o (Spooler). Economiza recursos significativos se voc&#xEA; n&#xE3;o usa impressora. Reative se precisar imprimir."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Print Spooler" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o de impress&#xE3;o (economiza RAM/CPU)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableSpooler" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableSpooler" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableSpooler_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Bluetooth -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa todos os servi&#xE7;os Bluetooth (BTAGService, bthserv, BthAvctpSvc, BluetoothUserService). Economiza recursos em PCs sem Bluetooth."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Servi&#xE7;os Bluetooth" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa BTAGService, bthserv, BthAvctpSvc, BluetoothUserService." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableBluetooth" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableBluetooth" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableBluetooth_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- MapsBroker -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o servi&#xE7;o MapsBroker (Downloaded Maps Manager). Impede que o Windows baixe mapas offline em segundo plano."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar MapsBroker" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o de mapas baixados (Downloaded Maps Manager)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableMapsBroker" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableMapsBroker" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMapsBroker_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- SysMain -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o SysMain (Superfetch). Em SSDs, esse servi&#xE7;o &#xE9; desnecess&#xE1;rio e pode causar uso elevado de CPU/Disco. Recomendado para sistemas com SSD."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar SysMain (Superfetch)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa Superfetch (recomendado para SSDs)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDisableSysMain" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDisableSysMain" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableSysMain_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ====== PERIFÉRICOS ====== -->
+            <TextBlock Text="Perif&#xE9;ricos" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+
+                    <!-- Keyboard Data Queue -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define o tamanho da fila de dados do teclado para 100 (KeyboardDataQueueSize=100). Reduz perda de inputs em jogos de alta velocidade."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Keyboard Data Queue (100)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Aumenta fila de dados do teclado para 100 (menos perda de input)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusKeyboardDataQueue" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkKeyboardDataQueue" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkKeyboardDataQueue_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Mouse Data Queue -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define o tamanho da fila de dados do mouse para 100 (MouseDataQueueSize=100). Melhora a precis&#xE3;o e resposta do mouse em jogos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Mouse Data Queue (100)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Aumenta fila de dados do mouse para 100 (maior precis&#xE3;o)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusMouseDataQueue" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkMouseDataQueue" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMouseDataQueue_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#2D2020" BorderBrush="#503030" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,20,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#x26A0;&#xFE0F;" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="16"/>
+                    <TextBlock Text="Altera&#xE7;&#xF5;es nestas configura&#xE7;&#xF5;es exigem que voc&#xEA; reinicie o computador para serem aplicadas pelo Windows." 
+                               Foreground="#FFC0C0" VerticalAlignment="Center" FontSize="13"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

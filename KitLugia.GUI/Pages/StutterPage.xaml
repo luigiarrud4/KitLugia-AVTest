@@ -1,0 +1,321 @@
+<Page x:Class="KitLugia.GUI.Pages.StutterPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Stutter Detector"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji" Loaded="StutterPage_Loaded">
+
+    <Page.Resources>
+        <Style x:Key="StatCard" TargetType="Border">
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="MinWidth" Value="140"/>
+        </Style>
+        <Style x:Key="StatValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#FFD700"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="StatLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#888888"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+
+        <Style x:Key="StutterButtonBase" TargetType="Button">
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bdr" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="1" ScaleY="1"/>
+                            </Border.RenderTransform>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="bdr"
+                                                Storyboard.TargetProperty="RenderTransform.ScaleX"
+                                                To="1.05" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="bdr"
+                                                Storyboard.TargetProperty="RenderTransform.ScaleY"
+                                                To="1.05" Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="bdr"
+                                                Storyboard.TargetProperty="RenderTransform.ScaleX"
+                                                To="1" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="bdr"
+                                                Storyboard.TargetProperty="RenderTransform.ScaleY"
+                                                To="1" Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                                <Setter TargetName="bdr" Property="Background" Value="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
+        <StackPanel Margin="24,20">
+
+            <TextBlock Text="Stutter Detector" FontSize="22" FontWeight="Bold" Foreground="#FFD700"/>
+            <TextBlock Text="Detecta travamentos e micro-stutters do sistema em tempo real via QPC" FontSize="12" Foreground="#666666" Margin="0,4,0,16"/>
+
+            <!-- Status Bar -->
+            <Border Background="#1A2A1A" CornerRadius="8" Padding="12,8" Margin="0,0,0,16"
+                    BorderBrush="#33FFD700" BorderThickness="1">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="#666" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock x:Name="TxtStatus" Text="Parado" FontSize="13" Foreground="#888" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtUptime" Text="" FontSize="12" Foreground="#666" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    <TextBlock x:Name="TxtSampleRate" Text="" FontSize="12" Foreground="#666" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Stats Cards -->
+            <WrapPanel Margin="0,0,0,16">
+                <Border Style="{StaticResource StatCard}">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtCurrentLatency" Style="{StaticResource StatValue}" Text="0"/>
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Latencia Atual (us)"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource StatCard}">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtMaxLatency" Style="{StaticResource StatValue}" Foreground="#FF4444" Text="0"/>
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Latencia Maxima (us)"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource StatCard}">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtAvgLatency" Style="{StaticResource StatValue}" Foreground="#8888FF" Text="0"/>
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Latencia Media (us)"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource StatCard}">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtStuttersTotal" Style="{StaticResource StatValue}" Foreground="#FF8844" Text="0"/>
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Total Stutters"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource StatCard}">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtStuttersMin" Style="{StaticResource StatValue}" Foreground="#FFD700" Text="0"/>
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Stutters/min"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource StatCard}">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtTotalSamples" Style="{StaticResource StatValue}" Foreground="#88CC88" Text="0"/>
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Total Amostras"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource StatCard}">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtDpcPercent" Style="{StaticResource StatValue}" Foreground="#88CCFF" Text="0"/>
+                        <TextBlock Style="{StaticResource StatLabel}" Text="DPC (%)"/>
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+
+            <!-- Monitoramento de Processo -->
+            <Border Background="#0D0D1A" CornerRadius="8" Padding="12" Margin="0,0,0,12"
+                    BorderBrush="#334488FF" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Processo:" FontSize="12" Foreground="#888" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox x:Name="TxtProcessName" Grid.Column="1"
+                             Background="#1A1A1A" Foreground="White" BorderBrush="#333" BorderThickness="1"
+                             Padding="8,4" FontSize="12"
+                             Text="" ToolTip="Digite o nome do processo (ex: chrome, explorer, ffxiv_dx11)"/>
+                    <Button x:Name="BtnMonitorProcess" Grid.Column="2" Content="Monitorar"
+                            Style="{StaticResource StutterButtonBase}"
+                            Background="#1A3A1A" BorderBrush="#3388FF88" Foreground="#88FF88"
+                            Margin="8,0,0,0" Padding="12,4" FontSize="12" Click="BtnMonitorProcess_Click"/>
+                    <Button x:Name="BtnStopMonitor" Grid.Column="3" Content="Parar"
+                            Style="{StaticResource StutterButtonBase}"
+                            Background="#3A1A1A" BorderBrush="#33FF8888" Foreground="#FF8888"
+                            IsEnabled="False" Margin="4,0,0,0" Padding="12,4" FontSize="12" Click="BtnStopMonitor_Click"/>
+
+                    <!-- Monitored Process Stats -->
+                    <WrapPanel Grid.Row="1" Grid.ColumnSpan="5" x:Name="PanelMonitoredStats" Margin="0,8,0,0" Visibility="Collapsed">
+                        <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtMonProcCpu" Text="0%" FontSize="16" FontWeight="Bold" Foreground="#88CC88" HorizontalAlignment="Center"/>
+                                <TextBlock Text="CPU" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtMonProcMem" Text="0 MB" FontSize="16" FontWeight="Bold" Foreground="#8888FF" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Memoria" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtMonProcThreads" Text="0" FontSize="16" FontWeight="Bold" Foreground="#FFD700" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Threads" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </WrapPanel>
+                </Grid>
+            </Border>
+
+            <!-- Audio Status + Severity Legend -->
+            <WrapPanel Margin="0,0,0,8">
+                <Border x:Name="PanelAudioStatus" Background="#1A1A1A" CornerRadius="6" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔊" FontSize="11" Margin="0,0,4,0"/>
+                        <TextBlock x:Name="TxtAudiodgCpu" Text="" FontSize="11" Foreground="#88CCFF"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="Micro-stutter (&lt;10ms)" FontSize="11" Foreground="#88CC88" Margin="0,0,16,0"/>
+                <TextBlock Text="Moderado (10-50ms)" FontSize="11" Foreground="#FFCC44" Margin="0,0,16,0"/>
+                <TextBlock Text="Grave (50-100ms)" FontSize="11" Foreground="#FF6644" Margin="0,0,16,0"/>
+                <TextBlock Text="TRAVAMENTO (&gt;100ms)" FontSize="11" Foreground="#FF2222" Margin="0,0,16,0"/>
+                <TextBlock Text="🔊 = Glitch Áudio" FontSize="11" Foreground="#88CCFF" Margin="0,0,16,0"/>
+            </WrapPanel>
+
+            <!-- Stutters Log -->
+            <Border Background="#0D0D0D" CornerRadius="8" Padding="0" MinHeight="200"
+                    BorderBrush="#222" BorderThickness="1" Margin="0,0,0,12">
+                <Grid>
+                    <TextBlock Text="Nenhum stutter detectado. Clique em Iniciar para monitorar."
+                               FontSize="13" Foreground="#444" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               x:Name="TxtEmptyState"/>
+                    <ListBox x:Name="LstStutters" Background="Transparent" BorderThickness="0"
+                             Foreground="White" FontSize="12"
+                             ScrollViewer.VerticalScrollBarVisibility="Visible"
+                             VirtualizingPanel.ScrollUnit="Pixel"
+                             AlternationCount="2">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="#1A1A1A"/>
+                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Padding" Value="8,4"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    Padding="{TemplateBinding Padding}"
+                                                    SnapsToDevicePixels="True">
+                                                <ContentPresenter/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="180"/>
+                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss.fff}}"
+                                               Foreground="#888" FontSize="11"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding DurationMsDisplay}"
+                                               Foreground="#CCC" FontSize="11"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding ExcessLatencyDisplay}"
+                                               Foreground="#AAA" FontSize="11"/>
+                                    <TextBlock Grid.Column="3" Text="{Binding Severity}" FontSize="11"/>
+                                    <TextBlock Grid.Column="4" Text="{Binding AudioIcon}"
+                                               Foreground="#88CCFF" FontSize="12" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="5" Text="{Binding TopProcessName}"
+                                               Foreground="#666" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- Recomendacoes -->
+            <Border x:Name="PanelRecommendations" Background="#1A1A2A" CornerRadius="8" Padding="12"
+                    BorderBrush="#33FFD700" BorderThickness="1" Margin="0,0,0,12" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Recomendacoes" FontSize="14" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                    <ItemsControl x:Name="RecList" ItemsSource="{Binding}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" FontSize="12" Foreground="#CCC" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Controls -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,20" FlowDirection="LeftToRight">
+                <Button x:Name="BtnStart" Content="  Iniciar Monitoramento"
+                        Style="{StaticResource StutterButtonBase}"
+                        Background="#1A4A1A" BorderBrush="#3388FF88" Foreground="#88FF88"
+                        Tag="#224A4A4A" Click="BtnStart_Click"/>
+                <Button x:Name="BtnStop" Content="  Parar"
+                        Style="{StaticResource StutterButtonBase}"
+                        Background="#4A1A1A" BorderBrush="#33FF8888" Foreground="#FF8888"
+                        IsEnabled="False" Tag="#224A4A4A" Click="BtnStop_Click"/>
+                <Button x:Name="BtnRecommend" Content="  Recomendar"
+                        Style="{StaticResource StutterButtonBase}"
+                        Background="#2A1A4A" BorderBrush="#338888FF" Foreground="#8888FF"
+                        Tag="#224A4A4A" Click="BtnRecommend_Click"/>
+                <Button x:Name="BtnAutoTest" Content="  Teste A/B"
+                        Style="{StaticResource StutterButtonBase}"
+                        Background="#4A2A1A" BorderBrush="#33FFAA44" Foreground="#FFAA44"
+                        Tag="#224A4A4A" Click="BtnAutoTest_Click"/>
+                <Button x:Name="BtnCopyLog" Content="  Copiar Log"
+                        Style="{StaticResource StutterButtonBase}"
+                        Background="#1A1A2A" BorderBrush="#3388CCFF" Foreground="#88CCFF"
+                        Tag="#224A4A4A" Click="BtnCopyLog_Click"/>
+                <Button x:Name="BtnClear" Content="  Limpar"
+                        Style="{StaticResource StutterButtonBase}"
+                        Background="#1A1A1A" BorderBrush="#333" Foreground="#888"
+                        Tag="#222A2A2A" Click="BtnClear_Click"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

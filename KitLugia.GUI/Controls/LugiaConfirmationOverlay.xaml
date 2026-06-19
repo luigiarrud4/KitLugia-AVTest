@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="KitLugia.GUI.Controls.LugiaConfirmationOverlay"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+
+    <!-- CORRE&#xC7;&#xC3;O: Alterado Height="240" para MinHeight="240". 
+         Isso permite que a janela cres&#xE7;a se o texto for grande, sem espremer o conte&#xFA;do. -->
+    <Border Width="500" MinHeight="240" CornerRadius="12" BorderThickness="1" BorderBrush="{StaticResource AccentColor}" Background="#1A1A1A"
+            HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Border.Effect>
+            <DropShadowEffect Color="#FFD700" BlurRadius="30" ShadowDepth="0" Opacity="0.4"/>
+        </Border.Effect>
+
+        <Grid Margin="25">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- T&#xED;tulo -->
+            <TextBlock Text="CONFIRMA&#xC7;&#xC3;O" Foreground="{StaticResource AccentColor}" 
+                       FontWeight="Bold" FontSize="16" HorizontalAlignment="Center"/>
+
+            <!-- Mensagem -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,20">
+                <TextBlock Text="&#x26A0;&#xFE0F;" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+                <!-- CORRE&#xC7;&#xC3;O: Viewbox removido. Adicionado TextWrapping="Wrap". 
+                     Isso garante que o texto fique leg&#xED;vel e quebre linhas automaticamente. -->
+                <TextBlock x:Name="TxtMessage" 
+                           Text="Deseja continuar?" 
+                           Foreground="#E0E0E0" 
+                           TextAlignment="Center" 
+                           FontSize="14" 
+                           TextWrapping="Wrap"
+                           LineHeight="20"
+                           Margin="10,0"/>
+            </StackPanel>
+
+            <!-- Bot&#xF5;es -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                <Button Content="SIM" Width="120" Height="40" Margin="0,0,20,0" Click="BtnYes_Click" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Background="{DynamicResource AccentColor}" CornerRadius="20">
+                                <TextBlock Text="{TemplateBinding Content}" Foreground="Black" FontWeight="ExtraBold" 
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="White"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Button Content="N&#xC3;O" Width="120" Height="40" Click="BtnNo_Click" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Background="#333" CornerRadius="20" BorderBrush="#555" BorderThickness="1">
+                                <TextBlock Text="{TemplateBinding Content}" Foreground="White" FontWeight="Bold"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#444"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

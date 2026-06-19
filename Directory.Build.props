@@ -1,0 +1,9 @@
+<Project>
+  <!--
+    Diretório de Propriedades Compartilhadas do KitLugia
+    Este arquivo é aplicado automaticamente a todos os projetos da solução.
+  -->
+  <PropertyGroup>
+    <UseNETCoreSdk>true</UseNETCoreSdk>
+  </PropertyGroup>
+</Project>

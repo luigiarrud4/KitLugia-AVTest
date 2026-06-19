@@ -1,0 +1,14 @@
+diff --git a/refind/global.h b/refind/global.h
+index 4397db8..fcbfcbf 100644
+--- a/refind/global.h
++++ b/refind/global.h
+@@ -74,7 +74,8 @@
+ #define TAG_FIRMWARE         (14)
+ #define TAG_MEMTEST          (15)
+ #define TAG_GDISK            (16)
+-#define NUM_TOOLS            (17)
++#define TAG_KITLUGIA         (17)
++#define NUM_TOOLS            (18)
+ 
+ #define NUM_SCAN_OPTIONS 10
+ 

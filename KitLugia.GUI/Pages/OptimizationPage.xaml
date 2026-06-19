@@ -1,0 +1,235 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.OptimizationPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Otimiza&#xE7;&#xE3;o Autom&#xE1;tica"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30" MaxWidth="950">
+
+            <!-- Cabe&#xE7;alho -->
+            <StackPanel Margin="0,0,0,25">
+                <TextBlock Text="Automa&#xE7;&#xE3;o de Sistema" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Text="Configure regras autom&#xE1;ticas para manter seu PC r&#xE1;pido sem interven&#xE7;&#xE3;o manual." 
+                           Foreground="{StaticResource TextSecondary}" Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <!-- Status Geral -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+                    BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,0,0,18" Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock x:Name="TxtRamUsage" Text="--" FontSize="24" FontWeight="Bold" 
+                                   Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="RAM em uso" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                        <TextBlock x:Name="TxtCpuUsage" Text="--" FontSize="24" FontWeight="Bold" 
+                                   Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="CPU" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                        <TextBlock x:Name="TxtAutoCleanStatus" Text="--" FontSize="24" FontWeight="Bold" 
+                                   Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Auto-Limpeza" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                        <TextBlock x:Name="TxtUptime" Text="--" FontSize="24" FontWeight="Bold" 
+                                   Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Uptime" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card: Limpeza Autom&#xE1;tica de RAM -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+                    BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="&#x1F9F9;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <StackPanel>
+                            <TextBlock Text="Limpeza Autom&#xE1;tica de RAM" FontSize="16" FontWeight="Bold" 
+                                       Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock Text="Limpa automaticamente quando o uso de RAM atingir o limite." 
+                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkAutoClean" Style="{StaticResource ToggleSwitchStyle}" 
+                                  HorizontalAlignment="Right" Margin="0,0,0,0" VerticalAlignment="Center"
+                                  Click="ChkAutoClean_Click"/>
+                    </StackPanel>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Limite de RAM para acionar limpeza" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock x:Name="TxtThresholdValue" Text="80%" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                        <Slider x:Name="SliderThreshold" Grid.Column="1" Minimum="50" Maximum="95" Value="80" 
+                                TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                                ValueChanged="SliderThreshold_ValueChanged"/>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Intervalo de verifica&#xE7;&#xE3;o" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock x:Name="TxtIntervalValue" Text="30 segundos" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                        <Slider x:Name="SliderInterval" Grid.Column="1" Minimum="10" Maximum="120" Value="30" 
+                                TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                                ValueChanged="SliderInterval_ValueChanged"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Card: Plano de Energia Autom&#xE1;tico -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+                    BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="&#x26A1;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <StackPanel>
+                            <TextBlock Text="Plano de Energia" FontSize="16" FontWeight="Bold" 
+                                       Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock Text="Selecione o plano de energia ativo do sistema." 
+                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="CmbPowerPlan" Height="36" VerticalAlignment="Center" Margin="0,0,10,0"
+                                  SelectionChanged="CmbPowerPlan_SelectionChanged"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="&#x1F504; Atualizar" Style="{StaticResource SecondaryButtonStyle}" 
+                                    Width="90" Height="36" Margin="0,0,8,0" Click="BtnRefreshPowerPlans_Click"/>
+                            <Button Content="&#x26A1; Ultimate" Style="{StaticResource GoldButtonStyle}" 
+                                    Width="90" Height="36" Click="BtnUltimatePower_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Card: Inicializa&#xE7;&#xE3;o com Windows -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+                    BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="&#x1F680;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <StackPanel>
+                            <TextBlock Text="Inicializa&#xE7;&#xE3;o com Windows" FontSize="16" FontWeight="Bold" 
+                                       Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock Text="Configure o KitLugia para iniciar automaticamente com o Windows." 
+                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Iniciar com Windows -->
+                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Iniciar KitLugia com o Windows" FontSize="13" FontWeight="SemiBold" 
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Inicia minimizado na bandeja do sistema." FontSize="11" 
+                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <CheckBox x:Name="ChkStartWithWindows" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
+                                      Click="ChkStartWithWindows_Click" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Turbo Boot -->
+                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Turbo Boot (Inicializa&#xE7;&#xE3;o R&#xE1;pida)" FontSize="13" FontWeight="SemiBold" 
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Usa hiberna&#xE7;&#xE3;o parcial para iniciar o Windows mais r&#xE1;pido." FontSize="11" 
+                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <CheckBox x:Name="ChkTurboBoot" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
+                                      Click="ChkTurboBoot_Click" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Turbo Shutdown -->
+                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Turbo Shutdown (Desligamento R&#xE1;pido)" FontSize="13" FontWeight="SemiBold" 
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Encerra processos mais rapidamente ao desligar." FontSize="11" 
+                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <CheckBox x:Name="ChkTurboShutdown" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
+                                      Click="ChkTurboShutdown_Click" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Card: Tarefas de Manuten&#xE7;&#xE3;o -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+                    BorderThickness="1" CornerRadius="8" Padding="22" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="&#x1F527;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <StackPanel>
+                            <TextBlock Text="Tarefas de Manuten&#xE7;&#xE3;o" FontSize="16" FontWeight="Bold" 
+                                       Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock Text="Execute a&#xE7;&#xF5;es de manuten&#xE7;&#xE3;o agora." 
+                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <WrapPanel>
+                        <Button Content="&#x1F9F9; Limpar Tempor&#xE1;rios" Style="{StaticResource SecondaryButtonStyle}" 
+                                Width="175" Height="38" Margin="0,0,8,8" Click="BtnQuickCleanTemp_Click"/>
+                        <Button Content="&#x1F4BE; Otimizar RAM" Style="{StaticResource SecondaryButtonStyle}" 
+                                Width="150" Height="38" Margin="0,0,8,8" Click="BtnOptimizeRam_Click"/>
+                        <Button Content="&#x1F50D; Verificar Disco" Style="{StaticResource SecondaryButtonStyle}" 
+                                Width="150" Height="38" Margin="0,0,8,8" Click="BtnCheckDisk_Click"/>
+                        <Button Content="&#x1F310; Flush DNS" Style="{StaticResource SecondaryButtonStyle}" 
+                                Width="120" Height="38" Margin="0,0,0,8" Click="BtnFlushDns_Click"/>
+                    </WrapPanel>
+
+                    <TextBlock x:Name="TxtActionResult" Text="" FontSize="12" Foreground="#4CAF50" 
+                               Margin="0,8,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

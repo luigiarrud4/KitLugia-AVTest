@@ -1,0 +1,93 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.GlobalSearchPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Resultados da Busca"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <Grid Margin="30">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="Resultados da Pesquisa" FontSize="28" FontWeight="SemiBold" Foreground="White"/>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Encontrados: " Foreground="#888" Margin="0,5,5,0"/>
+                <TextBlock x:Name="TxtResultCount" Text="0 itens" Foreground="{StaticResource AccentColor}" FontWeight="Bold" Margin="0,5,0,0"/>
+            </StackPanel>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="ListResults">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource CardStyle}"
+                                Width="320" Height="100" Margin="0,0,12,12" Padding="12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Background="#15FFD700" CornerRadius="8" Width="36" Height="36"
+                                        VerticalAlignment="Top" HorizontalAlignment="Left">
+                                    <TextBlock Text="{Binding Icon}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe UI Emoji"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="8,0,5,0">
+                                    <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="Bold" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Description}" Foreground="#999" FontSize="10"
+                                               TextWrapping="Wrap" MaxHeight="28" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                                </StackPanel>
+
+                                <Grid Grid.Column="2" VerticalAlignment="Center">
+                                    <Button Content="{Binding ButtonText}" Tag="{Binding}" Click="BtnExecute_Click"
+                                            Height="28" FontSize="10" FontWeight="Bold" Padding="10,0" Cursor="Hand" MinWidth="65">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsToggle}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+
+                                    <CheckBox IsChecked="{Binding IsActive, Mode=OneWay}"
+                                              Tag="{Binding}" Click="BtnExecute_Click" Cursor="Hand">
+                                        <CheckBox.Style>
+                                            <Style TargetType="CheckBox" BasedOn="{StaticResource ToggleSwitchStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsToggle}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </CheckBox.Style>
+                                    </CheckBox>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel x:Name="PanelNoResults" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+            <TextBlock Text="🔍" FontSize="50" HorizontalAlignment="Center" Opacity="0.3" Foreground="White"/>
+            <TextBlock Text="Nenhum resultado." Foreground="#AAA" FontSize="16" Margin="0,15,0,0" HorizontalAlignment="Center"/>
+            <TextBlock Text="Tente termos como: desempenho, rede, drivers, reparos..." Foreground="#666" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Page>
