@@ -103,8 +103,11 @@ class Program
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
+            string name = Path.GetFileName(file);
             string ext = Path.GetExtension(file).ToLowerInvariant();
             if (ext is ".pdb" or ".xml" or ".config" or ".log" or ".tmp")
+                continue;
+            if (name == "KitLugia.Updater.exe")
                 continue;
 
             try { File.Copy(file, dest, overwrite: true); }
