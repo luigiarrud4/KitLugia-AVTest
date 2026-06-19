@@ -67,17 +67,20 @@ namespace KitLugia.GUI.Pages
             {
                 TxtPCName.Text = System.Environment.MachineName;
 
-                // WMI síncrono em background para não travar a UI thread
                 double ram = await Task.Run(() => SystemUtils.GetTotalSystemRamGB());
 
                 using var dashManager = new DashboardManager();
                 var snapshot = await dashManager.GetSystemSnapshotAsync();
 
-                TxtSpecs.Text = $"{ram:F0} GB de RAM • {snapshot.OsName} • {snapshot.CpuName} • {snapshot.GpuName}";
+                string os = snapshot.OsName ?? "N/A";
+                string cpu = snapshot.CpuName ?? "N/A";
+                string gpu = snapshot.GpuName ?? "N/A";
+                TxtSpecs.Text = $"{ram:F0} GB de RAM • {os} • {cpu} • {gpu}";
             }
-            catch
+            catch (Exception ex)
             {
                 TxtSpecs.Text = "Falha ao ler hardware.";
+                Logger.Log($"[DASHBOARD] Erro ao carregar hardware: {ex.Message}");
             }
         }
 

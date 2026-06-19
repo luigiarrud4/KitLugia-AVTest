@@ -470,6 +470,8 @@ namespace KitLugia.GUI.Pages
             _isUpdateOperation = true;
             try
             {
+                TxtProgressStatus.Text = "Baixando atualização...";
+                OverlayBusy.Visibility = Visibility.Visible;
                 StatusText.Text = "⏳ Baixando atualização...";
                 UpdateButton.IsEnabled = false;
                 CheckButton.IsEnabled = false;
@@ -484,6 +486,7 @@ namespace KitLugia.GUI.Pages
                 }
                 else
                 {
+                    OverlayBusy.Visibility = Visibility.Collapsed;
                     StatusText.Text = "❌ Falha na atualização automática. Tente o download manual.";
                     UpdateButton.IsEnabled = true;
                     CheckButton.IsEnabled = true;
@@ -491,6 +494,7 @@ namespace KitLugia.GUI.Pages
             }
             catch (Exception ex)
             {
+                OverlayBusy.Visibility = Visibility.Collapsed;
                 StatusText.Text = $"❌ Erro: {ex.Message}";
                 UpdateButton.IsEnabled = true;
                 CheckButton.IsEnabled = true;
