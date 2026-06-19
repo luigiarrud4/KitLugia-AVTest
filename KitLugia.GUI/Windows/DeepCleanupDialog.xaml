@@ -1,0 +1,266 @@
+<Window x:Class="KitLugia.GUI.Windows.DeepCleanupDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Deep Cleanup"
+        Height="620"
+        Width="820"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="#0F0F0F"
+        WindowStyle="None"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="bdr" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bdr" Property="Background" Value="{DynamicResource CardHover}"/>
+                                <Setter TargetName="bdr" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bdr" Property="Background" Value="{DynamicResource AccentColor}"/>
+                                <Setter Property="Foreground" Value="Black"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bdr" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="TabHeaderStyle" TargetType="TabItem">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="#999"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="18,12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="0,0,0,3" Margin="0,0,4,0">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ItemRowStyle" TargetType="Border">
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+
+        <Style x:Key="ToolbarBtn" TargetType="Button">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+    </Window.Resources>
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="4"/>
+    </WindowChrome.WindowChrome>
+    <Border BorderBrush="#FFD700" BorderThickness="1">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock x:Name="TitleText" Text="Deep Cleanup" FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+            <TextBlock x:Name="SubtitleText" Text="Selecione os resíduos para remover" FontSize="13" Foreground="#AAA" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- Info bar: summary of found items -->
+        <Border Grid.Row="1" Background="#252525" CornerRadius="5" Padding="14,10" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="InfoBarText" Text="Analisando..." FontSize="12" Foreground="#BBB" VerticalAlignment="Center"/>
+                <TextBlock x:Name="InfoBarCount" Grid.Column="1" Text="" FontSize="12" Foreground="{StaticResource AccentColor}" FontWeight="Bold" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- Tabs: Files | Registry -->
+        <TabControl x:Name="ResultTabs" Grid.Row="2" Background="Transparent" BorderThickness="0">
+            <TabControl.Resources>
+                <Style TargetType="TabPanel">
+                    <Setter Property="Margin" Value="0,0,0,8"/>
+                </Style>
+            </TabControl.Resources>
+
+            <!-- TAB: Files & Folders -->
+            <TabItem Header="&#x1F4C1; Arquivos e Pastas" Style="{StaticResource TabHeaderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Toolbar -->
+                    <Border Grid.Row="0" Background="#252525" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox x:Name="ChkSelectAllFiles" Content="Selecionar Todos"
+                                      Foreground="#CCC" FontSize="12"
+                                      VerticalAlignment="Center"
+                                      Checked="ChkSelectAllFiles_Changed"
+                                      Unchecked="ChkSelectAllFiles_Changed"/>
+                            <TextBlock x:Name="TxtFileCount" Grid.Column="1" Text="0 itens" FontSize="12" Foreground="#888" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            <Button x:Name="BtnDeleteFiles" Grid.Column="2" Content="&#x1F5D1; Remover Selecionados (0)"
+                                    Background="#C0392B" Style="{StaticResource ToolbarBtn}" Click="BtnDeleteFiles_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- File list -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="FileList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource ItemRowStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                                            <Border Grid.Column="1" Width="32" Height="32" Background="#353535" CornerRadius="4" Margin="0,0,10,0">
+                                                <TextBlock Text="{Binding IconChar}" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource AccentColor}"/>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" Foreground="White"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding FullPath}" FontSize="11" Foreground="#888"
+                                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding FullPath}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB: Registry -->
+            <TabItem Header="&#x1F4D1; Registro" Style="{StaticResource TabHeaderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Toolbar -->
+                    <Border Grid.Row="0" Background="#252525" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox x:Name="ChkSelectAllReg" Content="Selecionar Todos"
+                                      Foreground="#CCC" FontSize="12"
+                                      VerticalAlignment="Center"
+                                      Checked="ChkSelectAllReg_Changed"
+                                      Unchecked="ChkSelectAllReg_Changed"/>
+                            <TextBlock x:Name="TxtRegCount" Grid.Column="1" Text="0 itens" FontSize="12" Foreground="#888" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            <Button x:Name="BtnDeleteReg" Grid.Column="2" Content="&#x1F5D1; Remover Selecionados (0)"
+                                    Background="#C0392B" Style="{StaticResource ToolbarBtn}" Click="BtnDeleteReg_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Registry list -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="RegList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource ItemRowStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                                            <Border Grid.Column="1" Width="32" Height="32" Background="#353535" CornerRadius="4" Margin="0,0,10,0">
+                                                <TextBlock Text="{Binding IconChar}" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="#E67E22"/>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" Foreground="White"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding FullPath}" FontSize="11" Foreground="#888"
+                                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding FullPath}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Bottom bar -->
+        <Border Grid.Row="3" Background="#252525" CornerRadius="5" Padding="14,10" Margin="0,12,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusText" Text="Nenhum item selecionado" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="Fechar" Width="90" Height="32"
+                            Background="#3E3E3E" Foreground="White" BorderThickness="0"
+                            Margin="0,0,8,0" Click="BtnClose_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.IntegrityPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      Title="Integridade do Sistema"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Page.Resources>
+
+    <Grid Margin="30">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 1. CABEÇALHO -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="Integridade e Seguranca" FontSize="32" FontWeight="SemiBold" Foreground="White"/>
+                <TextBlock Text="Monitoramento ativo de vulnerabilidades e configurações críticas." Foreground="#AAA" Margin="0,5,0,0"/>
+            </StackPanel>
+
+            <!-- Loading Spinner (sobreposto ao score quando carregando) -->
+            <Grid Grid.Column="1" Width="90" Height="90">
+                <Border Width="90" Height="90" CornerRadius="45" BorderThickness="4" x:Name="BorderScore">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock x:Name="TxtScore" Text="100%" FontSize="26" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                        <TextBlock Text="SCORE" FontSize="10" Foreground="#AAA" HorizontalAlignment="Center" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+                <!-- Loading overlay -->
+                <Border x:Name="LoadingOverlay" Width="90" Height="90" CornerRadius="45" Background="#CC111111"
+                        Visibility="Collapsed" IsHitTestVisible="True">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="⏳" FontSize="28" HorizontalAlignment="Center"/>
+                        <TextBlock Text="SCAN" FontSize="9" Foreground="#AAA" HorizontalAlignment="Center" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- 1.1 Loading Progress Bar -->
+        <Border Grid.Row="1" x:Name="ProgressBarContainer" Visibility="Collapsed" Margin="0,0,0,10" Height="4" CornerRadius="2" Background="#222">
+            <Border x:Name="ProgressBarFill" Width="100" Height="4" CornerRadius="2" Background="{StaticResource AccentColor}" HorizontalAlignment="Left">
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                        <BeginStoryboard>
+                            <Storyboard RepeatBehavior="Forever">
+                                <DoubleAnimation Storyboard.TargetProperty="Width" 
+                                    From="50" To="300" Duration="00:00:01.2" AutoReverse="True"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+            </Border>
+        </Border>
+
+        <!-- 2. BOTÕES E PESQUISA -->
+        <Grid Grid.Row="2" Margin="0,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="BtnFixAll" Content="🛡️ RESTAURAR TODOS (PADRÃO SEGURO)" Click="BtnFixAll_Click" 
+                    Width="280" Height="40" Background="#C42B1C" Foreground="White" FontWeight="Bold" 
+                    BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Style="{StaticResource GoldButtonStyle}"/>
+
+            <!-- SEARCH BOX (LUPA) -->
+            <Border Grid.Column="1" Height="36" Margin="15,0,15,0" CornerRadius="18" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="🔍" VerticalAlignment="Center" Margin="12,0,0,0" FontSize="14" Opacity="0.5"/>
+                    <TextBox x:Name="SearchBox" Grid.Column="1" 
+                             Text="" 
+                             VerticalAlignment="Center" Margin="5,0,12,0"
+                             Background="Transparent" Foreground="White" BorderThickness="0"
+                             FontSize="13" CaretBrush="White"
+                             TextChanged="SearchBox_TextChanged">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox">
+                                <Setter Property="Text" Value=""/>
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="Opacity" Value="0.5"/>
+                                    </Trigger>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="ToolTip" Value="Pesquisar por nome ou categoria..."/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Opacity" Value="1"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                    <!-- Botão limpar pesquisa -->
+                    <Button Grid.Column="1" x:Name="BtnClearSearch" Width="22" Height="22" 
+                            HorizontalAlignment="Right" Margin="0,0,6,0"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                            Visibility="Collapsed" Click="BtnClearSearch_Click">
+                        <TextBlock Text="✕" Foreground="#666" FontSize="10"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- CATEGORY FILTER COMBO -->
+            <Border Grid.Column="2" Height="36" CornerRadius="18" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1" Margin="0,0,10,0">
+                <ComboBox x:Name="CategoryFilter" VerticalAlignment="Center" Width="160"
+                          Background="Transparent" Foreground="White" BorderThickness="0"
+                          FontSize="12" SelectionChanged="CategoryFilter_SelectionChanged"
+                          IsHitTestVisible="True" Cursor="Hand">
+                    <ComboBoxItem Tag="ALL" IsSelected="True" Content="📋 Todas as Categorias"/>
+                    <ComboBoxItem Tag="SEGURANCA" Content="🛡️ Segurança"/>
+                    <ComboBoxItem Tag="DEFESA" Content="🛡️ Defesa"/>
+                    <ComboBoxItem Tag="PROTEGIDO" Content="✅ Protegido"/>
+                    <ComboBoxItem Tag="MODIFICADO" Content="⚠️ Modificado"/>
+                    <ComboBoxItem Tag="NAO_ENCONTRADO" Content="❌ Não Encontrado"/>
+                    <ComboBoxItem Tag="OPCIONAL" Content="⚙️ Opcional"/>
+                    <ComboBoxItem Tag="DESEMPENHO" Content="⚡ Desempenho"/>
+                </ComboBox>
+            </Border>
+
+            <Button Grid.Column="3" Content="🔄 Re-escanear" Click="BtnRescan_Click" x:Name="BtnRescan"
+                    Width="130" Height="36" Background="#222" Foreground="White" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Style="{StaticResource SecondaryButtonStyle}"/>
+        </Grid>
+
+        <!-- 3. LISTA DE ITENS COM VIRTUALIZAÇÃO -->
+        <Border Grid.Row="3" Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="8">
+            <Grid>
+                <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto" Padding="0"
+                              VirtualizingPanel.ScrollUnit="Item"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
+                    <ItemsControl x:Name="ItemsList"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
+                                  ScrollViewer.IsDeferredScrollingEnabled="False"
+                                  VirtualizingPanel.CacheLength="5,5">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
+                                                       VirtualizingPanel.VirtualizationMode="Recycling"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,1" Padding="15,10" Background="#161616" BorderBrush="#222" BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="140"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Escudo -->
+                                        <TextBlock Text="🛡️" VerticalAlignment="Center" FontSize="18" Opacity="0.7"/>
+
+                                        <!-- Nome e Categoria -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,10,0">
+                                            <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="11"/>
+                                        </StackPanel>
+
+                                        <!-- BOTÃO DE INFORMAÇÃO -->
+                                        <Button Grid.Column="2" Click="BtnInfo_Click" Tag="{Binding Description}"
+                                                Background="Transparent" BorderThickness="0" 
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                Width="30" Height="30" Cursor="Help"
+                                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                                            <Button.ToolTip>
+                                                <ToolTip Content="{Binding Description}"/>
+                                            </Button.ToolTip>
+                                            <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="Transparent">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Opacity" Value="1"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+
+                                        <!-- Badge de Status -->
+                                        <Border Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,15,0"
+                                                CornerRadius="4" Padding="10,4" MinWidth="100" x:Name="StatusBadge">
+                                            <TextBlock x:Name="TxtStatus" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Botão de Ação -->
+                                        <Button Grid.Column="4" Click="BtnToggleItem_Click" Tag="{Binding}"
+                                                Height="32" Width="120" Cursor="Hand" HorizontalAlignment="Right"
+                                                x:Name="BtnAction" FontWeight="SemiBold" FontSize="11">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="bdr" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="bdr" Property="Opacity" Value="0.8"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsEnabled" Value="False">
+                                                            <Setter TargetName="bdr" Property="Opacity" Value="0.5"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+
+                                    </Grid>
+                                </Border>
+
+                                <DataTemplate.Triggers>
+                                    <!-- ESTADO: MODIFICADO -->
+                                    <DataTrigger Binding="{Binding Status}" Value="MODIFIED">
+                                        <Setter TargetName="StatusBadge" Property="Background" Value="#25C42B1C"/>
+                                        <Setter TargetName="TxtStatus" Property="Text" Value="⚠️ MODIFICADO"/>
+                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#FF6F61"/>
+                                        <Setter TargetName="BtnAction" Property="Content" Value="CORRIGIR"/>
+                                        <Setter TargetName="BtnAction" Property="Background" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="Foreground" Value="Black"/>
+                                    </DataTrigger>
+
+                                    <!-- ESTADO: OK/PROTEGIDO -->
+                                    <DataTrigger Binding="{Binding Status}" Value="OK">
+                                        <Setter TargetName="StatusBadge" Property="Background" Value="#154CAF50"/>
+                                        <Setter TargetName="TxtStatus" Property="Text" Value="✅ PROTEGIDO"/>
+                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#4CAF50"/>
+                                        <Setter TargetName="BtnAction" Property="Content" Value="Desativar"/>
+                                        <Setter TargetName="BtnAction" Property="Background" Value="Transparent"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="#333333"/>
+                                        <Setter TargetName="BtnAction" Property="Foreground" Value="#777777"/>
+                                    </DataTrigger>
+
+                                    <!-- ESTADO: N/A -->
+                                    <DataTrigger Binding="{Binding Status}" Value="NOT_FOUND">
+                                        <Setter TargetName="StatusBadge" Property="Background" Value="#111111"/>
+                                        <Setter TargetName="TxtStatus" Property="Text" Value="N/A"/>
+                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#555555"/>
+                                        <Setter TargetName="BtnAction" Property="Visibility" Value="Hidden"/>
+                                    </DataTrigger>
+                                    
+                                    <!-- OPCIONAL (VBS, etc) -->
+                                    <DataTrigger Binding="{Binding IsOptional}" Value="True">
+                                        <Setter TargetName="StatusBadge" Property="Background" Value="#115533"/>
+                                        <Setter TargetName="TxtStatus" Property="Text" Value="⚠️ OPCIONAL"/>
+                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#FFA500"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Empty state quando pesquisa não encontra nada -->
+                <TextBlock x:Name="EmptyState" Text="🔍 Nenhum item encontrado para esta pesquisa." 
+                           Foreground="#666" FontSize="14"
+                           VerticalAlignment="Center" HorizontalAlignment="Center"
+                           Visibility="Collapsed"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

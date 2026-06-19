@@ -1,0 +1,1781 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.WinTunePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="WinTune">
+
+    <Page.Resources>
+        <!-- Estilo do ToolTip (Balão de Informação) -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="MaxWidth" Value="400"/>
+        </Style>
+
+        <!-- Estilo do Botão de Informação (ℹ️) -->
+        <Style x:Key="InfoButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Help"/>
+            <Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
+            <Setter Property="ToolTipService.ShowDuration" Value="20000"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Estilo do TabItem (Botões do topo) -->
+        <Style TargetType="TabItem">
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="#A0A0A0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" 
+                                Background="Transparent" 
+                                BorderThickness="0"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="4">
+                            <ContentPresenter x:Name="ContentSite" 
+                                            ContentSource="Header" 
+                                            HorizontalAlignment="Center" 
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                <Setter TargetName="Border" Property="Background" Value="#1A1A1A"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                <Setter TargetName="Border" Property="BorderThickness" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#2A2A2A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
+
+            <TextBlock Text="WinTune Optimizations" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Otimizações avançadas do WinTune. Alterações exigem reinicialização." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- Presets Recomendados -->
+            <TextBlock Text="Presets Recomendados" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15"/>
+            
+            <Grid Margin="0,0,0,25">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Seguro -->
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#4CAF50">
+                    <StackPanel>
+                        <TextBlock Text="✅ SEGURO" FontWeight="Bold" Foreground="#4CAF50" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Otimizações seguras. Não quebra funcionalidades." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
+                        <Button Content="Aplicar" Click="BtnApplySafePreset_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Performance -->
+                <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#FFA500">
+                    <StackPanel>
+                        <TextBlock Text="⚡ PERFORMANCE" FontWeight="Bold" Foreground="#FFA500" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Máxima performance. Pode desativar algumas funcionalidades." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
+                        <Button Content="Aplicar" Click="BtnApplyPerformancePreset_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Extremo -->
+                <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#C42B1C">
+                    <StackPanel>
+                        <TextBlock Text="⛔ EXTREMO" FontWeight="Bold" Foreground="#C42B1C" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Máximo desempenho. Pode quebrar funcionalidades." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
+                        <Button Content="Aplicar" Click="BtnApplyExtremePreset_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TabControl x:Name="WinTuneTabControl" Background="Transparent" BorderThickness="0">
+                <!-- ABA: SYSTEM -->
+                <TabItem Header="Sistema">
+                    <StackPanel Margin="0,10,0,0">
+                        <!-- Botões de Seleção Rápida -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <Button Content="✅ Selecionar Todos" Click="BtnSelectAllSystem_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="140"/>
+                            <Button Content="❌ Desmarcar Todos" Click="BtnDeselectAllSystem_Click" Style="{StaticResource SecondaryButtonStyle}" Width="140"/>
+                        </StackPanel>
+
+                        <!-- Item: GameBar -->
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Desativar GameBar" FontSize="14" Foreground="White"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}" Margin="10,0">
+                                <Button.ToolTip>
+                                    <ToolTip>
+                                        <StackPanel>
+                                            <TextBlock Text="Desativa a GameBar do Windows" FontWeight="Bold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="✓ Prós: Libera recursos do sistema, melhora performance em jogos" TextWrapping="Wrap"/>
+                                            <TextBlock Text="✗ Contras: Perde recursos de gravação e streaming nativos" TextWrapping="Wrap"/>
+                                            <TextBlock Text="⚠️ Riscos: Baixo - pode ser reativado se necessário" TextWrapping="Wrap"/>
+                                            <TextBlock Text="💡 Recomendação: Recomendado para gamers" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                                <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                            </Button>
+
+                            <CheckBox x:Name="ChkDisableGameBar" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Content=""/>
+                        </Grid>
+
+                        <!-- Item: Auto End Tasks -->
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Encerrar tarefas automaticamente" FontSize="14" Foreground="White"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}" Margin="10,0">
+                                <Button.ToolTip>
+                                    <ToolTip>
+                                        <StackPanel>
+                                            <TextBlock Text="Encerra automaticamente tarefas em segundo plano" FontWeight="Bold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="✓ Prós: Desligamento mais rápido, evita travamentos" TextWrapping="Wrap"/>
+                                            <TextBlock Text="✗ Contras: Apps podem não salvar dados corretamente" TextWrapping="Wrap"/>
+                                            <TextBlock Text="⚠️ Riscos: Médio - pode causar perda de dados não salvos" TextWrapping="Wrap"/>
+                                            <TextBlock Text="💡 Recomendação: Use com cautela" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                                <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                            </Button>
+
+                            <CheckBox x:Name="ChkAutoEndTasks" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Content=""/>
+                        </Grid>
+                            <CheckBox x:Name="ChkDisableAeDebug" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar AeDebug" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa o depurador automático do Windows" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Evita interrupções, melhora estabilidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Dificulta diagnóstico de problemas" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - problemas de sistema podem ser mais difíceis de resolver" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para usuários avançados" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAnimationEffectMaxMin" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar animações maximizar/minimizar" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Remove animações de janelas" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Resposta mais rápida, sistema mais fluido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde efeitos visuais do Windows" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas estético" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para performance" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAutoDefragIdle" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar desfragmentação automática" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa desfragmentação automática em SSDs" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Prolonga vida útil do SSD, reduz gravações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum - SSDs não precisam de desfragmentação" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - SSDs usam TRIM em vez de defrag" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Altamente recomendado para SSDs" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableBackgroundApps" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar apps em segundo plano" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa apps em segundo plano" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Economiza recursos, melhora bateria e performance" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Apps podem não funcionar corretamente em background" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - notificações podem não chegar" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para laptops" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableBootOptimize" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar otimização de boot" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa otimização automática de boot" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Reduz tempo de inicialização" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Boot pode ser mais lento ao longo do tempo" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - pode ser reativado manualmente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional - SSDs não precisam muito" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableCustomInking" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar coleta de tinta personalizada" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa coleta de dados de tinta" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade, menos telemetria" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Recursos de tinta podem ser menos precisos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas para usuários de caneta" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para privacidade" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableCrashAutoReboot" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar reinício automático após crash" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Impede reinício automático após falhas" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Evita reinícios inesperados" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Sistema pode não se recuperar de falhas graves" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - pode deixar sistema instável" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Não recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableErrorReporting" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar relatório de erros" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa envio de relatórios de erros" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade, reduz uso de rede" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Microsoft não recebe dados para corrigir bugs" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas afeta relatórios de erro" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para privacidade" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableGoogleUpdateTask" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Google Update" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa Google Update" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Reduz tarefas em background, economiza recursos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Chrome e apps Google não atualizam automaticamente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - pode deixar apps desatualizados" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional - atualize manualmente" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableLockScreen" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar tela de bloqueio" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Remove a tela de bloqueio" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Acesso mais rápido ao sistema" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde recursos de tela de bloqueio" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas estético e funcional" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para desktops" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableLowDiskSpaceChecks" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar verificação de pouco espaço" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa notificações de pouco espaço em disco" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos notificações irritantes" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Pode não ser avisado sobre pouco espaço" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - pode ficar sem espaço sem aviso" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Monitore espaço manualmente" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableMemoryPagination" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar paginação de memória" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa paginação de memória" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora performance em sistemas com 16GB+ RAM" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Pode causar problemas em sistemas com pouca RAM" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - pode causar crashes se RAM insuficiente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Apenas para sistemas com 32GB+ RAM" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableMenuShowDelay" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar atraso do menu" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Remove atraso ao abrir menus" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menus abrem instantaneamente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas melhora UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableMicrosoftEdgeUpdateTask" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Microsoft Edge Update" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa atualização do Edge" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Reduz tarefas em background" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Edge não atualiza automaticamente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - pode deixar navegador desatualizado" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional - atualize manualmente" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisablePrefetchParameters" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Prefetch" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa o serviço Prefetch" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Reduz gravações em SSD, melhora performance" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Apps podem abrir mais lentamente inicialmente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - SSDs são rápidos mesmo sem prefetch" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para SSDs" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableScheduledDefrag" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar desfragmentação agendada" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa desfragmentação agendada" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Reduz tarefas em background" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: SSDs não precisam de defrag" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - SSDs usam TRIM" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para SSDs" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableShortcutText" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar texto de atalho" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Remove texto 'Atalho para'" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Nomes de atalhos mais limpos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas estético" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkIoPageLockLimit" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Aumentar IoPageLockLimit" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Aumenta limite de I/O" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora performance de I/O" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Usa mais RAM" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - otimização segura" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkLinkResolveIgnoreLinkInfo" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ignorar informações de link" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ignora informações de link" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Resolução de links mais rápida" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Links podem não funcionar corretamente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - raramente causa problemas" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkMouseHoverTime" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Aumentar tempo de hover do mouse" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Aumenta tempo de hover do mouse" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Resposta mais rápida ao hover" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Pode causar cliques acidentais" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - ajuste menor" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkNoInternetOpenWith" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar 'Abrir com' da internet" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa 'Abrir com' da internet" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade, resposta mais rápida" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não busca apps online" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas funcionalidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkNoResolveSearch" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar resolução de busca" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa resolução de busca" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Links abrem mais rápido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Links quebrados não são corrigidos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas links quebrados" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkNoResolveTrack" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar rastreamento de resolução" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa rastreamento de resolução" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkNumLockonStartup" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="NumLock no startup" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="NumLock no startup" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: NumLock sempre ativado ao ligar" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas conveniência" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para desktop" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkOptimizeNetworkTransfer" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Otimizar transferência de rede" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Otimizar transferência de rede" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Transferências mais rápidas" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Usa mais recursos de rede" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - otimização segura" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkOptimizeProcessorPerformance" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Otimizar performance do processador" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Otimizar performance do processador" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora performance geral" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Pode aumentar consumo de energia" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - otimização segura" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkOptimizeRefreshPolicy" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Otimizar política de refresh" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Otimizar política de refresh" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Atualizações mais rápidas" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Pode usar mais CPU" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - otimização segura" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkShutdownAcceleration" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Acelerar desligamento" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Acelerar desligamento" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Desligamento mais rápido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Apps podem não fechar corretamente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - pode causar perda de dados" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Use com cautela" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkSnippingPrintScreen" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="PrintScreen para Snipping" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="PrintScreen para Snipping" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Acesso rápido à ferramenta de recorte" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde função original do PrintScreen" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas funcionalidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                        </StackPanel>
+                </TabItem>
+
+                <!-- ABA: PRIVACY -->
+                <TabItem Header="Privacidade">
+                    <StackPanel Margin="0,10,0,0">
+                        <!-- Botões de Seleção Rápida -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <Button Content="✅ Selecionar Todos" Click="BtnSelectAllPrivacy_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="140"/>
+                            <Button Content="❌ Desmarcar Todos" Click="BtnDeselectAllPrivacy_Click" Style="{StaticResource SecondaryButtonStyle}" Width="140"/>
+                        </StackPanel>
+                            <CheckBox x:Name="ChkDisableWebSearch" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar busca na web" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa busca na web no menu Iniciar" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade, busca mais rápida" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não busca na internet" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas funcionalidade de busca" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Altamente recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableMSACloudSearch" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar busca cloud MSA" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa busca cloud MSA" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade, busca mais rápida" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não busca na cloud MSA" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas funcionalidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAADCloudSearch" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar busca cloud AAD" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa busca cloud AAD" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade em empresas" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não busca na cloud AAD" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas funcionalidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado para empresas" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableDeviceSearchHistory" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar histórico de busca do dispositivo" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa histórico de busca" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde histórico de buscas" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableDiagTrack" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar DiagTrack (Telemetria)" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa serviço de telemetria do Windows" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade, reduz uso de rede e CPU" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Microsoft não recebe dados de uso" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas afeta coleta de dados" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Altamente recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDiagnosticDataOff" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar dados de diagnóstico" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa envio de dados de diagnóstico" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade, reduz uso de rede" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Microsoft não recebe dados de diagnóstico" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas afeta diagnósticos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Altamente recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAdsOnLockScreen" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar anúncios na tela de bloqueio" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar anúncios na tela de bloqueio" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Sem anúncios na tela de bloqueio" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas estético" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Altamente recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAutoInstallationApps" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar instalação automática de apps" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar auto-instalação Store" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Evita apps indesejados" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Apps não são instalados automaticamente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas conveniência" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAutoplay" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Autoplay" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar Autoplay" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora segurança, evita auto-execução" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Precisa abrir arquivos manualmente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - melhora segurança" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableVBSCodeIntegrity" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar integridade de código VBS" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa integridade de código VBS" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora performance significativa" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Reduz segurança do sistema" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - reduz proteção contra malware" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Não recomendado - use apenas se necessário" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableOfferSuggestions" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar sugestões de oferta" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar sugestões de oferta" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos sugestões de apps" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisablePersonalizedAdsStoreApps" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar anúncios personalizados de apps" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar anúncios personalizados" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableRemoteRegAccess" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar acesso remoto ao registro" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar acesso remoto ao registro" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora segurança" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não pode acessar registro remotamente" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas segurança" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableSettingsAppSuggestions" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar sugestões do app Configurações" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar sugestões no Configurações" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos sugestões" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableTailoredExperiences" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar experiências personalizadas" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar experiências personalizadas" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Menos personalização" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableTipsAndSuggestions" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar dicas e sugestões" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar dicas e sugestões" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos notificações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde dicas úteis" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableWCE" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Windows Customer Experience" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar Windows CEIP" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Microsoft não recebe feedback" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas telemetria" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableVisualStudioTelemetry" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar telemetria do Visual Studio" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar telemetria VS" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Microsoft não recebe dados de uso" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas telemetria" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableWindowsFeedback" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar feedback do Windows" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar solicitações de feedback" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos notificações de feedback" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Microsoft não recebe feedback" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                        </StackPanel>
+                </TabItem>
+
+                <!-- ABA: EXPLORER -->
+                <TabItem Header="Explorer">
+                    <StackPanel Margin="0,10,0,0">
+                        <!-- Botões de Seleção Rápida -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <Button Content="✅ Selecionar Todos" Click="BtnSelectAllExplorer_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="140"/>
+                            <Button Content="❌ Desmarcar Todos" Click="BtnDeselectAllExplorer_Click" Style="{StaticResource SecondaryButtonStyle}" Width="140"/>
+                        </StackPanel>
+                            <CheckBox x:Name="ChkDisableAutoSuggest" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar auto-sugestão" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar auto-sugestão" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos sugestões" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde sugestões úteis" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAppendCompletion" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar conclusão de anexo" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar conclusão automática" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos interferência ao digitar" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde autocomplete" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkShowExtensions" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Mostrar extensões de arquivo" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Mostrar extensões de arquivo" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Vê extensões, mais segurança" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Altamente recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkShowHidden" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Mostrar arquivos ocultos" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Mostrar arquivos ocultos" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Acesso a arquivos ocultos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkShowHiddenSystem" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Mostrar arquivos ocultos do sistema" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Mostrar arquivos ocultos do sistema" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Acesso completo ao sistema" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Pode deletar arquivos críticos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - cuidado ao deletar" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Apenas usuários avançados" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkShowThisPC" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Mostrar Este PC" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Mostrar Este PC" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Acesso rápido ao Este PC" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkOpenFileExplorerThisPC" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Abrir Explorer no Este PC" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Abrir Explorer em Este PC" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Acesso direto aos drives" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkIncreaseIconCache" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Aumentar cache de ícones" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Aumentar cache de ícones" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Ícones carregam mais rápido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Usa mais RAM" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - otimização segura" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableRecentFiles" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar arquivos recentes" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar histórico de arquivos" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde histórico" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableFrequentFolders" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar pastas frequentes" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar pastas frequentes" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde acesso rápido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableSyncProviderNotifications" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar notificações de sync" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar notificações de sync" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos notificações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não vê status de sync" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                        </StackPanel>
+                </TabItem>
+
+                <!-- ABA: START MENU -->
+                <TabItem Header="Menu Iniciar">
+                    <StackPanel Margin="0,10,0,0">
+                        <!-- Botões de Seleção Rápida -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <Button Content="✅ Selecionar Todos" Click="BtnSelectAllStartMenu_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="140"/>
+                            <Button Content="❌ Desmarcar Todos" Click="BtnDeselectAllStartMenu_Click" Style="{StaticResource SecondaryButtonStyle}" Width="140"/>
+                        </StackPanel>
+                            <CheckBox x:Name="ChkDisableStartMenuAppSuggestions" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar sugestões de apps no menu iniciar" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar sugestões de apps" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos sugestões" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkHideMostUsedApps" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ocultar apps mais usados" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ocultar apps mais usados" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde acesso rápido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkHideStartMenuRecentlyAdded" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ocultar recentemente adicionados" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ocultar apps recentemente adicionados" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde acesso rápido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkHideStartMenuRecentlyOpened" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ocultar recentemente abertos" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ocultar apps recentemente abertos" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora privacidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde acesso rápido" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkHideStartMenuAccountNotifications" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ocultar notificações de conta" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ocultar notificações de conta" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos notificações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não vê notificações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkHideStartMenuRecommendations" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ocultar recomendações" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ocultar recomendações" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos sugestões" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                        </StackPanel>
+                </TabItem>
+
+                <!-- ABA: OPTIONAL -->
+                <TabItem Header="Opcional">
+                    <StackPanel Margin="0,10,0,0">
+                        <!-- Botões de Seleção Rápida -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <Button Content="✅ Selecionar Todos" Click="BtnSelectAllOptional_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="140"/>
+                            <Button Content="❌ Desmarcar Todos" Click="BtnDeselectAllOptional_Click" Style="{StaticResource SecondaryButtonStyle}" Width="140"/>
+                        </StackPanel>
+                            <CheckBox x:Name="ChkEnableDarkMode" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ativar modo escuro" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ativar modo escuro" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos cansaço visual" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas estético" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkClassicContextMenu" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Menu de contexto clássico" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Menu de contexto clássico" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menu mais rápido e simples" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde recursos do Windows 11" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkAUOptions" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Opções de atualização" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Configurar atualizações" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Mais controle sobre atualizações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Nenhum" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas configuração" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableAutoWindowsUpdates" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar atualizações automáticas" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar atualizações automáticas" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Evita atualizações inesperadas" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Sistema fica desatualizado" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - vulnerabilidades de segurança" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: NÃO RECOMENDADO - atualize manualmente" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableHibernate" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar hibernação" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar hibernação" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Economiza espaço em disco" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde hibernação" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - não pode hibernar" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional - se não usa hibernação" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableHybridSleep" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar suspensão híbrida" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar suspensão híbrida" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Suspensão mais rápida" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde proteção contra perda de energia" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - pode perder dados sem energia" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional - use UPS" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisablePrintSpooler" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar spooler de impressão" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar spooler de impressão" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Economiza recursos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não pode imprimir" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - perde funcionalidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Apenas se não usa impressora" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableSleep" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar suspensão" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar suspensão" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Sistema nunca suspende" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Consome mais energia" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - consumo de energia" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: NÃO RECOMENDADO" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableSystemRestore" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Restauração do Sistema" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar Restauração do Sistema" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Economiza espaço em disco" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não pode restaurar sistema" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - sem backup do sistema" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: NÃO RECOMENDADO" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableTurnOffDisplay" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar desligamento de tela" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar desligamento de tela" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Tela nunca desliga" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Consome mais energia" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Alto - consumo de energia" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: NÃO RECOMENDADO" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkHideWindowsSecurityNotifications" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ocultar notificações do Windows Security" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ocultar notificações Security" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos notificações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não vê alertas de segurança" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - pode perder alertas importantes" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkHideWindowsSecurityNoncriticalNotifications" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ocultar notificações não críticas" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Ocultar notificações não críticas" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Menos notificações" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Não vê alertas não críticos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Baixo - apenas UX" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Recomendado" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableWindowsSearch" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Windows Search" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativar serviço de busca" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Economiza recursos significativos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Busca não funciona" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - perde funcionalidade" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional - se não usa busca" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkUninstallOneDrive" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desinstalar OneDrive" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desinstalar OneDrive" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Remove OneDrive, economiza recursos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Perde sincronização cloud" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: Médio - perde backup cloud" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: Opcional - se não usa OneDrive" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="ChkDisableMSDefender" Margin="0,5" Foreground="{StaticResource TextPrimary}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Desativar Microsoft Defender" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                    <Button Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Desativa Microsoft Defender" FontWeight="Bold" Foreground="#FF6B6B" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✓ Prós: Melhora performance, reduz uso de recursos" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="✗ Contras: Remove proteção antivírus nativa" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="⚠️ Riscos: MUITO ALTO - sistema fica vulnerável" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="💡 Recomendação: NÃO RECOMENDADO - use outro AV primeiro" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="12" Foreground="#FFD700" Opacity="0.6"/>
+                                    </Button>
+                                </StackPanel>
+                            </CheckBox>
+                        </StackPanel>
+                </TabItem>
+            </TabControl>
+
+            <!-- BOTÕES DE AÇÃO -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="Aplicar Selecionados" Width="150" Height="35" Margin="0,0,10,0" 
+                        Background="{StaticResource AccentColor}" Foreground="Black" FontWeight="Bold"
+                        Click="BtnApplyWinTune_Click" Cursor="Hand"/>
+                <Button Content="Reverter Tudo" Width="120" Height="35" 
+                        Background="#222" Foreground="White" BorderBrush="#444" BorderThickness="1"
+                        Click="BtnRevertWinTune_Click" Cursor="Hand"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

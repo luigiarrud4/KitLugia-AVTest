@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <NoWarn>$(NoWarn);CA1416;CS1668</NoWarn>
+    <RootNamespace>KitLugia.SpoofExtension</RootNamespace>
+    <AssemblyName>KitLugia.SpoofExtension</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KitLugia.Core\KitLugia.Core.csproj" />
+  </ItemGroup>
+
+</Project>

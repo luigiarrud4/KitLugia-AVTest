@@ -1,0 +1,331 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.ToolsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      Title="ToolsPage"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial" d:DesignHeight="700" d:DesignWidth="900">
+
+    <Page.Resources>
+        <Style TargetType="TabItem">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="0,0,0,3" Margin="0,0,10,0">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentColor}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentColor}" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="20" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.ColumnSpan="2" CornerRadius="6" Background="#1A1A1A" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" />
+                <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{StaticResource TextMuted}" />
+            </Grid>
+        </ControlTemplate>
+
+        <Style TargetType="{x:Type ComboBox}" x:Key="GoldComboBoxStyle">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="SelectedValuePath" Value="Guid"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="#1F1F1F"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                        <Setter Property="Height" Value="40"/>
+                        <Setter Property="MinHeight" Value="40"/>
+                        <Setter Property="MaxHeight" Value="40"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="bdr" Background="{TemplateBinding Background}" 
+                                        Padding="5,0" 
+                                        BorderThickness="0,0,0,1" 
+                                        BorderBrush="#2A2A2A">
+                                        <ContentPresenter VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bdr" Property="Background" Value="{StaticResource CardHover}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Grid.Column="2" Template="{StaticResource ComboBoxToggleButton}" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Focusable="false"/>
+                            <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Content="{Binding SelectedItem.Name, RelativeSource={RelativeSource TemplatedParent}}" Margin="10,5,25,5" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid x:Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#1F1F1F" BorderThickness="1" CornerRadius="6" BorderBrush="{StaticResource CardBorder}"/>
+                                    <ScrollViewer Margin="0" SnapsToDevicePixels="True" CanContentScroll="False">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,30,30,50" MaxWidth="900">
+            <TextBlock Text="Ferramentas e Utilit&#xE1;rios" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Fun&#xE7;&#xF5;es avan&#xE7;adas para reparo e configura&#xE7;&#xE3;o do sistema." Foreground="#A0A0A0" Margin="0,0,0,20"/>
+
+            <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
+
+                <!-- ABA 1: ENERGIA -->
+                <TabItem Header="Energia">
+                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                        <StackPanel Width="600" HorizontalAlignment="Left">
+                            <TextBlock Text="Gerenciador de Planos de Energia" FontSize="18" Foreground="White" Margin="0,0,0,20" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                                <TextBlock Text="Plano Atual: " Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtCurrentPlan" Text="Carregando..." Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Selecionar Plano:" Foreground="{StaticResource TextMuted}" Margin="0,0,0,5"/>
+
+                            <ComboBox x:Name="CmbPowerPlans" Margin="0,0,0,10" Style="{StaticResource GoldComboBoxStyle}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Height="40">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Text="{Binding Name}" Grid.Column="0" VerticalAlignment="Center" FontSize="14" 
+                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                                   Padding="0,0,10,0"/>
+
+                                            <Border Grid.Column="1" Background="#204CAF50" CornerRadius="4" 
+                                                VerticalAlignment="Stretch" Margin="0,5">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="ATIVO" FontWeight="Bold" Foreground="#4CAF50" FontSize="11" 
+                                                       VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            </Border>
+
+                                            <Button Grid.Column="1" 
+                                                Click="BtnDeleteItem_Click" 
+                                                Tag="{Binding}"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"
+                                                Cursor="Hand"
+                                                Margin="0,4"
+                                                Focusable="False">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Setter Property="Background" Value="#1AFFFFFF"/>
+                                                        <Setter Property="BorderBrush" Value="#33C42B1C"/>
+                                                        <Setter Property="Foreground" Value="#FF6F61"/>
+                                                        <Setter Property="Content" Value="EXCLUIR"/>
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border x:Name="bdr" Background="{TemplateBinding Background}" 
+                                                                        BorderBrush="{TemplateBinding BorderBrush}" 
+                                                                        BorderThickness="1" CornerRadius="4">
+                                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="bdr" Property="Background" Value="#C42B1C"/>
+                                                                            <Setter Property="Foreground" Value="White"/>
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding CanDelete}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+
+                                                            <DataTrigger Binding="{Binding IsConfirmingDelete}" Value="True">
+                                                                <Setter Property="Content" Value="CERTEZA?"/>
+                                                                <Setter Property="Background" Value="#C42B1C"/>
+                                                                <Setter Property="Foreground" Value="White"/>
+                                                                <Setter Property="FontWeight" Value="Bold"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <Button Content="Ativar Plano Selecionado" Click="BtnActivatePlan_Click" Style="{StaticResource GoldButtonStyle}"/>
+
+                            <Separator Background="{StaticResource CardBorder}" Margin="0,25"/>
+                            <TextBlock Text="Planos Especiais" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                            <Button Content="Desbloquear 'Desempenho M&#xE1;ximo' (Ultimate)" Click="BtnUltimate_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
+                            <Button Content="Importar 'Bitsum Highest Performance'" Click="BtnBitsum_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
+                <!-- ABA 2: REDE -->
+                <TabItem Header="Rede (DNS)">
+                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                        <StackPanel Width="500" HorizontalAlignment="Left">
+                            <TextBlock Text="Otimiza&#xE7;&#xE3;o de DNS" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Cloudflare (1.1.1.1)" Click="BtnDnsCloudflare_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,5,10"/>
+                                <Button Grid.Column="1" Content="Google (8.8.8.8)" Click="BtnDnsGoogle_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="5,0,0,10"/>
+                            </Grid>
+                            <Button Content="Restaurar Autom&#xE1;tico (DHCP)" Click="BtnDnsDhcp_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                            <Separator Background="{StaticResource CardBorder}" Margin="0,25"/>
+                            <TextBlock Text="Reparo de Rede" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+                            <Button Content="Limpar Cache DNS (FlushDNS)" Click="BtnFlushDns_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
+                            <Button Content="Resetar Pilha de Rede (TCP/IP Reset)" Click="BtnNetReset_Click" Style="{StaticResource GoldButtonStyle}" Background="#C42B1C" BorderBrush="#C42B1C"/>
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
+                <!-- ABA 3: SISTEMA -->
+                <TabItem Header="Sistema &amp; Loja">
+                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                        <StackPanel Width="500" HorizontalAlignment="Left">
+                            <TextBlock Text="Microsoft Store &amp; Xbox" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+                            <Button Content="Resetar Cache da Loja (WSReset)" Click="BtnStoreReset_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
+                            <Button Content="Reparar Gaming Services" Click="BtnGamingServices_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                            <Separator Background="{StaticResource CardBorder}" Margin="0,25"/>
+                            <TextBlock Text="Extras do Sistema" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+                            <Button Content="Ativar Editor de Pol&#xED;tica de Grupo (GPEDIT)" Click="BtnGpedit_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
+                            <Button Content="Ativar/Desativar 'God Mode' no Desktop" Click="BtnGodMode_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
+                            <Button Content="Backup de Drivers (Pasta)" Click="BtnDriverBackup_Click" Style="{StaticResource GoldButtonStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
+                <!-- ABA 4: EXPLORER & MENU (NOVA!) -->
+                <TabItem Header="Explorer &amp; Menu">
+                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                        <StackPanel Width="600" HorizontalAlignment="Left">
+                            <TextBlock Text="Menu de Contexto (Bot&#xE3;o Direito)" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Adicionar 'Obter Controle Total' (Take Ownership)" Foreground="White"/>
+                                    <TextBlock Text="Essencial para deletar arquivos de sistema bloqueados." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Adicionar / Remover" Click="BtnToggleOwnership_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Adicionar 'Abrir Prompt de Comando Aqui'" Foreground="White"/>
+                                    <TextBlock Text="Abre o CMD como Admin na pasta atual." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Adicionar / Remover" Click="BtnToggleCmd_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Separator Background="{StaticResource CardBorder}" Margin="0,20"/>
+
+                            <TextBlock Text="Visualiza&#xE7;&#xE3;o de Arquivos" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Mostrar/Ocultar Arquivos Ocultos" Foreground="White"/>
+                                    <TextBlock Text="Alterna a visualiza&#xE7;&#xE3;o de arquivos de sistema." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Alternar" Click="BtnToggleHidden_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Mostrar/Ocultar Extens&#xF5;es (.exe, .txt)" Foreground="White"/>
+                                    <TextBlock Text="Seguran&#xE7;a: sempre veja a extens&#xE3;o real do arquivo." Foreground="#888" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Alternar" Click="BtnToggleExtensions_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
+                            </Grid>
+
+                            <Separator Background="{StaticResource CardBorder}" Margin="0,20"/>
+                            <TextBlock Text="Impress&#xE3;o" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                            <Button Content="&#x1F5A8;&#xFE0F; Limpar Fila de Impress&#xE3;o (Spooler)" Click="BtnClearSpooler_Click" Style="{StaticResource GoldButtonStyle}" 
+                                    ToolTip="Remove documentos travados na fila de impress&#xE3;o."/>
+
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
+            </TabControl>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

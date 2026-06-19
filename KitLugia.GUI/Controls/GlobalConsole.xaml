@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="KitLugia.GUI.Controls.GlobalConsole"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="200" d:DesignWidth="800">
+
+    <Border Background="#0A0A0A" BorderBrush="{StaticResource AccentColor}" BorderThickness="0,1,0,0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="30"/>
+                <!-- Barra de Título -->
+                <RowDefinition Height="*"/>
+                <!-- Log -->
+            </Grid.RowDefinitions>
+
+            <!-- BARRA DE FERRAMENTAS DO CONSOLE -->
+            <Border Grid.Row="0" Background="#151515" BorderBrush="#333" BorderThickness="0,0,0,1">
+                <Grid Margin="10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text=">_ TERMINAL DO SISTEMA" FontFamily="Consolas" Foreground="#00FF00" FontWeight="Bold" FontSize="12"/>
+                        <TextBlock x:Name="TxtTitleStatus" Text=" | Monitorando..." FontFamily="Consolas" Foreground="#666" FontSize="12"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <!-- Checkbox para remover limite de logs -->
+                        <CheckBox x:Name="ChkRemoveLimit" Content="Sem Limite" 
+                                  Foreground="#888" Background="Transparent" BorderThickness="0"
+                                  FontFamily="Consolas" FontSize="11" Margin="0,0,10,0"
+                                  Checked="ChkRemoveLimit_Checked" Unchecked="ChkRemoveLimit_Unchecked"
+                                  ToolTip="Remove limite de 500 linhas para capturar logs completos"/>
+                        
+                        <!-- Botão Copiar -->
+                        <Button x:Name="BtnCopy" Content="COPIAR" Click="BtnCopy_Click" 
+                                Background="Transparent" Foreground="#888" BorderThickness="0" 
+                                FontFamily="Consolas" FontSize="11" Cursor="Hand" Margin="0,0,10,0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        
+                        <!-- Botão Limpar -->
+                        <Button x:Name="BtnClear" Content="LIMPAR" Click="BtnClear_Click"
+                                Background="Transparent" Foreground="#888" BorderThickness="0" 
+                                FontFamily="Consolas" FontSize="11" Cursor="Hand" Margin="0,0,10,0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        
+                        <!-- Botão Fechar -->
+                        <Button Content="X" Click="BtnClose_Click" 
+                                Background="Transparent" Foreground="#FF5555" BorderThickness="0" 
+                                FontFamily="Consolas" FontWeight="Bold" FontSize="12" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent" Padding="5,0">
+                                        <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="Red"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ÁREA DE TEXTO (LOGS) -->
+            <ScrollViewer x:Name="LogScroller" Grid.Row="1" VerticalScrollBarVisibility="Auto" Background="Transparent" Margin="5">
+                <TextBox x:Name="TxtLog" Background="Transparent" BorderThickness="0" FontFamily="Consolas" FontSize="12" Foreground="#DDDDDD" TextWrapping="Wrap" Margin="2,1" IsReadOnly="True" TextChanged="TxtLog_TextChanged"/>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

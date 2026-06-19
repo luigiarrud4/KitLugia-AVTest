@@ -1,0 +1,110 @@
+﻿<Page x:Class="KitLugia.GUI.Pages.DiagnosticPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Diagn&#xF3;stico Interno - KitLugia"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+    
+    <ScrollViewer Background="#0A0A0A">
+        <StackPanel Margin="30">
+            <TextBlock Text="&#x1F52C; DIAGN&#xD3;STICO INTERNO DO KITLUGIA" 
+                       FontSize="24" FontWeight="Bold" Foreground="#00FF88" Margin="0,0,0,20"/>
+            
+            <!-- STATUS GERAL -->
+            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="&#x1F4CA; STATUS GERAL" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Mem&#xF3;ria Atual:" FontSize="12" Foreground="#888"/>
+                            <TextBlock x:Name="TxtCurrentMemory" Text="--" FontSize="20" FontWeight="Bold" Foreground="#00FF88"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Timers Ativos:" FontSize="12" Foreground="#888"/>
+                            <TextBlock x:Name="TxtActiveTimers" Text="--" FontSize="20" FontWeight="Bold" Foreground="#00FF88"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Tasks em Background:" FontSize="12" Foreground="#888"/>
+                            <TextBlock x:Name="TxtBackgroundTasks" Text="--" FontSize="20" FontWeight="Bold" Foreground="#00FF88"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- CONTROLE DE M&#xD3;DULOS -->
+            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="&#x1F3AE; CONTROLE DE M&#xD3;DULOS (Clique para Desligar/Ligar)" 
+                               FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <Button x:Name="BtnToggleTray" Content="&#x1F310; Tray Icon Service" Click="BtnToggleTray_Click" 
+                                    Height="40" Margin="0,5" Background="#2A2A2A" Foreground="White" BorderBrush="#444"/>
+                            <Button x:Name="BtnToggleGameBoost" Content="&#x1F3AE; GameBoost" Click="BtnToggleGameBoost_Click" 
+                                    Height="40" Margin="0,5" Background="#2A2A2A" Foreground="White" BorderBrush="#444"/>
+                            <Button x:Name="BtnToggleAggressiveCleaner" Content="&#x1F9F9; Aggressive Cleaner" Click="BtnToggleAggressiveCleaner_Click" 
+                                    Height="40" Margin="0,5" Background="#2A2A2A" Foreground="White" BorderBrush="#444"/>
+                            
+                            <!-- CONTROLES INDIVIDUAIS DE TIMERS -->
+                            <Separator Background="#444" Margin="0,15" Height="2"/>
+                            <TextBlock Text="&#x23F1;&#xFE0F; CONTROLE INDIVIDUAL DE TIMERS:" FontSize="12" Foreground="#888" Margin="0,0,0,5"/>
+                            
+                            <Button x:Name="BtnToggleTrayTimer" Content="&#x23F1;&#xFE0F; Tray._monitorTimer (5s)" Click="BtnToggleTrayTimer_Click" 
+                                    Height="35" Margin="0,3" Background="#1A3A1A" Foreground="#00FF88" BorderBrush="#00FF88" FontSize="11"/>
+                            <Button x:Name="BtnToggleCleanerTimer" Content="&#x23F1;&#xFE0F; Cleaner._cleanupTimer (15s)" Click="BtnToggleCleanerTimer_Click" 
+                                    Height="35" Margin="0,3" Background="#1A3A1A" Foreground="#00FF88" BorderBrush="#00FF88" FontSize="11"/>
+                            <Button x:Name="BtnToggleDiagnosticTimer" Content="&#x23F1;&#xFE0F; Diagnostic._refreshTimer (2s)" Click="BtnToggleDiagnosticTimer_Click" 
+                                    Height="35" Margin="0,3" Background="#1A3A1A" Foreground="#00FF88" BorderBrush="#00FF88" FontSize="11"/>
+                        </StackPanel>
+                        
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                            <Button x:Name="BtnStopAllTimers" Content="&#x23F9;&#xFE0F; PARAR TODOS OS TIMERS" Click="BtnStopAllTimers_Click" 
+                                    Height="50" Margin="0,5" Background="#D32F2F" Foreground="White" FontWeight="Bold"/>
+                            <Button x:Name="BtnForceGCCollect" Content="&#x267B;&#xFE0F; FOR&#xC7;AR GC AGORA" Click="BtnForceGCCollect_Click" 
+                                    Height="50" Margin="0,5" Background="#1976D2" Foreground="White" FontWeight="Bold"/>
+                            <Button x:Name="BtnResetAll" Content="&#x1F504; RESETAR TUDO" Click="BtnResetAll_Click" 
+                                    Height="50" Margin="0,5" Background="#F57C00" Foreground="White" FontWeight="Bold"/>
+                            <Button x:Name="BtnCleanKitNow" Content="&#x1F9F9; LIMPAR KIT AGORA (RAM)" Click="BtnCleanKitNow_Click" 
+                                    Height="50" Margin="0,5" Background="#9C27B0" Foreground="White" FontWeight="Bold"
+                                    ToolTip="Limpa logs, caches e for&#xE7;a GC para liberar mem&#xF3;ria do Kit"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- LISTA DE TIMERS ATIVOS -->
+            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="&#x23F1;&#xFE0F; TIMERS ATIVOS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+                    <ListBox x:Name="ListActiveTimers" Background="#0A0A0A" Foreground="#00FF88" 
+                             BorderBrush="#333" Height="150" FontFamily="Consolas" FontSize="12"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- LOG DE ALLOCA&#xC7;&#xC3;O -->
+            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="&#x1F4DD; LOG DE ATIVIDADE (&#xDA;ltimos 30 segundos)" 
+                               FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+                    <TextBox x:Name="TxtActivityLog" Background="#0A0A0A" Foreground="#00FF88" 
+                             BorderBrush="#333" Height="200" FontFamily="Consolas" FontSize="11" 
+                             IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- ATUALIZAR -->
+            <Button Content="&#x1F504; ATUALIZAR DIAGN&#xD3;STICO" Click="BtnRefresh_Click" 
+                    Height="50" Background="#00FF88" Foreground="Black" FontWeight="Bold" FontSize="16"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

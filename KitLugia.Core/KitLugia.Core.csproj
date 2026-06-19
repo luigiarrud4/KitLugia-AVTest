@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <NoWarn>$(NoWarn);CA1416;CS1668</NoWarn>
+    <SatelliteResourceLanguages>pt-BR;en-US</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\BitsumHighestPerformance.pow" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.8" />
+    <PackageReference Include="System.Management" Version="10.0.8" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.8" />
+    <PackageReference Include="TaskScheduler" Version="2.12.2" />
+    <PackageReference Include="Ookii.BinarySize" Version="1.2.0" />
+    <!-- Windows SDK is auto-referenced via TargetFramework net10.0-windows10.0.26100.0 -->
+
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\BitsumHighestPerformance.pow" />
+    <Content Include="Resources\BootGoodies\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\LinuxPreOS\vmlinuz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\LinuxPreOS\initrd.gz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\LinuxPreOS\grubx64.efi" Condition="Exists('Resources\LinuxPreOS\grubx64.efi')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Referências a bibliotecas externas para ISO Editor (via NuGet) -->
+  <!-- Microsoft.Wim, Microsoft.Dism e DiscUtils instalados via NuGet -->
+
+</Project>

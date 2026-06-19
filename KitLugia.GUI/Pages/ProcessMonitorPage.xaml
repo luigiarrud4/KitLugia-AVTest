@@ -1,0 +1,282 @@
+﻿<Page x:Class="KitLugia.GUI.Pages.ProcessMonitorPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      Title="Monitor de Processos e RAM"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial"
+      d:DesignHeight="800" d:DesignWidth="1200">
+
+    <Grid Background="#1E1E1E">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2D2D30" Padding="20" Margin="10,10,10,5">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x1F3AE; Monitor Avan&#xE7;ado de Processos" 
+                          FontSize="24" 
+                          FontWeight="Bold" 
+                          Foreground="White" 
+                          VerticalAlignment="Center"/>
+                <TextBlock Text="RAM: " 
+                          FontSize="16" 
+                          Foreground="#00FF88" 
+                          VerticalAlignment="Center" 
+                          Margin="20,0,0,0"/>
+                <TextBlock x:Name="RamUsageText" 
+                          Text="0 GB / 16 GB (0%)" 
+                          FontSize="16" 
+                          Foreground="#00FF88" 
+                          VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Margin="10,5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Process List -->
+            <Border Grid.Column="0" Background="#252526" CornerRadius="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Process List Header -->
+                    <Border Grid.Row="0" Background="#3C3C3C" Padding="15,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="80"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBlock Grid.Column="0" Text="Processo" Foreground="White" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="1" Text="CPU %" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="RAM" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="Prioridade" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="4" Text="Status" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="5" Text="Rede" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="6" Text="A&#xE7;&#xF5;es" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Process List -->
+                    <ListView Grid.Row="1" x:Name="ProcessListView" 
+                             Background="Transparent" 
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Processo" DisplayMemberBinding="{Binding Name}" Width="250"/>
+                                <GridViewColumn Header="CPU %" DisplayMemberBinding="{Binding CpuUsage}" Width="80"/>
+                                <GridViewColumn Header="RAM" DisplayMemberBinding="{Binding RamUsage}" Width="80"/>
+                                <GridViewColumn Header="Prioridade" DisplayMemberBinding="{Binding Priority}" Width="90"/>
+                                <GridViewColumn Header="Status" DisplayMemberBinding="{Binding Status}" Width="100"/>
+                                <GridViewColumn Header="Rede" DisplayMemberBinding="{Binding NetworkUsage}" Width="70"/>
+                                <GridViewColumn Header="A&#xE7;&#xF5;es" Width="80"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+
+                    <!-- Process Controls -->
+                    <Border Grid.Row="2" Background="#3C3C3C" Padding="15,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="RefreshButton" Content="&#x1F504; Atualizar" 
+                                   Background="#0078D4" Foreground="White" 
+                                   Padding="15,8" Margin="0,0,10,0"
+                                   Click="RefreshButton_Click"/>
+                            <Button x:Name="OptimizeButton" Content="&#x26A1; Otimizar" 
+                                   Background="#107C10" Foreground="White" 
+                                   Padding="15,8" Margin="0,0,10,0"
+                                   Click="OptimizeButton_Click"/>
+                            <Button x:Name="KillSelectedButton" Content="&#x274C; Finalizar" 
+                                   Background="#D83B01" Foreground="White" 
+                                   Padding="15,8" Margin="0,0,10,0"
+                                   Click="KillSelectedButton_Click"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Advanced Customization Panel -->
+            <Border Grid.Column="2" Background="#252526" CornerRadius="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Customization Header -->
+                    <Border Grid.Row="0" Background="#3C3C3C" Padding="15,10">
+                        <StackPanel>
+                            <TextBlock Text="&#x2699;&#xFE0F; Customiza&#xE7;&#xE3;o Avan&#xE7;ada" 
+                                      FontSize="16" FontWeight="Bold" 
+                                      Foreground="White"/>
+                            <TextBlock Text="Detectar apps e otimizar automaticamente" 
+                                      FontSize="12" Foreground="#AAA" 
+                                      Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Customization Options -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="15">
+                            
+                            <!-- Gaming Profiles -->
+                            <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F3AE; Perfis de Gaming" 
+                                              FontSize="14" FontWeight="Bold" 
+                                              Foreground="White" Margin="0,0,0,10"/>
+                                    
+                                    <CheckBox x:Name="SteamProfile" Content="Steam" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="Profile_Checked"/>
+                                    <CheckBox x:Name="EpicProfile" Content="Epic Games" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="Profile_Checked"/>
+                                    <CheckBox x:Name="XboxProfile" Content="Xbox Game Pass" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="Profile_Checked"/>
+                                    <CheckBox x:Name="DiscordProfile" Content="Discord" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="Profile_Checked"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Performance Modes -->
+                            <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="&#x26A1; Modos de Desempenho" 
+                                              FontSize="14" FontWeight="Bold" 
+                                              Foreground="White" Margin="0,0,0,10"/>
+                                    
+                                    <CheckBox x:Name="UltraPerfMode" Content="&#x1F680; Ultra Desempenho (Downloads)" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="PerformanceMode_Checked"/>
+                                    <CheckBox x:Name="GamingMode" Content="&#x1F3AE; Gaming Mode" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="PerformanceMode_Checked"/>
+                                    <CheckBox x:Name="BalancedMode" Content="&#x2696;&#xFE0F; Balanced Mode" 
+                                             Foreground="White" Margin="0,5"
+                                             IsChecked="True"
+                                             Checked="PerformanceMode_Checked"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Network Optimization -->
+                            <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F310; Otimiza&#xE7;&#xE3;o de Rede" 
+                                              FontSize="14" FontWeight="Bold" 
+                                              Foreground="White" Margin="0,0,0,10"/>
+                                    
+                                    <CheckBox x:Name="HighBandwidthMode" Content="&#x1F4E1; Alta Prioridade de Rede" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="NetworkOptimization_Checked"/>
+                                    <CheckBox x:Name="LowLatencyMode" Content="&#x26A1; Baixa Lat&#xEA;ncia" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="NetworkOptimization_Checked"/>
+                                    <CheckBox x:Name="DownloadBoost" Content="&#x2B07;&#xFE0F; Boost para Downloads" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="NetworkOptimization_Checked"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- RAM Optimization -->
+                            <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F9E0; Otimiza&#xE7;&#xE3;o de RAM" 
+                                              FontSize="14" FontWeight="Bold" 
+                                              Foreground="White" Margin="0,0,0,10"/>
+                                    
+                                    <CheckBox x:Name="MemoryCompression" Content="&#x1F5DC;&#xFE0F; Compress&#xE3;o de RAM" 
+                                             Foreground="White" Margin="0,5"
+                                             IsChecked="True"
+                                             Checked="MemoryOptimization_Checked"/>
+                                    <CheckBox x:Name="IntelligentCleanup" Content="&#x1F9F9; Limpeza Inteligente" 
+                                             Foreground="White" Margin="0,5"
+                                             IsChecked="True"
+                                             Checked="MemoryOptimization_Checked"/>
+                                    <CheckBox x:Name="StandbyListOptimization" Content="&#x1F4A4; Otimizar Standby List" 
+                                             Foreground="White" Margin="0,5"
+                                             Checked="MemoryOptimization_Checked"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Auto-Detection -->
+                            <Border Background="#2D2D30" CornerRadius="5" Padding="15">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F916; Detec&#xE7;&#xE3;o Autom&#xE1;tica" 
+                                              FontSize="14" FontWeight="Bold" 
+                                              Foreground="White" Margin="0,0,0,10"/>
+                                    
+                                    <CheckBox x:Name="AutoDetectSteam" Content="&#x1F3AE; Detectar Steam (downloads/atualiza&#xE7;&#xF5;es)" 
+                                             Foreground="White" Margin="0,5"
+                                             IsChecked="True"
+                                             Checked="AutoDetection_Checked"/>
+                                    <CheckBox x:Name="AutoDetectEpic" Content="&#x1F3AE; Detectar Epic Games (downloads/atualiza&#xE7;&#xF5;es)" 
+                                             Foreground="White" Margin="0,5"
+                                             IsChecked="True"
+                                             Checked="AutoDetection_Checked"/>
+                                    <CheckBox x:Name="AutoDetectHighNetwork" Content="&#x1F4E1; Alta atividade de rede = Ultra modo" 
+                                             Foreground="White" Margin="0,5"
+                                             IsChecked="True"
+                                             Checked="AutoDetection_Checked"/>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Apply Button -->
+                    <Border Grid.Row="2" Background="#3C3C3C" Padding="15,10">
+                        <Button x:Name="ApplyCustomizationButton" 
+                               Content="&#x1F680; Aplicar Customiza&#xE7;&#xE3;o" 
+                               Background="#FF6B00" Foreground="White" 
+                               Padding="20,10" FontSize="14"
+                               Click="ApplyCustomizationButton_Click"/>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="#2D2D30" Padding="20,10" Margin="10,5,10,10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="StatusText" 
+                          Text="&#x1F7E2; Sistema otimizado" 
+                          FontSize="14" 
+                          Foreground="#00FF88" 
+                          VerticalAlignment="Center"/>
+                <TextBlock Text="Processos: " 
+                          FontSize="14" 
+                          Foreground="White" 
+                          VerticalAlignment="Center" 
+                          Margin="20,0,0,0"/>
+                <TextBlock x:Name="ProcessCountText" 
+                          Text="0" 
+                          FontSize="14" 
+                          Foreground="White" 
+                          VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>

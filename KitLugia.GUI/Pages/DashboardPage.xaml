@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.DashboardPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Sistema"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <Page.Resources>
+        <ControlTemplate x:Key="GameBoostComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="36" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="5" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L5,5 L10,0" IsHitTestVisible="False"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#2A2A2A" />
+                    <Setter TargetName="Border" Property="BorderBrush" Value="#666666" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#222222"/>
+            <Setter Property="BorderBrush" Value="#444444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton" Template="{StaticResource GameBoostComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Cursor="Hand"/>
+                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide" StaysOpen="False">
+                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#222222" BorderThickness="1" BorderBrush="#444444" CornerRadius="5"/>
+                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#333"/>
+                    <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#444"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="InfoButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Help"/>
+            <Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
+            <Setter Property="ToolTipService.ShowDuration" Value="20000"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,30,40,50" MaxWidth="850" HorizontalAlignment="Left">
+
+                <!-- T&#xCD;TULO -->
+                <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{StaticResource TextPrimary}"/>
+
+                <!-- BANNER INFORMATIVO (INFO PC) -->
+                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Imagem PC -->
+                        <TextBlock Text="&#x1F4BB;" FontSize="48" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtPCName" Text="DESKTOP-NAME" FontSize="20" FontWeight="Bold"/>
+                            <TextBlock x:Name="TxtSpecs" Text="Carregando informa&#xE7;&#xF5;es..." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- === NOVA SE&#xC7;&#xC3;O: A&#xC7;&#xD5;ES DE 1-CLIQUE === -->
+                <TextBlock Text="Otimiza&#xE7;&#xE3;o Inteligente (1-Clique)" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                <Grid Margin="0,0,0,30">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- BOT&#xC3;O 1: OTIMIZA&#xC7;&#xC3;O INTELIGENTE (VERDE) -->
+                    <Button Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personaliza&#xE7;&#xE3;o da otimiza&#xE7;&#xE3;o inteligente.">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#104CAF50" BorderBrush="#334CAF50" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- &#xCD;cone -->
+                                        <Border Background="#154CAF50" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="&#x1F680;" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="OTIMIZA&#xC7;&#xC3;O INTELIGENTE" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Personalizar &amp; Aplicar" Foreground="#81C784" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Escolha sua GPU e n&#xED;vel de VRAM dedicada." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#254CAF50"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#4CAF50"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#4CAF50" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <!-- BOT&#xC3;O 2: REVERTER / NORMAL (VERMELHO) -->
+                    <Button Grid.Column="2" Height="90" Click="BtnRevertNormal_Click" Cursor="Hand" ToolTip="Remove todas as otimiza&#xE7;&#xF5;es aplicadas e volta ao padr&#xE3;o do Windows.">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#10F44336" BorderBrush="#33F44336" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- &#xCD;cone -->
+                                        <Border Background="#15F44336" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="&#x21A9;&#xFE0F;" FontSize="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="REVERTER / NORMAL" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Restaurar Padr&#xF5;es" Foreground="#E57373" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Remove VRAM, Tweaks e Planos de Energia." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#25F44336"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#F44336"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#F44336" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+                
+
+                
+                <!-- === SE&#xC7;&#xC3;O: GAMING LATENCY PROFILE === -->
+                <TextBlock Text="Gaming Latency Profile (Baixa Lat&#xEA;ncia)" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
+
+                <Grid Margin="0,0,0,30">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- BOT&#xC3;O 1: GAMING LATENCY PROFILE (DOURO/&#xC2;MBAR) -->
+                    <Button Grid.Column="0" Height="90" Click="BtnOpenLatencyMenu_Click" Cursor="Hand" ToolTip="Abre o menu de otimiza&#xE7;&#xE3;o de lat&#xEA;ncia para gaming (estilo Khorvie)">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#10FFD700" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- &#xCD;cone -->
+                                        <Border Background="#15FFD700" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="&#x26A1;" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="GAMING LATENCY" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Baixa Lat&#xEA;ncia" Foreground="#FFD700" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Otimiza DPC/ISR, timers e input para m&#xED;nima lat&#xEA;ncia." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#25FFD700"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#FFD700"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#FFD700" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <!-- BOT&#xC3;O 2: REVERTER LATENCY (CINZA) -->
+                    <Button Grid.Column="2" Height="90" Click="BtnRevertLatency_Click" Cursor="Hand" ToolTip="Remove todas as otimiza&#xE7;&#xF5;es de lat&#xEA;ncia e volta ao padr&#xE3;o do Windows.">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#10666666" BorderBrush="#33666666" BorderThickness="1" CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- &#xCD;cone -->
+                                        <Border Background="#15666666" CornerRadius="10,0,0,10">
+                                            <TextBlock Text="&#x21A9;&#xFE0F;" FontSize="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Texto -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
+                                            <TextBlock Text="REVERTER LATENCY" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="Padr&#xE3;o Windows" Foreground="#999" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Restaura Win32Priority, Core Parking e timers." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="#25666666"/>
+                                        <Setter TargetName="bdr" Property="BorderBrush" Value="#666666"/>
+                                        <Setter TargetName="bdr" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect Color="#666666" BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+                
+                <!-- A LISTA DE CART&#xD5;ES (NAVEGA&#xC7;&#xC3;O COMPLETA) -->
+                <TextBlock Text="Gerenciamento do Sistema" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+
+                <!-- OTIMIZACAO E PERFORMANCE -->
+                <TextBlock Text="Performance e Otimiza&#xE7;&#xE3;o" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,10,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x26A1;" 
+                    Content="Otimiza&#xE7;&#xF5;es Avan&#xE7;adas"
+                    ToolTip="Gerenciar otimiza&#xE7;&#xF5;es de registro, prioridade de CPU e servi&#xE7;os"
+                    Click="BtnGoToTweaks_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4BF;" 
+                    Content="Armazenamento e Limpeza"
+                    ToolTip="Limpar arquivos tempor&#xE1;rios, shaders e bloatware"
+                    Click="BtnGoToCleanup_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4F1;" 
+                    Content="Bloatware e Aplicativos"
+                    ToolTip="Remover aplicativos desnecess&#xE1;rios do Windows"
+                    Click="BtnGoToBloatware_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F680;" 
+                    Content="GameBoost Pro"
+                    ToolTip="Otimiza&#xE7;&#xE3;o inteligente de processos em tempo real"
+                    Click="BtnGoToGameBoost_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F3AE;" 
+                    Content="Games e Modo Jogo"
+                    ToolTip="Configura&#xE7;&#xF5;es de jogos e otimiza&#xE7;&#xF5;es para games"
+                    Click="BtnGoToGames_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4CB;" 
+                    Content="Ferramentas de Sistema"
+                    ToolTip="SFC, DISM, limpeza de caches, rede, BCDedit, servi&#xE7;os e manuten&#xE7;&#xE3;o"
+                    Click="BtnGoToExmTweaks_Click"/>
+
+                <!-- SISTEMA E REPAROS -->
+                <TextBlock Text="Sistema e Reparos" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4C0;" 
+                    Content="ISO Editor (Winhance)"
+                    ToolTip="Editor de ISO Profissional - Montagem, Debloat, Features e Redu&#xE7;&#xE3;o de Tamanho"
+                    Click="BtnGoToIsoEditor_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4BD;" 
+                    Content="Gerenciador de Discos"
+                    ToolTip="Gerenciador de parti&#xE7;&#xF5;es e discos"
+                    Click="BtnGoToPartitions_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4E6;" 
+                    Content="Consertar Windows via ISO Montada"
+                    ToolTip="Monta uma ISO do Windows 11 e repara o sistema via DISM + SFC diretamente da imagem montada. Essencial quando o component store est&#xE1; corrompido."
+                    Click="BtnConsertarViaIso_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4BB;" 
+                    Content="WinBoot (Instala&#xE7;&#xE3;o Windows)"
+                    ToolTip="Instala&#xE7;&#xE3;o local do Windows sem USB - ISO, Parti&#xE7;&#xE3;o e WinBoot"
+                    Click="BtnGoToWinBoot_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x26A1;" 
+                    Content="Instala&#xE7;&#xE3;o R&#xE1;pida (Quick Install)"
+                    ToolTip="Selecione uma ISO, uma parti&#xE7;&#xE3;o e instale o Windows diretamente com DISM"
+                    Click="BtnGoToQuickInstall_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4BF;" 
+                    Content="Rufus (Pendrive Boot&#xE1;vel)"
+                    ToolTip="Criar pendrives boot&#xE1;veis a partir de ISOs (Windows, Linux, WinPE)"
+                    Click="BtnGoToRufus_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F527;" 
+                    Content="Reparos do Sistema"
+                    ToolTip="Ferramentas de reparo do Windows"
+                    Click="BtnGoToRepairs_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4BE;" 
+                    Content="Drivers do Sistema"
+                    ToolTip="Gerenciamento e atualiza&#xE7;&#xE3;o de drivers"
+                    Click="BtnGoToDrivers_Click"/>
+
+                <!-- REDE E INTERNET -->
+                <TextBlock Text="Rede e Conectividade" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F310;" 
+                    Content="Otimizador de Rede (Ping)"
+                    ToolTip="Ajustes de DNS, TCP/IP e Adaptador para menor lat&#xEA;ncia"
+                    Click="BtnGoToNetwork_Click"/>
+
+                <!-- PRIVACIDADE E SEGURANCA -->
+                <TextBlock Text="Privacidade e Seguran&#xE7;a" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F512;" 
+                    Content="Privacidade e Telemetria (O&amp;O ShutUp10)"
+                    ToolTip="Desativar Telemetria, Defender e controle de privacidade completo"
+                    Click="BtnGoToPrivacy_Click"/>
+
+                
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F510;" 
+                    Content="Seguran&#xE7;a do Sistema"
+                    ToolTip="Verificar status de seguran&#xE7;a e configura&#xE7;&#xF5;es de prote&#xE7;&#xE3;o"
+                    Click="BtnGoToSecurity_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F9F0;" 
+                    Content="Integridade do Sistema (Scan)"
+                    ToolTip="Verificar arquivos de sistema, DISM e reparos"
+                    Click="BtnGoToIntegrity_Click"/>
+
+                <!-- ATIVACAO E CONFIGURACOES -->
+                <TextBlock Text="Ativa&#xE7;&#xE3;o e Configura&#xE7;&#xF5;es" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F511;" 
+                    Content="Microsoft Activation Scripts"
+                    ToolTip="Verificar status de ativa&#xE7;&#xE3;o do Windows e Office"
+                    Click="BtnGoToActivation_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F514;" 
+                    Content="Configura&#xE7;&#xF5;es do TrayIcon"
+                    ToolTip="Configurar &#xED;cone da bandeja, RAM e GameBoost"
+                    Click="BtnGoToTraySettings_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F504;" 
+                    Content="Atualiza&#xE7;&#xF5;es do Kit Lugia"
+                    ToolTip="Verificar e instalar atualiza&#xE7;&#xF5;es do aplicativo"
+                    Click="BtnGoToUpdate_Click"/>
+
+                <!-- EXTRAS -->
+                <TextBlock Text="Extras" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F5A5;&#xFE0F;" 
+                    Content="Tela e Cores (Screen)"
+                    ToolTip="Configura&#xE7;&#xF5;es de tela, resolu&#xE7;&#xE3;o e cores"
+                    Click="BtnGoToScreen_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F50B;" 
+                    Content="Gerenciador de Planos de Energia"
+                    ToolTip="Gerenciar planos de energia, Bitsum Highest Performance e Ultimate Performance"
+                    Click="BtnGoToPowerPlans_Click"/>
+
+                <TextBlock Text="Utilit&#xE1;rios" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F3B5;" 
+                    Content="WinTune Optimizations"
+                    ToolTip="Otimiza&#xE7;&#xF5;es avan&#xE7;adas do WinTune"
+                    Click="BtnGoToWinTune_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x2702;&#xFE0F;"
+                    Content="Shrink &amp; Recovery (UEFI)"
+                    ToolTip="Reduzir partição e criar ambiente de recuperação UEFI com rEFInd + Alpine"
+                    Click="BtnGoToShrink_Click"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- OVERLAY: MENU DE SELE&#xC7;&#xC3;O R&#xC1;PIDA -->
+        <Grid x:Name="OverlayQuickMenu" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="820" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                    Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" CornerRadius="12" MaxHeight="680">
+                <Grid Margin="20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Configurar Otimiza&#xE7;&#xE3;o" FontSize="20" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="15"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- ===== COLUNA ESQUERDA: MENU ORIGINAL ===== -->
+                        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="Adaptador de V&#xED;deo (GPU):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
+                                <ComboBox x:Name="CmbGpu" Height="30" Margin="0,0,0,10">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Foreground="White" Padding="5"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Text="VRAM Dedicada (Segment Size):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
+                                <ComboBox x:Name="CmbVram" Height="30" Margin="0,0,0,10">
+                                    <ComboBoxItem Content="Padr&#xE3;o (Autom&#xE1;tico)" IsSelected="True" Foreground="White"/>
+                                    <ComboBoxItem Content="256 MB" Foreground="White"/>
+                                    <ComboBoxItem Content="512 MB" Foreground="White"/>
+                                    <ComboBoxItem Content="1024 MB (1GB)" Foreground="White"/>
+                                    <ComboBoxItem Content="2048 MB (2GB)" Foreground="White"/>
+                                    <ComboBoxItem Content="4096 MB (4GB)" Foreground="White"/>
+                                </ComboBox>
+
+                                <Separator Background="#333" Margin="0,0,0,6"/>
+
+                                <TextBlock Text="Motor do GameBoost:" Foreground="#AAA" FontSize="12" Margin="0,0,0,4"/>
+                                 <ComboBox x:Name="CmbGameEngine" Height="28" Margin="0,0,0,8" SelectedIndex="0"
+                                           Style="{StaticResource DarkComboBoxStyle}"
+                                           ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                                           SelectionChanged="CmbGameEngine_SelectionChanged"/>
+
+                                <Separator Background="#333" Margin="0,0,0,6"/>
+
+                                <CheckBox x:Name="ChkExtremeVisuals" Content="Modo Extreme (Remover Anima&#xE7;&#xF5;es)" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkPowerPlan" Content="Ativar Plano Bitsum Highest Performance" IsChecked="True" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkTurboShutdown" Content="Desligamento Turbo (Shutdownturbo 2s)" IsChecked="True" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkSystemTweaks" Content="Tweaks de Registro (Cache, Explorer, Bing)" IsChecked="True" Foreground="White" Margin="0,0,0,10"/>
+
+                                <Separator Background="#333" Margin="0,0,0,8"/>
+
+                                <TextBlock Text="TWEAKS QUE INICIAM JUNTO COM O PC" Foreground="#FFD54F" FontSize="11" FontWeight="Bold" Margin="0,0,0,3"/>
+                                <TextBlock Text="Melhorias mantidas em segundo plano ap&#xF3;s otimiza&#xE7;&#xE3;o inicial." Foreground="#AAA" FontSize="9" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                                
+                                <CheckBox x:Name="ChkTrayIcon" Content="1. &#xCD;cone de bandeja (Monitor RAM e CPU)" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkStartWithWindows" Content="2. Iniciar com o Windows (Silencioso)" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkGameBoost" Content="3. GameBoost (Prioridade M&#xE1;xima para Jogos)" Foreground="White" Margin="0,0,0,6"/>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- SEPARADOR VERTICAL -->
+                        <Border Grid.Column="1" Background="#333" Width="1"/>
+
+                        <!-- ===== COLUNA DIREITA: OTIMIZA&#xC7;&#xC3;O DO CRIADOR ===== -->
+                        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Margin="8,0,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Otimiza&#xE7;&#xE3;o do Criador" FontSize="16" FontWeight="Bold" Foreground="#FFB74D" Margin="0,0,0,2"/>
+                                <TextBlock Text="Todas as configura&#xE7;&#xF5;es que eu uso no meu dia a dia." Foreground="#A0A0A0" FontSize="10" Margin="0,0,0,8"/>
+
+                                <Button x:Name="BtnAtivarTodosCriador" Content="&#x25B6; ATIVAR TODOS" Height="28" FontSize="11" FontWeight="Bold"
+                                        Style="{StaticResource GoldButtonStyle}" Margin="0,0,0,10"
+                                        Click="BtnAtivarTodosCriador_Click"/>
+
+                                <!-- ATIVADOS -->
+                                <TextBlock Text="Itens ATIVADOS" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,6"/>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Impede que apps da Microsoft rodem em segundo plano, liberando RAM e CPU."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrBgApps" Content="Desativar Apps em Segundo Plano" Foreground="White" FontSize="12" Click="ChkCrBgApps_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Desativa servi&#xE7;os de diagn&#xF3;stico do Windows (DPS/Wdi) que consomem recursos em segundo plano."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrDiag" Content="Desativar Diagn&#xF3;sticos (DPS/Wdi)" Foreground="White" FontSize="12" Click="ChkCrDiag_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Desativa o GameBarPresenceWriter.exe, um processo que grava gameplay desnecessariamente."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrGameBar" Content="Desativar GameBarPresenceWriter.exe" Foreground="White" FontSize="12" Click="ChkCrGameBar_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Corrige escala de texto em jogos antigos, evitando desfoque e melhorando a legibilidade."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrGdi" Content="Desativar GDI Scaling" Foreground="White" FontSize="12" Click="ChkCrGdi_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Corrige vazamento de mem&#xF3;ria do NDU (Network Diagnostic Usage). Ideal para quem quer RAM est&#xE1;vel."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrNdu" Content="Desativar NDU (Fix Memory Leak)" Foreground="White" FontSize="12" Click="ChkCrNdu_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Desativa a economia de energia do PCIe, garantindo m&#xE1;xima largura de banda para a placa de v&#xED;deo."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrPcie" Content="Desativar PCIe Link State Power Mgmt" Foreground="White" FontSize="12" Click="ChkCrPcie_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Remove a busca da web da barra de tarefas, reduzindo chamadas de rede desnecess&#xE1;rias."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrBing" Content="Desativar Pesquisa Web (Bing)" Foreground="White" FontSize="12" Click="ChkCrBing_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Remove a limita&#xE7;&#xE3;o de energia da CPU, permitindo que o processador opere em velocidade m&#xE1;xima."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrPowerThrottle" Content="Desativar Power Throttling (CPU)" Foreground="White" FontSize="12" Click="ChkCrPowerThrottle_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Desativa a Virtualization-Based Security do Windows, podendo gerar ganhos significativos de FPS em jogos."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrVbs" Content="Desativar Seguran&#xE7;a VBS (Ganho de FPS)" Foreground="White" FontSize="12" Click="ChkCrVbs_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Impede que o Windows desligue o disco r&#xED;gido ou monitores por inatividade, evitando atrasos ao voltar."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrDiskTimeout" Content="Desativar Timeout de Disco e Tela" Foreground="White" FontSize="12" Click="ChkCrDiskTimeout_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Acelera o desligamento do Windows fechando apps automaticamente (ShutdownTurbo 2s)."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrTurboShutdown" Content="Desligamento Turbo (ShutdownTurbo)" Foreground="White" FontSize="12" Click="ChkCrTurboShutdown_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Prioridade m&#xE1;xima para jogos em tempo real + Motor V1. Melhora a responsividade em games."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrGameBoost" Content="GameBoost Pro" Foreground="White" FontSize="12" Click="ChkCrGameBoost_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Exibe o &#xED;cone do KitLugia na bandeja do sistema para monitorar RAM e CPU."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrTray" Content="&#xCD;cone na Bandeja / Mostrar &#xED;cone" Foreground="White" FontSize="12" Click="ChkCrTray_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Evita que o Windows reinicie automaticamente ap&#xF3;s atualiza&#xE7;&#xF5;es, dando controle total ao usu&#xE1;rio."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrNoReboot" Content="Impedir Rein&#xED;cio Autom&#xE1;tico" Foreground="White" FontSize="12" Click="ChkCrNoReboot_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Faz o KitLugia iniciar automaticamente com o Windows para manter as otimiza&#xE7;&#xF5;es ativas."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrAutoStart" Content="Iniciar com Windows" Foreground="White" FontSize="12" Click="ChkCrAutoStart_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Otimiza&#xE7;&#xF5;es agressivas de lat&#xEA;ncia de rede e GPU para reduzir ao m&#xE1;ximo o input lag."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrExtremeLatency" Content="Lat&#xEA;ncia Extrema de Rede &amp; GPU" Foreground="White" FontSize="12" Click="ChkCrExtremeLatency_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Ajusta o gerenciamento de mem&#xF3;ria do sistema via fsutil para melhor uso da RAM."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrFsutil" Content="Otimizar Uso de Mem&#xF3;ria (Fsutil)" Foreground="White" FontSize="12" Click="ChkCrFsutil_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Define prioridade alta para jogos no Game Mode, garantindo mais recursos de GPU."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrGameMode" Content="Prioridade de GPU (Game Mode)" Foreground="White" FontSize="12" Click="ChkCrGameMode_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Minimiza o KitLugia para a bandeja ao fechar, mantendo as otimiza&#xE7;&#xF5;es em segundo plano."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrBgRun" Content="Rodar em segundo plano" Foreground="White" FontSize="12" Click="ChkCrBgRun_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
+                                        <Button.ToolTip><ToolTip Content="Mant&#xE9;m todos os n&#xFA;cleos da CPU ativos, evitando que n&#xFA;cleos fiquem em estado de economia."/></Button.ToolTip>
+                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
+                                    </Button>
+                                    <CheckBox Grid.Column="1" x:Name="ChkCrUnpark" Content="UNPARK CPU" Foreground="White" FontSize="12" Click="ChkCrUnpark_Click"/>
+                                </Grid>
+
+
+
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- BOT&#xD5;ES -->
+                    <Grid Grid.Row="2" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="CANCELAR" Height="32" Style="{StaticResource SecondaryButtonStyle}" Click="BtnCancelQuickMenu_Click"/>
+                        <Button Grid.Column="2" Content="OTIMIZAR AGORA" Height="32" Style="{StaticResource GreenButtonStyle}" Click="BtnApplyCustomOptimization_Click"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- OVERLAY: GAMING LATENCY MENU -->
+        <Grid x:Name="OverlayLatencyMenu" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="650" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                    Background="#1E1E1E" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="12" MaxHeight="750">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                    <TextBlock Text="Gaming Latency Profile" FontSize="20" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,5"/>
+                    <TextBlock Text="Otimize DPC/ISR, timers e input para lat&#xEA;ncia m&#xED;nima" FontSize="11" Foreground="#999" Margin="0,0,0,20"/>
+
+                    <!-- LATENCY ANALYZER SECTION -->
+                    <Border Background="#2A2A2A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="&#x1F4CA; An&#xE1;lise de Lat&#xEA;ncia" Foreground="#FFD700" FontSize="14" FontWeight="Bold"/>
+                                    <TextBlock Text="Me&#xE7;a DPC/ISR e obtenha recomenda&#xE7;&#xF5;es" FontSize="10" Foreground="#888"/>
+                                </StackPanel>
+                                <Button x:Name="BtnScanLatency" Grid.Column="1" Content="ANALISAR" Height="30" Width="90"
+                                        Style="{StaticResource GoldButtonStyle}"
+                                        Click="BtnScanLatency_Click" FontSize="11" FontWeight="Bold"/>
+                            </Grid>
+                            
+                            <!-- Progress Bar -->
+                            <ProgressBar x:Name="ProgressLatencyScan" Height="4" Background="#333" Foreground="#FFD700" 
+                                         Visibility="Collapsed" Margin="0,0,0,10"/>
+                            
+                            <!-- Results Panel -->
+                            <StackPanel x:Name="PanelLatencyResults" Visibility="Collapsed">
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="0,0,4,0">
+                                        <StackPanel>
+                                            <TextBlock Text="ATUAL" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtCurrentLatency" Text="--" FontSize="16" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="&#xB5;s" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="2,0,2,0">
+                                        <StackPanel>
+                                            <TextBlock Text="M&#xC9;DIA" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtAvgLatency" Text="--" FontSize="16" Foreground="#4CAF50" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="&#xB5;s" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="4,0,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="M&#xC1;X" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtMaxLatency" Text="--" FontSize="16" Foreground="#FF5722" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="&#xB5;s" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                
+                                <TextBlock x:Name="TxtLatencyRecommendation" Text="" FontSize="10" Foreground="#AAA" 
+                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                
+                                <Button x:Name="BtnApplyRecommended" Content="APLICAR RECOMENDA&#xC7;&#xD5;ES" Height="32" 
+                                        Background="#4CAF50" Foreground="White" BorderThickness="0"
+                                        Click="BtnApplyRecommended_Click" FontSize="11" FontWeight="Bold" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- Win32PrioritySeparation SELETOR -->
+                    <TextBlock Text="Win32PrioritySeparation (Scheduling):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5" FontWeight="SemiBold"/>
+                    <TextBlock Text="Controla a prioridade de aplica&#xE7;&#xF5;es em foreground" FontSize="10" Foreground="#666" Margin="0,0,0,8"/>
+                    <ComboBox x:Name="CmbWin32Priority" Height="35" Margin="0,0,0,15" 
+                               SelectedIndex="1">
+                        <ComboBoxItem Content="0x18 (24) - Padr&#xE3;o Windows" Foreground="White"/>
+                        <ComboBoxItem Content="0x26 (38) - Foreground Boost (Recomendado)" Foreground="White"/>
+                        <ComboBoxItem Content="0x2A (42) - M&#xE1;ximo Foreground (Avan&#xE7;ado)" Foreground="White"/>
+                    </ComboBox>
+
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- TWEAKS INDIVIDUAIS COM TOGGLES -->
+                    <TextBlock Text="Tweaks Individuais (Toggle ON/OFF):" Foreground="#AAA" FontSize="12" Margin="0,0,0,10" FontWeight="SemiBold"/>
+
+                    <!-- Core Parking Toggle -->
+                    <Border x:Name="BorderCoreParking" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorCoreParking" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Core Parking Disable" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Mant&#xE9;m todos os cores CPU ativos" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleCoreParking" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleCoreParking_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Timer Coalescing Toggle -->
+                    <Border x:Name="BorderTimerCoalescing" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorTimerCoalescing" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Timer Coalescing Disable" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Timers de alta precis&#xE3;o (melhor para jogos)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleTimerCoalescing" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleTimerCoalescing_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Input Queue Toggle -->
+                    <Border x:Name="BorderInputQueue" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorInputQueue" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Input Queue Optimize" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Aumenta buffer de mouse/teclado (30 vs 100)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleInputQueue" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleInputQueue_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Global Timer Toggle -->
+                    <Border x:Name="BorderGlobalTimer" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorGlobalTimer" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Global Timer Resolution" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="Permite apps pedir timers precisos (1ms)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleGlobalTimer" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleGlobalTimer_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- System Responsiveness Toggle -->
+                    <Border x:Name="BorderSysResp" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,15">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="IndicatorSysResp" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="SystemResponsiveness Gaming" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="0 = M&#xE1;xima performance (desativa background)" FontSize="10" Foreground="#888"/>
+                            </StackPanel>
+                            <Button x:Name="BtnToggleSysResp" Grid.Column="2" Content="OFF" Height="26" Width="50" 
+                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Click="BtnToggleSysResp_Click" FontSize="10" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <Separator Background="#333" Margin="0,0,0,15"/>
+
+                    <!-- STATUS DOS TWEAKS -->
+                    <TextBlock Text="Status Atual:" Foreground="#AAA" FontSize="11" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="TxtLatencyStatus" Text="Verificando..." FontSize="10" Foreground="#888" Margin="0,0,0,15" TextWrapping="Wrap"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="FECHAR" Height="35" Style="{StaticResource SecondaryButtonStyle}" Click="BtnCancelLatencyMenu_Click"/>
+                        <Button Grid.Column="2" Content="APLICAR TODOS" Height="35" Style="{StaticResource GoldButtonStyle}" Click="BtnApplyAllLatency_Click" FontWeight="Bold"/>
+                        <Button Grid.Column="4" Content="REVERTER" Height="35" Style="{StaticResource SecondaryButtonStyle}" Click="BtnRevertLatencyMenu_Click" Foreground="#F44336"/>
+                    </Grid>
+                </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        
+        <!-- LOADING OVERLAY PARA BENCHMARK -->
+        <Grid x:Name="LoadingOverlayBenchmark" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                    Background="#1E1E1E" BorderBrush="#FFD700" BorderThickness="2" CornerRadius="12" Padding="30">
+                <StackPanel>
+                    <!-- Spinner -->
+                    <TextBlock Text="&#x23F3;" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    
+                    <!-- T&#xED;tulo -->
+                    <TextBlock Text="BENCHMARK EM ANDAMENTO" FontSize="18" FontWeight="Bold" 
+                               Foreground="#FFD700" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    
+                    <!-- Descri&#xE7;&#xE3;o -->
+                    <TextBlock Text="Testando m&#xFA;ltiplos perfis de performance..." FontSize="12" 
+                               Foreground="#AAA" HorizontalAlignment="Center" Margin="0,0,0,20" TextWrapping="Wrap"/>
+                    
+                    <!-- Progress Bar -->
+                    <ProgressBar x:Name="ProgressBarBenchmark" Height="8" Background="#333" Foreground="#FFD700" 
+                                Minimum="0" Maximum="100" Value="0" Margin="0,0,0,15"/>
+                    
+                    <!-- Status Text -->
+                    <TextBlock x:Name="TxtBenchmarkStatus" Text="Iniciando..." FontSize="11" 
+                               Foreground="#888" HorizontalAlignment="Center" Margin="0,0,0,10" TextWrapping="Wrap"/>
+                    
+                    <!-- Log Console -->
+                    <Border Background="#0A0A0A" CornerRadius="4" Padding="10" Margin="0,10,0,0" Height="120">
+                        <ScrollViewer x:Name="ScrollViewerBenchmarkLog" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtBenchmarkLog" Text="" FontSize="10" 
+                                       Foreground="#4CAF50" FontFamily="Consolas" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                    
+                    <!-- Cancel Button -->
+                    <Button x:Name="BtnCancelBenchmark" Content="CANCELAR" Height="35" Margin="0,15,0,0"
+                            Background="Transparent" BorderBrush="#F44336" Foreground="#F44336"
+                            Click="BtnCancelBenchmark_Click"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>
+

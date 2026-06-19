@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="KitLugia.GUI.Controls.TaskStatusIndicator"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="20" Height="20">
+    <Grid x:Name="SpinnerLayer" Visibility="Visible">
+        <Grid x:Name="SpinnerRotateHost" RenderTransformOrigin="0.5,0.5"
+              VerticalAlignment="Center" HorizontalAlignment="Center">
+            <Grid.RenderTransform>
+                <RotateTransform x:Name="SpinnerRotate" Angle="0"/>
+            </Grid.RenderTransform>
+            <Ellipse Width="16" Height="16"
+                     Stroke="#20FFFFFF" StrokeThickness="2.5"
+                     Fill="Transparent"/>
+            <Ellipse x:Name="SpinnerArc"
+                     Width="16" Height="16"
+                     Stroke="#FFD700" StrokeThickness="2.5"
+                     Fill="Transparent"
+                     StrokeDashArray="5 15" StrokeDashOffset="0"
+                     StrokeEndLineCap="Round" StrokeStartLineCap="Round"
+                     Visibility="Visible"/>
+        </Grid>
+
+        <TextBlock x:Name="IconSuccess"
+                   Text="&#x2714;"
+                   Foreground="#4CAF50"
+                   FontSize="12" FontWeight="Bold"
+                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                   Visibility="Collapsed"/>
+        <TextBlock x:Name="IconFailure"
+                   Text="&#x2718;"
+                   Foreground="#F44336"
+                   FontSize="12" FontWeight="Bold"
+                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                   Visibility="Collapsed"/>
+    </Grid>
+</UserControl>

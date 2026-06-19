@@ -1,0 +1,826 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.TweaksPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Tweaks"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
+
+            <TextBlock Text="Desempenho e Tweaks" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Altera&#xE7;&#xF5;es avan&#xE7;adas no registro. Mudan&#xE7;as exigem reinicializa&#xE7;&#xE3;o." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- GRUPO 1: JOGOS -->
+            <TextBlock Text="Jogos e Gr&#xE1;ficos" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <!-- Item 1: Game Mode -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <!-- Texto Esquerda -->
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Status Texto -->
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Switch -->
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Prioridade de GPU (Game Mode)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Define prioridade 'High' para jogos no registro." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusGame" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkGameMode" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkGameMode_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 2: MPO -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desativar Multi-Plane Overlay (MPO)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Corrige telas piscando e stutters em placas NVIDIA/AMD." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusMPO" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkMPO" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMPO_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 3: Timer & Latency -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Otimizar Timer &amp; Lat&#xEA;ncia (HPET)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Ajusta PlatformClock, Tick Din&#xE2;mico e Resolu&#xE7;&#xE3;o do Timer (1ms)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusTimer" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkTimer" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTimer_Click"/>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
+            <!-- GRUPO: SMARTCREEN -->
+            <TextBlock Text="SmartScreen e Navega&#xE7;&#xE3;o" FontSize="16" FontWeight="Bold" Foreground="#8AB4F8" Margin="0,25,0,15"/>
+            <Border CornerRadius="8" Padding="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#082B3A" Offset="0.0"/>
+                        <GradientStop Color="#081F2A" Offset="0.5"/>
+                        <GradientStop Color="#081520" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#305565" Offset="0.0"/>
+                        <GradientStop Color="#254555" Offset="0.5"/>
+                        <GradientStop Color="#1A3545" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <StackPanel>
+                    <!-- SmartScreen (Sistema) -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove o filtro SmartScreen do Windows, que envia dados de aplicativos e arquivos para a Microsoft. Desativar reduz uso de CPU/RAM e elimina bloqueios durante instalação de programas. Recomenda-se manter um antivírus de terceiros ativo."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,16,15,12">
+                            <TextBlock Text="Desativar SmartScreen (Sistema)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativar o SmartScreen trar&#xE1; uma experi&#xEA;ncia mais leve ao Windows.&#x0a;Recomenda-se ter um antiv&#xED;rus instalado." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusSmartScreenSystem" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkSmartScreenSystem" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSmartScreenSystem_Click" Margin="0,16,20,16"/>
+                    </Grid>
+
+                    <Separator Background="#254455" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- SmartScreen (Explorer - Bloqueio de Arquivos) -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Impede que o Windows Explorer bloqueie a execu&#xE7;&#xE3;o de arquivos baixados ou suspeitos com base na reputa&#xE7;&#xE3;o na nuvem. Ao desativar, voc&#xEA; poder&#xE1; abrir qualquer arquivo sem ser barrado pelo SmartScreen."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,12,15,16">
+                            <TextBlock Text="Desativar Bloqueio do Explorer (SmartScreen)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Esse comando faz o Windows deixar voc&#xEA; usar seus arquivos&#x0a;sem serem bloqueados pelo SmartScreen." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusSmartScreenExplorer" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkSmartScreenExplorer" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSmartScreenExplorer_Click" Margin="0,12,20,16"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- GRUPO 2: SISTEMA -->
+            <TextBlock Text="Sistema e Seguran&#xE7;a" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <!-- Item 3: VBS -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desativar Seguran&#xE7;a VBS (Ganho de FPS)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Virtualiza&#xE7;&#xE3;o de Seguran&#xE7;a. Desativar aumenta performance em CPU bound." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusVBS" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <!-- ATEN&#xC7;&#xC3;O: Aqui invertemos a l&#xF3;gica. Switch Azul = VBS DESLIGADO (Bom para Gamer) -->
+                        <CheckBox x:Name="ChkVBS" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkVBS_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 4: Bing -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desativar Pesquisa Web (Bing)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove sugest&#xF5;es da internet no Menu Iniciar." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusBing" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkBing" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBing_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 5: MemoryUsage -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Otimizar Uso de Mem&#xF3;ria (Fsutil)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Equivalente a 'fsutil behavior set memoryusage 2'. Otimiza gerenciamento de mem&#xF3;ria." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusMemoryUsage" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkMemoryUsage" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMemoryUsage_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 6: Fast Shutdown -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Desligamento Turbo (Shutdownturbo)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Reduz o tempo de espera para fechar apps ao desligar (2s)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusShutdown" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkShutdown" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkShutdown_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- GRUPO 3: TWEAKS DIVERSOS -->
+            <TextBlock Text="Tweaks Diversos" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <!-- Item 1: Background Apps -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help" Margin="0,0,10,0"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="GPEDIT: Computer Configuration > Administrative Templates > Windows Components > App Privacy > Let Windows apps run in the background = Force Deny. Impede que aplicativos da Microsoft executem em background, reduzindo processos e uso de CPU."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Apps em Segundo Plano" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede que aplicativos da Microsoft executem em background (reduz processos)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusBackgroundApps" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkBackgroundApps" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBackgroundApps_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 2: NDU Service (Memory Leak Fix) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help" Margin="0,0,10,0"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="NDU (Network Diagnostic Usage) &#xE9; um servi&#xE7;o que monitora uso de rede e &#xE9; conhecido por causar vazamento de mem&#xF3;ria (memory leak). Desabilitar (Start=4) resolve o problema de mem&#xF3;ria que cresce indefinidamente."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar NDU (Fix Memory Leak)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa servi&#xE7;o NDU que causa vazamento de mem&#xF3;ria (Start=4)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusNDU" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkNDU" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNDU_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 3: Service Startup -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help" Margin="0,0,10,0"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define servi&#xE7;os n&#xE3;o essenciais para 'Manual' (Start=3) em vez de 'Automatic' (Start=2). Servi&#xE7;os s&#xF3; iniciam quando necess&#xE1;rio, reduzindo processos de inicializa&#xE7;&#xE3;o. Servi&#xE7;os afetados: SysMain, DiagTrack, MapsBroker, lfsvc, SharedAccess, lltdsvc, CDPUserSvc, WpnService, WpnUserService, OneSyncSvc, PcaSvc, WerSvc, wisvc, icssvc."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Otimizar Startup de Servi&#xE7;os" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Define servi&#xE7;os n&#xE3;o essenciais para 'Manual' (reduz processos de inicializa&#xE7;&#xE3;o)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusServiceStartup" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkServiceStartup" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkServiceStartup_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 4: No Auto Reboot -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help" Margin="0,0,10,0"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Impede rein&#xED;cio autom&#xE1;tico do Windows quando usu&#xE1;rio est&#xE1; logado. Evita rein&#xED;cios surpresa durante atualiza&#xE7;&#xF5;es. Configura&#xE7;&#xE3;o: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings\BranchReadinessLevel = 32."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Impedir Rein&#xED;cio Autom&#xE1;tico" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Evita rein&#xED;cios surpresa durante atualiza&#xE7;&#xF5;es do Windows." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusNoAutoReboot" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkNoAutoReboot" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNoAutoReboot_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 5: Diagnostic Services (DPS, WdiServiceHost, WdiSystemHost) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help" Margin="0,0,10,0"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa servi&#xE7;os de diagn&#xF3;stico do Windows:&#x0a;&#x2022; DPS (Diagnostic Policy Service)&#x0a;&#x2022; WdiServiceHost (Windows Diagnostic Service Host)&#x0a;&#x2022; WdiSystemHost (Windows Diagnostic System Host)&#x0a;&#x0a;Benef&#xED;cios: Reduz atividade em segundo plano (~10 MB), remove &#xED;cone 'sem internet' da bandeja.&#x0a;Riscos: Windows n&#xE3;o detecta problemas de rede automaticamente.&#x0a;Recomendado para gamers e usu&#xE1;rios avan&#xE7;ados."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Diagn&#xF3;sticos (DPS/Wdi)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove &#xED;cone 'sem internet', reduz atividade em segundo plano (~10 MB)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusDiagnosticServices" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkDiagnosticServices" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDiagnosticServices_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 6: Power Throttling -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help" Margin="0,0,10,0"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Power Throttling &#xE9; um recurso do Windows que reduz a energia de processos em segundo plano para economizar bateria. Em jogos, pode causar micro-stutters quando um processo em BG &#xE9; throttled. Desativar (PowerThrottlingOff=1) mant&#xE9;m todos os processos em performance m&#xE1;xima."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Power Throttling (CPU)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede Windows de throttlar CPU de processos em segundo plano." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusPowerThrottling" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkPowerThrottling" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPowerThrottling_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- Item 7: GDI Scaling -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help" Margin="0,0,10,0"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="GDI Scaling &#xE9; um recurso do Windows 11 que faz scaling autom&#xE1;tico de aplicativos GDI legados em monitores de alta DPI. Desativar reduz carga da GPU em apps antigos e pode melhorar performance em jogos mais antigos.&#x0a;&#x0a;Recomendado para: Quem usa monitores 1080p ou joga t&#xED;tulos antigos.&#x0a;N&#xE3;o recomendado para: Monitores 4K com scaling &gt;100%."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar GDI Scaling" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Reduz carga da GPU em apps GDI legados (jogos antigos)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusGdiScaling" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkGdiScaling" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkGdiScaling_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- SLIDE ENGINE (BOTTOM) -->
+            <TextBlock Text="Performance Extrema (SLIDE)" FontSize="16" FontWeight="Bold" Foreground="#FFAA00" Margin="0,30,0,15"/>
+            <Border Background="#1A1500" BorderBrush="#805500" BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+                    
+                    <!-- Aviso de Seguran&#xE7;a -->
+                    <Border Background="#332000" BorderBrush="#995500" BorderThickness="1" CornerRadius="4" Padding="15" Margin="20,20,20,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#x26A0;&#xFE0F; CUIDADO:" FontWeight="Bold" Foreground="#FFAA00" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Estas op&#xE7;&#xF5;es injetam mudan&#xE7;as extremas nos drivers prim&#xE1;rios do sistema." Foreground="#DDDDDD" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Item 1: SLIDE Input -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Overdrive de Mouse &amp; Teclado" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Remove recuos de polling. Define Kbdclass/Mouclass para prioridade m&#xE1;xima no Kernel." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove recuos de polling do mouse e teclado. Define Kbdclass e Mouclass para prioridade m&#xE1;xima no kernel (Priority=31). Isso reduz lat&#xEA;ncia de input em jogos competitivos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <TextBlock x:Name="StatusSlideInput" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSlideInput" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSlideInput_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- Item 2: SLIDE USB -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Exterm&#xED;nio de Power Saving USB" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Varre toda a &#xE1;rvore de perif&#xE9;ricos e previne micro-suspens&#xF5;es (Selective Suspend)." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Varre toda a &#xE1;rvore de dispositivos USB e desativa Selective Suspend em todos os perif&#xE9;ricos. Previne micro-suspens&#xF5;es que causam lag de input em jogos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <TextBlock x:Name="StatusSlideUsb" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSlideUsb" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSlideUsb_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- Item 3: SLIDE Gaming -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Lat&#xEA;ncia Extrema de Rede &amp; GPU" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Desativa GameDVR nativo e arranca visualizadores DWM. Extingue Nagle's Algorithm via rede." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa GameDVR nativo e reduz overhead de visualiza&#xE7;&#xE3;o DWM. Desativa Nagle's Algorithm na rede para reduzir lat&#xEA;ncia de pacotes. Melhora lat&#xEA;ncia de GPU e rede em jogos online."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <TextBlock x:Name="StatusSlideGaming" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSlideGaming" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSlideGaming_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- Item 4: PCIe Link State Power Management -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Desativar PCIe Link State Power Management" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Desativa economia de energia PCIe (ASPM). Pode reduzir lat&#xEA;ncia de GPU em alguns sistemas." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa Link State Power Management (ASPM) para PCIe. Isso mant&#xE9;m o link PCIe sempre ativo, reduzindo lat&#xEA;ncia quando a GPU precisa de largura de banda m&#xE1;xima. Ganho de FPS varia entre sistemas (alguns usu&#xE1;rios reportaram 45-53 FPS para valores mais altos). N&#xE3;o recomendado para laptops (reduz bateria)."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <TextBlock x:Name="StatusPciePower" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkPciePower" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPciePower_Click"/>
+                    </Grid>
+
+                    <Separator Background="#805500" Opacity="0.5"/>
+
+                    <!-- Item 5: Hard Disk/Display Timeout -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Desativar Timeout de Disco e Tela" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Impede desligamento de disco e tela durante jogos longos." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Background="Transparent" BorderThickness="0" 
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Width="30" Height="30" Cursor="Help"
+                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define timeout de disco e tela para 0 (nunca desligar). Evita que o disco r&#xED;gido ou a tela desliguem no meio de jogos longos. Recomendado para desktops gaming. N&#xE3;o recomendado para laptops (reduz bateria)."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <TextBlock x:Name="StatusTimeout" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkTimeout" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTimeout_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- AVISO DE REIN&#xCD;CIO -->
+            <Border Background="#2D2020" BorderBrush="#503030" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,20,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#x26A0;&#xFE0F;" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="16"/>
+                    <TextBlock Text="Altera&#xE7;&#xF5;es nestas configura&#xE7;&#xF5;es exigem que voc&#xEA; reinicie o computador para serem aplicadas pelo Windows." 
+                               Foreground="#FFC0C0" VerticalAlignment="Center" FontSize="13"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,303 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.CleanupPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Limpeza"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,30,30,50" MaxWidth="1000">
+
+            <TextBlock Text="Limpeza de Sistema" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,6" Foreground="White"/>
+            <TextBlock Text="Libere espa&#xE7;o removendo arquivos tempor&#xE1;rios, caches e hist&#xF3;rico de navegadores."
+                       Foreground="#888" Margin="0,0,0,25"/>
+
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <!-- SE&#xC7;&#xC3;O PRINCIPAL: 3 Cards de limpeza r&#xE1;pida                 -->
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- CARD 1: Arquivos Tempor&#xE1;rios -->
+                <Button Grid.Column="0" Height="130" Click="BtnCleanTemp_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Style="{StaticResource CardStyle}" Padding="15">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="&#x1F5D1;&#xFE0F;" FontSize="28" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Arquivos Tempor&#xE1;rios" FontWeight="Bold" FontSize="13" Foreground="White" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Limpa %TEMP% e Windows\Temp" FontSize="11" Foreground="#888" HorizontalAlignment="Center" Margin="0,4,0,0" TextWrapping="Wrap" TextAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                    <Setter TargetName="bdr" Property="Background" Value="#2A2A2A"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <!-- CARD 2: Windows Update -->
+                <Button Grid.Column="2" Height="130" Click="BtnCleanUpdate_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Style="{StaticResource CardStyle}" Padding="15">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="&#x1F4E6;" FontSize="28" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Cache de Updates" FontWeight="Bold" FontSize="13" Foreground="White" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="SoftwareDistribution / Downloads" FontSize="11" Foreground="#888" HorizontalAlignment="Center" Margin="0,4,0,0" TextWrapping="Wrap" TextAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                    <Setter TargetName="bdr" Property="Background" Value="#2A2A2A"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <!-- CARD 3: Shaders -->
+                <Button Grid.Column="4" Height="130" Click="BtnCleanShaders_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Style="{StaticResource CardStyle}" Padding="15">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="&#x1F3AE;" FontSize="28" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Cache de Shaders" FontWeight="Bold" FontSize="13" Foreground="White" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="NVIDIA &amp; AMD (DX/GL)" FontSize="11" Foreground="#888" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                    <Setter TargetName="bdr" Property="Background" Value="#2A2A2A"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <!-- LOG + A&#xC7;&#xD5;ES PRINCIPAIS                                      -->
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <Grid Margin="0,0,0,25">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- CONSOLE DE LOG -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="LOG DE EXECU&#xC7;&#xC3;O" FontSize="11" Foreground="#666" Margin="0,0,0,5" FontWeight="Bold"/>
+                    <Border Grid.Row="1" Background="#111" CornerRadius="6" BorderBrush="#333" BorderThickness="1" Height="200">
+                        <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto">
+                            <TextBox x:Name="TxtLog" Background="Transparent" Foreground="#AAA" BorderThickness="0"
+                                     IsReadOnly="True" Padding="10" FontFamily="Consolas" TextWrapping="Wrap"
+                                     Text="[Pronto] Aguardando comando..."/>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+
+                <!-- BOT&#xD5;ES LATERAIS PRINCIPAIS -->
+                <StackPanel Grid.Column="2" Margin="0,20,0,0">
+                    <TextBlock Text="A&#xE7;&#xF5;es Principais" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+
+                    <Button Content="&#x1F9F9; LIMPEZA TOTAL" Height="45" Margin="0,0,0,10"
+                            Click="BtnFullClean_Click" Style="{StaticResource GoldButtonStyle}"/>
+
+                    <Button Content="&#x1F5D1;&#xFE0F; Limpar Lixeira" Height="38" Margin="0,0,0,8"
+                            Click="BtnCleanRecycleBin_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+
+                    <Button Content="&#x1F4CB; Limpar Prefetch" Height="38" Margin="0,0,0,8"
+                            Click="BtnCleanPrefetch_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+
+                    <Button Content="&#x1F5BC;&#xFE0F; Cache Thumbnails" Height="38" Margin="0,0,0,8"
+                            Click="BtnCleanThumbnails_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+
+                    <!-- CompactOS com aviso claro -->
+                    <Button Content="&#x1F4BD; CompactOS" Height="38" Margin="0,0,0,4"
+                            Click="BtnCompactOS_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" FontSize="10" Foreground="#808080">
+                        <Run Text="&#x26A0;&#xFE0F; CompactOS comprime o Windows para liberar espa&#xE7;o. Leva 30-60 min, abre janela CMD. Pode ser &#xFA;til para o WinBoot em discos pequenos. N&#xE3;o use em SSDs lentos."/>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <!-- SE&#xC7;&#xC3;O AVAN&#xC7;ADA: Cache de Navegadores                        -->
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <TextBlock Text="&#x1F527; Ferramentas Avan&#xE7;adas" FontSize="16" FontWeight="Bold"
+                       Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
+
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="&#x1F310; Cache de Navegadores" FontSize="15" FontWeight="Bold"
+                                       Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock x:Name="TxtBrowserCacheTotal" Text="Clique em 'Detectar' para verificar."
+                                       FontSize="12" Foreground="#888" Margin="0,3,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="&#x1F504; Detectar" Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="100" Height="34" Margin="0,0,8,0" Click="BtnDetectBrowsers_Click"/>
+                            <Button Content="&#x1F9F9; Limpar Todos" Style="{StaticResource GoldButtonStyle}"
+                                    Width="120" Height="34" Click="BtnCleanAllBrowsers_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Lista de navegadores detectados -->
+                    <ItemsControl x:Name="BrowserList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#1A1A1A" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Icon}" FontSize="20" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                            <TextBlock Text="{Binding CacheSizeFormatted}" FontSize="11" Foreground="#888"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding CacheSizeFormatted}" FontSize="12"
+                                                   Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <Button Grid.Column="3" Content="Limpar" Style="{StaticResource SecondaryButtonStyle}"
+                                                Width="70" Height="28" Tag="{Binding Name}" Click="BtnCleanSingleBrowser_Click"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="TxtNoBrowsers"
+                               Text="Nenhum navegador detectado ainda. Clique em 'Detectar'."
+                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <!-- SE&#xC7;&#xC3;O AVAN&#xC7;ADA: Limpador de Registro                        -->
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x1F527; Limpador de Registro" FontSize="15" FontWeight="Bold"
+                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                                <!-- &#xCD;cone de informa&#xE7;&#xE3;o -->
+                                <Border Background="#2A2A2A" CornerRadius="10" Width="20" Height="20"
+                                        Margin="8,0,0,0" VerticalAlignment="Center" Cursor="Hand"
+                                    ToolTip="O auditor de registro lista entradas suspeitas para revis&#xE3;o. Por padr&#xE3;o, os achados ficam como Manual para evitar remover integra&#xE7;&#xF5;es de apps, menus de contexto e associa&#xE7;&#xF5;es de arquivo. Use Copiar para pesquisar antes de qualquer limpeza.">
+                                    <TextBlock Text="&#x2139;" FontSize="11" Foreground="{StaticResource AccentColor}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="Audita entradas &#xF3;rf&#xE3;s de startup, programas, hist&#xF3;rico e extens&#xF5;es. N&#xE3;o remove itens manuais automaticamente."
+                                       FontSize="11" Foreground="#888" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="&#x1F50D; Escanear" Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90" Height="34" Margin="0,0,6,0" Click="BtnScanRegistry_Click"/>
+                            <Button x:Name="BtnSelectAuto" Content="&#x2705; Auto" Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="80" Height="34" Margin="0,0,6,0" IsEnabled="False" Click="BtnSelectAuto_Click"/>
+                            <Button x:Name="BtnCopyRegistryIssues" Content="&#x1F4CB; Copiar" Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="80" Height="34" Margin="0,0,6,0" IsEnabled="False" Click="BtnCopyRegistryIssues_Click"/>
+                            <Button x:Name="BtnCleanRegistry" Content="&#x1F9F9; Limpar" Style="{StaticResource GoldButtonStyle}"
+                                    Width="100" Height="34" IsEnabled="False" Click="BtnCleanRegistry_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock x:Name="TxtRegistryScanResult"
+                               Text="Clique em 'Escanear' para verificar o registro."
+                               FontSize="12" Foreground="#888" Margin="0,0,0,8"/>
+
+                    <!-- Lista de problemas encontrados -->
+                    <Border x:Name="RegistryIssuesBorder" Visibility="Collapsed" Background="#111"
+                            CornerRadius="6" Padding="0" MaxHeight="250">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="RegistryIssuesList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#0DFFFFFF" BorderThickness="0,0,0,1" BorderBrush="#222" Padding="6,4" MouseLeftButtonDown="IssueRow_MouseDown">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding CanClean}"
+                                                          VerticalAlignment="Center" Margin="0,0,6,0" Click="ChkIssue_Click"/>
+                                                <TextBlock Text="{Binding CategoryIcon}" FontSize="14"
+                                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="{Binding Description}" FontSize="12" Foreground="White" TextWrapping="Wrap"/>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Category}" FontSize="10" Foreground="#666" Margin="0,0,10,0"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding RegistryPath}" FontSize="9" Foreground="#444"/>
+                                                    </Grid>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="3" Text="{Binding SafeLabel}" FontSize="10"
+                                                           Foreground="{Binding SafeColor}" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                                                <Border Grid.Column="4" Background="#20FFFFFF" CornerRadius="3" Padding="2" VerticalAlignment="Center"
+                                                        ToolTip="{Binding RiskWarning}">
+                                                    <TextBlock Text="&#x2139;" FontSize="10" Foreground="#888" Padding="2,0"/>
+                                                </Border>
+                                            </Grid>
+                                            <Border.ContextMenu>
+                                                <ContextMenu Background="#1A1A1A" BorderBrush="{StaticResource AccentColor}" BorderThickness="1">
+                                                    <MenuItem Header="Remover este item" Click="MenuRemoveSingleIssue_Click"
+                                                              Foreground="#FF6F61" FontWeight="Bold"/>
+                                                    <MenuItem Header="Copiar caminho do registro" Click="MenuCopyIssuePath_Click"/>
+                                                    <Separator Background="#333"/>
+                                                    <MenuItem Header="Pesquisar no Google" Click="MenuSearchIssue_Click"/>
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

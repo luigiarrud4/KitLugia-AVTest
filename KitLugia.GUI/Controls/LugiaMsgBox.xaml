@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="KitLugia.GUI.Controls.LugiaMsgBox"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="450" VerticalAlignment="Center">
+    <!-- Sem Height fixa, centralizado verticalmente -->
+
+    <UserControl.Resources>
+        <DropShadowEffect x:Key="GlowEffect" Color="#FFD700" BlurRadius="30" ShadowDepth="0" Opacity="0.5"/>
+        <DropShadowEffect x:Key="TextGlow" Color="#FFD700" BlurRadius="8" ShadowDepth="0" Opacity="0.8"/>
+    </UserControl.Resources>
+
+    <!-- Borda Principal (Altura Autom&#xE1;tica devido ao Grid interno) -->
+    <Border CornerRadius="12" BorderThickness="1" BorderBrush="{StaticResource AccentColor}" 
+            Background="#0F0F0F" Effect="{StaticResource GlowEffect}"
+            MinHeight="180">
+        <!-- Altura M&#xED;nima para n&#xE3;o ficar muito pequeno -->
+
+        <Border CornerRadius="12" Background="{StaticResource WindowBackground}" ClipToBounds="True">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="50"/>
+                    <!-- T&#xED;tulo -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- &#xCD;cone e Texto (Auto = cresce conforme precisa) -->
+                    <RowDefinition Height="70"/>
+                    <!-- Bot&#xE3;o com espa&#xE7;o fixo embaixo -->
+                </Grid.RowDefinitions>
+
+                <!-- 1. BARRA DE T&#xCD;TULO -->
+                <Border Grid.Row="0" Background="#15FFD700" BorderBrush="#33FFD700" BorderThickness="0,0,0,1">
+                    <TextBlock x:Name="TxtTitle" Text="AVISO DO SISTEMA" Foreground="{StaticResource AccentColor}" 
+                               HorizontalAlignment="Center" VerticalAlignment="Center" 
+                               FontWeight="Bold" FontSize="14" Effect="{StaticResource TextGlow}"/>
+                </Border>
+
+                <!-- 2. CONTE&#xDA;DO PRINCIPAL -->
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="30,20">
+
+                    <!-- &#xCD;cone Tri&#xE2;ngulo (Desenhado com propor&#xE7;&#xE3;o fixa para n&#xE3;o deformar) -->
+                    <Grid HorizontalAlignment="Center" Margin="0,0,0,15" Width="44" Height="40">
+                        <Path Data="M 22,0 L 44,40 L 0,40 Z" 
+                              Fill="{StaticResource AccentColor}" 
+                              Stroke="{StaticResource AccentColor}" 
+                              Stretch="Fill" 
+                              Effect="{StaticResource TextGlow}" 
+                              StrokeThickness="3" StrokeLineJoin="Round"/>
+
+                        <TextBlock Text="!" FontSize="20" FontWeight="ExtraBold" Foreground="Black" 
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" 
+                                   Margin="0,8,0,0" IsHitTestVisible="False"/>
+                    </Grid>
+
+                    <!-- Texto da Mensagem -->
+                    <TextBlock x:Name="TxtMessage" Text="Mensagem..." 
+                               Foreground="{StaticResource TextPrimary}" 
+                               TextWrapping="Wrap" FontSize="15" 
+                               TextAlignment="Center" LineHeight="24"/>
+                </StackPanel>
+
+                <!-- 3. BOT&#xC3;O (Sempre no final) -->
+                <Border Grid.Row="2" Background="#0AFFFFFF" Padding="0,15">
+                    <Button x:Name="BtnOk" Content="ENTENDIDO" Width="150" Height="40" Cursor="Hand" Click="BtnOk_Click"
+                            Foreground="#101010" FontSize="13" FontWeight="ExtraBold" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" CornerRadius="20" Background="{DynamicResource AccentColor}" Effect="{StaticResource TextGlow}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Background" Value="White"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Border>
+            </Grid>
+        </Border>
+    </Border>
+</UserControl>

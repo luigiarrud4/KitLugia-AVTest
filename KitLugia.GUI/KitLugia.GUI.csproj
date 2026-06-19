@@ -1,0 +1,61 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+		<StartupObject>KitLugia.GUI.Program</StartupObject>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		
+		<NoWarn>$(NoWarn);WFAC010;CS1668</NoWarn>
+
+		<!-- Habilita WPF e Windows Forms (para diálogos de pasta) -->
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
+		<!-- Forçar codificação UTF-8 para caracteres especiais -->
+		<CodePage>65001</CodePage>
+		<ApplicationIcon>Iconarchive-Realistic-Fruits-Yellow-Apple.ico</ApplicationIcon>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<SatelliteResourceLanguages>pt-BR;en-US</SatelliteResourceLanguages>
+		<Version>2.0.5</Version>
+		<AssemblyVersion>2.0.5.0</AssemblyVersion>
+		<FileVersion>2.0.5.0</FileVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Remove="Pages\DriversPage.xaml.txt" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Include="Iconarchive-Realistic-Fruits-Yellow-Apple.ico" />
+	  <!-- Linux PreOS (GRUB2 boot) -->
+	  <Content Include="..\KitLugia.Core\Resources\LinuxPreOS\vmlinuz">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\LinuxPreOS\vmlinuz</Link>
+	  </Content>
+	  <Content Include="..\KitLugia.Core\Resources\LinuxPreOS\initrd.gz">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\LinuxPreOS\initrd.gz</Link>
+	  </Content>
+	  <Content Include="..\KitLugia.Core\Resources\LinuxPreOS\grubx64.efi" Condition="Exists('..\KitLugia.Core\Resources\LinuxPreOS\grubx64.efi')">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\LinuxPreOS\grubx64.efi</Link>
+	  </Content>
+	  <!-- Ferramentas Externas -->
+	  <Content Include="External\MAS\**\*">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="Resources\**\*">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <!-- GoodbyeDPI - Contorno de DPI -->
+	  <Content Include="Tools\GoodbyeDPI\**\*">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\KitLugia.Core\KitLugia.Core.csproj" />
+	</ItemGroup>
+
+</Project>

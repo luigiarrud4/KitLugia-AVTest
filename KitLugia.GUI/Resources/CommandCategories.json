@@ -1,0 +1,192 @@
+{
+  "categories": {
+    "Limpeza": {
+      "description": "Comandos para limpeza de sistema, arquivos temporários e cache",
+      "classes": ["CleanupManager"],
+      "methods": [
+        "FixDiskFullUsage",
+        "CleanTemporaryFiles",
+        "CleanWindowsUpdateCache",
+        "CleanShaderCaches",
+        "RunFullCleanup",
+        "CompactOS"
+      ]
+    },
+    "Diagnóstico": {
+      "description": "Comandos para diagnóstico e verificação de sistema",
+      "classes": ["DiagnosticsManager", "IntegrityCheckManager"],
+      "methods": [
+        "ScheduleDiskCheck",
+        "VerifyFileSystem",
+        "CheckSystemHealth"
+      ]
+    },
+    "Rede": {
+      "description": "Comandos para configuração e reparo de rede",
+      "classes": ["NetworkManager"],
+      "methods": [
+        "ResetNetworkStack",
+        "FlushDNS",
+        "RenewIP",
+        "ResetWinsock"
+      ]
+    },
+    "Reparo": {
+      "description": "Comandos para reparo de sistema e arquivos corrompidos",
+      "classes": ["GeneralRepairManager", "SystemRepairManager"],
+      "methods": [
+        "RepairSystemFiles",
+        "RepairComponentStore",
+        "RepairBoot",
+        "RestoreSystem"
+      ]
+    },
+    "Memória": {
+      "description": "Comandos para otimização e limpeza de memória RAM",
+      "classes": ["MemoryOptimizer"],
+      "methods": [
+        "CleanStandbyList",
+        "EmptyWorkingSets",
+        "OptimizeMemory"
+      ]
+    },
+    "Bloatware": {
+      "description": "Comandos para remoção de bloatware e aplicativos pré-instalados",
+      "classes": ["BloatwareManager"],
+      "methods": [
+        "RemoveBloatware",
+        "DisableTelemetry",
+        "DisableCortana",
+        "DisableWindowsUpdate"
+      ]
+    },
+    "Ativação": {
+      "description": "Comandos para ativação do Windows e Office",
+      "classes": ["ActivationManager"],
+      "methods": [
+        "ActivateWindows",
+        "ActivateOffice",
+        "CheckActivationStatus"
+      ]
+    },
+    "Boot": {
+      "description": "Comandos para otimização e configuração de boot",
+      "classes": ["BootOptimizerManager"],
+      "methods": [
+        "OptimizeBoot",
+        "DisableStartupPrograms",
+        "ConfigureBootServices"
+      ]
+    },
+    "Drivers": {
+      "description": "Comandos para gerenciamento de drivers",
+      "classes": ["DriverManager"],
+      "methods": [
+        "UpdateDrivers",
+        "CheckOutdatedDrivers",
+        "InstallDriver",
+        "UninstallDriver"
+      ]
+    },
+    "GPEDIT": {
+      "description": "Comandos para habilitação e configuração do gpedit.msc",
+      "classes": ["GPEditManager"],
+      "methods": [
+        "EnableGPEDIT",
+        "DisableDefender",
+        "ConfigurePolicies"
+      ]
+    },
+    "WinBoot": {
+      "description": "Comandos para instalação e configuração do Windows",
+      "classes": ["WinbootManager"],
+      "methods": [
+        "GenerateAutounattendXml",
+        "CreateBootableUSB",
+        "InstallWindows"
+      ]
+    },
+    "ISO": {
+      "description": "Comandos para manipulação de arquivos ISO",
+      "classes": ["IsoManager"],
+      "methods": [
+        "ExtractISO",
+        "CreateISO",
+        "BurnISO"
+      ]
+    },
+    "Partições": {
+      "description": "Comandos para gerenciamento de partições de disco",
+      "classes": ["PartitionManager"],
+      "methods": [
+        "CreatePartition",
+        "DeletePartition",
+        "FormatPartition",
+        "ResizePartition"
+      ]
+    },
+    "Segurança": {
+      "description": "Comandos para configuração de segurança do sistema",
+      "classes": ["SecurityManager"],
+      "methods": [
+        "ConfigureUAC",
+        "ConfigureFirewall",
+        "EnableBitLocker"
+      ]
+    },
+    "Privacidade": {
+      "description": "Comandos para configuração de privacidade",
+      "classes": ["PrivacyManager"],
+      "methods": [
+        "DisableTracking",
+        "ClearHistory",
+        "ConfigurePrivacy"
+      ]
+    },
+    "Jogos": {
+      "description": "Comandos para otimização de jogos",
+      "classes": ["GameOptimizerManager"],
+      "methods": [
+        "OptimizeForGaming",
+        "DisableGameDVR",
+        "ConfigureGameMode"
+      ]
+    },
+    "Serviços": {
+      "description": "Comandos para gerenciamento de serviços do Windows",
+      "classes": ["ServiceManager"],
+      "methods": [
+        "DisableService",
+        "EnableService",
+        "RestartService"
+      ]
+    },
+    "Registro": {
+      "description": "Comandos para edição do registro do Windows",
+      "classes": ["RegistryManager"],
+      "methods": [
+        "EditRegistry",
+        "BackupRegistry",
+        "RestoreRegistry"
+      ]
+    },
+    "Sistema": {
+      "description": "Comandos gerais do sistema",
+      "classes": ["SystemManager"],
+      "methods": [
+        "GetSystemInfo",
+        "GetHardwareInfo",
+        "ConfigureSystem"
+      ]
+    },
+    "Utilitários": {
+      "description": "Comandos utilitários diversos",
+      "classes": ["Toolbox", "SystemUtils"],
+      "methods": [
+        "RunExternalProcess",
+        "KillProcess",
+        "OpenFile"
+      ]
+    }
+  }
+}
