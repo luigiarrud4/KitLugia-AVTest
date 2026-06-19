@@ -81,12 +81,14 @@ namespace KitLugia.GUI.Pages
 
         private void ChkEmergencyPreBoot_Checked(object sender, RoutedEventArgs e)
         {
-            TxtStatus.Text = "Modo Emergency: o sistema será reiniciado para o Alpine Linux.";
+            if (TxtStatus != null)
+                TxtStatus.Text = "Modo Emergency: o sistema será reiniciado para o Alpine Linux.";
         }
 
         private void ChkEmergencyPreBoot_Unchecked(object sender, RoutedEventArgs e)
         {
-            TxtStatus.Text = "Pronto.";
+            if (TxtStatus != null)
+                TxtStatus.Text = "Pronto.";
         }
 
         private async void BtnExecute_Click(object sender, RoutedEventArgs e)
