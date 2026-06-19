@@ -16,7 +16,43 @@ namespace KitLugia.Core
 
         public async Task<SystemStats> GetSystemSnapshotAsync()
         {
+            try
+            {
+                return await GetSystemSnapshotWmiAsync();
+            }
+            catch (Exception ex) when (ex is System.IO.FileNotFoundException or TypeLoadException)
+            {
+                Logger.Log($"[DASHBOARD] WMI não disponível, usando fallback: {ex.Message}");
+                return GetSystemSnapshotFallback();
+            }
+        }
 
+        private SystemStats GetSystemSnapshotFallback()
+        {
+            string cpuName = "Desconhecido";
+            string osName = "Windows";
+            double ramTotal = 0;
+
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+                cpuName = key?.GetValue("ProcessorNameString")?.ToString() ?? "Desconhecido";
+            }
+            catch { }
+
+            try
+            {
+                osName = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+            }
+            catch { }
+
+            ramTotal = SystemUtils.GetTotalSystemRamGB();
+
+            return new SystemStats(cpuName, 0, 0, "N/A", 0, 0, 0, ramTotal, osName, SystemUtils.GetSystemUptime(), new List<StorageInfo>());
+        }
+
+        private async Task<SystemStats> GetSystemSnapshotWmiAsync()
+        {
             return await Task.Run(() =>
             {
                 string cpuName = "Desconhecido";
