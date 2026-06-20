@@ -47,7 +47,7 @@ namespace KitLugia.GUI.Pages
                 {
                     var result = new List<PartitionInfo>();
                     using var ps = new System.Management.ManagementObjectSearcher(
-                        "SELECT DiskIndex, Index, Size, DriveLetter FROM Win32_DiskPartition WHERE Type != 'Extended'"
+                        "SELECT DiskIndex, Index, Size, DriveLetter FROM Win32_DiskPartition WHERE Type <> 'Extended'"
                     );
                     foreach (var obj in ps.Get())
                     {
