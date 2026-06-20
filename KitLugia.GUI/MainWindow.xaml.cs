@@ -725,17 +725,6 @@ namespace KitLugia.GUI
                 return;
             }
 
-            // No Dashboard: popup rápido; nas demais páginas: página de resultados completa
-            if (MainFrame.Content is DashboardPage)
-            {
-                var quickResults = SearchEngine.Search(query).Take(10).ToList();
-                if (LstSearchResults != null)
-                    LstSearchResults.ItemsSource = quickResults;
-                if (SearchPopup != null)
-                    SearchPopup.IsOpen = quickResults.Count > 0;
-                return;
-            }
-
             UncheckAllNavButtons();
             CleanupAndNavigate(new GlobalSearchPage(query));
         }
