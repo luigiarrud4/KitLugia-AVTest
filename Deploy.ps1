@@ -86,6 +86,9 @@ if (Test-Path $coreOut) {
     Write-Host "  Copied Core files from $coreOut"
 }
 
+# Remove subpasta Updater (só queremos o .exe na raiz)
+Remove-Item -Path (Join-Path $OutputPath "Updater") -Recurse -Force -ErrorAction SilentlyContinue
+
 Write-Host "`nCreating ZIP..." -ForegroundColor Yellow
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
