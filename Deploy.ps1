@@ -88,7 +88,23 @@ if (Test-Path $coreOut) {
 
 Write-Host "`nCreating ZIP: $ZipPath..." -ForegroundColor Yellow
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory($OutputPath, $ZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+# Remove ZIP anterior (pode estar travado por outro processo)
+Remove-Item -Path $ZipPath -Force -ErrorAction SilentlyContinue
+
+$maxRetries = 5
+for ($i = 1; $i -le $maxRetries; $i++) {
+    try {
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($OutputPath, $ZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+        break
+    }
+    catch {
+        if ($i -eq $maxRetries) { throw }
+        Write-Warning "ZIP locked, retrying ($i/$maxRetries)..."
+        Start-Sleep -Milliseconds 500
+        Remove-Item -Path $ZipPath -Force -ErrorAction SilentlyContinue
+    }
+}
 
 if (-not $SkipHash) {
     Write-Host "`n[5/5] Computing SHA256..." -ForegroundColor Yellow
