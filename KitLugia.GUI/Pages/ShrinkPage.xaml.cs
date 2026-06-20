@@ -46,17 +46,45 @@ namespace KitLugia.GUI.Pages
                 var list = await Task.Run(() =>
                 {
                     var result = new List<PartitionInfo>();
+
+                    // Mapeia partição -> letra via Win32_LogicalDiskToPartition
+                    var assocMap = new Dictionary<(uint disk, uint part), string>();
+                    using (var assocQuery = new System.Management.ManagementObjectSearcher("SELECT * FROM Win32_LogicalDiskToPartition"))
+                    {
+                        foreach (var assoc in assocQuery.Get())
+                        {
+                            var antec = assoc["Antecedent"]?.ToString() ?? "";
+                            var dep = assoc["Dependent"]?.ToString() ?? "";
+                            // Antecedent: Win32_DiskPartition.DeviceID="Disk #0, Partition #0"
+                            // Dependent: Win32_LogicalDisk.DeviceID="C:"
+                            if (string.IsNullOrEmpty(antec) || string.IsNullOrEmpty(dep)) continue;
+
+                            var partMatch = System.Text.RegularExpressions.Regex.Match(antec, @"Disk\s+#(\d+),\s+Partition\s+#(\d+)");
+                            var driveMatch = System.Text.RegularExpressions.Regex.Match(dep, @"DeviceID=""([A-Za-z]):""");
+                            if (partMatch.Success && driveMatch.Success)
+                            {
+                                var key = (uint.Parse(partMatch.Groups[1].Value), uint.Parse(partMatch.Groups[2].Value));
+                                assocMap.TryAdd(key, driveMatch.Groups[1].Value);
+                            }
+                        }
+                    }
+
                     using var ps = new System.Management.ManagementObjectSearcher(
-                        "SELECT DiskIndex, Index, Size, DriveLetter FROM Win32_DiskPartition WHERE Type <> 'Extended'"
+                        "SELECT DeviceID, DiskIndex, Index, Size, Type FROM Win32_DiskPartition"
                     );
                     foreach (var obj in ps.Get())
                     {
-                        var dl = obj["DriveLetter"]?.ToString() ?? "";
-                        if (string.IsNullOrEmpty(dl)) continue;
+                        var type = obj["Type"]?.ToString() ?? "";
+                        if (type.Equals("Extended", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        var diskIdx = Convert.ToUInt32(obj["DiskIndex"]);
+                        var partIdx = Convert.ToUInt32(obj["Index"]);
+                        var dl = assocMap.GetValueOrDefault((diskIdx, partIdx), "");
+
                         result.Add(new PartitionInfo
                         {
-                            DiskIndex = Convert.ToUInt32(obj["DiskIndex"]),
-                            Index = Convert.ToUInt32(obj["Index"]),
+                            DiskIndex = diskIdx,
+                            Index = partIdx,
                             Size = Convert.ToInt64(obj["Size"]),
                             DriveLetter = dl
                         });
