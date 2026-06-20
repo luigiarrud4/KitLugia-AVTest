@@ -33,7 +33,7 @@ if (-not $SkipBuild) {
         -o $updaterOut `
         --nologo `
         -p:PublishSingleFile=true `
-        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:SelfContained=false `
         -p:DebugType=none `
         -p:DebugSymbols=false
     if (-not $?) { throw "Updater publish failed" }
@@ -53,7 +53,7 @@ Write-Host "`n[3/5] Publishing GUI (single-file, framework-dependent)..." -Foreg
     -o $OutputPath `
     --nologo `
     -p:PublishSingleFile=true `
-    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:SelfContained=false `
     -p:DebugType=none `
     -p:DebugSymbols=false
 if (-not $?) { throw "GUI publish failed" }
