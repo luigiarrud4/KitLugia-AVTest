@@ -48,7 +48,7 @@ New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 
 Write-Host "`n[4/5] Assembling release package..." -ForegroundColor Yellow
 
-$updaterExe = Join-Path $OutputPath "Updater" "KitLugia.Updater.exe"
+$updaterExe = Join-Path (Join-Path $OutputPath "Updater") "KitLugia.Updater.exe"
 if (Test-Path $updaterExe) {
     Copy-Item $updaterExe (Join-Path $OutputPath "KitLugia.Updater.exe")
     Write-Host "  Copied KitLugia.Updater.exe"
