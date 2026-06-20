@@ -48,14 +48,13 @@ New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 
 Write-Host "`n[4/5] Assembling release package..." -ForegroundColor Yellow
 
-# Copy Updater.exe
 $updaterExe = Join-Path $OutputPath "Updater" "KitLugia.Updater.exe"
 if (Test-Path $updaterExe) {
     Copy-Item $updaterExe (Join-Path $OutputPath "KitLugia.Updater.exe")
     Write-Host "  Copied KitLugia.Updater.exe"
 }
 else {
-    Write-Warning "KitLugia.Updater.exe not found at $updaterExe â€" publishing fallback..."
+    Write-Warning "KitLugia.Updater.exe not found - publishing fallback..."
     & dotnet publish "$RepoRoot\KitLugia.Updater\KitLugia.Updater.csproj" `
         -c $Configuration `
         -o $OutputPath `
@@ -66,7 +65,6 @@ else {
         -p:DebugSymbols=false
 }
 
-# Copy GUI output (excluding updater to avoid duplication)
 $guiOut = Join-Path $RepoRoot "KitLugia.GUI\bin\$Configuration\net10.0-windows10.0.26100.0"
 if (Test-Path $guiOut) {
     Get-ChildItem -Path $guiOut -File | Where-Object {
@@ -80,7 +78,6 @@ else {
     throw "GUI output not found at $guiOut. Build the solution first."
 }
 
-# Copy Core DLL
 $coreOut = Join-Path $RepoRoot "KitLugia.Core\bin\$Configuration\net10.0-windows10.0.26100.0"
 if (Test-Path $coreOut) {
     Get-ChildItem -Path $coreOut -File | ForEach-Object {
@@ -105,19 +102,13 @@ Write-Host "`n=== Done ===" -ForegroundColor Green
 Write-Host "Package: $ZipPath"
 Write-Host "Size: $([math]::Round((Get-Item $ZipPath).Length / 1MB, 2)) MB"
 
-# Optionally create GitHub release
 if ($CreateRelease) {
     if (-not $ReleaseTag) { $ReleaseTag = "v$(Get-Date -Format 'yyyy.MM.dd')" }
     if (-not $ReleaseName) { $ReleaseName = "KitLugia $ReleaseTag" }
-
     Write-Host "`nCreating GitHub release..." -ForegroundColor Yellow
     $assets = @("""$ZipPath""")
     if (Test-Path $HashPath) { $assets += """$HashPath""" }
-
-    & gh release create $ReleaseTag `
-        --title "$ReleaseName" `
-        --notes "Automated release from deploy script" `
-        $assets
+    & gh release create $ReleaseTag --title "$ReleaseName" --notes "Automated release" $assets
     if ($?) {
         Write-Host "  Release $ReleaseTag created!" -ForegroundColor Green
     }
