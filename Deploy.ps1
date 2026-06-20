@@ -65,32 +65,22 @@ else {
         -p:DebugSymbols=false
 }
 
-$guiOut = Join-Path $RepoRoot "KitLugia.GUI\bin\$Configuration\net10.0-windows10.0.26100.0"
-if (Test-Path $guiOut) {
-    Get-ChildItem -Path $guiOut -File | Where-Object {
-        $_.Name -ne "KitLugia.Updater.exe"
-    } | ForEach-Object {
-        Copy-Item $_.FullName (Join-Path $OutputPath $_.Name)
-    }
-    Write-Host "  Copied GUI files from $guiOut"
-}
-else {
-    throw "GUI output not found at $guiOut. Build the solution first."
-}
-
-$coreOut = Join-Path $RepoRoot "KitLugia.Core\bin\$Configuration\net10.0-windows10.0.26100.0"
-if (Test-Path $coreOut) {
-    Get-ChildItem -Path $coreOut -File | ForEach-Object {
-        Copy-Item $_.FullName (Join-Path $OutputPath $_.Name)
-    }
-    Write-Host "  Copied Core files from $coreOut"
-}
+Write-Host "  Publishing GUI (single-file, framework-dependent)..."
+& dotnet publish "$RepoRoot\KitLugia.GUI\KitLugia.GUI.csproj" `
+    -c $Configuration `
+    -o $OutputPath `
+    --nologo `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:DebugType=none `
+    -p:DebugSymbols=false
+if (-not $?) { throw "GUI publish failed" }
 
 # Remove subpasta Updater (só queremos o .exe na raiz)
 Remove-Item -Path (Join-Path $OutputPath "Updater") -Recurse -Force -ErrorAction SilentlyContinue
 
-# Remove .pdb (debug symbols, desnecessários para usuário final)
-Get-ChildItem -Path $OutputPath -Filter *.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
+# Remove .pdb, .xml (desnecessários)
+Get-ChildItem -Path $OutputPath -Include *.pdb,*.xml -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Write-Host "`nCreating ZIP..." -ForegroundColor Yellow
 Add-Type -AssemblyName System.IO.Compression.FileSystem
