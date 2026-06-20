@@ -26,11 +26,7 @@ if (Test-Path $OutputPath) {
 New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 
 if (-not $SkipBuild) {
-    Write-Host "`n[2/5] Building solution..." -ForegroundColor Yellow
-    & dotnet build "$RepoRoot\KitLugia.sln" -c $Configuration -nologo
-    if (-not $?) { throw "Build failed" }
-
-    Write-Host "`n[3/5] Publishing Updater (single-file)..." -ForegroundColor Yellow
+    Write-Host "`n[2/5] Publishing Updater (single-file)..." -ForegroundColor Yellow
     $updaterOut = Join-Path (Join-Path $RepoRoot $OutputDir) "Updater"
     & dotnet publish "$RepoRoot\KitLugia.Updater\KitLugia.Updater.csproj" `
         -c $Configuration `
@@ -41,31 +37,17 @@ if (-not $SkipBuild) {
         -p:DebugType=none `
         -p:DebugSymbols=false
     if (-not $?) { throw "Updater publish failed" }
+
+    # Copy updater to Core\Resources so it gets embedded in Core.dll / single-file .exe
+    $updaterDest = "$RepoRoot\KitLugia.Core\Resources\KitLugia.Updater.exe"
+    Copy-Item (Join-Path $updaterOut "KitLugia.Updater.exe") $updaterDest -Force
+    Write-Host "  Copied to Core\Resources for embedding"
 }
 else {
-    Write-Host "`n[2-3/5] Skipped (SkipBuild)" -ForegroundColor Magenta
+    Write-Host "`n[2/5] Skipped (SkipBuild)" -ForegroundColor Magenta
 }
 
-Write-Host "`n[4/5] Assembling release package..." -ForegroundColor Yellow
-
-$updaterExe = Join-Path (Join-Path $OutputPath "Updater") "KitLugia.Updater.exe"
-if (Test-Path $updaterExe) {
-    Copy-Item $updaterExe (Join-Path $OutputPath "KitLugia.Updater.exe")
-    Write-Host "  Copied KitLugia.Updater.exe"
-}
-else {
-    Write-Warning "KitLugia.Updater.exe not found - publishing fallback..."
-    & dotnet publish "$RepoRoot\KitLugia.Updater\KitLugia.Updater.csproj" `
-        -c $Configuration `
-        -o $OutputPath `
-        --nologo `
-        -p:PublishSingleFile=true `
-        -p:IncludeNativeLibrariesForSelfExtract=true `
-        -p:DebugType=none `
-        -p:DebugSymbols=false
-}
-
-Write-Host "  Publishing GUI (single-file, framework-dependent)..."
+Write-Host "`n[3/5] Publishing GUI (single-file, framework-dependent)..." -ForegroundColor Yellow
 & dotnet publish "$RepoRoot\KitLugia.GUI\KitLugia.GUI.csproj" `
     -c $Configuration `
     -o $OutputPath `
@@ -76,13 +58,13 @@ Write-Host "  Publishing GUI (single-file, framework-dependent)..."
     -p:DebugSymbols=false
 if (-not $?) { throw "GUI publish failed" }
 
-# Remove subpasta Updater (só queremos o .exe na raiz)
+# Remove subpasta Updater (só queremos o output limpo)
 Remove-Item -Path (Join-Path $OutputPath "Updater") -Recurse -Force -ErrorAction SilentlyContinue
 
 # Remove .pdb, .xml (desnecessários)
 Get-ChildItem -Path $OutputPath -Include *.pdb,*.xml -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
 
-Write-Host "`nCreating ZIP..." -ForegroundColor Yellow
+Write-Host "`n[4/5] Creating ZIP..." -ForegroundColor Yellow
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 # Cria o ZIP em pasta temporária (fora do diretório fonte) para evitar auto-lock

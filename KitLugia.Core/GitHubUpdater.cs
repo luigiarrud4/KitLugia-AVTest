@@ -164,35 +164,37 @@ namespace KitLugia.Core
                     Logger.Log("✅ Hash verificado com sucesso!");
                 }
 
-                // Find the Updater.exe next to the current executable
+                // Extract KitLugia.Updater.exe from embedded resources (single-file build)
                 string currentDllPath = Assembly.GetEntryAssembly()?.Location ?? "";
                 string currentExePath = Path.ChangeExtension(currentDllPath, ".exe");
                 string currentDir = Path.GetDirectoryName(currentDllPath) ?? "";
                 string updaterPath = Path.Combine(currentDir, "KitLugia.Updater.exe");
 
-                // If Updater.exe doesn't exist locally, try to find it in the extracted package
                 if (!File.Exists(updaterPath))
                 {
-                    // Extract just to find the updater
-                    string checkDir = Path.Combine(tempDir, "KitLugia_Check_" + DateTime.Now.Ticks);
-                    Directory.CreateDirectory(checkDir);
                     try
                     {
-                        ZipFile.ExtractToDirectory(updatePath, checkDir);
-                        var found = Directory.GetFiles(checkDir, "KitLugia.Updater.exe", SearchOption.AllDirectories)
-                            .FirstOrDefault();
-                        if (found != null)
-                            updaterPath = found;
+                        var asm = typeof(GitHubUpdater).Assembly;
+                        using var stream = asm.GetManifestResourceStream("KitLugia.Core.Resources.KitLugia.Updater.exe");
+                        if (stream != null)
+                        {
+                            updaterPath = Path.Combine(Path.GetTempPath(), "KitLugia.Updater.exe");
+                            using var file = File.Create(updaterPath);
+                            stream.CopyTo(file);
+                            Logger.Log("✅ Updater extraído dos recursos embutidos.");
+                        }
                     }
-                    catch { }
-                    try { Directory.Delete(checkDir, true); } catch { }
-
-                    if (!File.Exists(updaterPath))
+                    catch (Exception ex)
                     {
-                        Logger.Log("❌ KitLugia.Updater.exe não encontrado!");
-                        File.Delete(updatePath);
-                        return false;
+                        Logger.Log($"⚠️ Não foi possível extrair updater dos recursos: {ex.Message}");
                     }
+                }
+
+                if (!File.Exists(updaterPath))
+                {
+                    Logger.Log("❌ KitLugia.Updater.exe não encontrado!");
+                    File.Delete(updatePath);
+                    return false;
                 }
 
                 int currentPid = Process.GetCurrentProcess().Id;
