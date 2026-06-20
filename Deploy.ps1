@@ -86,25 +86,17 @@ if (Test-Path $coreOut) {
     Write-Host "  Copied Core files from $coreOut"
 }
 
-Write-Host "`nCreating ZIP: $ZipPath..." -ForegroundColor Yellow
+Write-Host "`nCreating ZIP..." -ForegroundColor Yellow
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# Remove ZIP anterior (pode estar travado por outro processo)
-Remove-Item -Path $ZipPath -Force -ErrorAction SilentlyContinue
+# Cria o ZIP em pasta temporária (fora do diretório fonte) para evitar auto-lock
+$tempZip = [System.IO.Path]::GetTempPath() + "KITLUGIA2_TEMP.zip"
+Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+[System.IO.Compression.ZipFile]::CreateFromDirectory($OutputPath, $tempZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 
-$maxRetries = 5
-for ($i = 1; $i -le $maxRetries; $i++) {
-    try {
-        [System.IO.Compression.ZipFile]::CreateFromDirectory($OutputPath, $ZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-        break
-    }
-    catch {
-        if ($i -eq $maxRetries) { throw }
-        Write-Warning "ZIP locked, retrying ($i/$maxRetries)..."
-        Start-Sleep -Milliseconds 500
-        Remove-Item -Path $ZipPath -Force -ErrorAction SilentlyContinue
-    }
-}
+# Move para o destino final
+Remove-Item -Path $ZipPath -Force -ErrorAction SilentlyContinue
+Move-Item -Path $tempZip -Destination $ZipPath -Force
 
 if (-not $SkipHash) {
     Write-Host "`n[5/5] Computing SHA256..." -ForegroundColor Yellow
