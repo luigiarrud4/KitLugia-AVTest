@@ -89,6 +89,9 @@ if (Test-Path $coreOut) {
 # Remove subpasta Updater (só queremos o .exe na raiz)
 Remove-Item -Path (Join-Path $OutputPath "Updater") -Recurse -Force -ErrorAction SilentlyContinue
 
+# Remove .pdb (debug symbols, desnecessários para usuário final)
+Get-ChildItem -Path $OutputPath -Filter *.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
+
 Write-Host "`nCreating ZIP..." -ForegroundColor Yellow
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
