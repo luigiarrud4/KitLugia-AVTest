@@ -19,13 +19,19 @@ Write-Host "=== KitLugia Deploy Script ===" -ForegroundColor Cyan
 Write-Host "Configuration: $Configuration"
 Write-Host "Output: $OutputPath"
 
+Write-Host "`n[1/5] Preparing output directory..." -ForegroundColor Yellow
+if (Test-Path $OutputPath) {
+    Remove-Item -Path $OutputPath -Recurse -Force
+}
+New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+
 if (-not $SkipBuild) {
-    Write-Host "`n[1/5] Building solution..." -ForegroundColor Yellow
+    Write-Host "`n[2/5] Building solution..." -ForegroundColor Yellow
     & dotnet build "$RepoRoot\KitLugia.sln" -c $Configuration -nologo
     if (-not $?) { throw "Build failed" }
 
-    Write-Host "`n[2/5] Publishing Updater (single-file)..." -ForegroundColor Yellow
-    $updaterOut = Join-Path $OutputPath "Updater"
+    Write-Host "`n[3/5] Publishing Updater (single-file)..." -ForegroundColor Yellow
+    $updaterOut = Join-Path (Join-Path $RepoRoot $OutputDir) "Updater"
     & dotnet publish "$RepoRoot\KitLugia.Updater\KitLugia.Updater.csproj" `
         -c $Configuration `
         -o $updaterOut `
@@ -37,14 +43,8 @@ if (-not $SkipBuild) {
     if (-not $?) { throw "Updater publish failed" }
 }
 else {
-    Write-Host "`n[1-2/5] Skipped (SkipBuild)" -ForegroundColor Magenta
+    Write-Host "`n[2-3/5] Skipped (SkipBuild)" -ForegroundColor Magenta
 }
-
-Write-Host "`n[3/5] Preparing output directory..." -ForegroundColor Yellow
-if (Test-Path $OutputPath) {
-    Remove-Item -Path $OutputPath -Recurse -Force
-}
-New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 
 Write-Host "`n[4/5] Assembling release package..." -ForegroundColor Yellow
 
