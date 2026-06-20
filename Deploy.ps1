@@ -55,7 +55,7 @@ if (Test-Path $updaterExe) {
     Write-Host "  Copied KitLugia.Updater.exe"
 }
 else {
-    Write-Warning "KitLugia.Updater.exe not found at $updaterExe â€” publishing fallback..."
+    Write-Warning "KitLugia.Updater.exe not found at $updaterExe â€" publishing fallback..."
     & dotnet publish "$RepoRoot\KitLugia.Updater\KitLugia.Updater.csproj" `
         -c $Configuration `
         -o $OutputPath `
