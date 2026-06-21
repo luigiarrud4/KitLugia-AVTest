@@ -11,6 +11,12 @@ namespace KitLugia.Core
         public DateTime Date { get; set; }
         public List<string> LeftoverFiles { get; set; } = new();
         public List<string> LeftoverRegistry { get; set; } = new();
+        // Revo-style: heuristic items found only after uninstall (lower confidence)
+        public List<string> HeuristicFiles { get; set; } = new();
+        public List<string> HeuristicRegistry { get; set; } = new();
+        // Pre-scan baseline counts (to show how many were detected before uninstall)
+        public int BaselineFileCount { get; set; }
+        public int BaselineRegistryCount { get; set; }
     }
 
     public static class LeftoverJunkManager
