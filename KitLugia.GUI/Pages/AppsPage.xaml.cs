@@ -38,6 +38,7 @@ namespace KitLugia.GUI.Pages
         private ObservableCollection<ProgramViewModel>? FilteredProgramsCollection;
         private CancellationTokenSource? _programsCts;
         private bool _programsLoaded = false;
+        private bool _junkLoaded = false;
 
         private bool _isAppOperation;
 
@@ -83,6 +84,12 @@ namespace KitLugia.GUI.Pages
                     {
                         _programsLoaded = true;
                         LoadPrograms();
+                    }
+                    // Aba de Resíduos carrega lazy também
+                    if (selectedTab.Header?.ToString()?.Contains("Resíduos") == true && !_junkLoaded)
+                    {
+                        _junkLoaded = true;
+                        LoadJunkItems();
                     }
                 }
             }
@@ -332,17 +339,12 @@ namespace KitLugia.GUI.Pages
                     btn.Content = "⏳";
                     btn.IsEnabled = false;
 
-                    // Diálogo de confirmação não-bloqueante
+                    // Confirmação simples
                     if (!await ShowConfirmAsync(
-                        $"🧹 Deep Uninstall UWP: {app.DisplayName}\n\n" +
-                        "Isso irá:\n" +
-                        "1. Remover o appx package (todos os usuários)\n" +
-                        "2. Remover da imagem do Windows (evita reinstalação)\n" +
-                        "3. Escanear pastas e registro por resíduos\n" +
-                        "4. Revisar e selecionar o que limpar",
-                        "Deep Uninstall"))
+                        $"Remover {app.DisplayName}?\n\n" +
+                        "O app será desinstalado e os resíduos ficarão disponíveis na aba \"Resíduos\" para limpeza posterior.",
+                        "Remover App"))
                     {
-                        // Cancelado: reverte o botão
                         btn.Content = "REMOVER";
                         btn.IsEnabled = true;
                         return;
@@ -354,10 +356,6 @@ namespace KitLugia.GUI.Pages
                         if (TxtBloatwareProgress != null)
                             TxtBloatwareProgress.Text = msg;
                     });
-
-                    bloatProgress.Report($"Criando ponto de restauração...");
-                    if (CbCreateRestorePoint.IsChecked == true)
-                        await Task.Run(() => DeepUninstaller.TryCreateRestorePoint($"KitLugia: Uninstall {app.DisplayName}"));
 
                     bloatProgress.Report($"Removendo {app.DisplayName}...");
                     var result = await SystemTweaks.DeepRemoveBloatwareAppAsync(app.PackageName, app.DisplayName);
@@ -376,16 +374,35 @@ namespace KitLugia.GUI.Pages
                     if (!scanResult.LeftoverFiles.Contains(pkgFolder, StringComparer.OrdinalIgnoreCase))
                     {
                         scanResult.LeftoverFiles.Add(pkgFolder);
-                        scanFileEntries.Add(new ScanEntry { Path = pkgFolder, Safety = CleanupSafety.Safe });
+                    }
+
+                    // Save leftovers to junk tab silently
+                    if (scanResult.LeftoverFiles.Count > 0 || scanResult.LeftoverRegistry.Count > 0 || scanResult.HeuristicFiles.Count > 0 || scanResult.HeuristicRegistry.Count > 0)
+                    {
+                        LeftoverJunkManager.Add(new LeftoverJunkEntry
+                        {
+                            AppName = app.DisplayName,
+                            Date = DateTime.Now,
+                            LeftoverFiles = scanResult.LeftoverFiles,
+                            LeftoverRegistry = scanResult.LeftoverRegistry,
+                            HeuristicFiles = scanResult.HeuristicFiles,
+                            HeuristicRegistry = scanResult.HeuristicRegistry,
+                            BaselineFileCount = scanResult.BaselineFileCount,
+                            BaselineRegistryCount = scanResult.BaselineRegistryCount
+                        });
                     }
 
                     BloatwareLoadingPanel.Visibility = Visibility.Collapsed;
                     btn.Content = "REMOVER";
                     btn.IsEnabled = true;
 
-                    _reviewProgramContext = null;
-                    _reviewBloatwareContext = app;
-                    await Dispatcher.InvokeAsync(() => ShowReviewPanel(app.DisplayName, scanResult, scanFileEntries, scanRegEntries));
+                    if (result.Success)
+                        MessageBox.Show($"✅ {app.DisplayName} removido com sucesso!", "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                    else
+                        MessageBox.Show($"⚠️ Falha ao remover {app.DisplayName}.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                    await Task.Delay(500);
+                    await LoadBloatware();
                 }
             }
             catch (Exception ex)
@@ -473,8 +490,8 @@ namespace KitLugia.GUI.Pages
 
                 string appNames = string.Join("\n", selectedApps.Select(a => a.DisplayName));
                 if (!await ShowConfirmAsync(
-                    $"Deep Uninstall: Remover {selectedApps.Count} app(s) selecionado(s)?\n\n{appNames}\n\nOs resíduos serão limpos automaticamente.",
-                    "Deep Uninstall"))
+                    $"Remover {selectedApps.Count} app(s) selecionado(s)?\n\n{appNames}\n\nOs resíduos ficarão na aba \"Resíduos\" para limpeza posterior.",
+                    "Remover Apps"))
                 {
                     return;
                 }
@@ -483,14 +500,10 @@ namespace KitLugia.GUI.Pages
                     int successCount = 0;
                     int failCount = 0;
                     int completedCount = 0;
-                    object countLock = new();
 
                     BloatwareLoadingPanel.Visibility = Visibility.Visible;
                     if (TxtBloatwareProgress != null)
                         TxtBloatwareProgress.Text = $"Removendo 0/{total}...";
-
-                    if (CbCreateRestorePoint.IsChecked == true)
-                        await Task.Run(() => DeepUninstaller.TryCreateRestorePoint($"KitLugia: Batch UWP ({total} apps)"));
 
                     foreach (var app in selectedApps)
                     {
@@ -505,9 +518,10 @@ namespace KitLugia.GUI.Pages
 
                     if (TxtBloatwareProgress != null) TxtBloatwareProgress.Text = "";
                     BloatwareLoadingPanel.Visibility = Visibility.Collapsed;
-                    string message = $"Deep Uninstall concluído:\n\n✅ {successCount} app(s) processados";
+                    string message = $"Remoção concluída:\n\n✅ {successCount} app(s) removidos";
                     if (failCount > 0) message += $"\n⚠️ {failCount} falharam";
-                    MessageBox.Show(message, "Resultado", MessageBoxButton.OK, MessageBoxImage.Information);
+                    message += "\n\nOs resíduos podem ser limpos na aba \"Resíduos\".";
+                    MessageBox.Show(message, "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
 
                     await Task.Delay(1000);
                     await LoadBloatware();
@@ -702,22 +716,16 @@ namespace KitLugia.GUI.Pages
                     btn.Content = "⏳";
                     btn.IsEnabled = false;
 
-                    // Diálogo de confirmação não-bloqueante
+                    // Confirmação simples
                     if (!await ShowConfirmAsync(
-                        $"🧹 Deep Uninstall: {program.DisplayName}\n\n" +
-                        "Isso irá:\n" +
-                        "1. Executar o uninstaller original\n" +
-                        "2. Escanear pastas e registro por resíduos\n" +
-                        "3. Revisar e selecionar o que limpar",
-                        "Deep Uninstall"))
+                        $"Remover {program.DisplayName}?\n\n" +
+                        "O app será desinstalado e os resíduos ficarão disponíveis na aba \"Resíduos\" para limpeza posterior.",
+                        "Remover App"))
                     {
-                        // Cancelado: reverte o botão
                         btn.Content = "REMOVER";
                         btn.IsEnabled = true;
                         return;
                     }
-
-                    bool createRp = CbCreateRestorePoint.IsChecked == true;
 
                     ProgramsLoadingPanel.Visibility = Visibility.Visible;
 
@@ -727,29 +735,15 @@ namespace KitLugia.GUI.Pages
                             TxtProgramsProgress.Text = msg;
                     });
 
-                    progress.Report($"Preparando desinstalação de {program.DisplayName}...");
+                    progress.Report($"Removendo {program.DisplayName}...");
 
-                    // Run DeepUninstall + leftover classification entirely on background thread
-                    var (scanResult, classifiedFiles, classifiedReg) = await Task.Run(() =>
+                    // Run DeepUninstall (uninstall + scan) entirely on background thread
+                    var scanResult = await Task.Run(() =>
                     {
                         var result = DeepUninstaller.DeepUninstallProgram(
                             program.DisplayName, program.UninstallString,
-                            program.InstallLocation, program.Publisher, program.DisplayIcon, createRp, progress).GetAwaiter().GetResult();
-
-                        var files = result.LeftoverFiles
-                            .Select(f => new ScanEntry
-                            {
-                                Path = f,
-                                Safety = DeepUninstaller.ClassifyFileSafety(program.DisplayName, program.InstallLocation, f)
-                            }).ToList();
-                        var reg = result.LeftoverRegistry
-                            .Select(r => new ScanEntry
-                            {
-                                Path = r,
-                                Safety = DeepUninstaller.ClassifyRegistrySafety(program.DisplayName, program.InstallLocation, r)
-                            }).ToList();
-
-                        return (result, files, reg);
+                            program.InstallLocation, program.Publisher, program.DisplayIcon, false, progress).GetAwaiter().GetResult();
+                        return result;
                     });
 
                     if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
@@ -757,13 +751,34 @@ namespace KitLugia.GUI.Pages
                     btn.Content = "REMOVER";
                     btn.IsEnabled = true;
 
-                    _reviewProgramContext = program;
-                    _reviewBloatwareContext = null;
-                    // Defensive: disconnect ItemsSource before switching to review panel
-                    // to prevent any WPF CollectionView enumeration conflict
-                    ProgramsList.ItemsSource = null;
-                    BloatwareList.ItemsSource = null;
-                    await Dispatcher.InvokeAsync(() => ShowReviewPanel(program.DisplayName, scanResult, classifiedFiles, classifiedReg));
+                    // Save leftovers to junk tab silently
+                    int leftoversCount = scanResult.LeftoverFiles.Count + scanResult.LeftoverRegistry.Count;
+                    int heuristicCount = scanResult.HeuristicFiles.Count + scanResult.HeuristicRegistry.Count;
+                    if (leftoversCount > 0 || heuristicCount > 0)
+                    {
+                        LeftoverJunkManager.Add(new LeftoverJunkEntry
+                        {
+                            AppName = program.DisplayName,
+                            Date = DateTime.Now,
+                            LeftoverFiles = scanResult.LeftoverFiles,
+                            LeftoverRegistry = scanResult.LeftoverRegistry,
+                            HeuristicFiles = scanResult.HeuristicFiles,
+                            HeuristicRegistry = scanResult.HeuristicRegistry,
+                            BaselineFileCount = scanResult.BaselineFileCount,
+                            BaselineRegistryCount = scanResult.BaselineRegistryCount
+                        });
+                    }
+
+                    string msgResult = scanResult.UninstallSuccess
+                        ? $"✅ {program.DisplayName} desinstalado com sucesso!"
+                        : $"⚠️ {program.DisplayName} pode não ter sido completamente desinstalado.";
+                    if (leftoversCount > 0)
+                        msgResult += $"\n\n🗑️ {leftoversCount} resíduo(s) salvos na aba \"Resíduos\".";
+                    MessageBox.Show(msgResult, "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    // Remove from list
+                    FilteredProgramsCollection?.Remove(program);
+                    ProgramsCollection?.Remove(program);
                 }
             }
             catch (Exception ex)
@@ -794,14 +809,12 @@ namespace KitLugia.GUI.Pages
 
                 string programNames = string.Join("\n", selectedPrograms.Select(p => p.DisplayName));
                 if (!await ShowConfirmAsync(
-                    $"Deep Uninstall: Remover {selectedPrograms.Count} programa(s) selecionado(s)?\n\n{programNames}\n\nOs resíduos serão limpos automaticamente.",
-                    "Deep Uninstall"))
+                    $"Remover {selectedPrograms.Count} programa(s) selecionado(s)?\n\n{programNames}\n\nOs resíduos ficarão na aba \"Resíduos\" para limpeza posterior.",
+                    "Remover Apps"))
                 {
                     return;
                 }
                 {
-                    bool batchCreateRp = CbCreateRestorePoint.IsChecked == true;
-
                     int total = selectedPrograms.Count;
                     int successCount = 0;
                     int failCount = 0;
@@ -821,16 +834,29 @@ namespace KitLugia.GUI.Pages
                         var program = selectedPrograms[i];
                         int idx = i;
 
-                        batchProgress.Report($"[{idx + 1}/{total}] {program.DisplayName} — Preparando...");
+                        batchProgress.Report($"[{idx + 1}/{total}] {program.DisplayName} — Removendo...");
 
                         var result = await Task.Run(() => DeepUninstaller.DeepUninstallProgram(
                             program.DisplayName, program.UninstallString,
-                            program.InstallLocation, program.Publisher, program.DisplayIcon, batchCreateRp, batchProgress));
+                            program.InstallLocation, program.Publisher, program.DisplayIcon, false, batchProgress));
 
-                        await Task.Run(() => DeepUninstaller.PerformCleanup(
-                            result.LeftoverFiles, result.LeftoverRegistry, result));
+                        bool ok = result.UninstallSuccess;
 
-                        bool ok = result.UninstallSuccess || result.FilesDeleted > 0 || result.RegistryDeleted > 0;
+                        // Save leftovers to junk tab
+                        if (result.LeftoverFiles.Count > 0 || result.LeftoverRegistry.Count > 0 || result.HeuristicFiles.Count > 0 || result.HeuristicRegistry.Count > 0)
+                        {
+                            LeftoverJunkManager.Add(new LeftoverJunkEntry
+                            {
+                                AppName = program.DisplayName,
+                                Date = DateTime.Now,
+                                LeftoverFiles = result.LeftoverFiles,
+                                LeftoverRegistry = result.LeftoverRegistry,
+                                HeuristicFiles = result.HeuristicFiles,
+                                HeuristicRegistry = result.HeuristicRegistry,
+                                BaselineFileCount = result.BaselineFileCount,
+                                BaselineRegistryCount = result.BaselineRegistryCount
+                            });
+                        }
 
                         if (ok)
                         {
@@ -846,11 +872,12 @@ namespace KitLugia.GUI.Pages
 
                     if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
                     ProgramsLoadingPanel.Visibility = Visibility.Collapsed;
-                    string message = $"Deep Uninstall concluído:\n\n✅ {successCount} programa(s) processados";
+                    string message = $"Remoção concluída:\n\n✅ {successCount} programa(s) removidos";
                     if (failCount > 0)
                         message += $"\n⚠️ {failCount} falharam";
+                    message += "\n\nOs resíduos podem ser limpos na aba \"Resíduos\".";
 
-                    MessageBox.Show(message, "Resultado", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(message, "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
@@ -925,6 +952,8 @@ namespace KitLugia.GUI.Pages
                     {
                         AppName = e.AppName,
                         Date = e.Date,
+                        BaselineFileCount = e.BaselineFileCount,
+                        BaselineRegistryCount = e.BaselineRegistryCount,
                         Files = e.LeftoverFiles.Select(f => new JunkDetailItem
                         {
                             Path = f,
@@ -942,7 +971,26 @@ namespace KitLugia.GUI.Pages
                             IsSelected = true
                         }).ToList()
                     };
-                    // Reclassify for safety
+                    // Load heuristic items (post-scan only, lower confidence)
+                    foreach (var hf in e.HeuristicFiles)
+                    {
+                        item.Files.Add(new JunkDetailItem
+                        {
+                            Path = hf, IsFile = true, CanDelete = true,
+                            Safety = CleanupSafety.Moderate, IsSelected = false,
+                            IsHeuristic = true
+                        });
+                    }
+                    foreach (var hr in e.HeuristicRegistry)
+                    {
+                        item.Registry.Add(new JunkDetailItem
+                        {
+                            Path = hr, IsFile = false, CanDelete = true,
+                            Safety = CleanupSafety.Moderate, IsSelected = false,
+                            IsHeuristic = true
+                        });
+                    }
+                    // Reclassify for safety (heuristic items remain unselected)
                     ReclassifyJunkItem(item);
                     _junkItems.Add(item);
                 }
@@ -965,14 +1013,23 @@ namespace KitLugia.GUI.Pages
 
             foreach (var f in item.Files)
             {
-                string lower = f.Path.ToLowerInvariant();
-                if (lower.Contains("\\temp\\") || lower.Contains(tempPath.ToLowerInvariant()))
+                // Confirmed items (pre-scan baseline) are always deletable and safe
+                if (!f.IsHeuristic)
+                {
+                    f.CanDelete = true;
+                    f.IsSelected = true;
+                    f.Safety = CleanupSafety.Safe;
+                    continue;
+                }
+
+                string fl = f.Path.ToLowerInvariant();
+                if (fl.Contains("\\temp\\") || fl.Contains(tempPath.ToLowerInvariant()))
                 { f.Safety = CleanupSafety.Safe; f.CanDelete = true; f.IsSelected = true; }
-                else if (lower.StartsWith(localAppData.ToLowerInvariant()))
+                else if (fl.StartsWith(localAppData.ToLowerInvariant()))
                 { f.Safety = CleanupSafety.Moderate; f.CanDelete = true; f.IsSelected = true; }
-                else if (lower.StartsWith(appData.ToLowerInvariant()))
+                else if (fl.StartsWith(appData.ToLowerInvariant()))
                 { f.Safety = CleanupSafety.Moderate; f.CanDelete = true; f.IsSelected = true; }
-                else if (lower.StartsWith(programData.ToLowerInvariant()))
+                else if (fl.StartsWith(programData.ToLowerInvariant()))
                 { f.Safety = CleanupSafety.Uncertain; f.CanDelete = false; f.IsSelected = false; }
                 else
                 { f.Safety = CleanupSafety.Moderate; f.CanDelete = true; f.IsSelected = true; }
@@ -980,6 +1037,15 @@ namespace KitLugia.GUI.Pages
 
             foreach (var r in item.Registry)
             {
+                // Confirmed items (pre-scan baseline) are always deletable and safe
+                if (!r.IsHeuristic)
+                {
+                    r.CanDelete = true;
+                    r.IsSelected = true;
+                    r.Safety = CleanupSafety.Safe;
+                    continue;
+                }
+
                 string lower = r.Path.ToLowerInvariant();
                 if (lower.StartsWith("hkey_local_machine") || lower.StartsWith("hklm"))
                 { r.Safety = CleanupSafety.Uncertain; r.CanDelete = false; r.IsSelected = false; }
@@ -1670,19 +1736,22 @@ namespace KitLugia.GUI.Pages
         public bool IsFile { get; set; }
         public bool CanDelete { get; set; } = true;
         public CleanupSafety Safety { get; set; } = CleanupSafety.Moderate;
+        public bool IsHeuristic { get; set; }
 
-        public string SafetyIcon => Safety switch
+        public string SafetyIcon => IsHeuristic ? "\u26D4" : Safety switch
         {
             CleanupSafety.Safe => "\U0001F7E2",
             CleanupSafety.Moderate => "\U0001F7E1",
             _ => "\U0001F534"
         };
-        public string SafetyTooltip => Safety switch
-        {
-            CleanupSafety.Safe => "Seguro — pode deletar",
-            CleanupSafety.Moderate => "Provável — pode deletar",
-            _ => "Informativo — não recomendado deletar"
-        };
+        public string SafetyTooltip => IsHeuristic
+            ? "Heurístico — encontrado apenas após desinstalação (menor confiança)"
+            : Safety switch
+            {
+                CleanupSafety.Safe => "Seguro — confirmado no pré-scan",
+                CleanupSafety.Moderate => "Provável — confirmado no pré-scan",
+                _ => "Informativo — não recomendado deletar"
+            };
 
         public bool IsSelected
         {
@@ -1706,6 +1775,8 @@ namespace KitLugia.GUI.Pages
 
         public List<JunkDetailItem> Files { get; set; } = new();
         public List<JunkDetailItem> Registry { get; set; } = new();
+        public int BaselineFileCount { get; set; }
+        public int BaselineRegistryCount { get; set; }
 
         public string SelectionSummary
         {
@@ -1715,7 +1786,9 @@ namespace KitLugia.GUI.Pages
                 int rSel = Registry.Count(r => r.IsSelected && r.CanDelete);
                 int fTotal = Files.Count(f => f.CanDelete);
                 int rTotal = Registry.Count(r => r.CanDelete);
-                return $"{fSel + rSel}/{fTotal + rTotal} sel";
+                int confirmed = Files.Count(f => !f.IsHeuristic) + Registry.Count(r => !r.IsHeuristic);
+                int heuristic = Files.Count(f => f.IsHeuristic) + Registry.Count(r => r.IsHeuristic);
+                return $"{fSel + rSel}/{fTotal + rTotal} sel | {confirmed} conf, {heuristic} heur";
             }
         }
 

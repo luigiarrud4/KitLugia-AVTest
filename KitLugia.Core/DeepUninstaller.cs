@@ -44,6 +44,12 @@ namespace KitLugia.Core
             public string UninstallOutput { get; set; } = "";
             public List<string> LeftoverFiles { get; set; } = new();
             public List<string> LeftoverRegistry { get; set; } = new();
+            // Heuristic items: found in post-scan but NOT in pre-scan baseline (lower confidence)
+            public List<string> HeuristicFiles { get; set; } = new();
+            public List<string> HeuristicRegistry { get; set; } = new();
+            // Pre-scan baseline snapshot (how many items were detected before uninstall)
+            public int BaselineFileCount { get; set; }
+            public int BaselineRegistryCount { get; set; }
             public int FilesDeleted { get; set; }
             public int RegistryDeleted { get; set; }
             public List<string> Errors { get; set; } = new();
@@ -131,6 +137,15 @@ namespace KitLugia.Core
             progress?.Report("Encerrando processos do aplicativo...");
             KillProcessesWithTree(displayName, installLocation);
 
+            // Pre-scan baseline (Revo Uninstaller pattern): detect all app-owned
+            // entries BEFORE uninstall so we can diff post-uninstall leftovers
+            // against it, filtering out heuristic false positives.
+            progress?.Report("Pré-escaneando baseline (Revo-style)...");
+            var baselineFiles = new HashSet<string>(ScanLeftoverFiles(displayName, installLocation, displayIcon, uninstallString), StringComparer.OrdinalIgnoreCase);
+            var baselineReg = new HashSet<string>(ScanLeftoverRegistry(displayName, installLocation), StringComparer.OrdinalIgnoreCase);
+            result.BaselineFileCount = baselineFiles.Count;
+            result.BaselineRegistryCount = baselineReg.Count;
+
             progress?.Report("Localizando desinstalador...");
             string? actualUninstaller = FindInstalledUninstaller(installLocation, uninstallString);
             string effectiveUninstall = actualUninstaller ?? uninstallString;
@@ -192,17 +207,38 @@ namespace KitLugia.Core
                 result.Errors.Add("No uninstall string available");
             }
 
-            // Scan once after uninstall (no "snapshot before" scan — cuts total scan time in half
-            // and avoids delaying the user with a redundant pre-uninstall pass)
             progress?.Report("Escaneando resíduos de arquivos...");
-            result.LeftoverFiles = ScanLeftoverFiles(displayName, installLocation, displayIcon, uninstallString)
-                .OrderBy(f => f).ToList();
+            var fileSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            fileSet.UnionWith(ScanLeftoverFiles(displayName, installLocation, displayIcon, uninstallString));
 
             progress?.Report("Escaneando resíduos do registro...");
-            result.LeftoverRegistry = ScanLeftoverRegistry(displayName, installLocation)
-                .OrderBy(r => r).ToList();
+            var regSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            regSet.UnionWith(ScanLeftoverRegistry(displayName, installLocation));
 
-            if (!result.UninstallSuccess && result.LeftoverFiles.Count == 0 && result.LeftoverRegistry.Count == 0)
+            // Additional scans: scheduled tasks + env vars
+            progress?.Report("Escaneando tarefas agendadas...");
+            ScanScheduledTasks(displayName, installLocation, "", fileSet, regSet);
+            progress?.Report("Escaneando variáveis de ambiente...");
+            ScanUserEnvironmentVars(displayName, installLocation, regSet);
+
+            // DIFF: confirmed = was in baseline AND still exists after uninstall
+            // heuristic = only found after uninstall (lower confidence)
+            var confirmedFiles = new HashSet<string>(fileSet, StringComparer.OrdinalIgnoreCase);
+            confirmedFiles.IntersectWith(baselineFiles);
+            var heuristicFiles = new HashSet<string>(fileSet, StringComparer.OrdinalIgnoreCase);
+            heuristicFiles.ExceptWith(baselineFiles);
+
+            var confirmedReg = new HashSet<string>(regSet, StringComparer.OrdinalIgnoreCase);
+            confirmedReg.IntersectWith(baselineReg);
+            var heuristicReg = new HashSet<string>(regSet, StringComparer.OrdinalIgnoreCase);
+            heuristicReg.ExceptWith(baselineReg);
+
+            result.LeftoverFiles = confirmedFiles.OrderBy(f => f).ToList();
+            result.LeftoverRegistry = confirmedReg.OrderBy(r => r).ToList();
+            result.HeuristicFiles = heuristicFiles.OrderBy(f => f).ToList();
+            result.HeuristicRegistry = heuristicReg.OrderBy(r => r).ToList();
+
+            if (!result.UninstallSuccess && result.LeftoverFiles.Count == 0 && result.LeftoverRegistry.Count == 0 && result.HeuristicFiles.Count == 0 && result.HeuristicRegistry.Count == 0)
                 result.Errors.Add("Uninstall may have failed — no leftovers detected.");
 
             return result;
@@ -252,18 +288,22 @@ namespace KitLugia.Core
             KillProcessesWithTree(displayName, installLocation);
             await Task.Delay(500);
 
-            // 2. Add install directory itself
-            if (!string.IsNullOrEmpty(installLocation) && Directory.Exists(installLocation))
-                result.LeftoverFiles.Add(installLocation);
+            // 2. Scan for file leftovers (includes install dir via ScanLeftoverFiles)
+            var fileSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(installLocation))
+                fileSet.Add(installLocation);
+            fileSet.UnionWith(ScanLeftoverFiles(displayName, installLocation, displayIcon, ""));
 
-            // 3. Scan for file leftovers
-            var filePaths = ScanLeftoverFiles(displayName, installLocation, displayIcon, "");
-            foreach (var f in filePaths)
-                if (!result.LeftoverFiles.Contains(f))
-                    result.LeftoverFiles.Add(f);
+            // 3. Scan for registry leftovers
+            var regSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            regSet.UnionWith(ScanLeftoverRegistry(displayName, installLocation));
 
-            // 4. Scan for registry leftovers
-            result.LeftoverRegistry = ScanLeftoverRegistry(displayName, installLocation);
+            // 4. Additional scans: scheduled tasks + env vars
+            ScanScheduledTasks(displayName, installLocation, "", fileSet, regSet);
+            ScanUserEnvironmentVars(displayName, installLocation, regSet);
+
+            result.LeftoverFiles = fileSet.OrderBy(f => f).ToList();
+            result.LeftoverRegistry = regSet.OrderBy(r => r).ToList();
 
             // 5. Also remove the app's own Uninstall registry key
             string? uninstallKey = FindUninstallRegistryKey(displayName);
@@ -278,7 +318,7 @@ namespace KitLugia.Core
             }
 
             // 7. Execute deletion
-            PerformCleanup(result.LeftoverFiles, result.LeftoverRegistry, result);
+            PerformCleanup(result.LeftoverFiles, result.LeftoverRegistry, result, displayName, installLocation ?? "");
 
             return result;
         }
@@ -286,8 +326,16 @@ namespace KitLugia.Core
         public static (List<ScanEntry> files, List<ScanEntry> registry) ScanLeftovers(string displayName, string publisher, ScannerMode mode = ScannerMode.Moderate)
         {
             string installLocation = GetInstallLocationFromRegistry(displayName) ?? "";
-            var rawFiles = ScanLeftoverFiles(displayName, installLocation, "", "", mode);
-            var rawReg = ScanLeftoverRegistry(displayName, installLocation, mode);
+            var rawFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var rawReg = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            rawFiles.UnionWith(ScanLeftoverFiles(displayName, installLocation, "", "", mode));
+            rawReg.UnionWith(ScanLeftoverRegistry(displayName, installLocation, mode));
+
+            // Additional scans: scheduled tasks + env vars
+            ScanScheduledTasks(displayName, installLocation, publisher, rawFiles, rawReg);
+            ScanUserEnvironmentVars(displayName, installLocation, rawReg);
+
             var files = rawFiles.Select(f => new ScanEntry { Path = f, Safety = ClassifyFileSafety(displayName, installLocation, f) }).OrderBy(e => e.Path).ToList();
             var reg = rawReg.Select(r => new ScanEntry { Path = r, Safety = ClassifyRegistrySafety(displayName, installLocation, r) }).OrderBy(e => e.Path).ToList();
             return (files, reg);
@@ -619,9 +667,19 @@ namespace KitLugia.Core
 
             var otherInstallLocations = mode == ScannerMode.Advanced ? null : GetAllInstallLocations(excludeName: displayName);
 
-            // InstallLocation
+            // InstallLocation — add the dir AND enumerate its contents (exe, dll, etc.)
             if (!string.IsNullOrEmpty(installLocation) && Directory.Exists(installLocation))
+            {
                 results.Add(installLocation);
+                try
+                {
+                    foreach (var f in Directory.EnumerateFiles(installLocation, "*", System.IO.SearchOption.AllDirectories))
+                        results.Add(f);
+                    foreach (var d in Directory.EnumerateDirectories(installLocation, "*", System.IO.SearchOption.AllDirectories))
+                        results.Add(d);
+                }
+                catch { }
+            }
 
             // Safe mode: only install dir + exact AppData name matches
             if (mode == ScannerMode.Safe)
@@ -653,12 +711,8 @@ namespace KitLugia.Core
             if (!string.IsNullOrEmpty(temp) && Directory.Exists(temp))
                 ScanFolderConfidence(temp, displayName, results, otherInstallLocations, depth: 0, maxDepth: 1);
 
-            // Prefetch — shallow
-            string sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.System).TrimEnd('\\');
-            sysRoot = Directory.GetParent(sysRoot)?.FullName ?? sysRoot;
-            string prefetch = Path.Combine(sysRoot, "Prefetch");
-            if (Directory.Exists(prefetch))
-                ScanFolderConfidence(prefetch, displayName, results, otherInstallLocations, depth: 0, maxDepth: 1);
+            // Prefetch via sorted executables (BCU pattern)
+            ScanPrefetchByExe(installLocation, displayIcon, uninstallString, results);
 
             // Uninstaller-specific leftovers
             ScanUninstallerSpecific(installLocation, displayIcon, displayName, results);
@@ -670,6 +724,9 @@ namespace KitLugia.Core
             ScanStartMenuShortcuts(displayName, results);
             ScanDesktopShortcuts(displayName, results);
 
+            // WER reports via sorted executables (BCU pattern)
+            ScanWerReports(installLocation, displayName, displayIcon, uninstallString, results);
+
             // Empty dir + questionable name detection (BCUninstaller pattern)
             if (!string.IsNullOrEmpty(installLocation) && Directory.Exists(installLocation))
                 ScanEmptyAndQuestionableDirs(installLocation, displayName, results);
@@ -680,6 +737,112 @@ namespace KitLugia.Core
             }
 
             return results.ToList();
+        }
+
+        /// <summary>
+        /// Scans Scheduled Tasks (TaskCache\Tree + Tasks\{GUID} + XML in System32\Tasks)
+        /// that reference the displayName, installLocation, or publisher.
+        /// Returns file paths (task XML) and registry paths (Tree + Tasks keys).
+        /// </summary>
+        private static void ScanScheduledTasks(string displayName, string installLocation, string publisher,
+            HashSet<string> fileResults, HashSet<string> regResults)
+        {
+            try
+            {
+                using var treeKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tree");
+                if (treeKey == null) return;
+
+                foreach (var taskName in treeKey.GetSubKeyNames())
+                {
+                    // Skip system tasks
+                    if (taskName.StartsWith("Microsoft\\", StringComparison.OrdinalIgnoreCase) ||
+                        taskName.StartsWith("\\Microsoft\\", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string leafName = taskName.Split('\\').Last();
+                    int conf = Confidence.Generate(displayName, leafName);
+                    if (conf < 70) conf = Confidence.Generate(publisher, leafName);
+                    if (conf < 70) continue;
+
+                    using var taskSubKey = treeKey.OpenSubKey(taskName);
+                    if (taskSubKey == null) continue;
+
+                    // Add Tree key to registry results
+                    string treeRegPath = $@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tree\{taskName}";
+                    regResults.Add(treeRegPath);
+
+                    // Get the task GUID to find the Tasks\{GUID} key and the XML file
+                    if (taskSubKey.GetValue("Id") is string taskGuid && !string.IsNullOrEmpty(taskGuid))
+                    {
+                        string tasksRegPath = $@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tasks\{taskGuid}";
+                        regResults.Add(tasksRegPath);
+
+                        // Task XML file in System32\Tasks (also SysWOW64 on 64-bit)
+                        string system32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                        string taskXml = Path.Combine(system32, "Tasks", taskName);
+                        if (File.Exists(taskXml)) fileResults.Add(taskXml);
+
+                        // Check SysWOW64 on 64-bit OS
+                        if (Environment.Is64BitOperatingSystem)
+                        {
+                            string syswow64 = system32.Replace("System32", "SysWOW64");
+                            string wowTaskXml = Path.Combine(syswow64, "Tasks", taskName);
+                            if (File.Exists(wowTaskXml)) fileResults.Add(wowTaskXml);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ScanScheduledTasks", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Scans user environment variables (HKCU\Environment) for entries
+        /// matching the app name or install location.
+        /// </summary>
+        private static void ScanUserEnvironmentVars(string displayName, string installLocation, HashSet<string> regResults)
+        {
+            try
+            {
+                using var envKey = Registry.CurrentUser.OpenSubKey("Environment");
+                if (envKey == null) return;
+
+                string? pathValue = envKey.GetValue("PATH") as string;
+
+                foreach (var name in envKey.GetValueNames())
+                {
+                    if (string.IsNullOrEmpty(name) || name == "PATH") continue;
+
+                    if (name.IndexOf(displayName, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        regResults.Add($@"HKEY_CURRENT_USER\Environment\{name}");
+                        continue;
+                    }
+
+                    string? val = envKey.GetValue(name) as string;
+                    if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(installLocation) &&
+                        val.IndexOf(installLocation, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        regResults.Add($@"HKEY_CURRENT_USER\Environment\{name}");
+                    }
+                }
+
+                // Check PATH entries referencing the install location
+                if (!string.IsNullOrEmpty(pathValue) && !string.IsNullOrEmpty(installLocation))
+                {
+                    var parts = pathValue.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Any(p => p.IndexOf(installLocation, StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        regResults.Add(@"HKEY_CURRENT_USER\Environment\PATH");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ScanUserEnvironmentVars", ex.Message);
+            }
         }
 
         private static readonly HashSet<string> GenericPublishers = new(StringComparer.OrdinalIgnoreCase)
@@ -978,6 +1141,93 @@ namespace KitLugia.Core
             }
         }
 
+        /// <summary>
+        /// BCU PrefetchScanner: scans %WINDIR%\Prefetch for .pf files whose executable name
+        /// (the part before the dash) matches an executable from the install directory.
+        /// </summary>
+        private static void ScanPrefetchByExe(string installLocation, string displayIcon, string uninstallString, HashSet<string> results)
+        {
+            if (string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation)) return;
+            try
+            {
+                var exes = BuildSortedExecutables(installLocation, displayIcon, uninstallString);
+                if (exes.Count == 0) return;
+
+                var targetExeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var exe in exes)
+                {
+                    string fileName = Path.GetFileName(exe);
+                    if (!string.IsNullOrEmpty(fileName)) targetExeNames.Add(fileName);
+                }
+
+                string sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.System).TrimEnd('\\');
+                sysRoot = Directory.GetParent(sysRoot)?.FullName ?? sysRoot;
+                string prefetchDir = Path.Combine(sysRoot, "Prefetch");
+                if (!Directory.Exists(prefetchDir)) return;
+
+                foreach (var pfFile in Directory.GetFiles(prefetchDir, "*.pf"))
+                {
+                    string fileName = Path.GetFileName(pfFile);
+                    int dashIdx = fileName.LastIndexOf('-');
+                    if (dashIdx < 0) continue;
+                    string appExeName = fileName[..dashIdx];
+                    if (!string.IsNullOrEmpty(appExeName) && targetExeNames.Contains(appExeName))
+                        results.Add(pfFile);
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Scans WER (Windows Error Reporting) ReportArchive and ReportQueue directories
+        /// for AppCrash_ entries matching executables from the install directory (BCU pattern).
+        /// </summary>
+        private static void ScanWerReports(string installLocation, string displayName, string displayIcon, string uninstallString, HashSet<string> results)
+        {
+            if (string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation)) return;
+            try
+            {
+                var exes = BuildSortedExecutables(installLocation, displayIcon, uninstallString);
+                if (exes.Count == 0) return;
+
+                var appExeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var exe in exes)
+                {
+                    string name = Path.GetFileNameWithoutExtension(exe);
+                    if (!string.IsNullOrEmpty(name)) appExeNames.Add(name);
+                }
+
+                string[] werRoots =
+                {
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\WER"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Windows\WER"),
+                };
+
+                const string crashLabel = "AppCrash_";
+                foreach (var root in werRoots)
+                {
+                    foreach (var sub in new[] { "ReportArchive", "ReportQueue" })
+                    {
+                        string dir = Path.Combine(root, sub);
+                        if (!Directory.Exists(dir)) continue;
+                        foreach (var reportDir in Directory.GetDirectories(dir))
+                        {
+                            string dirName = Path.GetFileName(reportDir);
+                            int idx = dirName.IndexOf(crashLabel, StringComparison.OrdinalIgnoreCase);
+                            if (idx < 0) continue;
+                            idx += crashLabel.Length;
+                            int end = dirName.IndexOf('_', idx);
+                            if (end <= idx) continue;
+                            string exeName = dirName[idx..end];
+                            if (!string.IsNullOrEmpty(exeName) && appExeNames.Contains(exeName))
+                                results.Add(reportDir);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
         // ── Registry Scanning ──────────────────────────────────────
 
         private static readonly bool Is64Bit = Environment.Is64BitOperatingSystem;
@@ -1071,6 +1321,9 @@ namespace KitLugia.Core
             foreach (var gh in guidHives)
                 ScanHiveByValues(gh, installLocation, displayName, results);
 
+            // COM by file path (BCU pattern: pre-load all COM entries, match by DLL/EXE path)
+            ScanComByFilePath(installLocation, results);
+
             // App Paths & Run
             ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths", displayName, results, installLocation);
             ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", displayName, results, installLocation);
@@ -1111,9 +1364,8 @@ namespace KitLugia.Core
             foreach (var cp in compatPaths)
                 ScanHiveForNames(cp, displayName, results, installLocation);
 
-            // RegisteredApplications
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\RegisteredApplications", displayName, results, installLocation);
-            ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE\RegisteredApplications", displayName, results, installLocation);
+            // RegisteredApplications (BCU pattern: follow value paths to find target keys + Capabilities)
+            ScanRegisteredApplicationsWithFollow(displayName, results);
 
             // VirtualStore
             string[] vsPaths =
@@ -1137,10 +1389,82 @@ namespace KitLugia.Core
             ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services", displayName, results, installLocation);
             ScanFirewallRules(displayName, results);
             ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application", displayName, results, installLocation);
-            ScanTracing(displayName, results);
+            ScanDebugTracingByExe(installLocation, results);
             ScanUserAssist(displayName, results);
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications", displayName, results, installLocation);
-            ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Internet Explorer\LowRegistry\Audio\PolicyConfig\PropertyStore", displayName, results, installLocation);
+            ScanHeapLeakByExe(installLocation, results);
+            ScanAudioPolicyConfig(installLocation, results);
+
+            // TestForSimilarNames: cross-reference found keys against other installed apps
+            // to remove entries that could belong to a different app with similar name (BCU pattern)
+            if (!string.IsNullOrEmpty(displayName))
+            {
+                var otherLocations = GetAllInstallLocations(excludeName: displayName);
+                var keysToRemove = new List<string>();
+                foreach (var r in results)
+                {
+                    // For each found registry key, check if another installed app references it
+                    // Extract the leaf name of the registry key
+                    string leafName = r.Split('\\').LastOrDefault() ?? "";
+                    if (string.IsNullOrEmpty(leafName) || leafName.Length < 3) continue;
+
+                    foreach (var otherLoc in otherLocations)
+                    {
+                        string otherName = Path.GetFileName(otherLoc.TrimEnd('\\')) ?? "";
+                        if (string.IsNullOrEmpty(otherName)) continue;
+
+                        // If the found key matches another app's name more closely than the target,
+                        // and the target's name doesn't contain the other app's name, flag it
+                        int targetConf = Confidence.Generate(displayName, leafName);
+                        int otherConf = Confidence.Generate(otherName, leafName);
+
+                        if (otherConf >= 70 && otherConf > targetConf &&
+                            !displayName.Contains(otherName, StringComparison.OrdinalIgnoreCase) &&
+                            !otherName.Contains(displayName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            keysToRemove.Add(r);
+                        }
+                    }
+                }
+                foreach (var k in keysToRemove)
+                    results.Remove(k);
+            }
+
+            // HKEY_USERS: scan other user profiles (Revo Uninstaller pattern)
+            // Only in Moderate+ mode to avoid excessive scan time
+            if (mode != ScannerMode.Safe)
+            {
+                try
+                {
+                    using var usersHive = Registry.Users.OpenSubKey("");
+                    if (usersHive != null)
+                    {
+                        string[] systemSids = { ".DEFAULT", "S-1-5-18", "S-1-5-19", "S-1-5-20" };
+                        foreach (var sid in usersHive.GetSubKeyNames())
+                        {
+                            if (string.IsNullOrEmpty(sid)) continue;
+                            if (systemSids.Contains(sid, StringComparer.OrdinalIgnoreCase)) continue;
+
+                            string userHive = $@"HKEY_USERS\{sid}";
+                            // Scan the user's Software hive for name matches
+                            ScanSoftwareRecursive($@"{userHive}\Software", displayName, results, ["Microsoft", "Classes", "Wow6432Node"], 0, installLocation);
+                            // Also scan Classes for COM references (per-user COM entries)
+                            ScanHiveForNames($@"{userHive}\Software\Classes\CLSID", displayName, results, installLocation);
+                            ScanHiveForNames($@"{userHive}\Software\Classes\AppID", displayName, results, installLocation);
+                            ScanHiveForNames($@"{userHive}\Software\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
+                            ScanHiveForNames($@"{userHive}\Software\Microsoft\Windows\CurrentVersion\Run", displayName, results, installLocation);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Active Setup scanner: apps register here for per-user setup on first login
+            if (mode >= ScannerMode.Moderate)
+            {
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Active Setup\Installed Components", displayName, results, installLocation);
+                if (Is64Bit)
+                    ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Active Setup\Installed Components", displayName, results, installLocation);
+            }
 
             // Cross-hive registry linking: for each found key, check equivalent hives
             var linkedResults = new List<string>();
@@ -1259,22 +1583,165 @@ namespace KitLugia.Core
             catch { }
         }
 
-        private static void ScanTracing(string displayName, HashSet<string> results)
+        /// <summary>
+        /// Scans RegisteredApplications by matching value names and following their value paths
+        /// to find target keys. If the target ends with \Capabilities, also adds the parent key (BCU pattern).
+        /// </summary>
+        private static void ScanRegisteredApplicationsWithFollow(string displayName, HashSet<string> results)
         {
+            string[] hiveKeys =
+            {
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\RegisteredApplications",
+                @"HKEY_CURRENT_USER\SOFTWARE\RegisteredApplications",
+            };
+
+            foreach (var hiveKey in hiveKeys)
+            {
+                try
+                {
+                    var hive = ResolveHive(hiveKey, out string subKey);
+                    if (hive == null || string.IsNullOrEmpty(subKey)) continue;
+                    using var key = hive.OpenSubKey(subKey, false);
+                    if (key == null) continue;
+
+                    foreach (var valName in key.GetValueNames())
+                    {
+                        if (string.IsNullOrEmpty(valName) || valName.Length < 2) continue;
+                        if (Confidence.Generate(displayName, valName) < 70) continue;
+
+                        // Add the value itself
+                        results.Add($@"{hiveKey}\{valName}");
+
+                        // Follow the value to find the target path
+                        string? targetPath = key.GetValue(valName) as string;
+                        if (string.IsNullOrEmpty(targetPath)) continue;
+                        targetPath = targetPath.Trim('\\', ' ', '"', '\'');
+
+                        // Resolve the target key
+                        string targetFull;
+                        if (hiveKey.StartsWith("HKEY_LOCAL_MACHINE", StringComparison.OrdinalIgnoreCase))
+                            targetFull = $@"HKEY_LOCAL_MACHINE\{targetPath}";
+                        else
+                            targetFull = $@"HKEY_CURRENT_USER\{targetPath}";
+
+                        var targetHive = ResolveHive(targetFull, out string targetSub);
+                        if (targetHive == null || string.IsNullOrEmpty(targetSub)) continue;
+                        using var targetKey = targetHive.OpenSubKey(targetSub, false);
+                        if (targetKey == null) continue;
+
+                        results.Add(targetFull);
+
+                        // If target ends with \Capabilities, also add the parent key
+                        const string capabilitiesSuffix = @"\Capabilities";
+                        if (targetFull.EndsWith(capabilitiesSuffix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string parentKey = targetFull[..^capabilitiesSuffix.Length];
+                            var parentHive = ResolveHive(parentKey, out string parentSub);
+                            if (parentHive != null && !string.IsNullOrEmpty(parentSub))
+                            {
+                                using var parentRegKey = parentHive.OpenSubKey(parentSub, false);
+                                if (parentRegKey != null)
+                                    results.Add(parentKey);
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// BCU HeapLeakDetectionScanner: scans 
+        /// HKLM\SOFTWARE\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications
+        /// for subkeys matching an executable filename found in the install directory.
+        /// </summary>
+        private static void ScanHeapLeakByExe(string installLocation, HashSet<string> results)
+        {
+            if (string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation)) return;
             try
             {
+                var exeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var f in Directory.GetFiles(installLocation, "*.exe", System.IO.SearchOption.TopDirectoryOnly))
+                {
+                    string fileName = Path.GetFileName(f);
+                    if (!string.IsNullOrEmpty(fileName)) exeFiles.Add(fileName);
+                }
+                if (exeFiles.Count == 0) return;
+
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications", false);
+                if (key == null) return;
+
+                foreach (var sub in key.GetSubKeyNames())
+                {
+                    if (!string.IsNullOrEmpty(sub) && exeFiles.Contains(sub))
+                        results.Add($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications\{sub}");
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// BCU AudioPolicyConfigScanner: scans 
+        /// HKCU\Microsoft\Internet Explorer\LowRegistry\Audio\PolicyConfig\PropertyStore
+        /// for subkeys whose default value contains the unrooted install path.
+        /// </summary>
+        private static void ScanAudioPolicyConfig(string installLocation, HashSet<string> results)
+        {
+            if (string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation)) return;
+            try
+            {
+                string pathRoot = Path.GetPathRoot(installLocation);
+                if (string.IsNullOrEmpty(pathRoot)) return;
+                string unrootedLocation = installLocation.Replace(pathRoot, string.Empty).Trim();
+                if (string.IsNullOrEmpty(unrootedLocation)) return;
+
+                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Internet Explorer\LowRegistry\Audio\PolicyConfig\PropertyStore", false);
+                if (key == null) return;
+
+                foreach (var subName in key.GetSubKeyNames())
+                {
+                    using var subKey = key.OpenSubKey(subName, false);
+                    if (subKey == null) continue;
+                    string? defVal = subKey.GetValue(null) as string;
+                    if (defVal != null && defVal.IndexOf(unrootedLocation, StringComparison.OrdinalIgnoreCase) >= 0)
+                        results.Add($@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Internet Explorer\LowRegistry\Audio\PolicyConfig\PropertyStore\{subName}");
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// BCU DebugTracingScanner: scans HKLM\SOFTWARE\Microsoft\Tracing for subkeys
+        /// ending in _RASAPI32 or _RASMANCS whose stem (part before the _) matches
+        /// an executable found in the install directory.
+        /// </summary>
+        private static void ScanDebugTracingByExe(string installLocation, HashSet<string> results)
+        {
+            if (string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation)) return;
+            try
+            {
+                var exeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var f in Directory.GetFiles(installLocation, "*.exe", System.IO.SearchOption.TopDirectoryOnly))
+                {
+                    string name = Path.GetFileNameWithoutExtension(f);
+                    if (!string.IsNullOrEmpty(name)) exeNames.Add(name);
+                }
+                if (exeNames.Count == 0) return;
+
                 using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Tracing", false);
                 if (key == null) return;
+
                 foreach (var name in key.GetSubKeyNames())
                 {
+                    if (!name.EndsWith("_RASAPI32", StringComparison.OrdinalIgnoreCase) &&
+                        !name.EndsWith("_RASMANCS", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
                     int idx = name.LastIndexOf('_');
-                    if (idx > 0)
-                    {
-                        string stem = name[..idx];
-                        if (string.IsNullOrEmpty(stem) || stem.Length < 3) continue;
-                        if (Confidence.Generate(displayName, stem) >= 70)
-                            results.Add($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Tracing\{name}");
-                    }
+                    if (idx <= 0) continue;
+                    string stem = name[..idx];
+                    if (!string.IsNullOrEmpty(stem) && exeNames.Contains(stem))
+                        results.Add($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Tracing\{name}");
                 }
             }
             catch { }
@@ -1396,7 +1863,7 @@ namespace KitLugia.Core
             return null;
         }
 
-        public static void PerformCleanup(List<string> filesToDelete, List<string> registryToDelete, UninstallResult result)
+        public static void PerformCleanup(List<string> filesToDelete, List<string> registryToDelete, UninstallResult result, string displayName = "", string installLocation = "")
         {
             var logEntries = new List<string>();
             logEntries.Add($"=== KitLugia Deletion Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
@@ -1473,35 +1940,7 @@ namespace KitLugia.Core
 
             foreach (var reg in registryToDelete.Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                try
-                {
-                    var parts = reg.Split(new[] { '\\' }, 3, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length < 2) continue;
-                    RegistryKey? hive = ResolveHive(reg, out _);
-                    if (hive == null) continue;
-                    string keyPath = parts.Length > 2 ? parts[2] : parts[1];
-
-                    // Safety: never delete the root of Microsoft hives - only specific subkeys
-                    // Our scanning only produces specific subkey paths, so this is a guard.
-                    if (IsRegPathTooBroad(reg, parts, keyPath))
-                        continue;
-
-                    // Backup registry key to .reg before deletion (restore safety)
-                    string? backupFile = BackupRegistryKey(reg);
-                    if (backupFile != null)
-                    {
-                        result.BackupRegistryFiles.Add(backupFile);
-                    }
-
-                    hive.DeleteSubKeyTree(keyPath, false);
-                    result.RegistryDeleted++;
-                    logEntries.Add($"REMOVED  {reg}");
-                }
-                catch (Exception ex)
-                {
-                    result.Errors.Add($"Registry: {reg} -> {ex.Message}");
-                    logEntries.Add($"FAILED   {reg} -> {ex.Message}");
-                }
+                SafeDeleteRegistryEntry(reg, displayName, installLocation, result, logEntries);
             }
 
             // Write deletion log
@@ -1983,6 +2422,7 @@ namespace KitLugia.Core
 
         // ── Registry .reg Backup ─────────────────────────────────
 
+        private static readonly string PathBackupDir = Path.Combine(Path.GetTempPath(), "KitLugia", "PathBackup");
         private static readonly string RegistryBackupDir = Path.Combine(
             Path.GetTempPath(), "KitLugia", "RegBackup");
 
@@ -2065,6 +2505,319 @@ namespace KitLugia.Core
                 if (sk != null)
                     ExportKeyToReg(sb, $@"{fullPath}\{name}", sk);
             }
+        }
+
+        /// <summary>
+        /// Backs up the current User PATH value to a .pathbak file before modification.
+        /// Returns the backup file path, or null on failure.
+        /// </summary>
+        private static string? BackupPathValue(string appName)
+        {
+            try
+            {
+                if (!Directory.Exists(PathBackupDir))
+                    Directory.CreateDirectory(PathBackupDir);
+                string safeName = string.Join("_", appName.Split(Path.GetInvalidFileNameChars()));
+                if (safeName.Length > 100) safeName = safeName[..100];
+                string backupFile = Path.Combine(PathBackupDir,
+                    $"{safeName}_{DateTime.Now:yyyyMMddHHmmss}.pathbak");
+                using var envKey = Registry.CurrentUser.OpenSubKey("Environment", false);
+                string? currentPath = envKey?.GetValue("PATH") as string;
+                if (currentPath == null) return null;
+                File.WriteAllText(backupFile, currentPath, Encoding.Unicode);
+                return backupFile;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Surgically removes any PATH entries matching the install location or app name.
+        /// Backs up the original PATH first. Only modifies the USER PATH (not SYSTEM).
+        /// Returns true if PATH was modified.
+        /// </summary>
+        private static bool RemovePathEntrySurgically(string displayName, string installLocation)
+        {
+            try
+            {
+                using var envKey = Registry.CurrentUser.OpenSubKey("Environment", true);
+                if (envKey == null) return false;
+                string? currentPath = envKey.GetValue("PATH") as string;
+                if (string.IsNullOrEmpty(currentPath)) return false;
+
+                var parts = currentPath.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                var newParts = new List<string>();
+                bool removed = false;
+
+                foreach (var entry in parts)
+                {
+                    string trimmed = entry.Trim();
+                    bool matches = false;
+
+                    // Match by install location
+                    if (!string.IsNullOrEmpty(installLocation) &&
+                        trimmed.IndexOf(installLocation.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) >= 0)
+                        matches = true;
+
+                    // Match by app name in the path entry
+                    if (!matches && !string.IsNullOrEmpty(displayName) &&
+                        trimmed.IndexOf(displayName, StringComparison.OrdinalIgnoreCase) >= 0)
+                        matches = true;
+
+                    // Safety: never remove non-directory entries (like %SYSTEMROOT% or bare drive roots)
+                    if (matches)
+                    {
+                        // Only remove if it looks like a directory path (contains \ or is a root path)
+                        if (trimmed.Contains('\\') || trimmed.Contains('/'))
+                        {
+                            removed = true;
+                            continue;
+                        }
+                    }
+
+                    newParts.Add(entry);
+                }
+
+                if (!removed) return false;
+
+                string newPath = string.Join(";", newParts);
+                envKey.SetValue("PATH", newPath, RegistryValueKind.ExpandString);
+                // Broadcast environment change
+                try
+                {
+                    using var chgKey = Registry.CurrentUser.OpenSubKey("Environment", true);
+                    if (chgKey != null)
+                        chgKey.SetValue("PATH", newPath, RegistryValueKind.ExpandString);
+                    // Notify Windows of env change
+                    _ = NativeMethods.SendMessageTimeout(
+                        new IntPtr(NativeMethods.HWND_BROADCAST),
+                        NativeMethods.WM_SETTINGCHANGE,
+                        IntPtr.Zero,
+                        "Environment",
+                        NativeMethods.SMTO_ABORTIFHUNG,
+                        5000,
+                        out _);
+                }
+                catch { }
+
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Determines whether a registry path points to a value (not a subkey).
+        /// Opens the parent key and checks if the last segment is a value name.
+        /// </summary>
+        private static bool IsRegistryValuePath(string fullPath)
+        {
+            try
+            {
+                int lastSep = fullPath.LastIndexOf('\\');
+                if (lastSep < 0) return false;
+                string parentPath = fullPath[..lastSep];
+                string leafName = fullPath[(lastSep + 1)..];
+
+                var hive = ResolveHive(parentPath, out string subKey);
+                if (hive == null || string.IsNullOrEmpty(subKey)) return false;
+                using var key = hive.OpenSubKey(subKey, false);
+                if (key == null) return false;
+                return key.GetValueNames().Contains(leafName, StringComparer.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Backs up a single registry value (not a whole subkey) to a .reg file.
+        /// </summary>
+        private static string? BackupRegistryValue(string fullPath)
+        {
+            try
+            {
+                if (!Directory.Exists(RegistryBackupDir))
+                    Directory.CreateDirectory(RegistryBackupDir);
+
+                int lastSep = fullPath.LastIndexOf('\\');
+                if (lastSep < 0) return null;
+                string parentPath = fullPath[..lastSep];
+                string valueName = fullPath[(lastSep + 1)..];
+
+                string safeName = fullPath.Replace('\\', '_').Replace('/', '_').Replace(':', '_').Trim('_');
+                if (safeName.Length > 200) safeName = safeName[^200..];
+                string backupFile = Path.Combine(RegistryBackupDir,
+                    $"{safeName}_{DateTime.Now:yyyyMMddHHmmss}.reg");
+
+                var hive = ResolveHive(parentPath, out string subKey);
+                if (hive == null || string.IsNullOrEmpty(subKey)) return null;
+                using var key = hive.OpenSubKey(subKey, false);
+                if (key == null) return null;
+
+                var val = key.GetValue(valueName);
+                if (val == null) return null;
+                var kind = key.GetValueKind(valueName);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Windows Registry Editor Version 5.00");
+                sb.AppendLine();
+                sb.AppendLine($@"[{parentPath}]");
+                string escapedName = valueName == "" ? "@" : EscapeRegString(valueName);
+                switch (kind)
+                {
+                    case RegistryValueKind.String:
+                    case RegistryValueKind.ExpandString:
+                        sb.AppendLine($@"{escapedName}=""{EscapeRegString(val.ToString() ?? "")}""");
+                        break;
+                    case RegistryValueKind.DWord:
+                        sb.AppendLine($@"{escapedName}=dword:{unchecked((uint)(int)val):x8}");
+                        break;
+                    case RegistryValueKind.QWord:
+                        sb.Append($@"{escapedName}=hex(b):");
+                        foreach (byte b in BitConverter.GetBytes((long)val))
+                            sb.Append($"{b:x2},");
+                        sb.AppendLine();
+                        break;
+                    case RegistryValueKind.Binary:
+                        sb.AppendLine($@"{escapedName}=hex:{BitConverter.ToString((byte[])val).Replace('-', ',').ToLowerInvariant()}");
+                        break;
+                    case RegistryValueKind.MultiString:
+                        var parts = (string[])val;
+                        sb.AppendLine($@"{escapedName}=hex(7):{string.Join(",", parts.SelectMany(s => Encoding.Unicode.GetBytes(s + "\0")).Select(b => b.ToString("x2")))}");
+                        break;
+                }
+                sb.AppendLine();
+                File.WriteAllText(backupFile, sb.ToString(), Encoding.Unicode);
+                return backupFile;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Safely deletes a registry entry, handling both subkey paths and value paths.
+        /// For PATH specifically, performs surgical removal of app entries instead of full deletion.
+        /// </summary>
+        private static void SafeDeleteRegistryEntry(string reg, string displayName, string installLocation,
+            UninstallResult result, List<string> logEntries)
+        {
+            try
+            {
+                // PATH special handling: surgically remove app entries, never delete the whole variable
+                if (reg.Equals(@"HKEY_CURRENT_USER\Environment\PATH", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (BackupPathValue(displayName) is string bakFile)
+                        result.BackupRegistryFiles.Add(bakFile);
+                    bool changed = RemovePathEntrySurgically(displayName, installLocation);
+                    if (changed)
+                    {
+                        result.RegistryDeleted++;
+                        logEntries.Add($"MODIFIED HKEY_CURRENT_USER\\Environment\\PATH (removed entries for {displayName})");
+                    }
+                    else
+                        logEntries.Add($"SKIPPED  {reg} (no matching PATH entries found)");
+                    return;
+                }
+
+                var parts = reg.Split(new[] { '\\' }, 3, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2) return;
+                RegistryKey? hive = ResolveHive(reg, out _);
+                if (hive == null) return;
+                string keyPath = parts.Length > 2 ? parts[2] : parts[1];
+
+                if (IsRegPathTooBroad(reg, parts, keyPath))
+                {
+                    logEntries.Add($"SKIPPED  {reg} (too broad)");
+                    return;
+                }
+
+                if (IsRegistryValuePath(reg))
+                {
+                    // This is a value, not a subkey — back it up and delete the single value
+                    string? backupFile = BackupRegistryValue(reg);
+                    if (backupFile != null)
+                        result.BackupRegistryFiles.Add(backupFile);
+
+                    int lastSep = reg.LastIndexOf('\\');
+                    string parentPath = reg[..lastSep];
+                    string valueName = reg[(lastSep + 1)..];
+                    var parentHive = ResolveHive(parentPath, out string parentSubKey);
+                    if (parentHive != null && !string.IsNullOrEmpty(parentSubKey))
+                    {
+                        using var parentKey = parentHive.OpenSubKey(parentSubKey, true);
+                        if (parentKey != null)
+                        {
+                            parentKey.DeleteValue(valueName, false);
+                            result.RegistryDeleted++;
+                            logEntries.Add($"REMOVED  {reg} [value]");
+                            return;
+                        }
+                    }
+                }
+                else
+                {
+                    // Service key: stop + unregister service before deleting
+                    if (reg.StartsWith(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string serviceName = keyPath.Split('\\').Last() ?? "";
+                        if (!string.IsNullOrEmpty(serviceName))
+                            TryStopAndDeleteService(serviceName);
+                    }
+
+                    // Subkey: normal backup and deletion
+                    string? backupFile = BackupRegistryKey(reg);
+                    if (backupFile != null)
+                        result.BackupRegistryFiles.Add(backupFile);
+
+                    hive.DeleteSubKeyTree(keyPath, false);
+                    result.RegistryDeleted++;
+                    logEntries.Add($"REMOVED  {reg} [key]");
+                }
+            }
+            catch (Exception ex)
+            {
+                logEntries.Add($"FAILED   {reg} -> {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Attempts to stop and unregister a Windows service by name.
+        /// Uses sc.exe for reliable behavior. Silently handles errors.
+        /// </summary>
+        private static void TryStopAndDeleteService(string serviceName)
+        {
+            try
+            {
+                using var sc = new System.Diagnostics.Process();
+                sc.StartInfo.FileName = "sc";
+                sc.StartInfo.Arguments = $"stop \"{serviceName}\"";
+                sc.StartInfo.CreateNoWindow = true;
+                sc.StartInfo.UseShellExecute = false;
+                sc.Start();
+                sc.WaitForExit(3000);
+            }
+            catch { }
+            try
+            {
+                using var sc = new System.Diagnostics.Process();
+                sc.StartInfo.FileName = "sc";
+                sc.StartInfo.Arguments = $"delete \"{serviceName}\"";
+                sc.StartInfo.CreateNoWindow = true;
+                sc.StartInfo.UseShellExecute = false;
+                sc.Start();
+                sc.WaitForExit(3000);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// P/Invoke declarations for broadcasting environment changes to Windows.
+        /// </summary>
+        private static class NativeMethods
+        {
+            public const int HWND_BROADCAST = 0xffff;
+            public const int WM_SETTINGCHANGE = 0x001a;
+            public const int SMTO_ABORTIFHUNG = 0x0002;
+
+            [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+            public static extern IntPtr SendMessageTimeout(
+                IntPtr hWnd, int Msg, IntPtr wParam, string lParam, int fuFlags, int uTimeout, out IntPtr lpdwResult);
         }
 
         private static string EscapeRegString(string s)
@@ -2343,6 +3096,302 @@ namespace KitLugia.Core
             }
         }
 
+        /// <summary>
+        /// BCU-pattern COM scanner: pre-loads ALL CLSID entries (from InprocServer32/InprocHandler32/LocalServer32
+        /// default values) and TypeLib entries (from 0\win32/win64 default values), then checks if any of the file
+        /// paths point inside the app's install location. Catches GUID-based COM entries that would never match by name.
+        /// Also scans Interface keys to find ProxyStubClsid32 references linking back to matched CLSIDs.
+        /// </summary>
+        private static void ScanComByFilePath(string installLocation, HashSet<string> results)
+        {
+            if (string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation)) return;
+
+            var comEntries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // GUID -> filePath
+            var interfaceToClsid = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // InterfaceGUID -> ProxyClsid
+
+            string normalizedInstall = Path.GetFullPath(installLocation).TrimEnd('\\');
+
+            string[][] classRoots =
+            {
+                new[] { @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes", "HKLM" },
+                new[] { @"HKEY_CURRENT_USER\SOFTWARE\Classes", "HKCU" },
+            };
+            if (Is64Bit)
+            {
+                classRoots = [
+                    ..classRoots,
+                    new[] { @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node", "HKLM" },
+                    new[] { @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node", "HKCU" },
+                ];
+            }
+
+            foreach (var root in classRoots)
+            {
+                string basePath = root[0];
+
+                // CLSID
+                ScanComClsidEntries(basePath, normalizedInstall, results, comEntries);
+
+                // TypeLib
+                ScanComTypeLibEntries(basePath, normalizedInstall, results, comEntries);
+
+                // Interface -> ProxyStubClsid32 mapping
+                ScanComInterfaceEntries(basePath, results, comEntries, interfaceToClsid);
+            }
+
+            // For each matched CLSID, also find related Interface keys via the reverse mapping
+            foreach (var kvp in comEntries)
+            {
+                string clsid = kvp.Key;
+                foreach (var iv in interfaceToClsid)
+                {
+                    if (iv.Value.Equals(clsid, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // This Interface key's ProxyStubClsid32 points to our matched CLSID
+                        // The interface key was already added during ScanComInterfaceEntries if matched
+                        // but we can also add the top-level Interface\{guid} key itself
+                        foreach (var root in classRoots)
+                        {
+                            string ifPath = $@"{root[0]}\Interface\{iv.Key}";
+                            if (KeyExists(ifPath))
+                                results.Add(ifPath);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static bool KeyExists(string fullPath)
+        {
+            try
+            {
+                var hive = ResolveHive(fullPath, out string subKey);
+                if (hive == null || string.IsNullOrEmpty(subKey)) return false;
+                using var key = hive.OpenSubKey(subKey, false);
+                return key != null;
+            }
+            catch { return false; }
+        }
+
+        private static void ScanComClsidEntries(string baseClassesPath, string normalizedInstall, HashSet<string> results, Dictionary<string, string> comEntries)
+        {
+            try
+            {
+                using var clsidKey = RegistryToolsOpenKey($@"{baseClassesPath}\CLSID");
+                if (clsidKey == null) return;
+
+                foreach (var guid in clsidKey.GetSubKeyNames())
+                {
+                    if (string.IsNullOrEmpty(guid) || guid.Contains("-0000-") || guid[0] != '{')
+                        continue;
+
+                    try
+                    {
+                        using var guidKey = clsidKey.OpenSubKey(guid, false);
+                        if (guidKey == null) continue;
+
+                        string? filePath = null;
+
+                        // InprocServer32 (DLL) - default value is the DLL path
+                        using (var inprocKey = guidKey.OpenSubKey("InprocServer32"))
+                        {
+                            if (inprocKey != null)
+                            {
+                                string? val = inprocKey.GetValue(null) as string;
+                                if (!string.IsNullOrEmpty(val))
+                                    filePath = Environment.ExpandEnvironmentVariables(val).TrimEnd('\\');
+                            }
+                        }
+
+                        // If no InprocServer32, try LocalServer32 (EXE)
+                        if (string.IsNullOrEmpty(filePath))
+                        {
+                            using var localKey = guidKey.OpenSubKey("LocalServer32");
+                            if (localKey != null)
+                            {
+                                string? val = localKey.GetValue(null) as string;
+                                if (!string.IsNullOrEmpty(val))
+                                {
+                                    // LocalServer32 often has command-line args, extract the exe path
+                                    string exePath = val.Split(' ')[0].Trim('"');
+                                    filePath = Environment.ExpandEnvironmentVariables(exePath);
+                                }
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) continue;
+
+                        // Check if the file is inside the install location
+                        string normalizedFile = Path.GetFullPath(filePath).TrimEnd('\\');
+                        if (!normalizedFile.StartsWith(normalizedInstall, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        // Found a match - add all relevant COM keys for this GUID
+                        comEntries[guid] = normalizedFile;
+
+                        string clsidPath = $@"{baseClassesPath}\CLSID\{guid}";
+                        results.Add(clsidPath);
+
+                        // AppID
+                        using (var appIdVal = guidKey.OpenSubKey("AppID"))
+                        {
+                            if (appIdVal != null)
+                            {
+                                string? appId = appIdVal.GetValue(null) as string;
+                                if (!string.IsNullOrEmpty(appId))
+                                    TryAddKey($@"{baseClassesPath}\AppID\{appId}", results);
+                            }
+                        }
+
+                        // ProgID
+                        using (var progIdKey = guidKey.OpenSubKey("ProgID"))
+                        {
+                            string? progId = progIdKey?.GetValue(null) as string;
+                            if (!string.IsNullOrEmpty(progId))
+                            {
+                                TryAddKey($@"{baseClassesPath}\{progId}", results);
+                                // Also check VersionIndependentProgID
+                                TryAddKey($@"{baseClassesPath}\{progId}\CLSID", results);
+                            }
+                        }
+
+                        // VersionIndependentProgID
+                        using (var indepKey = guidKey.OpenSubKey("VersionIndependentProgID"))
+                        {
+                            string? indepProgId = indepKey?.GetValue(null) as string;
+                            if (!string.IsNullOrEmpty(indepProgId))
+                                TryAddKey($@"{baseClassesPath}\{indepProgId}", results);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        private static void ScanComTypeLibEntries(string baseClassesPath, string normalizedInstall, HashSet<string> results, Dictionary<string, string> comEntries)
+        {
+            try
+            {
+                using var typeLibKey = RegistryToolsOpenKey($@"{baseClassesPath}\TypeLib");
+                if (typeLibKey == null) return;
+
+                foreach (var guid in typeLibKey.GetSubKeyNames())
+                {
+                    if (string.IsNullOrEmpty(guid) || guid.Contains("-0000-") || guid[0] != '{')
+                        continue;
+
+                    try
+                    {
+                        using var guidKey = typeLibKey.OpenSubKey(guid, false);
+                        if (guidKey == null) continue;
+
+                        // Get the first version subkey
+                        string? version = guidKey.GetSubKeyNames().FirstOrDefault();
+                        if (string.IsNullOrEmpty(version)) continue;
+
+                        string? filePath = null;
+
+                        // Try win64 then win32
+                        foreach (var arch in new[] { "0\\win64", "0\\win32" })
+                        {
+                            using var fileKey = guidKey.OpenSubKey($@"{version}\{arch}");
+                            if (fileKey != null)
+                            {
+                                string? val = fileKey.GetValue(null) as string;
+                                if (!string.IsNullOrEmpty(val))
+                                {
+                                    filePath = Environment.ExpandEnvironmentVariables(val);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) continue;
+
+                        string normalizedFile = Path.GetFullPath(filePath).TrimEnd('\\');
+                        if (!normalizedFile.StartsWith(normalizedInstall, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        // Add the TypeLib key
+                        string typeLibPath = $@"{baseClassesPath}\TypeLib\{guid}";
+                        results.Add(typeLibPath);
+
+                        // Check if a matching CLSID entry already exists
+                        if (!comEntries.ContainsKey(guid))
+                            comEntries[guid] = normalizedFile;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        private static void ScanComInterfaceEntries(string baseClassesPath, HashSet<string> results, Dictionary<string, string> comEntries, Dictionary<string, string> interfaceToClsid)
+        {
+            try
+            {
+                using var interfaceKey = RegistryToolsOpenKey($@"{baseClassesPath}\Interface");
+                if (interfaceKey == null) return;
+
+                foreach (var ifGuid in interfaceKey.GetSubKeyNames())
+                {
+                    if (string.IsNullOrEmpty(ifGuid) || ifGuid.Contains("-0000-") || ifGuid[0] != '{')
+                        continue;
+
+                    try
+                    {
+                        using var ifGuidKey = interfaceKey.OpenSubKey(ifGuid, false);
+                        if (ifGuidKey == null) continue;
+
+                        using var proxyKey = ifGuidKey.OpenSubKey("ProxyStubClsid32");
+                        string? proxyClsid = proxyKey?.GetValue(null) as string;
+                        if (string.IsNullOrEmpty(proxyClsid)) continue;
+
+                        // Check if this proxy CLSID matches any of our matched COM entries
+                        if (comEntries.ContainsKey(proxyClsid))
+                        {
+                            // The interface is related to our app's COM entry
+                            results.Add(ifGuidKey.Name);
+                            interfaceToClsid[ifGuid] = proxyClsid;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Opens a registry key from a full path like "HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID".
+        /// Returns null on any error.
+        /// </summary>
+        private static RegistryKey? RegistryToolsOpenKey(string fullPath)
+        {
+            try
+            {
+                var hive = ResolveHive(fullPath, out string subKey);
+                if (hive == null || string.IsNullOrEmpty(subKey)) return null;
+                return hive.OpenSubKey(subKey, false);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Adds a registry key path to results if it exists.
+        /// </summary>
+        private static void TryAddKey(string fullPath, HashSet<string> results)
+        {
+            try
+            {
+                var hive = ResolveHive(fullPath, out string subKey);
+                if (hive == null || string.IsNullOrEmpty(subKey)) return;
+                using var key = hive.OpenSubKey(subKey, false);
+                if (key != null) results.Add(fullPath);
+            }
+            catch { }
+        }
+
         // ── Empty Directory / Questionable Name Detection ──────────
 
         private static readonly HashSet<string> QuestionableDirNames = new(StringComparer.OrdinalIgnoreCase)
@@ -2592,36 +3641,70 @@ namespace KitLugia.Core
 
     internal static class Confidence
     {
+        // Generic words that should never produce a strong match on their own
+        private static readonly HashSet<string> GenericWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "launcher", "player", "app", "apps", "service", "services", "client", "helper",
+            "manager", "plugin", "addon", "add-on", "extension", "tool", "tools", "update",
+            "updater", "setup", "installer", "config", "configuration", "runtime", "engine",
+            "core", "helper", "daemon", "agent", "bridge", "connector", "desktop", "portable",
+            "sdk", "api", "module", "middleware", "bridge", "driver", "panel", "control",
+            "console", "launcher", "loader", "monitor", "task", "process", "wrapper",
+            "x86", "x64", "win32", "win64", "windows", "32-bit", "64-bit"
+        };
+
         public static int Generate(string displayName, string folderName)
         {
             if (string.IsNullOrEmpty(displayName) || string.IsNullOrEmpty(folderName)) return 0;
 
-            // Exact match or display name starts with folder name
+            // Exact match
             if (displayName.Equals(folderName, StringComparison.OrdinalIgnoreCase)) return 100;
             if (displayName.StartsWith(folderName, StringComparison.OrdinalIgnoreCase)) return 90;
             if (folderName.StartsWith(displayName, StringComparison.OrdinalIgnoreCase)) return 85;
 
-            // Remove common words and compare
+            // Reject if folderName is a single generic word (Launcher, Player, etc.)
+            string folderTrimmed = folderName.Trim().Trim('.', ' ');
+            if (GenericWords.Contains(folderTrimmed)) return 0;
+
+            // Reject very short names (< 4 chars) unless exact match
+            if (folderTrimmed.Length < 4) return 0;
+
             string cleanDisplay = CleanName(displayName);
             string cleanFolder = CleanName(folderName);
 
             if (string.IsNullOrEmpty(cleanDisplay) || string.IsNullOrEmpty(cleanFolder)) return 0;
             if (cleanDisplay.Equals(cleanFolder, StringComparison.OrdinalIgnoreCase)) return 80;
 
-            // Check if all words in folder name appear in display name
-            var words = cleanFolder.Split(new[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries);
-            int matchCount = words.Count(w => cleanDisplay.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
-            if (matchCount == words.Length && words.Length > 0) return 75;
+            // BCU-style MatchStringToProductName:
+            // Check if one contains the other (dodgy match)
+            string displayLower = cleanDisplay.ToLowerInvariant();
+            string folderLower = cleanFolder.ToLowerInvariant();
+            bool dirToName = folderLower.Contains(displayLower);
+            bool nameToDir = displayLower.Contains(folderLower);
 
-            // Sift4 string distance
-            int dist = Sift4Distance(cleanDisplay.ToLowerInvariant(), cleanFolder.ToLowerInvariant(), 5);
-            int maxLen = Math.Max(cleanDisplay.Length, cleanFolder.Length);
+            // Sift4 distance
+            int dist = Sift4Distance(displayLower, folderLower, 5);
+            int maxLen = Math.Max(displayLower.Length, folderLower.Length);
             if (maxLen == 0) return 0;
-            double ratio = 1.0 - (double)dist / maxLen;
 
-            if (ratio >= 0.8) return 70;
-            if (ratio >= 0.6) return 60;
-            if (ratio >= 0.4) return 40;
+            if (dirToName || nameToDir)
+            {
+                // One contains the other - assess how much difference remains
+                double ratio = 1.0 - (double)dist / maxLen;
+                if (ratio >= 0.8) return 70;
+                if (dist < maxLen / 3)
+                {
+                    // Difference is less than 1/3 of total length - still a reasonable match
+                    int score = (int)((1.0 - (double)dist / maxLen) * 65);
+                    return Math.Max(score, 50);
+                }
+                return 50; // dodgy match, below threshold
+            }
+
+            // Pure Sift4 distance match
+            double siftRatio = 1.0 - (double)dist / maxLen;
+            if (siftRatio >= 0.8) return 70;
+            if (siftRatio >= 0.6 && dist < maxLen / 3) return 60;
 
             return 0;
         }
