@@ -46,6 +46,9 @@ namespace KitLugia.GUI.Pages
         private int _maxCleanupSuccess;
         private int _maxCleanupFail;
 
+        // Junk (leftovers persistence)
+        private List<LeftoverJunkItem>? _junkItems;
+
         public Visibility MaxCleanupTabVisible
         {
             get { return (Visibility)GetValue(MaxCleanupTabVisibleProperty); }
@@ -357,9 +360,8 @@ namespace KitLugia.GUI.Pages
                             TxtBloatwareProgress.Text = msg;
                     });
 
-                    var settings = AppSettingsHelper.Load();
                     bloatProgress.Report($"Criando ponto de restauração...");
-                    if (settings.CreateRestorePointBeforeUninstall)
+                    if (CbCreateRestorePoint.IsChecked == true)
                         await Task.Run(() => DeepUninstaller.TryCreateRestorePoint($"KitLugia: Uninstall {app.DisplayName}"));
 
                     bloatProgress.Report($"Removendo {app.DisplayName}...");
@@ -492,8 +494,7 @@ namespace KitLugia.GUI.Pages
                     if (TxtBloatwareProgress != null)
                         TxtBloatwareProgress.Text = $"Removendo 0/{total}...";
 
-                    var settings = AppSettingsHelper.Load();
-                    if (settings.CreateRestorePointBeforeUninstall)
+                    if (CbCreateRestorePoint.IsChecked == true)
                         await Task.Run(() => DeepUninstaller.TryCreateRestorePoint($"KitLugia: Batch UWP ({total} apps)"));
 
                     foreach (var app in selectedApps)
@@ -721,8 +722,7 @@ namespace KitLugia.GUI.Pages
                         return;
                     }
 
-                    var settings = AppSettingsHelper.Load();
-                    bool createRp = settings.CreateRestorePointBeforeUninstall;
+                    bool createRp = CbCreateRestorePoint.IsChecked == true;
 
                     ProgramsLoadingPanel.Visibility = Visibility.Visible;
 
@@ -805,8 +805,7 @@ namespace KitLugia.GUI.Pages
                     return;
                 }
                 {
-                    var settings = AppSettingsHelper.Load();
-                    bool batchCreateRp = settings.CreateRestorePointBeforeUninstall;
+                    bool batchCreateRp = CbCreateRestorePoint.IsChecked == true;
 
                     int total = selectedPrograms.Count;
                     int successCount = 0;
@@ -892,7 +891,9 @@ namespace KitLugia.GUI.Pages
         private async void LoadMaxCleanupList()
         {
             _maxCleanupItems = new List<MaxCleanupItem>();
+            _junkItems = new List<LeftoverJunkItem>();
             MaxCleanupList.ItemsSource = null;
+            if (JunkItemsList != null) JunkItemsList.ItemsSource = null;
             if (TxtMaxCleanupInfo != null) TxtMaxCleanupInfo.Text = "Carregando...";
 
             try
@@ -963,8 +964,30 @@ namespace KitLugia.GUI.Pages
                 _ = LoadMaxCleanupIconsAsync(genericUwpIcon, genericProgIcon);
 
                 MaxCleanupList.ItemsSource = _maxCleanupItems;
+
+                // Load junk entries
+                var junkEntries = await Task.Run(() => LeftoverJunkManager.Load());
+                _junkItems = junkEntries.Select(e => new LeftoverJunkItem
+                {
+                    AppName = e.AppName,
+                    Date = e.Date,
+                    LeftoverFiles = e.LeftoverFiles,
+                    LeftoverRegistry = e.LeftoverRegistry
+                }).ToList();
+                if (JunkItemsList != null)
+                {
+                    JunkItemsList.ItemsSource = _junkItems;
+                    JunkSection.Visibility = _junkItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                }
+                if (JunkInfoText != null)
+                    JunkInfoText.Text = _junkItems.Count > 0
+                        ? $"{_junkItems.Count} app(s) com resíduos pendentes"
+                        : "";
+
+                int totalInstalled = uwpApps.Count + programs.Count;
                 if (TxtMaxCleanupInfo != null)
-                    TxtMaxCleanupInfo.Text = $"{_maxCleanupItems.Count} aplicativos encontrados ({uwpApps.Count} UWP, {programs.Count} Programas)";
+                    TxtMaxCleanupInfo.Text = $"{totalInstalled} aplicativos instalados ({uwpApps.Count} UWP, {programs.Count} Programas)" +
+                        (_junkItems.Count > 0 ? $" | {_junkItems.Count} com resíduos" : "");
                 UpdateMaxCleanupCounts();
             }
             catch (Exception ex)
@@ -1061,8 +1084,7 @@ namespace KitLugia.GUI.Pages
                     "Limpeza Máxima"))
                     return;
 
-                var settings = AppSettingsHelper.Load();
-                if (settings.CreateRestorePointBeforeUninstall)
+                if (CbCreateRestorePoint.IsChecked == true)
                     await Task.Run(() => DeepUninstaller.TryCreateRestorePoint("KitLugia: Maximum Cleanup"));
 
                 if (TxtMaxCleanupStatus != null)
@@ -1141,6 +1163,79 @@ namespace KitLugia.GUI.Pages
         {
             LoadMaxCleanupList();
         }
+
+        #region JUNK (leftover persistence)
+
+        private async void BtnJunkClean_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is LeftoverJunkItem item && _junkItems != null)
+            {
+                int index = _junkItems.IndexOf(item);
+                if (index < 0) return;
+
+                try
+                {
+                    btn.IsEnabled = false;
+                    btn.Content = "⏳";
+
+                    var result = new DeepUninstaller.UninstallResult();
+                    await Task.Run(() => DeepUninstaller.PerformCleanup(
+                        item.LeftoverFiles, item.LeftoverRegistry, result));
+
+                    _junkItems.RemoveAt(index);
+                    LeftoverJunkManager.RemoveAt(index);
+
+                    JunkItemsList.ItemsSource = null;
+                    JunkItemsList.ItemsSource = _junkItems;
+                    JunkSection.Visibility = _junkItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    if (JunkInfoText != null)
+                        JunkInfoText.Text = _junkItems.Count > 0
+                            ? $"{_junkItems.Count} app(s) com resíduos pendentes"
+                            : "";
+
+                    int fCount = item.LeftoverFiles.Count;
+                    int rCount = item.LeftoverRegistry.Count;
+                    MessageBox.Show($"{item.AppName}: {fCount} arquivo(s) e {rCount} registro(s) limpos.",
+                        "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("BtnJunkClean_Click", ex.Message);
+                    btn.IsEnabled = true;
+                    btn.Content = "\U0001F5D1 Limpar";
+                }
+            }
+        }
+
+        private void JunkCardHeader_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is LeftoverJunkItem item)
+            {
+                item.IsExpanded = !item.IsExpanded;
+            }
+        }
+
+        private void BtnJunkDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is LeftoverJunkItem item && _junkItems != null)
+            {
+                int index = _junkItems.IndexOf(item);
+                if (index < 0) return;
+
+                _junkItems.RemoveAt(index);
+                LeftoverJunkManager.RemoveAt(index);
+
+                JunkItemsList.ItemsSource = null;
+                JunkItemsList.ItemsSource = _junkItems;
+                JunkSection.Visibility = _junkItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                if (JunkInfoText != null)
+                    JunkInfoText.Text = _junkItems.Count > 0
+                        ? $"{_junkItems.Count} app(s) com resíduos pendentes"
+                        : "";
+            }
+        }
+
+        #endregion
 
         #endregion
 
@@ -1520,6 +1615,29 @@ namespace KitLugia.GUI.Pages
             int fDeleted = _reviewFilesDeleted;
             int rDeleted = _reviewRegDeleted;
 
+            // Save remaining leftovers as junk entry for the Max Cleanup tab
+            var remainingFiles = _reviewFileItems
+                .Where(f => !f.IsNavigational && !f.IsFolder)
+                .Select(f => f.FullPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var remainingReg = _reviewRegItems
+                .Where(r => !r.IsNavigational && !r.IsFolder)
+                .Select(r => r.FullPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if ((remainingFiles.Count > 0 || remainingReg.Count > 0) && !string.IsNullOrEmpty(appName))
+            {
+                var entry = new LeftoverJunkEntry
+                {
+                    AppName = appName,
+                    Date = DateTime.Now,
+                    LeftoverFiles = remainingFiles,
+                    LeftoverRegistry = remainingReg
+                };
+                LeftoverJunkManager.Add(entry);
+            }
+
             if (fDeleted > 0 || rDeleted > 0)
                 MessageBox.Show($"{appName}: {fDeleted} arquivo(s) e {rDeleted} registro(s) removidos.",
                     "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1641,6 +1759,27 @@ namespace KitLugia.GUI.Pages
         }
 
         public string ExpandIcon => IsExpanded ? "\u25BC" : "\u25B6";
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string? n = null) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
+    }
+
+    public class LeftoverJunkItem : INotifyPropertyChanged
+    {
+        public string AppName { get; set; } = "";
+        public DateTime Date { get; set; }
+        public string DateString => Date.ToString("g");
+        public List<string> LeftoverFiles { get; set; } = new();
+        public List<string> LeftoverRegistry { get; set; } = new();
+        public string ItemsCount => $"{LeftoverFiles.Count} arquivo(s), {LeftoverRegistry.Count} registro(s)";
+
+        private bool _isExpanded;
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { _isExpanded = value; OnPropertyChanged(); }
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? n = null) =>
