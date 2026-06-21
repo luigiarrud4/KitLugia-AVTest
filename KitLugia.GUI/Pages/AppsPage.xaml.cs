@@ -210,9 +210,6 @@ namespace KitLugia.GUI.Pages
             {
                 var apps = await Task.Run(() => SystemTweaks.GetBloatwareAppsStatus(), token);
 
-                // Pre-populate all with generic icon to avoid yellow flash
-                var genericIcon = await Task.Run(() => AppIconHelper.GetGenericStoreIcon());
-
                 foreach (var app in apps)
                 {
                     if (BloatwareCollection != null)
@@ -222,10 +219,6 @@ namespace KitLugia.GUI.Pages
                         {
                             app.Icon = oldIcons[packageName];
                         }
-                        else
-                        {
-                            app.Icon = genericIcon;
-                        }
                         BloatwareCollection.Add(app);
                     }
                 }
@@ -233,7 +226,7 @@ namespace KitLugia.GUI.Pages
                 FilteredBloatwareCollection = new ObservableCollection<BloatwareApp>(BloatwareCollection ?? Enumerable.Empty<BloatwareApp>());
                 if (BloatwareList != null) BloatwareList.ItemsSource = FilteredBloatwareCollection;
 
-                if (apps.Any() && apps.Any(a => a.Icon == genericIcon))
+                if (apps.Any())
                     _ = Task.Run(() => LoadBloatwareIconsAsync(token));
             }
             catch (OperationCanceledException)
@@ -260,7 +253,14 @@ namespace KitLugia.GUI.Pages
                 .ToList();
 
             int loadedIcons = totalIcons - items.Count;
+
             if (items.Count == 0) return;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (BloatwareIconProgressText != null)
+                    BloatwareIconProgressText.Text = $"Ícones carregados: {loadedIcons}/{totalIcons}";
+            });
 
             var results = new (int Index, object? Icon)[items.Count];
             var parallelOptions = new ParallelOptions
@@ -292,6 +292,7 @@ namespace KitLugia.GUI.Pages
                     if (icon != null && idx < BloatwareCollection.Count)
                         BloatwareCollection[idx].Icon = icon;
                 }
+
                 if (BloatwareIconProgressText != null)
                     BloatwareIconProgressText.Text = $"Ícones carregados: {BloatwareCollection.Count(a => a.Icon != null)}/{totalIcons}";
             });
@@ -541,10 +542,9 @@ namespace KitLugia.GUI.Pages
                 _programsCts = new CancellationTokenSource();
 
                 var programs = await Task.Run(() => RegistryProgramFactory.GetInstalledPrograms());
-                var genericIcon = await Task.Run(() => ProgramIconHelper.GetGenericIcon());
 
                 ProgramsCollection = new ObservableCollection<ProgramViewModel>(
-                    programs.Select(p => new ProgramViewModel(p) { Icon = genericIcon }));
+                    programs.Select(p => new ProgramViewModel(p)));
 
                 if (ProgramsIconProgressText != null)
                     ProgramsIconProgressText.Text = $"Ícones carregados: 0/{ProgramsCollection.Count}";
@@ -572,9 +572,8 @@ namespace KitLugia.GUI.Pages
             if (ProgramsCollection == null) return;
 
             var dispatcher = Dispatcher;
-            var semaphore = new SemaphoreSlim(5, 5);
+            var semaphore = new SemaphoreSlim(5, 5); // Limite de 5 ícones simultâneos (mais responsivo)
             var tasks = new List<Task>(200);
-            var iconResults = new Dictionary<ProgramViewModel, BitmapSource?>();
 
             foreach (var program in ProgramsCollection)
             {
@@ -586,42 +585,60 @@ namespace KitLugia.GUI.Pages
                     try
                     {
                         if (cancellationToken.IsCancellationRequested) return;
+
                         BitmapSource? icon = null;
+
                         try
                         {
                             if (!string.IsNullOrEmpty(program.DisplayIcon))
                                 icon = ProgramIconHelper.GetIconFromFile(program.DisplayIcon.Trim().Trim('"'));
+
                             if (icon == null && !string.IsNullOrEmpty(program.UninstallString))
                                 icon = ProgramIconHelper.GetIconFromFile(ExtractPathFromUninstallString(program.UninstallString));
+
                             if (icon == null && !string.IsNullOrEmpty(program.InstallLocation))
                                 icon = ProgramIconHelper.GetIconFromDirectory(program.InstallLocation);
+
                             icon ??= ProgramIconHelper.GetGenericIcon();
                         }
-                        catch { icon = ProgramIconHelper.GetGenericIcon(); }
+                        catch
+                        {
+                            icon = ProgramIconHelper.GetGenericIcon();
+                        }
 
                         if (icon != null && !cancellationToken.IsCancellationRequested)
                         {
-                            lock (iconResults) { iconResults[program] = icon; }
+                            await dispatcher.InvokeAsync(() =>
+                            {
+                                program.Icon = icon;
+
+                                if (ProgramsCollection != null)
+                                {
+                                    int loadedCount = ProgramsCollection.Count(p => p.Icon != null);
+                                    if (ProgramsIconProgressText != null)
+                                    {
+                                        ProgramsIconProgressText.Text = $"Ícones carregados: {loadedCount}/{ProgramsCollection.Count}";
+                                    }
+                                }
+                            }, System.Windows.Threading.DispatcherPriority.Background);
                         }
                     }
-                    finally { semaphore.Release(); }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
                 }, cancellationToken));
             }
 
             await Task.WhenAll(tasks);
-            if (cancellationToken.IsCancellationRequested) return;
 
-            // Single batch update on UI thread
             await dispatcher.InvokeAsync(() =>
             {
-                foreach (var (prog, icon) in iconResults)
-                {
-                    if (prog.Icon == null || prog.Icon == icon) continue;
-                    prog.Icon = icon;
-                }
                 if (ProgramsIconProgressText != null)
+                {
                     ProgramsIconProgressText.Text = "Ícones carregados!";
-            }, System.Windows.Threading.DispatcherPriority.Background);
+                }
+            });
         }
 
         private string? ExtractPathFromUninstallString(string uninstallString)
