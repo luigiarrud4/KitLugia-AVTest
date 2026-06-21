@@ -82,6 +82,163 @@
 
             <TabControl x:Name="MainTabs" Grid.Row="1" Background="Transparent" BorderThickness="0">
 
+                <!-- ABA 0: LIMPEZA MÁXIMA (unificada) -->
+                <TabItem Header="&#x2728; Limpeza Máxima" Visibility="{Binding MaxCleanupTabVisible, RelativeSource={RelativeSource AncestorType=Page}, FallbackValue=Visible}">
+                    <Grid Margin="0,15,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="Limpeza Máxima" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Todos os aplicativos (UWP + Programas) em uma lista unificada. Selecione os que deseja remover." Foreground="#AAA" Margin="0,3,0,0"/>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Background="#252525" CornerRadius="5" Padding="12,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtMaxCleanupInfo" Text="Carregando..." FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Selecionar Todos" Height="30" Padding="10,0" Background="#2C3E50" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,6,0" Click="BtnMaxSelectAll_Click"/>
+                                <Button Grid.Column="2" x:Name="BtnMaxClean" Content="&#x1F5D1; Limpar Selecionados (0)" Height="30" Padding="14,0" Background="#C0392B" Foreground="White" BorderThickness="0" FontSize="11" FontWeight="SemiBold" Cursor="Hand" IsEnabled="False" Click="BtnMaxClean_Click"/>
+                                <Button Grid.Column="3" Content="Atualizar" Height="30" Padding="10,0" Background="#333" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="6,0,0,0" Click="BtnMaxRefresh_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="MaxCleanupList" Background="Transparent" BorderThickness="0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,6" CornerRadius="6" BorderThickness="1" BorderBrush="#333">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#1E1E1E"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                            <Setter Property="Background" Value="#252525"/>
+                                                            <Setter Property="BorderBrush" Value="#FFD700"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
+                                                <!-- Card header: always visible -->
+                                                <Border Grid.Row="0" Padding="10,8" Cursor="Hand" MouseLeftButtonUp="MaxCardHeader_Click">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="32"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Expand/collapse arrow -->
+                                                        <TextBlock Grid.Column="0" Text="{Binding ExpandIcon}" FontSize="14" Foreground="#888" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="Bold"/>
+
+                                                        <!-- Checkbox -->
+                                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                            <CheckBox.LayoutTransform>
+                                                                <ScaleTransform ScaleX="1.5" ScaleY="1.5"/>
+                                                            </CheckBox.LayoutTransform>
+                                                        </CheckBox>
+
+                                                        <!-- Icon -->
+                                                        <Grid Grid.Column="2" Width="32" Height="32" VerticalAlignment="Center">
+                                                            <Image Source="{Binding Icon}" Width="32" Height="32" Stretch="Uniform"/>
+                                                            <Border Width="20" Height="20" Background="#2A2A2A" CornerRadius="3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                            </Border>
+                                                        </Grid>
+
+                                                        <!-- App name and details -->
+                                                        <StackPanel Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding DetailLine}" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
+                                                        </StackPanel>
+
+                                                        <!-- Type badge -->
+                                                        <Border Grid.Column="4" Padding="6,2" CornerRadius="3" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Background" Value="#2E7D32"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding AppType}" Value="Program">
+                                                                            <Setter Property="Background" Value="#2C3E50"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock Text="{Binding AppType}" FontSize="10" Foreground="White" FontWeight="SemiBold"/>
+                                                        </Border>
+
+                                                        <!-- Clean button -->
+                                                        <Button Grid.Column="5" Content="REMOVER" Height="28" FontSize="10" Padding="10,0" Background="Transparent" BorderBrush="#C42B1C" Foreground="#FF6F61" BorderThickness="1" Cursor="Hand" Tag="{Binding}" Click="BtnMaxSingleRemove_Click"/>
+                                                    </Grid>
+                                                </Border>
+
+                                                <!-- Expanded details panel -->
+                                                <Border Grid.Row="1" x:Name="DetailsPanel" CornerRadius="4" Margin="10,0,10,10" Padding="10,8" Background="#181818" BorderBrush="#333" BorderThickness="1">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto"/>
+                                                            <RowDefinition Height="*"/>
+                                                        </Grid.RowDefinitions>
+                                                        <TextBlock Text="Detalhes do aplicativo:" FontSize="12" FontWeight="SemiBold" Foreground="#AAA" Margin="0,0,0,6"/>
+                                                        <ScrollViewer Grid.Row="1" MaxHeight="180" VerticalScrollBarVisibility="Auto">
+                                                            <ItemsControl ItemsSource="{Binding DetailItems}" Background="Transparent" BorderThickness="0">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding}" FontSize="11" Foreground="#777" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </ScrollViewer>
+                                                    </Grid>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <Border Grid.Row="3" Background="#252525" CornerRadius="5" Padding="12,8" Margin="0,10,0,0">
+                            <TextBlock x:Name="TxtMaxCleanupStatus" Text="Pronto" FontSize="12" Foreground="#888"/>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
                 <!-- ABA 1: BLOATWARE (UWP) -->
                 <TabItem Header="&#x1F4E6; Bloatware (UWP)">
                     <Grid Margin="0,15,0,0">
@@ -173,17 +330,16 @@
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" Margin="8,0" VerticalAlignment="Center">
                                                 <Image Source="{Binding Icon}" Width="32" Height="32" Stretch="Uniform"/>
-                                                <Ellipse Width="24" Height="24" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Ellipse.Style>
-                                                        <Style TargetType="Ellipse">
+                                                <Border Width="24" Height="24" Background="#2A2A2A" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Setter Property="Opacity" Value="1"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </Ellipse.Style>
-                                                </Ellipse>
+                                                    </Border.Style>
+                                                </Border>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" Foreground="White" TextTrimming="CharacterEllipsis"/>
@@ -322,16 +478,16 @@
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" VerticalAlignment="Center">
                                                 <Image Width="32" Height="32" Source="{Binding Icon}" Stretch="Uniform"/>
-                                                <Ellipse Width="24" Height="24" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Ellipse.Style>
-                                                        <Style TargetType="Ellipse">
+                                                <Border Width="24" Height="24" Background="#2A2A2A" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </Ellipse.Style>
-                                                </Ellipse>
+                                                    </Border.Style>
+                                                </Border>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>

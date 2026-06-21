@@ -41,6 +41,19 @@ namespace KitLugia.GUI.Pages
 
         private bool _isAppOperation;
 
+        // Max Cleanup
+        private List<MaxCleanupItem>? _maxCleanupItems;
+        private int _maxCleanupSuccess;
+        private int _maxCleanupFail;
+
+        public Visibility MaxCleanupTabVisible
+        {
+            get { return (Visibility)GetValue(MaxCleanupTabVisibleProperty); }
+            set { SetValue(MaxCleanupTabVisibleProperty, value); }
+        }
+        public static readonly DependencyProperty MaxCleanupTabVisibleProperty =
+            DependencyProperty.Register(nameof(MaxCleanupTabVisible), typeof(Visibility), typeof(AppsPage), new PropertyMetadata(Visibility.Visible));
+
         // Inline review panel
         private List<AppCleanupItem> _reviewFileItems = new();
         private List<AppCleanupItem> _reviewRegItems = new();
@@ -197,6 +210,9 @@ namespace KitLugia.GUI.Pages
             {
                 var apps = await Task.Run(() => SystemTweaks.GetBloatwareAppsStatus(), token);
 
+                // Pre-populate all with generic icon to avoid yellow flash
+                var genericIcon = await Task.Run(() => AppIconHelper.GetGenericStoreIcon());
+
                 foreach (var app in apps)
                 {
                     if (BloatwareCollection != null)
@@ -206,6 +222,10 @@ namespace KitLugia.GUI.Pages
                         {
                             app.Icon = oldIcons[packageName];
                         }
+                        else
+                        {
+                            app.Icon = genericIcon;
+                        }
                         BloatwareCollection.Add(app);
                     }
                 }
@@ -213,7 +233,7 @@ namespace KitLugia.GUI.Pages
                 FilteredBloatwareCollection = new ObservableCollection<BloatwareApp>(BloatwareCollection ?? Enumerable.Empty<BloatwareApp>());
                 if (BloatwareList != null) BloatwareList.ItemsSource = FilteredBloatwareCollection;
 
-                if (apps.Any())
+                if (apps.Any() && apps.Any(a => a.Icon == genericIcon))
                     _ = Task.Run(() => LoadBloatwareIconsAsync(token));
             }
             catch (OperationCanceledException)
@@ -240,16 +260,8 @@ namespace KitLugia.GUI.Pages
                 .ToList();
 
             int loadedIcons = totalIcons - items.Count;
-
             if (items.Count == 0) return;
 
-            await Dispatcher.InvokeAsync(() =>
-            {
-                if (BloatwareIconProgressText != null)
-                    BloatwareIconProgressText.Text = $"Ícones carregados: {loadedIcons}/{totalIcons}";
-            });
-
-            // Carrega todos os ícones em paralelo SEM invocar Dispatcher durante o carregamento
             var results = new (int Index, object? Icon)[items.Count];
             var parallelOptions = new ParallelOptions
             {
@@ -273,7 +285,6 @@ namespace KitLugia.GUI.Pages
 
             if (token.IsCancellationRequested) return;
 
-            // ÚNICO Invoke para aplicar todos os ícones de uma vez
             await Dispatcher.InvokeAsync(() =>
             {
                 foreach (var (idx, icon) in results)
@@ -281,7 +292,6 @@ namespace KitLugia.GUI.Pages
                     if (icon != null && idx < BloatwareCollection.Count)
                         BloatwareCollection[idx].Icon = icon;
                 }
-
                 if (BloatwareIconProgressText != null)
                     BloatwareIconProgressText.Text = $"Ícones carregados: {BloatwareCollection.Count(a => a.Icon != null)}/{totalIcons}";
             });
@@ -531,9 +541,10 @@ namespace KitLugia.GUI.Pages
                 _programsCts = new CancellationTokenSource();
 
                 var programs = await Task.Run(() => RegistryProgramFactory.GetInstalledPrograms());
+                var genericIcon = await Task.Run(() => ProgramIconHelper.GetGenericIcon());
 
                 ProgramsCollection = new ObservableCollection<ProgramViewModel>(
-                    programs.Select(p => new ProgramViewModel(p)));
+                    programs.Select(p => new ProgramViewModel(p) { Icon = genericIcon }));
 
                 if (ProgramsIconProgressText != null)
                     ProgramsIconProgressText.Text = $"Ícones carregados: 0/{ProgramsCollection.Count}";
@@ -561,10 +572,9 @@ namespace KitLugia.GUI.Pages
             if (ProgramsCollection == null) return;
 
             var dispatcher = Dispatcher;
-            var semaphore = new SemaphoreSlim(5, 5); // Limite de 5 ícones simultâneos (mais responsivo)
-            // OTIMIZAÇÃO .NET 10: Capacidade pré-definida para List
-            // Típico: 50-200 programas instalados
+            var semaphore = new SemaphoreSlim(5, 5);
             var tasks = new List<Task>(200);
+            var iconResults = new Dictionary<ProgramViewModel, BitmapSource?>();
 
             foreach (var program in ProgramsCollection)
             {
@@ -576,67 +586,42 @@ namespace KitLugia.GUI.Pages
                     try
                     {
                         if (cancellationToken.IsCancellationRequested) return;
-
                         BitmapSource? icon = null;
-
                         try
                         {
-                            // 1) DisplayIcon (pode conter "caminho.dll,indice")
                             if (!string.IsNullOrEmpty(program.DisplayIcon))
                                 icon = ProgramIconHelper.GetIconFromFile(program.DisplayIcon.Trim().Trim('"'));
-
-                            // 2) Caminho do desinstalador
                             if (icon == null && !string.IsNullOrEmpty(program.UninstallString))
                                 icon = ProgramIconHelper.GetIconFromFile(ExtractPathFromUninstallString(program.UninstallString));
-
-                            // 3) Busca recursiva no diretório de instalação
                             if (icon == null && !string.IsNullOrEmpty(program.InstallLocation))
                                 icon = ProgramIconHelper.GetIconFromDirectory(program.InstallLocation);
-
-                            // 4) Genérico
                             icon ??= ProgramIconHelper.GetGenericIcon();
                         }
-                        catch
-                        {
-                            icon = ProgramIconHelper.GetGenericIcon();
-                        }
+                        catch { icon = ProgramIconHelper.GetGenericIcon(); }
 
                         if (icon != null && !cancellationToken.IsCancellationRequested)
                         {
-                            await dispatcher.InvokeAsync(() =>
-                            {
-                                program.Icon = icon;
-                                // Não chama Items.Refresh() para evitar travar a UI com virtualização
-
-                                // Atualiza contador (verifica se ProgramsCollection não é nulo)
-                                if (ProgramsCollection != null)
-                                {
-                                    int loadedCount = ProgramsCollection.Count(p => p.Icon != null);
-                                    if (ProgramsIconProgressText != null)
-                                    {
-                                        ProgramsIconProgressText.Text = $"Ícones carregados: {loadedCount}/{ProgramsCollection.Count}";
-                                    }
-                                }
-                            }, System.Windows.Threading.DispatcherPriority.Background);
+                            lock (iconResults) { iconResults[program] = icon; }
                         }
                     }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    finally { semaphore.Release(); }
                 }, cancellationToken));
             }
 
             await Task.WhenAll(tasks);
+            if (cancellationToken.IsCancellationRequested) return;
 
-            // Atualiza a UI após todos os ícones serem carregados
+            // Single batch update on UI thread
             await dispatcher.InvokeAsync(() =>
             {
-                if (ProgramsIconProgressText != null)
+                foreach (var (prog, icon) in iconResults)
                 {
-                    ProgramsIconProgressText.Text = "Ícones carregados!";
+                    if (prog.Icon == null || prog.Icon == icon) continue;
+                    prog.Icon = icon;
                 }
-            });
+                if (ProgramsIconProgressText != null)
+                    ProgramsIconProgressText.Text = "Ícones carregados!";
+            }, System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private string? ExtractPathFromUninstallString(string uninstallString)
@@ -884,6 +869,263 @@ namespace KitLugia.GUI.Pages
                 _isAppOperation = false;
             }
         }
+
+        #region MAX CLEANUP (unified)
+
+        private async void LoadMaxCleanupList()
+        {
+            _maxCleanupItems = new List<MaxCleanupItem>();
+            MaxCleanupList.ItemsSource = null;
+            if (TxtMaxCleanupInfo != null) TxtMaxCleanupInfo.Text = "Carregando...";
+
+            try
+            {
+                // Load both UWP and Programs in parallel
+                var uwpTask = Task.Run(() => SystemTweaks.GetBloatwareAppsStatus());
+                var progTask = Task.Run(() => RegistryProgramFactory.GetInstalledPrograms());
+                await Task.WhenAll(uwpTask, progTask);
+
+                var uwpApps = uwpTask.Result;
+                var programs = progTask.Result;
+
+                var genericUwpIcon = await Task.Run(() => AppIconHelper.GetGenericStoreIcon());
+                var genericProgIcon = await Task.Run(() => ProgramIconHelper.GetGenericIcon());
+
+                foreach (var app in uwpApps)
+                {
+                    app.Icon = genericUwpIcon;
+                    string pkgBase = app.PackageName.Split('_')[0];
+                    _maxCleanupItems.Add(new MaxCleanupItem
+                    {
+                        DisplayName = app.DisplayName,
+                        AppType = "UWP",
+                        Icon = genericUwpIcon,
+                        PackageName = app.PackageName,
+                        DetailLine = app.Publisher,
+                        DetailItems = new List<string>
+                        {
+                            $"Pacote: {app.PackageName}",
+                            $"Editor: {app.Publisher}",
+                            $"Tamanho: {app.Size}",
+                            app.IsInstalled ? "Status: Instalado" : "Status: Não instalado"
+                        },
+                        BloatwareSource = app,
+                        IsSelected = app.IsInstalled
+                    });
+                }
+
+                foreach (var p in programs)
+                {
+                    var vm = new ProgramViewModel(p) { Icon = genericProgIcon };
+                    string detail = !string.IsNullOrEmpty(p.DisplayVersion) ? $"v{p.DisplayVersion}" : "";
+                    if (!string.IsNullOrEmpty(p.EstimatedSize)) detail += $" | {p.EstimatedSize}";
+                    _maxCleanupItems.Add(new MaxCleanupItem
+                    {
+                        DisplayName = p.DisplayName,
+                        AppType = "Program",
+                        Icon = genericProgIcon,
+                        UninstallString = p.UninstallString,
+                        InstallLocation = p.InstallLocation,
+                        Publisher = p.Publisher,
+                        DisplayIcon = p.DisplayIcon,
+                        DetailLine = p.Publisher,
+                        DetailItems = new List<string>
+                        {
+                            $"Versão: {p.DisplayVersion}",
+                            $"Editor: {p.Publisher}",
+                            $"Tamanho: {p.EstimatedSize}",
+                            $"Instalado em: {p.InstallDate}",
+                            $"Local: {p.InstallLocation}"
+                        },
+                        ProgramSource = vm,
+                        IsSelected = !p.IsProtected
+                    });
+                }
+
+                // Load real icons in background
+                _ = LoadMaxCleanupIconsAsync(genericUwpIcon, genericProgIcon);
+
+                MaxCleanupList.ItemsSource = _maxCleanupItems;
+                if (TxtMaxCleanupInfo != null)
+                    TxtMaxCleanupInfo.Text = $"{_maxCleanupItems.Count} aplicativos encontrados ({uwpApps.Count} UWP, {programs.Count} Programas)";
+                UpdateMaxCleanupCounts();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LoadMaxCleanupList", ex.Message);
+                if (TxtMaxCleanupInfo != null) TxtMaxCleanupInfo.Text = $"Erro: {ex.Message}";
+            }
+        }
+
+        private async Task LoadMaxCleanupIconsAsync(object defaultUwpIcon, object defaultProgIcon)
+        {
+            if (_maxCleanupItems == null) return;
+            var dispatcher = Dispatcher;
+
+            foreach (var item in _maxCleanupItems)
+            {
+                try
+                {
+                    object? icon = null;
+                    if (item.AppType == "UWP")
+                    {
+                        string pkgBase = item.PackageName.Split('_')[0];
+                        icon = await Task.Run(() => AppIconHelper.GetAppIcon(pkgBase, 32));
+                    }
+                    else
+                    {
+                        var p = item.ProgramSource;
+                        if (p != null)
+                        {
+                            icon = await Task.Run(() =>
+                            {
+                                var ico = ProgramIconHelper.GetIconFromFile(p.DisplayIcon?.Trim().Trim('"'));
+                                if (ico == null && !string.IsNullOrEmpty(p.InstallLocation))
+                                    ico = ProgramIconHelper.GetIconFromDirectory(p.InstallLocation);
+                                return ico ?? ProgramIconHelper.GetGenericIcon();
+                            });
+                        }
+                    }
+                    if (icon != null)
+                    {
+                        item.Icon = icon;
+                        await dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        private void MaxCardHeader_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is MaxCleanupItem item)
+            {
+                item.IsExpanded = !item.IsExpanded;
+            }
+        }
+
+        private void BtnMaxSelectAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (_maxCleanupItems == null) return;
+            bool anyUnselected = _maxCleanupItems.Any(i => !i.IsSelected);
+            foreach (var item in _maxCleanupItems)
+                item.IsSelected = anyUnselected;
+            UpdateMaxCleanupCounts();
+        }
+
+        private void UpdateMaxCleanupCounts()
+        {
+            if (_maxCleanupItems == null) return;
+            int selected = _maxCleanupItems.Count(i => i.IsSelected);
+            if (BtnMaxClean != null)
+            {
+                BtnMaxClean.Content = selected > 0
+                    ? $"\U0001F5D1 Limpar Selecionados ({selected})"
+                    : "\U0001F5D1 Limpar Selecionados (0)";
+                BtnMaxClean.IsEnabled = selected > 0;
+            }
+        }
+
+        private async void BtnMaxClean_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isAppOperation || _maxCleanupItems == null) return;
+            _isAppOperation = true;
+            _maxCleanupSuccess = 0;
+            _maxCleanupFail = 0;
+            try
+            {
+                var selected = _maxCleanupItems.Where(i => i.IsSelected).ToList();
+                if (selected.Count == 0) return;
+
+                string names = string.Join("\n", selected.Select(i => i.DisplayName));
+                if (!await ShowConfirmAsync(
+                    $"Limpeza Máxima: Remover {selected.Count} aplicativo(s)?\n\n{names}\n\n" +
+                    "UWP: deep uninstall + resíduos\nProgramas: desinstalação silenciosa + resíduos",
+                    "Limpeza Máxima"))
+                    return;
+
+                var settings = AppSettingsHelper.Load();
+                if (settings.CreateRestorePointBeforeUninstall)
+                    await Task.Run(() => DeepUninstaller.TryCreateRestorePoint("KitLugia: Maximum Cleanup"));
+
+                if (TxtMaxCleanupStatus != null)
+                    TxtMaxCleanupStatus.Text = $"Processando 0/{selected.Count}...";
+
+                for (int i = 0; i < selected.Count; i++)
+                {
+                    var item = selected[i];
+                    if (TxtMaxCleanupStatus != null)
+                        TxtMaxCleanupStatus.Text = $"[{i + 1}/{selected.Count}] {item.DisplayName}...";
+
+                    try
+                    {
+                        if (item.AppType == "UWP" && item.BloatwareSource != null)
+                        {
+                            var result = await SystemTweaks.DeepRemoveBloatwareAppAsync(item.PackageName, item.DisplayName);
+                            if (result.Success) _maxCleanupSuccess++;
+                            else _maxCleanupFail++;
+                        }
+                        else if (item.AppType == "Program" && item.ProgramSource != null)
+                        {
+                            var result = await Task.Run(() => DeepUninstaller.DeepUninstallProgram(
+                                item.DisplayName, item.UninstallString,
+                                item.InstallLocation, item.Publisher, item.DisplayIcon, false, new Progress<string>(_ => { })));
+
+                            await Task.Run(() => DeepUninstaller.PerformCleanup(
+                                result.LeftoverFiles, result.LeftoverRegistry, result));
+
+                            if (result.UninstallSuccess || result.FilesDeleted > 0 || result.RegistryDeleted > 0)
+                                _maxCleanupSuccess++;
+                            else
+                                _maxCleanupFail++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"MaxCleanup {item.DisplayName}", ex.Message);
+                        _maxCleanupFail++;
+                    }
+
+                    item.IsSelected = false;
+                }
+
+                if (TxtMaxCleanupStatus != null)
+                    TxtMaxCleanupStatus.Text = $"Concluído: {_maxCleanupSuccess} sucesso, {_maxCleanupFail} falha";
+
+                MessageBox.Show(
+                    $"Limpeza Máxima concluída:\n\n✅ {_maxCleanupSuccess} processados\n⚠️ {_maxCleanupFail} falharam",
+                    "Resultado", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // Refresh list
+                await Task.Delay(500);
+                LoadMaxCleanupList();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnMaxClean_Click", ex.Message);
+            }
+            finally
+            {
+                _isAppOperation = false;
+                UpdateMaxCleanupCounts();
+            }
+        }
+
+        private void BtnMaxSingleRemove_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is MaxCleanupItem item)
+            {
+                item.IsSelected = true;
+                BtnMaxClean_Click(sender, e);
+            }
+        }
+
+        private void BtnMaxRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            LoadMaxCleanupList();
+        }
+
+        #endregion
 
         // ── Inline Review Panel (flat list — no ObservableCollection) ─
 
@@ -1341,6 +1583,47 @@ namespace KitLugia.GUI.Pages
             get => _isSelected;
             set { _isSelected = value; OnPropertyChanged(); }
         }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string? n = null) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
+    }
+
+    public class MaxCleanupItem : INotifyPropertyChanged
+    {
+        private bool _isSelected;
+        private bool _isExpanded;
+
+        public string DisplayName { get; set; } = "";
+        public string AppType { get; set; } = ""; // "UWP" or "Program"
+        public object? Icon { get; set; }
+        public string DetailLine { get; set; } = "";
+        public string PackageName { get; set; } = ""; // For UWP
+        public string UninstallString { get; set; } = ""; // For Programs
+        public string InstallLocation { get; set; } = "";
+        public string Publisher { get; set; } = "";
+        public string DisplayIcon { get; set; } = "";
+
+        // For UWP
+        public BloatwareApp? BloatwareSource { get; set; }
+        // For Programs
+        public ProgramViewModel? ProgramSource { get; set; }
+
+        public List<string> DetailItems { get; set; } = new();
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { _isSelected = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandIcon)); }
+        }
+
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { _isExpanded = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandIcon)); }
+        }
+
+        public string ExpandIcon => IsExpanded ? "\u25BC" : "\u25B6";
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? n = null) =>
