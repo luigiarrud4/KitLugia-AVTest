@@ -159,16 +159,16 @@
                                                         <!-- Icon -->
                                                         <Grid Grid.Column="2" Width="32" Height="32" VerticalAlignment="Center">
                                                             <Image Source="{Binding Icon}" Width="32" Height="32" Stretch="Uniform"/>
-                                                            <Border Width="20" Height="20" Background="#2A2A2A" CornerRadius="3" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border">
+                                                            <Ellipse Width="20" Height="20" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                <Ellipse.Style>
+                                                                    <Style TargetType="Ellipse">
                                                                         <Setter Property="Visibility" Value="Collapsed"/>
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </Border.Style>
-                                                            </Border>
+                                                                </Ellipse.Style>
+                                                            </Ellipse>
                                                         </Grid>
 
                                                         <!-- App name and details -->
@@ -330,16 +330,17 @@
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" Margin="8,0" VerticalAlignment="Center">
                                                 <Image Source="{Binding Icon}" Width="32" Height="32" Stretch="Uniform"/>
-                                                <Border Width="24" Height="24" Background="#2A2A2A" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
+                                                <Ellipse Width="24" Height="24" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Setter Property="Opacity" Value="1"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </Border.Style>
-                                                </Border>
+                                                    </Ellipse.Style>
+                                                </Ellipse>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" Foreground="White" TextTrimming="CharacterEllipsis"/>
@@ -478,16 +479,16 @@
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" VerticalAlignment="Center">
                                                 <Image Width="32" Height="32" Source="{Binding Icon}" Stretch="Uniform"/>
-                                                <Border Width="24" Height="24" Background="#2A2A2A" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
+                                                <Ellipse Width="24" Height="24" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </Border.Style>
-                                                </Border>
+                                                    </Ellipse.Style>
+                                                </Ellipse>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
