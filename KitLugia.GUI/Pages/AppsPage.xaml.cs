@@ -41,11 +41,6 @@ namespace KitLugia.GUI.Pages
 
         private bool _isAppOperation;
 
-        // Max Cleanup
-        private List<MaxCleanupItem>? _maxCleanupItems;
-        private int _maxCleanupSuccess;
-        private int _maxCleanupFail;
-
         // Junk (leftovers persistence)
         private List<LeftoverJunkItem>? _junkItems;
 
@@ -886,258 +881,197 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        #region MAX CLEANUP (unified)
+        #endregion
 
-        private async void LoadMaxCleanupList()
+        #region JUNK (leftover persistence with detailed selection)
+
+        private void RefreshJunkList()
         {
-            _maxCleanupItems = new List<MaxCleanupItem>();
-            _junkItems = new List<LeftoverJunkItem>();
-            MaxCleanupList.ItemsSource = null;
-            if (JunkItemsList != null) JunkItemsList.ItemsSource = null;
-            if (TxtMaxCleanupInfo != null) TxtMaxCleanupInfo.Text = "Carregando...";
+            if (_junkItems == null) return;
 
+            JunkItemsList.ItemsSource = null;
+            JunkItemsList.ItemsSource = _junkItems;
+
+            bool hasItems = _junkItems.Count > 0;
+            if (JunkSection != null) JunkSection.Visibility = hasItems ? Visibility.Visible : Visibility.Collapsed;
+            if (JunkEmptySection != null) JunkEmptySection.Visibility = hasItems ? Visibility.Collapsed : Visibility.Visible;
+            if (TxtMaxCleanupInfo != null)
+                TxtMaxCleanupInfo.Text = hasItems
+                    ? $"{_junkItems.Count} app(s) com resíduos pendentes"
+                    : "Nenhum resíduo pendente";
+            UpdateJunkCleanCount();
+        }
+
+        private void UpdateJunkCleanCount()
+        {
+            if (_junkItems == null || BtnMaxClean == null) return;
+            int totalSelected = _junkItems.Sum(j => j.SelectedCount);
+            BtnMaxClean.Content = totalSelected > 0
+                ? $"\U0001F5D1 Limpar Selecionados ({totalSelected})"
+                : "\U0001F5D1 Limpar Selecionados (0)";
+            BtnMaxClean.IsEnabled = totalSelected > 0;
+        }
+
+        private void LoadJunkItems()
+        {
+            _junkItems = new List<LeftoverJunkItem>();
+            if (TxtMaxCleanupInfo != null) TxtMaxCleanupInfo.Text = "Carregando...";
             try
             {
-                // Load both UWP and Programs in parallel
-                var uwpTask = Task.Run(() => SystemTweaks.GetBloatwareAppsStatus());
-                var progTask = Task.Run(() => RegistryProgramFactory.GetInstalledPrograms());
-                await Task.WhenAll(uwpTask, progTask);
-
-                var uwpApps = uwpTask.Result;
-                var programs = progTask.Result;
-
-                var genericUwpIcon = await Task.Run(() => AppIconHelper.GetGenericStoreIcon());
-                var genericProgIcon = await Task.Run(() => ProgramIconHelper.GetGenericIcon());
-
-                foreach (var app in uwpApps)
+                var entries = LeftoverJunkManager.Load();
+                foreach (var e in entries)
                 {
-                    app.Icon = genericUwpIcon;
-                    string pkgBase = app.PackageName.Split('_')[0];
-                    _maxCleanupItems.Add(new MaxCleanupItem
+                    var item = new LeftoverJunkItem
                     {
-                        DisplayName = app.DisplayName,
-                        AppType = "UWP",
-                        Icon = genericUwpIcon,
-                        PackageName = app.PackageName,
-                        DetailLine = app.Publisher,
-                        DetailItems = new List<string>
+                        AppName = e.AppName,
+                        Date = e.Date,
+                        Files = e.LeftoverFiles.Select(f => new JunkDetailItem
                         {
-                            $"Pacote: {app.PackageName}",
-                            $"Editor: {app.Publisher}",
-                            $"Tamanho: {app.Size}",
-                            app.IsInstalled ? "Status: Instalado" : "Status: Não instalado"
-                        },
-                        BloatwareSource = app,
-                        IsSelected = app.IsInstalled
-                    });
-                }
-
-                foreach (var p in programs)
-                {
-                    var vm = new ProgramViewModel(p) { Icon = genericProgIcon };
-                    string detail = !string.IsNullOrEmpty(p.DisplayVersion) ? $"v{p.DisplayVersion}" : "";
-                    if (!string.IsNullOrEmpty(p.EstimatedSize)) detail += $" | {p.EstimatedSize}";
-                    _maxCleanupItems.Add(new MaxCleanupItem
-                    {
-                        DisplayName = p.DisplayName,
-                        AppType = "Program",
-                        Icon = genericProgIcon,
-                        UninstallString = p.UninstallString,
-                        InstallLocation = p.InstallLocation,
-                        Publisher = p.Publisher,
-                        DisplayIcon = p.DisplayIcon,
-                        DetailLine = p.Publisher,
-                        DetailItems = new List<string>
+                            Path = f,
+                            IsFile = true,
+                            CanDelete = true,
+                            Safety = CleanupSafety.Moderate,
+                            IsSelected = true
+                        }).ToList(),
+                        Registry = e.LeftoverRegistry.Select(r => new JunkDetailItem
                         {
-                            $"Versão: {p.DisplayVersion}",
-                            $"Editor: {p.Publisher}",
-                            $"Tamanho: {p.EstimatedSize}",
-                            $"Instalado em: {p.InstallDate}",
-                            $"Local: {p.InstallLocation}"
-                        },
-                        ProgramSource = vm,
-                        IsSelected = !p.IsProtected
-                    });
+                            Path = r,
+                            IsFile = false,
+                            CanDelete = true,
+                            Safety = CleanupSafety.Moderate,
+                            IsSelected = true
+                        }).ToList()
+                    };
+                    // Reclassify for safety
+                    ReclassifyJunkItem(item);
+                    _junkItems.Add(item);
                 }
-
-                // Load real icons in background
-                _ = LoadMaxCleanupIconsAsync(genericUwpIcon, genericProgIcon);
-
-                MaxCleanupList.ItemsSource = _maxCleanupItems;
-
-                // Load junk entries
-                var junkEntries = await Task.Run(() => LeftoverJunkManager.Load());
-                _junkItems = junkEntries.Select(e => new LeftoverJunkItem
-                {
-                    AppName = e.AppName,
-                    Date = e.Date,
-                    LeftoverFiles = e.LeftoverFiles,
-                    LeftoverRegistry = e.LeftoverRegistry
-                }).ToList();
-                if (JunkItemsList != null)
-                {
-                    JunkItemsList.ItemsSource = _junkItems;
-                    JunkSection.Visibility = _junkItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-                }
-                if (JunkInfoText != null)
-                    JunkInfoText.Text = _junkItems.Count > 0
-                        ? $"{_junkItems.Count} app(s) com resíduos pendentes"
-                        : "";
-
-                int totalInstalled = uwpApps.Count + programs.Count;
-                if (TxtMaxCleanupInfo != null)
-                    TxtMaxCleanupInfo.Text = $"{totalInstalled} aplicativos instalados ({uwpApps.Count} UWP, {programs.Count} Programas)" +
-                        (_junkItems.Count > 0 ? $" | {_junkItems.Count} com resíduos" : "");
-                UpdateMaxCleanupCounts();
+                RefreshJunkList();
             }
             catch (Exception ex)
             {
-                Logger.LogError("LoadMaxCleanupList", ex.Message);
+                Logger.LogError("LoadJunkItems", ex.Message);
                 if (TxtMaxCleanupInfo != null) TxtMaxCleanupInfo.Text = $"Erro: {ex.Message}";
             }
         }
 
-        private async Task LoadMaxCleanupIconsAsync(object defaultUwpIcon, object defaultProgIcon)
+        private static void ReclassifyJunkItem(LeftoverJunkItem item)
         {
-            if (_maxCleanupItems == null) return;
-            var dispatcher = Dispatcher;
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string temp = Environment.GetFolderPath(Environment.SpecialFolder.InternetCache);
+            string tempPath = Environment.GetEnvironmentVariable("TEMP") ?? "";
+            string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
 
-            foreach (var item in _maxCleanupItems)
+            foreach (var f in item.Files)
             {
-                try
-                {
-                    object? icon = null;
-                    if (item.AppType == "UWP")
-                    {
-                        string pkgBase = item.PackageName.Split('_')[0];
-                        icon = await Task.Run(() => AppIconHelper.GetAppIcon(pkgBase, 32));
-                    }
-                    else
-                    {
-                        var p = item.ProgramSource;
-                        if (p != null)
-                        {
-                            icon = await Task.Run(() =>
-                            {
-                                var ico = ProgramIconHelper.GetIconFromFile(p.DisplayIcon?.Trim().Trim('"'));
-                                if (ico == null && !string.IsNullOrEmpty(p.InstallLocation))
-                                    ico = ProgramIconHelper.GetIconFromDirectory(p.InstallLocation);
-                                return ico ?? ProgramIconHelper.GetGenericIcon();
-                            });
-                        }
-                    }
-                    if (icon != null)
-                    {
-                        item.Icon = icon;
-                        await dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
-                    }
-                }
-                catch { }
+                string lower = f.Path.ToLowerInvariant();
+                if (lower.Contains("\\temp\\") || lower.Contains(tempPath.ToLowerInvariant()))
+                { f.Safety = CleanupSafety.Safe; f.CanDelete = true; f.IsSelected = true; }
+                else if (lower.StartsWith(localAppData.ToLowerInvariant()))
+                { f.Safety = CleanupSafety.Moderate; f.CanDelete = true; f.IsSelected = true; }
+                else if (lower.StartsWith(appData.ToLowerInvariant()))
+                { f.Safety = CleanupSafety.Moderate; f.CanDelete = true; f.IsSelected = true; }
+                else if (lower.StartsWith(programData.ToLowerInvariant()))
+                { f.Safety = CleanupSafety.Uncertain; f.CanDelete = false; f.IsSelected = false; }
+                else
+                { f.Safety = CleanupSafety.Moderate; f.CanDelete = true; f.IsSelected = true; }
+            }
+
+            foreach (var r in item.Registry)
+            {
+                string lower = r.Path.ToLowerInvariant();
+                if (lower.StartsWith("hkey_local_machine") || lower.StartsWith("hklm"))
+                { r.Safety = CleanupSafety.Uncertain; r.CanDelete = false; r.IsSelected = false; }
+                else
+                { r.Safety = CleanupSafety.Moderate; r.CanDelete = true; r.IsSelected = true; }
             }
         }
 
-        private void MaxCardHeader_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void JunkCardHeader_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (sender is FrameworkElement fe && fe.DataContext is MaxCleanupItem item)
-            {
+            if (sender is FrameworkElement fe && fe.DataContext is LeftoverJunkItem item)
                 item.IsExpanded = !item.IsExpanded;
-            }
         }
 
         private void BtnMaxSelectAll_Click(object sender, RoutedEventArgs e)
         {
-            if (_maxCleanupItems == null) return;
-            bool anyUnselected = _maxCleanupItems.Any(i => !i.IsSelected);
-            foreach (var item in _maxCleanupItems)
-                item.IsSelected = anyUnselected;
-            UpdateMaxCleanupCounts();
-        }
-
-        private void UpdateMaxCleanupCounts()
-        {
-            if (_maxCleanupItems == null) return;
-            int selected = _maxCleanupItems.Count(i => i.IsSelected);
-            if (BtnMaxClean != null)
+            if (_junkItems == null) return;
+            bool anyUnselected = _junkItems.Any(j => j.SelectedCount < j.TotalSelectableCount);
+            foreach (var item in _junkItems)
             {
-                BtnMaxClean.Content = selected > 0
-                    ? $"\U0001F5D1 Limpar Selecionados ({selected})"
-                    : "\U0001F5D1 Limpar Selecionados (0)";
-                BtnMaxClean.IsEnabled = selected > 0;
+                foreach (var f in item.Files) { if (f.CanDelete) f.IsSelected = anyUnselected; }
+                foreach (var r in item.Registry) { if (r.CanDelete) r.IsSelected = anyUnselected; }
             }
+            RefreshJunkList();
         }
 
         private async void BtnMaxClean_Click(object sender, RoutedEventArgs e)
         {
-            if (_isAppOperation || _maxCleanupItems == null) return;
+            if (_isAppOperation || _junkItems == null) return;
             _isAppOperation = true;
-            _maxCleanupSuccess = 0;
-            _maxCleanupFail = 0;
             try
             {
-                var selected = _maxCleanupItems.Where(i => i.IsSelected).ToList();
-                if (selected.Count == 0) return;
+                var toDeleteFiles = _junkItems
+                    .SelectMany(j => j.Files.Where(f => f.IsSelected && f.CanDelete))
+                    .Select(f => f.Path)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var toDeleteReg = _junkItems
+                    .SelectMany(j => j.Registry.Where(r => r.IsSelected && r.CanDelete))
+                    .Select(r => r.Path)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
 
-                string names = string.Join("\n", selected.Select(i => i.DisplayName));
+                int total = toDeleteFiles.Count + toDeleteReg.Count;
+                if (total == 0) return;
+
                 if (!await ShowConfirmAsync(
-                    $"Limpeza Máxima: Remover {selected.Count} aplicativo(s)?\n\n{names}\n\n" +
-                    "UWP: deep uninstall + resíduos\nProgramas: desinstalação silenciosa + resíduos",
-                    "Limpeza Máxima"))
+                    $"Limpar {total} item(ns) de resíduos?\n\n" +
+                    $"{toDeleteFiles.Count} arquivo(s)\n{toDeleteReg.Count} registro(s)",
+                    "Limpar Resíduos"))
                     return;
 
-                if (CbCreateRestorePoint.IsChecked == true)
-                    await Task.Run(() => DeepUninstaller.TryCreateRestorePoint("KitLugia: Maximum Cleanup"));
+                if (TxtMaxCleanupStatus != null) TxtMaxCleanupStatus.Text = "Limpando...";
 
-                if (TxtMaxCleanupStatus != null)
-                    TxtMaxCleanupStatus.Text = $"Processando 0/{selected.Count}...";
+                var result = new DeepUninstaller.UninstallResult();
+                await Task.Run(() => DeepUninstaller.PerformCleanup(toDeleteFiles, toDeleteReg, result));
 
-                for (int i = 0; i < selected.Count; i++)
+                // Remove deleted paths from junk entries and persist
+                var fileSet = new HashSet<string>(toDeleteFiles, StringComparer.OrdinalIgnoreCase);
+                var regSet = new HashSet<string>(toDeleteReg, StringComparer.OrdinalIgnoreCase);
+
+                for (int i = _junkItems.Count - 1; i >= 0; i--)
                 {
-                    var item = selected[i];
-                    if (TxtMaxCleanupStatus != null)
-                        TxtMaxCleanupStatus.Text = $"[{i + 1}/{selected.Count}] {item.DisplayName}...";
+                    var item = _junkItems[i];
+                    item.Files.RemoveAll(f => fileSet.Contains(f.Path) && f.CanDelete);
+                    item.Registry.RemoveAll(r => regSet.Contains(r.Path) && r.CanDelete);
 
-                    try
-                    {
-                        if (item.AppType == "UWP" && item.BloatwareSource != null)
-                        {
-                            var result = await SystemTweaks.DeepRemoveBloatwareAppAsync(item.PackageName, item.DisplayName);
-                            if (result.Success) _maxCleanupSuccess++;
-                            else _maxCleanupFail++;
-                        }
-                        else if (item.AppType == "Program" && item.ProgramSource != null)
-                        {
-                            var result = await Task.Run(() => DeepUninstaller.DeepUninstallProgram(
-                                item.DisplayName, item.UninstallString,
-                                item.InstallLocation, item.Publisher, item.DisplayIcon, false, new Progress<string>(_ => { })));
-
-                            await Task.Run(() => DeepUninstaller.PerformCleanup(
-                                result.LeftoverFiles, result.LeftoverRegistry, result));
-
-                            if (result.UninstallSuccess || result.FilesDeleted > 0 || result.RegistryDeleted > 0)
-                                _maxCleanupSuccess++;
-                            else
-                                _maxCleanupFail++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError($"MaxCleanup {item.DisplayName}", ex.Message);
-                        _maxCleanupFail++;
-                    }
-
-                    item.IsSelected = false;
+                    if (item.Files.Count == 0 && item.Registry.Count == 0)
+                        _junkItems.RemoveAt(i);
                 }
 
+                // Persist updated junk list (only items with remaining leftovers)
+                var toSave = _junkItems.Select(j => new LeftoverJunkEntry
+                {
+                    AppName = j.AppName,
+                    Date = j.Date,
+                    LeftoverFiles = j.Files.Select(f => f.Path).ToList(),
+                    LeftoverRegistry = j.Registry.Select(r => r.Path).ToList()
+                }).ToList();
+                LeftoverJunkManager.Save(toSave);
+
+                RefreshJunkList();
+
                 if (TxtMaxCleanupStatus != null)
-                    TxtMaxCleanupStatus.Text = $"Concluído: {_maxCleanupSuccess} sucesso, {_maxCleanupFail} falha";
+                    TxtMaxCleanupStatus.Text = $"{result.FilesDeleted + result.RegistryDeleted} item(ns) limpos";
 
-                MessageBox.Show(
-                    $"Limpeza Máxima concluída:\n\n✅ {_maxCleanupSuccess} processados\n⚠️ {_maxCleanupFail} falharam",
-                    "Resultado", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                // Refresh list
-                await Task.Delay(500);
-                LoadMaxCleanupList();
+                if (result.Errors.Count > 0)
+                    MessageBox.Show($"Erros ao limpar:\n{string.Join("\n", result.Errors.Take(5))}",
+                        "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                else
+                    MessageBox.Show($"{total} item(ns) limpos com sucesso.",
+                        "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -1146,25 +1080,13 @@ namespace KitLugia.GUI.Pages
             finally
             {
                 _isAppOperation = false;
-                UpdateMaxCleanupCounts();
-            }
-        }
-
-        private void BtnMaxSingleRemove_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is MaxCleanupItem item)
-            {
-                item.IsSelected = true;
-                BtnMaxClean_Click(sender, e);
             }
         }
 
         private void BtnMaxRefresh_Click(object sender, RoutedEventArgs e)
         {
-            LoadMaxCleanupList();
+            LoadJunkItems();
         }
-
-        #region JUNK (leftover persistence)
 
         private async void BtnJunkClean_Click(object sender, RoutedEventArgs e)
         {
@@ -1178,40 +1100,45 @@ namespace KitLugia.GUI.Pages
                     btn.IsEnabled = false;
                     btn.Content = "⏳";
 
+                    var selectedFiles = item.Files.Where(f => f.IsSelected && f.CanDelete).Select(f => f.Path).ToList();
+                    var selectedReg = item.Registry.Where(r => r.IsSelected && r.CanDelete).Select(r => r.Path).ToList();
+
+                    if (selectedFiles.Count == 0 && selectedReg.Count == 0) return;
+
                     var result = new DeepUninstaller.UninstallResult();
-                    await Task.Run(() => DeepUninstaller.PerformCleanup(
-                        item.LeftoverFiles, item.LeftoverRegistry, result));
+                    await Task.Run(() => DeepUninstaller.PerformCleanup(selectedFiles, selectedReg, result));
 
-                    _junkItems.RemoveAt(index);
-                    LeftoverJunkManager.RemoveAt(index);
+                    item.Files.RemoveAll(f => selectedFiles.Contains(f.Path));
+                    item.Registry.RemoveAll(r => selectedReg.Contains(r.Path));
 
-                    JunkItemsList.ItemsSource = null;
-                    JunkItemsList.ItemsSource = _junkItems;
-                    JunkSection.Visibility = _junkItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-                    if (JunkInfoText != null)
-                        JunkInfoText.Text = _junkItems.Count > 0
-                            ? $"{_junkItems.Count} app(s) com resíduos pendentes"
-                            : "";
+                    if (item.Files.Count == 0 && item.Registry.Count == 0)
+                        _junkItems.RemoveAt(index);
 
-                    int fCount = item.LeftoverFiles.Count;
-                    int rCount = item.LeftoverRegistry.Count;
-                    MessageBox.Show($"{item.AppName}: {fCount} arquivo(s) e {rCount} registro(s) limpos.",
+                    // Persist
+                    var toSave = _junkItems.Select(j => new LeftoverJunkEntry
+                    {
+                        AppName = j.AppName,
+                        Date = j.Date,
+                        LeftoverFiles = j.Files.Select(f => f.Path).ToList(),
+                        LeftoverRegistry = j.Registry.Select(r => r.Path).ToList()
+                    }).ToList();
+                    LeftoverJunkManager.Save(toSave);
+
+                    RefreshJunkList();
+
+                    int total = selectedFiles.Count + selectedReg.Count;
+                    MessageBox.Show($"{item.AppName}: {total} item(ns) limpos.",
                         "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
                     Logger.LogError("BtnJunkClean_Click", ex.Message);
+                }
+                finally
+                {
                     btn.IsEnabled = true;
                     btn.Content = "\U0001F5D1 Limpar";
                 }
-            }
-        }
-
-        private void JunkCardHeader_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (sender is FrameworkElement fe && fe.DataContext is LeftoverJunkItem item)
-            {
-                item.IsExpanded = !item.IsExpanded;
             }
         }
 
@@ -1224,18 +1151,31 @@ namespace KitLugia.GUI.Pages
 
                 _junkItems.RemoveAt(index);
                 LeftoverJunkManager.RemoveAt(index);
-
-                JunkItemsList.ItemsSource = null;
-                JunkItemsList.ItemsSource = _junkItems;
-                JunkSection.Visibility = _junkItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-                if (JunkInfoText != null)
-                    JunkInfoText.Text = _junkItems.Count > 0
-                        ? $"{_junkItems.Count} app(s) com resíduos pendentes"
-                        : "";
+                RefreshJunkList();
             }
         }
 
-        #endregion
+        private void BtnJunkSelectAllFiles_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is LeftoverJunkItem item)
+            {
+                bool anyUnselected = item.Files.Any(f => f.CanDelete && !f.IsSelected);
+                foreach (var f in item.Files)
+                    if (f.CanDelete) f.IsSelected = anyUnselected;
+                RefreshJunkList();
+            }
+        }
+
+        private void BtnJunkSelectAllReg_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is LeftoverJunkItem item)
+            {
+                bool anyUnselected = item.Registry.Any(r => r.CanDelete && !r.IsSelected);
+                foreach (var r in item.Registry)
+                    if (r.CanDelete) r.IsSelected = anyUnselected;
+                RefreshJunkList();
+            }
+        }
 
         #endregion
 
@@ -1656,8 +1596,6 @@ namespace KitLugia.GUI.Pages
                 _reviewBloatwareContext = null;
             }
         }
-
-        #endregion
     }
 
     /// <summary>
@@ -1724,41 +1662,33 @@ namespace KitLugia.GUI.Pages
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
     }
 
-    public class MaxCleanupItem : INotifyPropertyChanged
+    public class JunkDetailItem : INotifyPropertyChanged
     {
-        private bool _isSelected;
-        private bool _isExpanded;
+        private bool _isSelected = true;
 
-        public string DisplayName { get; set; } = "";
-        public string AppType { get; set; } = ""; // "UWP" or "Program"
-        public object? Icon { get; set; }
-        public string DetailLine { get; set; } = "";
-        public string PackageName { get; set; } = ""; // For UWP
-        public string UninstallString { get; set; } = ""; // For Programs
-        public string InstallLocation { get; set; } = "";
-        public string Publisher { get; set; } = "";
-        public string DisplayIcon { get; set; } = "";
+        public string Path { get; set; } = "";
+        public bool IsFile { get; set; }
+        public bool CanDelete { get; set; } = true;
+        public CleanupSafety Safety { get; set; } = CleanupSafety.Moderate;
 
-        // For UWP
-        public BloatwareApp? BloatwareSource { get; set; }
-        // For Programs
-        public ProgramViewModel? ProgramSource { get; set; }
-
-        public List<string> DetailItems { get; set; } = new();
+        public string SafetyIcon => Safety switch
+        {
+            CleanupSafety.Safe => "\U0001F7E2",
+            CleanupSafety.Moderate => "\U0001F7E1",
+            _ => "\U0001F534"
+        };
+        public string SafetyTooltip => Safety switch
+        {
+            CleanupSafety.Safe => "Seguro — pode deletar",
+            CleanupSafety.Moderate => "Provável — pode deletar",
+            _ => "Informativo — não recomendado deletar"
+        };
 
         public bool IsSelected
         {
             get => _isSelected;
-            set { _isSelected = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandIcon)); }
+            set { _isSelected = value; OnPropertyChanged(); }
         }
-
-        public bool IsExpanded
-        {
-            get => _isExpanded;
-            set { _isExpanded = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandIcon)); }
-        }
-
-        public string ExpandIcon => IsExpanded ? "\u25BC" : "\u25B6";
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? n = null) =>
@@ -1767,18 +1697,36 @@ namespace KitLugia.GUI.Pages
 
     public class LeftoverJunkItem : INotifyPropertyChanged
     {
+        private bool _isExpanded;
+
         public string AppName { get; set; } = "";
         public DateTime Date { get; set; }
         public string DateString => Date.ToString("g");
-        public List<string> LeftoverFiles { get; set; } = new();
-        public List<string> LeftoverRegistry { get; set; } = new();
-        public string ItemsCount => $"{LeftoverFiles.Count} arquivo(s), {LeftoverRegistry.Count} registro(s)";
+        public string ExpandIcon => IsExpanded ? "\u25BC" : "\u25B6";
 
-        private bool _isExpanded;
+        public List<JunkDetailItem> Files { get; set; } = new();
+        public List<JunkDetailItem> Registry { get; set; } = new();
+
+        public string SelectionSummary
+        {
+            get
+            {
+                int fSel = Files.Count(f => f.IsSelected && f.CanDelete);
+                int rSel = Registry.Count(r => r.IsSelected && r.CanDelete);
+                int fTotal = Files.Count(f => f.CanDelete);
+                int rTotal = Registry.Count(r => r.CanDelete);
+                return $"{fSel + rSel}/{fTotal + rTotal} sel";
+            }
+        }
+
+        public int SelectedCount => Files.Count(f => f.IsSelected && f.CanDelete) + Registry.Count(r => r.IsSelected && r.CanDelete);
+        public int TotalSelectableCount => Files.Count(f => f.CanDelete) + Registry.Count(r => r.CanDelete);
+        public string ItemsCount => $"{Files.Count} arquivo(s), {Registry.Count} registro(s)";
+
         public bool IsExpanded
         {
             get => _isExpanded;
-            set { _isExpanded = value; OnPropertyChanged(); }
+            set { _isExpanded = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandIcon)); }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
