@@ -707,6 +707,204 @@ namespace KitLugia.Core
 
         #endregion
 
+        #region Advanced Startup Locations (Winlogon, AppInit, BHO, BootExecute)
+
+        public static List<StartupAppDetails> GetWinlogonItems()
+        {
+            var items = new List<StartupAppDetails>();
+            string[] keys = {
+                @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Winlogon"
+            };
+
+            foreach (var regPath in keys)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(regPath);
+                    if (key == null) continue;
+
+                    string shell = key.GetValue("Shell") as string ?? "";
+                    string userinit = key.GetValue("Userinit") as string ?? "";
+                    string vmApplet = key.GetValue("AppSetup") as string ?? "";
+
+                    if (!string.IsNullOrEmpty(shell) && !shell.Equals("explorer.exe", StringComparison.OrdinalIgnoreCase))
+                        items.Add(new StartupAppDetails($"Winlogon Shell ({regPath})", shell, $"{regPath}\\Shell", StartupStatus.Enabled));
+
+                    if (!string.IsNullOrEmpty(userinit))
+                    {
+                        var parts = userinit.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var part in parts)
+                        {
+                            if (!part.Contains("userinit.exe", StringComparison.OrdinalIgnoreCase))
+                                items.Add(new StartupAppDetails($"Userinit ({Path.GetFileName(part)})", part, $"{regPath}\\Userinit", StartupStatus.Enabled));
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(vmApplet))
+                        items.Add(new StartupAppDetails($"AppSetup ({regPath})", vmApplet, $"{regPath}\\AppSetup", StartupStatus.Enabled));
+                }
+                catch { }
+            }
+
+            return items;
+        }
+
+        public static List<StartupAppDetails> GetAppInitDlls()
+        {
+            var items = new List<StartupAppDetails>();
+            string[] keys = {
+                @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Windows"
+            };
+
+            foreach (var regPath in keys)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(regPath);
+                    if (key == null) continue;
+
+                    string dlls = key.GetValue("AppInit_DLLs") as string ?? "";
+                    object loadFlag = key.GetValue("LoadAppInit_DLLs");
+
+                    bool isEnabled = loadFlag != null && loadFlag.ToString() == "1";
+
+                    if (!string.IsNullOrEmpty(dlls))
+                    {
+                        var parts = dlls.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var dll in parts)
+                        {
+                            string name = $"AppInit_DLL: {Path.GetFileName(dll)}";
+                            string status = isEnabled ? "Ativo" : "Inativo (LoadAppInit=0)";
+                            items.Add(new StartupAppDetails(name, dll, $"{regPath}\\AppInit_DLLs",
+                                isEnabled ? StartupStatus.Enabled : StartupStatus.Disabled));
+                        }
+                    }
+
+                    if (isEnabled && string.IsNullOrEmpty(dlls))
+                    {
+                        items.Add(new StartupAppDetails("AppInit_DLLs (habilitado, vazio)", "",
+                            $"{regPath}\\AppInit_DLLs", StartupStatus.Enabled));
+                    }
+                }
+                catch { }
+            }
+
+            return items;
+        }
+
+        public static List<StartupAppDetails> GetBHOItems()
+        {
+            var items = new List<StartupAppDetails>();
+            string[] bhoPaths = {
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects",
+                @"SOFTWARE\Microsoft\Internet Explorer\Extensions"
+            };
+
+            foreach (var bhoPath in bhoPaths)
+            {
+                try
+                {
+                    using var baseKey = Registry.LocalMachine.OpenSubKey(bhoPath);
+                    if (baseKey == null) continue;
+
+                    foreach (var sub in baseKey.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = baseKey.OpenSubKey(sub);
+                            if (subKey == null) continue;
+
+                            string name = subKey.GetValue("Name") as string
+                                          ?? subKey.GetValue("ButtonText") as string
+                                          ?? $"BHO {{{sub}}}";
+                            string clsid = subKey.GetValue("CLSID") as string
+                                           ?? subKey.GetValue("CLSID") as string ?? sub;
+
+                            // Try to get the InProcServer32 from the CLSID
+                            try
+                            {
+                                using var clsidKey = Registry.ClassesRoot.OpenSubKey($"CLSID\\{clsid}\\InProcServer32");
+                                if (clsidKey != null)
+                                {
+                                    string dllPath = clsidKey.GetValue(null) as string ?? "";
+                                    items.Add(new StartupAppDetails($"BHO: {name}", dllPath, bhoPath, StartupStatus.Enabled));
+                                    continue;
+                                }
+                            }
+                            catch { }
+
+                            items.Add(new StartupAppDetails($"BHO: {name}", clsid, bhoPath, StartupStatus.Enabled));
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            return items;
+        }
+
+        public static List<StartupAppDetails> GetBootExecuteItems()
+        {
+            var items = new List<StartupAppDetails>();
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\Session Manager");
+                if (key == null) return items;
+
+                object bootExec = key.GetValue("BootExecute");
+                object setupExec = key.GetValue("SetupExecute");
+                object exec = key.GetValue("Execute");
+                object pnpExec = key.GetValue("PnPMajorDeviceInit");
+
+                if (bootExec is string[] bootArr)
+                {
+                    foreach (var cmd in bootArr)
+                    {
+                        string trimmed = cmd.Trim().Trim('*');
+                        if (!string.IsNullOrEmpty(trimmed))
+                            items.Add(new StartupAppDetails("BootExecute", trimmed,
+                                @"HKLM\SYSTEM\...\Session Manager\BootExecute", StartupStatus.Enabled));
+                    }
+                }
+                else if (bootExec is string bootStr && !string.IsNullOrEmpty(bootStr))
+                {
+                    items.Add(new StartupAppDetails("BootExecute", bootStr,
+                        @"HKLM\SYSTEM\...\Session Manager\BootExecute", StartupStatus.Enabled));
+                }
+
+                if (setupExec is string[] setupArr)
+                {
+                    foreach (var cmd in setupArr)
+                    {
+                        string trimmed = cmd.Trim().Trim('*');
+                        if (!string.IsNullOrEmpty(trimmed))
+                            items.Add(new StartupAppDetails("SetupExecute", trimmed,
+                                @"HKLM\SYSTEM\...\Session Manager\SetupExecute", StartupStatus.Enabled));
+                    }
+                }
+            }
+            catch { }
+
+            return items;
+        }
+
+        public static List<StartupAppDetails> GetAllAdvancedItems()
+        {
+            var all = new List<StartupAppDetails>();
+            all.AddRange(GetWinlogonItems());
+            all.AddRange(GetAppInitDlls());
+            all.AddRange(GetBHOItems());
+            all.AddRange(GetBootExecuteItems());
+            return all;
+        }
+
+        #endregion
+
         #region Auto-Updater Integration
 
         public static void CheckAndFixStartupMethods()

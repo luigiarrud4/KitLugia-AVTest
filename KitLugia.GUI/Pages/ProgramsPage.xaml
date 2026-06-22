@@ -158,6 +158,9 @@
 
         <!-- Action Buttons -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Forçar Remoção" Click="BtnForceRemove_Click" Height="35" Width="130"
+                    Background="#8E44AD" Foreground="White" BorderThickness="0" Margin="0,0,10,0" Cursor="Hand"
+                    ToolTip="Remove programa quebrado/sem uninstaller — deleta pasta + limpa registro"/>
             <Button Content="Remover Selecionados" Click="BtnRemoveSelected_Click" Height="35" Width="140" 
                     Background="#C42B1C" Foreground="White" BorderThickness="0" Margin="0,0,10,0"
                     Style="{StaticResource GoldButtonStyle}"/>

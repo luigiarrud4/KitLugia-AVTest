@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -28,6 +29,7 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             this.Unloaded += CleanupPage_Unloaded;
             this.Loaded += CleanupPage_Loaded;
+            InitEvidenceList();
         }
 
         public void Cleanup()
@@ -621,6 +623,467 @@ namespace KitLugia.GUI.Pages
             >= 1_024 => $"{bytes / 1_024.0:N1} KB",
             _ => $"{bytes} B"
         };
+
+        private void InitEvidenceList()
+        {
+            var items = new ObservableCollection<EvidenceItemViewModel>
+            {
+                new("Recent Documents (MRU)", "Documentos abertos recentemente via File Explorer"),
+                new("RunMRU (Executar)", "Comandos digitados no Executar (Win+R)"),
+                new("Typed URLs (IE/Edge)", "URLs digitadas no Internet Explorer e Edge"),
+                new("UserAssist", "Rastro de programas executados via Explorer"),
+                new("BagMRU (Pastas)", "Histórico de navegação em pastas"),
+                new("Jump Lists", "Listas de atalhos recentes na taskbar"),
+                new("Windows Timeline", "Banco de dados de atividades (ActivitiesCache.db)"),
+                new("Clipboard History", "Histórico da área de transferência"),
+                new("Prefetch", "Arquivos .pf de pré-carregamento de apps"),
+                new("Office MRU", "Documentos recentes do Microsoft Office"),
+                new("Visual Studio MRU", "Projetos recentes do Visual Studio")
+            };
+            EvidenceList.ItemsSource = items;
+        }
+
+        private void BtnSelectAllEvidence_Click(object sender, RoutedEventArgs e)
+        {
+            if (EvidenceList.ItemsSource is ObservableCollection<EvidenceItemViewModel> items)
+            {
+                foreach (var item in items)
+                    item.IsSelected = true;
+                BtnCleanEvidence.IsEnabled = true;
+            }
+        }
+
+        private async void BtnCleanEvidence_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isCleanupOperation) return;
+            _isCleanupOperation = true;
+            try
+            {
+                if (EvidenceList.ItemsSource is not ObservableCollection<EvidenceItemViewModel> items) return;
+
+                var selected = items.Where(i => i.IsSelected).ToList();
+                if (selected.Count == 0)
+                {
+                System.Windows.MessageBox.Show("Nenhuma categoria selecionada.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (System.Windows.MessageBox.Show($"Limpar {selected.Count} categora(s) de evidncias?\n\nIsso remover rastros de uso do sistema.",
+                "Limpeza de Evidncias", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+
+                BtnCleanEvidence.IsEnabled = false;
+                BtnCleanEvidence.Content = "⏳";
+
+                int totalItems = 0;
+                int totalErrors = 0;
+
+                await Task.Run(() =>
+                {
+                    var results = EvidenceCleaner.CleanAll();
+                    foreach (var (cat, (items, errors)) in results)
+                    {
+                        var match = selected.FirstOrDefault(s => s.Name == cat);
+                        if (match != null)
+                        {
+                            match.Status = $"{items} itens limpos";
+                            totalItems += items;
+                            totalErrors += errors.Count;
+                        }
+                    }
+                });
+
+                string msg = $"✅ Limpeza concluída!\n\nTotal: {totalItems} itens removidos";
+                if (totalErrors > 0) msg += $"\n⚠️ {totalErrors} erros (itens em uso ignorados)";
+                System.Windows.MessageBox.Show(msg, "Limpeza de Evidncias", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnCleanEvidence_Click", ex.Message);
+            }
+            finally
+            {
+                BtnCleanEvidence.Content = "🧹 Limpar Selecionados";
+                BtnCleanEvidence.IsEnabled = true;
+                _isCleanupOperation = false;
+            }
+        }
+
+        // ─── Portable Apps Scanner ────────────────────────────────────────────
+
+        private List<PortableAppEntry>? _portableApps;
+
+        private async void BtnScanPortable_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isCleanupOperation) return;
+            _isCleanupOperation = true;
+            try
+            {
+                TxtPortableScanResult.Text = "Escaneando...";
+                TxtNoPortable.Visibility = Visibility.Collapsed;
+                BtnDeletePortable.IsEnabled = false;
+
+                var apps = await Task.Run(() => PortableAppScanner.Scan());
+                _portableApps = apps;
+
+                var viewModels = apps.Select(a => new PortableAppViewModel(a)).ToList();
+                PortableAppList.ItemsSource = viewModels;
+                TxtNoPortable.Visibility = viewModels.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+
+                if (viewModels.Count > 0)
+                {
+                    int high = viewModels.Count(v => v.Confidence >= 80);
+                    int medium = viewModels.Count(v => v.Confidence >= 50 && v.Confidence < 80);
+                    string summary = $"{viewModels.Count} port&#xE1;teis encontrados";
+                    if (high > 0) summary += $" ({high} alta confian&#xE7;a";
+                    if (medium > 0) summary += $", {medium} m&#xE9;dia";
+                    if (high > 0 || medium > 0) summary += ")";
+                    TxtPortableScanResult.Text = summary;
+                    AddLog($"✅ Portable scan: {viewModels.Count} apps encontrados.");
+                }
+                else
+                {
+                    TxtPortableScanResult.Text = "Nenhum aplicativo port&#xE1;til encontrado.";
+                    AddLog("Portable scan: nenhum encontrado.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnScanPortable_Click", ex.Message);
+                AddLog($"❌ Erro no scan portable: {ex.Message}");
+            }
+            finally
+            {
+                _isCleanupOperation = false;
+            }
+        }
+
+        private async void BtnDeletePortable_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isCleanupOperation) return;
+            if (PortableAppList.ItemsSource is not List<PortableAppViewModel> items) return;
+
+            var selected = items.Where(i => i.IsSelected).ToList();
+            if (selected.Count == 0)
+            {
+                System.Windows.MessageBox.Show("Selecione pelo menos um aplicativo port&#xE1;til para remover.",
+                    "Aviso", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            long totalSize = selected.Sum(s => s.TotalSizeBytes);
+            string sizeStr = totalSize switch
+            {
+                >= 1_073_741_824 => $"{totalSize / 1_073_741_824.0:N1} GB",
+                >= 1_048_576 => $"{totalSize / 1_048_576.0:N1} MB",
+                _ => $"{totalSize / 1_024.0:N1} KB"
+            };
+
+            var mw = System.Windows.Application.Current.MainWindow as MainWindow;
+            if (mw != null && !await mw.ShowConfirmationDialog(
+                $"Remover {selected.Count} aplicativo(s) port&#xE1;teis?\n\n" +
+                $"Espa&#xE7;o a ser liberado: {sizeStr}\n\n" +
+                $"Isso EXCLUIR&#xC1; as pastas permanentemente."))
+                return;
+
+            _isCleanupOperation = true;
+            BtnDeletePortable.IsEnabled = false;
+            BtnDeletePortable.Content = "⏳";
+
+            try
+            {
+                int successCount = 0;
+                long freedBytes = 0;
+
+                await Task.Run(() =>
+                {
+                    foreach (var vm in selected)
+                    {
+                        var result = PortableAppScanner.DeletePortableApp(vm.Entry);
+                        if (result.success)
+                        {
+                            successCount++;
+                            freedBytes += vm.TotalSizeBytes;
+                            vm.Status = "Removido";
+                        }
+                        else
+                        {
+                            vm.Status = $"Erro: {result.message}";
+                        }
+                    }
+                });
+
+                string freedStr = freedBytes switch
+                {
+                    >= 1_073_741_824 => $"{freedBytes / 1_073_741_824.0:N1} GB",
+                    >= 1_048_576 => $"{freedBytes / 1_048_576.0:N1} MB",
+                    _ => $"{freedBytes / 1_024.0:N1} KB"
+                };
+
+                AddLog($"✅ Portable: {successCount}/{selected.Count} removidos ({freedStr} liberados).");
+                System.Windows.MessageBox.Show(
+                    $"{successCount} de {selected.Count} aplicativos removidos.\n" +
+                    $"Espa&#xE7;o liberado: {freedStr}",
+                    "Remo&#xE7;&#xE3;o Conclu&#xED;da", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                BtnScanPortable_Click(null!, null!);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnDeletePortable_Click", ex.Message);
+                AddLog($"❌ Erro: {ex.Message}");
+            }
+            finally
+            {
+                BtnDeletePortable.Content = "🗑️ Remover Selecionados";
+                BtnDeletePortable.IsEnabled = true;
+                _isCleanupOperation = false;
+            }
+        }
+
+        private void BtnOpenPortableFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string tag)
+            {
+                string folder = tag;
+                if (Directory.Exists(folder))
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{folder}\"");
+            }
+        }
+
+        // ─── Install Monitor ──────────────────────────────────────────────────
+
+        private void BtnToggleMonitor_Click(object sender, RoutedEventArgs e)
+        {
+            if (InstallMonitor.IsRunning)
+            {
+                InstallMonitor.Stop();
+                MonitorStatusDot.Background = new SolidColorBrush(Color.FromRgb(85, 85, 85));
+                BtnToggleMonitor.Content = "▶ Iniciar Monitor";
+                BtnSnapshot.IsEnabled = false;
+                BtnCompare.IsEnabled = false;
+                BtnClearMonitor.IsEnabled = false;
+                BtnExportMonitor.IsEnabled = InstallMonitor.ChangeCount > 0;
+                TxtMonitorStatus.Text = $"Monitor parado. {InstallMonitor.ChangeCount} alteraçõe(s) registrada(s).";
+                AddLog($"Monitor de instalações parado. {InstallMonitor.ChangeCount} alterações detectadas.");
+                RefreshMonitorList();
+            }
+            else
+            {
+                InstallMonitor.OnChange += OnMonitorChange;
+                InstallMonitor.Start();
+                MonitorStatusDot.Background = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+                BtnToggleMonitor.Content = "⏹ Parar Monitor";
+                BtnSnapshot.IsEnabled = true;
+                BtnClearMonitor.IsEnabled = true;
+                BtnExportMonitor.IsEnabled = true;
+                TxtMonitorStatus.Text = "Monitorando alterações em arquivos...";
+                AddLog("Monitor de instalações iniciado (FileSystemWatcher).");
+                RefreshMonitorList();
+            }
+        }
+
+        private void OnMonitorChange(InstallMonitorChange change)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                RefreshMonitorList();
+            });
+        }
+
+        private void RefreshMonitorList()
+        {
+            var changes = InstallMonitor.GetChanges();
+            var viewModels = changes.Select(c => new MonitorChangeViewModel(c)).ToList();
+            MonitorChangeList.ItemsSource = viewModels;
+            TxtNoMonitorChanges.Visibility = viewModels.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+            BtnExportMonitor.IsEnabled = viewModels.Count > 0;
+
+            TxtMonitorStatus.Text = InstallMonitor.IsRunning
+                ? $"Monitorando... {viewModels.Count} alteraçõe(s) registrada(s). Snapshot: {InstallMonitor.HasRegistrySnapshot}"
+                : $"{viewModels.Count} alteraçõe(s) registrada(s).";
+        }
+
+        private void BtnSnapshot_Click(object sender, RoutedEventArgs e)
+        {
+            InstallMonitor.TakeRegistrySnapshot();
+            BtnCompare.IsEnabled = true;
+            AddLog("📸 Snapshot do registro tirado. Instale/remova programas e clique em 'Comparar'.");
+            TxtMonitorStatus.Text = "Snapshot salvo. Clique em 'Comparar' após instalar/remover programas.";
+        }
+
+        private async void BtnCompare_Click(object sender, RoutedEventArgs e)
+        {
+            int count = await Task.Run(() => InstallMonitor.CompareRegistryWithSnapshot());
+            RefreshMonitorList();
+            if (count > 0)
+            {
+                AddLog($"🔄 Comparação concluída: {count} alterações no registro detectadas.");
+                TxtMonitorStatus.Text = $"{count} alterações no registro encontradas.";
+            }
+            else
+            {
+                AddLog("✅ Nenhuma alteração no registro detectada desde o último snapshot.");
+                TxtMonitorStatus.Text = "Nenhuma alteração no registro.";
+            }
+        }
+
+        private void BtnClearMonitor_Click(object sender, RoutedEventArgs e)
+        {
+            InstallMonitor.ClearChanges();
+            RefreshMonitorList();
+            TxtNoMonitorChanges.Visibility = Visibility.Visible;
+            BtnExportMonitor.IsEnabled = false;
+            AddLog("Lista de alterações limpa.");
+        }
+
+        private async void BtnAdvancedStartup_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isCleanupOperation) return;
+            _isCleanupOperation = true;
+            try
+            {
+                AddLog("Escaneando locais avançados de inicialização...");
+
+                var result = await Task.Run(() =>
+                {
+                    var wl = KitLugia.Core.StartupManager.GetWinlogonItems();
+                    var ai = KitLugia.Core.StartupManager.GetAppInitDlls();
+                    var bho = KitLugia.Core.StartupManager.GetBHOItems();
+                    var be = KitLugia.Core.StartupManager.GetBootExecuteItems();
+                    return (winlogon: wl, appinit: ai, bho: bho, bootExec: be);
+                });
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("=== Locais Avançados de Inicialização ===\n");
+
+                sb.AppendLine($"── Winlogon ({result.winlogon.Count}) ──");
+                foreach (var item in result.winlogon)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                sb.AppendLine($"\n── AppInit_DLLs ({result.appinit.Count}) ──");
+                foreach (var item in result.appinit)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                sb.AppendLine($"\n── BHO ({result.bho.Count}) ──");
+                foreach (var item in result.bho)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                sb.AppendLine($"\n── BootExecute ({result.bootExec.Count}) ──");
+                foreach (var item in result.bootExec)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                AddLog($"✅ Scan concluído: {result.winlogon.Count + result.appinit.Count + result.bho.Count + result.bootExec.Count} itens.");
+                System.Windows.Clipboard.SetText(sb.ToString());
+                System.Windows.MessageBox.Show(
+                    $"Winlogon: {result.winlogon.Count}\n" +
+                    $"AppInit_DLLs: {result.appinit.Count}\n" +
+                    $"BHO: {result.bho.Count}\n" +
+                    $"BootExecute: {result.bootExec.Count}\n\n" +
+                    $"Total: {result.winlogon.Count + result.appinit.Count + result.bho.Count + result.bootExec.Count} itens\n\n" +
+                    "Resultado copiado para a área de transferência.",
+                    "Inicialização Avançada", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnAdvancedStartup_Click", ex.Message);
+                AddLog($"❌ Erro: {ex.Message}");
+            }
+            finally
+            {
+                _isCleanupOperation = false;
+            }
+        }
+
+        private void BtnExportMonitor_Click(object sender, RoutedEventArgs e)
+        {
+            var changes = InstallMonitor.GetChanges();
+            if (changes.Count == 0) return;
+
+            var lines = changes.Select(c =>
+                $"[{c.Timestamp:yyyy-MM-dd HH:mm:ss}] {c.Type} | {c.Category} | {c.Path}");
+            string text = $"=== Relatório do Monitor de Instalações ===\n" +
+                          $"Gerado em: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                          $"Total de alterações: {changes.Count}\n\n" +
+                          string.Join("\n", lines);
+
+            System.Windows.Clipboard.SetText(text);
+            AddLog($"📋 {changes.Count} alteraçõe(s) copiada(s) para a área de transferência.");
+        }
+    }
+
+    public class MonitorChangeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public InstallMonitorChange Change { get; }
+        public string Path => Change.Path;
+        public string Type => Change.Type;
+        public string Category => Change.Category;
+        public string Details => Change.Details;
+        public string TimestampFormatted => Change.Timestamp.ToString("HH:mm:ss");
+
+        public string TypeIcon => Change.Type switch
+        {
+            "Criado" or "Adicionado" => "➕",
+            "Removido" => "➖",
+            "Modificado" => "✏️",
+            "Renomeado" => "🔄",
+            _ => "❓"
+        };
+
+        public string TypeColor => Change.Type switch
+        {
+            "Criado" or "Adicionado" => "#4CAF50",
+            "Removido" => "#FF6F61",
+            "Modificado" => "#FFA500",
+            "Renomeado" => "#2196F3",
+            _ => "#888"
+        };
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        public MonitorChangeViewModel(InstallMonitorChange change)
+        {
+            Change = change;
+        }
+    }
+
+    public class PortableAppViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public PortableAppEntry Entry { get; }
+        public string Name => Entry.Name;
+        public string FolderPath => Entry.FolderPath;
+        public long TotalSizeBytes => Entry.TotalSizeBytes;
+        public string TotalSizeFormatted => Entry.TotalSizeFormatted;
+        public int Confidence => Entry.Confidence;
+        public string ConfidenceLabel => Entry.ConfidenceLabel;
+        public string ConfidenceColor => Entry.Confidence switch
+        {
+            >= 80 => "#4CAF50",
+            >= 50 => "#FFA500",
+            _ => "#FF6F61"
+        };
+        public string LastModifiedFormatted => Entry.LastModified.ToString("dd/MM/yyyy");
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        public PortableAppViewModel(PortableAppEntry entry)
+        {
+            Entry = entry;
+        }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { _isSelected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); }
+        }
+
+        private string _status = "Pronto";
+        public string Status
+        {
+            get => _status;
+            set { _status = value; PropertyChanged?.Invoke(this, new(nameof(Status))); }
+        }
     }
 
     /// <summary>
@@ -663,5 +1126,32 @@ namespace KitLugia.GUI.Pages
         public string RegistryPath => _issue.RegistryPath;
         public string ValueName => _issue.ValueName;
         public string CurrentValue => _issue.CurrentValue;
+    }
+
+    public class EvidenceItemViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public string Name { get; }
+        public string Description { get; }
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        public EvidenceItemViewModel(string name, string description)
+        {
+            Name = name;
+            Description = description;
+        }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { _isSelected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); }
+        }
+
+        private string _status = "Pronto";
+        public string Status
+        {
+            get => _status;
+            set { _status = value; PropertyChanged?.Invoke(this, new(nameof(Status))); }
+        }
     }
 }

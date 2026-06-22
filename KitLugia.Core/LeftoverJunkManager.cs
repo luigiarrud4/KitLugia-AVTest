@@ -62,10 +62,38 @@ namespace KitLugia.Core
             }
         }
 
+        private const int MaxEntries = 100;
+
         public static void Add(LeftoverJunkEntry entry)
         {
             var entries = Load();
+            // Dedup: se mesma AppName + mesma data, mescla leftovers em vez de duplicar
+            var existing = entries.Find(e =>
+                e.AppName.Equals(entry.AppName, StringComparison.OrdinalIgnoreCase) &&
+                (e.Date - entry.Date).Duration().TotalMinutes < 1);
+            if (existing != null)
+            {
+                foreach (var f in entry.LeftoverFiles)
+                    if (!existing.LeftoverFiles.Contains(f))
+                        existing.LeftoverFiles.Add(f);
+                foreach (var r in entry.LeftoverRegistry)
+                    if (!existing.LeftoverRegistry.Contains(r))
+                        existing.LeftoverRegistry.Add(r);
+                foreach (var f in entry.HeuristicFiles)
+                    if (!existing.HeuristicFiles.Contains(f))
+                        existing.HeuristicFiles.Add(f);
+                foreach (var r in entry.HeuristicRegistry)
+                    if (!existing.HeuristicRegistry.Contains(r))
+                        existing.HeuristicRegistry.Add(r);
+                existing.BaselineFileCount = entry.BaselineFileCount;
+                existing.BaselineRegistryCount = entry.BaselineRegistryCount;
+                Save(entries);
+                return;
+            }
             entries.Insert(0, entry);
+            // Cap total
+            if (entries.Count > MaxEntries)
+                entries.RemoveRange(MaxEntries, entries.Count - MaxEntries);
             Save(entries);
         }
 
