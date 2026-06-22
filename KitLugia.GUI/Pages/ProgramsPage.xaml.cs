@@ -12,6 +12,7 @@ using MessageBox = System.Windows.MessageBox;
 using KitLugia.Core.UninstallTools;
 using KitLugia.Core;
 using KitLugia.GUI.Helpers;
+using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 
 // --- CORREÇÃO DOS CONFLITOS DE AMBIGUIDADE ---
 using Button = System.Windows.Controls.Button;
@@ -310,6 +311,78 @@ namespace KitLugia.GUI.Pages
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             LoadPrograms();
+        }
+
+        private async void BtnForceRemove_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isProgramOperation) return;
+            _isProgramOperation = true;
+            try
+            {
+                // Pega programa selecionado ou mostra diálogo de seleção
+                ProgramViewModel? target = null;
+                if (sender is Button btn && btn.Tag is ProgramViewModel tagProgram)
+                    target = tagProgram;
+                else if (FilteredProgramsCollection?.FirstOrDefault(p => p.IsSelected) is ProgramViewModel sel)
+                    target = sel;
+
+                if (target == null)
+                {
+                    MessageBox.Show("Selecione um programa na lista ou clique em 'Forçar' no item desejado.",
+                        "Forçar Remoção", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                if (MessageBox.Show(
+                    $"Forçar remoção de {target.DisplayName}?\n\n" +
+                    "Isso irá:\n" +
+                    "• Matar processos do programa\n" +
+                    "• Deletar pasta de instalação\n" +
+                    "• Limpar entradas do registro\n\n" +
+                    "⚠️ Use apenas se o uninstaller original falhou ou não existe.",
+                    "Forçar Remoção", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+
+                LoadingPanel.Visibility = Visibility.Visible;
+
+                string installDir = target.InstallLocation ?? "";
+                if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir))
+                {
+                    // Pede para o usuário localizar a pasta
+                    var dialog = new System.Windows.Forms.FolderBrowserDialog();
+                    dialog.Description = $"Selecione a pasta de instalação de {target.DisplayName} (ou cancele para scan automático)";
+                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        installDir = dialog.SelectedPath;
+                }
+
+                var result = await DeepUninstaller.ForceDeleteProgram(
+                    target.DisplayName, installDir, target.Publisher ?? "", "", createRestorePoint: true);
+
+                string msg = $"✅ Força remoção concluída:\n\n" +
+                    $"Arquivos deletados: {result.FilesDeleted}\n" +
+                    $"Registros limpos: {result.RegistryDeleted}\n" +
+                    $"Erros: {result.Errors.Count}";
+                MessageBox.Show(msg, "Resultado", MessageBoxButton.OK,
+                    result.Errors.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+
+                // Remove da lista
+                if (FilteredProgramsCollection?.Contains(target) == true)
+                    FilteredProgramsCollection.Remove(target);
+                if (ProgramsCollection?.Contains(target) == true)
+                    ProgramsCollection.Remove(target);
+                if (ProgramCountText != null)
+                    ProgramCountText.Text = $"Programas: {ProgramsCollection?.Count ?? 0}";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnForceRemove_Click", ex.Message);
+                MessageBox.Show($"Erro: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                LoadingPanel.Visibility = Visibility.Collapsed;
+                _isProgramOperation = false;
+            }
         }
 
         private async Task<bool> UninstallProgram(ProgramViewModel program)

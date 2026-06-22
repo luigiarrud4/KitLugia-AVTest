@@ -1235,38 +1235,33 @@ namespace KitLugia.Core
         private static List<string> ScanLeftoverRegistry(string displayName, string installLocation = "", ScannerMode mode = ScannerMode.Moderate)
         {
             var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var lockObj = new object();
 
-            // Uninstall keys (always scanned)
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
-            ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
-            if (Is64Bit)
-                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
+            void AddLocal(Action<HashSet<string>> scan)
+            {
+                var local = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                scan(local);
+                lock (lockObj) { results.UnionWith(local); }
+            }
 
-            // Safe mode: only Uninstall keys + exact HKCU\Software\AppName — no recursive scan
+            // Safe mode: only Uninstall keys + exact HKCU\Software\AppName
             if (mode == ScannerMode.Safe)
             {
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
+                ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
+                if (Is64Bit)
+                    ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
                 ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE", displayName, results, installLocation);
                 return results.ToList();
             }
 
-            // Advanced mode: no publisher exclusions
-            string[] commonPublishers;
-            if (mode == ScannerMode.Advanced)
-            {
-                commonPublishers = [];
-            }
-            else
-            {
-                commonPublishers = GenericPublishers.Concat(["Wow6432Node", "Classes", "Clients", "RegisteredApplications", "VirtualBox", "Battle.net"]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            }
-            ScanSoftwareRecursive(@"HKEY_LOCAL_MACHINE\SOFTWARE", displayName, results, commonPublishers, 0, installLocation);
-            ScanSoftwareRecursive(@"HKEY_CURRENT_USER\SOFTWARE", displayName, results, ["Microsoft", "Classes", "Wow6432Node", ..commonPublishers], 0, installLocation);
-            if (Is64Bit)
-                ScanSoftwareRecursive(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node", displayName, results, ["Microsoft", "Windows", ..commonPublishers], 0, installLocation);
+            string[] commonPublishers = mode == ScannerMode.Advanced
+                ? []
+                : GenericPublishers.Concat(["Wow6432Node", "Classes", "Clients", "RegisteredApplications", "VirtualBox", "Battle.net"]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
-            // Classes hives — first pass by name, second pass by value (catches GUID leftovers)
-            string[] classPaths =
-            {
+            // Pre-compute class/guid hives based on bitness
+            string[] classPathsNominal =
+            [
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\AppID",
@@ -1279,131 +1274,149 @@ namespace KitLugia.Core
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\AppID",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\Interface",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\TypeLib",
-            };
-            if (Is64Bit)
-            {
-                classPaths =
-                [
-                    ..classPaths,
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\CLSID",
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\AppID",
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\Interface",
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\TypeLib",
-                    @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\CLSID",
-                    @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\AppID",
-                ];
-            }
-            foreach (var cp in classPaths)
-                ScanHiveForNames(cp, displayName, results, installLocation);
+            ];
+            string[] classPathsExtra = Is64Bit
+                ? [@"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\CLSID", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\AppID", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\Interface", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\TypeLib", @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\CLSID", @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\AppID"]
+                : [];
 
-            // Expanded COM scanning: ProgID, ShellEx, PersistentHandler, OpenWithProgIDs
-            ScanComHives(displayName, installLocation, results);
-
-            // Second pass on GUID-heavy hives: scan by value content
-            string[] guidHives =
+            string[] guidHivesNominal =
             [
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\AppID",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Interface",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\TypeLib",
             ];
-            if (Is64Bit)
-            {
-                guidHives =
-                [
-                    ..guidHives,
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\CLSID",
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\AppID",
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\Interface",
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\TypeLib",
-                ];
-            }
-            foreach (var gh in guidHives)
-                ScanHiveByValues(gh, installLocation, displayName, results);
+            string[] guidHivesExtra = Is64Bit
+                ? [@"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\CLSID", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\AppID", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\Interface", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\TypeLib"]
+                : [];
 
-            // COM by file path (BCU pattern: pre-load all COM entries, match by DLL/EXE path)
-            ScanComByFilePath(installLocation, results);
-
-            // App Paths & Run
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths", displayName, results, installLocation);
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", displayName, results, installLocation);
-            ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", displayName, results, installLocation);
-
-            // Shell extensions
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers", displayName, results, installLocation);
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", displayName, results, installLocation);
-
-            // MSI Installer
-            string[] msiPaths =
-            {
-                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Products",
-                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Features",
-                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Patches",
-            };
-            ScanMsiUserData(displayName, results, installLocation);
-            foreach (var mp in msiPaths)
-                ScanHiveForNames(mp, displayName, results, installLocation);
-
-            // SharedDLLs — reference counts for shared components
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\SharedDLLs", displayName, results, installLocation);
-
-            // Installer\Folders — value names are literal install paths
-            ScanInstallerFolders(installLocation, results);
-
-            // Installer\Components — GUID keys whose values point to installed files
-            ScanInstallerComponentsByValues(installLocation, displayName, results);
-
-            // AppCompat
-            string[] compatPaths =
-            {
-                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers",
-                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store",
-                @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers",
-                @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store",
-            };
-            foreach (var cp in compatPaths)
-                ScanHiveForNames(cp, displayName, results, installLocation);
-
-            // RegisteredApplications (BCU pattern: follow value paths to find target keys + Capabilities)
-            ScanRegisteredApplicationsWithFollow(displayName, results);
-
-            // VirtualStore
-            string[] vsPaths =
-            {
+            string[] vsPathsNominal =
+            [
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\VirtualStore\MACHINE\SOFTWARE",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\VirtualStore\MACHINE\SOFTWARE",
-            };
-            if (Is64Bit)
+            ];
+            string[] vsPathsExtra = Is64Bit
+                ? [@"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\VirtualStore\MACHINE\SOFTWARE\WOW6432Node", @"HKEY_CURRENT_USER\SOFTWARE\Classes\VirtualStore\MACHINE\SOFTWARE\WOW6432Node"]
+                : [];
+
+            var parallelActions = new List<Action>();
+
+            // Batch 1 — Uninstall keys (quick)
+            parallelActions.Add(() => AddLocal(r =>
             {
-                vsPaths =
-                [
-                    ..vsPaths,
-                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\VirtualStore\MACHINE\SOFTWARE\WOW6432Node",
-                    @"HKEY_CURRENT_USER\SOFTWARE\Classes\VirtualStore\MACHINE\SOFTWARE\WOW6432Node",
-                ];
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", displayName, r, installLocation);
+                ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", displayName, r, installLocation);
+                if (Is64Bit)
+                    ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall", displayName, r, installLocation);
+            }));
+
+            // Batch 2 — Software hives (slowest — recursive)
+            parallelActions.Add(() => AddLocal(r => ScanSoftwareRecursive(@"HKEY_LOCAL_MACHINE\SOFTWARE", displayName, r, commonPublishers, 0, installLocation)));
+            parallelActions.Add(() => AddLocal(r => ScanSoftwareRecursive(@"HKEY_CURRENT_USER\SOFTWARE", displayName, r, ["Microsoft", "Classes", "Wow6432Node", ..commonPublishers], 0, installLocation)));
+            if (Is64Bit)
+                parallelActions.Add(() => AddLocal(r => ScanSoftwareRecursive(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node", displayName, r, ["Microsoft", "Windows", ..commonPublishers], 0, installLocation)));
+
+            // Batch 3 — Classes name scan
+            parallelActions.Add(() => AddLocal(r =>
+            {
+                foreach (var cp in classPathsNominal.Concat(classPathsExtra))
+                    ScanHiveForNames(cp, displayName, r, installLocation);
+            }));
+
+            // Batch 4 — COM hives
+            parallelActions.Add(() => AddLocal(r => ScanComHives(displayName, installLocation, r)));
+
+            // Batch 5 — GUID hives value scan
+            parallelActions.Add(() => AddLocal(r =>
+            {
+                foreach (var gh in guidHivesNominal.Concat(guidHivesExtra))
+                    ScanHiveByValues(gh, installLocation, displayName, r);
+            }));
+
+            // Batch 6 — ComByFilePath + AppPaths/Run + ShellExt
+            parallelActions.Add(() => AddLocal(r =>
+            {
+                ScanComByFilePath(installLocation, r);
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths", displayName, r, installLocation);
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", displayName, r, installLocation);
+                ScanHiveForNames(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", displayName, r, installLocation);
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers", displayName, r, installLocation);
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", displayName, r, installLocation);
+            }));
+
+            // Batch 7 — MSI + SharedDLLs + InstallerFolders + InstallerComponents
+            parallelActions.Add(() => AddLocal(r =>
+            {
+                ScanMsiUserData(displayName, r, installLocation);
+                foreach (var mp in new[] { @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Products", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Features", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Patches" })
+                    ScanHiveForNames(mp, displayName, r, installLocation);
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\SharedDLLs", displayName, r, installLocation);
+                ScanInstallerFolders(installLocation, r);
+                ScanInstallerComponentsByValues(installLocation, displayName, r);
+            }));
+
+            // Batch 8 — AppCompat + RegisteredApplications + VirtualStore
+            parallelActions.Add(() => AddLocal(r =>
+            {
+                foreach (var cp in new[] {
+                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers",
+                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store",
+                    @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers",
+                    @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store",
+                })
+                    ScanHiveForNames(cp, displayName, r, installLocation);
+                ScanRegisteredApplicationsWithFollow(displayName, r);
+                foreach (var vp in vsPathsNominal.Concat(vsPathsExtra))
+                    ScanSoftwareRecursive(vp, displayName, r, installLocation: installLocation);
+            }));
+
+            // Batch 9 — Services / Firewall / EventLog / Debug / UserAssist / Heap / Audio
+            parallelActions.Add(() => AddLocal(r =>
+            {
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services", displayName, r, installLocation);
+                ScanFirewallRules(displayName, r);
+                ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application", displayName, r, installLocation);
+                ScanDebugTracingByExe(installLocation, r);
+                ScanUserAssist(displayName, r);
+                ScanHeapLeakByExe(installLocation, r);
+                ScanAudioPolicyConfig(installLocation, r);
+            }));
+
+            // Batch 10 — HKEY_USERS (can run in parallel with others)
+            if (mode != ScannerMode.Safe)
+            {
+                parallelActions.Add(() => AddLocal(r =>
+                {
+                    try
+                    {
+                        using var usersHive = Registry.Users.OpenSubKey("");
+                        if (usersHive == null) return;
+                        string[] systemSids = { ".DEFAULT", "S-1-5-18", "S-1-5-19", "S-1-5-20" };
+                        foreach (var sid in usersHive.GetSubKeyNames())
+                        {
+                            if (string.IsNullOrEmpty(sid)) continue;
+                            if (systemSids.Contains(sid, StringComparer.OrdinalIgnoreCase)) continue;
+                            string uh = $@"HKEY_USERS\{sid}";
+                            ScanSoftwareRecursive($@"{uh}\Software", displayName, r, ["Microsoft", "Classes", "Wow6432Node"], 0, installLocation);
+                            ScanHiveForNames($@"{uh}\Software\Classes\CLSID", displayName, r, installLocation);
+                            ScanHiveForNames($@"{uh}\Software\Classes\AppID", displayName, r, installLocation);
+                            ScanHiveForNames($@"{uh}\Software\Microsoft\Windows\CurrentVersion\Uninstall", displayName, r, installLocation);
+                            ScanHiveForNames($@"{uh}\Software\Microsoft\Windows\CurrentVersion\Run", displayName, r, installLocation);
+                        }
+                    }
+                    catch { }
+                }));
             }
-            foreach (var vp in vsPaths)
-                ScanSoftwareRecursive(vp, displayName, results, installLocation: installLocation);
 
-            // Services / Firewall / EventLog / Tracing / UserAssist / Heap / Audio
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services", displayName, results, installLocation);
-            ScanFirewallRules(displayName, results);
-            ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application", displayName, results, installLocation);
-            ScanDebugTracingByExe(installLocation, results);
-            ScanUserAssist(displayName, results);
-            ScanHeapLeakByExe(installLocation, results);
-            ScanAudioPolicyConfig(installLocation, results);
+            Parallel.Invoke(new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, parallelActions.ToArray());
 
-            // TestForSimilarNames: cross-reference found keys against other installed apps
-            // to remove entries that could belong to a different app with similar name (BCU pattern)
+            // Cross-reference: remove keys that may belong to another app with similar name
             if (!string.IsNullOrEmpty(displayName))
             {
                 var otherLocations = GetAllInstallLocations(excludeName: displayName);
                 var keysToRemove = new List<string>();
                 foreach (var r in results)
                 {
-                    // For each found registry key, check if another installed app references it
-                    // Extract the leaf name of the registry key
                     string leafName = r.Split('\\').LastOrDefault() ?? "";
                     if (string.IsNullOrEmpty(leafName) || leafName.Length < 3) continue;
 
@@ -1412,8 +1425,6 @@ namespace KitLugia.Core
                         string otherName = Path.GetFileName(otherLoc.TrimEnd('\\')) ?? "";
                         if (string.IsNullOrEmpty(otherName)) continue;
 
-                        // If the found key matches another app's name more closely than the target,
-                        // and the target's name doesn't contain the other app's name, flag it
                         int targetConf = Confidence.Generate(displayName, leafName);
                         int otherConf = Confidence.Generate(otherName, leafName);
 
@@ -1427,35 +1438,6 @@ namespace KitLugia.Core
                 }
                 foreach (var k in keysToRemove)
                     results.Remove(k);
-            }
-
-            // HKEY_USERS: scan other user profiles (Revo Uninstaller pattern)
-            // Only in Moderate+ mode to avoid excessive scan time
-            if (mode != ScannerMode.Safe)
-            {
-                try
-                {
-                    using var usersHive = Registry.Users.OpenSubKey("");
-                    if (usersHive != null)
-                    {
-                        string[] systemSids = { ".DEFAULT", "S-1-5-18", "S-1-5-19", "S-1-5-20" };
-                        foreach (var sid in usersHive.GetSubKeyNames())
-                        {
-                            if (string.IsNullOrEmpty(sid)) continue;
-                            if (systemSids.Contains(sid, StringComparer.OrdinalIgnoreCase)) continue;
-
-                            string userHive = $@"HKEY_USERS\{sid}";
-                            // Scan the user's Software hive for name matches
-                            ScanSoftwareRecursive($@"{userHive}\Software", displayName, results, ["Microsoft", "Classes", "Wow6432Node"], 0, installLocation);
-                            // Also scan Classes for COM references (per-user COM entries)
-                            ScanHiveForNames($@"{userHive}\Software\Classes\CLSID", displayName, results, installLocation);
-                            ScanHiveForNames($@"{userHive}\Software\Classes\AppID", displayName, results, installLocation);
-                            ScanHiveForNames($@"{userHive}\Software\Microsoft\Windows\CurrentVersion\Uninstall", displayName, results, installLocation);
-                            ScanHiveForNames($@"{userHive}\Software\Microsoft\Windows\CurrentVersion\Run", displayName, results, installLocation);
-                        }
-                    }
-                }
-                catch { }
             }
 
             // Active Setup scanner: apps register here for per-user setup on first login
@@ -1863,14 +1845,18 @@ namespace KitLugia.Core
             return null;
         }
 
-        public static void PerformCleanup(List<string> filesToDelete, List<string> registryToDelete, UninstallResult result, string displayName = "", string installLocation = "")
+        public static void PerformCleanup(List<string> filesToDelete, List<string> registryToDelete, UninstallResult result, string displayName = "", string installLocation = "", CancellationToken ct = default, IProgress<string>? progress = null)
         {
             var logEntries = new List<string>();
             logEntries.Add($"=== KitLugia Deletion Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
             logEntries.Add("");
 
+            int totalItems = filesToDelete.Distinct(StringComparer.OrdinalIgnoreCase).Count() + registryToDelete.Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            int current = 0;
+
             foreach (var file in filesToDelete.Distinct(StringComparer.OrdinalIgnoreCase))
             {
+                progress?.Report($"Limpando arquivos ({++current}/{totalItems})...");
                 try
                 {
                     // Self-check: never delete KitLugia's own files
@@ -1940,7 +1926,8 @@ namespace KitLugia.Core
 
             foreach (var reg in registryToDelete.Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                SafeDeleteRegistryEntry(reg, displayName, installLocation, result, logEntries);
+                progress?.Report($"Limpando registro ({++current}/{totalItems})...");
+                SafeDeleteRegistryEntry(reg, displayName, installLocation, result, logEntries, ct);
             }
 
             // Write deletion log
@@ -2430,10 +2417,11 @@ namespace KitLugia.Core
         /// Exports a registry key to a .reg file before deletion.
         /// Returns the path to the backup file, or null on failure.
         /// </summary>
-        private static string? BackupRegistryKey(string fullRegistryPath)
+        private static string? BackupRegistryKey(string fullRegistryPath, CancellationToken ct = default)
         {
             try
             {
+                ct.ThrowIfCancellationRequested();
                 if (!Directory.Exists(RegistryBackupDir))
                     Directory.CreateDirectory(RegistryBackupDir);
 
@@ -2456,18 +2444,24 @@ namespace KitLugia.Core
                 using var key = hive.OpenSubKey(subKey, false);
                 if (key == null) return null;
 
-                ExportKeyToReg(sb, fullRegistryPath, key);
+                ExportKeyToReg(sb, fullRegistryPath, key, maxItems: 500, ct: ct);
                 File.WriteAllText(backupFile, sb.ToString(), Encoding.Unicode);
                 return backupFile;
             }
             catch { return null; }
         }
 
-        private static void ExportKeyToReg(StringBuilder sb, string fullPath, RegistryKey key)
+        private static void ExportKeyToReg(StringBuilder sb, string fullPath, RegistryKey key, int maxItems = 500, CancellationToken ct = default)
         {
+            if (maxItems <= 0) { sb.AppendLine($"; [TRUNCATED — too many subkeys]"); return; }
+            ct.ThrowIfCancellationRequested();
+
             sb.AppendLine($@"[{fullPath}]");
+            int count = 0;
             foreach (var valName in key.GetValueNames())
             {
+                if (count++ >= maxItems) { sb.AppendLine($"; [TRUNCATED — too many values]"); break; }
+                ct.ThrowIfCancellationRequested();
                 var val = key.GetValue(valName);
                 if (val == null) continue;
                 var kind = key.GetValueKind(valName);
@@ -2499,11 +2493,17 @@ namespace KitLugia.Core
             }
             sb.AppendLine();
 
+            int remaining = maxItems - count;
+            if (remaining <= 0) { sb.AppendLine($"; [TRUNCATED — no room for subkeys]"); return; }
+
+            int subCount = 0;
             foreach (var name in key.GetSubKeyNames())
             {
+                if (subCount++ >= remaining) { sb.AppendLine($"; [TRUNCATED — too many subkeys]"); break; }
+                ct.ThrowIfCancellationRequested();
                 using var sk = key.OpenSubKey(name, false);
                 if (sk != null)
-                    ExportKeyToReg(sb, $@"{fullPath}\{name}", sk);
+                    ExportKeyToReg(sb, $@"{fullPath}\{name}", sk, remaining - subCount, ct);
             }
         }
 
@@ -2629,10 +2629,11 @@ namespace KitLugia.Core
         /// <summary>
         /// Backs up a single registry value (not a whole subkey) to a .reg file.
         /// </summary>
-        private static string? BackupRegistryValue(string fullPath)
+        private static string? BackupRegistryValue(string fullPath, CancellationToken ct = default)
         {
             try
             {
+                ct.ThrowIfCancellationRequested();
                 if (!Directory.Exists(RegistryBackupDir))
                     Directory.CreateDirectory(RegistryBackupDir);
 
@@ -2695,10 +2696,12 @@ namespace KitLugia.Core
         /// For PATH specifically, performs surgical removal of app entries instead of full deletion.
         /// </summary>
         private static void SafeDeleteRegistryEntry(string reg, string displayName, string installLocation,
-            UninstallResult result, List<string> logEntries)
+            UninstallResult result, List<string> logEntries, CancellationToken ct = default)
         {
             try
             {
+                ct.ThrowIfCancellationRequested();
+
                 // PATH special handling: surgically remove app entries, never delete the whole variable
                 if (reg.Equals(@"HKEY_CURRENT_USER\Environment\PATH", StringComparison.OrdinalIgnoreCase))
                 {
@@ -2730,7 +2733,7 @@ namespace KitLugia.Core
                 if (IsRegistryValuePath(reg))
                 {
                     // This is a value, not a subkey — back it up and delete the single value
-                    string? backupFile = BackupRegistryValue(reg);
+                    string? backupFile = BackupRegistryValue(reg, ct);
                     if (backupFile != null)
                         result.BackupRegistryFiles.Add(backupFile);
 
@@ -2760,8 +2763,8 @@ namespace KitLugia.Core
                             TryStopAndDeleteService(serviceName);
                     }
 
-                    // Subkey: normal backup and deletion
-                    string? backupFile = BackupRegistryKey(reg);
+                    // Subkey: normal backup and deletion (limited to 500 items via ct)
+                    string? backupFile = BackupRegistryKey(reg, ct);
                     if (backupFile != null)
                         result.BackupRegistryFiles.Add(backupFile);
 
@@ -2769,6 +2772,10 @@ namespace KitLugia.Core
                     result.RegistryDeleted++;
                     logEntries.Add($"REMOVED  {reg} [key]");
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                logEntries.Add($"TIMEOUT {reg} — operation timed out, skipped");
             }
             catch (Exception ex)
             {

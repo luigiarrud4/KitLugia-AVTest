@@ -1,246 +1,202 @@
-# Roadmap: Replicar Revo Uninstaller 1:1
+# Roadmap: Replicar Revo Uninstaller
 
-## 📌 Princípios do Revo
+## Comparação Revo Pro × KitLugia
 
-| Revo | KitLugia | Implementação |
-|------|----------|--------------|
-| **Bold (Created)** = deletado | `SafetyLevel.Safe` + `Moderate` | Só itens com certeza alta são deletáveis |
-| **Not Bold** = só info, NUNCA deleta | `SafetyLevel.Uncertain` | Checkbox existe mas é ignorada no delete |
-| **Red** = excluído, nunca listado | `IsExcluded` | Lista de exclusão de chaves/pastas conhecidas |
-| **"Mark as Created"** | `BtnMarkAsCreated_Click` | Usuário pode promover Uncertain → Moderate |
-| **Pre-scan analysis** | Snapshot do registro ANTES do uninstall | Salvar estado antes de rodar o desinstalador |
-| **Restore point** | Já tem | ✅ |
-| **Backup .reg + Lixeira** | Já tem parcialmente | BackupRegistryKey existe |
-| **3 níveis de scan** | Safe / Moderate / Advanced | Implementar os 3 modos |
-| **Exclude list** | `Microsoft`, `Windows`, vendors | Expandir lista |
+| Funcionalidade | Revo Pro | KitLugia | Status |
+|---|---|---|---|
+| **Deep Uninstall (pré→pós diff)** | ✅ | ✅ `DeepUninstaller.DeepUninstallProgram()` | ✅ Completo |
+| **Registry scanner paralelo** (10 buckets) | ✅ | ✅ `ScanLeftoverRegistry()` | ✅ Completo |
+| **3 modos de scan** (Safe/Moderate/Advanced) | ✅ | ✅ `ScannerMode` enum existe | ⚠️ Não está no UI |
+| **Classificação de segurança** (Safe/Moderate/Uncertain) | ✅ | ✅ `CleanupSafety`, `ScanEntry.Safety` | ⚠️ Não reflete no UI |
+| **Safety icons (🟢🟡🔴)** | ✅ | ✅ AppCleanupItem tem SafetyIcon | ⚠️ Parcial no UI |
+| **Hunter Mode** | ✅ | ✅ `HunterWindow` | ⚠️ Básico, pode melhorar |
+| **Restore point** | ✅ | ✅ `TryCreateRestorePoint()` | ✅ Completo |
+| **Backup .reg + lixeira** | ✅ | ✅ `BackupRegistryKey`, recycle bin | ✅ Completo |
+| **Deletion log** | ✅ | ✅ `DeletionLogFile` em `UninstallResult` | ✅ Completo |
+| **Forced Uninstall** (programa quebrado) | ✅ | ⚠️ `ForceDeleteProgram()` existe | ❌ Não tem UI |
+| **Evidence Remover** (MRU, RecentDocs, Prefetch, JumpLists, UserAssist, TypedURLs) | ✅ | ❌ Só Prefetch básico no CleanupManager | ❌ **FALTA** |
+| **Portable Apps Scanner** | ✅ | ❌ | ❌ **FALTA** |
+| **Install Monitor** (tempo real) | ✅ | ❌ | ❌ **FALTA** |
+| **Autorun Manager completo** (Winlogon, AppInit, BHO, BootExecute, etc.) | ✅ | ⚠️ Só Run/RunOnce + Startup Folder | ❌ **FALTA** |
+| **Shell Extensions Manager** | ✅ | ❌ | ❌ **FALTA** |
+| **File Type / Association Manager** | ✅ | ❌ | ❌ **FALTA** |
+| **Batch uninstall paralelo** | ✅ | ✅ UWP (3x) + Programs (2x) | ✅ Completo |
+| **Select All / Deselect All** | ✅ | ✅ Adicionado | ✅ Completo |
+| **Junk Cleaner (temp, cache, logs)** | ✅ | ✅ `CleanupManager`, `Toolbox` | ✅ Completo |
+| **Browser cache/history cleaner** | ✅ | ⚠️ Só cache | ❌ Falta history/cookies |
+| **Startup optimizer (Turbo Boot)** | ❌ | ✅ `StartupManager.TurboBoot` | ✅ Diferencial |
+| **Privacy settings (O&O ShutUp)** | ❌ | ✅ `PrivacyPage` + `OOShutUpManager` | ✅ Diferencial |
+| **Registry cleaner (órfão)** | ✅ | ✅ `RegistryCleaner` | ✅ Completo |
+| **Services optimizer** | ✅ | ✅ `ServicesPage` + presets | ✅ Completo |
 
----
+## ✅ Já implementado e funcionando
 
-## 🔷 FASE 1: Fundação — `SafetyLevel`
+### Deep Uninstall (Revo-style)
+- `DeepUninstaller.cs`: 3756 linhas
+- `DeepUninstallProgram()`: pré-scan → uninstall → pós-scan → diff (confirmed vs heuristic)
+- `ForceDeleteProgram()`: forced uninstall sem uninstaller (mata processos, deleta pastas, limpa registro)
+- `ScanLeftovers(displayName, publisher, mode)`: scan de arquivos + registro
+- `PerformCleanup()`: deleta com backup, recycle bin, safety checks
+- `CleanupSafety` enum: `Safe`, `Moderate`, `Uncertain`
+- `ScannerMode` enum: `Safe`, `Moderate`, `Advanced`
+- `UninstallResult` com: `LeftoverFiles`, `LeftoverRegistry`, `HeuristicFiles`, `HeuristicRegistry`, `BaselineFileCount`, `BaselineRegistryCount`, `BackupFiles`, `DeletionLogFile`
+- 10 buckets de scan de registro em paralelo
+- Proteção de sistema: `ProhibitedLocations`, `IsSystemFolder()`, `IsTooBroadForDeletion()`
+- `KillProcessesWithTree()`: mata processos do app antes de deletar
+- `BackupRegistryKey()`: backup .reg antes de deletar chave
 
-### F1.1 Criar enum `CleanupSafety`
+### UI de Programas (AppsPage)
+- 3 abas: Bloatware (UWP), Programas (Registry), Resíduos (junk tracker)
+- Remoção individual com Revo diff (single UWP)
+- Batch UWP com Revo diff (pré→pós) + semaphore 3x
+- Batch Programs com semaphore 2x
+- Hunter Mode
+- Select All / Deselect All (adicionado)
+- Busca por nome
+- Restore point
 
-Arquivo: `KitLugia.Core/DeepUninstaller.cs` ou novo arquivo.
+### UI de Resíduos (Junk Tracker)
+- `LeftoverJunkManager` com persistência JSON
+- Cards expansíveis com arquivos/registro por app
+- Safety icons, heuristic labels
+- Cleanup individual por app
+- Dedup + max 100 entries
 
-```csharp
-public enum CleanupSafety
-{
-    Safe,      // Negrito, pré-selecionado, deleta com certeza
-    Moderate,  // Semi-negrito, pré-selecionado, deleta
-    Uncertain  // Normal, NÃO pré-selecionado, NÃO deleta (só informação)
-}
-```
+### Outros
+- `StartupManager`: Run/RunOnce, Startup Folder, Task Scheduler, Turbo Boot
+- `RegistryCleaner`: scan de órfãos (COM, SharedDLLs, AppPaths, etc.)
+- `CleanupManager`: temp, cache Windows, prefetch, thumbnails, DNS, logs
+- `BrowserCacheManager`: cache de Chrome, Edge, Firefox, Opera, Brave, Vivaldi
+- `PrivacyPage`: 130+ settings estilo O&O ShutUp10++
+- `ServicesPage`: 4 abas, presets Safe/Gamer
+- `Guardian`: detecta 2000+ tweaks nocivos
 
-### F1.2 Adicionar `SafetyLevel` ao `AppCleanupItem`
+## ❌ O que falta vs Revo Pro
 
-Arquivo: `AppsPage.xaml.cs` — classe `AppCleanupItem` (~linha 1125)
+### 1. Forced Uninstall UI (MÉDIA PRIORIDADE)
+- `ForceDeleteProgram()` já existe no Core mas não tem botão no UI
+- Adicionar botão "Forçar Remoção" na ProgramsPage
+- Criar diálogo: selecionar pasta + confirmar
+- Adicionar na aba de Programas do AppsPage também
 
-- Propriedade `SafetyLevel` (default `Safe`)
-- Propriedade `IsBold` → `get => SafetyLevel != Uncertain`
-- Propriedade `CanDelete` → `get => SafetyLevel != Uncertain`
-- Propriedade `SafetyIcon` → `get => SafetyLevel switch { Safe => "🟢", Moderate => "🟡", _ => "🔴" }`
+### 2. Evidence Remover (ALTA PRIORIDADE)
+Criar classe `EvidenceCleaner.cs` em KitLugia.Core/:
 
-### F1.3 Modificar `PerformCleanup`: só deleta se `CanDelete == true`
+| Categoria | O que limpar | Implementação |
+|---|---|---|
+| **RecentDocs** | HKCU\...\RecentDocs | `Registry.DeleteSubKeyTree()` |
+| **RunMRU** | HKCU\...\RunMRU | Limpar lista de comandos executados |
+| **TypedURLs** | HKCU\...\TypedURLs (IE/Edge) | Limpar URLs digitadas |
+| **UserAssist** | HKCU\...\UserAssist | Limpar rastreamento de execução |
+| **BagMRU** | HKCU\...\BagMRU + Bags | Limpar histórico de pastas |
+| **Jump Lists** | %APPDATA%\Microsoft\Windows\Recent\AutomaticDestinations | Deletar arquivos `.automaticDestinations-ms` |
+| **Prefetch** | C:\Windows\Prefetch | Já existe no CleanupManager |
+| **Windows Timeline** | ActivitiesCache.db | Deletar db de atividades |
+| **Clipboard History** | %LOCALAPPDATA%\Microsoft\Windows\Clipboard | Limpar histórico |
+| **Office MRU** | HKCU\...\Office\*\MRU | Limpar documentos recentes do Office |
+| **Visual Studio MRU** | HKCU\...\VisualStudio\*\MRU | Limpar projetos recentes |
+| **Browser History** | Chrome, Edge, Firefox históricos | Estender BrowserCacheManager |
+| **Browser Cookies** | Cookies dos browsers | Estender BrowserCacheManager |
 
-Arquivo: `DeepUninstaller.cs` (~linha 1152)
+Recursos: opera uma vez sob demanda (não em bg). Zero impacto em bg.
 
-- `PerformCleanup` recebe `List<AppCleanupItem>` em vez de `List<string>`
-- No loop: `if (!item.CanDelete) continue;`
-- Ou manter `List<string>` mas passar duas listas separadas (uma só com items deletáveis)
+### 3. Portable Apps Scanner (MÉDIA PRIORIDADE)
+Criar classe `PortableAppScanner.cs`:
 
-### F1.4 Reverter `_isSelected = true`, mas só pré-seleciona Safe/Moderate
+- Escanear %USERPROFILE%\Downloads, Desktop, D:\ (drives externos)
+- Detectar executáveis que não passaram por install (sem registro)
+- Listar com opção de "limpar" (deletar pasta)
+- Heurística: .exe com .dll, .ini, _data folder = provavelmente portable
+- Falso positivo: não listar programas do sistema
 
-- `_isSelected = true` novamente
-- `IsSelected` get: se `SafetyLevel == Uncertain` → false (nunca pré-selecionado)
+Recursos: opera sob demanda. Scan é rápido (só metadados).
 
-### F1.5 Build + teste
+### 4. Install Monitor (BAIXA PRIORIDADE - recursos controlados)
+Criar classe `InstallMonitor.cs`:
 
-- Confirmar que Uncertain NÃO é deletado mesmo se o checkbox estiver marcado
+- **Não** usar ETW (consome >10% CPU)
+- **Não** usar WMI events (consome >300MB RAM)
+- Usar `FileSystemWatcher` em:
+  - %ProgramFiles%, %ProgramFiles(x86)%
+  - %APPDATA%, %LOCALAPPDATA%
+  - %ProgramData%
+- Usar snapshot de registro (HKLM\Software, HKCU\Software) via diff periódico
+- Periodo: snapshot a cada 5 minutos (não em tempo real)
+- Quando `setup.exe` / `installer.exe` / `msiexec` é detectado rodando:
+  - Salvar snapshot de arquivos (lista de paths em %ProgramFiles%)
+  - Salvar snapshot de registro (subchaves de HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall)
+  - Aguardar processo terminar
+  - Comparar: o que apareceu = instalado
+- Armazenar snapshots em JSON (~50KB cada)
+- UI: "Monitor de Instalação" com lista de instalações detectadas
 
----
+**Limite de recursos em bg**:
+- FileSystemWatcher: ~0% CPU, ~5MB RAM
+- Snapshot de registro periódico: ~2% CPU por 2 segundos a cada 5 min
+- Sem polling, sem loops infinitos
+- Thread de bg dorme 99% do tempo
 
-## 🔷 FASE 2: Classificar cada item escaneado
+### 5. Autorun Manager Expandido (BAIXA PRIORIDADE)
+Estender `StartupManager.cs` para incluir:
 
-### F2.1 `GetInstallLocationFromRegistry(displayName)`
-
-Arquivo: `DeepUninstaller.cs`
-
-- Procurar em `HKLM\...\Uninstall` e `HKCU\...\Uninstall` pelo display name
-- Extrair `InstallLocation` se existir
-- Usar como âncora para classificação
-
-### F2.2 ScanLeftoverFiles: classificar cada arquivo/pasta
-
-| Condição | Safety |
+| Localização | Status |
 |---|---|
-| Dentro do `installLocation` conhecido | **Safe** |
-| `AppData\Local\{AppName}` match exato | **Safe** |
-| `AppData\Roaming\{AppName}` match exato | **Safe** |
-| Nome do app aparece no path completo | **Moderate** |
-| Match Sift4 ≥85 | **Moderate** |
-| Match Sift4 ≥70 e <85 | **Uncertain** |
-| Dentro de `ProgramData` (qualquer match) | **Uncertain** |
-| Caminho também referenciado por outro programa | **Uncertain** |
+| HKLM\...\Run / RunOnce | ✅ Já tem |
+| HKCU\...\Run / RunOnce | ✅ Já tem |
+| Startup Folder (All Users + Current) | ✅ Já tem |
+| Task Scheduler | ✅ Já tem |
+| **Winlogon\Shell** | ❌ Falta |
+| **Winlogon\Userinit** | ❌ Falta |
+| **AppInit_DLLs** | ❌ Falta |
+| **KnownDLLs** | ❌ Falta |
+| **BootExecute** | ❌ Falta |
+| **ShellServiceObjectDelayLoad** | ❌ Falta |
+| **Browser Helper Objects (BHO)** | ❌ Falta |
+| **ShellExecuteHooks** | ❌ Falta |
+| **Context Menu Handlers** | ❌ Falta |
 
-### F2.3 ScanLeftoverRegistry: classificar cada chave
+### 6. File Type / Association Manager (BAIXA PRIORIDADE)
+- Listar extensões registradas
+- Mostrar programa associado
+- Permitir trocar/remover associação
 
-| Condição | Safety |
-|---|---|
-| GUID/CLSID que aponta para installLocation | **Safe** |
-| `HKCU\Software\{AppName}` match exato | **Safe** |
-| `HKLM\...\Uninstall\{AppName}` | **Safe** |
-| Match por nome ≥85 | **Moderate** |
-| Match por nome ≥70 e <85 | **Uncertain** |
-| Match só por valor (sem nome) | **Uncertain** |
-| Fora de HKCU\Software (ex: HKLM\SYSTEM, Classes) | **Uncertain** |
+### 7. Shell Extensions Manager (BAIXA PRIORIDADE)
+- Listar context menu handlers
+- Permitir desabilitar/habilitar
 
-### F2.4 ScanLeftovers retornar `List<AppCleanupItem>`
+## Fases de Implementação
 
-- Em vez de `(List<string> files, List<string> registry)`, retornar `(List<AppCleanupItem> files, List<AppCleanupItem> registry)`
+### FASE 1 - Forced Uninstall UI (1 dia)
+- [x] `ForceDeleteProgram()` já existe
+- [ ] Adicionar botão "Forçar Remoção" na ProgramsPage
+- [ ] Diálogo de confirmação com seleção de pasta
+- [ ] Relatório do que foi deletado
 
-### F2.5 Build + teste
+### FASE 2 - Evidence Remover (2 dias)
+- [ ] Criar `EvidenceCleaner.cs` com todos os métodos
+- [ ] Adicionar seção "Evidências" na CleanupPage
+- [ ] Categorias com checkboxes
+- [ ] Execução com progresso
 
-- RustDesk: todos os itens classificados corretamente
+### FASE 3 - Portable Apps Scanner (1 dia)
+- [ ] Criar `PortableAppScanner.cs`
+- [ ] Adicionar aba na AppsPage ou página separada
+- [ ] Lista com nome + caminho + tamanho
+- [ ] Opção "Mover para Lixeira"
 
----
+### FASE 4 - Safety UI + Scanner Mode Selector (1 dia)
+- [ ] Adicionar ComboBox de scanner mode (Safe/Moderate/Advanced) no AppsPage
+- [ ] Fazer UI refletir SafetyLevel (bold/not bold, cores)
+- [ ] "Selecionar Tudo" pular Uncertain
 
-## 🔷 FASE 3: Scanner mais inteligente
+### FASE 5 - Install Monitor (3 dias)
+- [ ] Criar `InstallMonitor.cs` com FileSystemWatcher + snapshot diff
+- [ ] BG thread com sleep 5 min entre snapshots
+- [ ] Detecção de processos instaladores
+- [ ] UI: "Monitor" tab com histórico
+- [ ] ⚠️ Respeitar limite: ≤10% CPU ≤300MB RAM
 
-### F3.1 Adicionar `ScannerMode` enum
-
-```csharp
-public enum ScannerMode { Safe, Moderate, Advanced }
-```
-
-### F3.2 `ScanFolderConfidence` por modo
-
-- **Safe**: só match exato + installLocation
-- **Moderate**: + Sift4 ≥85
-- **Advanced**: + Sift4 ≥70 (atual, com risco de falso positivo)
-
-### F3.3 Pular `otherInstallLocations`
-
-- `ScanLeftoverFiles` recebe `List<string> otherInstallLocations` de `GetAllInstallLocations(excludeName: displayName)`
-- Se caminho começa com `otherInstallLocations[i]` → pular ou marcar Uncertain
-
-### F3.4 Expandir `SystemFolderNames`
-
-Adicionar vendors conhecidos:
-- `Google`, `Mozilla`, `Adobe`, `Oracle`, `Apple`, `Package Cache`, `USOShared`, `USOPrivate`, `Temp`, `WinSxS`, `Assembly`, `Installer`, `MSBuild`, `Resources`, `servicing`
-
-### F3.5 Build + teste
-
-- Modo Safe não encontra falsos positivos
-
----
-
-## 🔷 FASE 4: UI do Review Panel
-
-### F4.1 3 visuais (🟢🟡🔴) + negrito
-
-Arquivo: `AppsPage.xaml`
-
-- Safe: fundo verde claro, negrito, pré-selecionado
-- Moderate: fundo amarelo claro, negrito, pré-selecionado
-- Uncertain: fundo normal, sem negrito, NÃO pré-selecionado, tooltip "Item informativo — não será deletado"
-
-### F4.2 "Marcar como Criado"
-
-- Botão de contexto (right-click) ou botão na barra
-- Promove Uncertain → Moderate
-- Aviso: "Tem certeza? Só marque se tiver absoluta certeza"
-
-### F4.3 "Selecionar Tudo" só marca Safe/Moderate
-
-- Revo behavior: Select All não marca Uncertain
-
-### F4.4 Contador separado
-
-- "5 itens serão deletados | 3 itens informativos"
-
-### F4.5 Build + teste
-
-- Review panel visualmente igual ao Revo
-
----
-
-## 🔷 FASE 5: Pré-scan (Analyze step do Revo)
-
-### F5.1 `SnapshotRegistryBeforeUninstall(displayName)`
-
-- Antes de rodar o uninstaller nativo:
-  - Salvar lista de subchaves de `HKCU\Software\{displayName}`
-  - Salvar lista de subchaves de `HKLM\...\Uninstall\{displayName}`
-  - Salvar caminhos de pasta conhecidos (installLocation, AppData match)
-
-### F5.2 Comparação pré/pós
-
-- Depois do uninstall, comparar com o estado pós
-- O que SUMIU era do programa → certeza 100%
-- O que SOBROU mas tem match → pode ser leftover (menos certeza)
-
-### F5.3 Itens que sumiram = Safe automático
-
-### F5.4 Build + teste
-
----
-
-## 🔷 FASE 6: Segurança extra
-
-### F6.1 Verificar backup .reg antes de deletar
-
-- `PerformCleanup` já chama `BackupRegistryKey`
-- Confirmar que backup foi criado com sucesso
-
-### F6.2 Log de deleções
-
-- `%LOCALAPPDATA%\KitLugia\deletion_log_{timestamp}.txt`
-- Data, app, caminho deletado, safety level
-
-### F6.3 "Restore Backup"
-
-- Mostrar backups recentes e permitir restaurar
-
-### F6.4 Build + teste completo
-
-- Testar com RustDesk e apps reais
-
----
-
-## 📋 Checklist Executável
-
-```
-[ ] F1.1  Criar enum CleanupSafety
-[ ] F1.2  Adicionar SafetyLevel ao AppCleanupItem + IsBold + CanDelete
-[ ] F1.3  Modificar PerformCleanup: só deleta se CanDelete == true
-[ ] F1.4  Reverter _isSelected = true, mas só pré-seleciona Safe/Moderate
-[ ] F1.5  Build + teste: Uncertain NÃO deletado mesmo se marcado
----
-[ ] F2.1  Implementar GetInstallLocationFromRegistry(displayName)
-[ ] F2.2  ScanLeftoverFiles classificar com SafetyLevel
-[ ] F2.3  ScanLeftoverRegistry classificar com SafetyLevel
-[ ] F2.4  ScanLeftovers retornar List<AppCleanupItem>
-[ ] F2.5  Build + teste: RustDesk classificado corretamente
----
-[ ] F3.1  Adicionar ScannerMode enum
-[ ] F3.2  FolderConfidence por modo (Safe/Moderate/Advanced)
-[ ] F3.3  Pular otherInstallLocations
-[ ] F3.4  Expandir SystemFolderNames
-[ ] F3.5  Build + teste: Safe mode sem falsos positivos
----
-[ ] F4.1  UI: 3 visuais + negrito no ItemsControl
-[ ] F4.2  UI: "Marcar como Criado" context menu
-[ ] F4.3  UI: "Selecionar Tudo" só marca Safe/Moderate
-[ ] F4.4  UI: contador separado
-[ ] F4.5  Build + teste: review panel igual ao Revo
----
-[ ] F5.1  SnapshotRegistryBeforeUninstall
-[ ] F5.2  Comparação pré/pós
-[ ] F5.3  Itens que sumiram = Safe automático
-[ ] F5.4  Build + teste
----
-[ ] F6.1  Verificar backup .reg antes de deletar
-[ ] F6.2  Log de deleções
-[ ] F6.3  UI: "Restore Backup"
-[ ] F6.4  Build + teste completo
-```
+### FASE 6 - Autorun + File Types + Shell Extensions (2 dias)
+- [ ] Estender StartupManager
+- [ ] FileTypeManager básico
+- [ ] ShellExtensionsManager básico

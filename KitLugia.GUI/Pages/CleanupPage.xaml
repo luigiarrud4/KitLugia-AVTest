@@ -136,6 +136,8 @@
                     <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" FontSize="10" Foreground="#808080">
                         <Run Text="&#x26A0;&#xFE0F; CompactOS comprime o Windows para liberar espa&#xE7;o. Leva 30-60 min, abre janela CMD. Pode ser &#xFA;til para o WinBoot em discos pequenos. N&#xE3;o use em SSDs lentos."/>
                     </TextBlock>
+                    <Button Content="&#x1F4A1; Inicializa&#xE7;&#xE3;o Avan&#xE7;ada" Height="38" Margin="0,0,0,8"
+                            Click="BtnAdvancedStartup_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                 </StackPanel>
             </Grid>
 
@@ -197,6 +199,218 @@
                     <TextBlock x:Name="TxtNoBrowsers"
                                Text="Nenhum navegador detectado ainda. Clique em 'Detectar'."
                                FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <!-- SE&#xC7;&#xC3;O: Limpeza de Evid&#xEA;ncias (MRU, hist&#xF3;rico, rastros) -->
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x1F50D; Limpeza de Evid&#xEA;ncias" FontSize="15" FontWeight="Bold"
+                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Remove rastros de uso: MRU, documentos recentes, jump lists, UserAssist, Timeline, etc."
+                                       FontSize="11" Foreground="#888" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="BtnSelectAllEvidence" Content="&#x2705; Selecionar Todos"
+                                    Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="34"
+                                    Margin="0,0,6,0" Click="BtnSelectAllEvidence_Click"/>
+                            <Button x:Name="BtnCleanEvidence" Content="&#x1F9F9; Limpar Selecionados"
+                                    Style="{StaticResource GoldButtonStyle}" Width="140" Height="34"
+                                    IsEnabled="False" Click="BtnCleanEvidence_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <ItemsControl x:Name="EvidenceList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#1A1A1A" CornerRadius="6" Padding="12,8" Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                            <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#666"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11"
+                                                   Foreground="#888" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="TxtNoEvidence"
+                               Text="Clique em 'Selecionar Todos' e depois 'Limpar' para remover evid&#xEA;ncias."
+                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <!-- SE&#xC7;&#xC3;O: Scanner de Portable Apps                              -->
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x1F4E6; Portable Apps Scanner" FontSize="15" FontWeight="Bold"
+                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtPortableScanResult"
+                                       Text="Detecta aplicativos port&#xE1;teis em Download, Desktop, outras unidades."
+                                       FontSize="11" Foreground="#888" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="&#x1F50D; Detectar" Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="100" Height="34" Margin="0,0,6,0" Click="BtnScanPortable_Click"/>
+                            <Button x:Name="BtnDeletePortable" Content="&#x1F5D1;&#xFE0F; Remover Selecionados"
+                                    Style="{StaticResource GoldButtonStyle}" Width="160" Height="34"
+                                    IsEnabled="False" Click="BtnDeletePortable_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <ItemsControl x:Name="PortableAppList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#1A1A1A" CornerRadius="6" Padding="12,8" Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                                <Border Background="{Binding ConfidenceColor}" CornerRadius="3" Padding="4,1" Margin="6,0,0,0">
+                                                    <TextBlock Text="{Binding ConfidenceLabel}" FontSize="9" Foreground="White"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding FolderPath}" FontSize="9" Foreground="#555"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding TotalSizeFormatted}" FontSize="12"
+                                                       Foreground="{StaticResource AccentColor}" HorizontalAlignment="Right"/>
+                                            <TextBlock Text="{Binding LastModifiedFormatted}" FontSize="9"
+                                                       Foreground="#666" HorizontalAlignment="Right"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="3" Content="&#x1F4C2;" Style="{StaticResource SecondaryButtonStyle}"
+                                                Width="30" Height="28" Tag="{Binding FolderPath}"
+                                                ToolTip="Abrir pasta" Click="BtnOpenPortableFolder_Click"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="TxtNoPortable"
+                               Text="Clique em 'Detectar' para procurar aplicativos port&#xE1;teis."
+                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <!-- SE&#xC7;&#xC3;O: Monitor de Instala&#xE7;&#xF5;es (Revo-style)              -->
+            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#x1F4E1; Monitor de Instala&#xE7;&#xF5;es" FontSize="15" FontWeight="Bold"
+                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                                <Border x:Name="MonitorStatusDot" Background="#555" CornerRadius="5"
+                                        Width="10" Height="10" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtMonitorStatus"
+                                       Text="Monitora altera&#xE7;&#xF5;es em Program Files e AppData (FSW). Snapshot + Compare para diffs de registro."
+                                       FontSize="11" Foreground="#888" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="BtnToggleMonitor" Content="&#x25B6; Iniciar Monitor"
+                                    Style="{StaticResource SecondaryButtonStyle}" Width="130" Height="34"
+                                    Margin="0,0,6,0" Click="BtnToggleMonitor_Click"/>
+                            <Button x:Name="BtnSnapshot" Content="&#x1F4F7; Snapshot"
+                                    Style="{StaticResource SecondaryButtonStyle}" Width="100" Height="34"
+                                    Margin="0,0,6,0" IsEnabled="False" Click="BtnSnapshot_Click"/>
+                            <Button x:Name="BtnCompare" Content="&#x1F504; Comparar"
+                                    Style="{StaticResource GoldButtonStyle}" Width="100" Height="34"
+                                    Margin="0,0,6,0" IsEnabled="False" Click="BtnCompare_Click"/>
+                            <Button x:Name="BtnClearMonitor" Content="&#x1F5D1;&#xFE0F; Limpar"
+                                    Style="{StaticResource SecondaryButtonStyle}" Width="80" Height="34"
+                                    Margin="0,0,6,0" IsEnabled="False" Click="BtnClearMonitor_Click"/>
+                            <Button x:Name="BtnExportMonitor" Content="&#x1F4CB; Exportar"
+                                    Style="{StaticResource SecondaryButtonStyle}" Width="90" Height="34"
+                                    IsEnabled="False" Click="BtnExportMonitor_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Background="#111" CornerRadius="6" Padding="0" MaxHeight="300">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="MonitorChangeList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#0DFFFFFF" BorderThickness="0,0,0,1" BorderBrush="#222" Padding="8,5">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding TypeIcon}" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Type}" FontSize="10" FontWeight="Bold"
+                                                               Foreground="{Binding TypeColor}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Margin="8,0">
+                                                    <TextBlock Text="{Binding Path}" FontSize="11" Foreground="White"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="500"/>
+                                                    <TextBlock Text="{Binding Details}" FontSize="9" Foreground="#666"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="3" Text="{Binding TimestampFormatted}" FontSize="9"
+                                                           Foreground="#555" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+
+                    <TextBlock x:Name="TxtNoMonitorChanges"
+                               Text="Clique em 'Iniciar Monitor', depois 'Snapshot' antes de instalar e 'Comparar' ap&#xF3;s."
+                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,10,0,0"/>
                 </StackPanel>
             </Border>
 
