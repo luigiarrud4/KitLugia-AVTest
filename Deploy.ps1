@@ -5,7 +5,8 @@ param(
     [switch]$SkipHash,
     [switch]$CreateRelease,
     [string]$ReleaseTag,
-    [string]$ReleaseName
+    [string]$ReleaseName,
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,14 +29,22 @@ New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 if (-not $SkipBuild) {
     Write-Host "`n[2/5] Publishing Updater (single-file)..." -ForegroundColor Yellow
     $updaterOut = Join-Path (Join-Path $RepoRoot $OutputDir) "Updater"
-    & dotnet publish "$RepoRoot\KitLugia.Updater\KitLugia.Updater.csproj" `
-        -c $Configuration `
-        -o $updaterOut `
-        --nologo `
-        -p:PublishSingleFile=true `
-        -p:SelfContained=false `
-        -p:DebugType=none `
-        -p:DebugSymbols=false
+    $updaterArgs = @(
+        "$RepoRoot\KitLugia.Updater\KitLugia.Updater.csproj",
+        "-c", "$Configuration",
+        "-o", "$updaterOut",
+        "--nologo",
+        "-p:PublishSingleFile=true",
+        "-p:SelfContained=false",
+        "-p:DebugType=none",
+        "-p:DebugSymbols=false"
+    )
+    if ($Version) {
+        $updaterArgs += "-p:Version=$Version"
+        $updaterArgs += "-p:AssemblyVersion=$Version.0"
+        $updaterArgs += "-p:FileVersion=$Version.0"
+    }
+    & dotnet publish @updaterArgs
     if (-not $?) { throw "Updater publish failed" }
 
     # Copy updater to Core\Resources so it gets embedded in Core.dll / single-file .exe
@@ -48,14 +57,22 @@ else {
 }
 
 Write-Host "`n[3/5] Publishing GUI (single-file, framework-dependent)..." -ForegroundColor Yellow
-& dotnet publish "$RepoRoot\KitLugia.GUI\KitLugia.GUI.csproj" `
-    -c $Configuration `
-    -o $OutputPath `
-    --nologo `
-    -p:PublishSingleFile=true `
-    -p:SelfContained=false `
-    -p:DebugType=none `
-    -p:DebugSymbols=false
+$guiArgs = @(
+    "$RepoRoot\KitLugia.GUI\KitLugia.GUI.csproj",
+    "-c", "$Configuration",
+    "-o", "$OutputPath",
+    "--nologo",
+    "-p:PublishSingleFile=true",
+    "-p:SelfContained=false",
+    "-p:DebugType=none",
+    "-p:DebugSymbols=false"
+)
+if ($Version) {
+    $guiArgs += "-p:Version=$Version"
+    $guiArgs += "-p:AssemblyVersion=$Version.0"
+    $guiArgs += "-p:FileVersion=$Version.0"
+}
+& dotnet publish @guiArgs
 if (-not $?) { throw "GUI publish failed" }
 
 # Remove subpasta Updater (só queremos o output limpo)
