@@ -318,7 +318,7 @@ namespace KitLugia.GUI.Pages
                 // Copiar KitLugia.exe (do executável atual)
                 try
                 {
-                    string kitLugiaExe = Assembly.GetExecutingAssembly().Location;
+                    string kitLugiaExe = Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
                     if (File.Exists(kitLugiaExe))
                     {
                         await Task.Run(() => File.Copy(kitLugiaExe, Path.Combine(kitLugiaSetup, "KitLugia.exe"), true));

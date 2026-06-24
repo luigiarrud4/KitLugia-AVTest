@@ -79,9 +79,12 @@ namespace KitLugia.GUI.Pages
                 // Informações da versão atual
                 var assembly = Assembly.GetExecutingAssembly();
                 var assemblyVersion = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
-                
 
-                var buildDate = System.IO.File.GetLastWriteTime(assembly.Location);
+                var assemblyPath = assembly.Location;
+                if (string.IsNullOrEmpty(assemblyPath))
+                    assemblyPath = Environment.ProcessPath ?? AppContext.BaseDirectory;
+
+                var buildDate = System.IO.File.GetLastWriteTime(assemblyPath);
                 
                 // ✅. Adicionar timeout de 10 segundos para evitar congelamento
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -92,7 +95,7 @@ namespace KitLugia.GUI.Pages
                 }, cts.Token);
                 
                 var localBuildDate = DateTimeOffset.Now; // Data/hora atual com timezone do usuário
-                var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                var exePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
 
 
                 CurrentVersionText.Text = $"v{versionInfo.RealVersion}";
@@ -927,10 +930,10 @@ del ""%~f0"" >nul 2>&1
                 KitLugia.Core.Logger.Log("Criando bootstrapper API nativa...");
 
                 // Método: Usar apenas APIs nativas do Windows
-                var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                if (currentExePath.EndsWith(".dll"))
+                var currentExePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location ?? "";
+                if (string.IsNullOrEmpty(currentExePath) || currentExePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                 {
-                    currentExePath = currentExePath.Replace(".dll", ".exe");
+                    currentExePath = Path.Combine(AppContext.BaseDirectory, "KitLugia.GUI.exe");
                 }
 
                 // Criar arquivo de configuração simples
@@ -1082,10 +1085,10 @@ del ""%~f0"" >nul 2>&1";
             {
                 KitLugia.Core.Logger.Log("Criando bootstrapper ultra-simples...");
 
-                var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                if (currentExePath.EndsWith(".dll"))
+                var currentExePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location ?? "";
+                if (string.IsNullOrEmpty(currentExePath) || currentExePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                 {
-                    currentExePath = currentExePath.Replace(".dll", ".exe");
+                    currentExePath = Path.Combine(AppContext.BaseDirectory, "KitLugia.GUI.exe");
                 }
 
                 // Método: Arquivo .cmd simples (menos suspeito que .bat)
