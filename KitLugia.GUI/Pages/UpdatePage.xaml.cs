@@ -355,7 +355,10 @@ namespace KitLugia.GUI.Pages
             {
 
                 var assembly = Assembly.GetExecutingAssembly();
-                var buildDate = System.IO.File.GetLastWriteTime(assembly.Location);
+                var assemblyPath = assembly.Location;
+                if (string.IsNullOrEmpty(assemblyPath))
+                    assemblyPath = Environment.ProcessPath ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
+                var buildDate = System.IO.File.GetLastWriteTime(assemblyPath);
                 var realVersion = KitLugia.Core.SmartVersionDetector.GetRealVersion(buildDate);
                 
                 // Converter string de versão para Version object
@@ -479,13 +482,14 @@ namespace KitLugia.GUI.Pages
                 UpdateButton.IsEnabled = false;
                 CheckButton.IsEnabled = false;
 
-                var success = await GitHubUpdater.DownloadAndInstallUpdateAsync();
+                // Usa o fluxo inline (download + extração + auto-update + restart)
+                var success = await DownloadAndInstallDirectAsync();
 
                 if (success)
                 {
-                    StatusText.Text = "🚀 Atualização em andamento! Reiniciando...";
-                    await Task.Delay(1500);
-                    System.Windows.Application.Current.Shutdown();
+                    StatusText.Text = "🚀 Atualização concluída! Nova versão iniciada.";
+                    UpdateButton.IsEnabled = false;
+                    CheckButton.IsEnabled = false;
                 }
                 else
                 {
@@ -705,33 +709,29 @@ namespace KitLugia.GUI.Pages
 
                     KitLugia.Core.Logger.Log("✅. Dependências copiadas");
 
-                    // 7. Criar notificação de update completo
+                    // 7. Criar marcador para notificação pós-restart
                     var notificationFile = Path.Combine(currentDir, "UPDATE_COMPLETE.txt");
-                    var notificationContent = $@"
-----------------------------------------
-   KITLUGIA AUTO-UPDATE CONCLUIDO
-----------------------------------------
+                    File.WriteAllText(notificationFile, $"Update concluído em {DateTime.Now:dd/MM/yyyy HH:mm:ss}");
 
-Atualizacao concluida com sucesso!
+                    // 8. Iniciar nova versão
+                    KitLugia.Core.Logger.Log("🚀 Iniciando nova versão...");
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = currentExePath,
+                            Arguments = "--tray",
+                            UseShellExecute = true
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        KitLugia.Core.Logger.Log($"⚠️ Erro ao reiniciar: {ex.Message}");
+                    }
 
-Versao antiga: {archivePath}
-Nova versao: {currentExePath}
-
-PROXIMO PASSO:
-Por favor, reinicie o KitLugia manualmente.
-
-O Tray Icon aparecera automaticamente na bandeja do sistema.
-
-----------------------------------------
-Data: {DateTime.Now:dd/MM/yyyy HH:mm:ss}
-----------------------------------------
-";
-                    File.WriteAllText(notificationFile, notificationContent);
-                    KitLugia.Core.Logger.Log("✅. Notificação criada");
-
-                    // 8. Fechar aplicação atual (notificação será mostrada na próxima inicialização)
+                    // 8. Fechar aplicação atual
                     KitLugia.Core.Logger.Log("✅ Update concluído, fechando aplicação...");
-                    await Task.Delay(2000);
+                    await Task.Delay(1000);
                     System.Windows.Application.Current.Shutdown();
 
                     return true;
