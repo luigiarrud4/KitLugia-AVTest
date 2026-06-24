@@ -164,10 +164,13 @@ namespace KitLugia.Core
                     Logger.Log("✅ Hash verificado com sucesso!");
                 }
 
-                // Extract KitLugia.Updater.exe from embedded resources (single-file build)
-                string currentDllPath = Assembly.GetEntryAssembly()?.Location ?? "";
-                string currentExePath = Path.ChangeExtension(currentDllPath, ".exe");
-                string currentDir = Path.GetDirectoryName(currentDllPath) ?? "";
+                // Resolve paths: Environment.ProcessPath works in single-file and normal builds
+                string currentExePath = Environment.ProcessPath
+                    ?? Path.ChangeExtension(Assembly.GetEntryAssembly()?.Location ?? "", ".exe")
+                    ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
+                if (currentExePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                    currentExePath = Path.ChangeExtension(currentExePath, ".exe");
+                string currentDir = Path.GetDirectoryName(currentExePath) ?? AppContext.BaseDirectory;
                 string updaterPath = Path.Combine(currentDir, "KitLugia.Updater.exe");
 
                 if (!File.Exists(updaterPath))

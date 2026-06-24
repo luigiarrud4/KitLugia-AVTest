@@ -10,4 +10,11 @@
     <AssemblyName>KitLugia.Updater</AssemblyName>
     <RootNamespace>KitLugia.Updater</RootNamespace>
   </PropertyGroup>
+
+  <!-- Auto-copy built updater to Core's Resources folder for embedding -->
+  <Target Name="CopyUpdaterToCoreResources" AfterTargets="Build" Condition="Exists('$(ProjectDir)..\KitLugia.Core\Resources')">
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).exe"
+          DestinationFolder="$([System.IO.Path]::GetFullPath('$(ProjectDir)..\KitLugia.Core\Resources'))"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
