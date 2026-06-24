@@ -623,14 +623,13 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                var currentDir = Path.GetDirectoryName(currentExePath) ?? string.Empty;
-                
-                // Corrigir: se currentExePath for .dll, mudar para .exe
-                if (currentExePath.EndsWith(".dll"))
-                {
-                    currentExePath = currentExePath.Replace(".dll", ".exe");
-                }
+                // Use Environment.ProcessPath (funciona em single-file e debug)
+                var currentExePath = Environment.ProcessPath
+                    ?? System.Reflection.Assembly.GetExecutingAssembly().Location
+                    ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
+                if (currentExePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                    currentExePath = Path.ChangeExtension(currentExePath, ".exe");
+                var currentDir = Path.GetDirectoryName(currentExePath) ?? AppContext.BaseDirectory;
 
                 KitLugia.Core.Logger.Log(" Iniciando update sem processos externos...");
 
@@ -651,11 +650,13 @@ namespace KitLugia.GUI.Pages
                 KitLugia.Core.Logger.Log(" Iniciando auto-update sem processos externos...");
 
                 // 1. Verificar se o destino é o próprio executável em execução
-                var currentAssembly = System.Reflection.Assembly.GetEntryAssembly();
-                if (currentAssembly == null)
-                    currentAssembly = System.Reflection.Assembly.GetCallingAssembly();
-
-                bool isSelfUpdate = currentAssembly.Location.ToUpper() == currentExePath.ToUpper();
+                string currentExeFromProcess = Environment.ProcessPath ?? "";
+                bool isSelfUpdate = string.Equals(currentExeFromProcess, currentExePath, StringComparison.OrdinalIgnoreCase)
+                    || (string.IsNullOrEmpty(currentExeFromProcess)
+                        && string.Equals(
+                            System.Reflection.Assembly.GetEntryAssembly()?.Location,
+                            currentExePath,
+                            StringComparison.OrdinalIgnoreCase));
                 KitLugia.Core.Logger.Log($"Auto-update necessário: {isSelfUpdate}");
 
                 if (isSelfUpdate)
@@ -725,10 +726,7 @@ Data: {DateTime.Now:dd/MM/yyyy HH:mm:ss}
                     File.WriteAllText(notificationFile, notificationContent);
                     KitLugia.Core.Logger.Log("✅. Notificação criada");
 
-                    // 8. Abrir notificação para o usuário
-                    Process.Start("notepad.exe", notificationFile);
-
-                    // 9. Fechar aplicação atual
+                    // 8. Fechar aplicação atual (notificação será mostrada na próxima inicialização)
                     KitLugia.Core.Logger.Log("✅ Update concluído, fechando aplicação...");
                     await Task.Delay(2000);
                     System.Windows.Application.Current.Shutdown();
@@ -818,6 +816,9 @@ del ""%~f0"" >nul 2>&1
                     }
 
                     KitLugia.Core.Logger.Log("✅. Update normal concluído");
+                    if (System.Windows.Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowActionNotification("Atualização Concluída",
+                            "O KitLugia foi atualizado com sucesso!");
                     return true;
                 }
             }

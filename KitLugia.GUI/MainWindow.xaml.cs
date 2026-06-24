@@ -1904,6 +1904,18 @@ namespace KitLugia.GUI
         public void ShowError(string title, string message) => ShowNotification(title, message, NotificationType.Error);
         public void ShowInfo(string title, string message) => ShowNotification(title, message, NotificationType.Info);
 
+        public void ShowActionNotification(string title, string message, Action? onAction = null)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var notif = new Controls.UpdateNotification();
+                notif.SetContent(title, message, onAction);
+                notif.Dismissed += (n) => ActionNotificationContainer.Children.Remove(n);
+                ActionNotificationContainer.Children.Clear();
+                ActionNotificationContainer.Children.Add(notif);
+            });
+        }
+
         private int GetPriorityValue(NotificationType type)
         {
             return type switch { NotificationType.Error => 3, NotificationType.Info => 2, NotificationType.Success => 1, _ => 0 };
@@ -2152,6 +2164,19 @@ namespace KitLugia.GUI
             // A intro só começa DEPOIS que o layout está completamente renderizado (via BeginInvoke Loaded).
             // Isso resolve o problema de animações não dispararem quando o sistema está ocupado.
             _ = LoadIntroSettingsAndPlay();
+            _ = CheckForUpdateNotificationAsync();
+        }
+
+        private async Task CheckForUpdateNotificationAsync()
+        {
+            var notificationFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "UPDATE_COMPLETE.txt");
+            if (System.IO.File.Exists(notificationFile))
+            {
+                await Dispatcher.InvokeAsync(() =>
+                    ShowActionNotification("Atualização Concluída",
+                        "O KitLugia foi atualizado para a versão mais recente. Reinicie o aplicativo se necessário."));
+                System.IO.File.Delete(notificationFile);
+            }
         }
 
         private async Task LoadIntroSettingsAndPlay()

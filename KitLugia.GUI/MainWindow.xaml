@@ -746,6 +746,15 @@
                         Panel.ZIndex="99998"
                         Background="{x:Null}"/>
 
+            <!-- NOTIFICA&#xC7;&#xC3;O DE A&#xC7;&#xC3;O (Update, etc.) -->
+            <StackPanel x:Name="ActionNotificationContainer"
+                        Grid.Row="0" Grid.Column="1"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"
+                        Margin="0,40,20,0"
+                        Panel.ZIndex="99997"
+                        Background="{x:Null}"/>
+
             <!-- &#x1F525; INDICADOR DE TAREFAS EM SEGUNDO PLANO -->
             <Border x:Name="BackgroundTaskIndicator"
                     Grid.Row="0" Grid.Column="1"

@@ -1092,7 +1092,6 @@ namespace KitLugia.Core
                     {
                         // BCU DirectlyInsideKnownFolder penalty: items directly inside user shell folders
                         // (Desktop, Documents, Downloads, etc.) are more likely to be false positives
-                        if (!match) { } // placeholder
                         string parentFolder = Path.GetFileName(Path.GetDirectoryName(dir));
                         if (!string.IsNullOrEmpty(parentFolder) && KnownUserShellFolders.Contains(parentFolder))
                         {
@@ -1102,6 +1101,17 @@ namespace KitLugia.Core
                                 (string.IsNullOrEmpty(publisher) || Confidence.Generate(publisher, dirName) < 85))
                                 match = false;
                         }
+
+                        // BCU ExecutablesArePresent penalty: if folder has executables that don't confirm the match
+                        if (match && !contentMatch && HasUnrelatedExecutables(dir, displayName, publisher))
+                            match = false;
+
+                        // BCU ItemNameEqualsCompanyName: if folder name matches publisher but not product name
+                        if (match && !contentMatch && !string.IsNullOrEmpty(publisher) &&
+                            !publisher.Equals(displayName, StringComparison.OrdinalIgnoreCase) &&
+                            dirName.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                            Confidence.Generate(displayName, dirName, publisher) < 85)
+                            match = false;
 
                         if (match)
                         {
@@ -1185,6 +1195,45 @@ namespace KitLugia.Core
             catch { }
 
             return false;
+        }
+
+        // BCU ExecutablesArePresent: returns true if the folder has executables/dlls that don't match the app/publisher
+        private static bool HasUnrelatedExecutables(string folderPath, string displayName, string publisher)
+        {
+            if (string.IsNullOrEmpty(publisher) && string.IsNullOrEmpty(displayName))
+                return false;
+
+            try
+            {
+                bool hasExecutables = false;
+                bool anyMatch = false;
+
+                foreach (var file in Directory.EnumerateFiles(folderPath, "*", System.IO.SearchOption.TopDirectoryOnly))
+                {
+                    string ext = Path.GetExtension(file).ToLowerInvariant();
+                    if (ext != ".exe" && ext != ".dll" && ext != ".sys" && ext != ".ocx")
+                        continue;
+
+                    hasExecutables = true;
+                    try
+                    {
+                        var fvi = FileVersionInfo.GetVersionInfo(file);
+                        if ((!string.IsNullOrEmpty(publisher) && fvi.CompanyName != null &&
+                             fvi.CompanyName.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrEmpty(displayName) && fvi.ProductName != null &&
+                             fvi.ProductName.IndexOf(displayName, StringComparison.OrdinalIgnoreCase) >= 0))
+                        {
+                            anyMatch = true;
+                            break;
+                        }
+                    }
+                    catch { }
+                }
+
+                // If executables exist but NONE match the app → likely unrelated
+                return hasExecutables && !anyMatch;
+            }
+            catch { return false; }
         }
 
         private static void ScanUninstallerSpecific(string installLocation, string displayIcon, string displayName, HashSet<string> results)

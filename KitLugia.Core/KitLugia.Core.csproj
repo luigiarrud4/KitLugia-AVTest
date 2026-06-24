@@ -27,6 +27,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\BitsumHighestPerformance.pow" />
     <EmbeddedResource Include="Resources\KitLugia.Updater.exe" Condition="Exists('Resources\KitLugia.Updater.exe')" />
+    <ProjectReference Include="..\KitLugia.Updater\KitLugia.Updater.csproj" ReferenceOutputAssembly="false" />
     <Content Include="Resources\BootGoodies\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
