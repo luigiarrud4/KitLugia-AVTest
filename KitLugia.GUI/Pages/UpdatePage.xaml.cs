@@ -713,25 +713,40 @@ namespace KitLugia.GUI.Pages
                     var notificationFile = Path.Combine(currentDir, "UPDATE_COMPLETE.txt");
                     File.WriteAllText(notificationFile, $"Update concluído em {DateTime.Now:dd/MM/yyyy HH:mm:ss}");
 
-                    // 8. Iniciar nova versão
-                    KitLugia.Core.Logger.Log("🚀 Iniciando nova versão...");
+                    // 8. Iniciar nova versão (sem --tray para mostrar a janela)
+                    KitLugia.Core.Logger.Log($"🚀 Iniciando nova versão: {currentExePath}");
+                    bool restartOk = false;
                     try
                     {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = currentExePath,
-                            Arguments = "--tray",
-                            UseShellExecute = true
-                        });
+                        using var proc = new Process();
+                        proc.StartInfo.FileName = currentExePath;
+                        proc.StartInfo.WorkingDirectory = currentDir;
+                        proc.StartInfo.UseShellExecute = false;
+                        restartOk = proc.Start();
+                        KitLugia.Core.Logger.Log($"✅ Restart direto: {restartOk}");
                     }
                     catch (Exception ex)
                     {
-                        KitLugia.Core.Logger.Log($"⚠️ Erro ao reiniciar: {ex.Message}");
+                        KitLugia.Core.Logger.Log($"⚠️ Restart direto falhou: {ex.Message}");
+                        try
+                        {
+                            using var proc = new Process();
+                            proc.StartInfo.FileName = currentExePath;
+                            proc.StartInfo.WorkingDirectory = currentDir;
+                            proc.StartInfo.UseShellExecute = true;
+                            restartOk = proc.Start();
+                            KitLugia.Core.Logger.Log($"✅ Restart shell: {restartOk}");
+                        }
+                        catch (Exception ex2)
+                        {
+                            KitLugia.Core.Logger.Log($"⚠️ Restart shell falhou: {ex2.Message}");
+                        }
                     }
+                    KitLugia.Core.Logger.Log($"🚀 Restart concluído: {restartOk}");
 
-                    // 8. Fechar aplicação atual
+                    // 9. Fechar aplicação atual
                     KitLugia.Core.Logger.Log("✅ Update concluído, fechando aplicação...");
-                    await Task.Delay(1000);
+                    await Task.Delay(1500);
                     System.Windows.Application.Current.Shutdown();
 
                     return true;
