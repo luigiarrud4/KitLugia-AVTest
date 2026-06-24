@@ -913,7 +913,7 @@ namespace KitLugia.Core
             {
                 Logger.Log("🔍 Verificando métodos de inicialização do KitLugia...");
                 
-                var currentExe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                var currentExe = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
                 
                 // Executar em background para não travar a UI
                 System.Threading.Tasks.Task.Run(() =>

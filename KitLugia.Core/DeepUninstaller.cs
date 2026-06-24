@@ -487,12 +487,12 @@ namespace KitLugia.Core
         {
             try
             {
-                string? loc = Assembly.GetExecutingAssembly().Location;
+                string? loc = Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location;
                 if (!string.IsNullOrEmpty(loc))
                     return Path.GetDirectoryName(loc)?.TrimEnd('\\') ?? "";
             }
             catch { }
-            return "";
+            return AppContext.BaseDirectory.TrimEnd('\\');
         }
 
         // All known system / well-known folder paths (CSIDL + WinRT KnownFolders equivalent)
