@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Management;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -137,11 +138,12 @@ namespace KitLugia.Core
             progress?.Report("Encerrando processos do aplicativo...");
             KillProcessesWithTree(displayName, installLocation);
 
-            // Pre-scan baseline (Revo Uninstaller pattern): detect all app-owned
-            // entries BEFORE uninstall so we can diff post-uninstall leftovers
-            // against it, filtering out heuristic false positives.
-            progress?.Report("Pré-escaneando baseline (Revo-style)...");
-            var baselineFiles = new HashSet<string>(ScanLeftoverFiles(displayName, installLocation, displayIcon, uninstallString), StringComparer.OrdinalIgnoreCase);
+            // Pre-scan baseline (true Revo Uninstaller pattern): snapshot ALL
+            // directories in key file locations BEFORE uninstall — no name matching,
+            // just capture everything. The post-uninstall scan (confidence + publisher)
+            // finds the same dirs, and the diff identifies non-removed leftovers.
+            progress?.Report("Snapshot de diretórios (pré-instalação)...");
+            var baselineFiles = SnapshotKeyFileLocations(installLocation);
             var baselineReg = new HashSet<string>(ScanLeftoverRegistry(displayName, installLocation), StringComparer.OrdinalIgnoreCase);
             result.BaselineFileCount = baselineFiles.Count;
             result.BaselineRegistryCount = baselineReg.Count;
@@ -207,9 +209,10 @@ namespace KitLugia.Core
                 result.Errors.Add("No uninstall string available");
             }
 
+            DateTime? installDate = GetInstallDateFromRegistry(displayName);
             progress?.Report("Escaneando resíduos de arquivos...");
             var fileSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            fileSet.UnionWith(ScanLeftoverFiles(displayName, installLocation, displayIcon, uninstallString));
+            fileSet.UnionWith(ScanLeftoverFiles(displayName, installLocation, displayIcon, uninstallString, publisher, installDate));
 
             progress?.Report("Escaneando resíduos do registro...");
             var regSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -242,6 +245,40 @@ namespace KitLugia.Core
                 result.Errors.Add("Uninstall may have failed — no leftovers detected.");
 
             return result;
+        }
+
+        /// <summary>
+        /// Full snapshot of top-level directories in key file system locations.
+        /// No confidence matching — captures everything for true Revo-style pre/post diff.
+        /// </summary>
+        private static HashSet<string> SnapshotKeyFileLocations(string installLocation)
+        {
+            var snapshot = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (!string.IsNullOrEmpty(installLocation) && Directory.Exists(installLocation))
+                snapshot.Add(installLocation);
+
+            string[] searchDirs = {
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            };
+
+            foreach (var dir in searchDirs)
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                try
+                {
+                    foreach (var sub in Directory.EnumerateDirectories(dir))
+                        snapshot.Add(sub);
+                }
+                catch { }
+            }
+
+            return snapshot;
         }
 
         /// <summary>
@@ -292,7 +329,7 @@ namespace KitLugia.Core
             var fileSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (!string.IsNullOrEmpty(installLocation))
                 fileSet.Add(installLocation);
-            fileSet.UnionWith(ScanLeftoverFiles(displayName, installLocation, displayIcon, ""));
+            fileSet.UnionWith(ScanLeftoverFiles(displayName, installLocation, displayIcon, "", publisher));
 
             // 3. Scan for registry leftovers
             var regSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -326,10 +363,11 @@ namespace KitLugia.Core
         public static (List<ScanEntry> files, List<ScanEntry> registry) ScanLeftovers(string displayName, string publisher, ScannerMode mode = ScannerMode.Moderate)
         {
             string installLocation = GetInstallLocationFromRegistry(displayName) ?? "";
+            DateTime? installDate = GetInstallDateFromRegistry(displayName);
             var rawFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var rawReg = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            rawFiles.UnionWith(ScanLeftoverFiles(displayName, installLocation, "", "", mode));
+            rawFiles.UnionWith(ScanLeftoverFiles(displayName, installLocation, "", "", publisher, installDate, mode));
             rawReg.UnionWith(ScanLeftoverRegistry(displayName, installLocation, mode));
 
             // Additional scans: scheduled tasks + env vars
@@ -535,7 +573,7 @@ namespace KitLugia.Core
                 set.Add(Path.Combine(user, "Pictures"));
                 set.Add(Path.Combine(user, "Music"));
                 set.Add(Path.Combine(user, "Videos"));
-                set.Add(Path.Combine(user, "Desktop"));
+                // Desktop removed — user profile Desktop folders are too prone to false positives
                 set.Add(Path.Combine(user, "Favorites"));
                 set.Add(Path.Combine(user, "Contacts"));
                 set.Add(Path.Combine(user, "Links"));
@@ -657,7 +695,7 @@ namespace KitLugia.Core
             "he-il", "ar-sa", "th-th", "vi-vn", "ms-my", "id-id"
         };
 
-        private static List<string> ScanLeftoverFiles(string displayName, string installLocation, string displayIcon, string uninstallString, ScannerMode mode = ScannerMode.Moderate)
+        private static List<string> ScanLeftoverFiles(string displayName, string installLocation, string displayIcon, string uninstallString, string publisher = "", DateTime? installDate = null, ScannerMode mode = ScannerMode.Moderate)
         {
             var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -703,13 +741,13 @@ namespace KitLugia.Core
             foreach (var dir in dirs)
             {
                 if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
-                ScanFolderConfidence(dir, displayName, results, otherInstallLocations, depth: 0, maxDepth: maxDepth);
+                ScanFolderConfidence(dir, displayName, publisher, installDate, results, otherInstallLocations, depth: 0, maxDepth: maxDepth);
             }
 
             // Temp — shallow
             string temp = Path.GetTempPath().TrimEnd('\\');
             if (!string.IsNullOrEmpty(temp) && Directory.Exists(temp))
-                ScanFolderConfidence(temp, displayName, results, otherInstallLocations, depth: 0, maxDepth: 1);
+                ScanFolderConfidence(temp, displayName, publisher, installDate, results, otherInstallLocations, depth: 0, maxDepth: 1);
 
             // Prefetch via sorted executables (BCU pattern)
             ScanPrefetchByExe(installLocation, displayIcon, uninstallString, results);
@@ -721,8 +759,8 @@ namespace KitLugia.Core
             ScanStartupFolders(displayName, results);
 
             // Start Menu shortcuts (.lnk files)
-            ScanStartMenuShortcuts(displayName, results);
-            ScanDesktopShortcuts(displayName, results);
+            ScanStartMenuShortcuts(displayName, publisher, results);
+            ScanDesktopShortcuts(displayName, publisher, results);
 
             // WER reports via sorted executables (BCU pattern)
             ScanWerReports(installLocation, displayName, displayIcon, uninstallString, results);
@@ -734,6 +772,34 @@ namespace KitLugia.Core
             {
                 if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                     ScanEmptyAndQuestionableDirs(dir, displayName, results);
+            }
+
+            // BCU TestForSimilarNames: remove results that match another app's name better
+            if (results.Count > 0)
+            {
+                var otherNames = GetAllAppDisplayNames(excludeName: displayName);
+                if (otherNames.Count > 0)
+                {
+                    var toRemove = new List<string>();
+                    foreach (var path in results)
+                    {
+                        string leafName = Path.GetFileNameWithoutExtension(path) ?? Path.GetFileName(path) ?? "";
+                        if (string.IsNullOrEmpty(leafName) || leafName.Length < 3) continue;
+
+                        int targetConf = Confidence.Generate(displayName, leafName, publisher);
+                        foreach (var other in otherNames)
+                        {
+                            int otherConf = Confidence.Generate(other, leafName);
+                            if (otherConf > targetConf)
+                            {
+                                toRemove.Add(path);
+                                break;
+                            }
+                        }
+                    }
+                    foreach (var r in toRemove)
+                        results.Remove(r);
+                }
             }
 
             return results.ToList();
@@ -760,8 +826,8 @@ namespace KitLugia.Core
                         continue;
 
                     string leafName = taskName.Split('\\').Last();
-                    int conf = Confidence.Generate(displayName, leafName);
-                    if (conf < 70) conf = Confidence.Generate(publisher, leafName);
+                    int conf = Confidence.Generate(displayName, leafName, publisher);
+                    if (conf < 70 && !string.IsNullOrEmpty(publisher)) conf = Confidence.Generate(publisher, leafName);
                     if (conf < 70) continue;
 
                     using var taskSubKey = treeKey.OpenSubKey(taskName);
@@ -962,13 +1028,11 @@ namespace KitLugia.Core
             string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             string programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string localLow = Path.Combine(user, "AppData", "LocalLow");
             string savedGames = Path.Combine(user, "Saved Games");
             string userStartMenu = Path.Combine(roamingAppData, "Microsoft", "Windows", "Start Menu", "Programs");
             string commonStartMenu = Path.Combine(programData, "Microsoft", "Windows", "Start Menu", "Programs");
-            string publicDesktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory));
             string virtualStore = Path.Combine(localAppData, "VirtualStore");
             string userPrograms = Path.Combine(roamingAppData, "Programs");
             string localPrograms = Path.Combine(localAppData, "Programs");
@@ -981,13 +1045,22 @@ namespace KitLugia.Core
             return new[]
             {
                 localAppData, roamingAppData, programData, programFiles, programFilesX86,
-                localLow, desktop, documents, savedGames, userStartMenu, commonStartMenu, publicDesktop,
+                localLow, documents, savedGames, userStartMenu, commonStartMenu,
                 virtualStore, userPrograms, localPrograms, publicPrograms,
                 werArchive, werQueue, werLocalArchive, werLocalQueue
             };
         }
 
-        private static void ScanFolderConfidence(string baseDir, string displayName, HashSet<string> results, List<string> otherInstallLocations, int depth, int maxDepth)
+        // BCU DirectlyInsideKnownFolder: known user shell folders where direct children are suspicious
+        private static readonly HashSet<string> KnownUserShellFolders = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Desktop", "Documents", "Downloads", "Pictures", "Music", "Videos",
+            "Favorites", "Contacts", "Links", "Searches", "Saved Games",
+            "OneDrive", "3D Objects", "Recorded Calls", "Camera Roll",
+            "Screenshots", "Local", "LocalLow", "Roaming"
+        };
+
+        private static void ScanFolderConfidence(string baseDir, string displayName, string publisher, DateTime? installDate, HashSet<string> results, List<string> otherInstallLocations, int depth, int maxDepth)
         {
             try
             {
@@ -1006,11 +1079,50 @@ namespace KitLugia.Core
                     if (IsTooBroadForDeletion(dir))
                         continue;
 
-                    bool match = Confidence.Generate(displayName, dirName) >= 70;
+                    bool contentMatch = VerifyFolderByContent(dir, displayName, publisher);
+
+                    // Use BCU-style publisher-trimmed matching
+                    bool nameMatch = Confidence.Generate(displayName, dirName, publisher) >= 70;
+                    if (!nameMatch && !string.IsNullOrEmpty(publisher))
+                        nameMatch = Confidence.Generate(publisher, dirName) >= 70;
+
+                    bool match = nameMatch || contentMatch;
 
                     if (match)
                     {
-                        // Cross-reference: skip if another app uses this dir
+                        // BCU DirectlyInsideKnownFolder penalty: items directly inside user shell folders
+                        // (Desktop, Documents, Downloads, etc.) are more likely to be false positives
+                        if (!match) { } // placeholder
+                        string parentFolder = Path.GetFileName(Path.GetDirectoryName(dir));
+                        if (!string.IsNullOrEmpty(parentFolder) && KnownUserShellFolders.Contains(parentFolder))
+                        {
+                            // Reduce confidence threshold for items directly in known shell folders
+                            // Only accept if very strong match (>= 85) or confirmed by content
+                            if (!contentMatch && Confidence.Generate(displayName, dirName, publisher) < 85 &&
+                                (string.IsNullOrEmpty(publisher) || Confidence.Generate(publisher, dirName) < 85))
+                                match = false;
+                        }
+
+                        if (match)
+                        {
+                            // Date sanity check: if InstallDate is available and this folder
+                            // was created before the install, it's unlikely to be a leftover
+                            if (installDate.HasValue)
+                            {
+                                try
+                                {
+                                    DateTime dirCreated = Directory.GetCreationTime(dir);
+                                    if (dirCreated < installDate.Value.AddDays(-1))
+                                        match = false;
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+
+                    if (match)
+                    {
+                        // Cross-reference: skip if another app uses this dir (BCU DirectoryStillUsed)
                         if (otherInstallLocations.Any(loc => dir.StartsWith(loc, StringComparison.OrdinalIgnoreCase)))
                             continue;
 
@@ -1022,10 +1134,57 @@ namespace KitLugia.Core
                     }
 
                     if (match && depth < maxDepth)
-                        ScanFolderConfidence(dir, displayName, results, otherInstallLocations, depth + 1, maxDepth);
+                        ScanFolderConfidence(dir, displayName, publisher, installDate, results, otherInstallLocations, depth + 1, maxDepth);
                 }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Verifica se uma pasta contém arquivos .exe/.dll cujo ProductName, CompanyName
+        /// ou assinatura digital coincidem com o app/publisher. Usado como terceiro sinal
+        /// de matching independente (além de nome e publisher).
+        /// </summary>
+        private static bool VerifyFolderByContent(string folderPath, string displayName, string publisher)
+        {
+            if (string.IsNullOrEmpty(publisher) && string.IsNullOrEmpty(displayName))
+                return false;
+
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(folderPath, "*", System.IO.SearchOption.TopDirectoryOnly))
+                {
+                    string ext = Path.GetExtension(file).ToLowerInvariant();
+                    if (ext != ".exe" && ext != ".dll" && ext != ".sys" && ext != ".ocx")
+                        continue;
+
+                    // 1. Check FileVersionInfo (ProductName, CompanyName)
+                    try
+                    {
+                        var fvi = FileVersionInfo.GetVersionInfo(file);
+                        if (!string.IsNullOrEmpty(publisher) && fvi.CompanyName != null &&
+                            fvi.CompanyName.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                        if (!string.IsNullOrEmpty(displayName) && fvi.ProductName != null &&
+                            fvi.ProductName.IndexOf(displayName, StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                    }
+                    catch { }
+
+                    // 2. Check digital signature (Authenticode)
+                    try
+                    {
+                        var cert = X509Certificate.CreateFromSignedFile(file);
+                        if (cert != null && !string.IsNullOrEmpty(publisher) &&
+                            cert.Subject.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            return false;
         }
 
         private static void ScanUninstallerSpecific(string installLocation, string displayIcon, string displayName, HashSet<string> results)
@@ -1092,7 +1251,7 @@ namespace KitLugia.Core
             }
         }
 
-        private static void ScanStartMenuShortcuts(string displayName, HashSet<string> results)
+        private static void ScanStartMenuShortcuts(string displayName, string publisher, HashSet<string> results)
         {
             string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string common = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -1111,7 +1270,7 @@ namespace KitLugia.Core
                     {
                         string name = Path.GetFileNameWithoutExtension(f);
                         if (string.IsNullOrEmpty(name) || name.Length < 3) continue;
-                        if (Confidence.Generate(displayName, name) >= 70)
+                        if (Confidence.Generate(displayName, name, publisher) >= 70)
                             results.Add(f);
                     }
                 }
@@ -1119,21 +1278,19 @@ namespace KitLugia.Core
             }
         }
 
-        private static void ScanDesktopShortcuts(string displayName, HashSet<string> results)
+        private static void ScanDesktopShortcuts(string displayName, string publisher, HashSet<string> results)
         {
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             string commonDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
 
-            foreach (var dir in new[] { desktop, commonDesktop })
+            if (!string.IsNullOrEmpty(commonDesktop) && Directory.Exists(commonDesktop))
             {
-                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
                 try
                 {
-                    foreach (var f in Directory.GetFiles(dir, "*.lnk"))
+                    foreach (var f in Directory.GetFiles(commonDesktop, "*.lnk"))
                     {
                         string name = Path.GetFileNameWithoutExtension(f);
                         if (string.IsNullOrEmpty(name) || name.Length < 3) continue;
-                        if (Confidence.Generate(displayName, name) >= 70)
+                        if (Confidence.Generate(displayName, name, publisher) >= 70)
                             results.Add(f);
                     }
                 }
@@ -1806,6 +1963,43 @@ namespace KitLugia.Core
             return locations.ToList();
         }
 
+        private static List<string> GetAllAppDisplayNames(string? excludeName = null)
+        {
+            var names = new List<string>();
+            string[] hiveKeys =
+            {
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+                @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            };
+
+            foreach (var hiveKey in hiveKeys)
+            {
+                var hive = ResolveHive(hiveKey, out string subKey);
+                if (hive == null) continue;
+                try
+                {
+                    using var key = hive.OpenSubKey(subKey, false);
+                    if (key == null) continue;
+                    foreach (var name in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var sk = key.OpenSubKey(name);
+                            var dn = sk?.GetValue("DisplayName") as string;
+                            if (string.IsNullOrEmpty(dn)) continue;
+                            if (!string.IsNullOrEmpty(excludeName) && dn.Equals(excludeName, StringComparison.OrdinalIgnoreCase)) continue;
+                            if (dn.Trim().Length >= 3)
+                                names.Add(dn.Trim());
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+            return names;
+        }
+
         // ── Cleanup ────────────────────────────────────────────────
 
         public static string? GetInstallLocationFromRegistry(string displayName)
@@ -1837,6 +2031,47 @@ namespace KitLugia.Core
                             var loc = sk.GetValue("InstallLocation") as string;
                             if (!string.IsNullOrEmpty(loc) && Directory.Exists(loc))
                                 return loc.TrimEnd('\\');
+                        }
+                    }
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        public static DateTime? GetInstallDateFromRegistry(string displayName)
+        {
+            if (string.IsNullOrEmpty(displayName)) return null;
+            string[] hivePaths =
+            [
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+            ];
+            foreach (var hivePath in hivePaths)
+            {
+                try
+                {
+                    var hive = ResolveHive(hivePath, out string subKey);
+                    if (hive == null || string.IsNullOrEmpty(subKey)) continue;
+                    using var key = hive.OpenSubKey(subKey, false);
+                    if (key == null) continue;
+                    foreach (var name in key.GetSubKeyNames())
+                    {
+                        using var sk = key.OpenSubKey(name, false);
+                        if (sk == null) continue;
+                        var dn = sk.GetValue("DisplayName") as string;
+                        if (string.IsNullOrEmpty(dn)) continue;
+                        if (dn.Equals(displayName, StringComparison.OrdinalIgnoreCase) ||
+                            dn.StartsWith(displayName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var raw = sk.GetValue("InstallDate") as string;
+                            if (string.IsNullOrEmpty(raw)) continue;
+                            if (DateTime.TryParseExact(raw, "yyyyMMdd", null,
+                                System.Globalization.DateTimeStyles.None, out var dt))
+                                return dt;
+                            if (DateTime.TryParse(raw, out var dt2))
+                                return dt2;
                         }
                     }
                 }
@@ -3664,17 +3899,17 @@ namespace KitLugia.Core
         {
             if (string.IsNullOrEmpty(displayName) || string.IsNullOrEmpty(folderName)) return 0;
 
-            // Exact match
-            if (displayName.Equals(folderName, StringComparison.OrdinalIgnoreCase)) return 100;
-            if (displayName.StartsWith(folderName, StringComparison.OrdinalIgnoreCase)) return 90;
-            if (folderName.StartsWith(displayName, StringComparison.OrdinalIgnoreCase)) return 85;
-
             // Reject if folderName is a single generic word (Launcher, Player, etc.)
             string folderTrimmed = folderName.Trim().Trim('.', ' ');
             if (GenericWords.Contains(folderTrimmed)) return 0;
 
             // Reject very short names (< 4 chars) unless exact match
             if (folderTrimmed.Length < 4) return 0;
+
+            // Exact match (after rejecting generic words)
+            if (displayName.Equals(folderName, StringComparison.OrdinalIgnoreCase)) return 100;
+            if (displayName.StartsWith(folderName, StringComparison.OrdinalIgnoreCase)) return 90;
+            if (folderName.StartsWith(displayName, StringComparison.OrdinalIgnoreCase)) return 85;
 
             string cleanDisplay = CleanName(displayName);
             string cleanFolder = CleanName(folderName);
@@ -3714,6 +3949,33 @@ namespace KitLugia.Core
             if (siftRatio >= 0.6 && dist < maxLen / 3) return 60;
 
             return 0;
+        }
+
+        // BCU-style: trim publisher from product name before matching
+        // e.g. "Adobe AIR" with publisher "Adobe" -> trim to "AIR"
+        // Prevents folder "Adobe" from falsely matching "Adobe AIR"
+        public static int Generate(string displayName, string folderName, string publisher)
+        {
+            if (string.IsNullOrEmpty(displayName) || string.IsNullOrEmpty(folderName)) return 0;
+
+            // Try with publisher-trimmed name first (BCU MatchStringToProductName pattern)
+            if (!string.IsNullOrEmpty(publisher) && publisher.Length > 4)
+            {
+                string pubLower = publisher.Trim().ToLowerInvariant();
+                string nameLower = displayName.Trim().ToLowerInvariant();
+                if (nameLower.Contains(pubLower))
+                {
+                    string trimmed = nameLower.Replace(pubLower, "").Trim();
+                    if (trimmed.Length > 4)
+                    {
+                        int trimmedScore = Generate(trimmed, folderName);
+                        if (trimmedScore >= 70) return trimmedScore;
+                    }
+                }
+            }
+
+            // Fall back to standard matching
+            return Generate(displayName, folderName);
         }
 
         private static string CleanName(string name)
