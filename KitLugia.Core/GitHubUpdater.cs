@@ -94,7 +94,7 @@ namespace KitLugia.Core
             }
         }
 
-        public static async Task<bool> DownloadAndInstallUpdateAsync()
+        public static async Task<bool> DownloadAndInstallUpdateAsync(bool visible = false)
         {
             try
             {
@@ -207,9 +207,9 @@ namespace KitLugia.Core
                 {
                     FileName = updaterPath,
                     Arguments = $"\"{updatePath}\" {currentPid} \"{currentExePath}\" \"{expectedHash}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden,
+                    UseShellExecute = !visible,
+                    CreateNoWindow = !visible,
+                    WindowStyle = visible ? ProcessWindowStyle.Normal : ProcessWindowStyle.Hidden,
                 };
                 Process.Start(psi);
 

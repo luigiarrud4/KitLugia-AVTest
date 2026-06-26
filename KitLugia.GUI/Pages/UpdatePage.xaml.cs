@@ -482,14 +482,14 @@ namespace KitLugia.GUI.Pages
                 UpdateButton.IsEnabled = false;
                 CheckButton.IsEnabled = false;
 
-                // Usa o fluxo inline (download + extração + auto-update + restart)
-                var success = await DownloadAndInstallDirectAsync();
+                // Fluxo: download ZIP + updater visível + shutdown
+                var success = await DownloadAndLaunchUpdaterAsync();
 
                 if (success)
                 {
-                    StatusText.Text = "🚀 Atualização concluída! Nova versão iniciada.";
-                    UpdateButton.IsEnabled = false;
-                    CheckButton.IsEnabled = false;
+                    StatusText.Text = "🚀 Atualização em andamento! O updater abrirá uma janela.";
+                    await Task.Delay(2000);
+                    System.Windows.Application.Current.Shutdown();
                 }
                 else
                 {
@@ -552,6 +552,102 @@ namespace KitLugia.GUI.Pages
                 UpdateButton.IsEnabled = true;
                 CheckButton.IsEnabled = true;
                 KitLugia.Core.Logger.Log($"✅ Erro na atualização: {ex.Message}");
+            }
+        }
+
+        private async Task<bool> DownloadAndLaunchUpdaterAsync()
+        {
+            try
+            {
+                if (_latestRelease?.Assets == null || _latestRelease.Assets.Length == 0)
+                {
+                    KitLugia.Core.Logger.Log("❌ Nenhum asset disponível");
+                    return false;
+                }
+
+                var asset = Array.Find(_latestRelease.Assets, a =>
+                    a.Name.Equals("KITLUGIA2.zip", StringComparison.OrdinalIgnoreCase));
+                if (asset == null)
+                {
+                    KitLugia.Core.Logger.Log("❌ Asset KITLUGIA2.zip não encontrado");
+                    return false;
+                }
+
+                KitLugia.Core.Logger.Log($"Baixando {asset.Name} ({asset.Size / 1024 / 1024}MB)");
+
+                var tempDir = Path.GetTempPath();
+                var zipPath = Path.Combine(tempDir, "KitLugia_Update.zip");
+                var hashPath = zipPath + ".sha256";
+
+                using (var httpClient = new HttpClient())
+                {
+                    httpClient.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater");
+                    httpClient.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+                    var response = await httpClient.GetAsync(asset.BrowserDownloadUrl);
+                    response.EnsureSuccessStatusCode();
+                    await using (var fileStream = File.Create(zipPath))
+                        await response.Content.CopyToAsync(fileStream);
+                }
+
+                KitLugia.Core.Logger.Log("✅ Download concluído!");
+
+                // Baixar hash
+                string expectedHash = "";
+                try
+                {
+                    using var hc = new HttpClient();
+                    expectedHash = (await hc.GetStringAsync(asset.BrowserDownloadUrl.Replace(".zip", ".zip.sha256"))).Trim();
+                }
+                catch { }
+
+                // Encontrar o updater
+                string currentDir = AppDomain.CurrentDomain.BaseDirectory;
+                string updaterPath = Path.Combine(currentDir, "KitLugia.Updater.exe");
+                if (!File.Exists(updaterPath))
+                {
+                    try
+                    {
+                        var asm = typeof(KitLugia.Core.GitHubUpdater).Assembly;
+                        using var stream = asm.GetManifestResourceStream("KitLugia.Core.Resources.KitLugia.Updater.exe");
+                        if (stream != null)
+                        {
+                            updaterPath = Path.Combine(Path.GetTempPath(), "KitLugia.Updater.exe");
+                            using var file = File.Create(updaterPath);
+                            stream.CopyTo(file);
+                        }
+                    }
+                    catch (Exception ex) { KitLugia.Core.Logger.Log($"⚠️ Erro ao extrair updater: {ex.Message}"); }
+                }
+
+                if (!File.Exists(updaterPath))
+                {
+                    KitLugia.Core.Logger.Log("❌ KitLugia.Updater.exe não encontrado!");
+                    File.Delete(zipPath);
+                    return false;
+                }
+
+                int currentPid = Process.GetCurrentProcess().Id;
+                string currentExePath = Environment.ProcessPath ?? "";
+                if (string.IsNullOrEmpty(currentExePath))
+                    currentExePath = Path.Combine(currentDir, "KitLugia.GUI.exe");
+
+                KitLugia.Core.Logger.Log($"🚀 Iniciando KitLugia.Updater.exe (visível)...");
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = updaterPath,
+                    Arguments = $"\"{zipPath}\" {currentPid} \"{currentExePath}\" \"{expectedHash}\"",
+                    UseShellExecute = true,
+                    WindowStyle = ProcessWindowStyle.Normal,
+                };
+                Process.Start(psi);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"❌ Erro no download/updater: {ex.Message}");
+                return false;
             }
         }
 
@@ -713,40 +809,29 @@ namespace KitLugia.GUI.Pages
                     var notificationFile = Path.Combine(currentDir, "UPDATE_COMPLETE.txt");
                     File.WriteAllText(notificationFile, $"Update concluído em {DateTime.Now:dd/MM/yyyy HH:mm:ss}");
 
-                    // 8. Iniciar nova versão (sem --tray para mostrar a janela)
-                    KitLugia.Core.Logger.Log($"🚀 Iniciando nova versão: {currentExePath}");
-                    bool restartOk = false;
-                    try
-                    {
-                        using var proc = new Process();
-                        proc.StartInfo.FileName = currentExePath;
-                        proc.StartInfo.WorkingDirectory = currentDir;
-                        proc.StartInfo.UseShellExecute = false;
-                        restartOk = proc.Start();
-                        KitLugia.Core.Logger.Log($"✅ Restart direto: {restartOk}");
-                    }
-                    catch (Exception ex)
-                    {
-                        KitLugia.Core.Logger.Log($"⚠️ Restart direto falhou: {ex.Message}");
-                        try
-                        {
-                            using var proc = new Process();
-                            proc.StartInfo.FileName = currentExePath;
-                            proc.StartInfo.WorkingDirectory = currentDir;
-                            proc.StartInfo.UseShellExecute = true;
-                            restartOk = proc.Start();
-                            KitLugia.Core.Logger.Log($"✅ Restart shell: {restartOk}");
-                        }
-                        catch (Exception ex2)
-                        {
-                            KitLugia.Core.Logger.Log($"⚠️ Restart shell falhou: {ex2.Message}");
-                        }
-                    }
-                    KitLugia.Core.Logger.Log($"🚀 Restart concluído: {restartOk}");
+                    // 8. Criar script .bat para reiniciar após o fechamento total do processo
+                    var restartBat = Path.Combine(Path.GetTempPath(), "kitlugia_restart.bat");
+                    File.WriteAllText(restartBat, $@"@echo off
+title KitLugia Auto-Restart
+echo ========================================
+echo    KitLugia Auto-Restart
+echo ========================================
+echo.
+echo Aguardando fechamento do processo antigo...
+timeout /t 3 /nobreak >nul
+echo Iniciando nova versao...
+start """" ""{currentExePath}""
+echo Nova versao iniciada!
+del ""%~f0"" >nul 2>&1
+");
+                    KitLugia.Core.Logger.Log($"🚀 Script de restart criado: {restartBat}");
 
-                    // 9. Fechar aplicação atual
+                    // 9. Executar script e fechar aplicação atual
+                    try { Process.Start(new ProcessStartInfo { FileName = restartBat, WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false }); }
+                    catch (Exception ex) { KitLugia.Core.Logger.Log($"⚠️ Erro ao iniciar script: {ex.Message}"); }
+
                     KitLugia.Core.Logger.Log("✅ Update concluído, fechando aplicação...");
-                    await Task.Delay(1500);
+                    await Task.Delay(500);
                     System.Windows.Application.Current.Shutdown();
 
                     return true;

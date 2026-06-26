@@ -9,9 +9,16 @@ class Program
 {
     static void Main(string[] args)
     {
+        Console.WriteLine("========================================");
+        Console.WriteLine("   KitLugia Updater v2.5");
+        Console.WriteLine("========================================");
+        Console.WriteLine();
+
         if (args.Length < 3)
         {
-            WriteError("Usage: KitLugia.Updater <zipPath> <mainPid> <mainExePath> [sha256]");
+            Console.WriteLine("USO: KitLugia.Updater <zipPath> <mainPid> <mainExePath> [sha256]");
+            Console.WriteLine();
+            PressioneTecla();
             return;
         }
 
@@ -22,73 +29,100 @@ class Program
         string appDir = Path.GetDirectoryName(mainExePath);
         string logPath = Path.Combine(appDir, "update.log");
 
+        bool success = false;
         try
         {
-            Log(logPath, "KitLugia Updater started");
-            Log(logPath, $"Zip: {zipPath}, PID: {mainPid}, Target: {mainExePath}");
-
-            // Verify hash if provided
+            Console.Write("[1/6] Verificando hash... ");
             if (!string.IsNullOrEmpty(expectedHash))
             {
-                Log(logPath, "Verifying SHA256...");
                 string actualHash = ComputeSha256(zipPath);
                 if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
                 {
-                    WriteError($"Hash mismatch. Expected: {expectedHash}, Actual: {actualHash}");
+                    Console.WriteLine($"FALHOU");
+                    Console.WriteLine($"  Hash esperado: {expectedHash}");
+                    Console.WriteLine($"  Hash calculado: {actualHash}");
                     Log(logPath, $"HASH MISMATCH. Expected: {expectedHash}, Actual: {actualHash}");
-                    return;
+                    goto error;
                 }
-                Log(logPath, "SHA256 verified OK");
+                Console.WriteLine("OK");
+            }
+            else
+            {
+                Console.WriteLine("pulado (sem hash)");
             }
 
-            // Wait for main process to exit
-            Log(logPath, "Waiting for main process to exit...");
+            Console.Write("[2/6] Aguardando fechamento do KitLugia... ");
             try
             {
                 var mainProcess = Process.GetProcessById(mainPid);
-                if (!mainProcess.WaitForExit(30000))
+                if (!mainProcess.WaitForExit(60000))
                 {
                     mainProcess.Kill();
                     mainProcess.WaitForExit(5000);
                 }
             }
             catch (ArgumentException) { }
-
-            // Give OS time to release file handles
+            Console.WriteLine("OK");
             Thread.Sleep(1000);
 
-            // Extract zip to temp
+            Console.Write("[3/6] Extraindo ZIP... ");
             string extractDir = Path.Combine(Path.GetTempPath(), $"KitLugia_Update_{Guid.NewGuid():N}");
             Directory.CreateDirectory(extractDir);
-            Log(logPath, $"Extracting to {extractDir}...");
             ZipFile.ExtractToDirectory(zipPath, extractDir, overwriteFiles: true);
-            Log(logPath, "Extraction done.");
+            Console.WriteLine("OK");
 
-            // Copy files to target directory
-            Log(logPath, $"Copying files to {appDir}...");
+            Console.Write("[4/6] Copiando arquivos... ");
             CopyDirectory(extractDir, appDir, logPath);
-            Log(logPath, "File copy complete.");
+            Console.WriteLine("OK");
 
-            // Cleanup
+            Console.Write("[5/6] Limpando temporarios... ");
             try { Directory.Delete(extractDir, true); } catch { }
             try { File.Delete(zipPath); } catch { }
+            Console.WriteLine("OK");
 
-            Log(logPath, "Restarting application...");
-            Process.Start(new ProcessStartInfo
+            Console.Write("[6/6] Iniciando nova versao... ");
+            try
             {
-                FileName = mainExePath,
-                UseShellExecute = true
-            });
+                var psi = new ProcessStartInfo
+                {
+                    FileName = mainExePath,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+                success = true;
+                Console.WriteLine("OK");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"FALHOU: {ex.Message}");
+                Log(logPath, $"Restart failed: {ex}");
+                goto error;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("========================================");
+            Console.WriteLine("   ATUALIZACAO CONCLUIDA COM SUCESSO!");
+            Console.WriteLine("========================================");
+            Console.WriteLine("A janela fechara em 3 segundos...");
+            Thread.Sleep(3000);
+            return;
+
+        error:
+            Console.WriteLine();
+            Console.WriteLine("========================================");
+            Console.WriteLine("   ERRO NA ATUALIZACAO");
+            Console.WriteLine("========================================");
+            Console.WriteLine("  Log salvo em: update.log");
+            PressioneTecla();
+            return;
         }
         catch (Exception ex)
         {
-            WriteError($"Update failed: {ex.Message}");
+            Console.WriteLine();
+            Console.WriteLine($"ERRO FATAL: {ex.Message}");
             Log(logPath, $"FATAL: {ex}");
-            try
-            {
-                Process.Start("https://github.com/luigiarrud4/KitLugia-AVTest/releases/latest");
-            }
-            catch { }
+            Console.WriteLine();
+            PressioneTecla();
         }
     }
 
@@ -107,12 +141,18 @@ class Program
             string ext = Path.GetExtension(file).ToLowerInvariant();
             if (ext is ".pdb" or ".xml" or ".config" or ".log" or ".tmp")
                 continue;
-            if (name == "KitLugia.Updater.exe")
+            if (name is "KitLugia.Updater.exe" or "KitLugia.Updater.dll")
                 continue;
 
             try { File.Copy(file, dest, overwrite: true); }
             catch (Exception ex) { Log(logPath, $"Warning: could not copy {relative}: {ex.Message}"); }
         }
+    }
+
+    static void PressioneTecla()
+    {
+        try { Console.ReadKey(); }
+        catch { Console.ReadLine(); }
     }
 
     static string ComputeSha256(string filePath)
@@ -130,11 +170,5 @@ class Program
             File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
         }
         catch { }
-    }
-
-    static void WriteError(string message)
-    {
-        var err = new { error = message };
-        Console.Error.WriteLine(JsonSerializer.Serialize(err));
     }
 }
