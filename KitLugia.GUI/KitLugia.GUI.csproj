@@ -9,17 +9,17 @@
 		
 		<NoWarn>$(NoWarn);WFAC010;CS1668</NoWarn>
 
-		<!-- Habilita WPF e Windows Forms (para diálogos de pasta) -->
+		<!-- Habilita WPF e Windows Forms (para di�logos de pasta) -->
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
-		<!-- Forçar codificação UTF-8 para caracteres especiais -->
+		<!-- For�ar codifica��o UTF-8 para caracteres especiais -->
 		<CodePage>65001</CodePage>
 		<ApplicationIcon>Iconarchive-Realistic-Fruits-Yellow-Apple.ico</ApplicationIcon>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<SatelliteResourceLanguages>pt-BR;en-US</SatelliteResourceLanguages>
-		<Version>2.0.23</Version>
-		<AssemblyVersion>2.0.23.0</AssemblyVersion>
-		<FileVersion>2.0.23.0</FileVersion>
+		<Version>2.0.24</Version>
+		<AssemblyVersion>2.0.24.0</AssemblyVersion>
+		<FileVersion>2.0.24.0</FileVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
