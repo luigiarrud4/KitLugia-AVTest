@@ -273,7 +273,11 @@ namespace KitLugia.GUI.Services
             ConditionalLog.Try("BoostTimerResolution", () =>
             {
                 NtSetTimerResolution(0, false, out _originalTimerResolution);
-                int desired = 5000;
+                // 1ms (10000) em vez de 0.5ms (5000) — 0.5ms causa estouro/popping
+                // em dispositivos de áudio virtual (Voicemeeter, VB-Cable etc.) porque
+                // aumenta latência DPC/ISR e causa underruns no buffer de software.
+                // 1ms é seguro para áudio e ainda melhora performance em jogos.
+                int desired = 10000;
                 int result = NtSetTimerResolution(desired, true, out int current);
                 if (result == 0)
                 {
@@ -2633,6 +2637,7 @@ namespace KitLugia.GUI.Services
 
             // GLOBAL: ThreadEfficiencyMode via pid (não precisa de handle)
             Win32Api.SetThreadEfficiencyForAllThreads(pid, true);
+            Win32Api.RestoreTimerResolution();
 
             // PROCESS-LEVEL: Prioridade, I/O, Page, GameClassInfo, EcoQoS
             try
@@ -2725,6 +2730,7 @@ namespace KitLugia.GUI.Services
 
 
                 Win32Api.SetWin32PrioritySeparation(false);
+                Win32Api.RestoreTimerResolution();
 
                 // Limpa referências
                 _lastForegroundHwnd = IntPtr.Zero;
