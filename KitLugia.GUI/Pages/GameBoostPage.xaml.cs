@@ -883,11 +883,11 @@ namespace KitLugia.GUI.Pages
                         {
                             1 => "YY V1 - Original Plus: Win32PrioritySeparation + CPU/IO/Page boost (PADRfO) - Seguro e estável",
                             2 => "YY V2 - FPS Estável Plus: P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
-                            3 => "V3 - Extremo Plus: P-Cores + GameMode + Timer 0.5ms + Scheduler Boost + ProBalance agressivo (>3%)",
-                            4 => "V4 - Extreme Pro: RealTime + Critical I/O + P-Cores + Network + Win32 + ProBalance OFF",
-                            _ => "Desconhecido"
-                        };
-                    }
+3 => "V3 - Extremo Plus: P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance agressivo (>3%)",
+                    4 => "V4 - Extreme Pro: RealTime + Critical I/O + P-Cores + Network + Win32 + ProBalance OFF",
+                    _ => "Desconhecido"
+                };
+            }
 
                     // Mostra mensagem de confirmação
                     string engineNameConfirm = engineNumber switch
@@ -978,7 +978,8 @@ namespace KitLugia.GUI.Pages
                 "  • CPU: High Priority\n" +
                 "  • I/O: High (3)\n" +
                 "  • Page: Maximum (5)\n" +
-                "  • Timer: 0.5ms (máxima precisão)\n" +
+                "  • Timer: 1ms (precisão balanceada)\n" +
+                "  ⚠️ Pode causar estouros em áudio virtual (Voicemeeter, VB-Cable)\n" +
                 "  • EcoQoS: DESATIVADO\n" +
                 "  • Network: Throttling OFF\n" +
                 "  • ProBalance: >3% CPU (agressivo)\n" +
@@ -1149,6 +1150,8 @@ namespace KitLugia.GUI.Pages
             {
                 TxtTimerResolutionStatus.Text = isChecked ? "ATIVADO" : "DESATIVADO";
                 TxtTimerResolutionStatus.Foreground = isChecked ? greenBrush : redBrush;
+                if (PanelTimerAudioWarning != null)
+                    PanelTimerAudioWarning.Visibility = isChecked ? Visibility.Visible : Visibility.Collapsed;
             }
             else if (toggle == TglEcoQoS && TxtEcoQoSStatus != null)
             {
@@ -1202,7 +1205,7 @@ namespace KitLugia.GUI.Pages
                 {
                     1 => "V1 - Original Plus: Win32PrioritySeparation + CPU/IO/Page boost (PADRÃO) - Seguro e estável",
                     2 => "V2 - FPS Estável Plus: P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
-                    3 => "V3 - Extremo Plus: P-Cores + GameMode + Timer 0.5ms + Scheduler Boost + ProBalance agressivo (>3%)",
+                    3 => "V3 - Extremo Plus: P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance agressivo (>3%)",
                     4 => "V4 - Extreme Pro: RealTime + Critical I/O + P-Cores + Network + Win32 + ProBalance OFF",
                     _ => "Desconhecido"
                 };
@@ -1686,7 +1689,7 @@ namespace KitLugia.GUI.Pages
                                 {
                                     1 => "🟢 V1 - Original Plus: Win32PrioritySeparation + CPU/IO/Page boost (PADRÃO) - Seguro e estável",
                                     2 => "🟡 V2 - FPS Estável Plus: P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
-                                    3 => "🔴 V3 - Extremo Plus: P-Cores + GameMode + Timer 0.5ms + Scheduler Boost + ProBalance agressivo (>3%)",
+                                    3 => "🔴 V3 - Extremo Plus: P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance agressivo (>3%)",
                                     _ => "Desconhecido"
                                 };
                             }

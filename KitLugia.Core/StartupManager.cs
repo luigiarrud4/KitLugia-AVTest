@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Versioning;
+using System.Security.Principal;
 using System.Text;
 // using IWshRuntimeLibrary; // Temporariamente comentado para permitir compilação
 
@@ -107,7 +108,10 @@ namespace KitLugia.Core
                     foreach (var task in lugiaTasks)
                     {
                         string rawName = task.Name;
-                        string cleanName = rawName.Replace("KitLUGIA_Elevated_", "").Replace("KitLUGIA_Delayed_", "");
+                        string cleanName = rawName
+                            .Replace("KitLUGIA_Elevated_", "")
+                            .Replace("KitLUGIA_Delayed_", "")
+                            .Replace("KitLUGIA_NonAdmin_", "");
 
                         string fullCommand = "";
                         if (task.Definition.Actions.FirstOrDefault() is ExecAction action)
@@ -120,8 +124,12 @@ namespace KitLugia.Core
 
                         if (!isTaskEnabled)
                             status = StartupStatus.Disabled;
+                        else if (rawName.Contains("Elevated"))
+                            status = StartupStatus.Elevated;
+                        else if (rawName.Contains("NonAdmin"))
+                            status = StartupStatus.TurboBootNormal;
                         else
-                            status = rawName.Contains("Elevated") ? StartupStatus.Elevated : StartupStatus.Enabled;
+                            status = StartupStatus.Enabled;
 
                         if (apps.ContainsKey(cleanName))
                         {
@@ -145,16 +153,23 @@ namespace KitLugia.Core
                 {
                     foreach (var valueName in key.GetValueNames())
                     {
+                        if (valueName.EndsWith("__Admin")) continue;
                         var commandLine = key.GetValue(valueName)?.ToString() ?? "";
+                        bool isAdmin = key.GetValue(valueName + "__Admin")?.ToString() != "0";
+                        var status = isAdmin ? StartupStatus.TurboBoot : StartupStatus.TurboBootNormal;
+
                         if (apps.ContainsKey(valueName))
                         {
                             var existing = apps[valueName];
-                            existing.Status = StartupStatus.TurboBoot; // KitLugia runs elevated
+                            existing.Status = status;
+                            existing.BootTrayRunAsAdmin = isAdmin;
                             existing.Location = "Turbo Boot (KitLugia)";
                         }
                         else
                         {
-                            apps.Add(valueName, new StartupAppDetails(valueName, commandLine, "Turbo Boot (KitLugia)", StartupStatus.TurboBoot));
+                            var app = new StartupAppDetails(valueName, commandLine, "Turbo Boot (KitLugia)", status);
+                            app.BootTrayRunAsAdmin = isAdmin;
+                            apps.Add(valueName, app);
                         }
                     }
                 }
@@ -454,7 +469,42 @@ namespace KitLugia.Core
 
         #region KitLugia Parallel Startup (Turbo)
 
-        public static (bool Success, string Message) DelegateToKitLugia(string appName)
+        public static bool GetBootTrayAdminFlag(string appName)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(KitLugiaStartupKey);
+                return key?.GetValue(appName + "__Admin")?.ToString() != "0";
+            }
+            catch { return true; }
+        }
+
+        public static void SetBootTrayAdminFlag(string appName, bool runAsAdmin)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(KitLugiaStartupKey);
+                key.SetValue(appName + "__Admin", runAsAdmin ? "1" : "0");
+
+                if (!runAsAdmin)
+                {
+                    string command = key.GetValue(appName)?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(command))
+                    {
+                        ExtractCommandParts(command, out string? path, out string? args);
+                        if (!string.IsNullOrEmpty(path))
+                            RegisterNonAdminTask(appName, path, args);
+                    }
+                }
+                else
+                {
+                    UnregisterNonAdminTask(appName);
+                }
+            }
+            catch { }
+        }
+
+        public static (bool Success, string Message) DelegateToKitLugia(string appName, bool runAsAdmin = true)
         {
             try
             {
@@ -474,8 +524,17 @@ namespace KitLugia.Core
                 // 2. Add to KitLugia list
                 using var key = Registry.CurrentUser.CreateSubKey(KitLugiaStartupKey);
                 key.SetValue(appName, app.FullCommand);
+                key.SetValue(appName + "__Admin", runAsAdmin ? "1" : "0");
 
-                return (true, $"'{appName}' agora iniciará via Turbo Boot (KitLugia).");
+                if (!runAsAdmin)
+                {
+                    ExtractCommandParts(app.FullCommand, out string? path, out string? args);
+                    if (!string.IsNullOrEmpty(path))
+                        RegisterNonAdminTask(appName, path, args);
+                }
+
+                string suffix = runAsAdmin ? "" : " (sem Admin)";
+                return (true, $"'{appName}' agora iniciará via Turbo Boot (KitLugia){suffix}.");
             }
             catch (Exception ex) { return (false, ex.Message); }
         }
@@ -484,10 +543,13 @@ namespace KitLugia.Core
         {
             try
             {
+                UnregisterNonAdminTask(appName);
+
                 using var key = Registry.CurrentUser.OpenSubKey(KitLugiaStartupKey, true);
                 if (key != null)
                 {
                     key.DeleteValue(appName, false);
+                    key.DeleteValue(appName + "__Admin", false);
                     return (true, $"'{appName}' removido do KitLugia com sucesso.");
                 }
                 return (false, "Chave de registro não encontrada.");
@@ -526,7 +588,68 @@ namespace KitLugia.Core
             catch (Exception ex) { return (false, $"Erro ao restaurar: {ex.Message}"); }
         }
 
-        public static void LaunchTurboApps()
+        #region Dormant Task Scheduler (non-admin launch)
+
+        private static string GetNonAdminTaskName(string appName)
+        {
+            return "KitLUGIA_NonAdmin_" + appName;
+        }
+
+        public static void RegisterNonAdminTask(string appName, string path, string? args)
+        {
+            try
+            {
+                string taskName = GetNonAdminTaskName(appName);
+                using var ts = new TaskService();
+                if (ts.GetTask(taskName) != null)
+                    ts.RootFolder.DeleteTask(taskName, false);
+
+                var td = ts.NewTask();
+                td.RegistrationInfo.Description = $"Non-admin startup: {appName} (KitLUGIA)";
+                td.Principal.LogonType = TaskLogonType.InteractiveToken;
+                td.Principal.UserId = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                td.Settings.DisallowStartIfOnBatteries = false;
+                td.Settings.StopIfGoingOnBatteries = false;
+                td.Settings.ExecutionTimeLimit = TimeSpan.Zero;
+                td.Settings.Hidden = true;
+                td.Settings.WakeToRun = false;
+                td.Actions.Add(new ExecAction(path, args ?? "", Path.GetDirectoryName(path) ?? ""));
+                ts.RootFolder.RegisterTaskDefinition(taskName, td);
+            }
+            catch { }
+        }
+
+        public static void UnregisterNonAdminTask(string appName)
+        {
+            try
+            {
+                string taskName = GetNonAdminTaskName(appName);
+                using var ts = new TaskService();
+                if (ts.GetTask(taskName) != null)
+                    ts.RootFolder.DeleteTask(taskName, false);
+            }
+            catch { }
+        }
+
+        public static void RunNonAdminTask(string appName)
+        {
+            try
+            {
+                string taskName = GetNonAdminTaskName(appName);
+                using var ts = new TaskService();
+                ts.GetTask(taskName)?.Run();
+            }
+            catch { }
+        }
+
+        #endregion
+
+        public static void LaunchTurboAppsNonAdmin()
+        {
+            LaunchTurboApps(true);
+        }
+
+        public static void LaunchTurboApps(bool? forceNonAdmin = null)
         {
             try
             {
@@ -535,8 +658,11 @@ namespace KitLugia.Core
 
                 foreach (var name in key.GetValueNames())
                 {
+                    if (name.EndsWith("__Admin")) continue;
                     string command = key.GetValue(name)?.ToString() ?? "";
                     if (string.IsNullOrEmpty(command)) continue;
+
+                    bool runAsAdmin = forceNonAdmin ?? (key.GetValue(name + "__Admin")?.ToString() != "0");
 
                     // OTIMIZAÇÃO: Thread.Start garante concorrência absoluta e imediata.
                     // O Task.Run usa o ThreadPool que, em picos de estresse de CPU na inicialização,
@@ -548,15 +674,22 @@ namespace KitLugia.Core
                             ExtractCommandParts(command, out string? path, out string? args);
                             if (string.IsNullOrEmpty(path)) return;
 
-                            var startInfo = new ProcessStartInfo
+                            if (runAsAdmin)
                             {
-                                FileName = path,
-                                Arguments = args,
-                                UseShellExecute = true,
-                                WindowStyle = ProcessWindowStyle.Normal,
-                                WorkingDirectory = Path.GetDirectoryName(path) ?? ""
-                            };
-                            Process.Start(startInfo);
+                                var startInfo = new ProcessStartInfo
+                                {
+                                    FileName = path,
+                                    Arguments = args,
+                                    UseShellExecute = true,
+                                    WindowStyle = ProcessWindowStyle.Normal,
+                                    WorkingDirectory = Path.GetDirectoryName(path) ?? ""
+                                };
+                                Process.Start(startInfo);
+                            }
+                            else
+                            {
+                                RunNonAdminTask(name);
+                            }
                         }
                         catch { }
                     }){ IsBackground = true, Priority = System.Threading.ThreadPriority.AboveNormal }.Start();

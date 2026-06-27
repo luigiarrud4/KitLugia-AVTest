@@ -1085,6 +1085,39 @@ namespace KitLugia.GUI.Services
 
             menu.Items.Add(new ToolStripSeparator());
 
+            // Boot Tray
+            int bootAppCount = 0;
+            try
+            {
+                using var bootKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\StartupApps");
+                if (bootKey != null) bootAppCount = bootKey.ValueCount;
+            }
+            catch { }
+            string bootCountStr = bootAppCount > 0 ? $"{bootAppCount} apps" : "vazio";
+            var itemBootTrayAdmin = new ToolStripMenuItem($"🛡️ Boot Tray: Iniciar (Admin)");
+            itemBootTrayAdmin.ToolTipText = $"Inicia os apps do Boot Tray com privilégios de Administrador ({bootCountStr})";
+            itemBootTrayAdmin.Click += (s, e) =>
+            {
+                try { StartupManager.LaunchTurboApps(); }
+                catch (Exception ex) { KitLugia.Core.Logger.LogError("BootTrayAdmin", ex.Message); }
+            };
+            menu.Items.Add(itemBootTrayAdmin);
+
+            var itemBootTrayNormal = new ToolStripMenuItem($"👤 Boot Tray: Iniciar (Normal - Sem Admin)");
+            itemBootTrayNormal.ToolTipText = $"Inicia os apps do Boot Tray como usuário normal via tarefa agendada ({bootCountStr})";
+            itemBootTrayNormal.Click += (s, e) =>
+            {
+                try { StartupManager.LaunchTurboAppsNonAdmin(); }
+                catch (Exception ex) { KitLugia.Core.Logger.LogError("BootTrayNormal", ex.Message); }
+            };
+            menu.Items.Add(itemBootTrayNormal);
+
+            var itemBootTrayManager = new ToolStripMenuItem($"📋 Gerenciar Boot Tray ({bootCountStr})");
+            itemBootTrayManager.Click += (s, e) => OnOpenSettings?.Invoke();
+            menu.Items.Add(itemBootTrayManager);
+
+            menu.Items.Add(new ToolStripSeparator());
+
             var itemSettings = new ToolStripMenuItem("⚙ Configurações");
             itemSettings.Click += (s, e) => OnOpenSettings?.Invoke();
             menu.Items.Add(itemSettings);
@@ -1093,6 +1126,40 @@ namespace KitLugia.GUI.Services
             itemOpen.Font = new Font(itemOpen.Font, FontStyle.Bold);
             itemOpen.Click += (s, e) => OnOpenMainWindow?.Invoke();
             menu.Items.Add(itemOpen);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            var itemRestartAdmin = new ToolStripMenuItem("🛡️ Iniciar como Admin");
+            itemRestartAdmin.Click += (s, e) =>
+            {
+                try
+                {
+                    string exe = Process.GetCurrentProcess().MainModule.FileName;
+                    Process.Start(new ProcessStartInfo { FileName = exe, UseShellExecute = true, Verb = "runas" });
+                    Dispose();
+                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+                }
+                catch { }
+            };
+            menu.Items.Add(itemRestartAdmin);
+
+            var itemRestartNormal = new ToolStripMenuItem("👤 Iniciar como Usuário Normal");
+            itemRestartNormal.Click += (s, e) =>
+            {
+                try
+                {
+                    string exe = Process.GetCurrentProcess().MainModule.FileName;
+                    KitLugia.Core.StartupManager.RegisterNonAdminTask("__KitLugiaRestart", exe, null);
+                    KitLugia.Core.StartupManager.RunNonAdminTask("__KitLugiaRestart");
+                    System.Threading.Thread.Sleep(1500);
+                    Dispose();
+                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+                }
+                catch { }
+            };
+            menu.Items.Add(itemRestartNormal);
+
+            menu.Items.Add(new ToolStripSeparator());
 
             var itemExit = new ToolStripMenuItem("❌ Sair Completamente");
             itemExit.Click += (s, e) =>
@@ -3268,6 +3335,24 @@ namespace KitLugia.GUI.Services
             KitLugia.Core.Logger.Log($"💾 Limite de RAM definido: {key} → {limitMB} MB ({(enabled ? "ativo" : "inativo")})");
         }
 
+        public ProcessEngineConfig? GetProcessEngineConfig(string processName)
+        {
+            string key = processName.ToLowerInvariant().Replace(".exe", "");
+            if (_processRamLimits.TryGetValue(key, out var limit))
+                return limit.EngineConfig;
+            return null;
+        }
+
+        public void SetProcessEngineConfig(string processName, ProcessEngineConfig config)
+        {
+            string key = processName.ToLowerInvariant().Replace(".exe", "");
+            if (_processRamLimits.TryGetValue(key, out var limit))
+            {
+                limit.EngineConfig = config;
+                SaveProcessLimits();
+            }
+        }
+
         /// <summary>
         /// Remove o limite de RAM de um processo.
         /// </summary>
@@ -4162,7 +4247,7 @@ namespace KitLugia.GUI.Services
         public class ProcessRamLimit
         {
             public string ProcessName { get; set; } = "";
-            public long LimitMB { get; set; } = 1024; // 1GB padrão
+            public long LimitMB { get; set; } = 1024;
             public bool Enabled { get; set; } = false;
             public string Description { get; set; } = "";
             public bool IsForeground { get; set; } = false;
@@ -4170,6 +4255,23 @@ namespace KitLugia.GUI.Services
             public long PeakRamMB { get; set; } = 0;
             public DateTime LastTrimTime { get; set; } = DateTime.MinValue;
             public int ConsecutiveTrimCount { get; set; } = 0;
+            public ProcessEngineConfig? EngineConfig { get; set; } = null;
+        }
+
+        public class ProcessEngineConfig
+        {
+            public string CpuPriority { get; set; } = "High";
+            public int IoPriorityLevel { get; set; } = 1;
+            public int PagePriorityLevel { get; set; } = 1;
+            public bool TimerBoost { get; set; } = false;
+            public bool EcoQoSEnabled { get; set; } = false;
+            public bool ProBalance { get; set; } = false;
+            public int ProBalanceCpuThreshold { get; set; } = 5;
+            public bool NetworkBoost { get; set; } = false;
+            public int ThreadMemoryPriority { get; set; } = 0;
+            public bool ThreadEfficiencyMode { get; set; } = false;
+            public bool GameClassInfo { get; set; } = true;
+            public bool Win32PrioritySeparation { get; set; } = true;
         }
     }
 

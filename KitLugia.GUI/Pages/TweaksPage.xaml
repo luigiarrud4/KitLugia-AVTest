@@ -2,6 +2,7 @@
 <Page x:Class="KitLugia.GUI.Pages.TweaksPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       Title="Tweaks"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
@@ -18,22 +19,22 @@
                     <!-- Item 1: Game Mode -->
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
-                            <!-- Texto Esquerda -->
                             <ColumnDefinition Width="Auto"/>
-                            <!-- Status Texto -->
                             <ColumnDefinition Width="Auto"/>
-                            <!-- Switch -->
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Define prioridade 'High' para jogos no registro via HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\GameMode. Reduz latência e melhora FPS em jogos, dando prioridade de CPU aos processos de jogos."/>
+
+                        <StackPanel Grid.Column="1">
                             <TextBlock Text="Prioridade de GPU (Game Mode)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Define prioridade 'High' para jogos no registro." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="StatusGame" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusGame" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
-                        <CheckBox x:Name="ChkGameMode" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkGameMode_Click"/>
+                        <CheckBox x:Name="ChkGameMode" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkGameMode_Click"/>
                     </Grid>
 
                     <Separator Background="{StaticResource CardBorder}"/>
@@ -41,19 +42,22 @@
                     <!-- Item 2: MPO -->
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Multi-Plane Overlay (MPO) é um recurso da GPU que permite ao DWM sobrepor múltiplos planos de imagem sem composição. Pode causar telas piscando e micro-stutters em placas NVIDIA/AMD. Desativar força o DWM a compor tudo em um único plano, resolvendo esses problemas."/>
+
+                        <StackPanel Grid.Column="1">
                             <TextBlock Text="Desativar Multi-Plane Overlay (MPO)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Corrige telas piscando e stutters em placas NVIDIA/AMD." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="StatusMPO" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusMPO" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
-                        <CheckBox x:Name="ChkMPO" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMPO_Click"/>
+                        <CheckBox x:Name="ChkMPO" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMPO_Click"/>
                     </Grid>
 
                     <Separator Background="{StaticResource CardBorder}"/>
@@ -61,19 +65,22 @@
                     <!-- Item 3: Timer & Latency -->
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Ajusta o PlatformClock para ACPI (mais estável), desativa o Tick Dinâmico (permite interrupções de timer mais precisas) e define a resolução do timer para 1ms (padrão é 15.6ms). Reduz latência de interrupções em jogos. Efeito: melhora estabilidade de FPS."/>
+
+                        <StackPanel Grid.Column="1">
                             <TextBlock Text="Otimizar Timer &amp; Lat&#xEA;ncia (HPET)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Ajusta PlatformClock, Tick Din&#xE2;mico e Resolu&#xE7;&#xE3;o do Timer (1ms)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="StatusTimer" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusTimer" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
-                        <CheckBox x:Name="ChkTimer" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTimer_Click"/>
+                        <CheckBox x:Name="ChkTimer" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTimer_Click"/>
                     </Grid>
 
                 </StackPanel>
@@ -181,20 +188,23 @@
                     <!-- Item 3: VBS -->
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Virtualization-Based Security (VBS) é um recurso de segurança do Windows que virtualiza componentes críticos usando Hyper-V. Consome 5-15% de CPU e até 2 GB de RAM. Desativar VBS é um dos maiores ganhos de FPS em jogos competitivos. ATENÇÃO: alguns anti-cheats como Easy Anti-Cheat podem não funcionar como esperado com VBS desativado. Recomendado para: gamers. Não recomendado para: ambientes corporativos."/>
+
+                        <StackPanel Grid.Column="1">
                             <TextBlock Text="Desativar Seguran&#xE7;a VBS (Ganho de FPS)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Virtualiza&#xE7;&#xE3;o de Seguran&#xE7;a. Desativar aumenta performance em CPU bound." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="StatusVBS" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusVBS" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
                         <!-- ATEN&#xC7;&#xC3;O: Aqui invertemos a l&#xF3;gica. Switch Azul = VBS DESLIGADO (Bom para Gamer) -->
-                        <CheckBox x:Name="ChkVBS" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkVBS_Click"/>
+                        <CheckBox x:Name="ChkVBS" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkVBS_Click"/>
                     </Grid>
 
                     <Separator Background="{StaticResource CardBorder}"/>
@@ -202,19 +212,22 @@
                     <!-- Item 4: Bing -->
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Remove as sugestões de pesquisa da web (Bing) do Menu Iniciar e da caixa de pesquisa. Reduz chamadas de rede desnecessárias quando você digita no Menu Iniciar. A pesquisa local de arquivos e configurações continua funcionando normalmente."/>
+
+                        <StackPanel Grid.Column="1">
                             <TextBlock Text="Desativar Pesquisa Web (Bing)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Remove sugest&#xF5;es da internet no Menu Iniciar." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="StatusBing" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusBing" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
-                        <CheckBox x:Name="ChkBing" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBing_Click"/>
+                        <CheckBox x:Name="ChkBing" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBing_Click"/>
                     </Grid>
 
                     <Separator Background="{StaticResource CardBorder}"/>
@@ -222,19 +235,22 @@
                     <!-- Item 5: MemoryUsage -->
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Equivalente a 'fsutil behavior set memoryusage 2'. Aumenta a frequência de descarga do cache do sistema de arquivos NTFS, reduzindo o uso de memória do kernel em cenários de alta carga de E/S. Efeito: pode reduzir travamentos em jogos que usam muita leitura/escrita de disco."/>
+
+                        <StackPanel Grid.Column="1">
                             <TextBlock Text="Otimizar Uso de Mem&#xF3;ria (Fsutil)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Equivalente a 'fsutil behavior set memoryusage 2'. Otimiza gerenciamento de mem&#xF3;ria." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="StatusMemoryUsage" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusMemoryUsage" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
-                        <CheckBox x:Name="ChkMemoryUsage" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMemoryUsage_Click"/>
+                        <CheckBox x:Name="ChkMemoryUsage" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMemoryUsage_Click"/>
                     </Grid>
 
                     <Separator Background="{StaticResource CardBorder}"/>
@@ -242,19 +258,22 @@
                     <!-- Item 6: Fast Shutdown -->
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Reduz o tempo de espera do Windows para fechar aplicativos ao desligar, de 5 segundos para 2 segundos (ShutdownTurbo). Configuração: WaitToKillServiceTimeout = 2000ms em HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control. Desliga o PC mais rápido sem esperar serviços travarem."/>
+
+                        <StackPanel Grid.Column="1">
                             <TextBlock Text="Desligamento Turbo (Shutdownturbo)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Reduz o tempo de espera para fechar apps ao desligar (2s)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="StatusShutdown" Text="Verificando..." Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusShutdown" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
 
-                        <CheckBox x:Name="ChkShutdown" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkShutdown_Click"/>
+                        <CheckBox x:Name="ChkShutdown" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkShutdown_Click"/>
                     </Grid>
                 </StackPanel>
             </Border>

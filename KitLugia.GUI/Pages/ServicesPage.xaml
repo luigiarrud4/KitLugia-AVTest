@@ -83,7 +83,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
 
-                                <DataGridTemplateColumn Header="Status" Width="130" IsReadOnly="True" SortMemberPath="Status">
+                                <DataGridTemplateColumn Header="Status" Width="190" IsReadOnly="True" SortMemberPath="Status">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock VerticalAlignment="Center" FontWeight="Bold">
@@ -111,10 +111,19 @@
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Status}" Value="TurboBoot">
                                                                 <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
-                                                                <Setter Property="Text" Value="&#x1F680; KITLUGIA"/>
+                                                                <Setter Property="Text" Value="&#x1F680; KITLUGIA (ADMIN)"/>
                                                                 <Setter Property="Effect">
                                                                     <Setter.Value>
                                                                         <DropShadowEffect Color="#FFD700" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="TurboBootNormal">
+                                                                <Setter Property="Foreground" Value="#E8C98A"/>
+                                                                <Setter Property="Text" Value="&#x1F680; KITLUGIA (NORMAL)"/>
+                                                                <Setter Property="Effect">
+                                                                    <Setter.Value>
+                                                                        <DropShadowEffect Color="#E8C98A" BlurRadius="4" ShadowDepth="0" Opacity="0.25"/>
                                                                     </Setter.Value>
                                                                 </Setter>
                                                             </DataTrigger>
@@ -139,12 +148,15 @@
 
                             <!-- Menu de Contexto para Startup -->
                             <DataGrid.ContextMenu>
-                                <ContextMenu Style="{StaticResource ServiceContextMenu}">
+                                <ContextMenu Style="{StaticResource ServiceContextMenu}" Opened="GridStartup_ContextMenuOpened">
                                     <MenuItem Header="Habilitar / Desabilitar" Click="BtnToggleStartup_Click" Style="{StaticResource ServiceMenuItem}"/>
-                                    <MenuItem Header="&#x1F680; Mover para Turbo Boot (KitLugia)" Click="MenuMoveToTurbo_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
+                                    <MenuItem x:Name="MenuMoveToTurboBoot_Admin" Header="&#x1F680; Mover para KitLugia Boot Tray (Admin)" Click="MenuMoveToTurboAdmin_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
+                                    <MenuItem x:Name="MenuMoveToTurboBoot_Normal" Header="&#x1F680; Mover para KitLugia Boot Tray (Normal - Sem Admin)" Click="MenuMoveToTurboNormal_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
+                                    <MenuItem x:Name="MenuRemoveFromTurboBoot" Header="&#x1F504; Remover do KitLugia Boot Tray" Click="MenuRemoveFromTurboBoot_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61"/>
+                                    <MenuItem x:Name="MenuRestoreNormal" Header="&#x23EA; Restaurar para Inicializa&#xE7;&#xE3;o Padr&#xE3;o" Click="MenuRestoreNormal_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <Separator Background="#333"/>
                                     <MenuItem Header="&#x1F6E1;&#xFE0F; Converter para Admin Elevado" Click="MenuConvertToAdmin_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
                                     <MenuItem Header="&#x23F3; Converter para Admin Elevado (Atraso 2min)" Click="MenuConvertToAdminDelayed_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
-                                    <MenuItem Header="&#x23EA; Restaurar para Inicializa&#xE7;&#xE3;o Padr&#xE3;o" Click="MenuRestoreNormal_Click" Style="{StaticResource ServiceMenuItem}"/>
                                     <Separator Background="#333"/>
                                     <MenuItem Header="&#x25B6; Executar Agora (Testar)" Click="MenuRunNow_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#4CAF50" FontWeight="Bold"/>
                                     <MenuItem Header="&#x2699; Editar Argumentos..." Click="MenuEditArgs_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>

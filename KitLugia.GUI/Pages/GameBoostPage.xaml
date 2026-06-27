@@ -375,7 +375,7 @@
                         <TextBlock Text="&#x26A1;" FontSize="24" HorizontalAlignment="Center" Margin="0,0,0,10"/>
                         <TextBlock Text="Otimiza&#xE7;&#xF5;es Avan&#xE7;adas" FontSize="14" FontWeight="Bold" Foreground="#4ECDC4"
                                    TextAlignment="Center" Margin="0,0,0,5"/>
-                        <TextBlock Text="EcoQoS + Thread Memory Priority + Timer Resolution (0.5ms)" FontSize="11" Foreground="#888"
+                        <TextBlock Text="EcoQoS + Thread Memory Priority + Timer Resolution (1ms)" FontSize="11" Foreground="#888"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
@@ -580,44 +580,55 @@
                             
                                     <!-- Timer Resolution -->
                             <Border Grid.Column="0" Grid.Row="0" Margin="0,0,10,10" Background="#2D2D2D" CornerRadius="8" Padding="12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Background="Transparent" BorderThickness="0" Width="24" Height="24"
-                                                    Cursor="Help" Margin="0,0,6,0" VerticalAlignment="Center"
-                                                    ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
-                                                <Button.ToolTip>
-                                                    <ToolTip Content="Ajusta a resolu&#xE7;&#xE3;o do timer do Windows para 0.5ms via ntdll. Reduz lat&#xEA;ncia de entrada, melhora responsividade em jogos e reduz stutter. Pode aumentar consumo de CPU em idle."/>
-                                                </Button.ToolTip>
-                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
-                                                <Button.Template>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border Background="Transparent">
-                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter Property="Opacity" Value="1"/>
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Button.Template>
-                                            </Button>
-                                            <TextBlock Text="&#x23F1;&#xFE0F; Timer Resolution" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Background="Transparent" BorderThickness="0" Width="24" Height="24"
+                                                        Cursor="Help" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                        ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                                                    <Button.ToolTip>
+                                                        <ToolTip Content="Ajusta a resolu&#xE7;&#xE3;o do timer do Windows para 1ms via ntdll. Reduz lat&#xEA;ncia de entrada, melhora responsividade em jogos e reduz stutter. Pode aumentar consumo de CPU em idle. AVISO: Pode causar estouros/popping em &#xE1;udio virtual (Voicemeeter, VB-Cable, etc.). Se usar &#xE1;udio virtual, deixe esta op&#xE7;&#xE3;o desligada."/>
+                                                    </Button.ToolTip>
+                                                    <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="Transparent">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Opacity" Value="1"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                                <TextBlock Text="&#x23F1;&#xFE0F; Timer Resolution" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                                            </StackPanel>
+                                            <TextBlock Text="Melhora precis&#xE3;o de timers" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
                                         </StackPanel>
-                                        <TextBlock Text="Melhora precis&#xE3;o de timers" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtTimerResolutionStatus" Text="DESATIVADO" 
-                                                   FontSize="9" FontWeight="Bold" Foreground="#FF6B6B" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <ToggleButton x:Name="TglTimerResolution" Style="{StaticResource GoldToggleStyle}"
-                                                      Checked="ToggleButton_Checked" Unchecked="ToggleButton_Unchecked"/>
-                                    </StackPanel>
-                                </Grid>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock x:Name="TxtTimerResolutionStatus" Text="DESATIVADO" 
+                                                       FontSize="9" FontWeight="Bold" Foreground="#FF6B6B" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <ToggleButton x:Name="TglTimerResolution" Style="{StaticResource GoldToggleStyle}"
+                                                          Checked="ToggleButton_Checked" Unchecked="ToggleButton_Unchecked"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="PanelTimerAudioWarning" Background="#3D1A1A" CornerRadius="6" Padding="8"
+                                            Margin="0,8,0,0" BorderBrush="#FF4444" BorderThickness="1" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <TextBlock Text="&#x26A0;&#xFE0F; AVISO DE &#xC1;UDIO" FontWeight="Bold" FontSize="11" Foreground="#FF6B6B"/>
+                                            <TextBlock Text="Timer de 1ms pode causar estouros/popping em &#xE1;udio virtual (Voicemeeter, VB-Cable, etc.). 
+                                            Desative esta op&#xE7;&#xE3;o se usar &#xE1;udio virtual ou equipamentos de &#xE1;udio USB sens&#xED;veis." 
+                                            FontSize="10" Foreground="#FF9999" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
                             </Border>
                             
                             <!-- EcoQoS -->
