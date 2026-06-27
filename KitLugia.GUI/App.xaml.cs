@@ -2,6 +2,7 @@
 using Application = System.Windows.Application;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 // A linha duplicada "using System.Windows;" foi removida daqui
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -35,7 +36,11 @@ namespace KitLugia.GUI
             base.OnStartup(e);
 
 
-            KitLugia.Core.StartupManager.CheckAndFixStartupMethods();
+            // Deferred in tray mode so tray icon appears faster
+            if (StartMinimized)
+                _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
+            else
+                KitLugia.Core.StartupManager.CheckAndFixStartupMethods();
 
             var mainWindow = new MainWindow();
             
