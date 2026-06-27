@@ -511,24 +511,19 @@ namespace KitLugia.GUI
             }
         }
 
-        public MainWindow()
+        public bool StartMinimized => (Application.Current as App)?.StartMinimized ?? false;
+        private bool _uiDeferredInit = false;
+
+        private void EnsureUIIinitialized()
         {
-            InitializeComponent();
+            if (_uiDeferredInit || !StartMinimized) return;
+            _uiDeferredInit = true;
 
-
-            _backgroundTasksCts = new CancellationTokenSource();
-
-            // Carrega configurações do GoodbyeDPI
-            LoadGoodbyeDPIConfig();
-
-            // Inicializa a Engine de Busca
             SearchEngine.Initialize();
 
-            // Configura o timer de pesquisa (300ms)
             _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
             _searchDebounceTimer.Tick += SearchDebounce_Tick;
 
-            // Configura timer para verificar status do GoodbyeDPI (a cada 2 segundos)
             _goodbyeDpiStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _goodbyeDpiStatusTimer.Tick += (s, e) =>
             {
@@ -539,16 +534,33 @@ namespace KitLugia.GUI
                     BtnGoodbyeDPI.ToolTip = $"GoodbyeDPI - {status}";
                 }
             };
-            // Timer só inicia após a intro (em OnIntroFinished) para não competir com animações
 
-            // Inicia na Dashboard (navegação segura)
             MainFrame.Navigate(new DashboardPage());
             if (BtnDashboard != null) BtnDashboard.IsChecked = true;
-            
-            // Limpa histórico inicial para evitar acúmulo desde o início
             while (MainFrame.NavigationService.CanGoBack)
-            {
                 MainFrame.NavigationService.RemoveBackEntry();
+
+            if (GlobalConsolePanel != null)
+                GlobalConsolePanel.RequestClose += (s, e) => { GlobalConsolePanel.Visibility = Visibility.Collapsed; };
+            if (LegacyTerminalPanel != null)
+                LegacyTerminalPanel.RequestClose += (s, e) => { LegacyTerminalPanel.Visibility = Visibility.Collapsed; };
+
+            UpdateDebugMenuVisibility(false);
+        }
+
+        public MainWindow()
+        {
+            InitializeComponent();
+
+
+            _backgroundTasksCts = new CancellationTokenSource();
+
+            // Carrega configurações do GoodbyeDPI
+            LoadGoodbyeDPIConfig();
+
+            if (!StartMinimized)
+            {
+                EnsureUIIinitialized();
             }
 
             // Conecta o Logger do Core ao Console da GUI
@@ -563,13 +575,16 @@ namespace KitLugia.GUI
             Services.BackgroundTaskTracker.Instance.TaskStatusChanged += BackgroundTaskTracker_TaskStatusChanged;
             Services.BackgroundTaskTracker.Instance.PropertyChanged += BackgroundTaskTracker_PropertyChanged;
 
-            // Configura o fechamento do painel de console (Rodapé)
-            if (GlobalConsolePanel != null)
-                GlobalConsolePanel.RequestClose += (s, e) => { GlobalConsolePanel.Visibility = Visibility.Collapsed; };
+            if (!StartMinimized)
+            {
+                // Configura o fechamento do painel de console (Rodapé)
+                if (GlobalConsolePanel != null)
+                    GlobalConsolePanel.RequestClose += (s, e) => { GlobalConsolePanel.Visibility = Visibility.Collapsed; };
 
-            // --- CORREÇÃO: Configura o fechamento do Terminal Legacy (Tela Cheia) ---
-            if (LegacyTerminalPanel != null)
-                LegacyTerminalPanel.RequestClose += (s, e) => { LegacyTerminalPanel.Visibility = Visibility.Collapsed; };
+                // --- CORREÇÃO: Configura o fechamento do Terminal Legacy (Tela Cheia) ---
+                if (LegacyTerminalPanel != null)
+                    LegacyTerminalPanel.RequestClose += (s, e) => { LegacyTerminalPanel.Visibility = Visibility.Collapsed; };
+            }
 
             // --- TRAY ICON: Inicializa o Monitor de RAM ---
             _trayService = new TrayIconService();
@@ -577,6 +592,7 @@ namespace KitLugia.GUI
             {
                 Dispatcher.Invoke(() =>
                 {
+                    EnsureUIIinitialized();
                     Show();
                     WindowState = WindowState.Normal;
                     Activate();
@@ -587,6 +603,7 @@ namespace KitLugia.GUI
             {
                 Dispatcher.Invoke(() =>
                 {
+                    EnsureUIIinitialized();
                     Show();
                     WindowState = WindowState.Normal;
                     Activate();
@@ -606,13 +623,12 @@ namespace KitLugia.GUI
             // automaticamente com o caminho atual para que o auto-start não suma silenciosamente.
             if (TrayIconService.IsTrayEnabledStatic())
             {
-                // Sempre re-registra para garantir que o caminho está atualizado após updates
-                TrayIconService.SetAutoStart(true);
-                
                 var currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 Logger.Log($"KitLugia iniciado: {currentPath}");
-                Logger.Log($"Tray ativo: {TrayIconService.IsTrayEnabledStatic()}");
-                Logger.Log($"Auto-start atualizado para: {currentPath}");
+                Logger.Log($"Tray ativo: true");
+
+                // Auto-start registration via Task Scheduler COM — defer off UI thread
+                _ = Task.Run(() => TrayIconService.SetAutoStart(true));
                 
 
                 _healthCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
@@ -660,8 +676,11 @@ namespace KitLugia.GUI
             AggressiveMemoryCleaner.StartIntelligentMonitoring(30, 200); // Verifica a cada 30s, limpa quando o processo ultrapassa 200MB
             Logger.Log("🧹 MemoryCleaner inteligente iniciado - Limite: 200MB, Verificação: 30s");
 
-            // --- MODO DESENVOLVEDOR: Inicializa com menu de debug OCULTO por padrão ---
-            UpdateDebugMenuVisibility(false);
+            if (!StartMinimized)
+            {
+                // --- MODO DESENVOLVEDOR: Inicializa com menu de debug OCULTO por padrão ---
+                UpdateDebugMenuVisibility(false);
+            }
 
             // --- NAMED EVENT: Permite que uma segunda instância sinalize para mostrar a janela ---
             _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "KitLugia_ShowWindow");
@@ -669,10 +688,11 @@ namespace KitLugia.GUI
             {
                 while (!_backgroundTasksCts.Token.IsCancellationRequested)
                 {
-                    if (_showWindowEvent.WaitOne(1000)) // Timeout de 1s para verificar cancelamento
+                    if (_showWindowEvent.WaitOne(1000))
                     {
                         Dispatcher.Invoke(() =>
                         {
+                            EnsureUIIinitialized();
                             Show();
                             WindowState = WindowState.Normal;
                             Activate();
@@ -2160,10 +2180,16 @@ namespace KitLugia.GUI
         // 📍 ANIMAÇÃO 21: Splash Screen de Intro (controlada por configuração) - MainWindow.xaml.cs linha ~1451-1650
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-
-            // A intro só começa DEPOIS que o layout está completamente renderizado (via BeginInvoke Loaded).
-            // Isso resolve o problema de animações não dispararem quando o sistema está ocupado.
-            _ = LoadIntroSettingsAndPlay();
+            if (StartMinimized)
+            {
+                // Tray mode: skip intro animation, finish init immediately
+                if (SplashScreen != null) SplashScreen.Visibility = Visibility.Collapsed;
+                OnIntroFinished();
+            }
+            else
+            {
+                _ = LoadIntroSettingsAndPlay();
+            }
             _ = CheckForUpdateNotificationAsync();
         }
 

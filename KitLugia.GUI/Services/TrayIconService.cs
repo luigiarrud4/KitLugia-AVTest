@@ -899,6 +899,15 @@ namespace KitLugia.GUI.Services
         // LocalApplicationData não depende de Roaming e é mais seguro
         private string _logPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KitLugia", "ram_stats.csv");
 
+        private bool _seDebugEnabled;
+
+        private void EnsureSeDebugPrivilege()
+        {
+            if (_seDebugEnabled) return;
+            _seDebugEnabled = true;
+            EnableSeDebugPrivilege();
+        }
+
         public event System.Action? OnOpenMainWindow;
         public event System.Action? OnOpenSettings;
 
@@ -906,9 +915,6 @@ namespace KitLugia.GUI.Services
         {
 
             _instance = this;
-
-
-            EnableSeDebugPrivilege();
 
             _monitorTimer = new DispatcherTimer
             {
@@ -1009,13 +1015,8 @@ namespace KitLugia.GUI.Services
         public void Initialize()
         {
             LoadSettings();
-            LoadProcessLimits();
-
 
             System.Threading.Tasks.Task.Run(() => AutoFixGameBarPresenceWriter());
-
-
-            ShowTrayStatusReport();
 
 
             try
@@ -1023,28 +1024,13 @@ namespace KitLugia.GUI.Services
                 _trayIcon = new NotifyIcon
                 {
                     Text = "KitLugia RAM Monitor",
-                    Visible = false // Inicia oculto para verificação
+                    Visible = false
                 };
-                KitLugia.Core.Logger.Log("NotifyIcon criado com sucesso");
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"ERRO ao criar NotifyIcon: {ex.Message}");
                 return;
-            }
-
-
-            try
-            {
-                // Testa se consegue criar um NotifyIcon temporário
-                using (var testIcon = new NotifyIcon())
-                {
-                    KitLugia.Core.Logger.Log("Sistema suporta NotifyIcon");
-                }
-            }
-            catch (Exception ex)
-            {
-                KitLugia.Core.Logger.Log($"AVISO: Sistema pode não suportar NotifyIcon - {ex.Message}");
             }
 
             // Generate the initial icon
@@ -1078,6 +1064,7 @@ namespace KitLugia.GUI.Services
             {
                 GamePriorityEnabled = !GamePriorityEnabled;
                 itemGameBoost.Checked = GamePriorityEnabled;
+                if (GamePriorityEnabled) EnsureSeDebugPrivilege();
                 SaveSettings();
                 KitLugia.Core.Logger.Log($"🚀 GameBoost {(GamePriorityEnabled ? "ativado" : "desativado")} via Tray Icon");
             };
@@ -1188,14 +1175,17 @@ namespace KitLugia.GUI.Services
 
                     if (_trayIcon.Visible)
                     {
-                        KitLugia.Core.Logger.Log("✅ Tray Icon ativado com sucesso");
-
-                        // Start monitoring if enabled
+                        // Start monitoring (first tick fires at interval)
                         _monitorTimer.Start();
-                        // Run an initial Safety Profiler
-                        Application.Current.Dispatcher.BeginInvoke(new System.Action(RunSafetyProfiler), DispatcherPriority.Background);
-                        // First tick immediately
-                        MonitorTick(null, EventArgs.Empty);
+
+                        // Defer heavy init to after icon is visible
+                        Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
+                        {
+                            LoadProcessLimits();
+                            ShowTrayStatusReport();
+                            RunSafetyProfiler();
+                            MonitorTick(null, EventArgs.Empty);
+                        }), DispatcherPriority.Background);
                     }
                     else
                     {
@@ -1942,6 +1932,8 @@ namespace KitLugia.GUI.Services
         public void InitializeGameBoost()
         {
             if (!GamePriorityEnabled) return;
+
+            EnsureSeDebugPrivilege();
 
             try
             {
