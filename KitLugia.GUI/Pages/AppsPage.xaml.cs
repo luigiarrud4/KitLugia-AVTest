@@ -298,6 +298,9 @@ namespace KitLugia.GUI.Pages
                         BloatwareCollection[idx].Icon = icon;
                 }
 
+                if (BloatwareList != null)
+                    BloatwareList.Items.Refresh();
+
                 if (BloatwareIconProgressText != null)
                     BloatwareIconProgressText.Text = $"Ícones carregados: {BloatwareCollection.Count(a => a.Icon != null)}/{totalIcons}";
             });
@@ -776,6 +779,9 @@ namespace KitLugia.GUI.Pages
 
             await dispatcher.InvokeAsync(() =>
             {
+                if (ProgramsList != null)
+                    ProgramsList.Items.Refresh();
+
                 if (ProgramsIconProgressText != null)
                 {
                     ProgramsIconProgressText.Text = "Ícones carregados!";

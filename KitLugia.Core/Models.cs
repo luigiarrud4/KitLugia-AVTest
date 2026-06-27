@@ -9,7 +9,7 @@ namespace KitLugia.Core
     // --- ENUMS ---
     public enum TweakType { Registry, Service, Mouse, Bcd, PageFile, GpuInterruptPriority }
     public enum TweakStatus { OK, MODIFIED, ERROR, NOT_FOUND }
-    public enum StartupStatus { Disabled, Enabled, Elevated, TurboBoot }
+    public enum StartupStatus { Disabled, Enabled, Elevated, TurboBoot, TurboBootNormal }
     public enum ActionType { BuiltIn, GenericCommand, Script }
     public enum ServiceSafetyLevel { Safe, Caution, Dangerous, Unknown }
 
@@ -60,6 +60,11 @@ namespace KitLugia.Core
                 return args ?? "";
             }
         }
+
+        public bool IsInBootTray =>
+            Location.Contains("Turbo Boot");
+
+        public bool BootTrayRunAsAdmin { get; set; } = true;
     }
 
     public record ServiceInfo(string Name, string DisplayName, string Description, string Status, string StartMode, ServiceSafetyLevel Safety);
@@ -214,5 +219,15 @@ namespace KitLugia.Core
         public string DisplayName => string.IsNullOrEmpty(DriveLetter) 
             ? $"Partição {Name} ({FileSystem}) - {SizeString}"
             : $"{DriveLetter} ({Label}) [{FileSystem}] - {FreeSpaceString} livres de {SizeString}";
+    }
+
+    public record SystemSpecsCache
+    {
+        public string PcName { get; init; } = "";
+        public double RamGB { get; init; }
+        public string OsName { get; init; } = "";
+        public string CpuName { get; init; } = "";
+        public string GpuName { get; init; } = "";
+        public DateTime ScanDate { get; init; }
     }
 }

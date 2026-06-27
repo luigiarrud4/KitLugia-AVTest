@@ -23,6 +23,8 @@ namespace KitLugia.GUI.Pages
         private CancellationTokenSource? _cts;
         private string _addMode = "Normal";
         private bool _isServiceOperation;
+        private static readonly System.Windows.Media.Brush RedBrush =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 107, 107));
 
         public ServicesPage(int tabIndex = 0)
         {
@@ -115,8 +117,9 @@ namespace KitLugia.GUI.Pages
                 var merged = apps.Concat(schedulerApps)
                     .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(g => g.First())
-                    .OrderByDescending(a => a.Status.ToString() == "Elevated")
-                    .ThenByDescending(a => a.Status.ToString() == "Enabled")
+                    .OrderByDescending(a => a.Status == StartupStatus.TurboBoot || a.Status == StartupStatus.TurboBootNormal)
+                    .ThenByDescending(a => a.Status == StartupStatus.Elevated)
+                    .ThenByDescending(a => a.Status == StartupStatus.Enabled)
                     .ThenBy(a => a.Name)
                     .ToList();
                 GridStartup.ItemsSource = merged;
@@ -397,7 +400,29 @@ namespace KitLugia.GUI.Pages
             AddStartupOverlay.Visibility = Visibility.Collapsed;
         }
 
-        private async void MenuMoveToTurbo_Click(object sender, RoutedEventArgs e)
+        private void GridStartup_ContextMenuOpened(object sender, RoutedEventArgs e)
+        {
+            if (GridStartup.SelectedItem is StartupAppDetails selectedApp)
+            {
+                bool inKitLugia = selectedApp.IsInBootTray || selectedApp.Location.Contains("KitLugia");
+                MenuRestoreNormal.Visibility = inKitLugia ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
+                if (selectedApp.IsInBootTray)
+                {
+                    MenuMoveToTurboBoot_Admin.Visibility = System.Windows.Visibility.Collapsed;
+                    MenuMoveToTurboBoot_Normal.Visibility = System.Windows.Visibility.Collapsed;
+                    MenuRemoveFromTurboBoot.Visibility = System.Windows.Visibility.Visible;
+                }
+                else
+                {
+                    MenuMoveToTurboBoot_Admin.Visibility = System.Windows.Visibility.Visible;
+                    MenuMoveToTurboBoot_Normal.Visibility = System.Windows.Visibility.Visible;
+                    MenuRemoveFromTurboBoot.Visibility = System.Windows.Visibility.Collapsed;
+                }
+            }
+        }
+
+        private async Task MoveToBootTray(bool runAsAdmin)
         {
             if (_isServiceOperation) return;
             _isServiceOperation = true;
@@ -405,22 +430,50 @@ namespace KitLugia.GUI.Pages
             {
                 if (GridStartup.SelectedItem is StartupAppDetails selectedApp && Application.Current.MainWindow is MainWindow mw)
                 {
-                    if (selectedApp.Location.Contains("Turbo Boot"))
-                    {
-                        mw.ShowInfo("TURBO BOOT", "Este aplicativo já está no KitLugia Turbo Boot.");
-                        return;
-                    }
-
-                    if (!await mw.ShowConfirmationDialog($"Mover '{selectedApp.Name}' para o Turbo Boot (KitLugia)?\n\nIsso utilizará uma inicialização paralela de alta prioridade.")) return;
-
-                    var resultAdd = await Task.Run(() => StartupManager.DelegateToKitLugia(selectedApp.Name));
-                    if (resultAdd.Success) { mw.ShowSuccess("BEM VINDO AO TURBO BOOT", resultAdd.Message); LoadStartupApps(); }
+                    string mode = runAsAdmin ? "Admin" : "Normal (Sem Admin)";
+                    if (!await mw.ShowConfirmationDialog($"Mover '{selectedApp.Name}' para o KitLugia Boot Tray ({mode})?")) return;
+                    var resultAdd = await Task.Run(() => StartupManager.DelegateToKitLugia(selectedApp.Name, runAsAdmin));
+                    if (resultAdd.Success) { mw.ShowSuccess("BOOT TRAY", resultAdd.Message); await LoadStartupApps(); }
                     else mw.ShowError("ERRO", resultAdd.Message);
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError("MenuMoveToTurbo_Click", ex.Message);
+                Logger.LogError("MoveToBootTray", ex.Message);
+            }
+            finally
+            {
+                _isServiceOperation = false;
+            }
+        }
+
+        private void MenuMoveToTurboAdmin_Click(object sender, RoutedEventArgs e)
+        {
+            _ = MoveToBootTray(true);
+        }
+
+        private void MenuMoveToTurboNormal_Click(object sender, RoutedEventArgs e)
+        {
+            _ = MoveToBootTray(false);
+        }
+
+        private async void MenuRemoveFromTurboBoot_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isServiceOperation) return;
+            _isServiceOperation = true;
+            try
+            {
+                if (GridStartup.SelectedItem is StartupAppDetails selectedApp && Application.Current.MainWindow is MainWindow mw)
+                {
+                    if (!await mw.ShowConfirmationDialog($"Remover '{selectedApp.Name}' do KitLugia Boot Tray?")) return;
+                    var result = await Task.Run(() => StartupManager.RemoveFromKitLugia(selectedApp.Name));
+                    if (result.Success) { mw.ShowSuccess("BOOT TRAY", result.Message); await LoadStartupApps(); }
+                    else mw.ShowError("ERRO", result.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("MenuRemoveFromTurboBoot_Click", ex.Message);
             }
             finally
             {
@@ -445,10 +498,13 @@ namespace KitLugia.GUI.Pages
                     StartupManager.ExtractCommandParts(selectedApp.FullCommand, out string? path, out string? args);
                     if (string.IsNullOrEmpty(path)) { mw.ShowError("ERRO", "Caminho inválido ou não pode ser convertido."); return; }
 
-                    await Task.Run(() => StartupManager.RemoveStartupItem(selectedApp.Name));
-                    var result = await Task.Run(() => StartupManager.CreateElevatedStartupTask(selectedApp.Name, path, args));
-                    
-                    if (result.Success) { mw.ShowSuccess("ELEVADO COM SUCESSO", result.Message); LoadStartupApps(); }
+                    var result = await Task.Run(() =>
+                    {
+                        StartupManager.RemoveStartupItem(selectedApp.Name);
+                        return StartupManager.CreateElevatedStartupTask(selectedApp.Name, path, args);
+                    });
+
+                    if (result.Success) { mw.ShowSuccess("ELEVADO COM SUCESSO", result.Message); await LoadStartupApps(); }
                     else mw.ShowError("ERRO", result.Message);
                 }
             }
@@ -473,10 +529,13 @@ namespace KitLugia.GUI.Pages
                     StartupManager.ExtractCommandParts(selectedApp.FullCommand, out string? path, out string? args);
                     if (string.IsNullOrEmpty(path)) { mw.ShowError("ERRO", "Caminho inválido ou não pode ser convertido."); return; }
 
-                    await Task.Run(() => StartupManager.RemoveStartupItem(selectedApp.Name));
-                    var result = await Task.Run(() => StartupManager.CreateElevatedDelayedStartupTask(selectedApp.Name, path, args));
-                    
-                    if (result.Success) { mw.ShowSuccess("ELEVADO (ATRASO) COM SUCESSO", result.Message); LoadStartupApps(); }
+                    var result = await Task.Run(() =>
+                    {
+                        StartupManager.RemoveStartupItem(selectedApp.Name);
+                        return StartupManager.CreateElevatedDelayedStartupTask(selectedApp.Name, path, args);
+                    });
+
+                    if (result.Success) { mw.ShowSuccess("ELEVADO (ATRASO) COM SUCESSO", result.Message); await LoadStartupApps(); }
                     else mw.ShowError("ERRO", result.Message);
                 }
             }
@@ -510,7 +569,7 @@ namespace KitLugia.GUI.Pages
                     if (result.Success)
                     {
                         mw.ShowSuccess("SUCESSO", result.Message);
-                        LoadStartupApps();
+                        await LoadStartupApps();
                     }
                     else mw.ShowError("ERRO", result.Message);
                 }
@@ -641,6 +700,32 @@ namespace KitLugia.GUI.Pages
                 if (GridStartup.SelectedItem is not StartupAppDetails app) return;
                 if (Application.Current.MainWindow is not MainWindow mw) return;
 
+                // Non-admin boot tray: usar tarefa agendada dormente para evitar herdar admin
+                if (app.IsInBootTray && !app.BootTrayRunAsAdmin)
+                {
+                    string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"Executando {app.Name} (sem admin)", "Services");
+                    bool success = false;
+                    string message = "";
+                    await Task.Run(() =>
+                    {
+                        try
+                        {
+                            StartupManager.RunNonAdminTask(app.Name);
+                            success = true;
+                            message = $"{app.Name} iniciado como NORMAL com sucesso.";
+                        }
+                        catch (Exception ex)
+                        {
+                            success = false;
+                            message = $"Erro ao executar via tarefa: {ex.Message}";
+                        }
+                    });
+                    Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, success, message);
+                    if (success) mw.ShowSuccess("EXECUTANDO (NORMAL)", message);
+                    else mw.ShowError("ERRO", message);
+                    return;
+                }
+
                 StartupManager.ExtractCommandParts(app.FullCommand, out string? path, out string? args);
                 if (string.IsNullOrWhiteSpace(path))
                 {
@@ -648,9 +733,9 @@ namespace KitLugia.GUI.Pages
                     return;
                 }
 
-                string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"Executando {app.Name}", "Services");
-                bool success = false;
-                string message = "";
+                string taskId2 = Services.BackgroundTaskTracker.Instance.RegisterTask($"Executando {app.Name}", "Services");
+                bool success2 = false;
+                string message2 = "";
 
                 await Task.Run(() =>
                 {
@@ -664,22 +749,22 @@ namespace KitLugia.GUI.Pages
                             WorkingDirectory = System.IO.Path.GetDirectoryName(path) ?? ""
                         };
                         System.Diagnostics.Process.Start(psi);
-                        success = true;
-                        message = $"{app.Name} iniciado com sucesso.";
+                        success2 = true;
+                        message2 = $"{app.Name} iniciado com sucesso.";
                     }
                     catch (Exception ex)
                     {
-                        success = false;
-                        message = $"Erro ao executar: {ex.Message}";
+                        success2 = false;
+                        message2 = $"Erro ao executar: {ex.Message}";
                     }
                 });
 
-                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, success, message);
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId2, success2, message2);
 
-                if (success)
-                    mw.ShowSuccess("EXECUTANDO", message);
+                if (success2)
+                    mw.ShowSuccess("EXECUTANDO", message2);
                 else
-                    mw.ShowError("ERRO", message);
+                    mw.ShowError("ERRO", message2);
             }
             catch (Exception ex)
             {

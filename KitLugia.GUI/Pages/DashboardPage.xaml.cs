@@ -26,6 +26,11 @@ namespace KitLugia.GUI.Pages
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KitLugia",
             "custom_profiles.json");
+        private static readonly string SpecsCachePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KitLugia",
+            "system_specs.json");
+        private static SystemSpecsCache? _sessionSpecs;
 
         public DashboardPage()
         {
@@ -65,8 +70,16 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                TxtPCName.Text = System.Environment.MachineName;
+                TxtPCName.Text = Environment.MachineName;
 
+                // Já escaneamos nesta sessão? Usa os dados em memória, sem WMI
+                if (_sessionSpecs != null)
+                {
+                    TxtSpecs.Text = $"{_sessionSpecs.RamGB:F0} GB de RAM • {_sessionSpecs.OsName} • {_sessionSpecs.CpuName} • {_sessionSpecs.GpuName}";
+                    return;
+                }
+
+                // Primeira vez nesta sessão: scan WMI e salva em memória + arquivo
                 double ram = await Task.Run(() => SystemUtils.GetTotalSystemRamGB());
 
                 using var dashManager = new DashboardManager();
@@ -76,11 +89,39 @@ namespace KitLugia.GUI.Pages
                 string cpu = snapshot.CpuName ?? "N/A";
                 string gpu = snapshot.GpuName ?? "N/A";
                 TxtSpecs.Text = $"{ram:F0} GB de RAM • {os} • {cpu} • {gpu}";
+
+                _sessionSpecs = new SystemSpecsCache
+                {
+                    PcName = Environment.MachineName,
+                    RamGB = ram,
+                    OsName = os,
+                    CpuName = cpu,
+                    GpuName = gpu,
+                    ScanDate = DateTime.Now
+                };
+
+                SaveSpecsCacheToFile(_sessionSpecs);
             }
             catch (Exception ex)
             {
                 TxtSpecs.Text = "Falha ao ler hardware.";
                 Logger.Log($"[DASHBOARD] Erro ao carregar hardware: {ex.Message}");
+            }
+        }
+
+        private static void SaveSpecsCacheToFile(SystemSpecsCache specs)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(SpecsCachePath);
+                if (dir != null && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                var json = JsonSerializer.Serialize(specs, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(SpecsCachePath, json);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[DASHBOARD] Erro ao salvar arquivo de configuração: {ex.Message}");
             }
         }
 

@@ -24,15 +24,19 @@ namespace KitLugia.GUI.Pages
         private const string AutoStartValueName = "KitLugia";
 
         private bool _isCleaningNow;
-        private bool _isRemovingTurboApp;
-        private bool _isRestoringTurboApp;
+        private bool _isLoading;
         private KitLugia.GUI.Controls.ProcessPickerOverlay? _currentPicker;
+
+        private static readonly System.Windows.Media.FontFamily _emojiFont =
+            new System.Windows.Media.FontFamily("Segoe UI Emoji, Segoe UI, Arial");
 
         public TraySettingsPage()
         {
+            _isLoading = true;
             InitializeComponent();
             LoadSettings();
             LoadProcessLimits();
+            _isLoading = false;
             StartRamRefresh();
 
 
@@ -104,21 +108,6 @@ namespace KitLugia.GUI.Pages
                 ChkAutoStart.IsChecked = false;
             }
 
-            LoadTurboApps();
-        }
-
-        private void LoadTurboApps()
-        {
-            try
-            {
-                var apps = StartupManager.GetStartupAppsWithDetails(true)
-                    .Where(a => a.Location == "Turbo Boot (KitLugia)")
-                    .ToList();
-
-                ListTurboApps.ItemsSource = apps;
-                TxtEmptyTurbo.Visibility = apps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            }
-            catch { }
         }
 
         private void OnRefreshTimerTick(object? s, EventArgs e)
@@ -162,6 +151,7 @@ namespace KitLugia.GUI.Pages
                 if (limit == null) continue;
 
                 if (nameStack.Children[1] is not TextBlock statusTb) continue;
+                statusTb.FontFamily = _emojiFont;
 
                 bool exceeded = limit.LastKnownMB > limit.LimitMB;
                 statusTb.Text = limit.LastKnownMB > 0
@@ -322,7 +312,7 @@ namespace KitLugia.GUI.Pages
 
         private void SliderThreshold_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (TxtThreshold == null) return;
+            if (_isLoading || TxtThreshold == null) return;
             int val = (int)SliderThreshold.Value;
             TxtThreshold.Text = $"{val}%";
             var tray = GetTrayService();
@@ -335,7 +325,7 @@ namespace KitLugia.GUI.Pages
 
         private void SliderInterval_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (TxtInterval == null) return;
+            if (_isLoading || TxtInterval == null) return;
             int val = (int)SliderInterval.Value;
             TxtInterval.Text = FormatInterval(val);
             var tray = GetTrayService();
@@ -346,35 +336,6 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private async void BtnRemoveTurboApp_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isRemovingTurboApp) return;
-            _isRemovingTurboApp = true;
-            try
-            {
-                if (sender is System.Windows.Controls.Button btn && btn.Tag is string appName && Application.Current.MainWindow is MainWindow mw)
-                {
-                    if (!await mw.ShowConfirmationDialog($"Remover '{appName}' do Turbo Boot?")) return;
-
-                    var result = StartupManager.RemoveFromKitLugia(appName);
-                    if (result.Success)
-                    {
-                        mw.ShowSuccess("TURBO BOOT", result.Message);
-                        LoadTurboApps();
-                    }
-                    else mw.ShowError("ERRO", result.Message);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[BtnRemoveTurboApp_Click] Error: {ex.Message}");
-            }
-            finally
-            {
-                _isRemovingTurboApp = false;
-            }
-        }
-
         private void BtnConfigureAutoClean_Click(object sender, RoutedEventArgs e)
         {
             // 🖱️ Abrir página de configurações avançada de limpeza automática via NavigateToPage
@@ -382,35 +343,6 @@ namespace KitLugia.GUI.Pages
             {
                 var advancedPage = new AdvancedRamCleanSettingsPage();
                 mw.NavigateToPage("AdvancedRamCleanSettings");
-            }
-        }
-
-        private async void BtnRestoreTurboApp_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isRestoringTurboApp) return;
-            _isRestoringTurboApp = true;
-            try
-            {
-                if (sender is System.Windows.Controls.Button btn && btn.Tag is string appName && Application.Current.MainWindow is MainWindow mw)
-                {
-                    if (!await mw.ShowConfirmationDialog($"Restaurar '{appName}' para a inicialização padrão?")) return;
-
-                    var result = await Task.Run(() => StartupManager.RestoreToNormal(appName));
-                    if (result.Success)
-                    {
-                        mw.ShowSuccess("RESTAURAR", result.Message);
-                        LoadTurboApps();
-                    }
-                    else mw.ShowError("ERRO", result.Message);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[BtnRestoreTurboApp_Click] Error: {ex.Message}");
-            }
-            finally
-            {
-                _isRestoringTurboApp = false;
             }
         }
 
@@ -527,12 +459,17 @@ namespace KitLugia.GUI.Pages
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             // Nome + status
+            string displayName = string.IsNullOrEmpty(limit.ProcessName)
+                ? "?"
+                : char.ToUpper(limit.ProcessName[0]) + limit.ProcessName.Substring(1);
+
             var nameStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             nameStack.Children.Add(new TextBlock
             {
-                Text = char.ToUpper(limit.ProcessName[0]) + limit.ProcessName.Substring(1),
+                Text = displayName,
                 Foreground = System.Windows.Media.Brushes.White,
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12
@@ -553,6 +490,7 @@ namespace KitLugia.GUI.Pages
             nameStack.Children.Add(new TextBlock
             {
                 Text = statusText,
+                FontFamily = _emojiFont,
                 Foreground = new System.Windows.Media.SolidColorBrush(statusColor),
                 FontSize = 10,
                 Margin = new Thickness(0, 2, 0, 0)
@@ -594,6 +532,28 @@ namespace KitLugia.GUI.Pages
             });
             Grid.SetColumn(grid.Children[^1], 2);
 
+            // ⚙️ Gear – per-process engine config
+            var gearBtn = new Button
+            {
+                Content = "⚙️",
+                FontFamily = _emojiFont,
+                Width = 24,
+                Height = 24,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(153, 153, 153)),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Tag = limit.ProcessName,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                ToolTip = "Configurações avançadas do processo",
+                Style = (Style)FindResource("FlatIconButton")
+            };
+            gearBtn.Click += BtnProcessGear_Click;
+            Grid.SetColumn(gearBtn, 3);
+            grid.Children.Add(gearBtn);
+
             // Toggle on/off
             var toggle = new CheckBox
             {
@@ -604,7 +564,7 @@ namespace KitLugia.GUI.Pages
                 Tag = limit.ProcessName
             };
             toggle.Click += ChkProcessLimitEnabled_Click;
-            Grid.SetColumn(toggle, 3);
+            Grid.SetColumn(toggle, 4);
             grid.Children.Add(toggle);
 
             // Botão remover
@@ -619,10 +579,11 @@ namespace KitLugia.GUI.Pages
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand,
                 Tag = limit.ProcessName,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)FindResource("FlatIconButton")
             };
             removeBtn.Click += BtnRemoveProcessLimit_Click;
-            Grid.SetColumn(removeBtn, 4);
+            Grid.SetColumn(removeBtn, 5);
             grid.Children.Add(removeBtn);
 
             row.Child = grid;
@@ -764,6 +725,38 @@ namespace KitLugia.GUI.Pages
                 l.ProcessName.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (limit != null)
                 tray.SetProcessRamLimit(name, limit.LimitMB, chk.IsChecked == true);
+        }
+
+        private void BtnProcessGear_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            string? name = btn.Tag?.ToString();
+            if (string.IsNullOrEmpty(name)) return;
+
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            var limits = tray.GetProcessRamLimits();
+            var limit = limits.FirstOrDefault(l =>
+                l.ProcessName.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (limit == null) return;
+
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            var overlayContainer = mw.FindName("OverlayContainer") as System.Windows.Controls.Grid;
+            if (overlayContainer == null) return;
+
+            var config = tray.GetProcessEngineConfig(name) ?? new TrayIconService.ProcessEngineConfig();
+            var overlay = new Controls.ProcessEngineConfigOverlay(name, config);
+            overlay.ConfigSaved += (savedConfig) =>
+            {
+                tray.SetProcessEngineConfig(name, savedConfig);
+                mw.ShowSuccess("Configuração salva", $"Configurações de '{name}' atualizadas.");
+            };
+            overlayContainer.Children.Add(overlay);
+            overlayContainer.Visibility = Visibility.Visible;
+            overlay.Open();
         }
 
         private void ShowNotification(string title, string message)

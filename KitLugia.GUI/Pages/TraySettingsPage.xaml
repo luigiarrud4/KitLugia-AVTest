@@ -1,12 +1,33 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Page x:Class="KitLugia.GUI.Pages.TraySettingsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
-      Title="Monitor de RAM"
+       xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
+       xmlns:converters="clr-namespace:KitLugia.GUI.Converters"
+       Title="Monitor de RAM"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
     
     <Page.Resources>
+        <converters:BoolToAdminIconConverter x:Key="BoolToAdminIcon"/>
+        <Style x:Key="FlatIconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bdr" Property="Background" Value="#15FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="TrayToggle" TargetType="CheckBox">
             <Setter Property="Width" Value="44"/>
             <Setter Property="Height" Value="24"/>
@@ -245,13 +266,13 @@
                     
                     <TextBlock Text="Limite de Uso" FontSize="11" Foreground="#666" Margin="0,10,0,3"/>
                     <Grid Margin="0,0,0,10">
-                        <Slider x:Name="SliderThreshold" Minimum="30" Maximum="95" Value="80" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SliderThreshold_ValueChanged"/>
+                        <Slider x:Name="SliderThreshold" Minimum="30" Maximum="95" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SliderThreshold_ValueChanged"/>
                         <TextBlock x:Name="TxtThreshold" Text="80%" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
                     </Grid>
                     
                     <TextBlock Text="Intervalo de Monitoramento" FontSize="11" Foreground="#666" Margin="0,0,0,3"/>
                     <Grid Margin="0,0,0,10">
-                        <Slider x:Name="SliderInterval" Minimum="5" Maximum="120" Value="30" TickFrequency="1" VerticalAlignment="Center" ValueChanged="SliderInterval_ValueChanged"/>
+                        <Slider x:Name="SliderInterval" Minimum="5" Maximum="120" TickFrequency="1" VerticalAlignment="Center" ValueChanged="SliderInterval_ValueChanged"/>
                         <TextBlock x:Name="TxtInterval" Text="30s" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
                     </Grid>
                 </StackPanel>
@@ -350,65 +371,7 @@
                     </Grid>
                 </StackPanel>
             </Border>
-            
-            <!-- Se&#xE7;&#xE3;o: Turbo Boot Apps -->
-            <Border Style="{StaticResource SubtleCardStyle}" Padding="15" Margin="0,0,0,10">
-                <StackPanel>
-                    <TextBlock Text="APLICATIVOS NO TURBO BOOT" 
-                               FontSize="12" 
-                               FontWeight="Bold" 
-                               Foreground="#666"
-                               Margin="0,0,0,10"/>
-                    
-                    <ItemsControl x:Name="ListTurboApps">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="11"/>
-                                        <TextBlock Text="{Binding FullCommand}" Foreground="#666" FontSize="10" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Button Content="&#x23EA;" Width="24" Height="24" Background="Transparent" Foreground="{StaticResource AccentColor}" BorderThickness="0" Cursor="Hand" Click="BtnRestoreTurboApp_Click" Tag="{Binding Name}" ToolTip="Restaurar">
-                                            <Button.Style>
-                                                <Style TargetType="Button">
-                                                    <Setter Property="Opacity" Value="0.7"/>
-                                                    <Style.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter Property="Opacity" Value="1"/>
-                                                        </Trigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                        <Button Content="&#x2715;" Width="24" Height="24" Background="Transparent" Foreground="#D32F2F" BorderThickness="0" Cursor="Hand" Click="BtnRemoveTurboApp_Click" Tag="{Binding Name}" ToolTip="Remover" Margin="4,0,0,0">
-                                            <Button.Style>
-                                                <Style TargetType="Button">
-                                                    <Setter Property="Opacity" Value="0.7"/>
-                                                    <Style.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter Property="Opacity" Value="1"/>
-                                                        </Trigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock x:Name="TxtEmptyTurbo" Text="Nenhum aplicativo delegado ao Turbo Boot." Foreground="#666" FontSize="11" HorizontalAlignment="Center" Margin="0,8" Visibility="Collapsed"/>
-                </StackPanel>
-            </Border>
 
-            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
-            <!-- Se&#xE7;&#xE3;o: Limitador de RAM por Processo (estilo Firemin)       -->
-            <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
             <Border Style="{StaticResource SubtleCardStyle}" Padding="15" Margin="0,0,0,10">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -418,7 +381,6 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- T&#xED;tulo + bot&#xE3;o adicionar -->
                     <Grid Grid.Row="0" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -433,7 +395,6 @@
                                        FontSize="11" Foreground="#555" Margin="0,3,0,0"/>
                         </StackPanel>
 
-                        <!-- Controle de intervalo -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal"
                                     VerticalAlignment="Center" Margin="0,0,8,0">
                             <TextBlock Text="Intervalo:" FontSize="11" Foreground="#666"
@@ -448,13 +409,11 @@
                                        VerticalAlignment="Center" Margin="4,0,0,0"/>
                         </StackPanel>
 
-                        <!-- Bot&#xE3;o adicionar por .exe -->
                         <Button Grid.Column="2" Content="&#x1F4C1; Adicionar por Arquivo"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Height="32" FontSize="11" Padding="10,0" Margin="0,0,6,0"
                                 ToolTip="Selecionar execut&#xE1;vel manualmente"
                                 Click="BtnAddByFile_Click"/>
-                        <!-- Bot&#xE3;o principal: abre seletor de processos -->
                         <Button Grid.Column="3" Content="&#x26A1; Selecionar Processo"
                                 Style="{StaticResource GoldButtonStyle}"
                                 Height="32" FontSize="11" Padding="10,0"
@@ -462,9 +421,6 @@
                                 Click="BtnOpenProcessPicker_Click"/>
                     </Grid>
 
-                    <!-- Atalhos r&#xE1;pidos removidos &#x2014; os apps variam por usu&#xE1;rio -->
-
-                    <!-- Lista de limites configurados (code-behind popula) -->
                     <StackPanel x:Name="ProcessLimitsPanel" Grid.Row="2"/>
 
                     <TextBlock x:Name="TxtNoLimits" Grid.Row="3"

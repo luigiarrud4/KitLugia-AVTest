@@ -55,7 +55,7 @@ namespace KitLugia.GUI.Controls
             InitializeComponent();
         }
 
-        // �"?�"?�"🔄 Abrir / Fechar �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+        // ───────────────────────────────────────────────────────────────
 
         public async void Open()
         {
@@ -244,7 +244,7 @@ namespace KitLugia.GUI.Controls
                     Margin = new Thickness(6, 0, 0, 0),
                     Child = new TextBlock
                     {
-                        Text = $"�-{entry.InstanceCount}",
+                        Text = $"×{entry.InstanceCount}",
                         Foreground = new SolidColorBrush(Color.FromRgb(136, 136, 136)),
                         FontSize = 10
                     }
@@ -475,7 +475,7 @@ namespace KitLugia.GUI.Controls
             if (!long.TryParse(TxtLimitMB.Text?.Trim(), out long limitMB) || limitMB < 50)
             {
                 if (Application.Current.MainWindow is MainWindow mw)
-                    mw.ShowError("�s�️ Limite inválido", "Digite um valor em MB (mínimo 50).");
+                    mw.ShowError("❌ Limite inválido", "Digite um valor em MB (mínimo 50).");
                 return;
             }
 
