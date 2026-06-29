@@ -26,15 +26,15 @@
 
         <!-- Main Content -->
         <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" Style="{StaticResource CardStyle}">
-            <Grid Margin="30">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid Margin="30">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- COLUNA ESQUERDA: VERS&#xC3;O ATUAL -->
-                <Border Grid.Column="0" Background="#2B2B2B" CornerRadius="8" Margin="0,0,10,0" Padding="20" BorderBrush="#444444" BorderThickness="1">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <!-- COLUNA ESQUERDA: VERS&#xC3;O ATUAL -->
+                    <Border Grid.Column="0" Background="#2B2B2B" CornerRadius="8" Margin="0,0,10,0" Padding="20" BorderBrush="#444444" BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="&#x1F4E6; VERS&#xC3;O ATUAL" FontSize="16" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,15"/>
                             
@@ -59,12 +59,10 @@
                                 <TextBlock Text="&#x2022; Execut&#xE1;vel: KitLugia.GUI.exe" FontSize="12" Foreground="#E0E0E0" Margin="0,2"/>
                             </StackPanel>
                         </StackPanel>
-                    </ScrollViewer>
-                </Border>
+                    </Border>
 
-                <!-- COLUNDA DIREITA: VERS&#xC3;O MAIS RECENTE -->
-                <Border Grid.Column="1" Background="#2B2B2B" CornerRadius="8" Margin="10,0,0,0" Padding="20" BorderBrush="#444444" BorderThickness="1">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <!-- COLUNDA DIREITA: VERS&#xC3;O MAIS RECENTE -->
+                    <Border Grid.Column="1" Background="#2B2B2B" CornerRadius="8" Margin="10,0,0,0" Padding="20" BorderBrush="#444444" BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="&#x1F680; VERS&#xC3;O MAIS RECENTE" FontSize="16" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,15"/>
                             
@@ -77,10 +75,12 @@
                             </Border>
 
                             <TextBlock Text="&#x1F4DD; NOTAS DA VERS&#xC3;O" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,15,0,10"/>
-                            <ScrollViewer Height="120" VerticalScrollBarVisibility="Auto">
-                                <TextBlock x:Name="ReleaseNotesText" Text="Carregando notas da vers&#xE3;o..." 
-                                           FontSize="11" Foreground="#E0E0E0" TextWrapping="Wrap"/>
-                            </ScrollViewer>
+                            <Border Background="#222222" CornerRadius="6" Padding="10" MaxHeight="180">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <TextBlock x:Name="ReleaseNotesText" Text="Carregando notas da vers&#xE3;o..." 
+                                               FontSize="11" Foreground="#E0E0E0" TextWrapping="Wrap"/>
+                                </ScrollViewer>
+                            </Border>
 
                             <TextBlock Text="&#x26A0;&#xFE0F; STATUS" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,15,0,10"/>
                             <Border x:Name="StatusBorder" Background="#FFA726" CornerRadius="6" Padding="10">
@@ -89,7 +89,7 @@
                             </Border>
 
                             <!-- Botão Reinstalar (visível apenas quando já está na mesma versão) -->
-                            <Button x:Name="ReinstallButton" Grid.Column="1" Content="&#x1F504; Reinstalar Atualização"
+                            <Button x:Name="ReinstallButton" Content="&#x1F504; Reinstalar Atualização"
                                     Padding="20,12" Margin="0,15,0,0"
                                     Style="{StaticResource GoldButtonStyle}"
                                     IsEnabled="False"
@@ -97,9 +97,9 @@
                                     Visibility="Collapsed"
                                     Click="ReinstallButton_Click" />
                         </StackPanel>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
         </Border>
 
         <!-- Bottom Actions -->
