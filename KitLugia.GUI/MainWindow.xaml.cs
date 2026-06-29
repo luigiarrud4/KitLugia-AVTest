@@ -760,6 +760,26 @@ namespace KitLugia.GUI
 
         private void TxtGlobalSearch_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // Navegação por setas no popup de pesquisa
+            if (e.Key == Key.Down || e.Key == Key.Up)
+            {
+                if (SearchPopup == null || !SearchPopup.IsOpen || LstSearchResults == null)
+                    return;
+
+                e.Handled = true;
+                int count = LstSearchResults.Items.Count;
+                if (count == 0) return;
+
+                int current = LstSearchResults.SelectedIndex;
+                int next = e.Key == Key.Down
+                    ? (current < count - 1 ? current + 1 : 0)
+                    : (current > 0 ? current - 1 : count - 1);
+
+                LstSearchResults.SelectedIndex = next;
+                LstSearchResults.ScrollIntoView(LstSearchResults.SelectedItem);
+                return;
+            }
+
             if (e.Key != Key.Enter || string.IsNullOrWhiteSpace(TxtGlobalSearch.Text))
                 return;
 
@@ -773,6 +793,109 @@ namespace KitLugia.GUI
                 UncheckAllNavButtons();
                 CleanupAndNavigate(new GlobalSearchPage(TxtGlobalSearch.Text));
             }
+        }
+
+        // 🎮 Atalhos de teclado globais
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // Ctrl+F: focar barra de pesquisa
+            if (e.Key == Key.F && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                e.Handled = true;
+                TxtGlobalSearch?.Focus();
+                TxtGlobalSearch?.SelectAll();
+                return;
+            }
+
+            // Esc: voltar ao Dashboard (ou fechar popup se aberto)
+            if (e.Key == Key.Escape)
+            {
+                if (SearchPopup != null && SearchPopup.IsOpen)
+                {
+                    SearchPopup.IsOpen = false;
+                    e.Handled = true;
+                    return;
+                }
+
+                if (MainFrame.Content is not DashboardPage)
+                {
+                    e.Handled = true;
+                    UncheckAllNavButtons();
+                    NavigateToPage(PageType.Dashboard);
+                }
+                return;
+            }
+
+            // F5: recarregar página atual
+            if (e.Key == Key.F5)
+            {
+                e.Handled = true;
+                if (MainFrame.Content is Page currentPage)
+                {
+                    var pageType = GetPageTypeFromContent(currentPage);
+                    if (pageType.HasValue)
+                    {
+                        CleanupAndNavigate(GetPageInstance(pageType.Value));
+                    }
+                }
+                return;
+            }
+
+            // Ctrl+R: recarregar (alias para F5)
+            if (e.Key == Key.R && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                e.Handled = true;
+                var pageType = MainFrame.Content is Page p ? GetPageTypeFromContent(p) : null;
+                if (pageType.HasValue)
+                {
+                    CleanupAndNavigate(GetPageInstance(pageType.Value));
+                }
+                return;
+            }
+        }
+
+        private static PageType? GetPageTypeFromContent(Page page)
+        {
+            return page switch
+            {
+                DashboardPage => PageType.Dashboard,
+                TweaksPage => PageType.Tweaks,
+                AppsPage => PageType.Apps,
+                CleanupPage => PageType.Storage,
+                NetworkPage => PageType.Network,
+                GamesPage => PageType.Games,
+                ServicesPage => PageType.Services,
+                RepairsPage => PageType.Repairs,
+                DriversPage => PageType.Drivers,
+                PartitionsPage => PageType.Partitions,
+                TraySettingsPage => PageType.TraySettings,
+                IntegrityPage => PageType.Integrity,
+                GameBoostPage => PageType.GameBoost,
+                DiagnosticPage => PageType.Diagnostic,
+                _ => null
+            };
+        }
+
+        private static Page GetPageInstance(PageType type)
+        {
+            return type switch
+            {
+                PageType.Dashboard => new DashboardPage(),
+                PageType.Tweaks => new TweaksPage(),
+                PageType.Apps => new AppsPage(),
+                PageType.Storage => new CleanupPage(),
+                PageType.Network => new NetworkPage(),
+                PageType.Games => new GamesPage(),
+                PageType.Services => new ServicesPage(),
+                PageType.Repairs => new RepairsPage(),
+                PageType.Drivers => new DriversPage(),
+                PageType.Partitions => new PartitionsPage(),
+                PageType.TraySettings => new TraySettingsPage(),
+                PageType.Integrity => new IntegrityPage(),
+                PageType.GameBoost => new GameBoostPage(),
+                PageType.Diagnostic => new DiagnosticPage(),
+                _ => new DashboardPage()
+            };
         }
 
         private async void LstSearchResults_SelectionChanged(object sender, SelectionChangedEventArgs e)

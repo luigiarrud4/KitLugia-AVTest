@@ -19,10 +19,63 @@ namespace KitLugia.Core
         public static readonly string ApiUrl = $"https://api.github.com/repos/{GitHubRepo}/releases/latest";
         public static readonly HttpClient _httpClient = new();
 
+        // Cache de disco para última release
+        private static ReleaseInfo? _cachedLatestRelease;
+        private static DateTime _cacheExpiry = DateTime.MinValue;
+        private static readonly string CacheDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KitLugia");
+        private static readonly string CacheFile = Path.Combine(CacheDir, "latest_release_cache.json");
+        private static readonly TimeSpan CacheTTL = TimeSpan.FromHours(1);
+
         static GitHubUpdater()
         {
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater/2.5.0");
             _httpClient.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+            TryLoadDiskCache();
+        }
+
+        private static void TryLoadDiskCache()
+        {
+            try
+            {
+                if (File.Exists(CacheFile))
+                {
+                    var json = File.ReadAllText(CacheFile);
+                    var cached = System.Text.Json.JsonSerializer.Deserialize<CachedRelease>(json);
+                    if (cached != null && DateTime.Now < cached.Expiry)
+                    {
+                        _cachedLatestRelease = cached.Release;
+                        _cacheExpiry = cached.Expiry;
+                        Logger.Log($"📦 Cache de disco carregado ({_cachedLatestRelease?.TagName}, expira {cached.Expiry:HH:mm})");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"⚠️ Erro ao carregar cache de disco: {ex.Message}");
+            }
+        }
+
+        private static void SaveDiskCache()
+        {
+            try
+            {
+                if (!Directory.Exists(CacheDir))
+                    Directory.CreateDirectory(CacheDir);
+                var cached = new CachedRelease { Release = _cachedLatestRelease, Expiry = _cacheExpiry };
+                File.WriteAllText(CacheFile, System.Text.Json.JsonSerializer.Serialize(cached));
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"⚠️ Erro ao salvar cache de disco: {ex.Message}");
+            }
+        }
+
+        private class CachedRelease
+        {
+            public ReleaseInfo? Release { get; set; }
+            public DateTime Expiry { get; set; }
         }
 
         public static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
@@ -55,19 +108,11 @@ namespace KitLugia.Core
             {
                 Logger.Log("🔍 Verificando atualizações no GitHub...");
 
-                var response = await _httpClient.GetAsync(ApiUrl);
-                if (!response.IsSuccessStatusCode)
-                {
-                    Logger.Log($"❌ Erro ao buscar release: {response.StatusCode}");
-                    return false;
-                }
-
-                var json = await response.Content.ReadAsStringAsync();
-                var release = JsonSerializer.Deserialize<ReleaseInfo>(json, JsonOptions);
+                var release = await GetLatestReleaseAsync();
 
                 if (release == null)
                 {
-                    Logger.Log("❌ Erro ao desserializar release");
+                    Logger.Log("❌ Não foi possível obter a última release (offline e sem cache)");
                     return false;
                 }
 
@@ -94,15 +139,54 @@ namespace KitLugia.Core
             }
         }
 
+        /// <summary>
+        /// Obtém a última release do cache ou da API (com fallback offline)
+        /// </summary>
+        public static async Task<ReleaseInfo?> GetLatestReleaseAsync()
+        {
+            // Cache em memória válido?
+            if (_cachedLatestRelease != null && DateTime.Now < _cacheExpiry)
+            {
+                Logger.Log($"📦 Usando cache de memória ({_cachedLatestRelease.TagName})");
+                return _cachedLatestRelease;
+            }
+
+            try
+            {
+                var response = await _httpClient.GetAsync(ApiUrl);
+                if (!response.IsSuccessStatusCode)
+                {
+                    Logger.Log($"❌ API GitHub retornou {response.StatusCode} — usando cache de disco");
+                    return _cachedLatestRelease;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var release = JsonSerializer.Deserialize<ReleaseInfo>(json, JsonOptions);
+
+                if (release != null)
+                {
+                    _cachedLatestRelease = release;
+                    _cacheExpiry = DateTime.Now.Add(CacheTTL);
+                    SaveDiskCache();
+                    Logger.Log($"📦 Cache atualizado: {release.TagName}");
+                }
+
+                return release;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"❌ Erro na API: {ex.Message} — usando cache de disco");
+                return _cachedLatestRelease;
+            }
+        }
+
         public static async Task<bool> DownloadAndInstallUpdateAsync(bool visible = false)
         {
             try
             {
                 Logger.Log("🔄 Baixando atualização...");
 
-                var response = await _httpClient.GetAsync(ApiUrl);
-                var json = await response.Content.ReadAsStringAsync();
-                var release = JsonSerializer.Deserialize<ReleaseInfo>(json, JsonOptions);
+                var release = await GetLatestReleaseAsync();
 
                 if (release?.Assets == null || release.Assets.Length == 0)
                 {

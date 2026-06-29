@@ -281,69 +281,59 @@ namespace KitLugia.GUI.Pages
             try
             {
                 KitLugia.Core.Logger.Log("Buscando detalhes do release GitHub...");
-                var response = await GitHubUpdater._httpClient.GetAsync(GitHubUpdater.ApiUrl);
+
+                _latestRelease = await GitHubUpdater.GetLatestReleaseAsync();
                 
-                KitLugia.Core.Logger.Log($"📡 Status HTTP: {response.StatusCode}");
-                
-                if (response.IsSuccessStatusCode)
+                if (_latestRelease != null)
                 {
-                    var json = await response.Content.ReadAsStringAsync();
-                    KitLugia.Core.Logger.Log($"📄 JSON completo: {json}");
+                    KitLugia.Core.Logger.Log($"📦 TagName: '{_latestRelease.TagName}'");
+                    KitLugia.Core.Logger.Log($"📦 Name: '{_latestRelease.Name}'");
+                    KitLugia.Core.Logger.Log($"📦 Body: '{_latestRelease.Body}'");
+                    KitLugia.Core.Logger.Log($"📦 PublishedAt: {_latestRelease.PublishedAt}");
+                    KitLugia.Core.Logger.Log($"📦 Assets: {_latestRelease.Assets.Length}");
                     
-                    _latestRelease = System.Text.Json.JsonSerializer.Deserialize<GitHubUpdater.ReleaseInfo>(json, GitHubUpdater.JsonOptions);
+
+                    var displayVersion = !string.IsNullOrEmpty(_latestRelease.TagName) ? _latestRelease.TagName : "Update";
+                    LatestVersionText.Text = displayVersion;
                     
-                    if (_latestRelease != null)
+
+                    var displayDate = _latestRelease.PublishedAt != DateTime.MinValue 
+                        ? _latestRelease.PublishedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") + " (local)"
+                        : "09/03/2026 01:49"; // Data do JSON
+                    LatestDateText.Text = displayDate;
+                    
+                    // Tamanho do arquivo
+                    if (_latestRelease.Assets?.Length > 0)
                     {
-                        KitLugia.Core.Logger.Log($"📦 TagName: '{_latestRelease.TagName}'");
-                        KitLugia.Core.Logger.Log($"📦 Name: '{_latestRelease.Name}'");
-                        KitLugia.Core.Logger.Log($"📦 Body: '{_latestRelease.Body}'");
-                        KitLugia.Core.Logger.Log($"📦 PublishedAt: {_latestRelease.PublishedAt}");
-                        KitLugia.Core.Logger.Log($"📦 Assets: {_latestRelease.Assets.Length}");
-                        
-
-                        var displayVersion = !string.IsNullOrEmpty(_latestRelease.TagName) ? _latestRelease.TagName : "Update";
-                        LatestVersionText.Text = displayVersion;
-                        
-
-                        var displayDate = _latestRelease.PublishedAt != DateTime.MinValue 
-                            ? _latestRelease.PublishedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") + " (local)"
-                            : "09/03/2026 01:49"; // Data do JSON
-                        LatestDateText.Text = displayDate;
-                        
-                        // Tamanho do arquivo
-                        if (_latestRelease.Assets?.Length > 0)
-                        {
-                            var sizeInMB = _latestRelease.Assets[0].Size / 1024.0 / 1024.0;
-                            LatestSizeText.Text = $"Tamanho: {sizeInMB:F1} MB";
-                            KitLugia.Core.Logger.Log($"📦 Asset: {_latestRelease.Assets[0].Name} - {sizeInMB:F1} MB");
-                        }
-                        else
-                        {
-                            LatestSizeText.Text = "N/A";
-                            KitLugia.Core.Logger.Log("✅ Nenhum asset encontrado");
-                        }
-                        
-                        // Notas da versão
-                        ReleaseNotesText.Text = string.IsNullOrEmpty(_latestRelease.Body) 
-                            ? "Nenhuma nota de versão disponível." 
-                            : _latestRelease.Body;
-                            
-                        KitLugia.Core.Logger.Log($"Título: {_latestRelease.Name}");
+                        var sizeInMB = _latestRelease.Assets[0].Size / 1024.0 / 1024.0;
+                        LatestSizeText.Text = $"Tamanho: {sizeInMB:F1} MB";
+                        KitLugia.Core.Logger.Log($"📦 Asset: {_latestRelease.Assets[0].Name} - {sizeInMB:F1} MB");
                     }
                     else
                     {
-                        KitLugia.Core.Logger.Log("✅ _latestRelease é null após deserialização");
+                        LatestSizeText.Text = "N/A";
+                        KitLugia.Core.Logger.Log("✅ Nenhum asset encontrado");
                     }
+                    
+                    // Notas da versão
+                    ReleaseNotesText.Text = string.IsNullOrEmpty(_latestRelease.Body) 
+                        ? "Nenhuma nota de versão disponível." 
+                        : _latestRelease.Body;
+                        
+                    KitLugia.Core.Logger.Log($"Título: {_latestRelease.Name}");
                 }
                 else
                 {
-                    KitLugia.Core.Logger.Log($"✅ Erro HTTP: {response.StatusCode} - {response.ReasonPhrase}");
+                    KitLugia.Core.Logger.Log("❌ Nenhum release disponível (offline e sem cache)");
+                    LatestVersionText.Text = "Offline";
+                    LatestDateText.Text = "--/--/---- --:--";
+                    LatestSizeText.Text = "N/A";
+                    ReleaseNotesText.Text = "Sem conexão com GitHub e nenhum cache disponível.";
                 }
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"✅ Erro ao buscar detalhes do release: {ex.Message}");
-                KitLugia.Core.Logger.Log($"✅ Stack: {ex.StackTrace}");
                 LatestVersionText.Text = "Erro";
                 LatestDateText.Text = "--/--/---- --:--";
                 LatestSizeText.Text = "N/A";
