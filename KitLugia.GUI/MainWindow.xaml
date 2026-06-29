@@ -731,7 +731,7 @@
             <!-- CONTE&#xDA;DO PRINCIPAL (DIREITA) -->
             <!-- ========================================================= -->
             <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 5: Fade-in ao navegar entre p&#xE1;ginas (0.25s) - MainWindow.xaml linha ~357 -->
-            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="Transparent" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated" Opacity="0">
+            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="Transparent" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated">
                 <Frame.RenderTransform>
                     <ScaleTransform ScaleX="1" ScaleY="1" CenterX="0.5" CenterY="0.5"/>
                 </Frame.RenderTransform>

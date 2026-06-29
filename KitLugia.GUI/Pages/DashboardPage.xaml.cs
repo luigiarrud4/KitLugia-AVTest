@@ -39,10 +39,8 @@ namespace KitLugia.GUI.Pages
             this.Unloaded += DashboardPage_Unloaded;
         }
 
-        private async void DashboardPage_Loaded(object sender, RoutedEventArgs e)
+        private void DashboardPage_Loaded(object sender, RoutedEventArgs e)
         {
-            // Pequeno delay para não competir com a animação de intro
-            try { await Task.Delay(80); } catch { }
             _ = LoadSystemInfo();
         }
 
@@ -50,9 +48,8 @@ namespace KitLugia.GUI.Pages
         public void Cleanup()
         {
 
+            this.Loaded -= DashboardPage_Loaded;
             this.Unloaded -= DashboardPage_Unloaded;
-
-
             this.DataContext = null;
 
 

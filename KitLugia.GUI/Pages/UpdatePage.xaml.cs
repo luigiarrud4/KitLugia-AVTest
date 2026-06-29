@@ -224,6 +224,8 @@ namespace KitLugia.GUI.Pages
                         StatusText.Foreground = Brushes.White;
                         UpdateButton.IsEnabled = false;
                         ManualDownloadLink.Visibility = Visibility.Collapsed;
+                        ReinstallButton.Visibility = Visibility.Visible;
+                        ReinstallButton.IsEnabled = true;
                         
                         LatestVersionText.Text = GetCurrentVersion().ToString();
                         LatestDateText.Text = "Você já está na versão mais recente";
@@ -518,6 +520,48 @@ namespace KitLugia.GUI.Pages
             OpenDownloadLink_Click(sender, null);
         }
 
+        private async void ReinstallButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdateOperation) return;
+            _isUpdateOperation = true;
+            try
+            {
+                TxtProgressStatus.Text = "Baixando versão atual para reinstalação...";
+                OverlayBusy.Visibility = Visibility.Visible;
+                StatusText.Text = "⏳ Reinstalando versão atual...";
+                ReinstallButton.IsEnabled = false;
+                CheckButton.IsEnabled = false;
+
+                var success = await DownloadAndLaunchUpdaterAsync();
+
+                if (success)
+                {
+                    StatusText.Text = "🚀 Reinstalação em andamento! O updater abrirá uma janela.";
+                    await Task.Delay(2000);
+                    System.Windows.Application.Current.Shutdown();
+                }
+                else
+                {
+                    OverlayBusy.Visibility = Visibility.Collapsed;
+                    StatusText.Text = "❌ Falha na reinstalação. Tente o download manual.";
+                    ReinstallButton.IsEnabled = true;
+                    CheckButton.IsEnabled = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                OverlayBusy.Visibility = Visibility.Collapsed;
+                StatusText.Text = $"❌ Erro: {ex.Message}";
+                ReinstallButton.IsEnabled = true;
+                CheckButton.IsEnabled = true;
+                Logger.Log($"Erro na reinstalação: {ex.Message}");
+            }
+            finally
+            {
+                _isUpdateOperation = false;
+            }
+        }
+
         private async Task<bool> DownloadAndLaunchUpdaterAsync()
         {
             try
@@ -553,52 +597,29 @@ namespace KitLugia.GUI.Pages
 
                 KitLugia.Core.Logger.Log("✅ Download concluído!");
 
-                // Baixar hash
-                string expectedHash = "";
-                try
-                {
-                    using var hc = new HttpClient();
-                    expectedHash = (await hc.GetStringAsync(asset.BrowserDownloadUrl.Replace(".zip", ".zip.sha256"))).Trim();
-                }
-                catch { }
+                int currentPid = Process.GetCurrentProcess().Id;
+                string currentExePath = Environment.ProcessPath ?? "";
+                if (string.IsNullOrEmpty(currentExePath))
+                    currentExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "KitLugia.GUI.exe");
 
-                // Encontrar o updater
-                string currentDir = AppDomain.CurrentDomain.BaseDirectory;
-                string updaterPath = Path.Combine(currentDir, "KitLugia.Updater.exe");
-                if (!File.Exists(updaterPath))
-                {
-                    try
-                    {
-                        var asm = typeof(KitLugia.Core.GitHubUpdater).Assembly;
-                        using var stream = asm.GetManifestResourceStream("KitLugia.Core.Resources.KitLugia.Updater.exe");
-                        if (stream != null)
-                        {
-                            updaterPath = Path.Combine(Path.GetTempPath(), "KitLugia.Updater.exe");
-                            using var file = File.Create(updaterPath);
-                            stream.CopyTo(file);
-                        }
-                    }
-                    catch (Exception ex) { KitLugia.Core.Logger.Log($"⚠️ Erro ao extrair updater: {ex.Message}"); }
-                }
+                string currentVersion = GetCurrentVersion().ToString();
+                string newVersion = _latestRelease.TagName ?? currentVersion;
+                if (newVersion.StartsWith("v"))
+                    newVersion = newVersion.Substring(1);
 
-                if (!File.Exists(updaterPath))
+                string batchPath = GitHubUpdater.GenerateUpdateBatch(zipPath, currentPid, currentExePath, currentVersion, newVersion);
+                if (batchPath == null)
                 {
-                    KitLugia.Core.Logger.Log("❌ KitLugia.Updater.exe não encontrado!");
+                    KitLugia.Core.Logger.Log("❌ Falha ao gerar script de atualização!");
                     File.Delete(zipPath);
                     return false;
                 }
 
-                int currentPid = Process.GetCurrentProcess().Id;
-                string currentExePath = Environment.ProcessPath ?? "";
-                if (string.IsNullOrEmpty(currentExePath))
-                    currentExePath = Path.Combine(currentDir, "KitLugia.GUI.exe");
-
-                KitLugia.Core.Logger.Log($"🚀 Iniciando KitLugia.Updater.exe (visível)...");
+                KitLugia.Core.Logger.Log($"🚀 Iniciando KitLugia_Update.cmd (visível)...");
 
                 var psi = new ProcessStartInfo
                 {
-                    FileName = updaterPath,
-                    Arguments = $"\"{zipPath}\" {currentPid} \"{currentExePath}\" \"{expectedHash}\"",
+                    FileName = batchPath,
                     UseShellExecute = true,
                     WindowStyle = ProcessWindowStyle.Normal,
                 };

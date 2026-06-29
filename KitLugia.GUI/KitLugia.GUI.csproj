@@ -20,9 +20,9 @@
 		<PublishReadyToRun>true</PublishReadyToRun>
 		<PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
 		<DebugType>embedded</DebugType>
-		<Version>2.0.24</Version>
-		<AssemblyVersion>2.0.24.0</AssemblyVersion>
-		<FileVersion>2.0.24.0</FileVersion>
+<Version>2.0.29</Version>
+<AssemblyVersion>2.0.29.0</AssemblyVersion>
+<FileVersion>2.0.29.0</FileVersion>
 	</PropertyGroup>
 
 	<ItemGroup>

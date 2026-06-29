@@ -24,7 +24,12 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             Loaded += AllTweaksPage_Loaded;
-            Unloaded += (_, _) => Cleanup();
+            Unloaded += AllTweaksPage_Unloaded;
+        }
+
+        private void AllTweaksPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         public void Cleanup()

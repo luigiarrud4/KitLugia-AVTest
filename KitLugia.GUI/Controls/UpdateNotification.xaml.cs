@@ -20,8 +20,27 @@ namespace KitLugia.GUI.Controls
         {
             TxtTitle.Text = title.ToUpper();
             TxtMessage.Text = message;
+            VersionBorder.Visibility = Visibility.Collapsed;
+            ChangelogBorder.Visibility = Visibility.Collapsed;
+            TxtOkBtn.Text = "OK";
             if (onAction != null)
                 ActionClicked += onAction;
+        }
+
+        public void SetUpdateContent(string title, string message, string newVersion, string oldVersion, string? changelog = null)
+        {
+            TxtTitle.Text = title.ToUpper();
+            TxtMessage.Text = message;
+            VersionBorder.Visibility = Visibility.Visible;
+            bool isReinstall = oldVersion == newVersion;
+            TxtVersionLine.Text = $"{oldVersion}  --->  {newVersion}";
+            TxtReinstallLabel.Text = isReinstall ? "Reinstalado" : "";
+            TxtOkBtn.Text = "ENTENDIDO";
+            if (!string.IsNullOrEmpty(changelog))
+            {
+                ChangelogBorder.Visibility = Visibility.Visible;
+                TxtChangelog.Text = changelog;
+            }
         }
 
         public void Dismiss()

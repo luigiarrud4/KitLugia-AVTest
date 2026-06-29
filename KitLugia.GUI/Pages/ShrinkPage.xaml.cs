@@ -30,6 +30,12 @@ namespace KitLugia.GUI.Pages
             Loaded += ShrinkPage_Loaded;
         }
 
+        public void Cleanup()
+        {
+            this.Loaded -= ShrinkPage_Loaded;
+            this.DataContext = null;
+        }
+
         private async void ShrinkPage_Loaded(object sender, RoutedEventArgs e)
         {
             await LoadPartitionsAsync();
