@@ -27,9 +27,13 @@ namespace KitLugia.GUI.Pages
         {
             _uiTimer?.Stop();
             _uiTimer = null;
-            _detector?.Stop();
-            _detector?.Dispose();
-            _detector = null;
+            if (_detector != null)
+            {
+                _detector.StutterDetected -= OnStutterDetected;
+                _detector.Stop();
+                _detector.Dispose();
+                _detector = null;
+            }
             this.Unloaded -= StutterPage_Unloaded;
             this.DataContext = null;
         }

@@ -516,7 +516,7 @@ namespace KitLugia.GUI
 
         private void EnsureUIIinitialized()
         {
-            if (_uiDeferredInit || !StartMinimized) return;
+            if (_uiDeferredInit) return;
             _uiDeferredInit = true;
 
             SearchEngine.Initialize();
@@ -534,6 +534,8 @@ namespace KitLugia.GUI
                     BtnGoodbyeDPI.ToolTip = $"GoodbyeDPI - {status}";
                 }
             };
+            // Se OnIntroFinished já foi executado (ex: StartMinimized), inicia o timer agora
+            if (_introCompleted) _goodbyeDpiStatusTimer.Start();
 
             MainFrame.Navigate(new DashboardPage());
             if (BtnDashboard != null) BtnDashboard.IsChecked = true;
@@ -557,11 +559,6 @@ namespace KitLugia.GUI
 
             // Carrega configurações do GoodbyeDPI
             LoadGoodbyeDPIConfig();
-
-            if (!StartMinimized)
-            {
-                EnsureUIIinitialized();
-            }
 
             // Conecta o Logger do Core ao Console da GUI
             _logHandler = (msg) => ConsoleManager.WriteLine(msg);
@@ -593,6 +590,13 @@ namespace KitLugia.GUI
                 Dispatcher.Invoke(() =>
                 {
                     EnsureUIIinitialized();
+                    // Garante MainFrame visível antes de Show() - mesmo que Window_Loaded
+                    // ainda não tenha sido chamado (MainFrame começa Opacity=0 no XAML)
+                    if (MainFrame != null)
+                    {
+                        MainFrame.BeginAnimation(Frame.OpacityProperty, null);
+                        MainFrame.Opacity = 1;
+                    }
                     Show();
                     WindowState = WindowState.Normal;
                     Activate();
@@ -604,6 +608,11 @@ namespace KitLugia.GUI
                 Dispatcher.Invoke(() =>
                 {
                     EnsureUIIinitialized();
+                    if (MainFrame != null)
+                    {
+                        MainFrame.BeginAnimation(Frame.OpacityProperty, null);
+                        MainFrame.Opacity = 1;
+                    }
                     Show();
                     WindowState = WindowState.Normal;
                     Activate();
@@ -879,17 +888,16 @@ namespace KitLugia.GUI
         {
             if (MainFrame.Content is Page page)
             {
-                // Animação de fade-in com scale leve
-                page.Opacity = 0;
-                page.RenderTransform = new ScaleTransform(0.98, 0.98, 0.5, 0.5);
-
-                var fadeIn = new DoubleAnimation
+                // Durante o carregamento inicial (antes da intro terminar),
+                // não animar escala para não conflitar com a transição do splash.
+                if (!_introCompleted)
                 {
-                    From = 0,
-                    To = 1,
-                    Duration = TimeSpan.FromMilliseconds(250),
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
+                    page.RenderTransform = null;
+                    return;
+                }
+
+                // Animação de fade-in com scale leve
+                page.RenderTransform = new ScaleTransform(0.98, 0.98, 0.5, 0.5);
 
                 var scaleIn = new DoubleAnimation
                 {
@@ -899,7 +907,6 @@ namespace KitLugia.GUI
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 };
 
-                page.BeginAnimation(Page.OpacityProperty, fadeIn);
                 if (page.RenderTransform is ScaleTransform scaleTrans)
                 {
                     scaleTrans.BeginAnimation(ScaleTransform.ScaleXProperty, scaleIn);
@@ -2133,6 +2140,9 @@ namespace KitLugia.GUI
                     _notificationCountHandler = null;
                 }
 
+                Services.BackgroundTaskTracker.Instance.TaskStatusChanged -= BackgroundTaskTracker_TaskStatusChanged;
+                Services.BackgroundTaskTracker.Instance.PropertyChanged -= BackgroundTaskTracker_PropertyChanged;
+
                 // Limpa o timer de debounce
                 _searchDebounceTimer?.Stop();
 
@@ -2188,6 +2198,10 @@ namespace KitLugia.GUI
             }
             else
             {
+                // Splash visível (Opacity=1, Z=99999) cobre MainFrame + sidebar.
+                // MainFrame já fica pronto atrás; OnIntroFinished só ativa a sidebar.
+                if (SplashScreen != null) SplashScreen.Opacity = 1;
+                EnsureUIIinitialized();
                 _ = LoadIntroSettingsAndPlay();
             }
             _ = CheckForUpdateNotificationAsync();
@@ -2198,20 +2212,43 @@ namespace KitLugia.GUI
             var notificationFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "UPDATE_COMPLETE.txt");
             if (System.IO.File.Exists(notificationFile))
             {
-                await Dispatcher.InvokeAsync(() =>
-                    ShowActionNotification("Atualização Concluída",
-                        "O KitLugia foi atualizado para a versão mais recente. Reinicie o aplicativo se necessário."));
+                try
+                {
+                    string json = System.IO.File.ReadAllText(notificationFile);
+                    var info = System.Text.Json.JsonSerializer.Deserialize<UpdateCompleteInfo>(json);
+                    if (info != null)
+                    {
+                        bool isReinstall = info.OldVersion == info.NewVersion;
+                        string versionLine = $"{info.OldVersion}  --->  {info.NewVersion}";
+                        if (isReinstall)
+                            versionLine += "  Reinstalado";
+                        string message = $"{versionLine}\n\nO KitLugia foi {(isReinstall ? "reinstalado" : "atualizado")} com sucesso.";
+
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            var notif = new Controls.UpdateNotification();
+                            notif.SetUpdateContent("Atualização Concluída", message, info.NewVersion, info.OldVersion);
+                            notif.Dismissed += (n) => ActionNotificationContainer.Children.Remove(n);
+                            ActionNotificationContainer.Children.Clear();
+                            ActionNotificationContainer.Children.Add(notif);
+                        });
+                    }
+                }
+                catch { }
                 System.IO.File.Delete(notificationFile);
             }
+        }
+
+        private class UpdateCompleteInfo
+        {
+            public string OldVersion { get; set; } = "";
+            public string NewVersion { get; set; } = "";
         }
 
         private async Task LoadIntroSettingsAndPlay()
         {
             // Garante que o layout WPF terminou de renderizar antes de iniciar qualquer animação
             await Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() => { }));
-
-            // Mostra o splash imediatamente (sem esperar configurações)
-            if (SplashScreen != null) SplashScreen.Opacity = 1;
 
             bool introEnabled = true;
             double introDuration = 2.2;
@@ -2299,7 +2336,8 @@ namespace KitLugia.GUI
             var sb = new Storyboard();
             if (SplashScreen != null)
             {
-                A(sb, SplashScreen, "Opacity", 0, 1, fadeInT, 0, new CubicEase { EasingMode = EasingMode.EaseOut });
+                // Sem fade-in de opacidade: o splash já está em Opacity=1 para cobrir
+                // o MainFrame desde o primeiro frame (setado em Window_Loaded).
                 A(sb, SplashScale, "ScaleX", 0.5, 1.0, fadeInT, 0, new CubicEase { EasingMode = EasingMode.EaseOut });
                 A(sb, SplashScale, "ScaleY", 0.5, 1.0, fadeInT, 0, new CubicEase { EasingMode = EasingMode.EaseOut });
                 if (SplashGlow != null) A(sb, SplashGlow, "BlurRadius", 30, 50, fadeInT * 0.5, 0, new CubicEase { EasingMode = EasingMode.EaseOut });
@@ -2312,7 +2350,8 @@ namespace KitLugia.GUI
                 A(sb, SplashScreen, "Opacity", 1, 0, fadeOutT, fadeOutStart, new CubicEase { EasingMode = EasingMode.EaseIn });
             }
             if (SidebarPanel != null) A(sb, SidebarPanel, "Opacity", 0, 1, menuT, menuStart, new CubicEase { EasingMode = EasingMode.EaseOut });
-            if (MainFrame != null) A(sb, MainFrame, "Opacity", 0, 1, menuT, menuStart, new CubicEase { EasingMode = EasingMode.EaseOut });
+            // MainFrame já está visível (Opacity=1) atrás do splash.
+            // Apenas a sidebar é animada aqui; aparece suave quando o splash sumir.
             sb.Completed += (_, _) => { OnIntroFinished(); };
             sb.Begin();
         }
@@ -2342,16 +2381,14 @@ namespace KitLugia.GUI
         // Pular animação de intro e mostrar menu diretamente
         private void SkipIntroAnimation()
         {
-
             if (_introCompleted) return;
-            _introCompleted = true;
 
             if (SplashScreen != null)
             {
                 SplashScreen.Visibility = Visibility.Collapsed;
             }
 
-            // Fade-in do menu lateral e MainFrame
+            // Fade-in do menu lateral
             var menuFadeInStoryboard = new Storyboard();
 
             if (SidebarPanel != null)
@@ -2368,28 +2405,30 @@ namespace KitLugia.GUI
                 menuFadeInStoryboard.Children.Add(sidebarOpacityAnimation);
             }
 
-            if (MainFrame != null)
-            {
-                var mainFrameOpacityAnimation = new DoubleAnimation
-                {
-                    From = 0,
-                    To = 1,
-                    Duration = TimeSpan.FromSeconds(0.3),
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                Storyboard.SetTarget(mainFrameOpacityAnimation, MainFrame);
-                Storyboard.SetTargetProperty(mainFrameOpacityAnimation, new PropertyPath("Opacity"));
-                menuFadeInStoryboard.Children.Add(mainFrameOpacityAnimation);
-            }
+            // MainFrame já está visível atrás do splash. Só a sidebar é animada.
 
             menuFadeInStoryboard.Completed += (_, _) => { OnIntroFinished(); };
             menuFadeInStoryboard.Begin();
+
+            // Safety: garante OnIntroFinished mesmo se o Storyboard Completed falhar
+            var safetyTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0) };
+            safetyTimer.Tick += (s, args) => { safetyTimer.Stop(); if (!_introCompleted) OnIntroFinished(); };
+            safetyTimer.Start();
         }
 
         private void OnIntroFinished()
         {
             if (_introCompleted) return;
             _introCompleted = true;
+
+            // Garante que a Sidebar fique visível (fallback caso a storyboard não tenha completado)
+            // MainFrame já está em Opacity=1, coberto pelo splash até agora.
+            if (SidebarPanel != null)
+            {
+                SidebarPanel.BeginAnimation(FrameworkElement.OpacityProperty, null);
+                SidebarPanel.Opacity = 1;
+            }
+
             if (SplashScreen != null) SplashScreen.Visibility = Visibility.Collapsed;
 
             // GoodbyeDPI timer só inicia agora (não compete com a intro)

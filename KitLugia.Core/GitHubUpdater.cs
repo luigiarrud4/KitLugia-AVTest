@@ -164,51 +164,31 @@ namespace KitLugia.Core
                     Logger.Log("✅ Hash verificado com sucesso!");
                 }
 
-                // Resolve paths: Environment.ProcessPath works in single-file and normal builds
+                int currentPid = Process.GetCurrentProcess().Id;
                 string currentExePath = Environment.ProcessPath
                     ?? Path.ChangeExtension(Assembly.GetEntryAssembly()?.Location ?? "", ".exe")
                     ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
                 if (currentExePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                     currentExePath = Path.ChangeExtension(currentExePath, ".exe");
                 string currentDir = Path.GetDirectoryName(currentExePath) ?? AppContext.BaseDirectory;
-                string updaterPath = Path.Combine(currentDir, "KitLugia.Updater.exe");
 
-                if (!File.Exists(updaterPath))
-                {
-                    try
-                    {
-                        var asm = typeof(GitHubUpdater).Assembly;
-                        using var stream = asm.GetManifestResourceStream("KitLugia.Core.Resources.KitLugia.Updater.exe");
-                        if (stream != null)
-                        {
-                            updaterPath = Path.Combine(Path.GetTempPath(), "KitLugia.Updater.exe");
-                            using var file = File.Create(updaterPath);
-                            stream.CopyTo(file);
-                            Logger.Log("✅ Updater extraído dos recursos embutidos.");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"⚠️ Não foi possível extrair updater dos recursos: {ex.Message}");
-                    }
-                }
+                string currentVersion = GetCurrentVersion().ToString();
+                string newVersion = ParseVersion(release.TagName).ToString();
 
-                if (!File.Exists(updaterPath))
+                string batchPath = GenerateUpdateBatch(updatePath, currentPid, currentExePath, currentVersion, newVersion);
+                if (batchPath == null)
                 {
-                    Logger.Log("❌ KitLugia.Updater.exe não encontrado!");
+                    Logger.Log("❌ Falha ao gerar script de atualização!");
                     File.Delete(updatePath);
                     return false;
                 }
 
-                int currentPid = Process.GetCurrentProcess().Id;
-                Logger.Log($"🚀 Iniciando KitLugia.Updater.exe...");
+                Logger.Log($"🚀 Iniciando KitLugia_Update.cmd...");
 
                 var psi = new ProcessStartInfo
                 {
-                    FileName = updaterPath,
-                    Arguments = $"\"{updatePath}\" {currentPid} \"{currentExePath}\" \"{expectedHash}\"",
-                    UseShellExecute = !visible,
-                    CreateNoWindow = !visible,
+                    FileName = batchPath,
+                    UseShellExecute = true,
                     WindowStyle = visible ? ProcessWindowStyle.Normal : ProcessWindowStyle.Hidden,
                 };
                 Process.Start(psi);
@@ -273,6 +253,68 @@ namespace KitLugia.Core
             catch (Exception ex)
             {
                 Logger.Log($"❌ Erro no auto-update check: {ex.Message}");
+            }
+        }
+
+        public static string GenerateUpdateBatch(string zipPath, int pid, string exePath, string oldVersion, string newVersion)
+        {
+            try
+            {
+                string appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
+                string batchPath = Path.Combine(appDir, "KitLugia_Update.cmd");
+
+                string batch = $@"@echo off
+title KitLugia - Atualizando...
+color 0E
+cls
+echo ================================================
+echo          KIT LUGIA - ATUALIZACAO
+echo ================================================
+echo.
+echo [1/4] Aguardando fechamento do KitLugia...
+:wait
+tasklist /fi ""PID eq {pid}"" 2>nul | findstr /i ""{pid}"" >nul
+if not errorlevel 1 (
+    timeout /t 1 /nobreak >nul
+    goto wait
+)
+echo  OK - KitLugia fechado.
+echo.
+echo [2/4] Extraindo arquivos...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ""try {{ Expand-Archive -Path '{zipPath.Replace("'", "''")}' -DestinationPath '{appDir.Replace("'", "''")}' -Force; exit 0 }} catch {{ echo $_; pause; exit 1 }}""
+if errorlevel 1 (
+    echo  ERRO - Falha ao extrair arquivos.
+    pause
+    exit /b 1
+)
+echo  OK - Arquivos extraidos.
+echo.
+echo [3/4] Limpando temporarios...
+if exist ""%~dp0KitLugia.Updater.exe"" del /q ""%~dp0KitLugia.Updater.exe"" 2>nul
+if exist ""%~dp0KitLugia.Updater.dll"" del /q ""%~dp0KitLugia.Updater.dll"" 2>nul
+if exist ""%~dp0update.log"" del /q ""%~dp0update.log"" 2>nul
+echo  OK - Temporarios removidos.
+echo.
+rem Write UPDATE_COMPLETE.txt
+echo {{""OldVersion"":""{oldVersion}"",""NewVersion"":""{newVersion}""}} > ""%~dp0UPDATE_COMPLETE.txt""
+echo [4/4] Iniciando nova versao...
+start """" ""%~dp0KitLugia.GUI.exe""
+echo.
+echo ================================================
+echo     ATUALIZACAO CONCLUIDA!
+echo ================================================
+timeout /t 3 /nobreak >nul
+del ""%~f0""
+";
+
+                File.WriteAllText(batchPath, batch);
+                Logger.Log($"✅ Script de atualização gerado: {batchPath}");
+                return batchPath;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"❌ Erro ao gerar script de atualização: {ex.Message}");
+                return null;
             }
         }
     }

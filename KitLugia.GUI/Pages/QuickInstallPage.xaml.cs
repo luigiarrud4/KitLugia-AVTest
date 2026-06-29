@@ -20,7 +20,7 @@ namespace KitLugia.GUI.Pages
             try
             {
                 InitializeComponent();
-                Loaded += async (_, _) => await RefreshDrives();
+                Loaded += QuickInstallPage_Loaded;
             }
             catch (Exception ex)
             {
@@ -28,8 +28,14 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private async void QuickInstallPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            await RefreshDrives();
+        }
+
         public void Cleanup()
         {
+            this.Loaded -= QuickInstallPage_Loaded;
             if (_extractPath != null && Directory.Exists(_extractPath))
                 try { Directory.Delete(_extractPath, true); } catch { }
         }

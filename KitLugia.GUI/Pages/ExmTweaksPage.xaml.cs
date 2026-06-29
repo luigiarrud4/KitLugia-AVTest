@@ -36,7 +36,12 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             _ = LoadCurrentStatus();
-            this.Unloaded += (_, _) => Cleanup();
+            this.Unloaded += ExmTweaksPage_Unloaded;
+        }
+
+        private void ExmTweaksPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         public void Cleanup()

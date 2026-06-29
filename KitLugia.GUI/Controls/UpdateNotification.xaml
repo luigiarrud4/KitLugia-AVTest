@@ -44,9 +44,10 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="16,14,16,8">
+            <Grid Grid.Row="0" Margin="16,14,16,8" MinHeight="40">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -84,7 +85,31 @@
 
             <Border Grid.Row="1" Height="1" Background="#22FFD700" Margin="16,0"/>
 
-            <Button x:Name="BtnOk" Grid.Row="1" Height="36" Margin="16,8,16,10" Cursor="Hand" Click="BtnOk_Click"
+            <!-- Versão antiga → nova -->
+            <Border x:Name="VersionBorder" Grid.Row="2" Margin="16,10,16,0" Visibility="Collapsed"
+                    Background="#151515" CornerRadius="6" Padding="10"
+                    BorderBrush="#33FFD700" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock x:Name="TxtVersionLine" Text="0.0.0  --->  0.0.0"
+                               FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TxtReinstallLabel" Text=""
+                               FontSize="10" Foreground="#FFD700" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Changelog -->
+            <Border x:Name="ChangelogBorder" Grid.Row="3" Margin="16,10,16,0"
+                    Background="#111" CornerRadius="6" Padding="10"
+                    BorderBrush="#22FFD700" BorderThickness="1"
+                    Visibility="Collapsed" MaxHeight="100">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBlock x:Name="TxtChangelog" Text="" FontSize="10" Foreground="#CCCCCC"
+                               TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </Border>
+
+            <Button x:Name="BtnOk" Grid.Row="4" Height="36" Margin="16,10,16,12" Cursor="Hand" Click="BtnOk_Click"
                     BorderThickness="0">
                 <Button.Background>
                     <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
@@ -92,7 +117,7 @@
                         <GradientStop Color="#FFA500" Offset="1"/>
                     </LinearGradientBrush>
                 </Button.Background>
-                <TextBlock Text="OK" FontWeight="Bold" FontSize="12" Foreground="#1A1A1A" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="TxtOkBtn" Text="ENTENDIDO" FontWeight="Bold" FontSize="12" Foreground="#1A1A1A" HorizontalAlignment="Center"/>
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="5"

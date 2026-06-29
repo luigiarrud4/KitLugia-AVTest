@@ -34,6 +34,12 @@ namespace KitLugia.GUI.Pages
 
         public void Cleanup()
         {
+            if (InstallMonitor.IsRunning)
+            {
+                InstallMonitor.OnChange -= OnMonitorChange;
+                InstallMonitor.Stop();
+            }
+            InstallMonitor.OnChange -= OnMonitorChange;
             TxtLog?.Clear();
             this.Unloaded -= CleanupPage_Unloaded;
             this.Loaded -= CleanupPage_Loaded;
@@ -857,6 +863,7 @@ namespace KitLugia.GUI.Pages
         {
             if (InstallMonitor.IsRunning)
             {
+                InstallMonitor.OnChange -= OnMonitorChange;
                 InstallMonitor.Stop();
                 MonitorStatusDot.Background = new SolidColorBrush(Color.FromRgb(85, 85, 85));
                 BtnToggleMonitor.Content = "▶ Iniciar Monitor";
