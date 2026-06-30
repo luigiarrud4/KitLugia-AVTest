@@ -40,6 +40,12 @@ namespace KitLugia.GUI.Pages
         private bool _programsLoaded = false;
         private bool _junkLoaded = false;
 
+        // Portable
+        private ObservableCollection<PortableDetectedViewModel>? PortableCollection;
+        private ObservableCollection<PortableDetectedViewModel>? FilteredPortableCollection;
+        private CancellationTokenSource? _portableCts;
+        private bool _portableLoaded = false;
+
         private bool _isAppOperation;
 
         // Junk (leftovers persistence)
@@ -85,6 +91,12 @@ namespace KitLugia.GUI.Pages
                         _programsLoaded = true;
                         LoadPrograms();
                     }
+                    // Aba de Portáteis carrega lazy também
+                    if (selectedTab.Header?.ToString()?.Contains("Portáteis") == true && !_portableLoaded)
+                    {
+                        _portableLoaded = true;
+                        LoadPortableApps();
+                    }
                     // Aba de Resíduos carrega lazy também
                     if (selectedTab.Header?.ToString()?.Contains("Resíduos") == true && !_junkLoaded)
                     {
@@ -118,6 +130,7 @@ namespace KitLugia.GUI.Pages
                 // Cancelar tokens ANTES de limpar collections
                 _bloatwareCts?.Cancel();
                 _programsCts?.Cancel();
+                _portableCts?.Cancel();
                 
                 // Tokens already cancelled — background tasks will observe them asynchronously
                 // Note: Do NOT add Thread.Sleep here (it would freeze UI during tab navigation)
@@ -153,11 +166,19 @@ namespace KitLugia.GUI.Pages
                 ProgramsCollection = null;
                 FilteredProgramsCollection = null;
 
+                // Cleanup Portable Data
+                PortableCollection?.Clear();
+                FilteredPortableCollection?.Clear();
+                PortableCollection = null;
+                FilteredPortableCollection = null;
+
                 // Dispor resources
                 _bloatwareCts?.Dispose();
                 _programsCts?.Dispose();
+                _portableCts?.Dispose();
                 _bloatwareCts = null;
                 _programsCts = null;
+                _portableCts = null;
 
                 // Remover event handlers
                 this.Unloaded -= AppsPage_Unloaded;
@@ -1053,6 +1074,135 @@ namespace KitLugia.GUI.Pages
             finally
             {
                 _isAppOperation = false;
+            }
+        }
+
+        #endregion
+
+        #region PORTABLE APPS (directory-detected)
+
+        private async void LoadPortableApps()
+        {
+            if (PortableLoadingPanel != null) PortableLoadingPanel.Visibility = Visibility.Visible;
+            if (PortableList != null) PortableList.ItemsSource = null;
+            if (TxtPortableProgress != null) TxtPortableProgress.Text = "";
+
+            try
+            {
+                _portableCts?.Cancel();
+                _portableCts = new CancellationTokenSource();
+
+                var apps = await Task.Run(() => PortableAppScanner.Scan());
+
+                PortableCollection = new ObservableCollection<PortableDetectedViewModel>(
+                    apps.Select(a => new PortableDetectedViewModel(a)));
+
+                if (PortableIconProgressText != null)
+                    PortableIconProgressText.Text = $"Detectados: {PortableCollection.Count}";
+
+                FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(PortableCollection);
+                if (PortableList != null) PortableList.ItemsSource = FilteredPortableCollection;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LoadPortableApps", ex.Message);
+                MessageBox.Show($"Erro ao detectar apps portáteis: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (PortableLoadingPanel != null) PortableLoadingPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private async void BtnPortableRemove_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isAppOperation) return;
+            _isAppOperation = true;
+            try
+            {
+                if (sender is Button btn && btn.Tag is PortableDetectedViewModel app)
+                {
+                    if (!await ShowConfirmAsync(
+                        $"Deletar {app.Name}?\n\n" +
+                        $"Pasta: {app.FolderPath}\n" +
+                        $"Tamanho: {app.TotalSizeFormatted}\n\n" +
+                        "A pasta será永久mente excluída. Esta ação não pode ser desfeita.",
+                        "Deletar App Portátil"))
+                    {
+                        return;
+                    }
+
+                    var (success, message) = await Task.Run(() => PortableAppScanner.DeletePortableApp(
+                        new PortableAppEntry
+                        {
+                            Name = app.Name,
+                            FolderPath = app.FolderPath,
+                            MainExecutable = app.MainExecutable,
+                            TotalSizeBytes = app.TotalSizeBytes
+                        }));
+
+                    if (success)
+                    {
+                        FilteredPortableCollection?.Remove(app);
+                        PortableCollection?.Remove(app);
+                        if (PortableIconProgressText != null && PortableCollection != null)
+                            PortableIconProgressText.Text = $"Detectados: {PortableCollection.Count}";
+                        MessageBox.Show($"✅ {app.Name} removido com sucesso!", "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"⚠️ {message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnPortableRemove_Click", ex.ToString());
+            }
+            finally
+            {
+                _isAppOperation = false;
+            }
+        }
+
+        private async void BtnRefreshPortable_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isAppOperation) return;
+            _isAppOperation = true;
+            try
+            {
+                LoadPortableApps();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnRefreshPortable_Click", ex.Message);
+            }
+            finally
+            {
+                _isAppOperation = false;
+            }
+        }
+
+        private void TxtSearchPortable_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is TextBox textBox && PortableCollection != null)
+            {
+                string searchText = textBox.Text.ToLower();
+
+                if (string.IsNullOrWhiteSpace(searchText))
+                {
+                    FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(PortableCollection);
+                }
+                else
+                {
+                    var filtered = PortableCollection.Where(p =>
+                        p.Name.ToLower().Contains(searchText) ||
+                        p.FolderPath.ToLower().Contains(searchText)).ToList();
+                    FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(filtered);
+                }
+
+                if (PortableList != null)
+                    PortableList.ItemsSource = FilteredPortableCollection;
             }
         }
 
@@ -2186,6 +2336,31 @@ namespace KitLugia.GUI.Pages
         public string RegistryPath { get; set; }
         public string RegistryKeyName { get; set; }
         public BitmapSource? Icon { get; set; }
+        public bool IsSelected { get; set; }
+    }
+
+    public class PortableDetectedViewModel
+    {
+        public PortableDetectedViewModel(PortableAppEntry entry)
+        {
+            Name = entry.Name;
+            FolderPath = entry.FolderPath;
+            MainExecutable = entry.MainExecutable;
+            TotalSizeBytes = entry.TotalSizeBytes;
+            TotalSizeFormatted = entry.TotalSizeFormatted;
+            LastModified = entry.LastModified;
+            Confidence = entry.Confidence;
+            ConfidenceLabel = entry.ConfidenceLabel;
+        }
+
+        public string Name { get; set; }
+        public string FolderPath { get; set; }
+        public string MainExecutable { get; set; }
+        public long TotalSizeBytes { get; set; }
+        public string TotalSizeFormatted { get; set; }
+        public DateTime LastModified { get; set; }
+        public int Confidence { get; set; }
+        public string ConfidenceLabel { get; set; }
         public bool IsSelected { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -351,6 +352,78 @@ exit";
         }
 
         /// <summary>
+        /// Executa bootsect.exe se disponível. Útil para boot BIOS legacy.
+        /// Se não encontrado, apenas loga aviso (UEFI continua funcionando).
+        /// </summary>
+        private static async Task RunBootsectIfAvailable(string arguments)
+        {
+            string? bootsectPath = FindBootsectPath();
+            if (bootsectPath != null)
+            {
+                await Task.Run(() => ProcessRunner.Run(bootsectPath, arguments, 30000));
+            }
+            else
+            {
+                Logger.Log("[BOOTSECT] bootsect.exe não encontrado (instale Windows ADK para boot BIOS legacy). " +
+                           "Boot UEFI continua funcionando normalmente.");
+            }
+        }
+
+        /// <summary>
+        /// Localiza bootsect.exe no Windows ADK ou no PATH.
+        /// Retorna o caminho completo ou null se não encontrado.
+        /// </summary>
+        private static string? FindBootsectPath()
+        {
+            // 1. Verificar se está no PATH
+            try
+            {
+                using var proc = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "where.exe",
+                    Arguments = "bootsect.exe",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                });
+                if (proc != null)
+                {
+                    string output = proc.StandardOutput.ReadToEnd().Trim();
+                    proc.WaitForExit(5000);
+                    if (proc.ExitCode == 0 && !string.IsNullOrEmpty(output))
+                    {
+                        string firstMatch = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                        if (File.Exists(firstMatch))
+                            return firstMatch;
+                    }
+                }
+            }
+            catch { }
+
+            // 2. Caminhos comuns do Windows ADK
+            string[] adkCandidates =
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                    "Windows Kits", "10", "Assessment and Deployment Kit",
+                    "Windows Preinstallation Environment", "bootsect.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                    "Windows Kits", "10", "Assessment and Deployment Kit",
+                    "Deployment and Imaging Tools", "bootsect.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "Windows Kits", "10", "Assessment and Deployment Kit",
+                    "Windows Preinstallation Environment", "bootsect.exe"),
+            };
+
+            foreach (var path in adkCandidates)
+            {
+                if (File.Exists(path))
+                    return path;
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Creates a dual-boot USB drive (Easy2Boot style): one FAT32 EFI partition
         /// and one NTFS data partition for ISOs. Both BIOS and UEFI bootable.
         /// Uses Windows built-in bootx64.efi + BCD for UEFI, bootsect for BIOS.
@@ -403,8 +476,7 @@ exit";
                 }
 
                 progress?.Report((50.0, "Configurando boot BIOS (bootsect)..."));
-                await Task.Run(() =>
-                    ProcessRunner.Run("bootsect", "/nt60 K: /force /mbr", 30000));
+                await RunBootsectIfAvailable("/nt60 K: /force /mbr");
 
                 // Copy ISOs to data partition
                 progress?.Report((60.0, "Copiando ISOs..."));
@@ -544,9 +616,7 @@ exit";
 
                 progress?.Report((60.0, "Aplicando boot sector..."));
 
-                // Apply bootsector for Windows boot compatibility
-                await Task.Run(() =>
-                    ProcessRunner.Run("bootsect", $"/nt60 {driveLetter} /force /mbr", 30000));
+                await RunBootsectIfAvailable($"/nt60 {driveLetter} /force /mbr");
 
                 // Apply BCD boot files if Windows is present
                 string windowsPath = $@"{driveLetter}\Windows";
@@ -600,8 +670,7 @@ exit";
                     return (false, $"Falha na cópia: {error}");
 
                 progress?.Report((50.0, "Aplicando boot sector (bootsect)..."));
-                await Task.Run(() =>
-                    ProcessRunner.Run("bootsect", $"/nt60 {driveLetter} /force /mbr", 30000));
+                await RunBootsectIfAvailable($"/nt60 {driveLetter} /force /mbr");
 
                 progress?.Report((65.0, "Configurando BCD (bcdboot)..."));
                 string windowsPath = $@"{driveLetter}\Windows";
@@ -657,8 +726,7 @@ exit";
             File.Copy(winreWimPath, Path.Combine(targetDir, "boot.wim"), true);
 
             progress?.Report((60.0, "Aplicando boot sector..."));
-            await Task.Run(() =>
-                ProcessRunner.Run("bootsect", $"/nt60 {driveLetter} /force /mbr", 30000));
+            await RunBootsectIfAvailable($"/nt60 {driveLetter} /force /mbr");
 
             progress?.Report((80.0, "Configurando BCD..."));
             await Task.Run(() =>
@@ -716,8 +784,7 @@ exit";
             }
 
             progress?.Report((85.0, "Instalando GRUB2..."));
-            await Task.Run(() =>
-                ProcessRunner.Run("bootsect", $"/nt60 {driveLetter} /force", 30000));
+            await RunBootsectIfAvailable($"/nt60 {driveLetter} /force");
 
             progress?.Report((100.0, "Concluído"));
             return (true, $"Multi-boot criado em {driveLetter} com {isoPaths.Count} ISO(s).");

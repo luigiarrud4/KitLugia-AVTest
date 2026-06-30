@@ -1252,46 +1252,150 @@ namespace KitLugia.Core
 
         public static async Task<BootFileInfo?> ExtractFiles(string isoPath, string targetPath)
         {
-            Log($"Extraindo ISO {isoPath} via 7-Zip Direto (Modo Turbo) para {targetPath}...");
+            Log($"Extraindo ISO {isoPath} para {targetPath}...");
 
             return await Task.Run(async () =>
             {
                 try
                 {
-                    string sevenZipPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "App", "7Zip", "7z.exe");
+                    // 1. Procurar 7z.exe em múltiplos locais
+                    string sevenZipPath = FindSevenZipPath();
                     
-                    if (!File.Exists(sevenZipPath))
+                    if (!string.IsNullOrEmpty(sevenZipPath))
                     {
-                        Log($"ERRO: 7-Zip não encontrado em {sevenZipPath}");
-                        return (BootFileInfo?)null;
+                        Log($"7-Zip encontrado: {sevenZipPath}");
+                        Log("Iniciando extração via 7-Zip...");
+                        string args = $"x \"{isoPath}\" -o\"{targetPath}\" -y";
+                        
+                        var (extCode, extOut) = await RunProcessCaptured(sevenZipPath, args, timeoutMs: 300_000);
+                        
+                        // 7-Zip return codes: 0 = No error, 1 = Warning (non-fatal errors)
+                        if (extCode == 0 || extCode == 1)
+                        {
+                            Log("Extração via 7-Zip concluída.");
+                            return await DetectBootFile(targetPath);
+                        }
+
+                        Log($"7-Zip falhou (código {extCode}). Detalhes:");
+                        foreach (var line in extOut.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                            Log($"  7z> {line.Trim()}");
+                    }
+                    else
+                    {
+                        Log("7-Zip não encontrado em nenhum caminho. Tentando fallback...");
                     }
 
-                    // 1. Extração Direta com 7-Zip
-                    Log("Iniciando Extração Direta I/O pela RAM...");
-                    string args = $"x \"{isoPath}\" -o\"{targetPath}\" -y";
-                    
-                    var (extCode, extOut) = await RunProcessCaptured(sevenZipPath, args);
-                    
-                    // 7-Zip return codes: 0 = No error, 1 = Warning (Non fatal errors)
-                    if (extCode != 0 && extCode != 1) 
-                    {
-                        Log($"ERRO 7-Zip (Código {extCode}): {extOut}");
-                        return (BootFileInfo?)null;
-                    }
-
-                    Log("Cópia de arquivos finalizada em altíssima velocidade.");
-
-                    // 2. DETECTAR BOOT FILE no destino
-                    var bootInfo = await DetectBootFile(targetPath);
-
-                    return bootInfo;
+                    // 2. FALLBACK: montar ISO via PowerShell e copiar com robocopy
+                    Log("Tentando fallback: Mount-DiskImage + robocopy...");
+                    return await ExtractViaMountAndRobocopy(isoPath, targetPath);
                 }
                 catch (Exception ex)
                 {
-                    Log($"FALHA NA EXTRAÇÃO (7-Zip): {ex.Message}");
-                    return (BootFileInfo?)null;
+                    Log($"Falha na extração: {ex.Message}");
+                    return null;
                 }
             });
+        }
+
+        private static string? FindSevenZipPath()
+        {
+            // 1. Bundled 7z.exe (copiado pelo .csproj para o output/publish)
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string bundled = Path.Combine(baseDir, "Resources", "App", "7Zip", "7z.exe");
+            if (File.Exists(bundled))
+                return Path.GetFullPath(bundled);
+
+            // 2. Mesmo diretório do assembly em execução (caso BaseDirectory seja diferente)
+            string? asmDir = Path.GetDirectoryName(typeof(WinbootManager).Assembly.Location);
+            if (asmDir != null)
+            {
+                string asmPath = Path.Combine(asmDir, "Resources", "App", "7Zip", "7z.exe");
+                if (File.Exists(asmPath))
+                    return Path.GetFullPath(asmPath);
+            }
+
+            // 3. 7-Zip instalado no sistema
+            string[] systemPaths =
+            {
+                @"C:\Program Files\7-Zip\7z.exe",
+                @"C:\Program Files (x86)\7-Zip\7z.exe",
+            };
+            foreach (var path in systemPaths)
+            {
+                if (File.Exists(path))
+                    return path;
+            }
+
+            return null;
+        }
+
+        private static async Task<BootFileInfo?> ExtractViaMountAndRobocopy(string isoPath, string targetPath)
+        {
+            bool wasMounted = false;
+            try
+            {
+                string mountResult = await MountIso(isoPath);
+                if (string.IsNullOrEmpty(mountResult))
+                {
+                    Log("Falha ao montar ISO via PowerShell.");
+                    Log("Verifique: ISO corrompida? Permissão de administrador?");
+                    return null;
+                }
+
+                wasMounted = true;
+                string isoDrive = mountResult;
+                Log($"ISO montada em {isoDrive}");
+
+                // Criar diretório destino se não existir
+                Directory.CreateDirectory(targetPath);
+
+                // Usar robocopy para copiar tudo
+                Log($"Copiando arquivos via robocopy de {isoDrive} para {targetPath}...");
+                var (rc, ro) = await RunProcessCaptured("robocopy.exe",
+                    $"\"{isoDrive}\" \"{targetPath}\" /E /R:2 /W:3 /NP /NDL /NFL",
+                    timeoutMs: 300_000);
+
+                // robocopy exit codes: 0-7 = success (files copied), 8+ = error
+                if (rc >= 8)
+                {
+                    Log($"robocopy falhou (código {rc}):");
+                    foreach (var line in ro.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                        Log($"  robocopy> {line.Trim()}");
+
+                    // Tentar xcopy como último recurso
+                    Log("Tentando fallback final: xcopy...");
+                    var (xc, xo) = await RunProcessCaptured("xcopy.exe",
+                        $"\"{isoDrive}\" \"{targetPath}\" /E /I /H /Y",
+                        timeoutMs: 300_000);
+                    if (xc != 0)
+                    {
+                        Log($"xcopy falhou (código {xc}):");
+                        foreach (var line in xo.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                            Log($"  xcopy> {line.Trim()}");
+                        return null;
+                    }
+                }
+                else
+                {
+                    Log($"robocopy concluído (código {rc}): arquivos copiados com sucesso.");
+                }
+
+                Log("Cópia via robocopy/xcopy concluída.");
+                return await DetectBootFile(targetPath);
+            }
+            catch (Exception ex)
+            {
+                Log($"Falha no fallback de extração: {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                if (wasMounted)
+                {
+                    await DismountIso(isoPath);
+                    Log("ISO desmontada.");
+                }
+            }
         }
 
         public static async Task<bool> ApplyCustomizations(string winbootDrive, bool bypassRequirements, bool localAccount, bool disablePrivacy, bool injectKit, bool autoCleanup, string? customXmlPath, string? userName, string? password, bool fullAuto, uint targetDisk, uint targetPartition, string? injectedFilesPath = null, bool safeMode = false, Func<string, Task<bool>>? downloadConfirmationCallback = null, string detectedLanguage = "pt-BR",
@@ -3395,21 +3499,24 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 progressCallback?.Invoke(50, "Movendo MFT e metadados...");
 
                 // Tentar usar contig para mover MFT (Sysinternals - usado por profissionais)
-                try
+                if (File.Exists("contig.exe") || File.Exists(Path.Combine(Environment.SystemDirectory, "contig.exe")))
                 {
-                    var (exitCode5, output5) = await RunProcessCaptured("contig", $"-v {driveLetter}\\$Mft");
-                    if (exitCode5 == 0)
+                    try
                     {
-                        Log($"MFT movido com sucesso: {output5}");
+                        var (exitCode5, output5) = await RunProcessCaptured("contig", $"-v {driveLetter}\\$Mft");
+                        if (exitCode5 == 0)
+                            Log($"MFT movido com sucesso: {output5}");
+                        else
+                            Log($"Contig falhou (ExitCode={exitCode5}), tentando fsutil...");
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Log($"Contig falhou (ExitCode={exitCode5}), tentando fsutil...");
+                        Log($"Contig não disponível ({ex.Message}), tentando fsutil...");
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Log($"Contig não disponível ({ex.Message}), tentando fsutil...");
+                    Log("contig.exe não encontrado (Sysinternals não instalado). Usando fsutil como fallback...");
                 }
 
                 // Fallback: usar fsutil para tentar mover MFT (técnica avançada)
@@ -3425,22 +3532,25 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 }
 
                 // Tentar mover $LogFile (journal NTFS que pode estar no meio do disco)
-                try
+                if (File.Exists("contig.exe") || File.Exists(Path.Combine(Environment.SystemDirectory, "contig.exe")))
                 {
-                    var (exitCode7, output7) = await RunProcessCaptured("contig", $"-v {driveLetter}\\$LogFile");
-                    if (exitCode7 == 0)
+                    try
                     {
-                        Log($"$LogFile movido com sucesso: {output7}");
+                        var (exitCode7, output7) = await RunProcessCaptured("contig", $"-v {driveLetter}\\$LogFile");
+                        if (exitCode7 == 0)
+                            Log($"$LogFile movido com sucesso: {output7}");
+                        else
+                            Log($"$LogFile não foi movido (ExitCode={exitCode7}): {output7}");
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Log($"$LogFile não foi movido (ExitCode={exitCode7}): {output7}");
+                        Log($"ERRO ao mover $LogFile: {ex.Message}");
+                        Log($"Continuando mesmo assim...");
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Log($"ERRO ao mover $LogFile: {ex.Message}");
-                    Log($"Continuando mesmo assim...");
+                    Log("contig.exe não encontrado. Pulando movimentação de $LogFile.");
                 }
 
                 progressCallback?.Invoke(55, "Preparação concluída");

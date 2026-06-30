@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace KitLugia.Core
 {
     /// <summary>
-    /// Detector inteligente de versões baseado em data de compilação
-    /// Obtém versões dinamicamente do GitHub (sem hardcoded)
+    /// Detector inteligente de versï¿½es baseado em data de compilaï¿½ï¿½o
+    /// Obtï¿½m versï¿½es dinamicamente do GitHub (sem hardcoded)
     /// </summary>
     public static class SmartVersionDetector
     {
@@ -17,7 +18,7 @@ namespace KitLugia.Core
         private static readonly string ReleasesApiUrl = $"https://api.github.com/repos/{GitHubRepo}/releases";
         private static readonly HttpClient _httpClient = new();
         
-        // Cache de releases (para evitar múltiplas requisições)
+        // Cache de releases (para evitar mï¿½ltiplas requisiï¿½ï¿½es)
         private static List<GitHubRelease>? _cachedReleases;
         private static DateTime _cacheExpiry = DateTime.MinValue;
         private static readonly string CacheDir = Path.Combine(
@@ -93,11 +94,11 @@ namespace KitLugia.Core
         }
         
         /// <summary>
-        /// Obtém TODOS os releases do GitHub (cache de 1 hora)
+        /// Obtï¿½m TODOS os releases do GitHub (cache de 1 hora)
         /// </summary>
         private static ValueTask<List<GitHubRelease>> GetAllReleasesAsync()
         {
-            // ?? Verificar cache (retorno síncrono sem alocação)
+            // ?? Verificar cache (retorno sï¿½ncrono sem alocaï¿½ï¿½o)
             if (_cachedReleases != null && DateTime.Now < _cacheExpiry)
             {
                 Logger.Log($"?? Usando cache de releases ({_cachedReleases.Count} releases)");
@@ -109,7 +110,7 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Implementação assíncrona de GetAllReleasesAsync
+        /// Implementaï¿½ï¿½o assï¿½ncrona de GetAllReleasesAsync
         /// </summary>
         private static async Task<List<GitHubRelease>> GetAllReleasesAsyncCore()
         {
@@ -128,19 +129,19 @@ namespace KitLugia.Core
                     if (!testResponse.IsSuccessStatusCode)
                     {
                         var statusCode = (int)testResponse.StatusCode;
-                        Logger.Log($"? GitHub API inacessível: {testResponse.StatusCode} ({statusCode})");
+                        Logger.Log($"? GitHub API inacessï¿½vel: {testResponse.StatusCode} ({statusCode})");
 
-                        // ?? Tratamento específico para diferentes status codes
+                        // ?? Tratamento especï¿½fico para diferentes status codes
                         switch (statusCode)
                         {
                             case 403:
-                                Logger.Log("?? GitHub API: 403 Forbidden - Possível Rate Limit ou IP bloqueado");
+                                Logger.Log("?? GitHub API: 403 Forbidden - Possï¿½vel Rate Limit ou IP bloqueado");
                                 break;
                             case 429:
                                 Logger.Log("?? GitHub API: 429 Too Many Requests - Rate Limit excedido");
                                 break;
                             case 401:
-                                Logger.Log("?? GitHub API: 401 Unauthorized - Token inválido ou expirado");
+                                Logger.Log("?? GitHub API: 401 Unauthorized - Token invï¿½lido ou expirado");
                                 break;
                             default:
                                 Logger.Log($"? GitHub API: {statusCode} - Erro desconhecido");
@@ -150,12 +151,12 @@ namespace KitLugia.Core
                         return GetFallbackReleases();
                     }
 
-                    Logger.Log("? GitHub API acessível - buscando releases...");
+                    Logger.Log("? GitHub API acessï¿½vel - buscando releases...");
                     await Task.Delay(1000); // Delay de 1 segundo para evitar rate limit
                 }
                 catch (HttpRequestException ex)
                 {
-                    Logger.Log($"? Erro de conexão com GitHub: {ex.Message}");
+                    Logger.Log($"? Erro de conexï¿½o com GitHub: {ex.Message}");
                     return GetFallbackReleases();
                 }
 
@@ -171,7 +172,7 @@ namespace KitLugia.Core
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 }) ?? new List<GitHubRelease>();
 
-                // ?? Filtrar releases válidos (não draft, não prerelease)
+                // ?? Filtrar releases vï¿½lidos (nï¿½o draft, nï¿½o prerelease)
                 var validReleases = releases
                     .Where(r => !r.Draft && !r.Prerelease)
                     .OrderByDescending(r => r.PublishedAt)
@@ -192,12 +193,12 @@ namespace KitLugia.Core
             }
             catch (HttpRequestException ex)
             {
-                Logger.Log($"? Erro de conexão com GitHub: {ex.Message}");
+                Logger.Log($"? Erro de conexï¿½o com GitHub: {ex.Message}");
                 return GetFallbackReleases();
             }
             catch (TaskCanceledException ex)
             {
-                Logger.Log($"? Timeout na conexão com GitHub: {ex.Message}");
+                Logger.Log($"? Timeout na conexï¿½o com GitHub: {ex.Message}");
                 return GetFallbackReleases();
             }
             catch (Exception ex)
@@ -214,7 +215,7 @@ namespace KitLugia.Core
         {
             if (_cachedReleases != null)
             {
-                Logger.Log($"?? Usando cache em memória ({_cachedReleases.Count} releases)");
+                Logger.Log($"?? Usando cache em memï¿½ria ({_cachedReleases.Count} releases)");
                 return _cachedReleases;
             }
 
@@ -234,15 +235,15 @@ namespace KitLugia.Core
             }
             catch { }
 
-            return GetFallbackReleases();
+            return GetPlaceholderReleases();
         }
 
         /// <summary>
-        /// Retorna releases placeholder quando GitHub está inacessível
+        /// Retorna releases placeholder quando GitHub estï¿½ inacessï¿½vel
         /// </summary>
         private static List<GitHubRelease> GetPlaceholderReleases()
         {
-            Logger.Log("?? Usando releases placeholder (GitHub inacessível)");
+            Logger.Log("?? Usando releases placeholder (GitHub inacessï¿½vel)");
             
             var now = DateTime.Now;
             return new List<GitHubRelease>
@@ -251,7 +252,7 @@ namespace KitLugia.Core
                 { 
                     TagName = "2.0.5", 
                     Name = "KitLugia v2.0.5 - Update Manual + Timezone",
-                    PublishedAt = now.AddDays(-7), // 7 dias atrás
+                    PublishedAt = now.AddDays(-7), // 7 dias atrï¿½s
                     Prerelease = false,
                     Draft = false
                 },
@@ -259,7 +260,7 @@ namespace KitLugia.Core
                 { 
                     TagName = "2.0.4", 
                     Name = "KitLugia v2.0.4 - GameBoost Fix",
-                    PublishedAt = now.AddDays(-14), // 14 dias atrás
+                    PublishedAt = now.AddDays(-14), // 14 dias atrï¿½s
                     Prerelease = false,
                     Draft = false
                 },
@@ -267,7 +268,7 @@ namespace KitLugia.Core
                 { 
                     TagName = "2.0.3", 
                     Name = "KitLugia v2.0.3 - Network Diagnostics",
-                    PublishedAt = now.AddDays(-21), // 21 dias atrás
+                    PublishedAt = now.AddDays(-21), // 21 dias atrï¿½s
                     Prerelease = false,
                     Draft = false
                 }
@@ -275,160 +276,69 @@ namespace KitLugia.Core
         }
         
         /// <summary>
-        /// Obtém a versão real baseada na data de compilação (DINÂMICO)
+        /// Obtï¿½m a versï¿½o do assembly atual via AssemblyVersion
         /// </summary>
-        /// <param name="buildDate">Data de compilação do assembly</param>
-        /// <returns>Versão detectada online (ex: "2.0.5")</returns>
-        public static async Task<string> GetRealVersionAsync(DateTime buildDate)
+        public static string GetCurrentAssemblyVersion()
         {
             try
             {
-                // ?? Buscar releases online
-                var releases = await GetAllReleasesAsync();
-                
-                if (!releases.Any())
-                {
-                    Logger.Log("? Nenhum release encontrado, usando fallback");
-                    return "2.0.x";
-                }
-                
-                // ?? Procurar release exato (até 7 dias + 15 minutos de tolerância)
-                foreach (var release in releases)
-                {
-                    // ? LÓGICA CORRETA: Se build for até 15min DEPOIS do release
-                    var releaseTimeWithTolerance = release.PublishedAt.AddMinutes(15); // 15 minutos DEPOIS
-                    if (buildDate >= release.PublishedAt.Date && 
-                        buildDate <= releaseTimeWithTolerance)
-                    {
-                        Logger.Log($"?? Versão exata detectada: {release.TagName} (Publicado: {release.PublishedAt:dd/MM/yyyy HH:mm}, Build: {buildDate:dd/MM/yyyy HH:mm})");
-                        return release.TagName;
-                    }
-                }
-                
-                // ?? Estimar versão baseada no último release
-                var lastRelease = releases.First();
-                var daysSinceLast = (buildDate - lastRelease.PublishedAt.Date).Days;
-                
-                // ?? Extrair números da versão
-                if (ParseVersionNumbers(lastRelease.TagName, out int major, out int minor, out int patch))
-                {
-                    // Estimar baseado em semanas desde o último release
-                    var weeksSinceLast = daysSinceLast / 7;
-                    var estimatedPatch = patch + weeksSinceLast;
-                    
-                    var estimatedVersion = $"{major}.{minor}.{estimatedPatch}";
-                    Logger.Log($"?? Versão estimada: {estimatedVersion} (+{weeksSinceLast} semanas desde {lastRelease.TagName})");
-                    return estimatedVersion;
-                }
-                
-                // Fallback para o último release
-                Logger.Log($"?? Usando último release: {lastRelease.TagName}");
-                return lastRelease.TagName;
+                var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+                var version = assembly.GetName().Version;
+                if (version != null)
+                    return $"{version.Major}.{version.Minor}.{version.Build}";
             }
-            catch (Exception ex)
-            {
-                Logger.Log($"? Erro ao detectar versão: {ex.Message}");
-                return "2.0.x"; // Fallback seguro
-            }
+            catch { }
+            return "2.0.x";
+        }
+
+        /// <summary>
+        /// Obtï¿½m a versï¿½o real usando AssemblyVersion em vez de data de compilaï¿½ï¿½o
+        /// </summary>
+        /// <param name="buildDate">Ignorado â€” mantido para compatibilidade</param>
+        /// <returns>Versï¿½o detectada (ex: "2.0.5")</returns>
+        public static async Task<string> GetRealVersionAsync(DateTime buildDate = default)
+        {
+            return await Task.FromResult(GetCurrentAssemblyVersion());
         }
         
         /// <summary>
-        /// Versão síncrona para compatibilidade (usa cache)
+        /// Versï¿½o sï¿½ncrona â€” usa AssemblyVersion diretamente
         /// </summary>
-        public static string GetRealVersion(DateTime buildDate)
+        public static string GetRealVersion(DateTime buildDate = default)
         {
-            try
-            {
-                // ? Usar cache se disponível
-                if (_cachedReleases != null)
-                {
-                    var task = GetRealVersionAsync(buildDate);
-                    return task.GetAwaiter().GetResult();
-                }
-                
-                // ?? Buscar online (bloqueante, mas necessário)
-                var syncTask = Task.Run(async () => await GetRealVersionAsync(buildDate));
-                return syncTask.GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"? Erro na versão síncrona: {ex.Message}");
-                return "2.0.x";
-            }
+            return GetCurrentAssemblyVersion();
         }
         
         /// <summary>
-        /// Extrai números da versão de uma string (ex: "v2.0.5" -> 2, 0, 5)
+        /// Obtï¿½m informaï¿½ï¿½es detalhadas da versï¿½o (baseada em AssemblyVersion)
         /// </summary>
-        private static bool ParseVersionNumbers(string versionTag, out int major, out int minor, out int patch)
+        public static async Task<(string RealVersion, string AssemblyVersion, string BuildDate, string DetectionMethod, int TotalReleases)> GetVersionInfoAsync(DateTime buildDate = default)
         {
-            major = minor = patch = 0;
-            
-            try
-            {
-                // Remover "v" e outros prefixos
-                var cleanVersion = versionTag.Trim().TrimStart('v', 'V');
-                var parts = cleanVersion.Split('.');
-                
-                if (parts.Length >= 1) int.TryParse(parts[0], out major);
-                if (parts.Length >= 2) int.TryParse(parts[1], out minor);
-                if (parts.Length >= 3) int.TryParse(parts[2], out patch);
-                
-                return major > 0 || minor > 0 || patch > 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        
-        /// <summary>
-        /// Obtém informações detalhadas da versão (DINÂMICO)
-        /// </summary>
-        public static async Task<(string RealVersion, string AssemblyVersion, string BuildDate, string DetectionMethod, int TotalReleases)> GetVersionInfoAsync(DateTime buildDate)
-        {
-            var realVersion = await GetRealVersionAsync(buildDate);
-            var assemblyVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0.0";
+            var realVersion = GetCurrentAssemblyVersion();
+            var assemblyVersion = Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString() ?? "1.0.0.0";
             var releases = await GetAllReleasesAsync();
-            
-            string detectionMethod;
-            if (releases.Any(r => 
-                buildDate >= r.PublishedAt.Date && 
-                buildDate <= r.PublishedAt.AddMinutes(15)))
-            {
-                detectionMethod = "Online Exata";
-            }
-            else if (releases.Any())
-            {
-                detectionMethod = "Online Estimada";
-            }
-            else
-            {
-                detectionMethod = "Offline Placeholder";
-            }
-            
-            return (realVersion, assemblyVersion, buildDate.ToString("dd/MM/yyyy HH:mm"), detectionMethod, releases.Count);
+            return (realVersion, assemblyVersion, DateTime.Now.ToString("dd/MM/yyyy HH:mm"), "AssemblyVersion", releases.Count);
         }
         
         /// <summary>
-        /// Versão síncrona para compatibilidade
+        /// Versï¿½o sï¿½ncrona para compatibilidade
         /// </summary>
-        public static (string RealVersion, string AssemblyVersion, string BuildDate, string DetectionMethod, int TotalReleases) GetVersionInfo(DateTime buildDate)
+        public static (string RealVersion, string AssemblyVersion, string BuildDate, string DetectionMethod, int TotalReleases) GetVersionInfo(DateTime buildDate = default)
         {
             try
             {
-                var task = GetVersionInfoAsync(buildDate);
+                var task = GetVersionInfoAsync();
                 return task.GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
                 Logger.Log($"? Erro em GetVersionInfo: {ex.Message}");
-                return ("2.0.x", "1.0.0.0", buildDate.ToString("dd/MM/yyyy HH:mm"), "Erro", 0);
+                return ("2.0.x", "1.0.0.0", DateTime.Now.ToString("dd/MM/yyyy HH:mm"), "Erro", 0);
             }
         }
         
         /// <summary>
-        /// Lista todas as versões disponíveis online
+        /// Lista todas as versï¿½es disponï¿½veis online
         /// </summary>
         public static async Task<List<(string TagName, DateTime PublishedAt, string Name)>> GetAllVersionsAsync()
         {
@@ -441,19 +351,19 @@ namespace KitLugia.Core
             }
             catch (Exception ex)
             {
-                Logger.Log($"? Erro ao listar versões: {ex.Message}");
+                Logger.Log($"? Erro ao listar versï¿½es: {ex.Message}");
                 return new List<(string, DateTime, string)>();
             }
         }
         
         /// <summary>
-        /// Força atualização do cache (para testes)
+        /// Forï¿½a atualizaï¿½ï¿½o do cache (para testes)
         /// </summary>
         public static void ClearCache()
         {
             _cachedReleases = null;
             _cacheExpiry = DateTime.MinValue;
-            Logger.Log("??? Cache de versões limpo");
+            Logger.Log("??? Cache de versï¿½es limpo");
         }
     }
 }

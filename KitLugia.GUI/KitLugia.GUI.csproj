@@ -44,6 +44,28 @@
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		<Link>Resources\LinuxPreOS\grubx64.efi</Link>
 	  </Content>
+	  <!-- antiX files -->
+	  <Content Include="..\KitLugia.Core\Resources\BootGoodies\antix\antiX-26_x64-core.iso">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\BootGoodies\antix\antiX-26_x64-core.iso</Link>
+	  </Content>
+	  <Content Include="..\KitLugia.Core\Resources\BootGoodies\antix\vmlinuz">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\BootGoodies\antix\vmlinuz</Link>
+	  </Content>
+	  <Content Include="..\KitLugia.Core\Resources\BootGoodies\antix\initrd.gz">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\BootGoodies\antix\initrd.gz</Link>
+	  </Content>
+	  <!-- rEFInd -->
+	  <Content Include="..\KitLugia.Core\Resources\BootGoodies\refind\refind_x64.efi">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\BootGoodies\refind\refind_x64.efi</Link>
+	  </Content>
+	  <Content Include="..\KitLugia.Core\Resources\BootGoodies\refind\shellx64.efi">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<Link>Resources\BootGoodies\refind\shellx64.efi</Link>
+	  </Content>
 	  <!-- Ferramentas Externas -->
 	  <Content Include="External\MAS\**\*">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

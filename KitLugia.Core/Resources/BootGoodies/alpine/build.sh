@@ -134,15 +134,41 @@ $BB ln -s $BB /bin/sh 2>/dev/null
 echo '==========================================='
 echo '  KitLugia Alpine Emergency Pre-Boot'
 echo '==========================================='
-CMDLINE=$($BB cat /proc/cmdline)
-DISK=""; PART=""; SHRINK_MB=""; LABEL=""; DL=""
-for x in $CMDLINE; do
-    case $x in kitlugia_disk=*) DISK="${x#kitlugia_disk=}" ;; esac
-    case $x in kitlugia_part=*) PART="${x#kitlugia_part=}" ;; esac
-    case $x in kitlugia_shrink_mb=*) SHRINK_MB="${x#kitlugia_shrink_mb=}" ;; esac
-    case $x in kitlugia_label=*) LABEL="${x#kitlugia_label=}" ;; esac
-    case $x in kitlugia_dl=*) DL="${x#kitlugia_dl=}" ;; esac
+# Try kernel_params.txt from ESP first (for BCD firmware boot)
+DISK=""; PART=""; SHRINK_MB=""; LABEL=""; DL=""; BCD_GUID=""
+$BB mkdir -p /tmp/esp_scan
+for esp_try_dev in $($BB ls /dev/sd? /dev/nvme?n? /dev/mmcblk? /dev/vd? 2>/dev/null); do
+    $BB mount "$esp_try_dev" /tmp/esp_scan 2>/dev/null && {
+        if [ -f "/tmp/esp_scan/EFI/KitLugia/kernel_params.txt" ]; then
+            echo "Lendo kernel_params.txt do ESP via $esp_try_dev"
+            for kv in $($BB cat "/tmp/esp_scan/EFI/KitLugia/kernel_params.txt"); do
+                case $kv in kitlugia_disk=*) DISK="${kv#kitlugia_disk=}" ;; esac
+                case $kv in kitlugia_part=*) PART="${kv#kitlugia_part=}" ;; esac
+                case $kv in kitlugia_shrink_mb=*) SHRINK_MB="${kv#kitlugia_shrink_mb=}" ;; esac
+                case $kv in kitlugia_label=*) LABEL="${kv#kitlugia_label=}" ;; esac
+                case $kv in kitlugia_dl=*) DL="${kv#kitlugia_dl=}" ;; esac
+                case $kv in kitlugia_bcd_guid=*) BCD_GUID="${kv#kitlugia_bcd_guid=}" ;; esac
+            done
+            $BB umount /tmp/esp_scan 2>/dev/null
+            break
+        fi
+        $BB umount /tmp/esp_scan 2>/dev/null
+    }
 done
+
+# Fallback: parse from cmdline (for rEFInd/EFI stub boots)
+if [ -z "$DISK" ]; then
+    echo "Falling back to /proc/cmdline..."
+    CMDLINE=$($BB cat /proc/cmdline)
+    for x in $CMDLINE; do
+        case $x in kitlugia_disk=*) DISK="${x#kitlugia_disk=}" ;; esac
+        case $x in kitlugia_part=*) PART="${x#kitlugia_part=}" ;; esac
+        case $x in kitlugia_shrink_mb=*) SHRINK_MB="${x#kitlugia_shrink_mb=}" ;; esac
+        case $x in kitlugia_label=*) LABEL="${x#kitlugia_label=}" ;; esac
+        case $x in kitlugia_dl=*) DL="${x#kitlugia_dl=}" ;; esac
+        case $x in kitlugia_bcd_guid=*) BCD_GUID="${x#kitlugia_bcd_guid=}" ;; esac
+    done
+fi
 echo "Disk=$DISK Part=$PART Shrink=${SHRINK_MB}MB Label=$LABEL"
 
 DISK_DEV=""; idx=0; target_idx=${DISK#PHYSICALDRIVE}

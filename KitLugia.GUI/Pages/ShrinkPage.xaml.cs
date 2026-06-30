@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -53,7 +54,6 @@ namespace KitLugia.GUI.Pages
                 {
                     var result = new List<PartitionInfo>();
 
-                    // Mapeia partição -> letra via Win32_LogicalDiskToPartition
                     var assocMap = new Dictionary<(uint disk, uint part), string>();
                     using (var assocQuery = new System.Management.ManagementObjectSearcher("SELECT * FROM Win32_LogicalDiskToPartition"))
                     {
@@ -61,8 +61,6 @@ namespace KitLugia.GUI.Pages
                         {
                             var antec = assoc["Antecedent"]?.ToString() ?? "";
                             var dep = assoc["Dependent"]?.ToString() ?? "";
-                            // Antecedent: Win32_DiskPartition.DeviceID="Disk #0, Partition #0"
-                            // Dependent: Win32_LogicalDisk.DeviceID="C:"
                             if (string.IsNullOrEmpty(antec) || string.IsNullOrEmpty(dep)) continue;
 
                             var partMatch = System.Text.RegularExpressions.Regex.Match(antec, @"Disk\s+#(\d+),\s+Partition\s+#(\d+)");
@@ -113,18 +111,6 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void ChkEmergencyPreBoot_Checked(object sender, RoutedEventArgs e)
-        {
-            if (TxtStatus != null)
-                TxtStatus.Text = "Modo Emergency: o sistema será reiniciado para o Alpine Linux.";
-        }
-
-        private void ChkEmergencyPreBoot_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (TxtStatus != null)
-                TxtStatus.Text = "Pronto.";
-        }
-
         private async void BtnExecute_Click(object sender, RoutedEventArgs e)
         {
             if (_isBusy) return;
@@ -145,20 +131,22 @@ namespace KitLugia.GUI.Pages
                     return;
                 }
 
-                AppendLog($"=== INICIANDO SHRINK ===");
-                AppendLog($"Partição: {selected.DisplayText}");
-                AppendLog($"Shrink: {shrinkMb} MB");
-                AppendLog($"Modo: {(ChkEmergencyPreBoot.IsChecked == true ? "Emergency Pre-Boot (Alpine + rEFInd)" : "UEFI Recovery (kitlugia_shrink.efi)")}");
+                AppendLog($"=== INICIANDO SHRINK (antiX) ===");
+                AppendLog($"Partição fonte: {selected.DriveLetter}:");
+                AppendLog($"Tamanho do shrink: {shrinkMb} MB");
+                AppendLog($"ISO antiX: antiX-26_x64-core.iso (645MB)");
 
                 var result = MessageBox.Show(
-                    "⚠️ SHRINK DE PARTIÇÃO\n\n" +
+                    "⚠️ SHRINK DE PARTIÇÃO (antiX Live)\n\n" +
                     $"O KitLugia vai:\n" +
                     $"1. Reduzir {selected.DriveLetter}: em {shrinkMb}MB\n" +
-                    $"2. Deploy do ambiente de recuperação no ESP\n" +
-                    (ChkEmergencyPreBoot.IsChecked == true
-                        ? "3. REINICIAR para Alpine Linux\n4. Executar shrink + criar partição KITLUGIA\n5. Reiniciar de volta para Windows"
-                        : "3. REINICIAR para kitlugia_shrink.efi\n4. Executar shrink + criar partição KITLUGIA\n5. Reiniciar de volta para Windows") +
-                    "\n\nDeseja continuar?",
+                    $"2. Criar partição KITLUGIA no espaço liberado\n" +
+                    $"3. Extrair antiX Linux completo (kernel + linuxfs) para a partição\n" +
+                    $"4. Substituir bootmgfw.efi pelo rEFInd no ESP\n" +
+                    $"5. REINICIAR — rEFInd mostra menu (timeout 20s)\n" +
+                    $"6. Selecione \"antiX Live\" para boot completo\n" +
+                    $"7. Execute gparted ou ntfsresize manualmente\n\n" +
+                    $"Deseja continuar?",
                     "Shrink Partição",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning);
@@ -170,64 +158,31 @@ namespace KitLugia.GUI.Pages
                 }
 
                 OverlayBusy.Visibility = Visibility.Visible;
-                TxtProgressStatus.Text = "Implantando ambiente de recuperação...";
+                TxtProgressStatus.Text = "Criando partição KITLUGIA + extraindo antiX...";
 
-                if (ChkEmergencyPreBoot.IsChecked == true)
+                var (ok, msg) = await EmergencyBcdBootManager.DeployAntiXAsync(
+                    selected.DriveLetter,
+                    shrinkMb,
+                    UpdateProgress
+                );
+
+                if (!ok)
                 {
-                    var (ok, msg) = await EmergencyPreBootManager.DeployAsync(
-                        (int)selected.DiskIndex,
-                        (int)selected.Index,
-                        selected.Size,
-                        selected.DriveLetter,
-                        shrinkMb,
-                        "KITLUGIA",
-                        UpdateProgress
-                    );
-
-                    if (!ok)
-                    {
-                        AppendLog($"ERRO: {msg}");
-                        MessageBox.Show($"Falha: {msg}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
-                        return;
-                    }
-
-                    AppendLog("Ambiente Alpine implantado com sucesso!");
-                    AppendLog(msg);
-                    TxtStatus.Text = "✅ Ambiente pronto. Reiniciando...";
-
-                    MessageBox.Show(msg + "\n\nO sistema será reiniciado AGORA.",
-                        "Shrink - KitLugia", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    await EmergencyPreBootManager.TriggerReboot();
+                    AppendLog($"ERRO: {msg}");
+                    MessageBox.Show($"Falha: {msg}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
                 }
-                else
-                {
-                    var (ok, msg) = await EmergencyUEFIManager.DeployAsync(
-                        (int)selected.DiskIndex,
-                        (int)selected.Index,
-                        selected.Size,
-                        selected.DriveLetter,
-                        shrinkMb,
-                        "KITLUGIA",
-                        UpdateProgress
-                    );
 
-                    if (!ok)
-                    {
-                        AppendLog($"ERRO: {msg}");
-                        MessageBox.Show($"Falha: {msg}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
-                        return;
-                    }
+                AppendLog("antiX + rEFInd implantado com sucesso!");
+                AppendLog(msg);
+                TxtStatus.Text = "✅ Pronto. Reinicie e selecione antiX Live.";
 
-                    AppendLog("Ambiente UEFI implantado com sucesso!");
-                    AppendLog(msg);
-                    TxtStatus.Text = "✅ Ambiente pronto. Reiniciando...";
+                var reboot = MessageBox.Show(
+                    msg + "\n\nDeseja reiniciar AGORA?",
+                    "Shrink - KitLugia", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
-                    MessageBox.Show(msg + "\n\nO sistema será reiniciado AGORA.",
-                        "Shrink - KitLugia", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    await EmergencyUEFIManager.TriggerReboot();
-                }
+                if (reboot == MessageBoxResult.Yes)
+                    await EmergencyBcdBootManager.TriggerReboot();
             }
             catch (Exception ex)
             {
@@ -249,6 +204,87 @@ namespace KitLugia.GUI.Pages
                 TxtProgressStatus.Text = label;
                 AppendLog($"[{pct:F0}%] {label}");
             });
+        }
+
+        private async void BtnInstallRefind_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isBusy) return;
+            _isBusy = true;
+
+            try
+            {
+                OverlayBusy.Visibility = Visibility.Visible;
+                TxtProgressStatus.Text = "Instalando rEFInd...";
+
+                AppendLog("=== INSTALAR rEFInd ===");
+
+                var (ok, msg) = await EmergencyBcdBootManager.InstallRefindOnlyAsync();
+
+                if (ok)
+                {
+                    AppendLog("rEFInd instalado.");
+                    TxtStatus.Text = "✅ rEFInd instalado (substituiu bootmgfw.efi)";
+                }
+                else
+                {
+                    AppendLog($"ERRO: {msg}");
+                    MessageBox.Show(msg, "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"ERRO: {ex.Message}");
+                TxtStatus.Text = "❌ Erro";
+                MessageBox.Show($"Erro ao instalar rEFInd: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isBusy = false;
+                OverlayBusy.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private async void BtnRemoveRefind_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isBusy) return;
+            _isBusy = true;
+
+            try
+            {
+                var confirm = MessageBox.Show(
+                    "Restaurar o Windows Boot Manager original (bootmgfw.efi)?\n" +
+                    "Isso removerá o rEFInd do ESP.\n\n" +
+                    "Deseja também remover a partição KITLUGIA?",
+                    "Desinstalar rEFInd",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (confirm == MessageBoxResult.Cancel)
+                    return;
+
+                OverlayBusy.Visibility = Visibility.Visible;
+                TxtProgressStatus.Text = "Removendo rEFInd...";
+                AppendLog("=== DESINSTALAR rEFInd ===");
+
+                bool removePartition = confirm == MessageBoxResult.Yes;
+                var (ok, msg) = await EmergencyBcdBootManager.CleanupAsync(removePartition);
+
+                if (ok)
+                    TxtStatus.Text = "✅ Windows Boot Manager restaurado";
+                else
+                    TxtStatus.Text = $"❌ {msg}";
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"ERRO: {ex.Message}");
+                TxtStatus.Text = "❌ Erro";
+                MessageBox.Show($"Erro ao remover rEFInd: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isBusy = false;
+                OverlayBusy.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void AppendLog(string line)

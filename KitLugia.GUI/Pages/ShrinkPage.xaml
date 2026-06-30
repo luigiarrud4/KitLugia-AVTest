@@ -42,18 +42,24 @@
                     <TextBox x:Name="TxtShrinkSize" Text="4096" Height="32" Margin="0,0,0,5"
                              Foreground="White" Background="#2B2B2B" BorderBrush="#444" BorderThickness="1"
                              VerticalContentAlignment="Center" Padding="8,0"/>
-                    <TextBlock Text="Mínimo 1024 MB (1GB). O espaço será usado para criar a partição KITLUGIA." FontSize="10" Foreground="#888" Margin="0,0,0,12"/>
+                    <TextBlock Text="Mínimo 1024 MB (1GB). Partição criada terá o antiX Live completo (kernel + linuxfs)." FontSize="10" Foreground="#888" Margin="0,0,0,12"/>
 
-                    <CheckBox x:Name="ChkEmergencyPreBoot" Content="&#x26A1; Emergency Pre-Boot (Alpine + rEFInd)"
-                              Foreground="#E0E0E0" FontSize="12" IsChecked="True" Margin="0,5,0,5"
-                              Checked="ChkEmergencyPreBoot_Checked" Unchecked="ChkEmergencyPreBoot_Unchecked"/>
+                    <Border Background="#1E2A1E" CornerRadius="6" Padding="10" Margin="0,0,0,8" BorderBrush="#4CAF50" BorderThickness="1">
+                        <TextBlock x:Name="TxtFlavorInfo" Text="&#x26A1; antiX Linux completo (kernel + linuxfs 585MB) será extraído na nova partição. rEFInd substitui o Windows Boot Manager e mostra menu interativo. Você escolhe entre antiX Live e Windows."
+                                   FontSize="11" Foreground="#A5D6A7" TextWrapping="Wrap"/>
+                    </Border>
 
                     <TextBlock x:Name="TxtEmergencyWarning" Text="&#x26A0;&#xFE0F; O sistema será reiniciado automaticamente. Salve seu trabalho antes de continuar."
                                FontSize="11" Foreground="#FFA726" TextWrapping="Wrap" Visibility="Visible" Margin="15,5,0,15"/>
 
-                    <Button x:Name="BtnExecute" Content="&#x25B6; EXECUTAR SHRINK" Height="40" FontSize="14" FontWeight="Bold"
-                            Style="{StaticResource GoldButtonStyle}" Margin="0,10,0,0"
-                            Click="BtnExecute_Click"/>
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button x:Name="BtnExecute" Content="&#x25B6; EXECUTAR SHRINK" Height="40" FontSize="14" FontWeight="Bold"
+                                Style="{StaticResource GoldButtonStyle}" Margin="0,0,8,0" Click="BtnExecute_Click" Width="220"/>
+                        <Button x:Name="BtnInstallRefind" Content="&#x2B55; Instalar rEFInd" Height="40" FontSize="13" FontWeight="Bold"
+                                Style="{StaticResource RecycleButtonStyle}" Margin="0,0,8,0" Click="BtnInstallRefind_Click" Width="160"/>
+                        <Button x:Name="BtnRemoveRefind" Content="&#x274C; Desinstalar rEFInd" Height="40" FontSize="13" FontWeight="Bold"
+                                Style="{StaticResource DeleteButtonStyle}" Click="BtnRemoveRefind_Click" Width="170"/>
+                    </WrapPanel>
 
                     <!-- Status -->
                     <Border Background="#2B2B2B" CornerRadius="6" Padding="12" Margin="0,15,0,0" BorderBrush="#444" BorderThickness="1">

@@ -80,18 +80,12 @@ namespace KitLugia.GUI.Pages
                 var assembly = Assembly.GetExecutingAssembly();
                 var assemblyVersion = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
 
-                var assemblyPath = assembly.Location;
-                if (string.IsNullOrEmpty(assemblyPath))
-                    assemblyPath = Environment.ProcessPath ?? AppContext.BaseDirectory;
-
-                var buildDate = System.IO.File.GetLastWriteTime(assemblyPath);
-                
-                // ✅. Adicionar timeout de 10 segundos para evitar congelamento
+                // ✅. Timeout de 10 segundos para segurança
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 
                 var versionInfo = await Task.Run(async () => 
                 {
-                    return await KitLugia.Core.SmartVersionDetector.GetVersionInfoAsync(buildDate);
+                    return await KitLugia.Core.SmartVersionDetector.GetVersionInfoAsync();
                 }, cts.Token);
                 
                 var localBuildDate = DateTimeOffset.Now; // Data/hora atual com timezone do usuário
@@ -101,7 +95,7 @@ namespace KitLugia.GUI.Pages
                 CurrentVersionText.Text = $"v{versionInfo.RealVersion}";
                 
 
-                CurrentBuildDateText.Text = $"📅 Compilado: {buildDate:dd/MM/yyyy HH:mm}";
+                CurrentBuildDateText.Text = $"📅 Versão: {assemblyVersion}";
                 CurrentNowDateText.Text = $"🕐 Agora: {localBuildDate:dd/MM/yyyy HH:mm}";
                 
                 // Informações do sistema
@@ -345,24 +339,9 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-
                 var assembly = Assembly.GetExecutingAssembly();
-                var assemblyPath = assembly.Location;
-                if (string.IsNullOrEmpty(assemblyPath))
-                    assemblyPath = Environment.ProcessPath ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
-                var buildDate = System.IO.File.GetLastWriteTime(assemblyPath);
-                var realVersion = KitLugia.Core.SmartVersionDetector.GetRealVersion(buildDate);
-                
-                // Converter string de versão para Version object
-                if (System.Version.TryParse(realVersion, out var version))
-                {
-                    KitLugia.Core.Logger.Log($"📦 Versão DIN,MICA detectada: {realVersion}");
-                    return version;
-                }
-                
-                // Fallback para assembly version
                 var assemblyVersion = assembly.GetName().Version ?? new System.Version("2.0.5");
-                KitLugia.Core.Logger.Log($"Usando assembly version: {assemblyVersion}");
+                KitLugia.Core.Logger.Log($"📦 Versão atual: {assemblyVersion}");
                 return assemblyVersion;
             }
             catch (Exception ex)

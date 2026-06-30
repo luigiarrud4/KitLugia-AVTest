@@ -37,7 +37,9 @@ namespace KitLugia.Core
             "ProgramData", "AppData", "Application Data", "Config.Msi", "PerfLogs",
             "Recovery", "System Volume Information", "$Recycle.Bin", "$WinREAgent",
             "Microsoft", "Common Files", "MSBuild", "Microsoft.NET", "Assembly",
-            "node_modules", ".git", ".svn", ".vs", "packages"
+            "node_modules", ".git", ".svn", ".vs", "packages",
+            "Packages", "Temp", "IsolatedStorage", "MicrosoftEdge", "cache",
+            "Caches", "Logs", "logs", "Temporary Internet Files"
         };
 
         private static readonly HashSet<string> _installerExePrefixes = new(StringComparer.OrdinalIgnoreCase)
@@ -108,6 +110,14 @@ namespace KitLugia.Core
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
             if (Directory.Exists(localPrograms))
                 locations.Add(localPrograms);
+
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrEmpty(localAppData) && Directory.Exists(localAppData))
+                locations.Add(localAppData);
+
+            string roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            if (!string.IsNullOrEmpty(roamingAppData) && Directory.Exists(roamingAppData))
+                locations.Add(roamingAppData);
 
             foreach (var drive in DriveInfo.GetDrives())
             {

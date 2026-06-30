@@ -2328,6 +2328,46 @@ namespace KitLugia.GUI
                 _ = LoadIntroSettingsAndPlay();
             }
             _ = CheckForUpdateNotificationAsync();
+            _ = CheckShrinkCompletionAsync();
+        }
+
+        private async Task CheckShrinkCompletionAsync()
+        {
+            try
+            {
+                await Task.Delay(3000);
+                Logger.Log("[SHRINK] Verificando conclusão do shrink...");
+                bool completed = EmergencyBcdBootManager.IsPreBootCompleted();
+
+                if (completed)
+                {
+                    Logger.Log("[SHRINK] Shrink concluído! Restaurando bootmgfw.efi...");
+                    var (ok, msg) = await EmergencyBcdBootManager.CleanupAsync();
+                    if (ok)
+                    {
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            ShowSuccess("SHRINK CONCLUÍDO",
+                                "A partição foi reduzida com sucesso!\n\n" +
+                                "O Windows Boot Manager foi restaurado.");
+                        });
+                    }
+                    else
+                    {
+                        Logger.Log($"[SHRINK] Cleanup: {msg}");
+                    }
+                }
+                else
+                {
+                    // Sem marcador: verifica se o bootmgfw.efi foi substituído
+                    // (caso o reboot não tenha completado o shrink)
+                    Logger.Log("[SHRINK] Nenhum marcador encontrado.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SHRINK] Erro na verificação pós-reboot: {ex.Message}");
+            }
         }
 
         private async Task CheckForUpdateNotificationAsync()

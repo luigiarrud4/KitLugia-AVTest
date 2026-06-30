@@ -176,6 +176,20 @@ namespace KitLugia.Core
             }
             catch { }
 
+            // --- 4. TAREFAS EXTERNAS DO AGENDADOR (não-KitLUGIA) ---
+            try
+            {
+                var externalTasks = GetExternalTaskSchedulerApps();
+                foreach (var task in externalTasks)
+                {
+                    if (!apps.ContainsKey(task.Name))
+                    {
+                        apps.Add(task.Name, task);
+                    }
+                }
+            }
+            catch { }
+
             return apps.Values.OrderBy(a => a.Name).ToList();
         }
 

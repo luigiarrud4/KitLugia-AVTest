@@ -1,0 +1,110 @@
+<Window x:Class="KitLugia.Updater.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KitLugia - Atualizando..." Width="480" Height="420"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Arial"
+        Loaded="Window_Loaded">
+    <Border BorderBrush="#FFD700" BorderThickness="2" CornerRadius="8">
+        <Border.Effect>
+            <DropShadowEffect Color="#FFD700" BlurRadius="15" ShadowDepth="0" Opacity="0.3"/>
+        </Border.Effect>
+        <Grid Background="#1A1A1A">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="#0D0D0D" Padding="20,15" CornerRadius="6,6,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="⚡" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0" FontFamily="Segoe UI Emoji"/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="KIT LUGIA" FontSize="18" FontWeight="Bold" Foreground="#FFD700"/>
+                        <TextBlock x:Name="TxtSubtitle" Text="ATUALIZANDO..." FontSize="11" Foreground="#AAAAAA"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Content -->
+            <Border Grid.Row="1" Background="#1A1A1A" Padding="30,20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Steps -->
+                    <ItemsControl x:Name="StepsList" Grid.Row="0" Margin="0,0,0,15">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Icon}" FontSize="14" Margin="0,0,10,0" FontFamily="Segoe UI Emoji"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Text}" FontSize="12" Foreground="{Binding Color}" VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Logo central (animação) -->
+                    <TextBlock x:Name="TxtLogo" Grid.Row="1" Text="⚡ KIT LUGIA" FontSize="32" FontWeight="Bold"
+                               Foreground="#22FFD700" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               FontFamily="Segoe UI Emoji, Segoe UI"/>
+
+                    <!-- Progress bar -->
+                    <Border Grid.Row="2" Height="6" Background="#333" CornerRadius="3" Margin="0,0,0,10">
+                        <Border x:Name="ProgressFill" Width="0" Height="6" Background="#FFD700" CornerRadius="3"
+                                HorizontalAlignment="Left"/>
+                    </Border>
+
+                    <!-- Status text -->
+                    <TextBlock x:Name="TxtStatus" Grid.Row="3" Text="Preparando..." FontSize="11" Foreground="#888888"
+                               HorizontalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- Footer -->
+            <Border Grid.Row="2" Background="#0D0D0D" Padding="20,12" CornerRadius="0,0,6,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="TxtInfo" Grid.Column="0" Text="" FontSize="10" Foreground="#666" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnOk" Grid.Column="1" Content="OK" Width="80" Height="30"
+                            IsEnabled="False" Visibility="Collapsed"
+                            Background="#FFD700" Foreground="#1A1A1A" FontWeight="Bold"
+                            BorderThickness="0" Cursor="Hand" Click="BtnOk_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="bdr" Background="#FFD700" CornerRadius="4">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bdr" Property="Opacity" Value="0.85"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
