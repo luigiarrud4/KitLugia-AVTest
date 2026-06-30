@@ -2337,7 +2337,7 @@ namespace KitLugia.GUI
             {
                 await Task.Delay(3000);
                 Logger.Log("[SHRINK] Verificando conclusão do shrink...");
-                bool completed = EmergencyBcdBootManager.IsPreBootCompleted();
+                bool completed = RefindManager.IsPreBootCompleted();
 
                 if (completed)
                 {

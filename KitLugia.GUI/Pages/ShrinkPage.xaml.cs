@@ -182,7 +182,7 @@ namespace KitLugia.GUI.Pages
                     "Shrink - KitLugia", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (reboot == MessageBoxResult.Yes)
-                    await EmergencyBcdBootManager.TriggerReboot();
+                    await RefindManager.TriggerReboot();
             }
             catch (Exception ex)
             {
@@ -218,7 +218,7 @@ namespace KitLugia.GUI.Pages
 
                 AppendLog("=== INSTALAR rEFInd ===");
 
-                var (ok, msg) = await EmergencyBcdBootManager.InstallRefindOnlyAsync();
+                var (ok, msg) = await RefindManager.InstallRefindOnlyAsync();
 
                 if (ok)
                 {
