@@ -494,6 +494,28 @@ namespace KitLugia.GUI.Services
             catch (Exception ex) { ConditionalLog.LogOnce("GetThreadCountOnECores", ex); }
             return count;
         }
+
+        // === Job Object CPU Rate Control (hard cap per-process) ===
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool SetInformationJobObject(IntPtr hJob, int JobObjectInformationClass, IntPtr lpJobObjectInformation, uint cbJobObjectInformationLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
+
+        public const int JobObjectCpuRateControlInformation = 15;
+        public const uint JOB_OBJECT_CPU_RATE_CONTROL_ENABLE = 0x1;
+        public const uint JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP = 0x4;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
+        {
+            public uint ControlFlags;
+            public uint CpuRate;
+        }
     }
 
     public class TrayIconService : IDisposable
@@ -509,6 +531,7 @@ namespace KitLugia.GUI.Services
         private DispatcherTimer? _ramLimiterTimer;
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ProcessRamLimit> _processRamLimits = new();
         private int _ramLimiterIntervalMs = 1000; // Intervalo em milissegundos
+        private readonly Dictionary<string, IntPtr> _cpuJobObjects = new();
         
 
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ProcessInfo> _processCache = new();
@@ -3071,6 +3094,10 @@ namespace KitLugia.GUI.Services
             // Para o timer dedicado do RAM Limiter
             StopRamLimiterTimer();
             
+            // Limpa job objects do limitador de CPU
+            foreach (var job in _cpuJobObjects.Values)
+                Win32Api.CloseHandle(job);
+            _cpuJobObjects.Clear();
 
             StopAdvancedMonitor();
 
@@ -3284,7 +3311,7 @@ namespace KitLugia.GUI.Services
             {
                 Interval = TimeSpan.FromMilliseconds(_ramLimiterIntervalMs)
             };
-            _ramLimiterTimer.Tick += (s, e) => ApplyProcessRamLimits();
+            _ramLimiterTimer.Tick += (s, e) => { ApplyProcessRamLimits(); ApplyProcessCpuLimits(); };
             _ramLimiterTimer.Start();
             KitLugia.Core.Logger.Log($"💾 RAM Limiter timer iniciado ({_ramLimiterIntervalMs}ms)");
         }
@@ -3485,6 +3512,87 @@ namespace KitLugia.GUI.Services
                     }
 
                     foreach (var proc in processes) try { proc.Dispose(); } catch { }
+                }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Aplica o limitador de CPU por Job Object (hard cap) para processos configurados.
+        /// </summary>
+        private void ApplyProcessCpuLimits()
+        {
+            if (_processRamLimits.IsEmpty) return;
+
+            foreach (var limit in _processRamLimits.Values)
+            {
+                if (!limit.Enabled) continue;
+                var cfg = limit.EngineConfig;
+                if (cfg == null || !cfg.CpuLimitEnabled) continue;
+
+                string key = limit.ProcessName.ToLowerInvariant().Replace(".exe", "");
+                int percent = Math.Clamp(cfg.CpuLimitPercent, 1, 99);
+
+                try
+                {
+                    var processes = Process.GetProcessesByName(limit.ProcessName);
+                    if (processes.Length == 0)
+                    {
+                        foreach (var p in processes) p.Dispose();
+                        continue;
+                    }
+
+                    if (_cpuJobObjects.TryGetValue(key, out var existingJob) && existingJob != IntPtr.Zero)
+                    {
+                        Win32Api.CloseHandle(existingJob);
+                    }
+
+                    IntPtr hJob = Win32Api.CreateJobObject(IntPtr.Zero, $"KitLugia_CPULimit_{key}");
+                    if (hJob == IntPtr.Zero)
+                    {
+                        foreach (var p in processes) p.Dispose();
+                        continue;
+                    }
+
+                    var cpuInfo = new Win32Api.JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
+                    {
+                        ControlFlags = Win32Api.JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | Win32Api.JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
+                        CpuRate = (uint)(percent * 100)
+                    };
+
+                    int size = System.Runtime.InteropServices.Marshal.SizeOf(cpuInfo);
+                    IntPtr ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
+                    bool setOk = false;
+                    try
+                    {
+                        System.Runtime.InteropServices.Marshal.StructureToPtr(cpuInfo, ptr, false);
+                        setOk = Win32Api.SetInformationJobObject(hJob, Win32Api.JobObjectCpuRateControlInformation, ptr, (uint)size);
+                    }
+                    finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(ptr); }
+
+                    if (!setOk)
+                    {
+                        Win32Api.CloseHandle(hJob);
+                        foreach (var p in processes) p.Dispose();
+                        continue;
+                    }
+
+                    int assigned = 0;
+                    foreach (var proc in processes)
+                    {
+                        try
+                        {
+                            if (Win32Api.AssignProcessToJobObject(hJob, proc.Handle))
+                                assigned++;
+                        }
+                        catch { }
+                        proc.Dispose();
+                    }
+
+                    if (assigned > 0)
+                        _cpuJobObjects[key] = hJob;
+                    else
+                        Win32Api.CloseHandle(hJob);
                 }
                 catch { }
             }
@@ -4259,6 +4367,8 @@ namespace KitLugia.GUI.Services
             public bool EcoQoSEnabled { get; set; } = false;
             public bool ProBalance { get; set; } = false;
             public int ProBalanceCpuThreshold { get; set; } = 5;
+            public bool CpuLimitEnabled { get; set; } = false;
+            public int CpuLimitPercent { get; set; } = 50;
             public bool NetworkBoost { get; set; } = false;
             public int ThreadMemoryPriority { get; set; } = 0;
             public bool ThreadEfficiencyMode { get; set; } = false;
@@ -4277,6 +4387,8 @@ namespace KitLugia.GUI.Services
         public bool EcoQoSEnabled { get; set; } = false;
         public bool ProBalance { get; set; } = false;
         public int ProBalanceCpuThreshold { get; set; } = 5;
+        public bool CpuLimitEnabled { get; set; } = false;
+        public int CpuLimitPercent { get; set; } = 50;
         public bool NetworkBoost { get; set; } = false;
         public int ThreadMemoryPriority { get; set; } = 0;
         public bool ThreadEfficiencyMode { get; set; } = false; // false=P-cores, true=E-cores

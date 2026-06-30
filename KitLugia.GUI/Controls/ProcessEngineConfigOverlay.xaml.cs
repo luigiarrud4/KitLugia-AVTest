@@ -54,6 +54,9 @@ namespace KitLugia.GUI.Controls
             ChkProBalance.IsChecked = _config.ProBalance;
             TxtProBalanceThreshold.Text = _config.ProBalanceCpuThreshold.ToString();
             PanelProBalanceThreshold.IsEnabled = _config.ProBalance;
+            ChkCpuLimit.IsChecked = _config.CpuLimitEnabled;
+            TxtCpuLimitPercent.Text = _config.CpuLimitPercent.ToString();
+            PanelCpuLimit.IsEnabled = _config.CpuLimitEnabled;
             ChkGameClass.IsChecked = _config.GameClassInfo;
             ChkWin32Priority.IsChecked = _config.Win32PrioritySeparation;
             ChkEcoQoS.IsChecked = _config.EcoQoSEnabled;
@@ -62,6 +65,11 @@ namespace KitLugia.GUI.Controls
         private void ChkProBalance_Checked(object sender, RoutedEventArgs e)
         {
             PanelProBalanceThreshold.IsEnabled = ChkProBalance.IsChecked == true;
+        }
+
+        private void ChkCpuLimit_Checked(object sender, RoutedEventArgs e)
+        {
+            PanelCpuLimit.IsEnabled = ChkCpuLimit.IsChecked == true;
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
@@ -80,6 +88,9 @@ namespace KitLugia.GUI.Controls
             _config.ProBalance = ChkProBalance.IsChecked == true;
             if (int.TryParse(TxtProBalanceThreshold.Text, out int cpuThr) && cpuThr >= 1 && cpuThr <= 100)
                 _config.ProBalanceCpuThreshold = cpuThr;
+            _config.CpuLimitEnabled = ChkCpuLimit.IsChecked == true;
+            if (int.TryParse(TxtCpuLimitPercent.Text, out int cpuLimit) && cpuLimit >= 1 && cpuLimit <= 99)
+                _config.CpuLimitPercent = cpuLimit;
             _config.GameClassInfo = ChkGameClass.IsChecked == true;
             _config.Win32PrioritySeparation = ChkWin32Priority.IsChecked == true;
             _config.EcoQoSEnabled = ChkEcoQoS.IsChecked == true;

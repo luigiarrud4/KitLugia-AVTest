@@ -6,7 +6,7 @@
 
     <Grid Background="#CC000000">
         <Border Background="#1A1A1A" BorderBrush="#FFD700" BorderThickness="1"
-                CornerRadius="10" Width="480" MaxHeight="560"
+                CornerRadius="10" Width="520" MaxHeight="620"
                 HorizontalAlignment="Center" VerticalAlignment="Center">
             <Border.Effect>
                 <DropShadowEffect Color="#FFD700" BlurRadius="20" ShadowDepth="0" Opacity="0.15"/>
@@ -130,6 +130,28 @@
                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
                                      Height="28" FontSize="12" Padding="6,0"/>
                         </Grid>
+
+                        <TextBlock Text="Limitador de CPU" Foreground="#888" FontSize="11" FontWeight="Bold" Margin="0,12,0,4"/>
+                        <CheckBox x:Name="ChkCpuLimit" Content="Limitar uso máximo de CPU (%)" Foreground="#CCC" FontSize="12" Margin="0,3" Checked="ChkCpuLimit_Checked" Unchecked="ChkCpuLimit_Checked"/>
+                        <Grid Margin="20,4,0,0" x:Name="PanelCpuLimit">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="CPU Máximo (%)" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1" x:Name="TxtCpuLimitPercent" Text="50"
+                                     Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                     Height="28" FontSize="12" Padding="6,0"/>
+                        </Grid>
+                        <Border Background="#2A1A1A" BorderBrush="#FF4444" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,8,0,4">
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#FF9999">
+                                <Run Text="⚠️ " FontWeight="Bold"/>
+                                <Run Text="Limita o uso máximo de CPU deste processo pelo Windows Job Object (hard cap). "/>
+                                <Run Text="O processo não ultrapassará o percentual definido, "/>
+                                <Run Text="mas pode causar lentidão em aplicações sensíveis a tempo real. "/>
+                                <Run Text="Recomendado apenas para processos em segundo plano com alto consumo de CPU."/>
+                            </TextBlock>
+                        </Border>
 
                         <TextBlock Text="Recursos Adicionais" Foreground="#888" FontSize="11" FontWeight="Bold" Margin="0,12,0,4"/>
                         <CheckBox x:Name="ChkGameClass" Content="Game Class Info (sinalizar como jogo)" Foreground="#CCC" FontSize="12" Margin="0,3" IsChecked="True"/>
