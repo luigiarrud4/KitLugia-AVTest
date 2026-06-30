@@ -27,7 +27,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\BitsumHighestPerformance.pow" />
     
-    <Content Include="Resources\BootGoodies\**">
+    <Content Include="Resources\BootGoodies\**" Exclude="Resources\BootGoodies\antix\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
