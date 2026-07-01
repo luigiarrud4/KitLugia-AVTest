@@ -423,6 +423,17 @@ exit";
             return null;
         }
 
+        private static char FindFreeDriveLetter(char start = 'K')
+        {
+            var used = DriveInfo.GetDrives().Select(d => d.Name[0]).ToHashSet();
+            for (char c = start; c <= 'Z'; c++)
+            {
+                if (!used.Contains(c))
+                    return c;
+            }
+            return 'Z';
+        }
+
         /// <summary>
         /// Creates a dual-boot USB drive (Easy2Boot style): one FAT32 EFI partition
         /// and one NTFS data partition for ISOs. Both BIOS and UEFI bootable.
@@ -438,16 +449,19 @@ exit";
 
             progress?.Report((0.0, "Criando partições (FAT32 EFI + NTFS Data)..."));
 
+            char efiLetter = FindFreeDriveLetter('K');
+            char dataLetter = FindFreeDriveLetter((char)(efiLetter + 1));
+
             // Script diskpart: clean, create EFI partition (512MB FAT32), rest NTFS
             var diskpartScript = $@"select disk {diskNumber}
 clean
 convert gpt
 create partition efi size=512
 format fs=fat32 quick label=""KITEFI""
-assign letter=""K""
+assign letter=""{efiLetter}""
 create partition primary
 format fs=ntfs quick label=""KITDATA""
-assign letter=""L""
+assign letter=""{dataLetter}""
 exit";
 
             string scriptPath = Path.Combine(Path.GetTempPath(), "kitdualboot.txt");
@@ -463,7 +477,7 @@ exit";
                 progress?.Report((30.0, "Configurando boot UEFI..."));
 
                 // Copy Windows boot files to EFI partition
-                string efiDir = @"K:\EFI\BOOT";
+                string efiDir = $@"{efiLetter}:\EFI\BOOT";
                 Directory.CreateDirectory(efiDir);
 
                 // Use Windows built-in bootx64.efi from System32
@@ -476,11 +490,11 @@ exit";
                 }
 
                 progress?.Report((50.0, "Configurando boot BIOS (bootsect)..."));
-                await RunBootsectIfAvailable("/nt60 K: /force /mbr");
+                await RunBootsectIfAvailable($"/nt60 {efiLetter}: /force /mbr");
 
                 // Copy ISOs to data partition
                 progress?.Report((60.0, "Copiando ISOs..."));
-                string isoDir = @"L:\ISOS";
+                string isoDir = $@"{dataLetter}:\ISOS";
                 Directory.CreateDirectory(isoDir);
 
                 for (int i = 0; i < isoPaths.Count; i++)
@@ -495,7 +509,7 @@ exit";
                 try
                 {
                     await Task.Run(() =>
-                        ProcessRunner.Run("bcdboot", @"K:\Windows /s K: /f UEFI", 30000));
+                        ProcessRunner.Run("bcdboot", $@"{efiLetter}:\Windows /s {efiLetter}: /f UEFI", 30000));
                 }
                 catch { }
 
@@ -505,8 +519,8 @@ exit";
             finally
             {
                 try { File.Delete(scriptPath); } catch { }
-                try { SystemUtils.RunExternalProcess("diskpart", "/c \"select volume K\" & \"remove letter=K\"", true); } catch { }
-                try { SystemUtils.RunExternalProcess("diskpart", "/c \"select volume L\" & \"remove letter=L\"", true); } catch { }
+                try { SystemUtils.RunExternalProcess("diskpart", $"/c \"select volume {efiLetter}\" & \"remove letter={efiLetter}\"", true); } catch { }
+                try { SystemUtils.RunExternalProcess("diskpart", $"/c \"select volume {dataLetter}\" & \"remove letter={dataLetter}\"", true); } catch { }
             }
         }
 

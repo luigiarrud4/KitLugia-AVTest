@@ -1495,6 +1495,8 @@ namespace KitLugia.GUI.Services
                         if (!targets.Contains(boostedPid))
                             DownloadBoostEngine.Revert(boostedPid);
                     }
+
+                    DownloadBoostEngine.CleanupStaleBackups();
                 }
 
                 // 1. Refresh System Stats
@@ -2270,21 +2272,40 @@ namespace KitLugia.GUI.Services
             if (config.NetworkBoost)
                 ApplyNetworkBoostV3();
 
-            // DOWNLOAD BOOST
+            // DOWNLOAD BOOST — amostra tráfego e aplica aos downloaders reais
             if (config.DownloadBoostEnabled)
             {
-                var dlConfig = new DownloadBoostEngine.DownloadBoostConfig
+                try
                 {
-                    Enabled = true,
-                    Level = config.DownloadBoostLevel switch
+                    var trafficSnapshot = NetworkTrafficMonitor.SampleTraffic(pid);
+                    var level = config.DownloadBoostLevel switch
                     {
                         "Download" => DownloadBoostEngine.BoostLevel.Download,
                         "Latency" => DownloadBoostEngine.BoostLevel.Latency,
                         "Balanced" => DownloadBoostEngine.BoostLevel.Balanced,
                         _ => DownloadBoostEngine.BoostLevel.Auto
-                    }
-                };
-                DownloadBoostEngine.Apply(dlConfig, pid);
+                    };
+
+                    var dlConfig = new DownloadBoostEngine.DownloadBoostConfig
+                    {
+                        Enabled = true,
+                        Level = level,
+                        AutoThresholdMBps = 5.0,
+                        ForegroundPid = pid
+                    };
+
+                    var targets = level == DownloadBoostEngine.BoostLevel.Auto
+                        ? DownloadBoostEngine.AutoDecide(trafficSnapshot, dlConfig)
+                        : NetworkTrafficMonitor.GetActiveDownloaders(trafficSnapshot, 5.0)
+                            .Select(p => p.Pid).ToList();
+
+                    foreach (var t in targets)
+                        DownloadBoostEngine.Apply(dlConfig, t);
+                }
+                catch (Exception ex)
+                {
+                    KitLugia.Core.Logger.Log($"⚠️ Download Boost (ApplyBoostCustom): {ex.Message}");
+                }
             }
 
             // GLOBAL Win32PrioritySeparation (não precisa de handle)

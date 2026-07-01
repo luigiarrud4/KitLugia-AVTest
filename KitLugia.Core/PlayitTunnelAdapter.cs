@@ -77,9 +77,10 @@ public sealed class PlayitTunnelAdapter : IDisposable
     /// </summary>
     private async Task<string?> FindPlayitPathAsync()
     {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var possiblePaths = new[]
         {
-            @"C:\Users\Lugia\AppData\Local\Programs\playit\playit.exe",
+            Path.Combine(localAppData, @"Programs\playit\playit.exe"),
             @"C:\Program Files\playit\playit.exe",
             "playit.exe"
         };
@@ -108,7 +109,9 @@ public sealed class PlayitTunnelAdapter : IDisposable
             
             // URL de download direto do GitHub (executável correto)
             var downloadUrl = "https://github.com/playit-cloud/playit-agent/releases/download/v0.17.1/playit-windows-x86_64.exe";
-            var downloadPath = @"C:\Users\Lugia\AppData\Local\Programs\playit\playit.exe";
+            var downloadPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                @"Programs\playit\playit.exe");
             
             // Criar diretório
             var dir = Path.GetDirectoryName(downloadPath);

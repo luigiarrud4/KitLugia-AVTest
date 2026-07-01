@@ -374,7 +374,9 @@ namespace KitLugia.Core
                 // Remove leftover files from WindowsApps
                 try
                 {
-                    string winApps = @"C:\Program Files\WindowsApps";
+                    string winApps = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                        "WindowsApps");
                     if (Directory.Exists(winApps))
                     {
                         foreach (var dir in Directory.GetDirectories(winApps, $"*{packageNameBase}*"))
@@ -484,7 +486,9 @@ namespace KitLugia.Core
 
                 try
                 {
-                    string winApps = @"C:\Program Files\WindowsApps";
+                    string winApps = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                        "WindowsApps");
                     if (Directory.Exists(winApps))
                     {
                         foreach (var dir in Directory.GetDirectories(winApps, $"*{packageNameBase}*"))
@@ -7161,7 +7165,9 @@ namespace KitLugia.Core
                 System.Threading.Thread.Sleep(1000);
 
 
-                string onedriveSetup = @"C:\Windows\System32\OneDriveSetup.exe";
+                string onedriveSetup = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.System),
+                    "OneDriveSetup.exe");
                 if (File.Exists(onedriveSetup))
                 {
                     Process.Start(new ProcessStartInfo
@@ -7219,7 +7225,9 @@ namespace KitLugia.Core
             try
             {
 
-                string onedriveSetup = @"C:\Windows\System32\OneDriveSetup.exe";
+                string onedriveSetup = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.System),
+                    "OneDriveSetup.exe");
                 if (File.Exists(onedriveSetup))
                     return false;
 

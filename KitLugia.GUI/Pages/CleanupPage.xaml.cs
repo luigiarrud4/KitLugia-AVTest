@@ -682,25 +682,22 @@ namespace KitLugia.GUI.Pages
                 BtnCleanEvidence.Content = "⏳";
 
                 int totalItems = 0;
-                int totalErrors = 0;
 
                 await Task.Run(() =>
                 {
                     var results = EvidenceCleaner.CleanAll();
-                    foreach (var (cat, (items, errors)) in results)
+                    foreach (var (cat, items) in results)
                     {
                         var match = selected.FirstOrDefault(s => s.Name == cat);
                         if (match != null)
                         {
                             match.Status = $"{items} itens limpos";
                             totalItems += items;
-                            totalErrors += errors.Count;
                         }
                     }
                 });
 
                 string msg = $"✅ Limpeza concluída!\n\nTotal: {totalItems} itens removidos";
-                if (totalErrors > 0) msg += $"\n⚠️ {totalErrors} erros (itens em uso ignorados)";
                 System.Windows.MessageBox.Show(msg, "Limpeza de Evidncias", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)

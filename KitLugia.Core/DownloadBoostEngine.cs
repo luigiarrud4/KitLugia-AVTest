@@ -67,17 +67,22 @@ namespace KitLugia.Core
         public static bool IsActive => _currentLevel != BoostLevel.Off;
         public static IReadOnlySet<uint> BoostedPids => _activeBoostedPids;
 
-        /// <summary>
-        /// Aplica otimizações. Per-process sempre; system-wide só se config.SystemWideTuning=true.
-        /// </summary>
-        public static (bool Success, string Message) Apply(DownloadBoostConfig config, uint targetPid = 0)
+        public static void CleanupStaleBackups()
+        {
+            foreach (var pid in _processBackup.Keys.ToList())
+            {
+                if (!_activeBoostedPids.Contains(pid))
+                    _processBackup.Remove(pid);
+            }
+        }
+
+        public static void Apply(DownloadBoostConfig config, uint targetPid = 0)
         {
             _activeConfig = config;
             var steps = new List<string>();
-            var errors = new List<string>();
 
             if (!config.Enabled || config.Level == BoostLevel.Off)
-                return (false, "Download Boost desabilitado.");
+                return;
 
             _currentLevel = config.Level;
             _lastApplied = DateTime.Now;
@@ -85,22 +90,20 @@ namespace KitLugia.Core
             if (targetPid > 0)
             {
                 _activeBoostedPids.Add(targetPid);
-                ApplyPerProcess(targetPid, config, steps, errors);
+                ApplyPerProcess(targetPid, config, steps);
             }
 
             if (config.SystemWideTuning)
-                ApplySystemTcp(config, steps, errors);
+                ApplySystemTcp(config, steps);
             else
-                ApplyConservativeSystem(config, steps, errors);
+                ApplyConservativeSystem(config, steps);
 
             string tag = config.SystemWideTuning ? " [FULL]" : " [SAFE]";
-            Logger.Log($"📥 Download Boost [{config.Level}{tag}]: " + string.Join(", ", steps) +
-                (errors.Count > 0 ? $" | Falhas: {string.Join(", ", errors)}" : ""));
-
-            return (errors.Count == 0, string.Join("\n", steps));
+            if (steps.Count > 0)
+                Logger.Log($"📥 Download Boost [{config.Level}{tag}]: " + string.Join(", ", steps));
         }
 
-        private static void ApplyPerProcess(uint pid, DownloadBoostConfig config, List<string> steps, List<string> errors)
+        private static void ApplyPerProcess(uint pid, DownloadBoostConfig config, List<string> steps)
         {
             try
             {
@@ -109,7 +112,6 @@ namespace KitLugia.Core
 
                 var backup = new PerProcessBackup();
 
-                // 1. CPU priority → AboveNormal (não High para não causar starvation)
                 if (config.PerProcessPriority)
                 {
                     try
@@ -122,41 +124,35 @@ namespace KitLugia.Core
                             steps.Add($"CPU: AboveNormal (PID {pid})");
                         }
                     }
-                    catch { errors.Add("CPU priority"); }
+                    catch { }
                 }
 
-                // 2. I/O priority → High (3) — ajuda escrita em disco
                 if (config.PerProcessPriority)
                 {
                     try
                     {
                         IntPtr h = proc.Handle;
-                        uint currentIo = 2; // Normal
                         backup.OriginalIoPriority = 2;
-                        // Tenta ler o I/O priority atual
-                        try { currentIo = (uint)GetProcessIoPriority(h); } catch { }
-                        backup.OriginalIoPriority = (int)currentIo;
-                        SetProcessIoPriority(h, 3u); // High
+                        try { backup.OriginalIoPriority = (int)GetProcessIoPriority(h); } catch { }
+                        SetProcessIoPriority(h, 3u);
                         steps.Add($"I/O: High (PID {pid})");
                     }
-                    catch { errors.Add("I/O priority"); }
+                    catch { }
                 }
 
-                // 3. Page priority → High (5) — mantém páginas do processo em RAM
                 if (config.PerProcessPriority)
                 {
                     try
                     {
                         IntPtr h = proc.Handle;
-                        backup.OriginalPagePriority = 5; // default
+                        backup.OriginalPagePriority = 5;
                         try { backup.OriginalPagePriority = (int)GetProcessPagePriority(h); } catch { }
                         SetProcessPagePriority(h, 5);
                         steps.Add($"Page: High (PID {pid})");
                     }
-                    catch { errors.Add("Page priority"); }
+                    catch { }
                 }
 
-                // 4. EcoQoS — desliga (impede Windows de throttlear o processo)
                 if (config.DisableEcoQoS)
                 {
                     try
@@ -175,23 +171,16 @@ namespace KitLugia.Core
                         backup.EcoQoSWasEnabled = false;
                         steps.Add($"EcoQoS: desligado (PID {pid})");
                     }
-                    catch { errors.Add("EcoQoS"); }
+                    catch { }
                 }
 
                 _processBackup[pid] = backup;
             }
-            catch
-            {
-                errors.Add($"PID {pid} não encontrado");
-            }
+            catch { }
         }
 
-        /// <summary>
-        /// TCP tuning agressivo para throughput máximo.
-        /// </summary>
-        private static void ApplySystemTcp(DownloadBoostConfig config, List<string> steps, List<string> errors)
+        private static void ApplySystemTcp(DownloadBoostConfig config, List<string> steps)
         {
-            // 1. Congestion provider
             if (config.TcpOptimization)
             {
                 try
@@ -208,10 +197,9 @@ namespace KitLugia.Core
                         steps.Add("TCP: CTCP ativado");
                     }
                 }
-                catch { errors.Add("congestion provider"); }
+                catch { }
             }
 
-            // 2. Auto-tuning = normal (max throughput)
             if (config.TcpOptimization)
             {
                 try
@@ -219,10 +207,9 @@ namespace KitLugia.Core
                     SystemUtils.RunExternalProcess("netsh", "int tcp set global autotuninglevel=normal", true);
                     steps.Add("TCP: auto-tuning=normal");
                 }
-                catch { errors.Add("autotuning"); }
+                catch { }
             }
 
-            // 3. RSS
             if (config.RssEnable)
             {
                 try
@@ -233,10 +220,9 @@ namespace KitLugia.Core
                     key?.SetValue("EnableRSS", 1, RegistryValueKind.DWord);
                     steps.Add("RSS: habilitado");
                 }
-                catch { errors.Add("RSS"); }
+                catch { }
             }
 
-            // 4. RSC = enabled
             if (config.RscEnable)
             {
                 try
@@ -244,10 +230,9 @@ namespace KitLugia.Core
                     SystemUtils.RunExternalProcess("netsh", "int tcp set global rsc=enabled", true);
                     steps.Add("RSC: habilitado");
                 }
-                catch { errors.Add("RSC"); }
+                catch { }
             }
 
-            // 5. NetworkThrottling
             if (config.NetworkThrottling)
             {
                 try
@@ -263,10 +248,9 @@ namespace KitLugia.Core
                         steps.Add("NetworkThrottling: desabilitado");
                     }
                 }
-                catch { errors.Add("NetworkThrottling"); }
+                catch { }
             }
 
-            // 6. MaxUserPort + TcpTimedWaitDelay
             if (config.MaxUserPort > 0)
             {
                 try
@@ -282,14 +266,12 @@ namespace KitLugia.Core
                         steps.Add($"MaxUserPort={config.MaxUserPort}, TcpTimedWaitDelay={config.TcpTimedWaitDelay}");
                     }
                 }
-                catch { errors.Add("MaxUserPort"); }
+                catch { }
             }
 
-            // 7. Nagle
             if (config.NagleDisable)
-                ApplyNagleDisable(steps, errors);
+                ApplyNagleDisable(steps);
 
-            // 8. DNS
             if (config.DnsOptimize)
             {
                 try
@@ -297,20 +279,15 @@ namespace KitLugia.Core
                     SystemUtils.RunExternalProcess("ipconfig", "/flushdns", true);
                     steps.Add("DNS: cache limpo");
                 }
-                catch { errors.Add("DNS flush"); }
+                catch { }
             }
         }
 
-        /// <summary>
-        /// TCP tuning conservador — só o que melhora latência sem prejudicar outros processos.
-        /// </summary>
-        private static void ApplyConservativeSystem(DownloadBoostConfig config, List<string> steps, List<string> errors)
+        private static void ApplyConservativeSystem(DownloadBoostConfig config, List<string> steps)
         {
-            // 1. Nagle disable (reduz latência de pacotes pequenos — seguro para TODOS)
             if (config.NagleDisable)
-                ApplyNagleDisable(steps, errors);
+                ApplyNagleDisable(steps);
 
-            // 2. Auto-tuning = disabled (reduz bufferbloat — ajuda o foreground)
             if (config.TcpOptimization)
             {
                 try
@@ -324,10 +301,9 @@ namespace KitLugia.Core
                     SystemUtils.RunExternalProcess("netsh", $"int tcp set global autotuninglevel={level}", true);
                     steps.Add($"TCP: auto-tuning={level} (modo conservador)");
                 }
-                catch { errors.Add("autotuning"); }
+                catch { }
             }
 
-            // 3. RSC = disabled (reduz latência — seguro)
             if (config.RscEnable)
             {
                 try
@@ -335,13 +311,11 @@ namespace KitLugia.Core
                     SystemUtils.RunExternalProcess("netsh", "int tcp set global rsc=disabled", true);
                     steps.Add("RSC: desabilitado (modo conservador)");
                 }
-                catch { errors.Add("RSC"); }
+                catch { }
             }
-
-            // Pula: BBR2, RSS, NetworkThrottling, MaxUserPort, DNS
         }
 
-        private static void ApplyNagleDisable(List<string> steps, List<string> errors)
+        private static void ApplyNagleDisable(List<string> steps)
         {
             try
             {
@@ -369,34 +343,29 @@ namespace KitLugia.Core
                 }
                 steps.Add("Nagle: desabilitado");
             }
-            catch { errors.Add("Nagle"); }
+            catch { }
         }
 
-        /// <summary>
-        /// Reverte tudo — per-process + system TCP.
-        /// </summary>
-        public static (bool Success, string Message) Revert(uint targetPid = 0)
+        public static void Revert(uint targetPid = 0)
         {
             var steps = new List<string>();
 
-            // Reverte per-process
             if (targetPid > 0)
                 RevertPerProcess(targetPid, steps);
 
             if (targetPid > 0)
                 _activeBoostedPids.Remove(targetPid);
 
-            // Se ainda há PIDs ativos, não reverte sistema
             if (_activeBoostedPids.Count > 0)
-                return (true, "Ainda há processos com Download Boost ativo.");
+                return;
 
             RevertSystemTcp(steps);
 
             _currentLevel = BoostLevel.Off;
             _activeConfig = null;
 
-            Logger.Log("🔄 Download Boost: todas as otimizações revertidas. " + string.Join(", ", steps));
-            return (true, string.Join("\n", steps));
+            if (steps.Count > 0)
+                Logger.Log("🔄 Download Boost: todas as otimizações revertidas. " + string.Join(", ", steps));
         }
 
         private static void RevertPerProcess(uint pid, List<string> steps)
@@ -491,7 +460,6 @@ namespace KitLugia.Core
                     }
                 }
 
-                // Reverte Nagle per-interface
                 foreach (var ifKey in lm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces")?.GetSubKeyNames() ?? Array.Empty<string>())
                 {
                     try
@@ -513,9 +481,6 @@ namespace KitLugia.Core
             _registryBackup.Clear();
         }
 
-        /// <summary>
-        /// Decide quais PIDs receberão boost baseado no tráfego + foreground.
-        /// </summary>
         public static List<uint> AutoDecide(NetworkTrafficMonitor.TrafficSnapshot snapshot, DownloadBoostConfig config)
         {
             var targets = new List<uint>();
@@ -537,7 +502,6 @@ namespace KitLugia.Core
                 {
                     targets.Add(proc.Pid);
 
-                    // Só aplica system-wide TCP se o foreground for o próprio downloader
                     if (isForeground)
                         config.SystemWideTuning = true;
 

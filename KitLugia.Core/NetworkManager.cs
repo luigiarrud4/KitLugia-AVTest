@@ -759,104 +759,30 @@ namespace KitLugia.Core
         /// Limpeza segura de rede — não altera configurações permanentes do PC.
         /// Limpa cache DNS, Winsock, TCP/IP, ARP, proxy, certificados SSL e credenciais de rede.
         /// </summary>
-        public static (bool Success, string Message) CleanNetworkSafe()
+        public static string CleanNetworkSafe()
         {
-            var errors = new List<string>();
             var steps = new List<string>();
 
-            try
-            {
-                SystemUtils.RunExternalProcess("ipconfig", "/flushdns", hidden: true);
-                steps.Add("Cache DNS limpo");
-            }
-            catch { errors.Add("flushdns"); }
+            try { SystemUtils.RunExternalProcess("ipconfig", "/flushdns", hidden: true); steps.Add("Cache DNS limpo"); } catch { }
+            try { SystemUtils.RunExternalProcess("netsh", "winsock reset", hidden: true); steps.Add("Winsock resetado"); } catch { }
+            try { SystemUtils.RunExternalProcess("netsh", "int ip reset", hidden: true); steps.Add("TCP/IP resetado"); } catch { }
+            try { SystemUtils.RunExternalProcess("arp", "-d *", hidden: true); steps.Add("Tabela ARP esvaziada"); } catch { }
+            try { SystemUtils.RunExternalProcess("netsh", "winhttp reset proxy", hidden: true); steps.Add("Proxy winhttp resetado"); } catch { }
+            try { SystemUtils.RunExternalProcess("cmdkey", "/list", hidden: true); SystemUtils.RunExternalProcess("cmdkey", "/delete:*", hidden: true); steps.Add("Credenciais de rede limpas"); } catch { }
+            try { SystemUtils.RunExternalProcess("certutil", "-urlcache * delete", hidden: true); steps.Add("Cache SSL limpo"); } catch { }
 
-            try
-            {
-                SystemUtils.RunExternalProcess("netsh", "winsock reset", hidden: true);
-                steps.Add("Winsock resetado");
-            }
-            catch { errors.Add("winsock"); }
-
-            try
-            {
-                SystemUtils.RunExternalProcess("netsh", "int ip reset", hidden: true);
-                steps.Add("TCP/IP resetado");
-            }
-            catch { errors.Add("ipreset"); }
-
-            try
-            {
-                SystemUtils.RunExternalProcess("arp", "-d *", hidden: true);
-                steps.Add("Tabela ARP esvaziada");
-            }
-            catch { errors.Add("arp"); }
-
-            try
-            {
-                SystemUtils.RunExternalProcess("netsh", "winhttp reset proxy", hidden: true);
-                steps.Add("Proxy winhttp resetado");
-            }
-            catch { errors.Add("winhttp"); }
-
-            try
-            {
-                // Limpar credenciais de rede salvas (Windows Credential Manager)
-                SystemUtils.RunExternalProcess("cmdkey", "/list", hidden: true);
-                SystemUtils.RunExternalProcess("cmdkey", "/delete:*", hidden: true);
-                steps.Add("Credenciais de rede limpas");
-            }
-            catch { errors.Add("credenciais"); }
-
-            try
-            {
-                // Limpar cache de certificados SSL (certutil)
-                SystemUtils.RunExternalProcess("certutil", "-urlcache * delete", hidden: true);
-                steps.Add("Cache SSL limpo");
-            }
-            catch { errors.Add("certutil"); }
-
-            var result = "✓ " + string.Join("\n✓ ", steps);
-            if (errors.Count > 0)
-                result += $"\n\n⚠ Falha em: {string.Join(", ", errors)} (podem exigir admin)";
-
-            return (errors.Count == 0, result);
+            return "✓ " + string.Join("\n✓ ", steps);
         }
 
-        /// <summary>
-        /// Limpeza completa de rede — inclui tudo da limpeza segura mais reset completo do firewall.
-        /// ATENÇÃO: netsh advfirewall reset RESTAURA O FIREWALL PARA AS CONFIGURAÇÕES PADRÃO DE FÁBRICA,
-        /// removendo TODAS as regras personalizadas (inbound/outbound) criadas por apps, jogos ou pelo usuário.
-        /// </summary>
-        public static (bool Success, string Message) CleanNetworkFull()
+        public static string CleanNetworkFull()
         {
             var safe = CleanNetworkSafe();
-            var errors = new List<string>();
-            var steps = new List<string>();
+            var steps = new List<string>(safe.Split('\n').Select(l => l.TrimStart('✓', ' ')).Where(l => l.Length > 0));
 
-            steps.AddRange(safe.Message.Split('\n').Select(l => l.TrimStart('✓', ' ')).Where(l => l.Length > 0));
+            try { SystemUtils.RunExternalProcess("netsh", "advfirewall reset", hidden: true); steps.Add("Firewall resetado"); } catch { }
+            try { SystemUtils.RunExternalProcess("netsh", "advfirewall set allprofiles state on", hidden: true); steps.Add("Firewall reativado"); } catch { }
 
-            try
-            {
-                // Reset completo do firewall — remove TODAS as regras personalizadas
-                SystemUtils.RunExternalProcess("netsh", "advfirewall reset", hidden: true);
-                steps.Add("Firewall resetado para padrão de fábrica");
-            }
-            catch { errors.Add("firewall"); }
-
-            try
-            {
-                // Reset também do firewall para perfis públicos/privados/domínio
-                SystemUtils.RunExternalProcess("netsh", "advfirewall set allprofiles state on", hidden: true);
-                steps.Add("Firewall reativado em todos os perfis");
-            }
-            catch { }
-
-            var result = "✓ " + string.Join("\n✓ ", steps);
-            if (errors.Count > 0)
-                result += $"\n\n⚠ Falha em: {string.Join(", ", errors)}";
-
-            return (errors.Count == 0, result);
+            return "✓ " + string.Join("\n✓ ", steps);
         }
     }
 }

@@ -326,9 +326,10 @@ public sealed class UniversalTunnelAdapter : IDisposable
     /// </summary>
     private async Task<string?> FindPlayitPathAsync()
     {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var possiblePaths = new[]
         {
-            @"C:\Users\Lugia\AppData\Local\Programs\playit\playit.exe",
+            Path.Combine(localAppData, @"Programs\playit\playit.exe"),
             @"C:\Program Files\playit\playit.exe",
             "playit.exe"
         };
@@ -349,9 +350,10 @@ public sealed class UniversalTunnelAdapter : IDisposable
     /// </summary>
     private async Task<string?> FindNgrokPathAsync()
     {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var possiblePaths = new[]
         {
-            @"C:\Users\Lugia\AppData\Local\ngrok\ngrok.exe",
+            Path.Combine(localAppData, @"ngrok\ngrok.exe"),
             @"C:\Program Files\ngrok\ngrok.exe",
             "ngrok.exe"
         };
@@ -378,7 +380,9 @@ public sealed class UniversalTunnelAdapter : IDisposable
             
             // URL de download do playit
             var downloadUrl = "https://playit.gg/playit-windows-exe";
-            var downloadPath = @"C:\Users\Lugia\AppData\Local\Programs\playit\playit.exe";
+            var downloadPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                @"Programs\playit\playit.exe");
             
             // Criar diretório
             var dir = System.IO.Path.GetDirectoryName(downloadPath);

@@ -395,10 +395,7 @@ namespace KitLugia.GUI.Pages
 
             mw.ShowInfo("LIMPEZA", "Executando limpeza segura de rede...");
             var result = await Task.Run(() => Toolbox.CleanNetworkSafe());
-            if (result.Success)
-                mw.ShowSuccess("LIMPEZA", result.Message);
-            else
-                mw.ShowInfo("LIMPEZA", result.Message);
+            mw.ShowSuccess("LIMPEZA", result);
         }
 
         private async void BtnCleanNetworkFull_Click(object sender, RoutedEventArgs e)
@@ -428,10 +425,7 @@ namespace KitLugia.GUI.Pages
 
             mw.ShowInfo("LIMPEZA TOTAL", "Executando limpeza completa de rede...");
             var result = await Task.Run(() => Toolbox.CleanNetworkFull());
-            if (result.Success)
-                mw.ShowSuccess("LIMPEZA TOTAL", result.Message);
-            else
-                mw.ShowInfo("LIMPEZA TOTAL", result.Message);
+            mw.ShowSuccess("LIMPEZA TOTAL", result);
         }
 
         // =========================================================

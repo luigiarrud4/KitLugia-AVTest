@@ -200,10 +200,25 @@ public sealed class WMIAdapter : IDisposable
     /// </summary>
     private async Task<string?> FindDevconPathAsync()
     {
+        // Procura no PATH
+        try
+        {
+            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (var dir in pathEnv.Split(Path.PathSeparator))
+            {
+                string candidate = Path.Combine(dir.Trim(), "devcon.exe");
+                if (System.IO.File.Exists(candidate))
+                    return candidate;
+            }
+        }
+        catch { }
+
         var possiblePaths = new[]
         {
-            @"C:\Program Files (x86)\Windows Kits\10\Tools\x64\devcon.exe",
-            @"C:\Program Files\Windows Kits\10\Tools\x64\devcon.exe",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                @"Windows Kits\10\Tools\x64\devcon.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                @"Windows Kits\10\Tools\x64\devcon.exe"),
             "devcon.exe"
         };
 

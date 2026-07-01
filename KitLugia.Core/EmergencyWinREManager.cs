@@ -9,9 +9,12 @@ namespace KitLugia.Core
     [SupportedOSPlatform("windows")]
     public static class EmergencyWinREManager
     {
-        private const string WINRE_WORK_DIR = @"C:\KitLugia\WinRE";
-        private const string WINRE_SOURCE = @"C:\Windows\System32\Recovery\winre.wim";
-        private const string MOUNT_DIR = @"C:\KitLugia\WinRE\Mount";
+        private static string WinreWorkDir => Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "WinRE");
+        private static string WinreSource => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            @"System32\Recovery\winre.wim");
+        private static string MountDir => Path.Combine(WinreWorkDir, "Mount");
         private const string MARKER_FILE = "winre_complete.txt";
         private const string NEW_PARTITION_LABEL = "KITLUGIA";
 
@@ -27,29 +30,29 @@ namespace KitLugia.Core
             try
             {
                 progressCallback?.Invoke(5, "Preparando diretório de trabalho...");
-                Directory.CreateDirectory(WINRE_WORK_DIR);
-                Directory.CreateDirectory(MOUNT_DIR);
+                Directory.CreateDirectory(WinreWorkDir);
+                Directory.CreateDirectory(MountDir);
 
-                string targetWim = Path.Combine(WINRE_WORK_DIR, "winre.wim");
+                string targetWim = Path.Combine(WinreWorkDir, "winre.wim");
 
                 progressCallback?.Invoke(10, "Copiando winre.wim original...");
-                if (!File.Exists(WINRE_SOURCE))
-                    return (false, $"winre.wim não encontrado em {WINRE_SOURCE}");
-                File.Copy(WINRE_SOURCE, targetWim, true);
+                if (!File.Exists(WinreSource))
+                    return (false, $"winre.wim não encontrado em {WinreSource}");
+                File.Copy(WinreSource, targetWim, true);
 
                 progressCallback?.Invoke(20, "Montando imagem WIM via DISM...");
                 var (exitMount, _) = await RunDismAsync(
-                    $"/Mount-Image /ImageFile:\"{targetWim}\" /Index:1 /MountDir:\"{MOUNT_DIR}\"");
+                    $"/Mount-Image /ImageFile:\"{targetWim}\" /Index:1 /MountDir:\"{MountDir}\"");
                 if (exitMount != 0)
                     return (false, $"Falha ao montar WIM. Código: {exitMount}");
 
                 try
                 {
                     progressCallback?.Invoke(40, "Injetando winpeshl.ini...");
-                    string system32Dir = Path.Combine(MOUNT_DIR, "Windows", "System32");
+                    string system32Dir = Path.Combine(MountDir, "Windows", "System32");
                     string winpeshlPath = Path.Combine(system32Dir, "winpeshl.ini");
                     string diskpartScriptPath = Path.Combine(system32Dir, "diskpart_kitlugia.txt");
-                    string markerPath = Path.Combine(MOUNT_DIR, MARKER_FILE);
+                    string markerPath = Path.Combine(MountDir, MARKER_FILE);
 
                     string winpeshlContent = $@"[LaunchApps]
 %SystemRoot%\System32\diskpart.exe /s %SystemRoot%\System32\diskpart_kitlugia.txt
@@ -72,19 +75,19 @@ exit
 
                     progressCallback?.Invoke(70, "Desmontando WIM com commit...");
                     var (exitDismount, outputDismount) = await RunDismAsync(
-                        $"/Unmount-Image /MountDir:\"{MOUNT_DIR}\" /Commit");
+                        $"/Unmount-Image /MountDir:\"{MountDir}\" /Commit");
                     if (exitDismount != 0)
                         return (false, $"Falha ao commitar WIM: {outputDismount}");
                 }
                 catch
                 {
-                    await RunDismAsync($"/Unmount-Image /MountDir:\"{MOUNT_DIR}\" /Discard");
+                    await RunDismAsync($"/Unmount-Image /MountDir:\"{MountDir}\" /Discard");
                     throw;
                 }
 
                 progressCallback?.Invoke(85, "Registrando WinRE modificado via reagentc...");
                 var (exitReagent, outputReagent) = await RunProcessCaptured(
-                    "reagentc", $"/setreimage /path \"{WINRE_WORK_DIR}\" /target \"{WINRE_SOURCE}\"");
+                    "reagentc", $"/setreimage /path \"{WinreWorkDir}\" /target \"{WinreSource}\"");
                 if (exitReagent != 0)
                     return (false, $"Falha ao registrar WinRE: {outputReagent}");
 
@@ -92,7 +95,7 @@ exit
                 var (exitBoot, _) = await RunProcessCaptured("reagentc", "/boottore");
                 if (exitBoot != 0)
                 {
-                    await RunProcessCaptured("reagentc", $"/setreimage /target \"{WINRE_SOURCE}\"");
+                    await RunProcessCaptured("reagentc", $"/setreimage /target \"{WinreSource}\"");
                     return (false, "Falha ao programar boot no WinRE (reagentc /boottore).");
                 }
 
@@ -118,22 +121,22 @@ exit
         {
             try
             {
-                string targetWim = Path.Combine(WINRE_WORK_DIR, "winre.wim");
+                string targetWim = Path.Combine(WinreWorkDir, "winre.wim");
 
                 if (File.Exists(targetWim))
                 {
                     Logger.Log("[EMERGENCY] Restaurando WinRE original...");
                     var (exit, output) = await RunProcessCaptured(
-                        "reagentc", $"/setreimage /target \"{WINRE_SOURCE}\"");
+                        "reagentc", $"/setreimage /target \"{WinreSource}\"");
                     if (exit != 0)
                         Logger.Log($"[EMERGENCY] Aviso: falha ao restaurar WinRE original: {output}");
                     else
                         Logger.Log("[EMERGENCY] WinRE original restaurado.");
                 }
 
-                if (Directory.Exists(WINRE_WORK_DIR))
+                if (Directory.Exists(WinreWorkDir))
                 {
-                    try { Directory.Delete(WINRE_WORK_DIR, true); }
+                    try { Directory.Delete(WinreWorkDir, true); }
                     catch { Logger.Log("[EMERGENCY] Aviso: não foi possível limpar diretório WinRE."); }
                 }
 

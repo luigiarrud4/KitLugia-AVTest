@@ -37,6 +37,22 @@ namespace KitLugia.Core
             public MIB_TCPROW_OWNER_PID table;
         }
 
+        // IPv6: layout é diferente — endereços de 16 bytes + scope id
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MIB_TCP6ROW_OWNER_PID
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+            public byte[] LocalAddr;
+            public uint LocalScopeId;
+            public int LocalPort;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+            public byte[] RemoteAddr;
+            public uint RemoteScopeId;
+            public int RemotePort;
+            public uint State;
+            public uint OwningPid;
+        }
+
         // Performance counters por processo (instance -> counter)
         private static readonly ConcurrentDictionary<string, PerformanceCounter> _ioReadCounters = new();
         private static readonly ConcurrentDictionary<string, PerformanceCounter> _ioWriteCounters = new();
@@ -73,35 +89,53 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Escaneia todas as conexões TCP ativas e retorna contagem por PID.
+        /// Escaneia conexões TCP ativas (IPv4 + IPv6) e retorna contagem por PID.
         /// </summary>
         public static Dictionary<uint, int> GetActiveTcpConnectionsPerPid()
         {
             var result = new Dictionary<uint, int>();
+            EnumerateTcpTable(AF_INET, result);
+            EnumerateTcpTable(AF_INET6, result);
+            return result;
+        }
 
+        private static void EnumerateTcpTable(uint addressFamily, Dictionary<uint, int> result)
+        {
             try
             {
                 int bufferSize = 0;
-                uint ret = GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
-                if (ret != 0 && bufferSize <= 0) return result;
+                uint ret = GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, addressFamily, TCP_TABLE_OWNER_PID_ALL, 0);
+                if (ret != 0 && bufferSize <= 0) return;
 
                 IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
                 try
                 {
-                    ret = GetExtendedTcpTable(buffer, ref bufferSize, false, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
+                    ret = GetExtendedTcpTable(buffer, ref bufferSize, false, addressFamily, TCP_TABLE_OWNER_PID_ALL, 0);
                     if (ret == 0)
                     {
                         int entryCount = Marshal.ReadInt32(buffer);
-                        int entrySize = Marshal.SizeOf<MIB_TCPROW_OWNER_PID>();
+                        bool isIPv6 = addressFamily == AF_INET6;
+                        int entrySize = isIPv6 ? Marshal.SizeOf<MIB_TCP6ROW_OWNER_PID>() : Marshal.SizeOf<MIB_TCPROW_OWNER_PID>();
                         IntPtr current = buffer + 4;
 
                         for (int i = 0; i < entryCount; i++)
                         {
-                            var row = Marshal.PtrToStructure<MIB_TCPROW_OWNER_PID>(current);
-                            uint state = row.State;
+                            uint state, pid;
+                            if (isIPv6)
+                            {
+                                var row = Marshal.PtrToStructure<MIB_TCP6ROW_OWNER_PID>(current);
+                                state = row.State;
+                                pid = row.OwningPid;
+                            }
+                            else
+                            {
+                                var row = Marshal.PtrToStructure<MIB_TCPROW_OWNER_PID>(current);
+                                state = row.State;
+                                pid = row.OwningPid;
+                            }
+
                             if (state == 5 || state == 8)
                             {
-                                uint pid = row.OwningPid;
                                 if (pid > 0)
                                     result[pid] = result.TryGetValue(pid, out int c) ? c + 1 : 1;
                             }
@@ -112,8 +146,6 @@ namespace KitLugia.Core
                 finally { Marshal.FreeHGlobal(buffer); }
             }
             catch { }
-
-            return result;
         }
 
         /// <summary>
@@ -132,6 +164,9 @@ namespace KitLugia.Core
             {
                 var tcpMap = GetActiveTcpConnectionsPerPid();
                 var now = DateTime.Now;
+
+                // Limpa counters de processos que não existem mais
+                CleanupStaleCounters(tcpMap);
 
                 // Só mede processos com conexões TCP ativas
                 foreach (var kvp in tcpMap)
@@ -168,23 +203,7 @@ namespace KitLugia.Core
                         _ioWriteCounters.TryRemove(procName, out _);
                     }
 
-                    // Pega delta do IO total (primeira leitura do perf counter retorna 0)
-                    float readDelta = 0, writeDelta = 0;
-                    bool isFirstSample = false;
-
-                    lock (_cacheLock)
-                    {
-                        if (_lastIoSnapshot.TryGetValue(pid, out var prev))
-                        {
-                            readDelta = Math.Max(0, readPerSec - prev.ReadBytesPerSec);
-                            writeDelta = Math.Max(0, writePerSec - prev.WriteBytesPerSec);
-                        }
-                        else
-                            isFirstSample = true;
-                    }
-
                     bool hasActivity = readPerSec > 1024 || writePerSec > 1024;
-                    bool wasActive = !isFirstSample;
 
                     var stats = new ProcessNetworkStats
                     {
@@ -221,6 +240,36 @@ namespace KitLugia.Core
             catch { }
 
             return snapshot;
+        }
+
+        /// <summary>
+        /// Remove PerformanceCounters de processos que não estão mais no TCP table.
+        /// </summary>
+        private static void CleanupStaleCounters(Dictionary<uint, int> currentTcpMap)
+        {
+            try
+            {
+                var activeNames = new HashSet<string>();
+                foreach (var pid in currentTcpMap.Keys)
+                {
+                    try
+                    {
+                        using var proc = Process.GetProcessById((int)pid);
+                        activeNames.Add(proc.ProcessName);
+                    }
+                    catch { }
+                }
+
+                foreach (var key in _ioReadCounters.Keys.ToList())
+                {
+                    if (!activeNames.Contains(key))
+                    {
+                        if (_ioReadCounters.TryRemove(key, out var c)) c.Dispose();
+                        if (_ioWriteCounters.TryRemove(key, out var c2)) c2.Dispose();
+                    }
+                }
+            }
+            catch { }
         }
 
         /// <summary>

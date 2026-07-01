@@ -22,9 +22,9 @@ namespace KitLugia.Core
             "Visual Studio MRU"
         };
 
-        public static Dictionary<string, (int items, List<string> errors)> CleanAll()
+        public static Dictionary<string, int> CleanAll()
         {
-            var results = new Dictionary<string, (int, List<string>)>();
+            var results = new Dictionary<string, int>();
             results["Recent Documents (MRU)"] = CleanRecentDocs();
             results["RunMRU (Executar)"] = CleanRunMRU();
             results["Typed URLs (Internet Explorer/Edge)"] = CleanTypedURLs();
@@ -39,10 +39,9 @@ namespace KitLugia.Core
             return results;
         }
 
-        public static (int items, List<string> errors) CleanRecentDocs()
+        public static int CleanRecentDocs()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs", true);
@@ -51,13 +50,11 @@ namespace KitLugia.Core
                     var names = key.GetValueNames();
                     foreach (var n in names)
                     {
-                        try { key.DeleteValue(n); count++; } catch (Exception ex) { errors.Add($"RecentDocs value: {ex.Message}"); }
+                        try { key.DeleteValue(n); count++; } catch { }
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"RecentDocs: {ex.Message}"); }
-
-            // Limpa também a pasta Recent
+            catch { }
             try
             {
                 string recent = Environment.GetFolderPath(Environment.SpecialFolder.Recent);
@@ -67,13 +64,12 @@ namespace KitLugia.Core
                 }
             }
             catch { }
-            return (count, errors);
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanRunMRU()
+        public static int CleanRunMRU()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU", true);
@@ -84,19 +80,18 @@ namespace KitLugia.Core
                     {
                         if (n != "MRUListEx")
                         {
-                            try { key.DeleteValue(n); count++; } catch (Exception ex) { errors.Add($"RunMRU: {ex.Message}"); }
+                            try { key.DeleteValue(n); count++; } catch { }
                         }
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"RunMRU key: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanTypedURLs()
+        public static int CleanTypedURLs()
         {
             int count = 0;
-            var errors = new List<string>();
             string[] paths = {
                 @"Software\Microsoft\Internet Explorer\TypedURLs",
                 @"Software\Microsoft\Internet Explorer\TypedURLsTime",
@@ -116,13 +111,12 @@ namespace KitLugia.Core
                 }
                 catch { }
             }
-            return (count, errors);
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanUserAssist()
+        public static int CleanUserAssist()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 string[] guidPaths = {
@@ -143,14 +137,13 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"UserAssist: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanBagMRU()
+        public static int CleanBagMRU()
         {
             int count = 0;
-            var errors = new List<string>();
             string[] mruPaths = {
                 @"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\BagMRU",
                 @"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\Bags",
@@ -174,13 +167,12 @@ namespace KitLugia.Core
                 }
                 catch { }
             }
-            return (count, errors);
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanJumpLists()
+        public static int CleanJumpLists()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 string jlDir = Path.Combine(
@@ -190,7 +182,7 @@ namespace KitLugia.Core
                 {
                     foreach (var f in Directory.GetFiles(jlDir, "*.automaticDestinations-ms"))
                     {
-                        try { File.Delete(f); count++; } catch (Exception ex) { errors.Add($"JumpList: {ex.Message}"); }
+                        try { File.Delete(f); count++; } catch { }
                     }
                 }
                 string customDir = Path.Combine(
@@ -204,14 +196,13 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"JumpLists dir: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanWindowsTimeline()
+        public static int CleanWindowsTimeline()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 string timelineDb = Path.Combine(
@@ -221,7 +212,6 @@ namespace KitLugia.Core
                 {
                     File.Delete(timelineDb); count++;
                 }
-                // Tenta também outros perfis
                 string cdpDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "ConnectedDevicesPlatform");
@@ -236,14 +226,13 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"Timeline: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanClipboardHistory()
+        public static int CleanClipboardHistory()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 string clipDir = Path.Combine(
@@ -257,14 +246,13 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"Clipboard: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanPrefetch()
+        public static int CleanPrefetch()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 string prefetch = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Prefetch");
@@ -276,14 +264,13 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"Prefetch: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
 
-        public static (int items, List<string> errors) CleanOfficeMRU()
+        public static int CleanOfficeMRU()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 using var officeKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Office", true);
@@ -306,19 +293,18 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch (Exception ex) { errors.Add($"Office MRU: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
 
         private static string GetOfficeAppMRUPrefix(string version)
         {
-            return "Word"; // Simplificado - cobre Word MRU como exemplo
+            return "Word";
         }
 
-        public static (int items, List<string> errors) CleanVisualStudioMRU()
+        public static int CleanVisualStudioMRU()
         {
             int count = 0;
-            var errors = new List<string>();
             try
             {
                 string[] vsVersions = { "VisualStudio", "VisualStudio_D14", "VisualStudio_D15", "VisualStudio_D16", "VisualStudio_D17" };
@@ -338,8 +324,8 @@ namespace KitLugia.Core
                     catch { }
                 }
             }
-            catch (Exception ex) { errors.Add($"VS MRU: {ex.Message}"); }
-            return (count, errors);
+            catch { }
+            return count;
         }
     }
 }

@@ -274,7 +274,10 @@ namespace KitLugia.Core
         {
             try
             {
-                var cpuCounter = new PerformanceCounter("Processor Information", "% Processor Time", "_Total");
+                string category = PerformanceCounterCategory.Exists("Processor Information")
+                    ? "Processor Information"
+                    : "Processor";
+                var cpuCounter = new PerformanceCounter(category, "% Processor Time", "_Total");
                 cpuCounter.NextValue();
                 Thread.Sleep(200);
                 double cpu = cpuCounter.NextValue();
