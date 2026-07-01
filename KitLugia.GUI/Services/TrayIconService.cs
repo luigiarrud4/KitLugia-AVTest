@@ -674,6 +674,9 @@ namespace KitLugia.GUI.Services
         public bool FocusAssistEnabled { get; set; } = false;
         public bool TimerBoost { get; set; } = false;
         public bool NetworkBoost { get; set; } = false;
+        public bool DownloadBoostEnabled { get; set; } = false;
+        public string DownloadBoostLevel { get; set; } = "Auto";
+        public double DownloadBoostThreshold { get; set; } = 5.0;
         public bool ProBalance { get; set; } = false;
         public bool TurboBootEnabled
         {
@@ -1272,6 +1275,9 @@ namespace KitLugia.GUI.Services
                 key.SetValue("FocusAssist", FocusAssistEnabled ? 1 : 0);
                 key.SetValue("TimerBoost", TimerBoost ? 1 : 0);
                 key.SetValue("NetworkBoost", NetworkBoost ? 1 : 0);
+                key.SetValue("DownloadBoostEnabled", DownloadBoostEnabled ? 1 : 0);
+                key.SetValue("DownloadBoostLevel", DownloadBoostLevel);
+                key.SetValue("DownloadBoostThreshold", DownloadBoostThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 key.SetValue("ProBalance", ProBalance ? 1 : 0);
                 key.SetValue("TurboBoot", TurboBootEnabled ? 1 : 0);
                 key.SetValue("TurboShutdown", TurboShutdownEnabled ? 1 : 0);
@@ -1362,6 +1368,10 @@ namespace KitLugia.GUI.Services
                 FocusAssistEnabled = (int)key.GetValue("FocusAssist", 0) == 1;
                 TimerBoost = (int)key.GetValue("TimerBoost", 0) == 1;
                 NetworkBoost = (int)key.GetValue("NetworkBoost", 0) == 1;
+                DownloadBoostEnabled = (int)key.GetValue("DownloadBoostEnabled", 0) == 1;
+                DownloadBoostLevel = (string)key.GetValue("DownloadBoostLevel", "Auto");
+                double.TryParse((string)key.GetValue("DownloadBoostThreshold", "5.0"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var dbt);
+                DownloadBoostThreshold = dbt > 0 ? dbt : 5.0;
                 ProBalance = (int)key.GetValue("ProBalance", 0) == 1;
                 
 
@@ -1444,6 +1454,49 @@ namespace KitLugia.GUI.Services
         {
             try
             {
+                // 0. Download Boost Auto-Detection
+                if (DownloadBoostEnabled)
+                {
+                    uint fgPid = GamePriorityEnabled ? _currentBoostedPid : 0;
+                    var trafficSnapshot = NetworkTrafficMonitor.SampleTraffic(fgPid > 0 ? fgPid : null);
+                    var level = DownloadBoostLevel switch
+                    {
+                        "Download" => DownloadBoostEngine.BoostLevel.Download,
+                        "Latency" => DownloadBoostEngine.BoostLevel.Latency,
+                        "Balanced" => DownloadBoostEngine.BoostLevel.Balanced,
+                        _ => DownloadBoostEngine.BoostLevel.Auto
+                    };
+
+                    bool systemWide = level switch
+                    {
+                        DownloadBoostEngine.BoostLevel.Download => true,
+                        _ => false
+                    };
+
+                    var config = new DownloadBoostEngine.DownloadBoostConfig
+                    {
+                        Enabled = true,
+                        Level = level,
+                        AutoThresholdMBps = DownloadBoostThreshold,
+                        ForegroundPid = fgPid,
+                        SystemWideTuning = systemWide
+                    };
+
+                    var targets = level == DownloadBoostEngine.BoostLevel.Auto
+                        ? DownloadBoostEngine.AutoDecide(trafficSnapshot, config)
+                        : NetworkTrafficMonitor.GetActiveDownloaders(trafficSnapshot, DownloadBoostThreshold)
+                            .Select(p => p.Pid).ToList();
+
+                    foreach (var pid in targets)
+                        DownloadBoostEngine.Apply(config, pid);
+
+                    foreach (var boostedPid in DownloadBoostEngine.BoostedPids.ToList())
+                    {
+                        if (!targets.Contains(boostedPid))
+                            DownloadBoostEngine.Revert(boostedPid);
+                    }
+                }
+
                 // 1. Refresh System Stats
                 var stats = MemoryOptimizer.GetMemoryStats();
                 int usedPercent = stats.Percent;
@@ -2216,6 +2269,23 @@ namespace KitLugia.GUI.Services
             // GLOBAL NETWORK BOOST (não precisa de handle)
             if (config.NetworkBoost)
                 ApplyNetworkBoostV3();
+
+            // DOWNLOAD BOOST
+            if (config.DownloadBoostEnabled)
+            {
+                var dlConfig = new DownloadBoostEngine.DownloadBoostConfig
+                {
+                    Enabled = true,
+                    Level = config.DownloadBoostLevel switch
+                    {
+                        "Download" => DownloadBoostEngine.BoostLevel.Download,
+                        "Latency" => DownloadBoostEngine.BoostLevel.Latency,
+                        "Balanced" => DownloadBoostEngine.BoostLevel.Balanced,
+                        _ => DownloadBoostEngine.BoostLevel.Auto
+                    }
+                };
+                DownloadBoostEngine.Apply(dlConfig, pid);
+            }
 
             // GLOBAL Win32PrioritySeparation (não precisa de handle)
             if (config.Win32PrioritySeparation)
@@ -4374,6 +4444,8 @@ namespace KitLugia.GUI.Services
             public bool ThreadEfficiencyMode { get; set; } = false;
             public bool GameClassInfo { get; set; } = true;
             public bool Win32PrioritySeparation { get; set; } = true;
+            public bool DownloadBoostEnabled { get; set; } = false;
+            public string DownloadBoostLevel { get; set; } = "Auto";
         }
     }
 
@@ -4391,8 +4463,10 @@ namespace KitLugia.GUI.Services
         public int CpuLimitPercent { get; set; } = 50;
         public bool NetworkBoost { get; set; } = false;
         public int ThreadMemoryPriority { get; set; } = 0;
-        public bool ThreadEfficiencyMode { get; set; } = false; // false=P-cores, true=E-cores
-        public bool GameClassInfo { get; set; } = true; // Sinaliza ao Windows como jogo
-        public bool Win32PrioritySeparation { get; set; } = true; // Registry scheduler boost
+        public bool ThreadEfficiencyMode { get; set; } = false;
+        public bool GameClassInfo { get; set; } = true;
+        public bool Win32PrioritySeparation { get; set; } = true;
+        public bool DownloadBoostEnabled { get; set; } = false;
+        public string DownloadBoostLevel { get; set; } = "Auto";
     }
 }

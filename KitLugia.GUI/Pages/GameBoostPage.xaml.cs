@@ -339,6 +339,22 @@ namespace KitLugia.GUI.Pages
                 }
                 
                 if (ChkGameBarPresenceWriter != null) ChkGameBarPresenceWriter.IsChecked = gameBarDisabled;
+
+                // Restaura estado do Download Boost
+                if (TglDownloadBoost != null && mw?.TrayService != null)
+                {
+                    TglDownloadBoost.IsChecked = mw.TrayService.DownloadBoostEnabled;
+                    PanelDownloadBoostOptions.Visibility = mw.TrayService.DownloadBoostEnabled ? Visibility.Visible : Visibility.Collapsed;
+                    var level = mw.TrayService.DownloadBoostLevel ?? "Auto";
+                    CboDownloadBoostMode.SelectedIndex = level switch
+                    {
+                        "Download" => 1,
+                        "Latency" => 2,
+                        "Balanced" => 3,
+                        _ => 0
+                    };
+                    TxtDownloadBoostThreshold.Text = mw.TrayService.DownloadBoostThreshold.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+                }
                 
                 // Atualiza indicador de status
                 if (gameBoostEnabled)
@@ -405,6 +421,18 @@ namespace KitLugia.GUI.Pages
                     mw.TrayService.ProBalance = ChkProBalance?.IsChecked == true;
                     // Persiste a preferência do GameBarPresenceWriter para verificação automática
                     mw.TrayService.GameBarPresenceWriterDisabled = ChkGameBarPresenceWriter?.IsChecked == true;
+                    mw.TrayService.DownloadBoostEnabled = TglDownloadBoost?.IsChecked == true;
+                    var boostLevel = CboDownloadBoostMode.SelectedIndex switch
+                    {
+                        1 => "Download",
+                        2 => "Latency",
+                        3 => "Balanced",
+                        _ => "Auto"
+                    };
+                    mw.TrayService.DownloadBoostLevel = boostLevel;
+                    if (double.TryParse(TxtDownloadBoostThreshold?.Text, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double thr) && thr > 0)
+                        mw.TrayService.DownloadBoostThreshold = thr;
                     mw.TrayService.SaveSettings();
                 }
                 
@@ -767,6 +795,45 @@ namespace KitLugia.GUI.Pages
             }
         }
         
+
+        private void TglDownloadBoost_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService == null) return;
+
+            bool enabled = TglDownloadBoost.IsChecked == true;
+            mw.TrayService.DownloadBoostEnabled = enabled;
+            PanelDownloadBoostOptions.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+            KitLugia.Core.Logger.Log($"📥 Download Boost {(enabled ? "ativado" : "desativado")}");
+        }
+
+        private void CboDownloadBoostMode_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService == null) return;
+            var level = CboDownloadBoostMode.SelectedIndex switch
+            {
+                1 => "Download",
+                2 => "Latency",
+                3 => "Balanced",
+                _ => "Auto"
+            };
+            mw.TrayService.DownloadBoostLevel = level;
+        }
+
+        private void TxtDownloadBoostThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService == null) return;
+            if (double.TryParse(TxtDownloadBoostThreshold.Text, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double val) && val > 0)
+            {
+                mw.TrayService.DownloadBoostThreshold = val;
+            }
+        }
 
         private void UpdateProBalanceStatusText(bool isEnabled)
         {
