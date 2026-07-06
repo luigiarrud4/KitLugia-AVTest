@@ -535,9 +535,9 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool active = ChkDisableLockScreen.IsChecked == true;
             using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Personalization");
-            if (active)
+            if (key != null && active)
                 key.SetValue("NoLockScreen", 1, RegistryValueKind.DWord);
-            else
+            else if (key != null)
                 key.DeleteValue("NoLockScreen", false);
             UpdateLabel(StatusDisableLockScreen, active);
             ShowInfo("Lock Screen", active ? "Tela de bloqueio removida." : "Restaurada.");
@@ -548,9 +548,9 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool active = ChkDisableToast.IsChecked == true;
             using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Explorer");
-            if (active)
+            if (key != null && active)
                 key.SetValue("DisableNotificationCenter", 1, RegistryValueKind.DWord);
-            else
+            else if (key != null)
                 key.DeleteValue("DisableNotificationCenter", false);
             UpdateLabel(StatusDisableToast, active);
             ShowInfo("Toast", active ? "Notificações toast desativadas." : "Restauradas.");
@@ -1220,8 +1220,8 @@ namespace KitLugia.GUI.Pages
         {
             if (_isLoading) return;
             bool active = ChkBlockCortana.IsChecked == true;
-            var search = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Windows Search");
-            if (active)
+            using var search = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Windows Search");
+            if (search != null && active)
             {
                 search.SetValue("AllowCortana", 0, RegistryValueKind.DWord);
                 search.SetValue("AllowCloudSearch", 0, RegistryValueKind.DWord);
@@ -1230,7 +1230,7 @@ namespace KitLugia.GUI.Pages
                 search.SetValue("ConnectedSearchUseWeb", 0, RegistryValueKind.DWord);
                 search.SetValue("DisableWebSearch", 0, RegistryValueKind.DWord);
             }
-            else
+            else if (search != null)
             {
                 search.DeleteValue("AllowCortana", false);
                 search.DeleteValue("AllowCloudSearch", false);
@@ -1248,9 +1248,9 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool active = ChkDisableActivityFeed.IsChecked == true;
             using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\System");
-            if (active)
+            if (key != null && active)
                 key.SetValue("EnableActivityFeed", 0, RegistryValueKind.DWord);
-            else
+            else if (key != null)
                 key.DeleteValue("EnableActivityFeed", false);
             UpdateLabel(StatusDisableActivityFeed, active);
             ShowInfo("Activity Feed", active ? "Activity Feed desativado (histórico não é mais coletado)." : "Restaurado.");
@@ -1261,9 +1261,9 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool active = ChkDisableWindowsFeeds.IsChecked == true;
             using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Windows Feeds");
-            if (active)
+            if (key != null && active)
                 key.SetValue("EnableFeeds", 0, RegistryValueKind.DWord);
-            else
+            else if (key != null)
                 key.DeleteValue("EnableFeeds", false);
             UpdateLabel(StatusDisableWindowsFeeds, active);
             ShowInfo("Feeds", active ? "Windows Feeds (News & Interests) desativado." : "Restaurado.");
@@ -1274,9 +1274,9 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool active = ChkBlockAdvertisingId.IsChecked == true;
             using var key = Registry.LocalMachine.CreateSubKey(@"Software\Policies\Microsoft\Windows\AdvertisingInfo");
-            if (active)
+            if (key != null && active)
                 key.SetValue("DisabledByGroupPolicy", 1, RegistryValueKind.DWord);
-            else
+            else if (key != null)
                 key.DeleteValue("DisabledByGroupPolicy", false);
             UpdateLabel(StatusBlockAdvertisingId, active);
             ShowInfo("Advertising ID", active ? "Advertising ID bloqueado por política de grupo." : "Restaurado.");
@@ -1287,12 +1287,12 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool active = ChkDisableConsumerFeatures.IsChecked == true;
             using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\CloudContent");
-            if (active)
+            if (key != null && active)
             {
                 key.SetValue("DisableWindowsConsumerFeatures", 1, RegistryValueKind.DWord);
                 key.SetValue("DisableThirdPartySuggestions", 1, RegistryValueKind.DWord);
             }
-            else
+            else if (key != null)
             {
                 key.DeleteValue("DisableWindowsConsumerFeatures", false);
                 key.DeleteValue("DisableThirdPartySuggestions", false);
@@ -1306,13 +1306,13 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool active = ChkDisableErrorReporting.IsChecked == true;
             using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting");
-            if (active)
+            if (key != null && active)
             {
                 key.SetValue("Disabled", 1, RegistryValueKind.DWord);
                 key.SetValue("DoReport", 0, RegistryValueKind.DWord);
                 key.SetValue("LoggingDisabled", 1, RegistryValueKind.DWord);
             }
-            else
+            else if (key != null)
             {
                 key.DeleteValue("Disabled", false);
                 key.DeleteValue("DoReport", false);

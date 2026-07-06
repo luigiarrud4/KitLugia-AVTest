@@ -17,6 +17,7 @@ using System.Windows.Threading;
 using KitLugia.Core;
 using KitLugia.GUI.Controls;
 using KitLugia.GUI.Pages;
+using KitLugia.GUI.Pages.WindowsSettings;
 using KitLugia.GUI.Services;
 using MessageBox = System.Windows.MessageBox;
 using Button = System.Windows.Controls.Button;
@@ -123,7 +124,7 @@ namespace KitLugia.GUI
         Apps,
         Storage,
         Network,
-        Games,
+        Windows,
         Tools,
         GameBoost,
         Services,
@@ -181,6 +182,8 @@ namespace KitLugia.GUI
 
 
         private CancellationTokenSource? _backgroundTasksCts;
+
+        private bool _isShuttingDown;
 
         // GoodbyeDPI
         private Process? _goodbyeDpiProcess;
@@ -557,8 +560,12 @@ namespace KitLugia.GUI
 
             _backgroundTasksCts = new CancellationTokenSource();
 
-            // Carrega configurações do GoodbyeDPI
-            LoadGoodbyeDPIConfig();
+            // Defer GoodbyeDPI config load — not needed for tray icon startup
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { LoadGoodbyeDPIConfig(); }
+                catch (Exception ex) { Logger.Log($"⚠️ Erro GoodbyeDPI init: {ex.Message}"); }
+            }), DispatcherPriority.Background);
 
             // Conecta o Logger do Core ao Console da GUI
             _logHandler = (msg) => ConsoleManager.WriteLine(msg);
@@ -620,7 +627,18 @@ namespace KitLugia.GUI
                     NavigateToPage(PageType.TraySettings);
                 });
             };
-            _trayService.Initialize();
+            // Defer heavy tray init to Background priority so window appears faster
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    _trayService.Initialize();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"⚠️ Erro na inicialização do TrayIconService: {ex.Message}");
+                }
+            }), DispatcherPriority.Background);
 
 
             // O GameBoost continua funcionando mesmo com a janela minimizada
@@ -630,38 +648,50 @@ namespace KitLugia.GUI
 
             // IsAutoStartEnabled() detecta o mismatch e retorna false. Nesse caso, re-registramos
             // automaticamente com o caminho atual para que o auto-start não suma silenciosamente.
-            if (TrayIconService.IsTrayEnabledStatic())
+            // Move Process.MainModule.FileName (~10-100ms Win32 query) to background thread.
+            var trayActive = TrayIconService.IsTrayEnabledStatic();
+            if (trayActive)
             {
-                var currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                Logger.Log($"KitLugia iniciado: {currentPath}");
                 Logger.Log($"Tray ativo: true");
 
-                // Auto-start registration via Task Scheduler COM — defer off UI thread
-                _ = Task.Run(() => TrayIconService.SetAutoStart(true));
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        var currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                        Logger.Log($"KitLugia iniciado: {currentPath}");
+                        TrayIconService.SetAutoStart(true);
+                    }
+                    catch { }
+                });
                 
 
-                _healthCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-                _healthCheckTimer.Tick += (s, e) =>
+                // Health check deferred to idle priority — don't block tray startup
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    _healthCheckTimer?.Stop();
-                    if (_trayService != null && !_trayService.IsTrayIconHealthy())
+                    _healthCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                    _healthCheckTimer.Tick += (s, e) =>
                     {
-                        Logger.Log("❌ Tray Icon não está saudável, tentando recuperar...");
-                        if (_trayService.RecoverTrayIcon())
+                        _healthCheckTimer?.Stop();
+                        if (_trayService != null && !_trayService.IsTrayIconHealthy())
                         {
-                            Logger.Log("✅ Tray Icon recuperado com sucesso");
+                            Logger.Log("❌ Tray Icon não está saudável, tentando recuperar...");
+                            if (_trayService.RecoverTrayIcon())
+                            {
+                                Logger.Log("✅ Tray Icon recuperado com sucesso");
+                            }
+                            else
+                            {
+                                Logger.Log("❌ Falha na recuperação do Tray Icon");
+                            }
                         }
                         else
                         {
-                            Logger.Log("❌ Falha na recuperação do Tray Icon");
+                            Logger.Log("✅ Tray Icon está saudável");
                         }
-                    }
-                    else
-                    {
-                        Logger.Log("✅ Tray Icon está saudável");
-                    }
-                };
-                _healthCheckTimer.Start();
+                    };
+                    _healthCheckTimer.Start();
+                }), DispatcherPriority.Background);
             }
 
 
@@ -863,7 +893,7 @@ namespace KitLugia.GUI
                 AppsPage => PageType.Apps,
                 CleanupPage => PageType.Storage,
                 NetworkPage => PageType.Network,
-                GamesPage => PageType.Games,
+                WindowsPage => PageType.Windows,
                 ServicesPage => PageType.Services,
                 RepairsPage => PageType.Repairs,
                 DriversPage => PageType.Drivers,
@@ -885,7 +915,7 @@ namespace KitLugia.GUI
                 PageType.Apps => new AppsPage(),
                 PageType.Storage => new CleanupPage(),
                 PageType.Network => new NetworkPage(),
-                PageType.Games => new GamesPage(),
+                PageType.Windows => new WindowsPage(),
                 PageType.Services => new ServicesPage(),
                 PageType.Repairs => new RepairsPage(),
                 PageType.Drivers => new DriversPage(),
@@ -972,7 +1002,7 @@ namespace KitLugia.GUI
             ["📱"] = PageType.Apps,
             ["💿"] = PageType.Storage,
             ["🌐"] = PageType.Network,
-            ["🎮"] = PageType.Games,
+            ["🪟"] = PageType.Windows,
             ["🛡️"] = PageType.Services,
             ["🔧"] = PageType.Repairs,
             ["💾"] = PageType.Drivers,
@@ -1045,7 +1075,7 @@ namespace KitLugia.GUI
             else if (MainFrame.Content is AppsPage) BtnApps.IsChecked = true;
             else if (MainFrame.Content is CleanupPage) BtnStorage.IsChecked = true;
             else if (MainFrame.Content is NetworkPage) BtnNetwork.IsChecked = true;
-            else if (MainFrame.Content is GamesPage) BtnGames.IsChecked = true;
+            else if (MainFrame.Content is WindowsPage) BtnGames.IsChecked = true;
             else if (MainFrame.Content is ServicesPage) BtnServices.IsChecked = true;
             else if (MainFrame.Content is RepairsPage) BtnRepairs.IsChecked = true;
             else if (MainFrame.Content is DriversPage) BtnDrivers.IsChecked = true;
@@ -1118,7 +1148,7 @@ namespace KitLugia.GUI
                 PageType.Apps => new AppsPage(),
                 PageType.Storage => new CleanupPage(),
                 PageType.Network => new NetworkPage(),
-                PageType.Games => new GamesPage(),
+                PageType.Windows => new WindowsPage(),
                 PageType.Tools => new ToolsPage(tabIndex),
                 PageType.GameBoost => new GameBoostPage(),
                 PageType.Services => new ServicesPage(tabIndex),
@@ -1202,9 +1232,7 @@ namespace KitLugia.GUI
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
-            // Minimiza para a bandeja em vez de fechar
-            Hide();
-            _trayService?.ShowMinimizedNotification();
+            Close(); // Window_Closing trata o CloseToTray / Notificação Wiki:
         }
         private void BtnMaximize_Click(object sender, RoutedEventArgs e) => WindowState = (WindowState == WindowState.Normal) ? WindowState.Maximized : WindowState.Normal;
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -1395,7 +1423,7 @@ namespace KitLugia.GUI
                 else
                 {
                     // Verificar se ESET está instalado (incompatível)
-                    string esetPath = @"C:\Program Files\ESET\ESET Security\ekrn.exe";
+                    string esetPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "ESET", "ESET Security", "ekrn.exe");
                     if (System.IO.File.Exists(esetPath))
                     {
                         var result = MessageBox.Show(
@@ -2615,11 +2643,14 @@ namespace KitLugia.GUI
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (_isShuttingDown) return;
+
             // Verificar se deve minimizar para tray em vez de fechar
             if (TrayService != null && TrayService.CloseToTray && TrayService.IsTrayEnabled)
             {
                 e.Cancel = true; // Cancelar o fechamento
                 this.Hide(); // Minimizar para tray
+                try { _trayService?.ShowMinimizedNotification(); } catch { }
                 KitLugia.Core.Logger.Log("🔔 Janela minimizada para Tray (Close to Tray ativado)");
             }
             else
@@ -2632,6 +2663,16 @@ namespace KitLugia.GUI
         {
             Cleanup();
             base.OnClosed(e);
+        }
+
+        /// <summary>
+        /// Encerra o aplicativo corretamente, respeitando ou bypassando CloseToTray.
+        /// </summary>
+        public void ForceShutdown()
+        {
+            _isShuttingDown = true;
+            try { _trayService?.Dispose(); } catch { }
+            Application.Current.Shutdown();
         }
 
         #endregion

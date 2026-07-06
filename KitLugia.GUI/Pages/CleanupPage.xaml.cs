@@ -955,8 +955,17 @@ namespace KitLugia.GUI.Pages
                     var ai = KitLugia.Core.StartupManager.GetAppInitDlls();
                     var bho = KitLugia.Core.StartupManager.GetBHOItems();
                     var be = KitLugia.Core.StartupManager.GetBootExecuteItems();
-                    return (winlogon: wl, appinit: ai, bho: bho, bootExec: be);
+                    var kd = KitLugia.Core.StartupManager.GetKnownDllsItems();
+                    var ssodl = KitLugia.Core.StartupManager.GetShellServiceObjectDelayLoad();
+                    var seh = KitLugia.Core.StartupManager.GetShellExecuteHooks();
+                    var cmh = KitLugia.Core.StartupManager.GetContextMenuHandlers();
+                    return (winlogon: wl, appinit: ai, bho: bho, bootExec: be,
+                            knownDlls: kd, ssodl: ssodl, shellExecHooks: seh, contextMenu: cmh);
                 });
+
+                int total = result.winlogon.Count + result.appinit.Count + result.bho.Count +
+                            result.bootExec.Count + result.knownDlls.Count + result.ssodl.Count +
+                            result.shellExecHooks.Count + result.contextMenu.Count;
 
                 var sb = new System.Text.StringBuilder();
                 sb.AppendLine("=== Locais Avançados de Inicialização ===\n");
@@ -977,14 +986,34 @@ namespace KitLugia.GUI.Pages
                 foreach (var item in result.bootExec)
                     sb.AppendLine($"  {item.Name}: {item.FullCommand}");
 
-                AddLog($"✅ Scan concluído: {result.winlogon.Count + result.appinit.Count + result.bho.Count + result.bootExec.Count} itens.");
+                sb.AppendLine($"\n── KnownDLLs ({result.knownDlls.Count}) ──");
+                foreach (var item in result.knownDlls)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                sb.AppendLine($"\n── ShellServiceObjectDelayLoad ({result.ssodl.Count}) ──");
+                foreach (var item in result.ssodl)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                sb.AppendLine($"\n── ShellExecuteHooks ({result.shellExecHooks.Count}) ──");
+                foreach (var item in result.shellExecHooks)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                sb.AppendLine($"\n── ContextMenuHandlers ({result.contextMenu.Count}) ──");
+                foreach (var item in result.contextMenu)
+                    sb.AppendLine($"  {item.Name}: {item.FullCommand}");
+
+                AddLog($"✅ Scan concluído: {total} itens.");
                 System.Windows.Clipboard.SetText(sb.ToString());
                 System.Windows.MessageBox.Show(
                     $"Winlogon: {result.winlogon.Count}\n" +
                     $"AppInit_DLLs: {result.appinit.Count}\n" +
                     $"BHO: {result.bho.Count}\n" +
-                    $"BootExecute: {result.bootExec.Count}\n\n" +
-                    $"Total: {result.winlogon.Count + result.appinit.Count + result.bho.Count + result.bootExec.Count} itens\n\n" +
+                    $"BootExecute: {result.bootExec.Count}\n" +
+                    $"KnownDLLs: {result.knownDlls.Count}\n" +
+                    $"SSODL: {result.ssodl.Count}\n" +
+                    $"ShellExecHooks: {result.shellExecHooks.Count}\n" +
+                    $"ContextMenu: {result.contextMenu.Count}\n\n" +
+                    $"Total: {total} itens\n\n" +
                     "Resultado copiado para a área de transferência.",
                     "Inicialização Avançada", MessageBoxButton.OK, MessageBoxImage.Information);
             }

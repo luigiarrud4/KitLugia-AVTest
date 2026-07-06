@@ -400,7 +400,7 @@ namespace KitLugia.GUI.Pages
 
             // Update Tray if exists
             var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
-            if (tray != null) tray.TurboShutdownEnabled = nowActive;
+            if (tray != null) { tray.TurboShutdownEnabled = nowActive; tray.SaveSettings(); }
         }
 
         private void ChkBackgroundApps_Click(object sender, RoutedEventArgs e)

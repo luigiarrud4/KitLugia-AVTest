@@ -313,7 +313,6 @@ namespace KitLugia.GUI.Pages
                 {
                     mw.TrayService.GamePriorityEnabled = enable;
                     mw.TrayService.SaveSettings();
-                    mw.TrayService.LoadSettings();
                     ShowToast(enable ? "GameBoost ativado" : "GameBoost desativado");
                 }
             }

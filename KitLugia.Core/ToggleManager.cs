@@ -15,6 +15,7 @@ namespace KitLugia.Core
             {
                 using (var configKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\KitLugia\Toggles", true))
                 {
+                    if (configKey == null) return;
                     // 1. Salvar vulnerabilidades (Guardian)
                     var allTweaks = Guardian.GetAllTweaksDefinition();
                     foreach (var tweak in allTweaks)
@@ -124,6 +125,7 @@ namespace KitLugia.Core
                 // Salvar estado do toggle rápido
                 using (var configKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\KitLugia\QuickToggles", true))
                 {
+                    if (configKey != null)
                     configKey.SetValue(functionName, enable, RegistryValueKind.DWord);
                 }
 

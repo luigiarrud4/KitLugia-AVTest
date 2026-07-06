@@ -126,21 +126,29 @@ del List.txt
                     // Para Arquivos
                     using (var fileKey = Registry.ClassesRoot.CreateSubKey(fileKeyPath))
                     {
+                        if (fileKey != null)
+                        {
                         fileKey.SetValue("", "Obter Controle Total");
                         fileKey.SetValue("NoWorkingDirectory", "");
                         fileKey.SetValue("HasLUAShield", ""); // Adiciona o ícone de escudo UAC
                         using var cmd = fileKey.CreateSubKey("command");
+                        if (cmd != null)
                         cmd.SetValue("", @"cmd.exe /c takeown /f ""%1"" && icacls ""%1"" /grant administradores:F");
+                        }
                     }
 
                     // Para Pastas
                     using (var dirKey = Registry.ClassesRoot.CreateSubKey(dirKeyPath))
                     {
+                        if (dirKey != null)
+                        {
                         dirKey.SetValue("", "Obter Controle Total");
                         dirKey.SetValue("NoWorkingDirectory", "");
                         dirKey.SetValue("HasLUAShield", "");
                         using var cmd = dirKey.CreateSubKey("command");
+                        if (cmd != null)
                         cmd.SetValue("", @"cmd.exe /c takeown /f ""%1"" /r /d y && icacls ""%1"" /grant administradores:F /t");
+                        }
                     }
 
                     return (true, "'Obter Controle Total' adicionado ao menu.");
@@ -168,10 +176,14 @@ del List.txt
                 else
                 {
                     using var key = Registry.ClassesRoot.CreateSubKey(keyPath);
+                    if (key != null)
+                    {
                     key.SetValue("", "Abrir CMD aqui (Admin)");
                     key.SetValue("HasLUAShield", "");
                     using var cmd = key.CreateSubKey("command");
+                    if (cmd != null)
                     cmd.SetValue("", @"powershell.exe -Command ""Start-Process cmd.exe -ArgumentList '/s /k pushd ""%V""' -Verb runas""");
+                    }
                     return (true, "Atalho CMD (Admin) adicionado.");
                 }
             }

@@ -259,7 +259,7 @@ namespace KitLugia.Core
                 string currentVersion = GetCurrentVersion().ToString();
                 string newVersion = ParseVersion(release.TagName).ToString();
 
-                string batchPath = GenerateUpdateBatch(updatePath, currentPid, currentExePath, currentVersion, newVersion);
+                string? batchPath = GenerateUpdateBatch(updatePath, currentPid, currentExePath, currentVersion, newVersion);
                 if (batchPath == null)
                 {
                     Logger.Log("❌ Falha ao gerar script de atualização!");
@@ -340,7 +340,7 @@ namespace KitLugia.Core
             }
         }
 
-        public static string GenerateUpdateBatch(string zipPath, int pid, string exePath, string oldVersion, string newVersion)
+        public static string? GenerateUpdateBatch(string zipPath, int pid, string exePath, string oldVersion, string newVersion)
         {
             try
             {

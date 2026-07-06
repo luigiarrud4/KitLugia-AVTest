@@ -319,9 +319,7 @@ namespace KitLugia.GUI.Pages
             {
                 if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow && mainWindow.TrayService != null)
                 {
-                    mainWindow.TrayService.IsTrayEnabled = ToggleTray.IsChecked == true;
-                    mainWindow.TrayService.SaveSettings();
-                    mainWindow.TrayService.LoadSettings(); // Recarregar para aplicar
+                    mainWindow.TrayService.SetTrayEnabled(ToggleTray.IsChecked == true);
                     Logger.Log($"⚙️ Tray Icon: {(ToggleTray.IsChecked == true ? "ativado" : "desativado")}");
                 }
             }
@@ -339,7 +337,6 @@ namespace KitLugia.GUI.Pages
                 {
                     mainWindow.TrayService.GamePriorityEnabled = ToggleGameBoost.IsChecked == true;
                     mainWindow.TrayService.SaveSettings();
-                    mainWindow.TrayService.LoadSettings(); // Recarregar para aplicar
                     Logger.Log($"⚙️ GameBoost: {(ToggleGameBoost.IsChecked == true ? "ativado" : "desativado")}");
                 }
             }
@@ -357,7 +354,6 @@ namespace KitLugia.GUI.Pages
                 {
                     mainWindow.TrayService.TurboBootEnabled = ToggleTurboBoot.IsChecked == true;
                     mainWindow.TrayService.SaveSettings();
-                    mainWindow.TrayService.LoadSettings(); // Recarregar para aplicar
                     Logger.Log($"⚙️ Turbo Boot: {(ToggleTurboBoot.IsChecked == true ? "ativado" : "desativado")}");
                 }
             }
@@ -375,7 +371,6 @@ namespace KitLugia.GUI.Pages
                 {
                     mainWindow.TrayService.TurboShutdownEnabled = ToggleTurboShutdown.IsChecked == true;
                     mainWindow.TrayService.SaveSettings();
-                    mainWindow.TrayService.LoadSettings(); // Recarregar para aplicar
                     Logger.Log($"⚙️ Turbo Shutdown: {(ToggleTurboShutdown.IsChecked == true ? "ativado" : "desativado")}");
                 }
             }
@@ -393,7 +388,6 @@ namespace KitLugia.GUI.Pages
                 {
                     mainWindow.TrayService.StandbyCleanEnabled = ToggleStandbyClean.IsChecked == true;
                     mainWindow.TrayService.SaveSettings();
-                    mainWindow.TrayService.LoadSettings(); // Recarregar para aplicar
                     Logger.Log($"⚙️ Standby Clean: {(ToggleStandbyClean.IsChecked == true ? "ativado" : "desativado")}");
                 }
             }

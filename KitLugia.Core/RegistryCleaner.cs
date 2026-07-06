@@ -858,12 +858,16 @@ namespace KitLugia.Core
             if (string.IsNullOrEmpty(path)) return false;
 
             string lower = path.ToLowerInvariant();
-            return lower.Contains(@"windows\system32") ||
-                   lower.Contains(@"windows\syswow64") ||
-                   lower.Contains(@"windows\winsxs") ||
-                   lower.Contains(@"program files\windows") ||
-                   lower.Contains(@"program files (x86)\windows") ||
-                   lower.StartsWith(@"c:\windows\") ||
+            string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows).ToLowerInvariant();
+            string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles).ToLowerInvariant();
+            string progFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86).ToLowerInvariant();
+
+            return lower.Contains(Path.Combine(winDir, "system32")) ||
+                   lower.Contains(Path.Combine(winDir, "syswow64")) ||
+                   lower.Contains(Path.Combine(winDir, "winsxs")) ||
+                   lower.Contains(Path.Combine(progFiles, "windows")) ||
+                   (progFiles != progFilesX86 && lower.Contains(Path.Combine(progFilesX86, "windows"))) ||
+                   lower.StartsWith(winDir + @"\") ||
                    lower.Contains("microsoft.net") ||
                    lower.Contains("dotnet");
         }

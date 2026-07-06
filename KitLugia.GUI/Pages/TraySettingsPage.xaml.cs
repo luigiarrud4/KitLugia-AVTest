@@ -75,6 +75,16 @@ namespace KitLugia.GUI.Pages
             var tray = GetTrayService();
             if (tray == null) return;
 
+            if (!tray.IsInitialized)
+            {
+                int waited = 0;
+                while (!tray.IsInitialized && waited < 3000)
+                {
+                    System.Threading.Thread.Sleep(50);
+                    waited += 50;
+                }
+            }
+
             ChkEnableTray.IsChecked = tray.IsTrayEnabled;
             ChkAutoClean.IsChecked = tray.AutoCleanEnabled;
             SliderThreshold.Value = tray.AutoCleanThresholdPercent;
@@ -289,7 +299,7 @@ namespace KitLugia.GUI.Pages
             if (cb == ChkStandbyClean) tray.StandbyCleanEnabled = cb.IsChecked == true;
             else if (cb == ChkTurboBoot) tray.TurboBootEnabled = cb.IsChecked == true;
             else if (cb == ChkTurboShutdown) tray.TurboShutdownEnabled = cb.IsChecked == true;
-            else if (cb == ChkTrayIcon) tray.IsTrayEnabled = cb.IsChecked == true;
+            else if (cb == ChkTrayIcon) tray.SetTrayEnabled(cb.IsChecked == true);
             else if (cb == ChkCloseToTray) tray.CloseToTray = cb.IsChecked == true;
 
             tray.SaveSettings();

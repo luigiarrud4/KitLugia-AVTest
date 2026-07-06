@@ -19,6 +19,7 @@ namespace KitLugia.GUI.Pages
     public partial class ServicesPage : Page
     {
         private List<ServiceInfo> _allServices = new();
+        private List<StartupAppDetails> _allStartupApps = new();
         private int _initialTabIndex = 0;
         private CancellationTokenSource? _cts;
         private string _addMode = "Normal";
@@ -112,24 +113,66 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                var apps = await Task.Run(() => StartupManager.GetStartupAppsWithDetails(false), cancellationToken);
-                var schedulerApps = await Task.Run(() => StartupManager.GetExternalTaskSchedulerApps(), cancellationToken);
-                var merged = apps.Concat(schedulerApps)
-                    .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.First())
-                    .OrderByDescending(a => a.Status == StartupStatus.TurboBoot || a.Status == StartupStatus.TurboBootNormal)
-                    .ThenByDescending(a => a.Status == StartupStatus.Elevated)
-                    .ThenByDescending(a => a.Status == StartupStatus.Enabled)
-                    .ThenBy(a => a.Name)
-                    .ToList();
-                GridStartup.ItemsSource = merged;
+                TxtStartupLoadingStatus.Text = "Carregando...";
+                StartupLoadingOverlay.Visibility = Visibility.Visible;
+
+                // FASE 1 (rápida): registro + pastas + tarefas KitLugia — sem Task Scheduler externo
+                var fast = await Task.Run(() => StartupManager.GetStartupAppsFast(), cancellationToken);
+                _allStartupApps = fast;
+                ApplyStartupFilter();
+
+                // FASE 2 (background): enriquecer com tarefas externas + UWP + Active Setup
+                TxtStartupLoadingStatus.Text = "Buscando mais apps...";
+                var full = await Task.Run(() => StartupManager.GetStartupAppsWithDetails(true), cancellationToken);
+                if (full.Count > _allStartupApps.Count)
+                {
+                    _allStartupApps = full;
+                    ApplyStartupFilter();
+                }
             }
             catch (OperationCanceledException)
             {
             }
+            finally
+            {
+                StartupLoadingOverlay.Visibility = Visibility.Collapsed;
+            }
         }
 
         private async Task LoadStartupApps() => await LoadStartupApps(_cts?.Token ?? CancellationToken.None);
+
+        private void ApplyStartupFilter()
+        {
+            if (_allStartupApps == null || _allStartupApps.Count == 0) return;
+
+            string filter = TxtSearchStartup.Text.ToLower().Trim();
+
+            var filtered = _allStartupApps
+                .Where(a =>
+                    string.IsNullOrEmpty(filter) ||
+                    a.Name.ToLower().Contains(filter) ||
+                    (a.FullCommand ?? "").ToLower().Contains(filter) ||
+                    (a.Location ?? "").ToLower().Contains(filter))
+                .OrderByDescending(a => a.Status == StartupStatus.TurboBoot || a.Status == StartupStatus.TurboBootNormal)
+                .ThenByDescending(a => a.Status == StartupStatus.Elevated)
+                .ThenByDescending(a => a.Status == StartupStatus.Enabled)
+                .ThenBy(a => a.Name)
+                .ToList();
+
+            GridStartup.ItemsSource = filtered;
+            UpdateStartupCount(filtered.Count);
+        }
+
+        private void TxtSearchStartup_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplyStartupFilter();
+        }
+
+        private void UpdateStartupCount(int count)
+        {
+            if (TxtStartupCount != null)
+                TxtStartupCount.Text = $"{count} ite{(count == 1 ? "m" : "ns")}";
+        }
 
         private async void BtnRefreshStartup_Click(object sender, RoutedEventArgs e)
         {

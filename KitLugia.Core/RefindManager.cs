@@ -73,7 +73,7 @@ menuentry ""EFI Shell"" {{
         {
             try
             {
-                string espDrive = await MountEspAsync();
+                string? espDrive = await MountEspAsync();
                 if (espDrive == null)
                     return (false, "Não foi possível montar ESP para limpeza.");
 

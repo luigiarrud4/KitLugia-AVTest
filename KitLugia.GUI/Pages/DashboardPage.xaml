@@ -328,9 +328,9 @@
                     ToolTip="Otimiza&#xE7;&#xE3;o inteligente de processos em tempo real"
                     Click="BtnGoToGameBoost_Click"/>
 
-                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F3AE;" 
-                    Content="Games e Modo Jogo"
-                    ToolTip="Configura&#xE7;&#xF5;es de jogos e otimiza&#xE7;&#xF5;es para games"
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1FA9F;" 
+                    Content="Configurações do Windows"
+                    ToolTip="Teclado, mouse, acessibilidade, energia e painéis nativos do Windows"
                     Click="BtnGoToGames_Click"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4CB;" 

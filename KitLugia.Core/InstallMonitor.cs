@@ -9,25 +9,25 @@ namespace KitLugia.Core
 {
     public class InstallMonitorChange
     {
-        public string Path { get; set; }
-        public string Type { get; set; }
-        public string Category { get; set; }
+        public string Path { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
-        public string Details { get; set; }
+        public string Details { get; set; } = string.Empty;
     }
 
     public static class InstallMonitor
     {
         private static readonly ConcurrentBag<InstallMonitorChange> _changes = new();
         private static readonly List<FileSystemWatcher> _watchers = new();
-        private static Dictionary<string, long> _registrySnapshot;
+        private static Dictionary<string, long>? _registrySnapshot;
         private static bool _isRunning;
-        private static string[] _watchDirs;
+        private static string[]? _watchDirs;
 
         public static bool IsRunning => _isRunning;
         public static int ChangeCount => _changes.Count;
 
-        public static event Action<InstallMonitorChange> OnChange;
+        public static event Action<InstallMonitorChange>? OnChange;
 
         public static void Start()
         {
@@ -158,17 +158,17 @@ namespace KitLugia.Core
             {
                 try
                 {
-                    using var key = Registry.LocalMachine.OpenSubKey(regPath);
+                    using RegistryKey? key = Registry.LocalMachine.OpenSubKey(regPath);
                     if (key != null)
                     {
                         foreach (var sub in key.GetSubKeyNames())
                         {
                             try
                             {
-                                using var subKey = key.OpenSubKey(sub);
+                                using RegistryKey? subKey = key.OpenSubKey(sub);
                                 if (subKey != null)
                                 {
-                                    string dn = subKey.GetValue("DisplayName") as string;
+                                    string? dn = subKey.GetValue("DisplayName") as string;
                                     long installDate = 0;
                                     if (long.TryParse(subKey.GetValue("InstallDate") as string ?? "", out var d))
                                         installDate = d;

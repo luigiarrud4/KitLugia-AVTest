@@ -56,6 +56,38 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                         <TextBlock Text="Aplicativos que iniciam com o Windows" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+
+                        <Border Background="#15FFFFFF" CornerRadius="6" Height="32" Margin="10,0,0,0" BorderBrush="#404040" BorderThickness="1" Width="240">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="&#x1F50D;" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#888" FontSize="13"/>
+
+                                <TextBlock Text="Pesquisar..." Foreground="#606060" VerticalAlignment="Center"
+                                           IsHitTestVisible="False" FontStyle="Italic" FontSize="13" Grid.Column="1">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=TxtSearchStartup}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <TextBox x:Name="TxtSearchStartup" Background="Transparent" BorderThickness="0"
+                                         Foreground="White" VerticalAlignment="Center" FontSize="13"
+                                         Padding="0,0,8,0" CaretBrush="{StaticResource AccentColor}"
+                                         TextChanged="TxtSearchStartup_TextChanged" Grid.Column="1"/>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock x:Name="TxtStartupCount" Text="0 itens" Foreground="#666" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="11"/>
                         <Button Content="Recarregar Lista" Click="BtnRefreshStartup_Click" Margin="20,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="12"/>
                     </StackPanel>
 
@@ -321,6 +353,36 @@
                                     <Button x:Name="BtnAddSave" Content="Adicionar" Click="BtnAddSave_Click" Width="100" Height="30" Style="{StaticResource GoldButtonStyle}" IsEnabled="False"/>
                                 </StackPanel>
                             </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Loading Overlay para startup -->
+                    <Grid x:Name="StartupLoadingOverlay" Grid.RowSpan="3" Visibility="Collapsed" Background="#CC000000" ZIndex="99">
+                        <Border Background="#1E1E1E" CornerRadius="12" BorderBrush="{StaticResource AccentColor}" BorderThickness="1"
+                                Width="260" Height="100" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Viewbox Width="36" Height="36" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Ellipse Stroke="{StaticResource AccentColor}" StrokeThickness="3" Fill="Transparent"
+                                                Width="36" Height="36" Opacity="0.3"/>
+                                        <Ellipse Stroke="{StaticResource AccentColor}" StrokeThickness="3" Fill="Transparent"
+                                                Width="36" Height="36" StrokeDashArray="94 31">
+                                            <Ellipse.Triggers>
+                                                <EventTrigger RoutedEvent="Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="StrokeDashOffset"
+                                                                           From="0" To="125" Duration="0:0:1" RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Ellipse.Triggers>
+                                        </Ellipse>
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock x:Name="TxtStartupLoadingStatus" Text="Carregando..."
+                                          Foreground="White" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center"/>
+                            </StackPanel>
                         </Border>
                     </Grid>
                 </Grid>

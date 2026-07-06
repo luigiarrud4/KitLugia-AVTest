@@ -297,7 +297,7 @@ namespace KitLugia.GUI.Pages
             var tray = GetTrayService();
             if (tray != null)
             {
-                tray.IsTrayEnabled = !tray.IsTrayEnabled;
+                tray.SetTrayEnabled(!tray.IsTrayEnabled);
                 LogActivity(tray.IsTrayEnabled ? "🌐 Tray Icon ATIVADO" : "🌐 Tray Icon DESATIVADO");
                 RefreshDiagnostics();
             }
@@ -313,6 +313,7 @@ namespace KitLugia.GUI.Pages
                 if (tray != null)
                 {
                     tray.GamePriorityEnabled = !tray.GamePriorityEnabled;
+                    tray.SaveSettings();
                     LogActivity(tray.GamePriorityEnabled ? "🎮 GameBoost ATIVADO" : "🎮 GameBoost DESATIVADO");
                 }
             }
@@ -410,8 +411,9 @@ namespace KitLugia.GUI.Pages
             var tray = GetTrayService();
             if (tray != null)
             {
-                tray.IsTrayEnabled = true;
+                tray.SetTrayEnabled(true);
                 tray.GamePriorityEnabled = false;
+                tray.SaveSettings();
             }
             
             // Reiniciar AggressiveCleaner

@@ -694,7 +694,7 @@
                             <RadioButton x:Name="BtnStorage"   GroupName="Menu" Tag="&#x1F4BF;" Content="Armazenamento" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnPartitions" GroupName="Menu" Tag="&#x1F4BD;" Content="Gerenciar Discos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnNetwork"   GroupName="Menu" Tag="&#x1F310;" Content="Rede e Internet" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
-                            <RadioButton x:Name="BtnGames"     GroupName="Menu" Tag="&#x1F3AE;" Content="Jogos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
+                            <RadioButton x:Name="BtnGames"     GroupName="Menu" Tag="&#x1FA9F;" Content="Windows" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnDrivers"   GroupName="Menu" Tag="&#x1F4BE;" Content="Drivers" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnRepairs"   GroupName="Menu" Tag="&#x1F527;" Content="Reparos AIO" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnServices"  GroupName="Menu" Tag="&#x1F6E1;&#xFE0F;" Content="Servi&#xE7;os" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>

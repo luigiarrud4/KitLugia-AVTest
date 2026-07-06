@@ -360,7 +360,7 @@ namespace KitLugia.Core
                     {
                         using (partition)
                         {
-                            object[] methodArgs = { null, null, null };
+                            object[] methodArgs = { null!, null!, null! };
                             var result = partition.InvokeMethod("GetSupportedSize", methodArgs);
                             uint returnCode = Convert.ToUInt32(result);
 
@@ -471,7 +471,7 @@ namespace KitLugia.Core
                 using (partition)
                 {
                     progressCallback?.Invoke(70, "Redimensionando...");
-                    object[] methodArgs = { newSizeInBytes, null };
+                    object[] methodArgs = { newSizeInBytes, null! };
                     var result = partition.InvokeMethod("Resize", methodArgs);
                     uint returnValue = Convert.ToUInt32(result);
 

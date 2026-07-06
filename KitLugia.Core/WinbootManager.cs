@@ -1259,7 +1259,7 @@ namespace KitLugia.Core
                 try
                 {
                     // 1. Procurar 7z.exe em múltiplos locais
-                    string sevenZipPath = FindSevenZipPath();
+                    string? sevenZipPath = FindSevenZipPath();
                     
                     if (!string.IsNullOrEmpty(sevenZipPath))
                     {
@@ -2063,7 +2063,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                         Path.Combine(bootDir, "grub.cfg")
                     };
                     
-                    string targetCfg = cfgPaths.FirstOrDefault(File.Exists);
+                    string? targetCfg = cfgPaths.FirstOrDefault(File.Exists);
                     if (targetCfg != null)
                     {
                         string currentContent = File.ReadAllText(targetCfg);
@@ -2105,7 +2105,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             Log("Instalando gerenciador de boot UEFI (rEFInd) no ESP...");
 
             // 1. Montar a partição de sistema EFI
-            string espDrive = await MountEspAsync();
+            string? espDrive = await MountEspAsync();
             if (espDrive == null)
             {
                 Log("ERRO: Não foi possível montar a partição ESP UEFI.");
@@ -3144,7 +3144,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                     return false;
                 }
 
-                ManagementObject partition = null;
+                ManagementObject? partition = null;
                 foreach (ManagementObject p in partitions)
                 {
                     partition = p;
@@ -3299,7 +3299,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 progressCallback?.Invoke(5, "Preparando shrink avançado...");
 
                 // Criar diretório KitLugia
-                string kitlugiaDir = Path.Combine("C:\\", "KitLugia");
+                string kitlugiaDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "KitLugia");
                 if (!Directory.Exists(kitlugiaDir))
                     Directory.CreateDirectory(kitlugiaDir);
 

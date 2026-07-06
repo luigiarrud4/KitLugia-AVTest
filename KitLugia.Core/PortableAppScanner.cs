@@ -8,9 +8,9 @@ namespace KitLugia.Core
 {
     public class PortableAppEntry
     {
-        public string Name { get; set; }
-        public string FolderPath { get; set; }
-        public string MainExecutable { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string FolderPath { get; set; } = string.Empty;
+        public string MainExecutable { get; set; } = string.Empty;
         public long TotalSizeBytes { get; set; }
         public string TotalSizeFormatted => TotalSizeBytes switch
         {
@@ -125,7 +125,7 @@ namespace KitLugia.Core
                 {
                     string root = drive.RootDirectory.FullName;
                     if (!root.StartsWith(
-                        Environment.GetEnvironmentVariable("SystemDrive"),
+                        Environment.GetEnvironmentVariable("SystemDrive") ?? "C:",
                         StringComparison.OrdinalIgnoreCase))
                     {
                         locations.Add(root);
@@ -146,17 +146,17 @@ namespace KitLugia.Core
                 try
                 {
                     using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
-                    using var uninstallKey = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+                    using RegistryKey? uninstallKey = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
                     if (uninstallKey != null)
                     {
                         foreach (var sub in uninstallKey.GetSubKeyNames())
                         {
                             try
                             {
-                                using var appKey = uninstallKey.OpenSubKey(sub);
+                                using RegistryKey? appKey = uninstallKey.OpenSubKey(sub);
                                 if (appKey != null)
                                 {
-                                    string installPath = appKey.GetValue("InstallLocation") as string;
+                                    string? installPath = appKey.GetValue("InstallLocation") as string;
                                     if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
                                         paths.Add(Path.GetFullPath(installPath).TrimEnd('\\'));
                                 }
@@ -189,7 +189,7 @@ namespace KitLugia.Core
             return false;
         }
 
-        private static PortableAppEntry AnalyzeFolder(string folderPath, HashSet<string> installedPaths)
+        private static PortableAppEntry? AnalyzeFolder(string folderPath, HashSet<string> installedPaths)
         {
             try
             {

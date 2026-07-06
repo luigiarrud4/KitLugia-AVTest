@@ -35,7 +35,8 @@ namespace KitLugia.Core
 
             try
             {
-                string output = await RunCommandAsync("cscript", "//nologo C:\\Windows\\System32\\slmgr.vbs /dli");
+                string slmgrPath = Path.Combine(Environment.SystemDirectory, "slmgr.vbs");
+                string output = await RunCommandAsync("cscript", $"//nologo \"{slmgrPath}\" /dli");
 
                 if (string.IsNullOrWhiteSpace(output))
                 {
@@ -64,7 +65,7 @@ namespace KitLugia.Core
                 }
 
                 // Detect activation method
-                string dliAll = await RunCommandAsync("cscript", "//nologo C:\\Windows\\System32\\slmgr.vbs /dlv");
+                string dliAll = await RunCommandAsync("cscript", $"//nologo \"{slmgrPath}\" /dlv");
                 if (dliAll.Contains("VOLUME_KMSCLIENT", StringComparison.OrdinalIgnoreCase))
                     status.ActivationMethod = "KMS";
                 else if (dliAll.Contains("RETAIL", StringComparison.OrdinalIgnoreCase))

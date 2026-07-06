@@ -245,7 +245,19 @@ namespace KitLugia.GUI.Pages
             {
 
                 var mw = Application.Current.MainWindow as MainWindow;
-                
+
+                // Wait for TrayService to finish Initialize() so registry values are loaded
+                var trayService = mw?.TrayService;
+                if (trayService != null && !trayService.IsInitialized)
+                {
+                    int waited = 0;
+                    while (!trayService.IsInitialized && waited < 3000)
+                    {
+                        System.Threading.Thread.Sleep(50);
+                        waited += 50;
+                    }
+                }
+
                 // IMPORTANTE: NfO usar padrões! Só ler do serviço.
                 bool gameBoostEnabled = false; // Começa com false
                 bool trayEnabled = false;
@@ -317,8 +329,8 @@ namespace KitLugia.GUI.Pages
                 if (ChkProBalance != null) ChkProBalance.IsChecked = proBalance;
 
 
-                string gameBarPath = @"C:\Windows\System32\GameBarPresenceWriter.exe";
-                string backupPath = @"C:\Windows\System32\GameBarPresenceWriter.exe.bak";
+                string gameBarPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe");
+                string backupPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe.bak");
                 bool gameBarDisabled = File.Exists(backupPath) && !File.Exists(gameBarPath);
                 
 
@@ -419,7 +431,7 @@ namespace KitLugia.GUI.Pages
                     mw.TrayService.SetTrayEnabled(ChkTrayIcon?.IsChecked == true);
                     mw.TrayService.CloseToTray = ChkCloseToTray?.IsChecked == true;
                     mw.TrayService.ProBalance = ChkProBalance?.IsChecked == true;
-                    // Persiste a preferência do GameBarPresenceWriter para verificação automática
+                    mw.TrayService.UnparkCpuEnabled = ChkUnparkCpu?.IsChecked == true;
                     mw.TrayService.GameBarPresenceWriterDisabled = ChkGameBarPresenceWriter?.IsChecked == true;
                     mw.TrayService.DownloadBoostEnabled = TglDownloadBoost?.IsChecked == true;
                     var boostLevel = CboDownloadBoostMode.SelectedIndex switch
@@ -458,31 +470,29 @@ namespace KitLugia.GUI.Pages
         }
 
         // NOVO: Handler do toggle TrayIcon (ToggleButton)
-        private async void ChkTrayIcon_Click(object sender, RoutedEventArgs e)
+        private void ChkTrayIcon_Click(object sender, RoutedEventArgs e)
         {
-            // PROTEÇÃO: Ignora eventos durante carregamento inicial
             if (_isLoadingSettings) return;
 
             try
             {
                 ChkTrayIcon.IsEnabled = false;
-                bool isChecked = ChkTrayIcon.IsChecked == true; // Captura ANTES do Task.Run
+                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
 
-                await Task.Run(() =>
+                if (trayService != null)
                 {
-                    var mw = Application.Current.MainWindow as MainWindow;
-                    if (mw?.TrayService != null)
-                    {
-                        mw.TrayService.SetTrayEnabled(isChecked);
-                        KitLugia.Core.Logger.Log($"🎮 Tray Icon: {(isChecked ? "ativado" : "desativado")}");
-                    }
-                });
+                    trayService.SetTrayEnabled(ChkTrayIcon.IsChecked == true);
+                    KitLugia.Core.Logger.Log($"🎮 Tray Icon: {(ChkTrayIcon.IsChecked == true ? "ativado" : "desativado")}");
+                }
 
-                ChkTrayIcon.IsEnabled = true;
+                SaveGameBoostSettings();
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar Tray Icon: {ex.Message}");
+            }
+            finally
+            {
                 ChkTrayIcon.IsEnabled = true;
             }
         }
@@ -512,6 +522,7 @@ namespace KitLugia.GUI.Pages
                         }
                         ChkStartWithWindows.IsChecked = actualState;
                         KitLugia.Core.Logger.Log($"🎮 AutoStart: {(actualState ? "ativado" : "desativado")}");
+                        SaveGameBoostSettings();
                     });
                 });
 
@@ -582,32 +593,28 @@ namespace KitLugia.GUI.Pages
         }
 
         // NOVO: Handler do toggle CloseToTray (ToggleButton)
-        private async void ChkCloseToTray_Click(object sender, RoutedEventArgs e)
+        private void ChkCloseToTray_Click(object sender, RoutedEventArgs e)
         {
-            // PROTEÇÃO: Ignora eventos durante carregamento inicial
             if (_isLoadingSettings) return;
 
             try
             {
                 ChkCloseToTray.IsEnabled = false;
-                bool isChecked = ChkCloseToTray.IsChecked == true; // Captura ANTES do Task.Run
+                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
 
-                await Task.Run(() =>
+                if (trayService != null)
                 {
-                    var mw = Application.Current.MainWindow as MainWindow;
-                    if (mw?.TrayService != null)
-                    {
-                        mw.TrayService.CloseToTray = isChecked;
-                        mw.TrayService.SaveSettings();
-                        KitLugia.Core.Logger.Log($"🎮 Close to Tray: {(isChecked ? "ativado" : "desativado")}");
-                    }
-                });
-
-                ChkCloseToTray.IsEnabled = true;
+                    trayService.CloseToTray = ChkCloseToTray.IsChecked == true;
+                    trayService.SaveSettings();
+                    KitLugia.Core.Logger.Log($"🎮 Close to Tray: {(ChkCloseToTray.IsChecked == true ? "ativado" : "desativado")}");
+                }
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar Close to Tray: {ex.Message}");
+            }
+            finally
+            {
                 ChkCloseToTray.IsEnabled = true;
             }
         }
@@ -665,8 +672,8 @@ namespace KitLugia.GUI.Pages
 
                 await Task.Run(() =>
                 {
-                    string gameBarPath = @"C:\Windows\System32\GameBarPresenceWriter.exe";
-                    string backupPath = @"C:\Windows\System32\GameBarPresenceWriter.exe.bak";
+                    string gameBarPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe");
+                    string backupPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe.bak");
 
                     if (isEnabled)
                     {
@@ -786,7 +793,11 @@ namespace KitLugia.GUI.Pages
                 });
 
 
-                Dispatcher.Invoke(() => ChkGameBarPresenceWriter.IsEnabled = true);
+                Dispatcher.Invoke(() =>
+                {
+                    ChkGameBarPresenceWriter.IsEnabled = true;
+                    SaveGameBoostSettings();
+                });
             }
             catch (Exception ex)
             {
@@ -805,6 +816,7 @@ namespace KitLugia.GUI.Pages
             bool enabled = TglDownloadBoost.IsChecked == true;
             mw.TrayService.DownloadBoostEnabled = enabled;
             PanelDownloadBoostOptions.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+            mw.TrayService.SaveSettings();
             KitLugia.Core.Logger.Log($"📥 Download Boost {(enabled ? "ativado" : "desativado")}");
         }
 
@@ -821,6 +833,7 @@ namespace KitLugia.GUI.Pages
                 _ => "Auto"
             };
             mw.TrayService.DownloadBoostLevel = level;
+            mw.TrayService.SaveSettings();
         }
 
         private void TxtDownloadBoostThreshold_LostFocus(object sender, RoutedEventArgs e)
@@ -832,6 +845,7 @@ namespace KitLugia.GUI.Pages
                 System.Globalization.CultureInfo.InvariantCulture, out double val) && val > 0)
             {
                 mw.TrayService.DownloadBoostThreshold = val;
+                mw.TrayService.SaveSettings();
             }
         }
 

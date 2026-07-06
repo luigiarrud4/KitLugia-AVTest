@@ -71,7 +71,7 @@ namespace KitLugia.Core
                     SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
                     string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft\\Windows\\Explorer");
                     SystemUtils.RunExternalProcess("cmd", $"/c del /f /q \"{path}\\iconcache*\"", true);
-                    Process.Start("explorer.exe");
+                    using var _ = Process.Start("explorer.exe");
                     Logger.Log("[SUCESSO] Cache de ícones limpo.");
                 }
             });
@@ -86,7 +86,7 @@ namespace KitLugia.Core
                     Logger.Log("Limpando cache de miniaturas (Thumbnails)...");
                     SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
                     SystemUtils.RunExternalProcess("cmd", "/c del /f /s /q \"%LocalAppData%\\Microsoft\\Windows\\Explorer\\thumbcache_*.db\"", true);
-                    Process.Start("explorer.exe");
+                    using var _ = Process.Start("explorer.exe");
                 }
             });
 
@@ -135,7 +135,7 @@ namespace KitLugia.Core
                 Execute = () => {
                     Logger.Log("Resetando ícones da bandeja do sistema...");
                     SystemUtils.RunExternalProcess("reg", "delete \"HKCU\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\TrayNotify\" /v IconStreams /f", true);
-                    Process.Start("explorer.exe");
+                    using var _ = Process.Start("explorer.exe");
                 }
             });
 
@@ -147,7 +147,7 @@ namespace KitLugia.Core
                 Description = "Mostra os segundos no relógio da barra de tarefas.",
                 Execute = () => {
                     SystemUtils.RunExternalProcess("reg", "add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v ShowSecondsInSystemClock /t REG_DWORD /d 1 /f", true);
-                    Process.Start("explorer.exe");
+                    using var _ = Process.Start("explorer.exe");
                 }
             });
 
@@ -160,7 +160,7 @@ namespace KitLugia.Core
                 Execute = () => {
                     Logger.Log("Apagando chaves de visualização de pastas (BagMRU)...");
                     SystemUtils.RunExternalProcess("reg", "delete \"HKCU\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\BagMRU\" /f", true);
-                    Process.Start("explorer.exe");
+                    using var _ = Process.Start("explorer.exe");
                 }
             });
 

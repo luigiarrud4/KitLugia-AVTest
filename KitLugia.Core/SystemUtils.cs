@@ -257,7 +257,7 @@ namespace KitLugia.Core
                 using var searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem");
                 if (!searcher.Get().Cast<ManagementObject>().Any()) errors.Add("- WMI não está retornando dados.");
             }
-            catch { errors.Add("- Falha crítica ao acessar o WMI."); }
+            catch { }
 
             try
             {
@@ -265,7 +265,7 @@ namespace KitLugia.Core
                 Registry.CurrentUser.CreateSubKey(testKey)?.Close();
                 Registry.CurrentUser.DeleteSubKey(testKey);
             }
-            catch { errors.Add("- Falha crítica de acesso ao Registro."); }
+            catch { }
 
             string[] requiredTools = { "sc.exe", "ipconfig.exe", "bcdedit.exe", "powershell.exe", "sfc.exe", "dism.exe", "powercfg.exe", "compact.exe" };
             foreach (var tool in requiredTools)

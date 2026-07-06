@@ -98,3 +98,5 @@
 {"timestamp":"2026-05-31T21:36:36.813Z","type":"mcp","status":"registered","instanceId":"114d2a48-43ed-4207-a5c3-51a01b57ca6f","message":"MCP registered — opencode","aiClientName":"opencode"}
 {"timestamp":"2026-06-11T17:37:19.273Z","type":"mcp","status":"registered","instanceId":"0cea6e81-ae3b-4949-9fb8-a8e0de9370c7","message":"MCP registered — opencode","aiClientName":"opencode"}
 {"timestamp":"2026-06-11T18:37:19.783Z","type":"mcp","status":"unregistered","instanceId":"0cea6e81-ae3b-4949-9fb8-a8e0de9370c7","message":"MCP unregistered — opencode","aiClientName":"opencode"}
+{"timestamp":"2026-07-02T16:36:40.103Z","type":"mcp","status":"registered","instanceId":"68197591-04e6-40f4-923f-45daa1c34a1c","message":"MCP registered — 68197591-04e6-40f4-923f-45daa1c34a1c"}
+{"timestamp":"2026-07-02T17:36:40.615Z","type":"mcp","status":"unregistered","instanceId":"68197591-04e6-40f4-923f-45daa1c34a1c","message":"MCP unregistered — opencode","aiClientName":"opencode"}

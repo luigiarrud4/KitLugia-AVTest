@@ -42,7 +42,7 @@ namespace KitLugia.Core
             try
             {
                 progressCallback?.Invoke(5, "Montando ESP...");
-                string espDrive = await MountEspAsync();
+                string? espDrive = await MountEspAsync();
                 if (espDrive == null)
                     return (false, "Não foi possível montar a partição ESP.");
 
@@ -161,7 +161,7 @@ menuentry ""Windows"" {{
         {
             try
             {
-                string espDrive = await MountEspAsync();
+                string? espDrive = await MountEspAsync();
                 if (espDrive == null) return false;
 
                 string markerPath = Path.Combine(espDrive, MARKER_FILE);
@@ -205,7 +205,7 @@ menuentry ""Windows"" {{
         {
             try
             {
-                string espDrive = await MountEspAsync();
+                string? espDrive = await MountEspAsync();
                 if (espDrive == null)
                     return (false, "Não foi possível montar ESP para limpeza.");
 

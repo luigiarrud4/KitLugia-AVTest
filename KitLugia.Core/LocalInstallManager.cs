@@ -32,7 +32,7 @@ namespace KitLugia.Core
 
                     // Validação robusta do resultado
                     if (output.Contains("sucesso") || output.Contains("successfully") || output.Contains("DiskPart successfully"))
-                        return (true, "Partição Z: criada com sucesso.", "Z:\\");
+                        return (true, "Partição criada com sucesso.", "");
                     else
                         return (false, "Erro no Diskpart (verifique espaço livre). Saída: " + output, "");
                 }
@@ -57,7 +57,7 @@ namespace KitLugia.Core
             {
                 // Detecta se é UEFI ou BIOS de forma robusta
                 bool isUefi = Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Panther")) ||
-                               Directory.Exists("C:\\EFI");
+                               Directory.Exists(Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "EFI"));
 
                 // Usa BCDBoot (método recomendado pela Microsoft)
                 string bcdBootCommand = $"bcdboot {targetDrive}Windows /s {targetDrive.Substring(0, 2)} /f {(isUefi ? "UEFI" : "BIOS")}";
@@ -129,7 +129,7 @@ namespace KitLugia.Core
                 if (firmware.Contains("winload.exe")) return false;
 
                 // Método 2: Verificar pasta EFI
-                if (Directory.Exists("C:\\EFI")) return true;
+                if (Directory.Exists(Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "EFI"))) return true;
 
                 // Método 3: Verificar registro
                 using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\SecureBoot\State"))

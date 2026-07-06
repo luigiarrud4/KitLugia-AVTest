@@ -34,6 +34,11 @@ namespace KitLugia.GUI
                 }
             }
 
+            // ★ OTIMIZAÇÃO: boost self priority to High so the tray icon + watchdog load faster.
+            // Padrão é Normal — fica atrás de outros apps de boot na disputa por CPU.
+            try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High; }
+            catch { /* pode falhar sem admin — não é crítico */ }
+
             // --- SINGLE INSTANCE CHECK ---
             // Se já existe uma instância, traz a janela dela para frente e sai
             _mutex = new Mutex(true, "Global\\KitLugia_SingleInstance", out bool isNew);
@@ -45,13 +50,11 @@ namespace KitLugia.GUI
             }
 
             // ==============================================================================
-            // OTIMIZAÇÃO EXTREMA "RUST-LIKE": 
-            // Intercepta e lança os apps do Turbo Boot IMEDIATAMENTE antes do WPF engatar.
+            // OTIMIZAÇÃO EXTREMA "RUST-LIKE":
+            // O lançamento dos apps do Turbo Boot foi movido para TrayIconService.Initialize()
+            // (após o ícone da bandejar ficar visível), onde roda em background thread.
+            // Isto destrava o WPF para carregar o mais rápido possível.
             // ==============================================================================
-            if (startMinimized)
-            {
-                StartupManager.LaunchTurboApps();
-            }
 
             // Inicia o WPF normalmente
             var app = new App();

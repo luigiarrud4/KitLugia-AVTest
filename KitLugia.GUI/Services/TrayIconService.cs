@@ -526,6 +526,7 @@ namespace KitLugia.GUI.Services
         
 
         public bool GameBarPresenceWriterDisabled { get; set; } = false;
+        public bool IsInitialized { get; private set; } = false;
 
         // RAM Limiter - Variáveis e configurações
         private DispatcherTimer? _ramLimiterTimer;
@@ -678,6 +679,7 @@ namespace KitLugia.GUI.Services
         public string DownloadBoostLevel { get; set; } = "Auto";
         public double DownloadBoostThreshold { get; set; } = 5.0;
         public bool ProBalance { get; set; } = false;
+        public bool UnparkCpuEnabled { get; set; } = false;
         public bool TurboBootEnabled
         {
             get => SystemTweaks.IsTurboBootEnabled();
@@ -854,7 +856,7 @@ namespace KitLugia.GUI.Services
                                 }
                             }
 
-                            // Criar nova tarefa com privilégios admin
+                            // Criar nova tarefa com privilégios admin + alta prioridade de boot
                             var td = ts.NewTask();
                             td.RegistrationInfo.Description = "KitLugia Auto-Startup (Admin Mode)";
                             td.Principal.RunLevel = TaskRunLevel.Highest;
@@ -863,6 +865,15 @@ namespace KitLugia.GUI.Services
                             td.Settings.ExecutionTimeLimit = TimeSpan.Zero;
                             td.Settings.StartWhenAvailable = true;
                             td.Settings.AllowHardTerminate = false;
+
+                            // ★ OTIMIZAÇÃO TIPO WALLPAPER ENGINE: Priority High (1) = HIGH_PRIORITY_CLASS
+                            // Padrão do Task Scheduler é 7 (BELOW_NORMAL) — lento demais para boot
+                            bool turboBoot = SystemTweaks.IsTurboBootEnabled();
+                            td.Settings.Priority = turboBoot ? ProcessPriorityClass.High : ProcessPriorityClass.Normal;
+
+                            // ★ Restart on failure: se o processo morrer nos primeiros 30s depois do logon, tentar 2x
+                            td.Settings.RestartCount = 2;
+                            td.Settings.RestartInterval = TimeSpan.FromSeconds(30);
 
                             // Trigger: Logon imediato para inicialização rápida
                             var trigger = new LogonTrigger
@@ -877,7 +888,8 @@ namespace KitLugia.GUI.Services
 
                             // Registrar tarefa
                             ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
-                            KitLugia.Core.Logger.Log("✅ Tarefa agendada com privilégios admin criada: " + path);
+                            KitLugia.Core.Logger.Log($"✅ Tarefa agendada com privilégios admin criada: {path}" +
+                                $" (Priority: {(turboBoot ? "High" : "Normal")})");
                         }
                         else
                         {
@@ -1044,7 +1056,6 @@ namespace KitLugia.GUI.Services
 
             System.Threading.Tasks.Task.Run(() => AutoFixGameBarPresenceWriter());
 
-
             try
             {
                 _trayIcon = new NotifyIcon
@@ -1059,10 +1070,39 @@ namespace KitLugia.GUI.Services
                 return;
             }
 
-            // Generate the initial icon
-            UpdateTrayIcon(0);
+            // ★ Show tray icon IMMEDIATELY before building menus
+            if (IsTrayEnabled && _trayIcon != null)
+            {
+                try
+                {
+                    UpdateTrayIcon(GetMemoryUsagePercent());
+                    _trayIcon.Visible = true;
+                    _monitorTimer.Start();
 
-            // Context Menu
+                    // ★ LANÇAR OS APPS DO TURBO BOOT EM BACKGROUND
+                    // Depois do tray visível — não bloqueia WPF. Conc Bulk: cada app dispara em thread própria.
+                    // Isto garante que o KitLugia apareça PRIMEIRO no tray, e depois orquestre o lançamento.
+                    // (Antes isto rodava sincrono no Program.cs e travava o startup do próprio KitLugia.)
+                    if (Environment.CommandLine.Contains("--tray") || Environment.CommandLine.Contains("--minimized"))
+                    {
+                        System.Threading.Tasks.Task.Run(() =>
+                        {
+                            try
+                            {
+                                System.Threading.Thread.Sleep(50); // Dá 50ms pro tray renderizar
+                                StartupManager.LaunchTurboApps();
+                            }
+                            catch (Exception ex) { KitLugia.Core.Logger.LogError("LaunchTurboApps bg", ex.Message); }
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    KitLugia.Core.Logger.Log($"❌ ERRO ao ativar Tray Icon: {ex.Message}");
+                }
+            }
+
+            // Context Menu — build after icon is visible
             var menu = new ContextMenuStrip();
 
             var itemClean = new ToolStripMenuItem("🧹 Limpar RAM Agora");
@@ -1147,7 +1187,7 @@ namespace KitLugia.GUI.Services
             {
                 try
                 {
-                    string exe = Process.GetCurrentProcess().MainModule.FileName;
+                    string exe = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
                     Process.Start(new ProcessStartInfo { FileName = exe, UseShellExecute = true, Verb = "runas" });
                     Dispose();
                     Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
@@ -1161,7 +1201,7 @@ namespace KitLugia.GUI.Services
             {
                 try
                 {
-                    string exe = Process.GetCurrentProcess().MainModule.FileName;
+                    string exe = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
                     KitLugia.Core.StartupManager.RegisterNonAdminTask("__KitLugiaRestart", exe, null);
                     KitLugia.Core.StartupManager.RunNonAdminTask("__KitLugiaRestart");
                     System.Threading.Thread.Sleep(1500);
@@ -1177,8 +1217,10 @@ namespace KitLugia.GUI.Services
             var itemExit = new ToolStripMenuItem("❌ Sair Completamente");
             itemExit.Click += (s, e) =>
             {
-                Dispose();
-                Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ForceShutdown();
+                else
+                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
             };
             menu.Items.Add(itemExit);
 
@@ -1187,40 +1229,27 @@ namespace KitLugia.GUI.Services
             // Double-click to open main window
             _trayIcon.DoubleClick += (s, e) => OnOpenMainWindow?.Invoke();
 
-
             if (IsTrayEnabled && _trayIcon != null)
             {
-                try
+                if (_trayIcon.Visible)
                 {
-                    // Força atualização do ícone antes de tornar visível
-                    UpdateTrayIcon(GetMemoryUsagePercent());
-
-                    // Torna visível e verifica
-                    _trayIcon.Visible = true;
-
-
-                    if (_trayIcon.Visible)
+                    // Defer heavy init tasks to threadpool so UI stays responsive
+                    _ = System.Threading.Tasks.Task.Run(() =>
                     {
-                        // Start monitoring (first tick fires at interval)
-                        _monitorTimer.Start();
+                        try { RunSafetyProfiler(); }
+                        catch { }
+                    });
 
-                        // Defer heavy init to after icon is visible
-                        Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
-                        {
-                            LoadProcessLimits();
-                            ShowTrayStatusReport();
-                            RunSafetyProfiler();
-                            MonitorTick(null, EventArgs.Empty);
-                        }), DispatcherPriority.Background);
-                    }
-                    else
+                    Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
                     {
-                        KitLugia.Core.Logger.Log("❌ ERRO: Tray Icon não ficou visível após tentativa");
-                    }
+                        LoadProcessLimits();
+                        ShowTrayStatusReport();
+                        MonitorTick(null, EventArgs.Empty);
+                    }), DispatcherPriority.Background);
                 }
-                catch (Exception ex)
+                else
                 {
-                    KitLugia.Core.Logger.Log($"❌ ERRO ao ativar Tray Icon: {ex.Message}");
+                    KitLugia.Core.Logger.Log("❌ ERRO: Tray Icon não ficou visível após tentativa");
                 }
             }
             else
@@ -1236,6 +1265,8 @@ namespace KitLugia.GUI.Services
             {
                 InitializeGameBoost();
             }
+
+            IsInitialized = true;
         }
 
         public void ShutdownTurboCharge()
@@ -1279,6 +1310,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("DownloadBoostLevel", DownloadBoostLevel);
                 key.SetValue("DownloadBoostThreshold", DownloadBoostThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 key.SetValue("ProBalance", ProBalance ? 1 : 0);
+                key.SetValue("UnparkCpu", UnparkCpuEnabled ? 1 : 0);
                 key.SetValue("TurboBoot", TurboBootEnabled ? 1 : 0);
                 key.SetValue("TurboShutdown", TurboShutdownEnabled ? 1 : 0);
                 
@@ -1373,6 +1405,7 @@ namespace KitLugia.GUI.Services
                 double.TryParse((string)key.GetValue("DownloadBoostThreshold", "5.0"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var dbt);
                 DownloadBoostThreshold = dbt > 0 ? dbt : 5.0;
                 ProBalance = (int)key.GetValue("ProBalance", 0) == 1;
+                UnparkCpuEnabled = (int)key.GetValue("UnparkCpu", 0) == 1;
                 
 
                 EnableSmartAlerts = (int)key.GetValue("EnableSmartAlerts", 1) == 1;
@@ -1407,22 +1440,35 @@ namespace KitLugia.GUI.Services
             catch { }
         }
 
-        public void SetTrayEnabled(bool enabled)
+        private void ApplyTrayEnabledState(bool enabled)
         {
-            IsTrayEnabled = enabled;
             if (_trayIcon != null)
-            {
                 _trayIcon.Visible = enabled;
-            }
 
             if (enabled)
             {
                 if (!_monitorTimer.IsEnabled) _monitorTimer.Start();
+                UpdateTrayIcon(GetMemoryUsagePercent());
             }
             else
             {
                 _monitorTimer.Stop();
             }
+
+            SaveSettings();
+        }
+
+        public void SetTrayEnabled(bool enabled)
+        {
+            IsTrayEnabled = enabled;
+
+            if (Application.Current?.Dispatcher is { } d && !d.CheckAccess())
+            {
+                d.BeginInvoke(new System.Action(() => ApplyTrayEnabledState(enabled)));
+                return;
+            }
+
+            ApplyTrayEnabledState(enabled);
         }
 
 

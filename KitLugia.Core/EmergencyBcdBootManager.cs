@@ -175,7 +175,7 @@ menuentry ""Windows"" {{
                 if (removePartition)
                 {
                     Logger.Log("[BCDBOOT] Removendo partição KITLUGIA...");
-                    WinbootManager.RemoveWinboot();
+                    _ = WinbootManager.RemoveWinboot();
                 }
 
                 return (true, "Boot restaurado. rEFInd removido.");

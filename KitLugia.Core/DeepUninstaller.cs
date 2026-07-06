@@ -703,7 +703,7 @@ namespace KitLugia.Core
             if (string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length < 3)
                 return results.ToList();
 
-            var otherInstallLocations = mode == ScannerMode.Advanced ? null : GetAllInstallLocations(excludeName: displayName);
+            List<string>? otherInstallLocations = mode == ScannerMode.Advanced ? null : GetAllInstallLocations(excludeName: displayName);
 
             // InstallLocation — add the dir AND enumerate its contents (exe, dll, etc.)
             if (!string.IsNullOrEmpty(installLocation) && Directory.Exists(installLocation))
@@ -1060,7 +1060,7 @@ namespace KitLugia.Core
             "Screenshots", "Local", "LocalLow", "Roaming"
         };
 
-        private static void ScanFolderConfidence(string baseDir, string displayName, string publisher, DateTime? installDate, HashSet<string> results, List<string> otherInstallLocations, int depth, int maxDepth)
+        private static void ScanFolderConfidence(string baseDir, string displayName, string publisher, DateTime? installDate, HashSet<string> results, List<string>? otherInstallLocations, int depth, int maxDepth)
         {
             try
             {
@@ -1092,7 +1092,7 @@ namespace KitLugia.Core
                     {
                         // BCU DirectlyInsideKnownFolder penalty: items directly inside user shell folders
                         // (Desktop, Documents, Downloads, etc.) are more likely to be false positives
-                        string parentFolder = Path.GetFileName(Path.GetDirectoryName(dir));
+                        string? parentFolder = Path.GetFileName(Path.GetDirectoryName(dir));
                         if (!string.IsNullOrEmpty(parentFolder) && KnownUserShellFolders.Contains(parentFolder))
                         {
                             // Reduce confidence threshold for items directly in known shell folders
@@ -1133,7 +1133,7 @@ namespace KitLugia.Core
                     if (match)
                     {
                         // Cross-reference: skip if another app uses this dir (BCU DirectoryStillUsed)
-                        if (otherInstallLocations.Any(loc => dir.StartsWith(loc, StringComparison.OrdinalIgnoreCase)))
+                        if (otherInstallLocations != null && otherInstallLocations.Any(loc => dir.StartsWith(loc, StringComparison.OrdinalIgnoreCase)))
                             continue;
 
                         // Also skip dirs that are known Windows/System dirs
@@ -1878,7 +1878,7 @@ namespace KitLugia.Core
             if (string.IsNullOrEmpty(installLocation) || !Directory.Exists(installLocation)) return;
             try
             {
-                string pathRoot = Path.GetPathRoot(installLocation);
+                string? pathRoot = Path.GetPathRoot(installLocation);
                 if (string.IsNullOrEmpty(pathRoot)) return;
                 string unrootedLocation = installLocation.Replace(pathRoot, string.Empty).Trim();
                 if (string.IsNullOrEmpty(unrootedLocation)) return;

@@ -127,7 +127,7 @@ namespace KitLugia.GUI.Pages
         private void BtnGoToCleanup_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Storage);
         private void BtnGoToBloatware_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Apps);
         private void BtnGoToGameBoost_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.GameBoost);
-        private void BtnGoToGames_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Games);
+        private void BtnGoToGames_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Windows);
         private void BtnGoToWinTune_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.WinTune);
         private void BtnGoToShrink_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Shrink);
         private void BtnGoToTools_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools);
@@ -1189,8 +1189,7 @@ namespace KitLugia.GUI.Pages
             var mw = Application.Current.MainWindow as MainWindow;
             if (mw?.TrayService != null)
             {
-                mw.TrayService.IsTrayEnabled = ChkCrTray.IsChecked == true;
-                mw.TrayService.SaveSettings();
+                mw.TrayService.SetTrayEnabled(ChkCrTray.IsChecked == true);
             }
         }
 

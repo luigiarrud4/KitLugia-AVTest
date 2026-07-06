@@ -1127,7 +1127,7 @@ namespace KitLugia.Core
         new() {
             Name = "Arquivo de Paginação Fragmentado",
             Description = "Page file altamente fragmentado. Causa lentidão geral do sistema em operações de memória virtual, especialmente em sistemas com pouca RAM.",
-            Category = "Performance Degradada", Type = TweakType.PageFile, KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "PagingFiles", HarmfulValue = new string[] { "" }, DefaultValue = new string[] { @"C:\pagefile.sys" }
+            Category = "Performance Degradada", Type = TweakType.PageFile, KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "PagingFiles", HarmfulValue = new string[] { "" }, DefaultValue = new string[] { Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? string.Empty, "pagefile.sys") }
         },
         new() {
             Name = "Driver de Exibição Com Falha (Timeout Detection Recovery)",
@@ -1163,7 +1163,7 @@ namespace KitLugia.Core
         new() {
             Name = "Layout de Inicialização (Boot Layout Corrompido)",
             Description = "Layout de inicialização corrompido. Impede que o Windows otimize a posição dos arquivos de boot no disco, resultando em inicialização cada vez mais lenta.",
-            Category = "Performance Degradada", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\OptimalLayout", ValueName = "LayoutFilePath", HarmfulValue = "", DefaultValue = @"C:\Windows\Prefetch\Layout.ini"
+            Category = "Performance Degradada", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\OptimalLayout", ValueName = "LayoutFilePath", HarmfulValue = "", DefaultValue = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Prefetch", "Layout.ini")
         },
         new() {
             Name = "Serviço de Diagnóstico de Inicialização",
@@ -2210,7 +2210,7 @@ namespace KitLugia.Core
         new() {
             Name = "File History (Backup para Unidade de Rede Desconectada)",
             Description = "Histórico de arquivos configurado para unidade de rede que não está mais disponível. Backups falham silenciosamente sem notificação ao usuário.",
-            Category = "Backup e Restauração", KeyPath = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\FileHistory", ValueName = "TargetUrl", HarmfulValue = "", DefaultValue = @"C:\FileHistory"
+            Category = "Backup e Restauração", KeyPath = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\FileHistory", ValueName = "TargetUrl", HarmfulValue = "", DefaultValue = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? string.Empty, "FileHistory")
         },
         new() {
             Name = "Volume Shadow Copy (Cópias de Sombra Excluídas)",
@@ -2354,7 +2354,7 @@ namespace KitLugia.Core
         new() {
             Name = "Userinit (Inicialização de Usuário) Substituído",
             Description = "Programa de inicialização de usuário substituído. Pode ser malware carregado antes do Explorer, dificultando remoção.",
-            Category = "Inicialização", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", ValueName = "Userinit", HarmfulValue = "", DefaultValue = @"C:\Windows\system32\userinit.exe,"
+            Category = "Inicialização", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", ValueName = "Userinit", HarmfulValue = "", DefaultValue = Path.Combine(Environment.SystemDirectory, "userinit.exe") + ","
         },
         new() {
             Name = "Notificação de Logon (AppInit_DLLs) Ativada",
@@ -2939,7 +2939,7 @@ namespace KitLugia.Core
                     case TweakType.PageFile:
                         const string pfKey = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
                         if (applySafeValue)
-                            Registry.SetValue(pfKey, "PagingFiles", new string[] { @"C:\pagefile.sys" }, RegistryValueKind.MultiString);
+                                Registry.SetValue(pfKey, "PagingFiles", new string[] { Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "pagefile.sys") }, RegistryValueKind.MultiString);
                         else
                             Registry.SetValue(pfKey, "PagingFiles", Array.Empty<string>(), RegistryValueKind.MultiString);
                         break;

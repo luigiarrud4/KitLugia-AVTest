@@ -786,14 +786,17 @@ namespace KitLugia.Core
         }
 
         #region Turbo Boot (Task Scheduler)
-        private const string TurboTaskName = "KitLugiaTurboBoot";
+        private const string TurboTaskName = "KitLugia";
 
         public static bool IsTurboBootEnabled()
         {
             try
             {
                 using var ts = new TaskService();
-                return ts.GetTask(TurboTaskName) != null;
+                var task = ts.GetTask(TurboTaskName);
+                if (task == null) return false;
+                // Turbo Boot = tarefa KitLugia com prioridade High
+                return task.Enabled && task.Definition.Settings.Priority == ProcessPriorityClass.High;
             }
             catch { return false; }
         }
@@ -803,32 +806,61 @@ namespace KitLugia.Core
             try
             {
                 using var ts = new TaskService();
+                var task = ts.GetTask(TurboTaskName);
+
                 if (enable)
                 {
-                    string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                    if (string.IsNullOrEmpty(exePath)) return;
+                    // Se a tarefa não existe, criá-la agora (alta prioridade)
+                    if (task == null)
+                    {
+                        string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                        if (string.IsNullOrEmpty(exePath))
+                        {
+                            KitLugia.Core.Logger.LogError("ToggleTurboBoot", "Não foi possível obter o caminho do executável");
+                            return;
+                        }
 
-                    TaskDefinition td = ts.NewTask();
-                    td.RegistrationInfo.Description = "KitLugia Turbo Boot (High Privilege)";
-                    td.Principal.RunLevel = TaskRunLevel.Highest;
-                    
-                    td.Triggers.Add(new LogonTrigger());
-                    td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
-                    
-                    // Optimization: Do not wait for network, start immediately
-                    td.Settings.DisallowStartIfOnBatteries = false;
-                    td.Settings.StopIfGoingOnBatteries = false;
-                    td.Settings.ExecutionTimeLimit = TimeSpan.Zero; // Infinite
-                    td.Settings.Priority = ProcessPriorityClass.High;
+                        var td = ts.NewTask();
+                        td.RegistrationInfo.Description = "KitLugia Auto-Startup (Admin + Turbo Boot)";
+                        td.Principal.RunLevel = TaskRunLevel.Highest;
+                        td.Settings.DisallowStartIfOnBatteries = false;
+                        td.Settings.StopIfGoingOnBatteries = false;
+                        td.Settings.ExecutionTimeLimit = TimeSpan.Zero;
+                        td.Settings.StartWhenAvailable = true;
+                        td.Settings.Priority = ProcessPriorityClass.High;
+                        td.Settings.RestartCount = 2;
+                        td.Settings.RestartInterval = TimeSpan.FromSeconds(30);
 
-                    ts.RootFolder.RegisterTaskDefinition(TurboTaskName, td);
+                        var trigger = new LogonTrigger { Delay = TimeSpan.Zero, Enabled = true };
+                        td.Triggers.Add(trigger);
+                        td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
+                        ts.RootFolder.RegisterTaskDefinition(TurboTaskName, td);
+                        KitLugia.Core.Logger.Log("🚀 Turbo Boot: tarefa KitLugia criada com Priority High");
+                    }
+                    else
+                    {
+                        // Tarefa existe — apenas bumpa a prioridade
+                        var td = task.Definition;
+                        td.Settings.Priority = ProcessPriorityClass.High;
+                        task.RegisterChanges();
+                        KitLugia.Core.Logger.Log("🚀 Turbo Boot: prioridade da tarefa KitLugia elevada para High");
+                    }
                 }
                 else
                 {
-                    ts.RootFolder.DeleteTask(TurboTaskName, false);
+                    // Desativar Turbo = baixar prioridade (mas mantém a tarefa se ela existir)
+                    if (task != null)
+                    {
+                        task.Definition.Settings.Priority = ProcessPriorityClass.Normal;
+                        task.RegisterChanges();
+                        KitLugia.Core.Logger.Log("Turbo Boot: prioridade reduzida para Normal");
+                    }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogError("ToggleTurboBoot", ex.Message);
+            }
         }
         #endregion
 
