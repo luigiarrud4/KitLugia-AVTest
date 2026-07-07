@@ -14,6 +14,8 @@ namespace KitLugia.GUI.Pages
     public partial class TweaksPage : Page
     {
         private bool _isLoading = true;
+        private int _selectedGpuIndex = -1;
+        private string? _selectedGpuRegPath;
         private readonly SolidColorBrush _colorActive = new SolidColorBrush(Color.FromRgb(108, 203, 95));
         private readonly SolidColorBrush _colorDefault = new SolidColorBrush(Color.FromRgb(150, 150, 150));
         private readonly SolidColorBrush _colorSlideActive = new SolidColorBrush(Color.FromRgb(255, 170, 0)); // Amarelo Escuro para SLIDE
@@ -21,10 +23,12 @@ namespace KitLugia.GUI.Pages
         public TweaksPage()
         {
             InitializeComponent();
-            _ = LoadCurrentStatus();
 
+            this.Loaded += (s, e) => { _isPageLoaded = true; _ = LoadCurrentStatus(); };
             this.Unloaded += TweaksPage_Unloaded;
         }
+
+        private bool _isPageLoaded;
 
 
         public void Cleanup()
@@ -40,6 +44,7 @@ namespace KitLugia.GUI.Pages
 
         private void TweaksPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            _isPageLoaded = false;
             Cleanup();
         }
 
@@ -63,7 +68,8 @@ namespace KitLugia.GUI.Pages
 
                 Dispatcher.Invoke(() =>
                 {
-                    _isLoading = true; // Pausa eventos durante carga
+                    if (!_isPageLoaded) return;
+                    _isLoading = true;
 
                     ChkGameMode.IsChecked = gamesOptimized;
                     UpdateLabel(StatusGame, gamesOptimized, "Prioridade Alta", "Padrão");
@@ -131,6 +137,78 @@ namespace KitLugia.GUI.Pages
 
                     ChkTimeout.IsChecked = timeoutDisabled;
                     UpdateSlideLabel(StatusTimeout, timeoutDisabled, "Desativado (0)", "Padrão");
+
+                    // Hardware & Rede
+                    bool l2CacheSet = SystemTweaks.IsSecondLevelDataCacheSet();
+                    bool nagleDisabled = SystemTweaks.IsNagleAlgorithmDisabled();
+                    bool coreParkingDisabled = SystemTweaks.IsCoreParkingDisabled();
+
+                    ChkL2Cache.IsChecked = l2CacheSet;
+                    UpdateLabel(StatusL2Cache, l2CacheSet, "Aplicado", "Padrão");
+
+                    // Info CPU + Cache
+                    var cpuInfo = SystemTweaks.GetCpuInfo();
+                    var cacheVal = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache", 0);
+                    int cacheKb = cacheVal != null ? Convert.ToInt32(cacheVal) : 0;
+                    string cacheStr = cacheKb > 0 ? $"{cacheKb} KB" : "Não definido";
+                    InfoCpu.Text = $"CPU: {cpuInfo.Name}  |  L2: {cpuInfo.L2CacheKb} KB  |  L3: {cpuInfo.L3CacheKb} KB  |  Registry: {cacheStr}";
+
+                    ChkNagle.IsChecked = nagleDisabled;
+                    UpdateLabel(StatusNagle, nagleDisabled, "Aplicado", "Padrão");
+
+                    ChkCoreParking.IsChecked = coreParkingDisabled;
+                    UpdateLabel(StatusCoreParking, coreParkingDisabled, "Aplicado", "Padrão");
+
+                    // GPU & Scheduling
+                    // Populate GPU selector
+                    ChkGpuSelector.Items.Clear();
+                    var gpuNames = SystemTweaks.GetAllGpuNames();
+                    foreach (var gn in gpuNames)
+                        ChkGpuSelector.Items.Add(gn);
+                    if (ChkGpuSelector.Items.Count > 0)
+                    {
+                        ChkGpuSelector.SelectedIndex = 0;
+                        _selectedGpuIndex = 0;
+                        _selectedGpuRegPath = SystemTweaks.FindGpuRegistryPathByDescription(gpuNames[0]);
+                    }
+
+                    BuildVramRows();
+
+                    bool frameQueue = SystemTweaks.IsFrameQueueModeSet();
+                    bool preemption = SystemTweaks.IsPreemptionEnabled();
+                    bool gpuIdle = SystemTweaks.IsGpuIdleDisabled();
+                    bool powerLatency = SystemTweaks.IsGpuPowerLatencySet();
+
+                    ChkFrameQueue.IsChecked = frameQueue;
+                    UpdateLabel(StatusFrameQueue, frameQueue, "Low Latency (0)", "Padrão (1)");
+                    InfoFrameQueue.Text = frameQueue ? "FrameQueueMode=0 (Low Latency)" : "FrameQueueMode=1 (Padrão Windows)";
+
+                    ChkPreemption.IsChecked = preemption;
+                    UpdateLabel(StatusPreemption, preemption, "Ativado", "Padrão");
+
+                    ChkGpuIdle.IsChecked = gpuIdle;
+                    UpdateLabel(StatusGpuIdle, gpuIdle, "Desativado", "Ativo");
+
+                    ChkPowerLatency.IsChecked = powerLatency;
+                    UpdateLabel(StatusPowerLatency, powerLatency, "Latência (1)", "Padrão (0)");
+
+                    // Hardware & Rede — novos
+                    bool hags = SystemTweaks.IsHagsEnabled();
+                    bool tdr = SystemTweaks.IsTdrDelayIncreased();
+                    bool ioLock = SystemTweaks.IsIoPageLockLimitSet();
+                    bool inputQueue = SystemTweaks.IsInputQueueSizeIncreased();
+
+                    ChkHags.IsChecked = hags;
+                    UpdateLabel(StatusHags, hags, "Ativado (2)", "Padrão");
+
+                    ChkTdr.IsChecked = tdr;
+                    UpdateLabel(StatusTdr, tdr, "10s", "Padrão (2s)");
+
+                    ChkIoLock.IsChecked = ioLock;
+                    UpdateLabel(StatusIoLock, ioLock, "8192 KB", "Padrão");
+
+                    ChkInputQueue.IsChecked = inputQueue;
+                    UpdateLabel(StatusInputQueue, inputQueue, "200", "Padrão (100)");
 
                     _isLoading = false;
                 });
@@ -806,6 +884,469 @@ namespace KitLugia.GUI.Pages
                 mw.ShowInfo("SmartScreen Explorer", disable
                     ? "Bloqueio de arquivos do Explorer desativado em múltiplas camadas. Você poderá abrir qualquer arquivo sem restrições."
                     : "Proteção do Explorer reativada.");
+        }
+
+        // --- HARDWARE & REDE ---
+
+        private void BuildVramRows()
+        {
+            VramContainer.Children.Clear();
+            var gpus = SystemTweaks.GetAllGpuInfo();
+            double totalRam = SystemUtils.GetTotalSystemRamGB();
+            int recommended = SystemTweaks.GetRecommendedVramMb(totalRam);
+
+            if (gpus.Count == 0)
+            {
+                VramContainer.Children.Add(new TextBlock
+                {
+                    Text = "Nenhuma GPU detectada.",
+                    Foreground = _colorDefault,
+                    Margin = new Thickness(20),
+                    FontSize = 13
+                });
+                VramSeparator.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            for (int i = 0; i < gpus.Count; i++)
+            {
+                var gpu = gpus[i];
+                int vramMb = 0;
+                if (!string.IsNullOrEmpty(gpu.RegPath))
+                {
+                    var val = Registry.GetValue(gpu.RegPath, "DedicatedSegmentSize", 0);
+                    vramMb = val != null ? Convert.ToInt32(val) : 0;
+                }
+                bool isApplied = vramMb > 0;
+                string displayName = gpu.Name.Length > 50 ? gpu.Name[..50] + "..." : gpu.Name;
+                bool hasRegPath = !string.IsNullOrEmpty(gpu.RegPath);
+
+                var grid = new Grid { Margin = new Thickness(20) };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                // Info button
+                var infoBtn = new System.Windows.Controls.Button
+                {
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Width = 30,
+                    Height = 30,
+                    Cursor = System.Windows.Input.Cursors.Help,
+                    Margin = new Thickness(0, 0, 10, 0),
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Content = new TextBlock
+                    {
+                        Text = "\u2139\uFE0F",
+                        FontSize = 16,
+                        Foreground = new SolidColorBrush(Color.FromRgb(170, 136, 255)),
+                        Opacity = 0.6
+                    }
+                };
+                ToolTipService.SetInitialShowDelay(infoBtn, 0);
+                ToolTipService.SetShowDuration(infoBtn, 20000);
+                infoBtn.ToolTip = new System.Windows.Controls.ToolTip
+                {
+                    Content = hasRegPath
+                        ? $"Aumenta a VRAM dedicada (DedicatedSegmentSize) no registro para esta GPU.{Environment.NewLine}Caminho: {gpu.RegPath}{Environment.NewLine}Recomendado: {recommended} MB baseado em {totalRam:F1} GB de RAM.{Environment.NewLine}Útil para GPUs integradas e jogos que reportam pouca VRAM."
+                        : $"Não foi possível encontrar o caminho do registro para esta GPU.{Environment.NewLine}Os tweaks de VRAM não estarão disponíveis para ela."
+                };
+                Grid.SetColumn(infoBtn, 0);
+                grid.Children.Add(infoBtn);
+
+                // GPU name
+                var stack = new StackPanel();
+                var nameBlock = new TextBlock
+                {
+                    Text = displayName,
+                    FontSize = 14,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = System.Windows.Media.Brushes.White
+                };
+                stack.Children.Add(nameBlock);
+
+                // VRAM info line
+                string statusPart = isApplied ? $"{vramMb} MB" : "Padr\u00E3o";
+                string regPart = hasRegPath ? "" : "  (caminho do registro n\u00E3o encontrado)";
+                var vramLine = new TextBlock
+                {
+                    Text = $"VRAM: {statusPart}  |  RAM: {totalRam:F1} GB  |  Recomendado: {recommended} MB{regPart}",
+                    FontSize = 11,
+                    Foreground = hasRegPath
+                        ? (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#A0A0A0")
+                        : System.Windows.Media.Brushes.Orange,
+                    Margin = new Thickness(0, 2, 0, 0)
+                };
+                stack.Children.Add(vramLine);
+                Grid.SetColumn(stack, 1);
+                grid.Children.Add(stack);
+
+                // Status badge
+                var border = new Border
+                {
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Padding = new Thickness(8, 3, 8, 3),
+                    CornerRadius = new CornerRadius(4),
+                    Background = (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#0A2838"),
+                    BorderBrush = (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#1A6B80"),
+                    BorderThickness = new Thickness(1),
+                    Margin = new Thickness(0, 0, 15, 0)
+                };
+                var statusLabel = new TextBlock
+                {
+                    Text = isApplied ? "Aplicado" : "Padr\u00E3o",
+                    Foreground = isApplied ? _colorActive : _colorDefault,
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 12
+                };
+                border.Child = statusLabel;
+                Grid.SetColumn(border, 2);
+                grid.Children.Add(border);
+
+                // Toggle (só habilitado se achou o caminho do registro)
+                var toggle = new System.Windows.Controls.CheckBox
+                {
+                    Style = (System.Windows.Style)FindResource("ToggleSwitchStyle"),
+                    IsChecked = isApplied,
+                    Tag = gpu.RegPath ?? "",
+                    IsEnabled = hasRegPath,
+                    Margin = new Thickness(0, 20, 20, 20),
+                    Opacity = hasRegPath ? 1.0 : 0.3
+                };
+                toggle.Click += VramToggle_Click;
+                Grid.SetColumn(toggle, 3);
+                grid.Children.Add(toggle);
+
+                VramContainer.Children.Add(grid);
+
+                if (i < gpus.Count - 1)
+                {
+                    VramContainer.Children.Add(new Separator
+                    {
+                        Background = (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#1A5568"),
+                        Opacity = 0.4,
+                        Margin = new Thickness(20, 0, 20, 0)
+                    });
+                }
+            }
+
+            VramSeparator.Visibility = gpus.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private async void VramToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            if (sender is System.Windows.Controls.CheckBox toggle && toggle.Tag is string regPath)
+            {
+                _isLoading = true;
+                try
+                {
+                    bool targetActive = toggle.IsChecked == true;
+                    string gpuName = "";
+
+                    // Extrai o nome da GPU do StackPanel na mesma linha
+                    if (toggle.Parent is Grid parentGrid && parentGrid.Children.Count > 1
+                        && parentGrid.Children[1] is StackPanel sp && sp.Children.Count > 0
+                        && sp.Children[0] is TextBlock nameTb)
+                    {
+                        gpuName = nameTb.Text.TrimEnd('.');
+                    }
+
+                    await Task.Run(() =>
+                    {
+                        if (targetActive)
+                        {
+                            if (!string.IsNullOrEmpty(regPath))
+                            {
+                                double totalRam = SystemUtils.GetTotalSystemRamGB();
+                                int sizeToSet = SystemTweaks.GetRecommendedVramMb(totalRam);
+                                SystemTweaks.ApplyGpuVramTweak(regPath, sizeToSet);
+                            }
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrEmpty(regPath))
+                                SystemTweaks.RevertRegistryValue(regPath, "DedicatedSegmentSize");
+                        }
+                    });
+
+                    // Atualiza a UI inline sem recriar nada
+                    if (toggle.Parent is Grid pg && pg.Children.Count > 2)
+                    {
+                        if (pg.Children[2] is Border b && b.Child is TextBlock st)
+                        {
+                            st.Text = targetActive ? "Aplicado" : "Padr\u00E3o";
+                            st.Foreground = targetActive ? _colorActive : _colorDefault;
+                        }
+                        if (pg.Children[1] is StackPanel s && s.Children.Count > 1 && s.Children[1] is TextBlock vl)
+                        {
+                            double totalRam = SystemUtils.GetTotalSystemRamGB();
+                            int recommended = SystemTweaks.GetRecommendedVramMb(totalRam);
+                            string vramStr = targetActive ? $"{recommended} MB" : "Padr\u00E3o";
+                            vl.Text = $"VRAM: {vramStr}  |  RAM: {totalRam:F1} GB  |  Recomendado: {recommended} MB";
+                        }
+                    }
+
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowInfo("VRAM", targetActive
+                            ? $"VRAM ajustada em {gpuName}"
+                            : $"VRAM removida de {gpuName}");
+                }
+                catch { }
+                finally { _isLoading = false; }
+            }
+        }
+
+        private async void ChkFrameQueue_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkFrameQueue.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.ApplyLowLatencyFrameQueue();
+                    else SystemTweaks.RevertFrameQueue();
+                });
+                UpdateLabel(StatusFrameQueue, targetActive, "Low Latency (0)", "Padrão (1)");
+                InfoFrameQueue.Text = targetActive ? "FrameQueueMode=0 (Low Latency)" : "FrameQueueMode=1 (Padrão Windows)";
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("GPU", targetActive ? "FrameQueueMode: Low Latency" : "FrameQueueMode: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkPreemption_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkPreemption.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.EnableGpuPreemption();
+                    else SystemTweaks.RevertGpuPreemption();
+                });
+                UpdateLabel(StatusPreemption, targetActive, "Ativado", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("GPU", targetActive ? "Preempção de GPU ativada" : "Preempção de GPU: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkGpuIdle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkGpuIdle.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.DisableGpuIdleSchedule();
+                    else SystemTweaks.RevertGpuIdleSchedule();
+                });
+                UpdateLabel(StatusGpuIdle, targetActive, "Desativado", "Ativo");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("GPU", targetActive ? "GPU Idle desativado" : "GPU Idle: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkPowerLatency_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkPowerLatency.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.SetGpuPowerLatency();
+                    else SystemTweaks.RevertGpuPowerLatency();
+                });
+                UpdateLabel(StatusPowerLatency, targetActive, "Latência (1)", "Padrão (0)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("GPU", targetActive ? "GPU Power Latency: Priorizar Latência" : "GPU Power Latency: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private void ChkGpuSelector_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (_isLoading) return;
+            _selectedGpuIndex = ChkGpuSelector.SelectedIndex;
+            var names = SystemTweaks.GetAllGpuNames();
+            if (_selectedGpuIndex >= 0 && _selectedGpuIndex < names.Count)
+                _selectedGpuRegPath = SystemTweaks.FindGpuRegistryPathByDescription(names[_selectedGpuIndex]);
+            else
+                _selectedGpuRegPath = null;
+        }
+
+        private async void ChkL2Cache_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkL2Cache.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.ApplyAutoCacheTweak();
+                    else SystemTweaks.RevertRegistryValue(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache");
+                });
+                UpdateLabel(StatusL2Cache, targetActive, "Aplicado", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("CACHE CPU", targetActive ? "Cache L2/L3 configurado conforme sua CPU." : "Cache L2/L3 restaurado para padrão.");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkNagle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkNagle.IsChecked == true;
+                var result = await Task.Run(() => targetActive
+                    ? SystemTweaks.DisableNagleAlgorithm()
+                    : SystemTweaks.RevertNagleAlgorithm());
+                if (!result.Success)
+                {
+                    ChkNagle.IsChecked = !targetActive;
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowError("NAGLE", result.Message);
+                }
+                else
+                {
+                    UpdateLabel(StatusNagle, targetActive, "Aplicado", "Padrão");
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowInfo("NAGLE", result.Message);
+                }
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkCoreParking_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkCoreParking.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.DisableCoreParking();
+                    else
+                    {
+                        string[] keys = {
+                            @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\0cc5b647-c1df-4637-891a-dec35c318583",
+                            @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\ea4be0c1-7c65-46f8-8c17-f298766665d9"
+                        };
+                        foreach (var k in keys)
+                        {
+                            SystemTweaks.RevertRegistryValue(k, "ValueMax");
+                            SystemTweaks.RevertRegistryValue(k, "ValueMin");
+                        }
+                    }
+                });
+                UpdateLabel(StatusCoreParking, targetActive, "Aplicado", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("CORE PARKING", targetActive ? "Core Parking desativado. Todos os núcleos permanecem ativos." : "Core Parking restaurado para padrão.");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkHags_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkHags.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.EnableHags();
+                    else SystemTweaks.RevertHags();
+                });
+                UpdateLabel(StatusHags, targetActive, "Ativado (2)", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("GPU", targetActive ? "HAGS ativado (HwSchMode=2)" : "HAGS: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkTdr_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkTdr.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.IncreaseTdrDelay();
+                    else SystemTweaks.RevertTdrDelay();
+                });
+                UpdateLabel(StatusTdr, targetActive, "10s", "Padrão (2s)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("GPU", targetActive ? "TDR Delay aumentado para 10s" : "TDR Delay: Padrão (2s)");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkIoLock_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkIoLock.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.SetIoPageLockLimit();
+                    else SystemTweaks.RevertIoPageLockLimit();
+                });
+                UpdateLabel(StatusIoLock, targetActive, "8192 KB", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("MEMÓRIA", targetActive ? "IoPageLockLimit=8192 KB" : "IoPageLockLimit: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkInputQueue_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkInputQueue.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.IncreaseInputQueueSize();
+                    else SystemTweaks.RevertInputQueueSize();
+                });
+                UpdateLabel(StatusInputQueue, targetActive, "200", "Padrão (100)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("INPUT", targetActive ? "Fila de input aumentada para 200" : "Fila de input: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
         }
     }
 }

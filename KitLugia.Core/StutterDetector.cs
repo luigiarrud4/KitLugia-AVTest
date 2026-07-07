@@ -236,10 +236,13 @@ namespace KitLugia.Core
 
                 if ((now - _lastDpcSample).TotalSeconds >= 2)
                 {
-                    _ = Task.Run(() => SampleDpcIsr());
-                    _ = Task.Run(() => SampleTopProcess());
-                    _ = Task.Run(() => SampleMonitoredProcess());
-                    _ = Task.Run(() => SampleAudiodg());
+                    _ = Task.Run(() =>
+                    {
+                        SampleDpcIsr();
+                        SampleTopProcess();
+                        SampleMonitoredProcess();
+                        SampleAudiodg();
+                    });
                     _lastDpcSample = now;
                 }
 
@@ -277,11 +280,18 @@ namespace KitLugia.Core
                 string category = PerformanceCounterCategory.Exists("Processor Information")
                     ? "Processor Information"
                     : "Processor";
+                double cpu = 0;
                 var cpuCounter = new PerformanceCounter(category, "% Processor Time", "_Total");
-                cpuCounter.NextValue();
-                Thread.Sleep(200);
-                double cpu = cpuCounter.NextValue();
-                cpuCounter.Dispose();
+                try
+                {
+                    cpuCounter.NextValue();
+                    Thread.Sleep(200);
+                    cpu = cpuCounter.NextValue();
+                }
+                finally
+                {
+                    cpuCounter.Dispose();
+                }
 
                 double avg = AverageLatencyUs;
                 if (avg > 500)

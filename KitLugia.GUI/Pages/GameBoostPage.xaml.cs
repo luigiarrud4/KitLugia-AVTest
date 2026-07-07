@@ -250,12 +250,7 @@ namespace KitLugia.GUI.Pages
                 var trayService = mw?.TrayService;
                 if (trayService != null && !trayService.IsInitialized)
                 {
-                    int waited = 0;
-                    while (!trayService.IsInitialized && waited < 3000)
-                    {
-                        System.Threading.Thread.Sleep(50);
-                        waited += 50;
-                    }
+                    // Will use defaults, values update when service is ready
                 }
 
                 // IMPORTANTE: NfO usar padrões! Só ler do serviço.
@@ -691,9 +686,6 @@ namespace KitLugia.GUI.Pages
                                 catch { /* Ignora se processo não estiver rodando */ }
 
 
-                                System.Threading.Thread.Sleep(500);
-
-
                                 if (File.Exists(backupPath))
                                 {
 
@@ -705,9 +697,6 @@ namespace KitLugia.GUI.Pages
 
                                         SystemUtils.RunExternalProcess("icacls", $"\"{backupPath}\" /grant *S-1-3-4:F /t /c /l", true);
                                         KitLugia.Core.Logger.Log("🔓 Permissões concedidas para Everyone no .bak");
-                                        
-
-                                        System.Threading.Thread.Sleep(500);
                                         
 
                                         File.Delete(backupPath);
@@ -726,9 +715,6 @@ namespace KitLugia.GUI.Pages
 
                                 SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
                                 KitLugia.Core.Logger.Log("🔓 Permissões concedidas para Everyone no .exe");
-
-
-                                System.Threading.Thread.Sleep(500);
 
 
                                 File.Move(gameBarPath, backupPath);
@@ -772,9 +758,6 @@ namespace KitLugia.GUI.Pages
 
                                 SystemUtils.RunExternalProcess("icacls", $"\"{backupPath}\" /grant *S-1-3-4:F /t /c /l", true);
                                 KitLugia.Core.Logger.Log("🔓 Permissões concedidas para Everyone");
-
-
-                                System.Threading.Thread.Sleep(500);
 
 
                                 File.Move(backupPath, gameBarPath);

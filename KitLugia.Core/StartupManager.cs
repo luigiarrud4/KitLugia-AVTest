@@ -2033,7 +2033,7 @@ namespace KitLugia.Core
         {
             try
             {
-                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
                 {
                     if (key == null)
                     {
@@ -2041,44 +2041,56 @@ namespace KitLugia.Core
                         return;
                     }
 
-                    var kitLugiaPath = key.GetValue("KitLugia") as string;
-                    
-                    if (string.IsNullOrEmpty(kitLugiaPath))
+                    var rawValue = key.GetValue("KitLugia") as string;
+                    string expectedValue = $"\"{exePath}\" --tray";
+
+                    if (string.IsNullOrEmpty(rawValue))
                     {
                         Logger.Log("❌ Nenhuma entrada no registro Run encontrada");
-                        Logger.Log("🔧 Criando entrada no registro Run...");
-                        key.SetValue("KitLugia", exePath + " --tray");
-                        Logger.Log("✅ Entrada no registro Run criada com --tray");
+                        return;
                     }
-                    else if (!File.Exists(kitLugiaPath))
+
+                    // Extrai o caminho do executável do valor (com ou sem aspas)
+                    string existingPath = rawValue.Trim();
+                    if (existingPath.StartsWith("\""))
                     {
-                        Logger.Log($"⚠️ Entrada no registro Run aponta para arquivo inexistente: {kitLugiaPath}");
-                        Logger.Log("🔧 Corrigindo entrada no registro...");
-                        key.SetValue("KitLugia", exePath + " --tray");
-                        Logger.Log("✅ Entrada no registro Run corrigida com --tray");
-                    }
-                    else if (kitLugiaPath != exePath)
-                    {
-                        Logger.Log($"⚠️ Entrada no registro Run aponta para versão antiga: {kitLugiaPath}");
-                        Logger.Log("🔧 Atualizando entrada no registro...");
-                        key.SetValue("KitLugia", exePath + " --tray");
-                        Logger.Log("✅ Entrada no registro Run atualizada com --tray");
+                        int endQuote = existingPath.IndexOf('"', 1);
+                        existingPath = endQuote > 0 ? existingPath.Substring(1, endQuote - 1) : exePath;
                     }
                     else
                     {
-                        // Verificar se já tem --tray
-                        if (!kitLugiaPath.Contains("--tray"))
-                        {
-                            Logger.Log("⚠️ Entrada no registro Run não tem --tray");
-                            Logger.Log("🔧 Adicionando --tray para garantir Tray Icon...");
-                            key.SetValue("KitLugia", kitLugiaPath + " --tray");
-                            Logger.Log("✅ --tray adicionado à entrada do registro Run");
-                        }
-                        else
-                        {
-                            Logger.Log("✅ Entrada no registro Run está correta com --tray");
-                        }
+                        // Valor sem aspas — pega até o primeiro espaço
+                        int firstSpace = existingPath.IndexOf(' ');
+                        if (firstSpace > 0) existingPath = existingPath.Substring(0, firstSpace);
                     }
+
+                    if (string.IsNullOrEmpty(existingPath))
+                    {
+                        Logger.Log("⚠️ Valor do registro Run inválido, ignorando...");
+                        return;
+                    }
+
+                    if (!File.Exists(existingPath))
+                    {
+                        Logger.Log($"⚠️ Entrada no registro Run aponta para arquivo inexistente: {existingPath}");
+                        return;
+                    }
+
+                    if (!string.Equals(existingPath, exePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Log($"⚠️ Entrada no registro Run aponta para versão antiga: {existingPath}");
+                        return;
+                    }
+
+                    if (rawValue != expectedValue)
+                    {
+                        Logger.Log("⚠️ Corrigindo entrada no registro Run (caminho sem aspas ou sem --tray)...");
+                        key.SetValue("KitLugia", expectedValue);
+                        Logger.Log("✅ Entrada no registro Run corrigida");
+                        return;
+                    }
+
+                    Logger.Log("✅ Entrada no registro Run está correta");
                 }
             }
             catch (Exception ex)
@@ -2097,45 +2109,27 @@ namespace KitLugia.Core
                     
                     if (task == null)
                     {
-                        Logger.Log("❌ Nenhuma tarefa agendada encontrada");
-                        Logger.Log("ℹ️ Criando tarefa agendada para inicialização com Windows...");
-                        
-                        // Criar tarefa agendada
-                        var td = ts.NewTask();
-                        td.RegistrationInfo.Description = "KitLugia Auto-Startup";
-                        td.Settings.DisallowStartIfOnBatteries = false;
-                        td.Settings.StopIfGoingOnBatteries = false;
-                        td.Settings.ExecutionTimeLimit = TimeSpan.Zero;
-                        td.Settings.StartWhenAvailable = true;
-                        
-                        var trigger = new LogonTrigger
-                        {
-                            Delay = TimeSpan.FromSeconds(5)
-                        };
-                        td.Triggers.Add(trigger);
-                        td.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
-                        
-                        ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
-                        Logger.Log("✅ Tarefa agendada criada com sucesso");
+                        Logger.Log("ℹ️ Nenhuma tarefa agendada encontrada (o TrayIcon criará se necessário)");
+                        return;
+                    }
+
+                    var execAction = task.Definition.Actions.FirstOrDefault() as ExecAction;
+                    string? taskPath = execAction?.Path;
+
+                    if (string.IsNullOrEmpty(taskPath) || !string.Equals(taskPath, exePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Log($"⚠️ Tarefa agendada aponta para: {taskPath ?? "(vazio)"}");
+                        Logger.Log("🔧 Atualizando tarefa agendada...");
+
+                        task.Definition.Actions.Clear();
+                        task.Definition.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
+                        task.RegisterChanges();
+
+                        Logger.Log("✅ Tarefa agendada atualizada");
                     }
                     else
                     {
-                        var taskPath = task.Definition.Actions[0] as ExecAction;
-                        if (taskPath?.Path != exePath)
-                        {
-                            Logger.Log($"⚠️ Tarefa agendada aponta para: {taskPath?.Path}");
-                            Logger.Log("🔧 Atualizando tarefa agendada...");
-                            
-                            task.Definition.Actions.Clear();
-                            task.Definition.Actions.Add(new ExecAction(exePath, "--tray", Path.GetDirectoryName(exePath) ?? ""));
-                            task.RegisterChanges();
-                            
-                            Logger.Log("✅ Tarefa agendada atualizada");
-                        }
-                        else
-                        {
-                            Logger.Log("✅ Tarefa agendada está correta");
-                        }
+                        Logger.Log("✅ Tarefa agendada está correta");
                     }
                 }
             }

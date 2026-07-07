@@ -73,7 +73,7 @@ namespace KitLugia.GUI
 
         public static void Add(string title, string message, NotificationType type)
         {
-            if (Application.Current != null)
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownFinished)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -97,7 +97,7 @@ namespace KitLugia.GUI
 
         public static void Remove(NotificationItem item)
         {
-            if (Application.Current != null)
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownFinished)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -112,7 +112,7 @@ namespace KitLugia.GUI
 
         public static void ClearAll()
         {
-            if (Application.Current != null)
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownFinished)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {

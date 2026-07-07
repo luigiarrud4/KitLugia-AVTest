@@ -344,7 +344,7 @@ namespace KitLugia.Core
                     Logger.Log($"[INFO] Hardware ID vazio, usando Google search");
                 }
 
-                Process.Start(new ProcessStartInfo("cmd", $"/c start {url}") { CreateNoWindow = true });
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
             }
             catch (Exception ex)
             {
@@ -394,7 +394,7 @@ namespace KitLugia.Core
                 sb.AppendLine($"Data: {DateTime.Now}");
                 sb.AppendLine("========================================");
 
-                var list = _cachedDrivers.Count > 0 ? _cachedDrivers : GetSystemDriversAsync(true).GetAwaiter().GetResult();
+                var list = _cachedDrivers.Count > 0 ? _cachedDrivers : Task.Run(() => GetSystemDriversAsync(true)).GetAwaiter().GetResult();
                 foreach (var d in list)
                 {
                     sb.AppendLine($"Dispositivo: {d.DeviceName}");

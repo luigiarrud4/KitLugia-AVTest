@@ -329,8 +329,7 @@ namespace KitLugia.Core
                 DeepUninstaller.KillProcessesForApp(packageFullName);
 
                 var pm = new Windows.Management.Deployment.PackageManager();
-                var op = pm.RemovePackageAsync(packageFullName);
-                op.AsTask().GetAwaiter().GetResult();
+                Task.Run(() => pm.RemovePackageAsync(packageFullName).AsTask().GetAwaiter().GetResult()).GetAwaiter().GetResult();
 
                 return (true, "Removido com sucesso");
             }
@@ -352,8 +351,7 @@ namespace KitLugia.Core
                 try
                 {
                     var pm = new Windows.Management.Deployment.PackageManager();
-                    var op = pm.RemovePackageAsync(packageFullName);
-                    op.AsTask().GetAwaiter().GetResult();
+                    Task.Run(() => pm.RemovePackageAsync(packageFullName).AsTask().GetAwaiter().GetResult()).GetAwaiter().GetResult();
                 }
                 catch { }
 
@@ -933,7 +931,7 @@ namespace KitLugia.Core
                 using var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_VideoController");
                 foreach (ManagementObject obj in searcher.Get())
                 {
-                    using (obj) // Garante dispose de cada objeto
+                    using (obj)
                     {
                         string? name = obj["Name"]?.ToString();
                         if (!string.IsNullOrEmpty(name))
@@ -943,6 +941,75 @@ namespace KitLugia.Core
             }
             catch { }
             return names;
+        }
+
+        public record GpuInfo(string Name, string? RegPath, string PnpDeviceId);
+
+        public static List<GpuInfo> GetAllGpuInfo()
+        {
+            var result = new List<GpuInfo>();
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("SELECT Name, PNPDeviceID FROM Win32_VideoController");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    using (obj)
+                    {
+                        string? name = obj["Name"]?.ToString();
+                        string? pnpId = obj["PNPDeviceID"]?.ToString();
+                        if (string.IsNullOrEmpty(name)) continue;
+
+                        string? regPath = FindGpuRegistryPathByPnpId(pnpId);
+                        result.Add(new GpuInfo(name, regPath, pnpId ?? ""));
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+
+        private static string? FindGpuRegistryPathByPnpId(string? pnpDeviceId)
+        {
+            if (string.IsNullOrEmpty(pnpDeviceId)) return null;
+            try
+            {
+                string videoClassGuid = "{4d36e968-e325-11ce-bfc1-08002be10318}";
+                string regBase = $@"SYSTEM\CurrentControlSet\Control\Class\{videoClassGuid}";
+                using var baseKey = Registry.LocalMachine.OpenSubKey(regBase);
+                if (baseKey == null) return null;
+
+                foreach (var subKeyName in baseKey.GetSubKeyNames())
+                {
+                    if (!Regex.IsMatch(subKeyName, @"^\d{4}$")) continue;
+                    using var subKey = baseKey.OpenSubKey(subKeyName);
+                    if (subKey == null) continue;
+
+                    // Match primário: DeviceInstance contra PNPDeviceID do WMI
+                    string? deviceInstance = subKey.GetValue("DeviceInstance")?.ToString();
+                    if (!string.IsNullOrEmpty(deviceInstance) &&
+                        deviceInstance.Equals(pnpDeviceId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return $@"HKEY_LOCAL_MACHINE\{regBase}\{subKeyName}";
+                    }
+                }
+
+                // Fallback: tenta MatchingDeviceId como prefixo do PNPDeviceID
+                foreach (var subKeyName in baseKey.GetSubKeyNames())
+                {
+                    if (!Regex.IsMatch(subKeyName, @"^\d{4}$")) continue;
+                    using var subKey = baseKey.OpenSubKey(subKeyName);
+                    if (subKey == null) continue;
+
+                    string? matchingId = subKey.GetValue("MatchingDeviceId")?.ToString();
+                    if (!string.IsNullOrEmpty(matchingId) &&
+                        pnpDeviceId.StartsWith(matchingId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return $@"HKEY_LOCAL_MACHINE\{regBase}\{subKeyName}";
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
 
         /// <summary>
@@ -1002,15 +1069,31 @@ namespace KitLugia.Core
                 using var baseKey = Registry.LocalMachine.OpenSubKey(regBase);
                 if (baseKey == null) return null;
 
+                // 1. Match exato (case-insensitive)
                 foreach (var subKeyName in baseKey.GetSubKeyNames())
                 {
-                    if (Regex.IsMatch(subKeyName, @"^\d{4}$"))
+                    if (!Regex.IsMatch(subKeyName, @"^\d{4}$")) continue;
+                    using var subKey = baseKey.OpenSubKey(subKeyName);
+                    if (subKey == null) continue;
+                    string? driverDesc = subKey.GetValue("DriverDesc")?.ToString();
+                    if (!string.IsNullOrEmpty(driverDesc) &&
+                        driverDesc.Equals(gpuDescription, StringComparison.OrdinalIgnoreCase))
                     {
-                        using var subKey = baseKey.OpenSubKey(subKeyName);
-                        if (subKey?.GetValue("DriverDesc")?.ToString() == gpuDescription)
-                        {
-                            return $@"HKEY_LOCAL_MACHINE\{regBase}\{subKeyName}";
-                        }
+                        return $@"HKEY_LOCAL_MACHINE\{regBase}\{subKeyName}";
+                    }
+                }
+
+                // 2. Fallback: contém a descrição (case-insensitive)
+                foreach (var subKeyName in baseKey.GetSubKeyNames())
+                {
+                    if (!Regex.IsMatch(subKeyName, @"^\d{4}$")) continue;
+                    using var subKey = baseKey.OpenSubKey(subKeyName);
+                    if (subKey == null) continue;
+                    string? driverDesc = subKey.GetValue("DriverDesc")?.ToString();
+                    if (!string.IsNullOrEmpty(driverDesc) &&
+                        driverDesc.Contains(gpuDescription, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return $@"HKEY_LOCAL_MACHINE\{regBase}\{subKeyName}";
                     }
                 }
             }
@@ -1138,6 +1221,204 @@ namespace KitLugia.Core
             {
                 Logger.Log($"ERRO na reversão agressiva: {ex.Message}");
             }
+        }
+
+        // ============================================================
+        // GPU SCHEDULING TWEAKS (FrameQueue, Preemption, Idle, Latency)
+        // ============================================================
+
+        private const string GpuSchedulerPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\Scheduler";
+        private const string GpuPowerPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\Power";
+
+        // --- FrameQueueMode: 0 = Low Latency ---
+        public static bool IsFrameQueueModeSet() => (int?)Registry.GetValue(GpuSchedulerPath, "FrameQueueMode", 0) == 0;
+        public static void ApplyLowLatencyFrameQueue()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
+                key?.SetValue("FrameQueueMode", 0, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertFrameQueue()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("FrameQueueMode", false);
+            }
+            catch { }
+        }
+
+        // --- EnablePreemption: 1 = Allow GPU preemption ---
+        public static bool IsPreemptionEnabled() => (int?)Registry.GetValue(GpuSchedulerPath, "EnablePreemption", 0) == 1;
+        public static void EnableGpuPreemption()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
+                key?.SetValue("EnablePreemption", 1, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertGpuPreemption()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("EnablePreemption", false);
+            }
+            catch { }
+        }
+
+        // --- DisableGpuIdle: 1 = GPU never idles ---
+        public static bool IsGpuIdleDisabled() => (int?)Registry.GetValue(GpuSchedulerPath, "DisableGpuIdle", 0) == 1;
+        public static void DisableGpuIdleSchedule()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
+                key?.SetValue("DisableGpuIdle", 1, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertGpuIdleSchedule()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("DisableGpuIdle", false);
+            }
+            catch { }
+        }
+
+        // --- GPU Power Latency: 1 = Priority to latency ---
+        public static bool IsGpuPowerLatencySet() => (int?)Registry.GetValue(GpuPowerPath, "Latency", 0) == 1;
+        public static void SetGpuPowerLatency()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(GpuPowerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
+                key?.SetValue("Latency", 1, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertGpuPowerLatency()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(GpuPowerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("Latency", false);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // HAGS (Hardware Accelerated GPU Scheduling)
+        // ============================================================
+        private const string GpuDriversPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
+
+        public static bool IsHagsEnabled() => (int?)Registry.GetValue(GpuDriversPath, "HwSchMode", 0) == 2;
+        public static void EnableHags()
+        {
+            try
+            {
+                Registry.SetValue(GpuDriversPath, "HwSchMode", 2, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertHags()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(GpuDriversPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("HwSchMode", false);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // TDR Delay (Timeout Detection & Recovery)
+        // ============================================================
+        public static bool IsTdrDelayIncreased() => (int?)Registry.GetValue(GpuDriversPath, "TdrDelay", 0) >= 10;
+        public static void IncreaseTdrDelay()
+        {
+            try
+            {
+                Registry.SetValue(GpuDriversPath, "TdrDelay", 10, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertTdrDelay()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(GpuDriversPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("TdrDelay", false);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // IoPageLockLimit (memória travada para I/O de GPU/disco)
+        // ============================================================
+        private const string MemManagementPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
+
+        public static bool IsIoPageLockLimitSet() => (int?)Registry.GetValue(MemManagementPath, "IoPageLockLimit", 0) >= 8192;
+        public static void SetIoPageLockLimit()
+        {
+            try
+            {
+                Registry.SetValue(MemManagementPath, "IoPageLockLimit", 8192, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertIoPageLockLimit()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(MemManagementPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("IoPageLockLimit", false);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // Input Queue Size (Mouse & Keyboard)
+        // ============================================================
+        private const string MouclassPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\mouclass\Parameters";
+        private const string KbdclassPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\kbdclass\Parameters";
+
+        public static bool IsInputQueueSizeIncreased()
+        {
+            try
+            {
+                int mouse = (int?)Registry.GetValue(MouclassPath, "MouseDataQueueSize", 0) ?? 0;
+                int kbd = (int?)Registry.GetValue(KbdclassPath, "KeyboardDataQueueSize", 0) ?? 0;
+                return mouse >= 200 || kbd >= 200;
+            }
+            catch { return false; }
+        }
+        public static void IncreaseInputQueueSize()
+        {
+            try
+            {
+                Registry.SetValue(MouclassPath, "MouseDataQueueSize", 200, RegistryValueKind.DWord);
+                Registry.SetValue(KbdclassPath, "KeyboardDataQueueSize", 200, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertInputQueueSize()
+        {
+            try
+            {
+                using var mk = Registry.LocalMachine.OpenSubKey(MouclassPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                mk?.DeleteValue("MouseDataQueueSize", false);
+                using var kk = Registry.LocalMachine.OpenSubKey(KbdclassPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                kk?.DeleteValue("KeyboardDataQueueSize", false);
+            }
+            catch { }
         }
 
         public static bool IsGamingOptimized() => (int?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games", "GPU Priority", 0) == 8;
@@ -3506,11 +3787,21 @@ namespace KitLugia.Core
                 };
 
                 using var process1 = Process.Start(psi);
-                process1?.WaitForExit();
+                if (process1 != null)
+                {
+                    process1.StandardOutput.ReadToEnd();
+                    process1.StandardError.ReadToEnd();
+                    process1.WaitForExit();
+                }
 
                 psi.Arguments = "-attributes SUB_PROCESSOR 7b224883-b3cc-4d79-819f-8374152cbe7c +ATTRIB_HIDE";
                 using var process2 = Process.Start(psi);
-                process2?.WaitForExit();
+                if (process2 != null)
+                {
+                    process2.StandardOutput.ReadToEnd();
+                    process2.StandardError.ReadToEnd();
+                    process2.WaitForExit();
+                }
 
                 Logger.Log("Gaming Latency: CPU unpark revertido (idle thresholds ocultados novamente)");
                 return (true, "CPU unpark revertido. Processor idle thresholds restaurados para padrão.");
@@ -3916,6 +4207,8 @@ namespace KitLugia.Core
                 }
             };
             p.Start();
+            string _ = p.StandardOutput.ReadToEnd();
+            string __ = p.StandardError.ReadToEnd();
             p.WaitForExit(15000);
             return p.ExitCode == 0;
         }
@@ -7276,7 +7569,7 @@ namespace KitLugia.Core
                         FileName = "powershell",
                         Arguments = "-Command \"Get-AppxPackage -Name Microsoft.OneDrive\"",
                         WindowStyle = ProcessWindowStyle.Hidden,
-                        UseShellExecute = true,
+                        UseShellExecute = false,
                         RedirectStandardOutput = true
                     };
                     using (var process = Process.Start(psi))
@@ -7351,6 +7644,148 @@ namespace KitLugia.Core
             catch
             {
                 return false;
+            }
+        }
+
+        #endregion
+
+        #region TweaksPage UI - Info Methods
+
+        public static (string Name, int L2CacheKb, int L3CacheKb) GetCpuInfo()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("SELECT Name, L2CacheSize, L3CacheSize FROM Win32_Processor");
+                foreach (ManagementObject obj in searcher.Get().Cast<ManagementObject>())
+                {
+                    using (obj)
+                    {
+                        string name = obj["Name"]?.ToString()?.Trim() ?? "Desconhecido";
+                        int l2 = obj["L2CacheSize"] != null ? Convert.ToInt32(obj["L2CacheSize"]) : 0;
+                        int l3 = obj["L3CacheSize"] != null ? Convert.ToInt32(obj["L3CacheSize"]) : 0;
+                        return (name, l2, l3);
+                    }
+                }
+            }
+            catch { }
+            return ("Desconhecido", 0, 0);
+        }
+
+        public static string GetPrimaryGpuName()
+        {
+            try
+            {
+                var names = GetAllGpuNames();
+                return names.Count > 0 ? names[0] : "N/A";
+            }
+            catch { return "N/A"; }
+        }
+
+        public static int GetVramAppliedMb()
+        {
+            try
+            {
+                using var primaryGpu = GetPrimaryGpu();
+                if (primaryGpu == null) return 0;
+                string? regPath = FindGpuRegistryPath(primaryGpu);
+                if (string.IsNullOrEmpty(regPath)) return 0;
+                var val = Registry.GetValue(regPath, "DedicatedSegmentSize", 0);
+                return val != null ? Convert.ToInt32(val) : 0;
+            }
+            catch { return 0; }
+        }
+
+        #endregion
+
+        #region TweaksPage UI - Check Methods
+
+        public static bool IsSecondLevelDataCacheSet()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache", 0);
+                return val != null && Convert.ToInt64(val) > 0;
+            }
+            catch { return false; }
+        }
+
+        public static bool IsVramTweakApplied()
+        {
+            try
+            {
+                using var primaryGpu = GetPrimaryGpu();
+                if (primaryGpu == null) return false;
+                string? regPath = FindGpuRegistryPath(primaryGpu);
+                if (string.IsNullOrEmpty(regPath)) return false;
+                var val = Registry.GetValue(regPath, "DedicatedSegmentSize", 0);
+                return val != null && Convert.ToInt32(val) > 0;
+            }
+            catch { return false; }
+        }
+
+        public static bool IsNagleAlgorithmDisabled()
+        {
+            try
+            {
+                string? regPath = GetActiveInterfaceRegPath();
+                if (string.IsNullOrEmpty(regPath)) return false;
+                using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using var key = localMachine.OpenSubKey(regPath.Replace("HKEY_LOCAL_MACHINE\\", ""), false);
+                if (key == null) return false;
+                var tcpNoDelay = key.GetValue("TCPNoDelay");
+                return tcpNoDelay != null && Convert.ToInt32(tcpNoDelay) == 1;
+            }
+            catch { return false; }
+        }
+
+        public static bool IsCoreParkingDisabled()
+        {
+            try
+            {
+                string[] keys = {
+                    @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\0cc5b647-c1df-4637-891a-dec35c318583",
+                    @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\ea4be0c1-7c65-46f8-8c17-f298766665d9"
+                };
+                using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                foreach (var keyPath in keys)
+                {
+                    using var key = localMachine.OpenSubKey(keyPath, false);
+                    if (key == null) continue;
+                    var valMax = key.GetValue("ValueMax");
+                    var valMin = key.GetValue("ValueMin");
+                    if (valMax == null || Convert.ToInt32(valMax) != 0) return false;
+                    if (valMin == null || Convert.ToInt32(valMin) != 0) return false;
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public static (bool Success, string Message) ToggleAutoCacheTweak()
+        {
+            if (IsSecondLevelDataCacheSet())
+            {
+                RevertRegistryValue(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache");
+                return (true, "Cache L2/L3 restaurado para padrão.");
+            }
+            else
+            {
+                ApplyAutoCacheTweak();
+                return (true, "Cache L2/L3 configurado conforme CPU.");
+            }
+        }
+
+        public static (bool Success, string Message) ToggleVramTweak()
+        {
+            if (IsVramTweakApplied())
+            {
+                RevertVramTweaks();
+                return (true, "VRAM restaurada para padrão.");
+            }
+            else
+            {
+                ApplyAutomaticVramTweak();
+                return (true, "VRAM ajustada automaticamente.");
             }
         }
 

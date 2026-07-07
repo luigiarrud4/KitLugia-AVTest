@@ -19,7 +19,8 @@ namespace KitLugia.Core
                 try
                 {
                     // Comando PowerShell corrigido e robusto para obter a letra da unidade
-                    string psCommand = $"$m = Mount-DiskImage -ImagePath '{isoPath}' -PassThru; ($m | Get-Volume).DriveLetter";
+                    string safePath = isoPath.Replace("'", "''");
+                    string psCommand = $"$m = Mount-DiskImage -ImagePath '{safePath}' -PassThru; ($m | Get-Volume).DriveLetter";
                     
                     var startInfo = new ProcessStartInfo
                     {
@@ -61,7 +62,8 @@ namespace KitLugia.Core
             {
                 try
                 {
-                    string psCommand = $"Dismount-DiskImage -ImagePath '{isoPath}'";
+                    string safePath = isoPath.Replace("'", "''");
+                    string psCommand = $"Dismount-DiskImage -ImagePath '{safePath}'";
                     var psi = new ProcessStartInfo
                     {
                         FileName = "powershell.exe",
@@ -372,15 +374,15 @@ namespace KitLugia.Core
                     };
 
                     using var process = Process.Start(psi)!;
-                    bool exited = process.WaitForExit(30000); // 30 segundos
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
+                    bool exited = process.WaitForExit(30000);
                     
                     if (!exited)
                     {
                         process.Kill();
-                        return 1; // Fallback para índice 1
+                        return 1;
                     }
-
-                    string output = process.StandardOutput.ReadToEnd();
                     
                     // Procurar por "Image Index" no output
                     var match = System.Text.RegularExpressions.Regex.Match(output, @"Image Index:\s*(\d+)");
@@ -422,12 +424,14 @@ namespace KitLugia.Core
                     };
 
                     using var process = Process.Start(psi)!;
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
                     process.WaitForExit();
 
                     if (process.ExitCode == 0)
                         return (true, "Drivers injetados com sucesso.");
                     else
-                        return (false, $"Erro ao injetar drivers: {process.StandardError.ReadToEnd()}");
+                        return (false, $"Erro ao injetar drivers: {error}");
                 }
                 catch (Exception ex)
                 {
@@ -511,9 +515,9 @@ namespace KitLugia.Core
                             };
 
                             using var processDiscard = Process.Start(psiDiscard)!;
-                            processDiscard.WaitForExit();
-                            
+                            string outputDiscard = processDiscard.StandardOutput.ReadToEnd();
                             string errorDiscard = processDiscard.StandardError.ReadToEnd();
+                            processDiscard.WaitForExit();
                             if (processDiscard.ExitCode == 0)
                                 return (true, "Imagem desmontada com /Discard (alterações não salvas devido a travamento).");
                             else

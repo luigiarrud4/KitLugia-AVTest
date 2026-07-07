@@ -49,11 +49,14 @@ namespace KitLugia.GUI.Services
             ConsoleManager.WriteLine("[PROFILER] 🛑 Diagnóstico parado");
         }
 
-        private static void ProfilerTimer_Tick(object? sender, EventArgs e)
+        private static async void ProfilerTimer_Tick(object? sender, EventArgs e)
         {
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, true);
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            await Task.Run(() =>
+            {
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, true);
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+            });
 
             AnalyzeHeap();
         }

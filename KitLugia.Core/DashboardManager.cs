@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Management; // A única dependência necessária (Nativa do Windows)
+using System.Management;
 using System.Runtime.Versioning;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace KitLugia.Core
@@ -14,11 +15,16 @@ namespace KitLugia.Core
         // O Dispose fica apenas para manter a compatibilidade se a GUI chamar.
         public void Dispose() { }
 
-        public async Task<SystemStats> GetSystemSnapshotAsync()
+        public async Task<SystemStats> GetSystemSnapshotAsync(CancellationToken ct = default)
         {
             try
             {
-                return await GetSystemSnapshotWmiAsync();
+                return await GetSystemSnapshotWmiAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.Log("[DASHBOARD] WMI excedeu o tempo limite, usando fallback.");
+                return GetSystemSnapshotFallback();
             }
             catch (Exception ex) when (ex is System.IO.FileNotFoundException or TypeLoadException)
             {
@@ -46,12 +52,20 @@ namespace KitLugia.Core
             }
             catch { }
 
-            ramTotal = SystemUtils.GetTotalSystemRamGB();
+            try
+            {
+                using var mem = new System.Diagnostics.PerformanceCounter("Memory", "Available MBytes");
+                ramTotal = mem.NextValue() / 1024.0;
+            }
+            catch
+            {
+                ramTotal = SystemUtils.GetTotalSystemRamGB();
+            }
 
             return new SystemStats(cpuName, 0, 0, "N/A", 0, 0, 0, ramTotal, osName, SystemUtils.GetSystemUptime(), new List<StorageInfo>());
         }
 
-        private async Task<SystemStats> GetSystemSnapshotWmiAsync()
+        private async Task<SystemStats> GetSystemSnapshotWmiAsync(CancellationToken ct)
         {
             return await Task.Run(() =>
             {
@@ -68,12 +82,15 @@ namespace KitLugia.Core
 
                     // Mas com melhor GC do .NET 10, alocações são mais eficientes
 
+                    ct.ThrowIfCancellationRequested();
+
                     // 1. CPU (Nome e Carga)
                     using (var searcher = new ManagementObjectSearcher("SELECT Name, LoadPercentage FROM Win32_Processor"))
                     using (var results = searcher.Get())
                     {
                         foreach (ManagementObject item in results)
                         {
+                            ct.ThrowIfCancellationRequested();
                             using (item)
                             {
                                 cpuName = item["Name"]?.ToString() ?? "CPU Genérica";
@@ -83,25 +100,28 @@ namespace KitLugia.Core
                         }
                     }
 
+                    ct.ThrowIfCancellationRequested();
+
                     // 2. RAM (Total e Livre)
-                    // Usando Win32_OperatingSystem é mais rápido que Win32_PhysicalMemory para isso
                     using (var searcher = new ManagementObjectSearcher("SELECT TotalVisibleMemorySize, FreePhysicalMemory, Caption FROM Win32_OperatingSystem"))
                     using (var results = searcher.Get())
                     {
                         foreach (ManagementObject item in results)
                         {
+                            ct.ThrowIfCancellationRequested();
                             using (item)
                             {
-                                // WMI retorna em Kilobytes (KB)
                                 ulong totalKb = Convert.ToUInt64(item["TotalVisibleMemorySize"]);
                                 ulong freeKb = Convert.ToUInt64(item["FreePhysicalMemory"]);
                                 osName = item["Caption"]?.ToString() ?? "Windows";
 
-                                ramTotal = totalKb / 1024.0 / 1024.0; // Converte KB para GB
+                                ramTotal = totalKb / 1024.0 / 1024.0;
                                 ramFree = freeKb / 1024.0 / 1024.0;
                             }
                         }
                     }
+
+                    ct.ThrowIfCancellationRequested();
 
                     // 3. GPU (Nome e VRAM Estimada)
                     using (var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController"))

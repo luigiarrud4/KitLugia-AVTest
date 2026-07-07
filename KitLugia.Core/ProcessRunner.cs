@@ -26,10 +26,11 @@ namespace KitLugia.Core
                 
                 process.Start();
                 
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                
                 if (process.WaitForExit(timeoutMs))
                 {
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
                     return (process.ExitCode, output, error);
                 }
                 else

@@ -1324,8 +1324,8 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void ShowError(string msg) => System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(msg, "Erro Winboot", MessageBoxButton.OK, MessageBoxImage.Error));
-        private void ShowSuccess(string title, string msg) => System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(msg, title, MessageBoxButton.OK, MessageBoxImage.Information));
+        private void ShowError(string msg) { if (System.Windows.Application.Current?.Dispatcher == null || System.Windows.Application.Current.Dispatcher.HasShutdownFinished) return; System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(msg, "Erro Winboot", MessageBoxButton.OK, MessageBoxImage.Error)); }
+        private void ShowSuccess(string title, string msg) { if (System.Windows.Application.Current?.Dispatcher == null || System.Windows.Application.Current.Dispatcher.HasShutdownFinished) return; System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(msg, title, MessageBoxButton.OK, MessageBoxImage.Information)); }
         private bool ConfirmAction(string msg) => System.Windows.MessageBox.Show(msg, "Winboot - Confirmação", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
         // Propriedade para ser checada pelo MainWindow ao navegar

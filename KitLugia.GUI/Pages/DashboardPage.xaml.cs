@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -31,6 +32,7 @@ namespace KitLugia.GUI.Pages
             "KitLugia",
             "system_specs.json");
         private static SystemSpecsCache? _sessionSpecs;
+        private static readonly object _specsLock = new();
 
         public DashboardPage()
         {
@@ -55,6 +57,7 @@ namespace KitLugia.GUI.Pages
 
 
 
+
             MemoryHelper.TrimWorkingSet();
         }
 
@@ -62,7 +65,7 @@ namespace KitLugia.GUI.Pages
         {
             Cleanup();
         }
-       
+        
         private async Task LoadSystemInfo()
         {
             try
@@ -70,24 +73,26 @@ namespace KitLugia.GUI.Pages
                 TxtPCName.Text = Environment.MachineName;
 
                 // Já escaneamos nesta sessão? Usa os dados em memória, sem WMI
-                if (_sessionSpecs != null)
+                SystemSpecsCache? cached;
+                lock (_specsLock) { cached = _sessionSpecs; }
+                if (cached != null)
                 {
-                    TxtSpecs.Text = $"{_sessionSpecs.RamGB:F0} GB de RAM • {_sessionSpecs.OsName} • {_sessionSpecs.CpuName} • {_sessionSpecs.GpuName}";
+                    TxtSpecs.Text = $"{cached.RamGB:F0} GB de RAM • {cached.OsName} • {cached.CpuName} • {cached.GpuName}";
                     return;
                 }
 
                 // Primeira vez nesta sessão: scan WMI e salva em memória + arquivo
-                double ram = await Task.Run(() => SystemUtils.GetTotalSystemRamGB());
-
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                 using var dashManager = new DashboardManager();
-                var snapshot = await dashManager.GetSystemSnapshotAsync();
+                var snapshot = await dashManager.GetSystemSnapshotAsync(cts.Token);
 
                 string os = snapshot.OsName ?? "N/A";
                 string cpu = snapshot.CpuName ?? "N/A";
                 string gpu = snapshot.GpuName ?? "N/A";
+                double ram = snapshot.RamTotal;
                 TxtSpecs.Text = $"{ram:F0} GB de RAM • {os} • {cpu} • {gpu}";
 
-                _sessionSpecs = new SystemSpecsCache
+                var specs = new SystemSpecsCache
                 {
                     PcName = Environment.MachineName,
                     RamGB = ram,
@@ -97,7 +102,8 @@ namespace KitLugia.GUI.Pages
                     ScanDate = DateTime.Now
                 };
 
-                SaveSpecsCacheToFile(_sessionSpecs);
+                lock (_specsLock) { _sessionSpecs = specs; }
+                SaveSpecsCacheToFile(specs);
             }
             catch (Exception ex)
             {
@@ -105,7 +111,6 @@ namespace KitLugia.GUI.Pages
                 Logger.Log($"[DASHBOARD] Erro ao carregar hardware: {ex.Message}");
             }
         }
-
         private static void SaveSpecsCacheToFile(SystemSpecsCache specs)
         {
             try

@@ -62,11 +62,11 @@ namespace KitLugia.GUI.Pages
         private void StartRefreshTimers()
         {
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-            _refreshTimer.Tick += async (s, e) => await RefreshAdapterStatus();
+            _refreshTimer.Tick += async (s, e) => { try { await RefreshAdapterStatus(); } catch { } };
             _refreshTimer.Start();
 
             _dnsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
-            _dnsTimer.Tick += async (s, e) => await RefreshDnsStatus();
+            _dnsTimer.Tick += async (s, e) => { try { await RefreshDnsStatus(); } catch { } };
             _dnsTimer.Start();
         }
 

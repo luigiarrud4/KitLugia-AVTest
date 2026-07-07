@@ -59,12 +59,16 @@ namespace KitLugia.GUI.Controls
 
         public async void Open()
         {
-            Visibility = Visibility.Visible;
-            TxtSearch.Text = "";
-            TxtSelectedProcess.Text = "Nenhum processo selecionado";
-            BtnConfirm.IsEnabled = false;
-            _selectedEntry = null;
-            await RefreshAsync();
+            try
+            {
+                Visibility = Visibility.Visible;
+                TxtSearch.Text = "";
+                TxtSelectedProcess.Text = "Nenhum processo selecionado";
+                BtnConfirm.IsEnabled = false;
+                _selectedEntry = null;
+                await RefreshAsync();
+            }
+            catch { }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)

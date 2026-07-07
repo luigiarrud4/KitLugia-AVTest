@@ -35,7 +35,7 @@ namespace KitLugia.Core
             try
             {
                 // Montar ISO temporariamente para verificar
-                string driveLetter = MountIso(isoPath).GetAwaiter().GetResult();
+                string driveLetter = Task.Run(() => MountIso(isoPath)).GetAwaiter().GetResult();
                 if (string.IsNullOrEmpty(driveLetter))
                 {
                     return false;
@@ -45,7 +45,7 @@ namespace KitLugia.Core
                 bool isKitLugia = File.Exists(kitlugiaIdFile);
 
                 // Desmontar ISO
-                DismountIso(isoPath).GetAwaiter().GetResult();
+                Task.Run(() => DismountIso(isoPath)).GetAwaiter().GetResult();
 
                 if (isKitLugia)
                 {
@@ -88,7 +88,7 @@ namespace KitLugia.Core
                 Log("Detectando idioma da ISO...");
 
                 // Montar ISO temporariamente
-                string driveLetter = MountIso(isoPath).GetAwaiter().GetResult();
+                string driveLetter = Task.Run(() => MountIso(isoPath)).GetAwaiter().GetResult();
                 if (string.IsNullOrEmpty(driveLetter))
                 {
                     Log("Falha ao montar ISO para detecção de idioma.");
@@ -96,7 +96,7 @@ namespace KitLugia.Core
                 }
 
                 string lang = DetectLanguageFromDrive(driveLetter);
-                DismountIso(isoPath).GetAwaiter().GetResult();
+                Task.Run(() => DismountIso(isoPath)).GetAwaiter().GetResult();
                 return lang;
             }
             catch (Exception ex)
@@ -3877,7 +3877,8 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
         public static async Task<string> MountIso(string isoPath)
         {
-            string script = $"Mount-DiskImage -ImagePath '{isoPath}' -PassThru | Get-Volume | Select-Object -ExpandProperty DriveLetter";
+            string safePath = isoPath.Replace("'", "''");
+            string script = $"Mount-DiskImage -ImagePath '{safePath}' -PassThru | Get-Volume | Select-Object -ExpandProperty DriveLetter";
             string drv = await RunPowerShell(script);
             drv = drv.Trim();
             return drv.Length == 1 ? drv + ":" : "";
@@ -3885,7 +3886,8 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
         public static async Task DismountIso(string isoPath)
         {
-            await RunPowerShell($"Dismount-DiskImage -ImagePath '{isoPath}'");
+            string safePath = isoPath.Replace("'", "''");
+            await RunPowerShell($"Dismount-DiskImage -ImagePath '{safePath}'");
         }
 
         private static async Task<string> RunPowerShell(string script)
@@ -3900,7 +3902,13 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 CreateNoWindow = true
             };
             process.Start();
-            return await process.StandardOutput.ReadToEndAsync();
+            var readTask = process.StandardOutput.ReadToEndAsync();
+            if (await Task.WhenAny(readTask, Task.Delay(30000)) != readTask)
+            {
+                try { process.Kill(); } catch { }
+                return "";
+            }
+            return await readTask;
         }
 
         public static string GetCurrentEditionId()

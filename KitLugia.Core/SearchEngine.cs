@@ -183,8 +183,8 @@ namespace KitLugia.Core
             AddAction("Flush DNS", "Limpa cache de resolução DNS.", "🚿", () => Toolbox.FlushDnsCache());
             AddAction("Resetar Windows Update", "Corrige erro 0x800 de atualização.", "🔄", () => { var r = Toolbox.ResetWindowsUpdateComponents(); return (r.Success, "Resetado."); });
             AddAction("Limpeza Total", "Limpa temporários, cache e lixeira.", "🧹", () => { Toolbox.RunFullCleanup(); return (true, "Limpeza concluída."); });
-            AddAction("Reparar Imagem (DISM)", "Corrige corrupção do sistema.", "🚑", () => { var r = SystemRepair.RunDismRestoreHealthAsync().GetAwaiter().GetResult(); return (r.Success, r.Output); });
-            AddAction("Verificar Arquivos (SFC)", "Escaneia arquivos protegidos.", "⚕️", () => { var r = SystemRepair.RunSfcScanNowAsync().GetAwaiter().GetResult(); return (r.Success, r.Output); });
+            AddAction("Reparar Imagem (DISM)", "Corrige corrupção do sistema.", "🚑", () => { var r = Task.Run(() => SystemRepair.RunDismRestoreHealthAsync()).GetAwaiter().GetResult(); return (r.Success, r.Output); });
+            AddAction("Verificar Arquivos (SFC)", "Escaneia arquivos protegidos.", "⚕️", () => { var r = Task.Run(() => SystemRepair.RunSfcScanNowAsync()).GetAwaiter().GetResult(); return (r.Success, r.Output); });
 
             _isInitialized = true;
         }

@@ -889,7 +889,8 @@ namespace KitLugia.GUI.Pages
 
         private void OnMonitorChange(InstallMonitorChange change)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
+            Application.Current.Dispatcher.Invoke(() =>
             {
                 RefreshMonitorList();
             });

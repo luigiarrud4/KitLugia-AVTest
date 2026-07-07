@@ -16,7 +16,6 @@ namespace KitLugia.GUI.Services
     /// </summary>
     public static class MemoryDiagnostics
     {
-        private static readonly Process _currentProcess = Process.GetCurrentProcess();
         private static DispatcherTimer? _monitorTimer;
         private static long _lastMemoryBytes;
         private static int _navigationCount;
@@ -73,13 +72,10 @@ namespace KitLugia.GUI.Services
             _monitorTimer = null;
         }
         
-        /// <summary>
-        /// Obtém uso atual de memória em bytes
-        /// </summary>
         public static long GetCurrentMemoryBytes()
         {
-            _currentProcess.Refresh();
-            return _currentProcess.WorkingSet64;
+            using var proc = Process.GetCurrentProcess();
+            return proc.WorkingSet64;
         }
         
         /// <summary>
@@ -98,9 +94,9 @@ namespace KitLugia.GUI.Services
                 Peak: {peakMB:F1} MB
                 Uptime: {uptime:h\:mm\:ss}
                 Navigations: {_navigationCount}
-                Process ID: {_currentProcess.Id}
-                Threads: {_currentProcess.Threads.Count}
-                Handles: {_currentProcess.HandleCount}
+                Process ID: {Environment.ProcessId}
+                Threads: {System.Diagnostics.Process.GetCurrentProcess().Threads.Count}
+                Handles: {System.Diagnostics.Process.GetCurrentProcess().HandleCount}
                 =================================
                 """;
         }

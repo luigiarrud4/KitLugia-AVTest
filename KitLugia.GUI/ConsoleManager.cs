@@ -31,7 +31,7 @@ namespace KitLugia.GUI
             if (_flushScheduled) return;
             _flushScheduled = true;
 
-            if (Application.Current?.Dispatcher == null) return;
+            if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
             Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(FlushBatch));
         }
 
@@ -78,7 +78,7 @@ namespace KitLugia.GUI
 
         public static void Clear()
         {
-            if (Application.Current?.Dispatcher == null) return;
+            if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
             Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
             {
                 Logs.Clear();

@@ -204,6 +204,8 @@ public sealed class TunnelManager : IDisposable
             using var process = Process.Start(startInfo);
             if (process != null)
             {
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
                 await Task.Run(() => process.WaitForExit(5000));
                 return process.ExitCode == 0;
             }

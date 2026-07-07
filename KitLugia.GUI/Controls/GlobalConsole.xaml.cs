@@ -31,31 +31,21 @@ namespace KitLugia.GUI.Controls
 
         private void UpdateTextBox()
         {
-            // Simples e direto - sem otimizações que causam loops
-            if (Application.Current != null)
+            if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                Application.Current.Dispatcher.BeginInvoke(() =>
+                try
                 {
-                    try
-                    {
-                        // Pega todos os logs do ConsoleManager
-                        var allLogs = string.Join("\n", ConsoleManager.Logs);
-                        
-                        // Atualiza TextBox
-                        TxtLog.Text = allLogs;
-                        
-                        // Scroll automático
-                        if (LogScroller.IsLoaded)
-                        {
-                            LogScroller.ScrollToEnd();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Erro no console: {ex.Message}");
-                    }
-                });
-            }
+                    var allLogs = string.Join("\n", ConsoleManager.Logs);
+                    TxtLog.Text = allLogs;
+                    if (LogScroller.IsLoaded)
+                        LogScroller.ScrollToEnd();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Erro no console: {ex.Message}");
+                }
+            });
         }
 
         private void TxtLog_TextChanged(object sender, TextChangedEventArgs e)

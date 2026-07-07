@@ -19,12 +19,15 @@ namespace KitLugia.GUI.Controls
         {
             InitializeComponent();
 
-            // Liga a UI aos dados
             ListNotifications.ItemsSource = NotificationHistoryManager.History;
 
-            // Monitora mudanças para mostrar o aviso "Vazio"
             NotificationHistoryManager.History.CollectionChanged += History_CollectionChanged;
             CheckEmptyState();
+
+            this.Unloaded += (s, e) =>
+            {
+                NotificationHistoryManager.History.CollectionChanged -= History_CollectionChanged;
+            };
         }
 
         private void History_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)

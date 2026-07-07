@@ -378,7 +378,6 @@ namespace KitLugia.Core
 
                     return (0UL, 0UL, 999u, "Partição não encontrada");
                 });
-                cts.Token.Register(() => { try { task.Dispose(); } catch { } });
                 return await task.WaitAsync(cts.Token);
             }
             catch (OperationCanceledException)
@@ -1133,8 +1132,8 @@ namespace KitLugia.Core
                     CreateNoWindow = true,
                     // DISM costuma emitir Unicode/UTF-8; Diskpart/Robocopy em PT-BR usam OEM (CP850).
                     // Usamos OEM encoding para garantir acentos corretos em português.
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
+                    StandardOutputEncoding = Encoding.GetEncoding(850),
+                    StandardErrorEncoding = Encoding.GetEncoding(850)
                 };
 
                 using var proc = new Process { StartInfo = psi };
@@ -1157,7 +1156,11 @@ namespace KitLugia.Core
                 proc.Start();
                 proc.BeginOutputReadLine();
                 proc.BeginErrorReadLine();
-                proc.WaitForExit();
+                if (!proc.WaitForExit(300000))
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    fullOutput.AppendLine("[TIMEOUT] Processo excedeu 5 minutos e foi encerrado.");
+                }
 
                 return (proc.ExitCode, fullOutput.ToString());
             });

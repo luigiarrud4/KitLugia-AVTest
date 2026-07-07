@@ -355,25 +355,27 @@ namespace KitLugia.GUI
         // Reinicia GoodbyeDPI com novas configurações
         private async void RestartGoodbyeDPIWithNewSettings()
         {
-            if (GoodbyeDPIActive)
+            try
             {
-                // Encerra processo atual
-                if (_goodbyeDpiProcess != null && !_goodbyeDpiProcess.HasExited)
+                if (GoodbyeDPIActive)
                 {
-                    _goodbyeDpiProcess.Kill();
+                    if (_goodbyeDpiProcess != null && !_goodbyeDpiProcess.HasExited)
+                    {
+                        _goodbyeDpiProcess.Kill();
+                        await Task.Run(() => _goodbyeDpiProcess.WaitForExit(5000));
+                        _goodbyeDpiProcess.Dispose();
+                        _goodbyeDpiProcess = null;
+                    }
 
-                    await Task.Run(() => _goodbyeDpiProcess.WaitForExit(5000));
-                    _goodbyeDpiProcess = null;
+                    await Task.Delay(500);
+                    ActivateGoodbyeDPI();
                 }
-
-
-                await Task.Delay(500);
-                ActivateGoodbyeDPI();
+                else
+                {
+                    ShowInfo("📶 GoodbyeDPI", "Ative o GoodbyeDPI para aplicar as novas configurações.");
+                }
             }
-            else
-            {
-                ShowInfo("📶 GoodbyeDPI", "Ative o GoodbyeDPI para aplicar as novas configurações.");
-            }
+            catch { }
         }
 
         // Ativa GoodbyeDPI (método auxiliar)
@@ -517,7 +519,7 @@ namespace KitLugia.GUI
         public bool StartMinimized => (Application.Current as App)?.StartMinimized ?? false;
         private bool _uiDeferredInit = false;
 
-        private void EnsureUIIinitialized()
+        private void EnsureUIInitialized()
         {
             if (_uiDeferredInit) return;
             _uiDeferredInit = true;
@@ -579,16 +581,7 @@ namespace KitLugia.GUI
             Services.BackgroundTaskTracker.Instance.TaskStatusChanged += BackgroundTaskTracker_TaskStatusChanged;
             Services.BackgroundTaskTracker.Instance.PropertyChanged += BackgroundTaskTracker_PropertyChanged;
 
-            if (!StartMinimized)
-            {
-                // Configura o fechamento do painel de console (Rodapé)
-                if (GlobalConsolePanel != null)
-                    GlobalConsolePanel.RequestClose += (s, e) => { GlobalConsolePanel.Visibility = Visibility.Collapsed; };
-
-                // --- CORREÇÃO: Configura o fechamento do Terminal Legacy (Tela Cheia) ---
-                if (LegacyTerminalPanel != null)
-                    LegacyTerminalPanel.RequestClose += (s, e) => { LegacyTerminalPanel.Visibility = Visibility.Collapsed; };
-            }
+            // (RequestClose subscriptions moved to EnsureUIInitialized)
 
             // --- TRAY ICON: Inicializa o Monitor de RAM ---
             _trayService = new TrayIconService();
@@ -596,7 +589,7 @@ namespace KitLugia.GUI
             {
                 Dispatcher.Invoke(() =>
                 {
-                    EnsureUIIinitialized();
+                    EnsureUIInitialized();
                     // Garante MainFrame visível antes de Show() - mesmo que Window_Loaded
                     // ainda não tenha sido chamado (MainFrame começa Opacity=0 no XAML)
                     if (MainFrame != null)
@@ -614,7 +607,7 @@ namespace KitLugia.GUI
             {
                 Dispatcher.Invoke(() =>
                 {
-                    EnsureUIIinitialized();
+                    EnsureUIInitialized();
                     if (MainFrame != null)
                     {
                         MainFrame.BeginAnimation(Frame.OpacityProperty, null);
@@ -722,22 +715,26 @@ namespace KitLugia.GUI
             }
 
             // --- NAMED EVENT: Permite que uma segunda instância sinalize para mostrar a janela ---
-            _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "KitLugia_ShowWindow");
+            _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "Global\\KitLugia_ShowWindow");
             _showWindowMonitor = new System.Threading.Thread(() =>
             {
                 while (!_backgroundTasksCts.Token.IsCancellationRequested)
                 {
-                    if (_showWindowEvent.WaitOne(1000))
+                    try
                     {
-                        Dispatcher.Invoke(() =>
+                        if (_showWindowEvent.WaitOne(1000))
                         {
-                            EnsureUIIinitialized();
-                            Show();
-                            WindowState = WindowState.Normal;
-                            Activate();
-                            Focus();
-                        });
+                            Dispatcher.Invoke(() =>
+                            {
+                                EnsureUIInitialized();
+                                Show();
+                                WindowState = WindowState.Normal;
+                                Activate();
+                                Focus();
+                            });
+                        }
                     }
+                    catch { }
                 }
             }) { IsBackground = true, Name = "ShowWindowMonitor" };
             _showWindowMonitor.Start();
@@ -2060,6 +2057,7 @@ namespace KitLugia.GUI
             TxtConfirmMessage.Text = message;
             OverlayContainer.Visibility = Visibility.Visible;
             OverlayConfirm.Visibility = Visibility.Visible;
+            _confirmCompletionSource?.TrySetResult(false);
             _confirmCompletionSource = new TaskCompletionSource<bool>();
             return await _confirmCompletionSource.Task;
         }
@@ -2101,7 +2099,7 @@ namespace KitLugia.GUI
 
         private void ShowNotification(string title, string message, NotificationType type)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 ConsoleManager.WriteLine($"NOTIFICAÇÃO: [{title}] {message}");
 
@@ -2315,13 +2313,16 @@ namespace KitLugia.GUI
                     try
                     {
                         _goodbyeDpiProcess.Kill();
-                        _goodbyeDpiProcess.WaitForExit(5000);
-                        Logger.Log("GOODBYEDPI: Processo encerrado no cleanup");
+                        if (!_goodbyeDpiProcess.WaitForExit(2000))
+                            Logger.Log("GOODBYEDPI: Processo nao encerrou a tempo");
+                        else
+                            Logger.Log("GOODBYEDPI: Processo encerrado no cleanup");
                     }
                     catch (Exception ex)
                     {
                         Logger.LogError("GoodbyeDPI.Cleanup", ex.Message);
                     }
+                    _goodbyeDpiProcess.Dispose();
                     _goodbyeDpiProcess = null;
                 }
 
@@ -2352,7 +2353,7 @@ namespace KitLugia.GUI
                 // Splash visível (Opacity=1, Z=99999) cobre MainFrame + sidebar.
                 // MainFrame já fica pronto atrás; OnIntroFinished só ativa a sidebar.
                 if (SplashScreen != null) SplashScreen.Opacity = 1;
-                EnsureUIIinitialized();
+                EnsureUIInitialized();
                 _ = LoadIntroSettingsAndPlay();
             }
             _ = CheckForUpdateNotificationAsync();

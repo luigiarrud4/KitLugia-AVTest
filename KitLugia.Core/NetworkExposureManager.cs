@@ -498,12 +498,7 @@ public sealed class NetworkExposureManager : IDisposable
     // ------------------------------------------------------------
     public void Dispose()
     {
-        try
-        {
-            CloseAllPortsAsync().GetAwaiter().GetResult();
-        }
-        catch { }
-        
+        try { _ = CloseAllPortsAsync(); } catch { }
         _discoveryCts?.Cancel();
         _discoveryCts?.Dispose();
     }
@@ -810,7 +805,10 @@ public class NatPmpDevice
             var request = new byte[] { 0, 0 }; // Versão 0, OP 0
             await udpClient.SendAsync(request, request.Length, endPoint);
             
-            var result = await udpClient.ReceiveAsync();
+            var receiveTask = udpClient.ReceiveAsync();
+            if (await Task.WhenAny(receiveTask, Task.Delay(3000)) != receiveTask)
+                return null;
+            var result = await receiveTask;
             if (result.Buffer.Length >= 12 && result.Buffer[0] == 0 && result.Buffer[1] == 128)
             {
                 // Extrair IP dos bytes 8-11
@@ -857,7 +855,10 @@ public class NatPmpDevice
             
             await udpClient.SendAsync(request, request.Length, endPoint);
             
-            var result = await udpClient.ReceiveAsync();
+            var receiveTask2 = udpClient.ReceiveAsync();
+            if (await Task.WhenAny(receiveTask2, Task.Delay(3000)) != receiveTask2)
+                return 0;
+            var result = await receiveTask2;
             if (result.Buffer.Length >= 16 && result.Buffer[0] == 0 && result.Buffer[1] == (opCode | 128))
             {
                 // Sucesso - extrair porta real atribuída (bytes 6-7)

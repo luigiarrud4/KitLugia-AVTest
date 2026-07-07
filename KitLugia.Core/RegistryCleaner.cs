@@ -800,9 +800,16 @@ namespace KitLugia.Core
             startInfo.ArgumentList.Add("/y");
 
             using var process = Process.Start(startInfo);
-            process?.WaitForExit(5000);
+            if (process == null)
+                throw new InvalidOperationException("Nao foi possivel iniciar reg.exe.");
 
-            if (process == null || process.ExitCode != 0)
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(); } catch { }
+                throw new InvalidOperationException("reg export excedeu o tempo limite.");
+            }
+
+            if (process.ExitCode != 0)
             {
                 throw new InvalidOperationException("Nao foi possivel exportar backup do registro.");
             }

@@ -86,6 +86,228 @@
                 </StackPanel>
             </Border>
 
+            <!-- GRUPO: GPU & SCHEDULING -->
+            <TextBlock Text="GPU &amp; Scheduling" FontSize="16" FontWeight="Bold" Foreground="#AA88FF" Margin="0,25,0,15"/>
+            <Border CornerRadius="8" Padding="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#1A0A2E" Offset="0.0"/>
+                        <GradientStop Color="#150826" Offset="0.5"/>
+                        <GradientStop Color="#0E0620" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#7744CC" Offset="0.0"/>
+                        <GradientStop Color="#6633AA" Offset="0.5"/>
+                        <GradientStop Color="#552288" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <StackPanel>
+
+                    <!-- GPU Selector -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Seleciona qual GPU será usada como alvo para os tweaks de agendamento (FrameQueue, Preemption, Idle, Latency). A VRAM abaixo mostra todas as GPUs com toggle independente. A GPU selecionada aqui é usada como referência para o kit aplicar os tweaks corretamente."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AA88FF" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Adaptador de Vídeo (GPU):" Foreground="#BB99FF" FontSize="12" Margin="0,0,15,4"/>
+                            <ComboBox x:Name="ChkGpuSelector" Height="32" MinWidth="280" SelectionChanged="ChkGpuSelector_SelectionChanged">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="White" Padding="5"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="15,0,0,0">
+                            <TextBlock Text="GPU alvo para tweaks de agendamento" Foreground="#A0A0A0" FontSize="11"/>
+                            <TextBlock Text="A VRAM abaixo mostra TODAS as GPUs com toggle individual." Foreground="#8877AA" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator Background="#552288" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- VRAM Dedicada (dinâmico por GPU) -->
+                    <StackPanel x:Name="VramContainer" Margin="0"/>
+
+                    <Separator x:Name="VramSeparator" Background="#552288" Opacity="0.4" Margin="20,0" Visibility="Collapsed"/>
+
+                    <!-- FrameQueueMode -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="FrameQueueMode=0 força mínima fila de quadros (Low Latency). Reduz input lag drasticamente ao evitar que a GPU enfileire múltiplos quadros antes de processar. Padrão Windows é 'Normal' (1), que adiciona latência. Recomendado para jogos competitivos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AA88FF" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="FrameQueueMode (Low Latency)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="For&#xE7;a fila m&#xED;nima de quadros na GPU para menor input lag." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="InfoFrameQueue" Text="Verificando..." FontSize="11" Foreground="#BB99FF" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E0A40" BorderBrush="#7744CC" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusFrameQueue" Text="Verificando..." Foreground="#BB99FF" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkFrameQueue" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkFrameQueue_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#552288" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- EnablePreemption -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="EnablePreemption=1 permite que a GPU interrompa tarefas computacionais longas para renderizar quadros mais urgentes. Reduz micro-stutters em jogos que usam compute shaders e async compute. Compatível com NVIDIA, AMD e Intel."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AA88FF" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Preempção de GPU (EnablePreemption)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Permite interromper tarefas GPU longas para renderizar quadros." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E0A40" BorderBrush="#7744CC" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusPreemption" Text="Verificando..." Foreground="#BB99FF" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkPreemption" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPreemption_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#552288" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- DisableGpuIdle -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="DisableGpuIdle=1 impede que a GPU entre em estado de idle (economia) durante jogos. Elimina micro-latência de reativação. Mantém a GPU sempre pronta para processar o próximo quadro. Impacto maior em GPUs NVIDIA com drivers recentes."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AA88FF" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar GPU Idle" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede a GPU de entrar em economia durante jogos." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E0A40" BorderBrush="#7744CC" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusGpuIdle" Text="Verificando..." Foreground="#BB99FF" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkGpuIdle" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkGpuIdle_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#552288" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- GPU Power Latency -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Latency=1 no power profile da GPU prioriza latência sobre economia de energia. Instrui o driver a não reduzir clocks ou estados de energia durante cargas GPU-bound. Complementa o Disable Dynamic Pstate dos drivers NVIDIA/AMD."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AA88FF" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="GPU Power Latency" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Prioriza lat&#xEA;ncia sobre economia de energia na GPU." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E0A40" BorderBrush="#7744CC" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusPowerLatency" Text="Verificando..." Foreground="#BB99FF" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkPowerLatency" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPowerLatency_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
             <!-- GRUPO: SMARTCREEN -->
             <TextBlock Text="SmartScreen e Navega&#xE7;&#xE3;o" FontSize="16" FontWeight="Bold" Foreground="#8AB4F8" Margin="0,25,0,15"/>
             <Border CornerRadius="8" Padding="0">
@@ -828,6 +1050,292 @@
                         <TextBlock x:Name="StatusTimeout" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkTimeout" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTimeout_Click"/>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- GRUPO: HARDWARE & REDE -->
+            <TextBlock Text="Hardware &amp; Rede" FontSize="16" FontWeight="Bold" Foreground="#4FC3F7" Margin="0,30,0,15"/>
+            <Border CornerRadius="8" Padding="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#05202B" Offset="0.0"/>
+                        <GradientStop Color="#041A22" Offset="0.5"/>
+                        <GradientStop Color="#031418" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#1A6B80" Offset="0.0"/>
+                        <GradientStop Color="#145568" Offset="0.5"/>
+                        <GradientStop Color="#0E4050" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <StackPanel>
+
+                    <!-- Cache L2/L3 -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Ajusta o SecondLevelDataCache no registro com base no L2 Cache real da CPU. O Windows usa este valor para otimizar o agendamento de threads. Configurado pela Otimização Inteligente do Dashboard."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Cache de CPU (L2/L3)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="SecondLevelDataCache baseado no L2 real da CPU." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="InfoCpu" Text="Verificando..." FontSize="11" Foreground="#80D0FF" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusL2Cache" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkL2Cache" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkL2Cache_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <!-- Nagle's Algorithm -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o Nagle's Algorithm em todas as interfaces de rede ativas (TCPNoDelay=1, TcpAckFrequency=1). Reduz latência de pacotes em jogos online. Aplica o mesmo tweak que o SLIDE Gaming afirma fazer (mas não fazia de fato)."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Nagle (TCPNoDelay)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Reduz lat&#xEA;ncia de rede em jogos online." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusNagle" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkNagle" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNagle_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Core Parking -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa Core Parking (ValueMax=0, ValueMin=0). Mantém todos os núcleos da CPU ativos e prontos, eliminando latência de reativação de cores adormecidos. Melhora performance em jogos CPU-bound."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Core Parking" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Mant&#xE9;m todos os n&#xFA;cleos da CPU ativos." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusCoreParking" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkCoreParking" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkCoreParking_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- HAGS -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="HAGS (Hardware Accelerated GPU Scheduling, HwSchMode=2) permite que a GPU gerencie sua própria memória e fila de trabalho, reduzindo latência e melhorando consistência de FPS. Benchmark: 2-5% de ganho em jogos, menor input lag. Padrão é 1 (driver scheduling). Recomendado para GPUs NVIDIA RTX 30+ / AMD RX 6000+ / Intel Arc."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="HAGS (GPU Scheduling Acelerado)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="HwSchMode=2. GPU gerencia própria fila, reduz lat&#xEA;ncia. 2-5% FPS." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusHags" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkHags" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkHags_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- TDR Delay -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="TDR (Timeout Detection &amp; Recovery) reinicia o driver GPU se ele travar por mais de 2s. Aumentar TdrDelay para 10s evita resets falsos em jogos pesados com shaders complexos ou texturas HD. Útil se você receber 'driver parou de responder e foi recuperado'. Padrão: 2s. Recomendado: 10s."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Aumentar TDR Delay (GPU Timeout)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Evita resets falsos do driver GPU em jogos pesados (2s &#x2192; 10s)." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusTdr" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkTdr" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTdr_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- IoPageLockLimit -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="IoPageLockLimit define quantos KB de memória podem ser travados para operações de I/O (disco, GPU). Aumentar para 8192 (8 MB) reduz micro-stutters em jogos com streaming de texturas. Padrão é 0 (512 KB). Efeito: menos stutter em textura loading. Recomendado para sistemas com 16 GB+ de RAM."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="IoPageLockLimit (Cache I/O)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Aumenta mem&#xF3;ria travada para I/O. Reduz stutter em streaming de texturas." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusIoLock" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkIoLock" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkIoLock_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Input Queue Size -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Aumenta a fila de entrada do mouse e teclado de 100 para 200 pacotes. Reduz micro-stutters de input em jogos competitivos ao dar mais buffer para eventos de mouse/teclado. Ambos MouseDataQueueSize e KeyboardDataQueueSize são ajustados para 200. Efeito: input mais consistente em altas taxas de polling."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Fila de Input (Mouse/Teclado)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Aumenta buffer de entrada para input mais consistente." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusInputQueue" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkInputQueue" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkInputQueue_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
                 </StackPanel>
             </Border>
 

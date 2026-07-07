@@ -38,7 +38,8 @@ namespace KitLugia.Core
         {
             try
             {
-                using var s = new ManagementObject($"Win32_Service.Name='{serviceName}'");
+                var scope = new ManagementScope(@"\\.\root\cimv2", new ConnectionOptions { Timeout = TimeSpan.FromSeconds(10) });
+                using var s = new ManagementObject(scope, new ManagementPath($"Win32_Service.Name='{serviceName.Replace("'", "''")}'"), null);
                 s.Get();
                 return s["StartMode"]?.ToString();
             }
@@ -117,15 +118,19 @@ namespace KitLugia.Core
                 if (process == null) return string.Empty;
                 if (waitForExit)
                 {
-                    var outputTask = process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
-                    var errorTask = process.StandardError.ReadToEndAsync().ConfigureAwait(false);
+                    var outputTask = process.StandardOutput.ReadToEndAsync();
+                    var errorTask = process.StandardError.ReadToEndAsync();
                     
-                    await process.WaitForExitAsync().ConfigureAwait(false);
+                    var exitTask = process.WaitForExitAsync();
+                    if (await Task.WhenAny(exitTask, Task.Delay(120000)).ConfigureAwait(false) != exitTask)
+                    {
+                        try { process.Kill(entireProcessTree: true); } catch { }
+                        return "[TIMEOUT] Processo excedeu 120 segundos.";
+                    }
                     
-                    string output = await outputTask;
-                    string error = await errorTask;
+                    string output = await outputTask.ConfigureAwait(false);
+                    string error = await errorTask.ConfigureAwait(false);
                     
-                    // Combinar stdout e stderr para capturar todos os resultados
                     if (!string.IsNullOrEmpty(error))
                     {
                         return string.IsNullOrEmpty(output) ? error : $"{output}\n{error}";

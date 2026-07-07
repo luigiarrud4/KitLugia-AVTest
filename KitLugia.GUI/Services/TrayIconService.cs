@@ -640,9 +640,6 @@ namespace KitLugia.GUI.Services
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ProcessProfile> _processProfiles = new(concurrencyLevel: 4, capacity: 50, comparer: StringComparer.OrdinalIgnoreCase);
 
 
-        private Process[]? _cachedProcesses;
-        private DateTime _lastProcessCacheTime = DateTime.MinValue;
-        private readonly TimeSpan _processCacheLifetime = TimeSpan.FromSeconds(5); // Cache por 5 segundos
         private readonly object _processCacheLock = new();
 
 
@@ -1012,42 +1009,12 @@ namespace KitLugia.GUI.Services
 
         private Process[] GetCachedProcesses()
         {
-            lock (_processCacheLock)
-            {
-                if (_cachedProcesses != null && DateTime.Now - _lastProcessCacheTime < _processCacheLifetime)
-                {
-                    return _cachedProcesses;
-                }
-
-                // Descartar cache antigo se existir
-                if (_cachedProcesses != null)
-                {
-                    foreach (var proc in _cachedProcesses)
-                    {
-                        try { proc.Dispose(); } catch { }
-                    }
-                }
-
-                _cachedProcesses = Process.GetProcesses();
-                _lastProcessCacheTime = DateTime.Now;
-                return _cachedProcesses;
-            }
+            return Process.GetProcesses();
         }
 
 
         private void ClearProcessCache()
         {
-            lock (_processCacheLock)
-            {
-                if (_cachedProcesses != null)
-                {
-                    foreach (var proc in _cachedProcesses)
-                    {
-                        try { proc.Dispose(); } catch { }
-                    }
-                    _cachedProcesses = null;
-                }
-            }
         }
 
         public void Initialize()
@@ -1197,16 +1164,17 @@ namespace KitLugia.GUI.Services
             menu.Items.Add(itemRestartAdmin);
 
             var itemRestartNormal = new ToolStripMenuItem("👤 Iniciar como Usuário Normal");
-            itemRestartNormal.Click += (s, e) =>
+            itemRestartNormal.Click += async (s, e) =>
             {
                 try
                 {
                     string exe = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
                     KitLugia.Core.StartupManager.RegisterNonAdminTask("__KitLugiaRestart", exe, null);
                     KitLugia.Core.StartupManager.RunNonAdminTask("__KitLugiaRestart");
-                    System.Threading.Thread.Sleep(1500);
+                    await System.Threading.Tasks.Task.Delay(1500);
                     Dispose();
-                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+                    if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownFinished)
+                        Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
                 }
                 catch { }
             };
@@ -1240,6 +1208,7 @@ namespace KitLugia.GUI.Services
                         catch { }
                     });
 
+                    if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
                     Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
                     {
                         LoadProcessLimits();
@@ -1760,13 +1729,11 @@ namespace KitLugia.GUI.Services
                 {
                     try
                     {
-                        // Don't touch the user's active game/app
                         if (proc.Id == foregroundPid) continue;
 
                         string name = proc.ProcessName.ToLower();
                         bool isVip = _vipProcesses.Any(v => name.Contains(v));
 
-                        // Essential system processes to ignore
                         if (name == "explorer" || name == "dwm" || name == "lsass" || name == "csrss" || name == "searchindexer") continue;
 
                         ulong currentWs = (ulong)proc.WorkingSet64;
@@ -1774,8 +1741,6 @@ namespace KitLugia.GUI.Services
 
                         if (currentWs > activeThreshold)
                         {
-                            // Target ONLY this leaky process
-                            // If it's a VIP, we ONLY do a Leve trim to prevent lag
                             MemoryOptimizer.EmptyProcessWorkingSet(proc.Id);
                         }
                     }
@@ -2090,7 +2055,8 @@ namespace KitLugia.GUI.Services
             {
                 if (hwnd == IntPtr.Zero || hwnd == _lastForegroundHwnd) return;
                 _lastForegroundHwnd = hwnd;
-                Application.Current?.Dispatcher.BeginInvoke(() =>
+                if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
+                Application.Current.Dispatcher.BeginInvoke(() =>
                 {
                     try { CheckForegroundWindow(); }
                     catch (Exception ex) { ConditionalLog.LogOnce("WinEventHookDispatch", ex); }
@@ -3030,7 +2996,7 @@ namespace KitLugia.GUI.Services
                             ? $"RAM liberada! {before}% → {after}% ({freed}% liberado) [{_lastCleanDurationMs}ms]"
                             : $"Limpeza concluída. RAM: {after}%";
 
-                        // Atualizar UI na thread principal
+                        if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
                         Application.Current.Dispatcher.Invoke(() =>
                         {
                             UpdateTrayIcon(after);
@@ -3221,32 +3187,36 @@ namespace KitLugia.GUI.Services
 
         public void Dispose()
         {
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownFinished)
+            {
+                Application.Current.Dispatcher.Invoke(() => DisposeCore());
+                return;
+            }
+            DisposeCore();
+        }
 
+        private void DisposeCore()
+        {
             if (_monitorTimer != null)
             {
                 _monitorTimer.Tick -= MonitorTick;
                 _monitorTimer.Stop();
             }
 
-            // Para o timer dedicado do RAM Limiter
             StopRamLimiterTimer();
             
-            // Limpa job objects do limitador de CPU
             foreach (var job in _cpuJobObjects.Values)
                 Win32Api.CloseHandle(job);
             _cpuJobObjects.Clear();
 
             StopAdvancedMonitor();
 
-
             ClearProcessCache();
-            
 
             _processCache.Clear();
             _processAlerts.Clear();
             _processBehaviors.Clear();
             _cpuTimeCache.Clear();
-
 
             ShutdownGameBoost();
 
@@ -3414,8 +3384,8 @@ namespace KitLugia.GUI.Services
                     // Inicia o timer dedicado se houver limites configurados
                     if (!_processRamLimits.IsEmpty)
                     {
-                        // Usa BeginInvoke para garantir que o Dispatcher está pronto
-                        Application.Current?.Dispatcher.BeginInvoke(
+                        if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
+                        Application.Current.Dispatcher.BeginInvoke(
                             new System.Action(StartRamLimiterTimer),
                             System.Windows.Threading.DispatcherPriority.Background);
                         KitLugia.Core.Logger.Log("🔄 Timer do RAM Limiter iniciado automaticamente");
@@ -3485,7 +3455,8 @@ namespace KitLugia.GUI.Services
             // Inicia o timer dedicado se ainda não estiver rodando
             if (!_processRamLimits.IsEmpty)
             {
-                Application.Current?.Dispatcher.Invoke(() => StartRamLimiterTimer());
+                if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
+                Application.Current.Dispatcher.Invoke(() => StartRamLimiterTimer());
             }
 
             KitLugia.Core.Logger.Log($"💾 Limite de RAM definido: {key} → {limitMB} MB ({(enabled ? "ativo" : "inativo")})");

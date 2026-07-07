@@ -134,7 +134,7 @@ namespace KitLugia.Core
                         try
                         {
                             var macResult = SystemUtils.RunExternalProcess("powershell",
-                                $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName}' -ErrorAction SilentlyContinue).MacAddress\"",
+                                $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName.Replace("'", "''")}' -ErrorAction SilentlyContinue).MacAddress\"",
                                 hidden: true);
                             if (!string.IsNullOrWhiteSpace(macResult) && macResult.Length >= 12)
                                 liveMac = macResult.Trim().ToUpper().Replace("-", "").Replace(":", "");
@@ -149,7 +149,7 @@ namespace KitLugia.Core
                         try
                         {
                             var statusResult = SystemUtils.RunExternalProcess("powershell",
-                                $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName}' -ErrorAction SilentlyContinue).Status -eq 'Up'\"",
+                                $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName.Replace("'", "''")}' -ErrorAction SilentlyContinue).Status -eq 'Up'\"",
                                 hidden: true);
                             isUp = statusResult.Trim().Equals("True", StringComparison.OrdinalIgnoreCase);
                         }
@@ -352,7 +352,7 @@ namespace KitLugia.Core
         /// </summary>
         public static (bool Success, string Message) RestartAdapter(string connectionName)
         {
-            return RestartAdapterAsync(connectionName).GetAwaiter().GetResult();
+            return Task.Run(() => RestartAdapterAsync(connectionName)).GetAwaiter().GetResult();
         }
 
         public static string GetCurrentMac(string connectionName)

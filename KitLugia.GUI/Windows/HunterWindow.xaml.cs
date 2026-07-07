@@ -947,7 +947,7 @@ namespace KitLugia.GUI.Windows
             if (mode == MessageBoxResult.No)
             {
                 DeepUninstaller.KillProcessesForApp(dn, il);
-                try { Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{us}\"") { UseShellExecute = true, Verb = "runas" }); }
+                try { Process.Start(new ProcessStartInfo(us) { UseShellExecute = true, Verb = "runas" }); }
                 catch (Exception ex) { MessageBox.Show($"Erro: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error); }
                 return;
             }
@@ -1012,7 +1012,7 @@ namespace KitLugia.GUI.Windows
         private void BtnProperties_Click(object? sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(_detectedPath) && File.Exists(_detectedPath))
-                try { Process.Start("properties", _detectedPath); } catch { }
+                try { Process.Start("explorer.exe", $"/select,\"{_detectedPath}\""); } catch { }
             else if (!string.IsNullOrEmpty(_detectedName))
                 MessageBox.Show($"Nome: {_detectedName}\nCaminho: {_detectedPath}", "Propriedades", MessageBoxButton.OK, MessageBoxImage.Information);
         }

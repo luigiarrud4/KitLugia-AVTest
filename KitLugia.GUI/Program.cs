@@ -41,8 +41,20 @@ namespace KitLugia.GUI
 
             // --- SINGLE INSTANCE CHECK ---
             // Se já existe uma instância, traz a janela dela para frente e sai
-            _mutex = new Mutex(true, "Global\\KitLugia_SingleInstance", out bool isNew);
-            if (!isNew)
+            // Usa WaitOne em vez de initiallyOwned=true para tratar AbandonedMutexException
+            // (crash da instância anterior não impede reinício do app).
+            _mutex = new Mutex(false, "Global\\KitLugia_SingleInstance");
+            bool acquired;
+            try
+            {
+                acquired = _mutex.WaitOne(TimeSpan.FromMilliseconds(100));
+            }
+            catch (AbandonedMutexException)
+            {
+                // Instância anterior crashou — assumimos ownership e continuamos
+                acquired = true;
+            }
+            if (!acquired)
             {
                 // Já existe uma instância rodando — traz para frente
                 BringExistingToFront();
@@ -57,14 +69,17 @@ namespace KitLugia.GUI
             // ==============================================================================
 
             // Inicia o WPF normalmente
-            var app = new App();
-            app.StartMinimized = startMinimized;
-            app.InitializeComponent();
-            app.Run();
-
-            // Libera o mutex ao sair
-            _mutex?.ReleaseMutex();
-            _mutex?.Dispose();
+            try
+            {
+                var app = new App();
+                app.StartMinimized = startMinimized;
+                app.InitializeComponent();
+                app.Run();
+            }
+            finally
+            {
+                try { _mutex?.ReleaseMutex(); _mutex?.Dispose(); } catch { }
+            }
         }
 
         private static void BringExistingToFront()
@@ -75,21 +90,20 @@ namespace KitLugia.GUI
                 var existing = Process.GetProcessesByName(current.ProcessName)
                     .FirstOrDefault(p => p.Id != current.Id);
 
-                if (existing is not null && existing.MainWindowHandle != IntPtr.Zero)
+                if (existing is not null && !existing.HasExited && existing.MainWindowHandle != IntPtr.Zero)
                 {
                     if (IsIconic(existing.MainWindowHandle)) ShowWindow(existing.MainWindowHandle, SW_RESTORE);
                     else ShowWindow(existing.MainWindowHandle, SW_SHOW);
                     SetForegroundWindow(existing.MainWindowHandle);
+                    return;
                 }
-                else
+
+                // Janela oculta (tray mode) ou processo inexistente — envia sinal via named event
+                try
                 {
-                    // Janela oculta (tray mode) — envia sinal via named event
-                    try
-                    {
-                        EventWaitHandle.OpenExisting("KitLugia_ShowWindow")?.Set();
-                    }
-                    catch { }
+                        EventWaitHandle.OpenExisting("Global\\KitLugia_ShowWindow")?.Set();
                 }
+                catch { }
             }
             catch { }
         }

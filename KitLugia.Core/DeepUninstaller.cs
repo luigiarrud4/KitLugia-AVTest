@@ -2462,6 +2462,13 @@ namespace KitLugia.Core
                 int end = cmd.IndexOf('"', 1);
                 if (end > 0) return (cmd[1..end], end + 1 < cmd.Length ? cmd[(end + 1)..].TrimStart() : "");
             }
+            int exeIdx = cmd.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+            if (exeIdx > 0)
+            {
+                string exePath = cmd[..(exeIdx + 4)];
+                string rest = cmd.Length > exeIdx + 4 ? cmd[(exeIdx + 5)..].TrimStart() : "";
+                return (exePath, rest);
+            }
             int space = cmd.IndexOf(' ');
             if (space > 0) return (cmd[..space], cmd[(space + 1)..].TrimStart());
             return (cmd, "");
@@ -3795,7 +3802,7 @@ namespace KitLugia.Core
             // InstallShield: -s /s /sms
             if (lower.Contains("isuninst.exe") || lower.Contains("-s") ||
                 lower.Contains("setup.exe"))
-                return $"{trimmed} -s -f1\"{installLocation}\"uninstall.iss";
+                return $"{trimmed} -s -f1\"{installLocation}\\uninstall.iss\"";
 
             // Wise Installation System: /s
             if (lower.Contains("wise") || lower.Contains("/s"))

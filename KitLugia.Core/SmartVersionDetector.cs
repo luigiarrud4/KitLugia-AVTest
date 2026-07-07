@@ -327,8 +327,7 @@ namespace KitLugia.Core
         {
             try
             {
-                var task = GetVersionInfoAsync();
-                return task.GetAwaiter().GetResult();
+                return Task.Run(() => GetVersionInfoAsync()).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {

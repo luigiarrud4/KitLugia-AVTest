@@ -77,12 +77,7 @@ namespace KitLugia.GUI.Pages
 
             if (!tray.IsInitialized)
             {
-                int waited = 0;
-                while (!tray.IsInitialized && waited < 3000)
-                {
-                    System.Threading.Thread.Sleep(50);
-                    waited += 50;
-                }
+                // Will use defaults, values update when service is ready
             }
 
             ChkEnableTray.IsChecked = tray.IsTrayEnabled;

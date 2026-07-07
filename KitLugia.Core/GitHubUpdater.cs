@@ -17,7 +17,7 @@ namespace KitLugia.Core
     {
         private static readonly string GitHubRepo = "luigiarrud4/KitLugia-AVTest";
         public static readonly string ApiUrl = $"https://api.github.com/repos/{GitHubRepo}/releases/latest";
-        public static readonly HttpClient _httpClient = new();
+        public static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         // Cache de disco para última release
         private static ReleaseInfo? _cachedLatestRelease;
@@ -153,7 +153,8 @@ namespace KitLugia.Core
 
             try
             {
-                var response = await _httpClient.GetAsync(ApiUrl);
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+                var response = await _httpClient.GetAsync(ApiUrl, cts.Token);
                 if (!response.IsSuccessStatusCode)
                 {
                     Logger.Log($"❌ API GitHub retornou {response.StatusCode} — usando cache de disco");

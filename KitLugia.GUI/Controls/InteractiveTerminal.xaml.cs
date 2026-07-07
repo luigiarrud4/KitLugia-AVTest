@@ -182,7 +182,7 @@ namespace KitLugia.GUI.Controls
                 }
             }
 
-            // Fecha o controle visualmente
+            if (Dispatcher.HasShutdownFinished) return;
             Dispatcher.Invoke(() =>
             {
                 this.Visibility = Visibility.Collapsed;

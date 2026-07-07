@@ -480,6 +480,8 @@ AllowUserConfig=true
                     };
 
                     using var mountProcess = Process.Start(psi)!;
+                    await mountProcess.StandardOutput.ReadToEndAsync();
+                    await mountProcess.StandardError.ReadToEndAsync();
                     await mountProcess.WaitForExitAsync();
 
                     if (mountProcess.ExitCode == 0)
@@ -495,6 +497,8 @@ AllowUserConfig=true
                         };
 
                         using var injectProcess = Process.Start(injectPsi)!;
+                        await injectProcess.StandardOutput.ReadToEndAsync();
+                        await injectProcess.StandardError.ReadToEndAsync();
                         await injectProcess.WaitForExitAsync();
 
                         var unmountPsi = new ProcessStartInfo
@@ -508,6 +512,8 @@ AllowUserConfig=true
                         };
 
                         using var unmountProcess = Process.Start(unmountPsi)!;
+                        await unmountProcess.StandardOutput.ReadToEndAsync();
+                        await unmountProcess.StandardError.ReadToEndAsync();
                         await unmountProcess.WaitForExitAsync();
                     }
 

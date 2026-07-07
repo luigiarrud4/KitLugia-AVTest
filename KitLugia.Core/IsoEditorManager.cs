@@ -153,7 +153,7 @@ namespace KitLugia.Core
         /// </summary>
         public static async Task<(bool Success, string Message, List<string> RemovedApps)> RemoveProvisionedApps(string mountPath, List<string> packageNames)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 try
                 {
@@ -165,7 +165,7 @@ namespace KitLugia.Core
                     var notFoundApps = new List<string>();
 
                     // Primeiro, listar todos os provisioned apps disponíveis
-                    var (listSuccess, _, availableApps) = GetProvisionedApps(mountPath).Result;
+                    var (listSuccess, _, availableApps) = await GetProvisionedApps(mountPath);
                     if (!listSuccess || availableApps.Count == 0)
                     {
                         return (false, "Não foi possível listar apps disponíveis na imagem.", new List<string>());

@@ -45,9 +45,8 @@ namespace KitLugia.GUI
         /// </summary>
         public static void Write(string text)
         {
-            if (_outputBlock == null) return;
+            if (_outputBlock?.Dispatcher == null || _outputBlock.Dispatcher.HasShutdownFinished) return;
 
-            // Garante que rode na Thread da UI para não travar
             _outputBlock.Dispatcher.Invoke(() =>
             {
                 _outputBlock.Text += text;
@@ -60,7 +59,7 @@ namespace KitLugia.GUI
         /// </summary>
         public static void Clear()
         {
-            if (_outputBlock == null) return;
+            if (_outputBlock?.Dispatcher == null || _outputBlock.Dispatcher.HasShutdownFinished) return;
             _outputBlock.Dispatcher.Invoke(() => _outputBlock.Text = "");
         }
 
@@ -70,26 +69,26 @@ namespace KitLugia.GUI
         /// </summary>
         public static async Task<string> ReadLineAsync()
         {
-            if (_inputBox == null) return "";
+            if (_inputBox?.Dispatcher == null || _inputBox.Dispatcher.HasShutdownFinished) return "";
 
-            // 1. Destrava a caixa de texto e foca nela
+            _inputTask?.TrySetCanceled();
+            _inputTask = new TaskCompletionSource<string>();
+
             _inputBox.Dispatcher.Invoke(() =>
             {
                 _inputBox.IsEnabled = true;
                 _inputBox.Focus();
             });
 
-            // 2. Cria uma "promessa" de que um texto virá no futuro
-            _inputTask = new TaskCompletionSource<string>();
-
-            // 3. Espera (await) até a promessa ser cumprida no método SubmitInput
             string result = await _inputTask.Task;
 
-            // 4. Trava a caixa de texto de novo
-            _inputBox.Dispatcher.Invoke(() =>
+            if (!_inputBox.Dispatcher.HasShutdownFinished)
             {
-                _inputBox.IsEnabled = false;
-            });
+                _inputBox.Dispatcher.Invoke(() =>
+                {
+                    _inputBox.IsEnabled = false;
+                });
+            }
 
             return result;
         }
