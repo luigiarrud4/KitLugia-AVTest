@@ -828,7 +828,7 @@ namespace KitLugia.Core
                         td.Settings.StartWhenAvailable = true;
                         td.Settings.Priority = ProcessPriorityClass.High;
                         td.Settings.RestartCount = 2;
-                        td.Settings.RestartInterval = TimeSpan.FromSeconds(30);
+                        td.Settings.RestartInterval = TimeSpan.FromMinutes(1);
 
                         var trigger = new LogonTrigger { Delay = TimeSpan.Zero, Enabled = true };
                         td.Triggers.Add(trigger);

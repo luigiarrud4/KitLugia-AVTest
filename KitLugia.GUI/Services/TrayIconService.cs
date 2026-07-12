@@ -714,39 +714,77 @@ namespace KitLugia.GUI.Services
                 string currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 if (string.IsNullOrEmpty(currentPath)) return false;
 
+                // 1. Verificar Task Scheduler primeiro
                 using (var ts = new TaskService())
                 {
                     var task = ts.GetTask("KitLugia");
-                    if (task == null) return false;
-
-                    // Verificar se a tarefa está habilitada
-                    if (!task.Enabled) return false;
-
-                    // Verificar se o caminho do executável corresponde à versão atual
-                    foreach (var action in task.Definition.Actions)
+                    if (task != null)
                     {
-                        if (action is ExecAction execAction)
+                        if (!task.Enabled) return false;
+
+                        foreach (var action in task.Definition.Actions)
                         {
-                            string taskPath = execAction.Path;
-                            if (string.Equals(taskPath, currentPath, StringComparison.OrdinalIgnoreCase))
+                            if (action is ExecAction execAction)
                             {
-                                // KitLugia.Core.Logger.Log($"✅ Auto-Start habilitado com caminho correto: {currentPath}");
-                                return true;
-                            }
-                            else
-                            {
-                                KitLugia.Core.Logger.Log($"⚠️ Auto-Start aponta para versão antiga: {taskPath} != {currentPath}");
-                                return false;
+                                string taskPath = execAction.Path;
+                                if (string.Equals(taskPath, currentPath, StringComparison.OrdinalIgnoreCase))
+                                    return true;
+                                else
+                                    KitLugia.Core.Logger.Log($"⚠️ Auto-Start aponta para versão antiga: {taskPath} != {currentPath}");
                             }
                         }
                     }
                 }
+
+                // 2. Fallback: verificar Registry Run key (caso SetAutoStart tenha caído no fallback)
+                return CheckRegistryAutoStart(currentPath);
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.LogError("IsAutoStartEnabled", $"Erro: {ex.Message}");
+                return CheckRegistryAutoStart();
             }
-            return false;
+        }
+
+        private static bool CheckRegistryAutoStart(string? currentPath = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(currentPath))
+                {
+                    currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                    if (string.IsNullOrEmpty(currentPath)) return false;
+                }
+
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+                if (key == null) return false;
+
+                var value = key.GetValue("KitLugia") as string;
+                if (string.IsNullOrEmpty(value)) return false;
+
+                value = value.Trim();
+
+                // Extrair o caminho entre aspas: "c:\path\exe" --tray
+                string registryPath;
+                if (value.StartsWith("\"") && value.Length > 1)
+                {
+                    int closingQuote = value.IndexOf('"', 1);
+                    if (closingQuote > 0)
+                        registryPath = value.Substring(1, closingQuote - 1);
+                    else
+                        registryPath = value;
+                }
+                else
+                {
+                    registryPath = value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)[0];
+                }
+
+                return string.Equals(registryPath, currentPath, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -870,7 +908,7 @@ namespace KitLugia.GUI.Services
 
                             // ★ Restart on failure: se o processo morrer nos primeiros 30s depois do logon, tentar 2x
                             td.Settings.RestartCount = 2;
-                            td.Settings.RestartInterval = TimeSpan.FromSeconds(30);
+                            td.Settings.RestartInterval = TimeSpan.FromMinutes(1);
 
                             // Trigger: Logon imediato para inicialização rápida
                             var trigger = new LogonTrigger

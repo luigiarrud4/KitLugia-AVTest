@@ -346,11 +346,9 @@ namespace KitLugia.GUI.Pages
                     ChkGameBoost.IsChecked = mw.TrayService.GamePriorityEnabled;
                 }
 
-                using (var ts = new Microsoft.Win32.TaskScheduler.TaskService())
-                {
-                    var task = ts.GetTask("KitLugia");
-                    ChkStartWithWindows.IsChecked = task?.Enabled == true;
-                }
+                bool autoStart = Services.TrayIconService.IsAutoStartEnabled();
+                ChkStartWithWindows.IsChecked = autoStart;
+                ChkCrAutoStart.IsChecked = autoStart;
             }
             catch { }
         }
@@ -1208,7 +1206,9 @@ namespace KitLugia.GUI.Pages
 
         private void ChkCrAutoStart_Click(object sender, RoutedEventArgs e)
         {
-            Services.TrayIconService.SetAutoStart(ChkCrAutoStart.IsChecked == true);
+            bool enabled = ChkCrAutoStart.IsChecked == true;
+            Services.TrayIconService.SetAutoStart(enabled);
+            ChkStartWithWindows.IsChecked = enabled;
         }
 
         private void ChkCrExtremeLatency_Click(object sender, RoutedEventArgs e)
