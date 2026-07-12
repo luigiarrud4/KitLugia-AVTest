@@ -150,6 +150,8 @@ namespace KitLugia.GUI
         WinTune,
         QuickInstall,
         Shrink,
+        ContextMenu,
+        ContextMenuPreview,
     }
 
     public partial class MainWindow : Window, INotifyPropertyChanged
@@ -899,6 +901,8 @@ namespace KitLugia.GUI
                 IntegrityPage => PageType.Integrity,
                 GameBoostPage => PageType.GameBoost,
                 DiagnosticPage => PageType.Diagnostic,
+                ContextMenuPage => PageType.ContextMenu,
+                ContextMenuPreviewPage => PageType.ContextMenuPreview,
                 _ => null
             };
         }
@@ -921,6 +925,8 @@ namespace KitLugia.GUI
                 PageType.Integrity => new IntegrityPage(),
                 PageType.GameBoost => new GameBoostPage(),
                 PageType.Diagnostic => new DiagnosticPage(),
+                PageType.ContextMenu => new ContextMenuPage(),
+                PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
                 _ => new DashboardPage()
             };
         }
@@ -1171,6 +1177,8 @@ namespace KitLugia.GUI
                 PageType.WinTune => new WinTunePage(),
                 PageType.QuickInstall => new QuickInstallPage(),
                 PageType.Shrink => new ShrinkPage(),
+                PageType.ContextMenu => new ContextMenuPage(),
+                PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
                 _ => null
             };
 

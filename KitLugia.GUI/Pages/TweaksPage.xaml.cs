@@ -52,6 +52,7 @@ namespace KitLugia.GUI.Pages
         {
             await Task.Run(() =>
             {
+                // ========== LER TODOS OS REGISTROS NA THREAD DE BACKGROUND ==========
                 bool gamesOptimized = SystemTweaks.IsGamingOptimized();
                 bool mpoDisabled = SystemTweaks.IsMpoDisabled();
                 bool vbsEnabledInSystem = SystemTweaks.IsVbsEnabled();
@@ -59,13 +60,60 @@ namespace KitLugia.GUI.Pages
                 bool memoryUsageEnabled = SystemTweaks.IsMemoryUsageEnabled();
                 bool timerOptimized = SystemTweaks.IsTimerResolutionOptimized();
                 bool shutdownOptimized = SystemTweaks.IsFastShutdownEnabled();
-
                 bool slideInput = SystemTweaks.IsInputLatencyOptimized();
                 bool slideUsb = SystemTweaks.IsUsbPowerSavingDisabled();
                 bool slideGaming = SystemTweaks.IsGamingLatencyOptimized();
                 bool pciePowerDisabled = SystemTweaks.IsPcieLinkStatePowerManagementDisabled();
                 bool timeoutDisabled = SystemTweaks.IsHardDiskDisplayTimeoutDisabled();
 
+                bool smartScreenSystemDisabled = IsSmartScreenSystemDisabled();
+                bool smartScreenExplorerDisabled = IsSmartScreenExplorerDisabled();
+
+                bool backgroundApps = SystemTweaks.IsBackgroundAppsDisabled();
+                bool ndu = SystemTweaks.IsNDUDisabled();
+                bool serviceStartup = SystemTweaks.IsServiceStartupOptimized();
+                bool noAutoReboot = SystemTweaks.IsNoAutoRebootEnabled();
+                bool diagnosticServices = SystemTweaks.IsDiagnosticServicesDisabled();
+                bool powerThrottling = SystemTweaks.IsPowerThrottlingDisabled();
+                bool gdiScaling = SystemTweaks.IsGdiScalingDisabled();
+
+                bool l2CacheSet = SystemTweaks.IsSecondLevelDataCacheSet();
+                bool nagleDisabled = SystemTweaks.IsNagleAlgorithmDisabled();
+                bool coreParkingDisabled = SystemTweaks.IsCoreParkingDisabled();
+                var cpuInfo = SystemTweaks.GetCpuInfo();
+                var cacheVal = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache", 0);
+                int cacheKb = cacheVal != null ? Convert.ToInt32(cacheVal) : 0;
+
+                var gpuNames = SystemTweaks.GetAllGpuNames();
+                string firstGpuRegPath = gpuNames.Count > 0 ? SystemTweaks.FindGpuRegistryPathByDescription(gpuNames[0]) : null;
+
+                bool frameQueue = SystemTweaks.IsFrameQueueModeSet();
+                bool preemption = SystemTweaks.IsPreemptionEnabled();
+                bool gpuIdle = SystemTweaks.IsGpuIdleDisabled();
+                bool powerLatency = SystemTweaks.IsGpuPowerLatencySet();
+
+                bool hags = SystemTweaks.IsHagsEnabled();
+                bool tdr = SystemTweaks.IsTdrDelayIncreased();
+                bool ioLock = SystemTweaks.IsIoPageLockLimitSet();
+                bool inputQueue = SystemTweaks.IsInputQueueSizeIncreased();
+
+                bool startupDelay = SystemTweaks.IsStartupDelayOptimized();
+                bool fastStartup = SystemTweaks.IsFastStartupDisabled();
+                bool bootMenu = SystemTweaks.IsBootMenuTimeoutZero();
+                bool numLock = SystemTweaks.IsNumLockOnStartupEnabled();
+
+                bool waitToKillService = SystemTweaks.IsWaitToKillServiceOptimized();
+                bool quickAppKill = SystemTweaks.IsQuickAppKillApplied();
+                bool clearPageFile = SystemTweaks.IsClearPageFileDisabled();
+                bool verboseStatus = SystemTweaks.IsVerboseStatusEnabled();
+
+                bool menuDelay = SystemTweaks.IsMenuShowDelayOptimized();
+                bool visualFX = SystemTweaks.IsVisualFXOptimized();
+                int explorerLaunchTo = SystemTweaks.GetExplorerLaunchToIndex();
+                bool iconCache = SystemTweaks.IsIconCacheIncreased();
+                bool pca = SystemTweaks.IsPCADisabled();
+
+                // ========== ATUALIZAR UI NA THREAD PRINCIPAL ==========
                 Dispatcher.Invoke(() =>
                 {
                     if (!_isPageLoaded) return;
@@ -93,35 +141,33 @@ namespace KitLugia.GUI.Pages
                     ChkShutdown.IsChecked = shutdownOptimized;
                     UpdateLabel(StatusShutdown, shutdownOptimized, "⚡ Turbo Boot", "Padrão");
 
-                    // SmartScreen — varredura multi-camada
-                    bool smartScreenSystemDisabled = IsSmartScreenSystemDisabled();
+                    // SmartScreen
                     UpdateLabel(StatusSmartScreenSystem, smartScreenSystemDisabled, "Desativado", "Ativo");
                     ChkSmartScreenSystem.IsChecked = smartScreenSystemDisabled;
 
-                    bool smartScreenExplorerDisabled = IsSmartScreenExplorerDisabled();
                     UpdateLabel(StatusSmartScreenExplorer, smartScreenExplorerDisabled, "Desativado", "Ativo");
                     ChkSmartScreenExplorer.IsChecked = smartScreenExplorerDisabled;
 
-                    ChkBackgroundApps.IsChecked = SystemTweaks.IsBackgroundAppsDisabled();
-                    UpdateLabel(StatusBackgroundApps, ChkBackgroundApps.IsChecked == true, "Desativado", "Padrão");
+                    ChkBackgroundApps.IsChecked = backgroundApps;
+                    UpdateLabel(StatusBackgroundApps, backgroundApps, "Desativado", "Padrão");
 
-                    ChkNDU.IsChecked = SystemTweaks.IsNDUDisabled();
-                    UpdateLabel(StatusNDU, ChkNDU.IsChecked == true, "Desativado", "Padrão");
+                    ChkNDU.IsChecked = ndu;
+                    UpdateLabel(StatusNDU, ndu, "Desativado", "Padrão");
 
-                    ChkServiceStartup.IsChecked = SystemTweaks.IsServiceStartupOptimized();
-                    UpdateLabel(StatusServiceStartup, ChkServiceStartup.IsChecked == true, "Otimizado", "Padrão");
+                    ChkServiceStartup.IsChecked = serviceStartup;
+                    UpdateLabel(StatusServiceStartup, serviceStartup, "Otimizado", "Padrão");
 
-                    ChkNoAutoReboot.IsChecked = SystemTweaks.IsNoAutoRebootEnabled();
-                    UpdateLabel(StatusNoAutoReboot, ChkNoAutoReboot.IsChecked == true, "Ativado", "Padrão");
+                    ChkNoAutoReboot.IsChecked = noAutoReboot;
+                    UpdateLabel(StatusNoAutoReboot, noAutoReboot, "Ativado", "Padrão");
 
-                    ChkDiagnosticServices.IsChecked = SystemTweaks.IsDiagnosticServicesDisabled();
-                    UpdateLabel(StatusDiagnosticServices, ChkDiagnosticServices.IsChecked == true, "Desativado", "Padrão");
+                    ChkDiagnosticServices.IsChecked = diagnosticServices;
+                    UpdateLabel(StatusDiagnosticServices, diagnosticServices, "Desativado", "Padrão");
 
-                    ChkPowerThrottling.IsChecked = SystemTweaks.IsPowerThrottlingDisabled();
-                    UpdateLabel(StatusPowerThrottling, ChkPowerThrottling.IsChecked == true, "Desativado", "Padrão");
+                    ChkPowerThrottling.IsChecked = powerThrottling;
+                    UpdateLabel(StatusPowerThrottling, powerThrottling, "Desativado", "Padrão");
 
-                    ChkGdiScaling.IsChecked = SystemTweaks.IsGdiScalingDisabled();
-                    UpdateLabel(StatusGdiScaling, ChkGdiScaling.IsChecked == true, "Desativado", "Padrão");
+                    ChkGdiScaling.IsChecked = gdiScaling;
+                    UpdateLabel(StatusGdiScaling, gdiScaling, "Desativado", "Padrão");
 
                     ChkSlideInput.IsChecked = slideInput;
                     UpdateSlideLabel(StatusSlideInput, slideInput, "Nível Máximo", "Padrão");
@@ -139,17 +185,9 @@ namespace KitLugia.GUI.Pages
                     UpdateSlideLabel(StatusTimeout, timeoutDisabled, "Desativado (0)", "Padrão");
 
                     // Hardware & Rede
-                    bool l2CacheSet = SystemTweaks.IsSecondLevelDataCacheSet();
-                    bool nagleDisabled = SystemTweaks.IsNagleAlgorithmDisabled();
-                    bool coreParkingDisabled = SystemTweaks.IsCoreParkingDisabled();
-
                     ChkL2Cache.IsChecked = l2CacheSet;
                     UpdateLabel(StatusL2Cache, l2CacheSet, "Aplicado", "Padrão");
 
-                    // Info CPU + Cache
-                    var cpuInfo = SystemTweaks.GetCpuInfo();
-                    var cacheVal = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache", 0);
-                    int cacheKb = cacheVal != null ? Convert.ToInt32(cacheVal) : 0;
                     string cacheStr = cacheKb > 0 ? $"{cacheKb} KB" : "Não definido";
                     InfoCpu.Text = $"CPU: {cpuInfo.Name}  |  L2: {cpuInfo.L2CacheKb} KB  |  L3: {cpuInfo.L3CacheKb} KB  |  Registry: {cacheStr}";
 
@@ -160,24 +198,17 @@ namespace KitLugia.GUI.Pages
                     UpdateLabel(StatusCoreParking, coreParkingDisabled, "Aplicado", "Padrão");
 
                     // GPU & Scheduling
-                    // Populate GPU selector
                     ChkGpuSelector.Items.Clear();
-                    var gpuNames = SystemTweaks.GetAllGpuNames();
                     foreach (var gn in gpuNames)
                         ChkGpuSelector.Items.Add(gn);
                     if (ChkGpuSelector.Items.Count > 0)
                     {
                         ChkGpuSelector.SelectedIndex = 0;
                         _selectedGpuIndex = 0;
-                        _selectedGpuRegPath = SystemTweaks.FindGpuRegistryPathByDescription(gpuNames[0]);
+                        _selectedGpuRegPath = firstGpuRegPath;
                     }
 
                     BuildVramRows();
-
-                    bool frameQueue = SystemTweaks.IsFrameQueueModeSet();
-                    bool preemption = SystemTweaks.IsPreemptionEnabled();
-                    bool gpuIdle = SystemTweaks.IsGpuIdleDisabled();
-                    bool powerLatency = SystemTweaks.IsGpuPowerLatencySet();
 
                     ChkFrameQueue.IsChecked = frameQueue;
                     UpdateLabel(StatusFrameQueue, frameQueue, "Low Latency (0)", "Padrão (1)");
@@ -193,11 +224,6 @@ namespace KitLugia.GUI.Pages
                     UpdateLabel(StatusPowerLatency, powerLatency, "Latência (1)", "Padrão (0)");
 
                     // Hardware & Rede — novos
-                    bool hags = SystemTweaks.IsHagsEnabled();
-                    bool tdr = SystemTweaks.IsTdrDelayIncreased();
-                    bool ioLock = SystemTweaks.IsIoPageLockLimitSet();
-                    bool inputQueue = SystemTweaks.IsInputQueueSizeIncreased();
-
                     ChkHags.IsChecked = hags;
                     UpdateLabel(StatusHags, hags, "Ativado (2)", "Padrão");
 
@@ -209,6 +235,58 @@ namespace KitLugia.GUI.Pages
 
                     ChkInputQueue.IsChecked = inputQueue;
                     UpdateLabel(StatusInputQueue, inputQueue, "200", "Padrão (100)");
+
+                    // Startup
+                    ChkStartupDelay.IsChecked = startupDelay;
+                    UpdateLabel(StatusStartupDelay, startupDelay, "Removido", "Padrão");
+
+                    ChkFastStartup.IsChecked = fastStartup;
+                    UpdateLabel(StatusFastStartup, fastStartup, "Desativado", "Ativo");
+
+                    ChkBootMenu.IsChecked = bootMenu;
+                    UpdateLabel(StatusBootMenu, bootMenu, "0s", "Padrão (30s)");
+
+                    ChkNumLock.IsChecked = numLock;
+                    UpdateLabel(StatusNumLock, numLock, "Ativado", "Desativado");
+
+                    // Shutdown
+                    ChkWaitToKillService.IsChecked = waitToKillService;
+                    UpdateLabel(StatusWaitToKillService, waitToKillService, "2s", "Padrão (5s)");
+
+                    ChkQuickAppKill.IsChecked = quickAppKill;
+                    UpdateLabel(StatusQuickAppKill, quickAppKill, "Ativado", "Padrão");
+
+                    ChkClearPageFile.IsChecked = clearPageFile;
+                    UpdateLabel(StatusClearPageFile, clearPageFile, "Desativado", "Padrão");
+
+                    ChkVerboseStatus.IsChecked = verboseStatus;
+                    UpdateLabel(StatusVerboseStatus, verboseStatus, "Detalhado", "Oculto");
+
+                    // Interface & Explorer
+                    bool menuDelay = SystemTweaks.IsMenuShowDelayOptimized();
+                    bool visualFX = SystemTweaks.IsVisualFXOptimized();
+                    int explorerLaunchTo = SystemTweaks.GetExplorerLaunchToIndex();
+                    bool iconCache = SystemTweaks.IsIconCacheIncreased();
+                    bool pca = SystemTweaks.IsPCADisabled();
+
+                    ChkMenuDelay.IsChecked = menuDelay;
+                    UpdateLabel(StatusMenuDelay, menuDelay, "0ms", "Padrão (400ms)");
+
+                    ChkVisualFX.IsChecked = visualFX;
+                    UpdateLabel(StatusVisualFX, visualFX, "Máximo", "Padrão");
+
+                    // Populate Explorer LaunchTo ComboBox
+                    ChkExplorerLaunchTo.Items.Clear();
+                    ChkExplorerLaunchTo.Items.Add("Acesso Rápido");
+                    ChkExplorerLaunchTo.Items.Add("Este Computador");
+                    ChkExplorerLaunchTo.Items.Add("Downloads");
+                    ChkExplorerLaunchTo.SelectedIndex = explorerLaunchTo >= 0 && explorerLaunchTo <= 2 ? explorerLaunchTo : 0;
+
+                    ChkIconCache.IsChecked = iconCache;
+                    UpdateLabel(StatusIconCache, iconCache, "8192 KB", "Padrão");
+
+                    ChkPCA.IsChecked = pca;
+                    UpdateLabel(StatusPCA, pca, "Desativado", "Ativo");
 
                     _isLoading = false;
                 });
@@ -1344,6 +1422,262 @@ namespace KitLugia.GUI.Pages
                 UpdateLabel(StatusInputQueue, targetActive, "200", "Padrão (100)");
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("INPUT", targetActive ? "Fila de input aumentada para 200" : "Fila de input: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkStartupDelay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkStartupDelay.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.OptimizeStartupDelay();
+                    else SystemTweaks.RevertStartupDelay();
+                });
+                UpdateLabel(StatusStartupDelay, targetActive, "Removido", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("STARTUP", targetActive ? "Startup delay removido (0ms)" : "Startup delay: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkFastStartup_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkFastStartup.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.DisableFastStartup();
+                    else SystemTweaks.EnableFastStartup();
+                });
+                UpdateLabel(StatusFastStartup, targetActive, "Desativado", "Ativo");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("STARTUP", targetActive ? "Fast Startup desativado (desligamento completo)" : "Fast Startup: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkBootMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkBootMenu.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.SetBootMenuTimeoutZero();
+                    else SystemTweaks.RevertBootMenuTimeout();
+                });
+                UpdateLabel(StatusBootMenu, targetActive, "0s", "Padrão (30s)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("STARTUP", targetActive ? "Boot menu timeout: 0s" : "Boot menu timeout: 30s");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkNumLock_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkNumLock.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.EnableNumLockOnStartup();
+                    else SystemTweaks.DisableNumLockOnStartup();
+                });
+                UpdateLabel(StatusNumLock, targetActive, "Ativado", "Desativado");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("STARTUP", targetActive ? "NumLock ativado na inicialização" : "NumLock desativado na inicialização");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkWaitToKillService_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkWaitToKillService.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.OptimizeWaitToKillService();
+                    else SystemTweaks.RevertWaitToKillService();
+                });
+                UpdateLabel(StatusWaitToKillService, targetActive, "2s", "Padrão (5s)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("SHUTDOWN", targetActive ? "WaitToKillService: 2s" : "WaitToKillService: Padrão (5s)");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkQuickAppKill_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkQuickAppKill.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.ApplyQuickAppKill();
+                    else SystemTweaks.RevertQuickAppKill();
+                });
+                UpdateLabel(StatusQuickAppKill, targetActive, "Ativado", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("SHUTDOWN", targetActive ? "Quick App Kill: Ativado" : "Quick App Kill: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkClearPageFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkClearPageFile.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.DisableClearPageFile();
+                    else SystemTweaks.EnableClearPageFile();
+                });
+                UpdateLabel(StatusClearPageFile, targetActive, "Desativado", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("SHUTDOWN", targetActive ? "Limpeza de PageFile: Desativada" : "Limpeza de PageFile: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkVerboseStatus_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkVerboseStatus.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.EnableVerboseStatus();
+                    else SystemTweaks.DisableVerboseStatus();
+                });
+                UpdateLabel(StatusVerboseStatus, targetActive, "Detalhado", "Oculto");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("SHUTDOWN", targetActive ? "VerboseStatus: Ativado (mensagens detalhadas)" : "VerboseStatus: Oculto");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkMenuDelay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkMenuDelay.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.OptimizeMenuShowDelay();
+                    else SystemTweaks.RevertMenuShowDelay();
+                });
+                UpdateLabel(StatusMenuDelay, targetActive, "0ms", "Padrão (400ms)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("INTERFACE", targetActive ? "MenuShowDelay: 0ms (instantâneo)" : "MenuShowDelay: Padrão (400ms)");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkVisualFX_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkVisualFX.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.OptimizeVisualFX();
+                    else SystemTweaks.RevertVisualFX();
+                });
+                UpdateLabel(StatusVisualFX, targetActive, "Máximo", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("INTERFACE", targetActive ? "Animações visuais: Desativadas" : "Animações visuais: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkExplorerLaunchTo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                int value = ChkExplorerLaunchTo.SelectedIndex;
+                await Task.Run(() => SystemTweaks.SetExplorerLaunchTo(value));
+                var label = value == 0 ? "Acesso Rápido" : value == 1 ? "Este Computador" : "Downloads";
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("EXPLORER", $"Explorer abre em: {label}");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkIconCache_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkIconCache.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.IncreaseIconCache();
+                    else SystemTweaks.ResetIconCache();
+                });
+                UpdateLabel(StatusIconCache, targetActive, "8192 KB", "Padrão");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("EXPLORER", targetActive ? "Cache de ícones: 8192 KB" : "Cache de ícones: Padrão");
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkPCA_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkPCA.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.DisablePCA();
+                    else SystemTweaks.EnablePCA();
+                });
+                UpdateLabel(StatusPCA, targetActive, "Desativado", "Ativo");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("SISTEMA", targetActive ? "PCA: Desativado" : "PCA: Ativo (padrão)");
             }
             catch { }
             finally { _isLoading = false; }

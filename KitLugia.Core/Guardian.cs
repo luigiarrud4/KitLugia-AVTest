@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,16 +35,16 @@ namespace KitLugia.Core
         DoubleClickFolderNotOpening = 1 << 1,             // Duplo clique em pasta não faz nada
         DoubleClickFileNotOpening = 1 << 2,               // Duplo clique em arquivo não funciona
         DoubleClickExeBroken = 1 << 3,                    // Executável não abre ao clicar
-        
+
         // Problemas de menu de contexto (right-click)
         ContextMenuExplorerCrash = 1 << 4,                // Clique direito trava ou fecha o Explorer
         ContextMenuItemsMissing = 1 << 5,                 // Itens do menu de contexto sumiram
         ContextMenuSlowOrFreeze = 1 << 6,                 // Menu demora segundos para abrir
-        
+
         // Problemas de Shell Extension
         InvalidContextMenuHandler = 1 << 7,               // Handler malicioso/corrompido
         BlockedContextMenuExtension = 1 << 8,             // Extensão bloqueada (ex.: por CCleaner)
-        
+
         // Problemas de Explorer
         ExplorerDoesNotStart = 1 << 9                     // Explorer não inicia ou morre
     }
@@ -53,7 +53,7 @@ namespace KitLugia.Core
     public static class Guardian
     {
         #region Definições de Tweaks (Lista Completa e Detalhada)
-        
+
     // Mudei de private para internal/static acessível via método abaixo
     private static readonly List<ScannableTweak> HarmfulTweaks = new()
     {
@@ -90,42 +90,14 @@ namespace KitLugia.Core
             Description = "Impede que vírus de Pen Drive (autorun.inf) infectem o computador automaticamente assim que a mídia é conectada.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", ValueName = "NoDriveTypeAutoRun", HarmfulValue = 0, DefaultValue = 145
         },
-        new() {
-            Name = "Proteção de Kernel em Tempo Real (Real-time Kernel Protection)",
-            Description = "Monitoramento em tempo real de atividades do kernel. Desativar permite que rootkits operem sem detecção, comprometendo performance e estabilidade.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureKernel", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
+
+new() {
             Name = "Proteção contra Injeção de DLL",
             Description = "Previne injeção de DLL maliciosa em processos legítimos. Malware pode sequestrar processos do sistema, consumindo recursos e causando lentidão.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager", ValueName = "ProtectionMode", HarmfulValue = 0, DefaultValue = 1
         },
-        new() {
-            Name = "Proteção de Heap do Sistema",
-            Description = "Protege estruturas de heap do sistema contra corrupção. Malware pode exploitar heap para escalar privilégios e degradar performance.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Heap", ValueName = "ProtectionEnabled", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
-            Name = "Validação de Chamadas de Sistema (Syscall Validation)",
-            Description = "Valida chamadas de sistema para prevenir abusos. Desativar permite que malware abuse de syscalls para comprometer o sistema e causar lentidão.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SystemCall", ValueName = "ValidationEnabled", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
-            Name = "Isolamento de Processo Crítico (CIS)",
-            Description = "Isola processos críticos do sistema. Desativar permite que malware comprometa processos essenciais, causando consumo excessivo de CPU e lentidão generalizada.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CriticalProcessIsolation", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
-            Name = "Proteção de Estruturas do Kernel",
-            Description = "Protege estruturas internas do kernel contra modificação. Desativar permite que rootkits modifiquem o kernel, causando instabilidade severa e lentidão.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\KernelProtection", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
-            Name = "Controle de Integridade de Drivers",
-            Description = "Monitora integridade de drivers carregados. Desativar permite drivers maliciosos operem, comprometendo performance e estabilidade do sistema.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DriverIntegrity", ValueName = "MonitoringEnabled", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
+
+new() {
             Name = "Proteção de Pilha de Hardware",
             Description = "Mecanismo de segurança que previne ataques de buffer overflow no nível de hardware. Desativar torna o sistema vulnerável a exploits de memória.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "FeatureSettingsOverrideMask", HarmfulValue = 0, DefaultValue = 3
@@ -1687,8 +1659,7 @@ namespace KitLugia.Core
         },
 
         // ==================================================================================
-        // 18. VULNERABILIDADES CRÍTICAS (NOTA: verificações de registro apenas como indicadores;
-        // a detecção real de zero-days requer patch management e ferramentas dedicadas)
+        // 18. SEGURANÇA CRÍTICA (configurações de proteção do sistema)
         // ==================================================================================
         new() {
             Name = "Virtualização Baseada em Segurança (VBS)",
@@ -1696,66 +1667,49 @@ namespace KitLugia.Core
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard", ValueName = "EnableVirtualizationBasedSecurity", HarmfulValue = 0, DefaultValue = 1, IsOptional = true
         },
         new() {
-            Name = "Desktop Window Manager Information Disclosure - CVE-2026-20805",
-            Description = "Vulnerabilidade zero-day no Desktop Window Manager. Permite disclosure de informações de memória localmente, expondo endereços ALPC remotas. Ativamente explorada.",
+            Name = "Proteção do Desktop Window Manager (DWM)",
+            Description = "DWM é um componente essencial do Windows. Desativá-lo compromete a renderização da interface gráfica e pode expor informações de memória do sistema.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\DWM", ValueName = "Enable", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "Windows Graphics Component Elevation of Privilege - CVE-2026-20822",
-            Description = "Vulnerabilidade crítica no componente gráfico. Use-after-free que permite escalonamento de privilégios para SYSTEM após race condition.",
+            Name = "Proteção do Componente Gráfico do Windows",
+            Description = "Configuração de aceleração gráfica do Windows. Desativar a aceleração de hardware pode reduzir desempenho em tarefas visuais, mas é recomendado em sistemas com GPUs instáveis.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Graphics", ValueName = "HardwareAcceleration", HarmfulValue = 0, DefaultValue = 1
         },
+
         new() {
-            Name = "VBS Enclave Elevation of Privilege - CVE-2026-20876",
-            Description = "Heap-based buffer overflow no VBS Enclave. Permite ganhar Virtual Trust Level 2 (VTL2), comprometendo virtualização baseada em segurança.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard", ValueName = "HypervisorEnforcedCodeIntegrity", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
-            Name = "LSASS Remote Code Execution - CVE-2026-20854",
-            Description = "Vulnerabilidade crítica no LSASS. Use-after-free permite execução remota de código. Compromete autenticação e credenciais do sistema.",
-            Category = "Segurança Crítica", Type = TweakType.Service, ServiceName = "LSASS", HarmfulStartMode = "Disabled", DefaultStartMode = "Automatic"
-        },
-        new() {
-            Name = "Secure Boot Certificate Expiration - CVE-2026-21265",
-            Description = "Vulnerabilidade na expiração de certificados Secure Boot de 2011. Permite bypass completo do Secure Boot em sistemas não atualizados.",
+            Name = "Verificação de Certificados Secure Boot",
+            Description = "Verificação de integridade do Secure Boot. Desativá-lo permite que sistemas operacionais não autorizados ou modificados sejam inicializados, comprometendo a cadeia de confiança.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot", ValueName = "SecureBootEnabled", HarmfulValue = 0, DefaultValue = 1
         },
+
         new() {
-            Name = "Windows SMB Server Elevation of Privilege - CVE-2026-20919",
-            Description = "Vulnerabilidade no servidor SMB. Permite escalonamento de privilégios através do protocolo SMB, comprometendo acesso a recursos de rede compartilhados.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", ValueName = "EnableSMB1Protocol", HarmfulValue = 1, DefaultValue = 0
-        },
-        new() {
-            Name = "Windows URL Parsing Remote Code Execution - CVE-2025-59295",
-            Description = "Vulnerabilidade no parsing de URLs do Windows. Permite execução remota de código através de URLs maliciosas construídas para overflow de ponteiros de função.",
+            Name = "Segurança no Parsing de URLs do Windows",
+            Description = "Configuração de segurança de URLs do Internet Explorer/Edge. Modificações podem comprometer a proteção contra redirecionamentos e execução de scripts maliciosos.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings", ValueName = "URLSecurity", HarmfulValue = 0, DefaultValue = 1
         },
 
         // ==================================================================================
-        // 19. VULNERABILIDADES ADICIONAIS CONFIRMADAS 2025-2026
+        // 19. SEGURANÇA ADICIONAL (configurações de proteção do sistema)
         // ==================================================================================
         new() {
-            Name = "NTLM Hash Leak Zero-Click - CVE-2026-32202",
-            Description = "Vulnerabilidade zero-click no NTLM que vaza hashes de autenticação. Adicionada ao catálogo CISA KEV em abril/2026. Pode ser encadeada com pass-the-hash para comprometimento de domínio.",
+            Name = "Restrição de Tráfego NTLM (Mitigação de vazamento de hash)",
+            Description = "Restringe envio de tráfego NTLM para prevenir vazamento de hashes de autenticação. Ataques pass-the-hash podem comprometer credenciais de domínio se configurado incorretamente.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0", ValueName = "RestrictSendingNTLMTraffic", HarmfulValue = 0, DefaultValue = 2
         },
         new() {
-            Name = "MSHTML Remote Code Execution - CVE-2026-21513",
-            Description = "RCE no motor MSHTML (Trident), explorado pelo grupo APT28 em campanhas de spear-phishing contra alvos diplomáticos e de defesa. Atua via renderização de conteúdo malicioso.",
+            Name = "Desativação do Motor MSHTML (Internet Explorer)",
+            Description = "Desativa o motor MSHTML (Trident) do Internet Explorer. Reduz a superfície de ataque contra renderização de conteúdo HTML malicioso em aplicações que utilizam o componente WebOC.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Internet Explorer\Main", ValueName = "DisableMSHTML", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "Security Feature Bypass (Protected View) - CVE-2026-21509",
-            Description = "Bypass de segurança que permite execução de código malicioso mesmo com Protected View ativado no Office. Explorado em campanhas de phishing.",
+            Name = "Proteção de Visualização Protegida (Office Protected View)",
+            Description = "Modo de Visualização Protegida do Microsoft Office. Desativá-lo permite que documentos baixados da internet sejam abertos sem as restrições de segurança padrão.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Office\Common\Security", ValueName = "ProtectedView", HarmfulValue = 0, DefaultValue = 1
         },
-        new() {
-            Name = "Windows Kernel Privilege Escalation - CVE-2025-62215",
-            Description = "Vulnerabilidade double-free no kernel Windows. Permite escalonamento de privilégios local. Explorado ativamente após comprometimento inicial via phishing ou RCE.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\kSecPkg", ValueName = "Start", HarmfulValue = 4, DefaultValue = 3
-        },
+
         // ==================================================================================
-        // 20. PROBLEMAS DO WINDOWS EXPLORER 2026
+        // 20. PROBLEMAS DO WINDOWS EXPLORER
         // ==================================================================================
         new() {
             Name = "Associação de Pasta (Folder) Corrompida",
@@ -1838,73 +1792,43 @@ namespace KitLugia.Core
             DefaultValue = false
         },
         new() {
-            Name = "Microsoft Graphics Component VM Escape - CVE-2025-49708",
-            Description = "Vulnerabilidade crítica com CVSS 9.9. Permite escape completo de máquinas virtuais, comprometendo todas as VMs no mesmo host com privilégios SYSTEM.",
+            Name = "Timeout de Drivers Gráficos (TDR)",
+            Description = "TDR (Timeout Detection and Recovery) de drivers gráficos configurado incorretamente. Pode causar travamentos e falhas de renderização em sistemas com GPU.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers", ValueName = "TdrLevel", HarmfulValue = 0, DefaultValue = 3
         },
         new() {
-            Name = "ASP.NET Security Feature Bypass - CVE-2025-55315",
-            Description = "Vulnerabilidade crítica com CVSS 9.9. Permite bypass de controles de segurança através de smuggling de requisições HTTP maliciosas dentro de requisições autenticadas.",
+            Name = "Validação de Requisições ASP.NET",
+            Description = "Validação de requisições ASP.NET desativada. Expõe aplicações web a ataques de injeção e smuggling de requisições HTTP maliciosas.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\ASP.NET", ValueName = "RequestValidation", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "Windows Server Update Service (WSUS) RCE - CVE-2025-59287",
-            Description = "Vulnerabilidade crítica com CVSS 9.8. Permite execução remota de código no WSUS, comprometendo sistema de atualizações da rede.",
-            Category = "Segurança Crítica", Type = TweakType.Service, ServiceName = "WSUS", HarmfulStartMode = "Disabled", DefaultStartMode = "Automatic"
-        },
-        new() {
-            Name = "Windows NPU Power Management Bug - KB5074109",
-            Description = "Bug em laptops com NPU que impede sleep adequado, causando consumo excessivo de bateria e lentidão do sistema devido a throttling térmico.",
+            Name = "Gerenciamento de Energia com NPU (Sleep/Bateria)",
+            Description = "Configuração de timeout de sleep inadequada em laptops com NPU. Causa consumo excessivo de bateria e lentidão do sistema devido a throttling térmico.",
             Category = "Estabilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power", ValueName = "SleepInactivityTimeout", HarmfulValue = 0, DefaultValue = 1800
         },
         new() {
-            Name = "Windows Update Boot Failure - KB5074109 Regression",
-            Description = "Regressão crítica na atualização KB5074109 causando boot failures com UNMOUNTABLE_BOOT_VOLUME. Requer recuperação manual e pode causar perda de dados.",
+            Name = "Verificação de Reinicialização Pendente do Windows Update",
+            Description = "Indicador de reinicialização necessária após atualizações. Pode causar boot failures se o sistema não for reiniciado adequadamente para concluir a instalação.",
             Category = "Estabilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update", ValueName = "RebootRequired", HarmfulValue = 1, DefaultValue = 0
         },
         new() {
-            Name = "OneDrive/Dropbox Crash Bug - KB5074109 Regression",
-            Description = "Bug na atualização KB5074109 causando crashes e não-responsividade no OneDrive e Dropbox, afetando sincronização de arquivos e performance geral.",
+            Name = "Sincronização de Armazenamento em Nuvem (CloudStoreSync)",
+            Description = "Sincronização de armazenamento em nuvem desativada. Pode causar problemas de salvamento e crashes em aplicativos como OneDrive e Dropbox.",
             Category = "Estabilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", ValueName = "CloudStoreSync", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "WinSqlite3.dll Vulnerability - CVE-2025-6965",
-            Description = "Vulnerabilidade no componente WinSqlite3.dll. Ferramentas de segurança detectam como vulnerável mesmo em sistemas totalmente atualizados.",
+            Name = "Segurança de Componentes WinSqlite3.dll",
+            Description = "Configuração de segurança de componentes SQLite do Windows. Modificações podem ser detectadas como vulneráveis por ferramentas de segurança.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModel", ValueName = "SqliteSecurity", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "Windows TPM 2.0 Out-of-Bounds Read - CVE-2025-2884",
-            Description = "Vulnerabilidade na implementação TPM 2.0. Out-of-bounds read na função CryptHmacSign pode expor dados sensíveis do Trusted Platform Module.",
+            Name = "Proteção de TPM 2.0",
+            Description = "Configuração de segurança do Trusted Platform Module 2.0. Desativar reduz a proteção de chaves de criptografia e dados sensíveis armazenados no hardware.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TPM", ValueName = "TpmSecurity", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "Windows Kernel Memory Corruption - CVE-2026-20941",
-            Description = "Vulnerabilidade no Host Process for Windows Tasks. Permite escalonamento de privilégios através de corrupção de memória do kernel.",
-            Category = "Segurança Crítica", Type = TweakType.Service, ServiceName = "TaskHost", HarmfulStartMode = "Disabled", DefaultStartMode = "Automatic"
-        },
-        new() {
-            Name = "Kernel Streaming Service - CVE-2025-23511",
-            Description = "Vulnerabilidade de escalonamento de privilégios no driver ks.sys. Permite que atacante local execute código no kernel com privilégios SYSTEM.",
-            Category = "Segurança Crítica", Type = TweakType.Service, ServiceName = "KS", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
-        },
-        new() {
-            Name = "Windows Kerberos - CVE-2025-23625",
-            Description = "Vulnerabilidade de bypass de recurso de segurança no Kerberos. Permite que atacante ignore validação de tickets de autenticação.",
-            Category = "Segurança Crítica", Type = TweakType.Service, ServiceName = "Kerberos", HarmfulStartMode = "Disabled", DefaultStartMode = "Demand"
-        },
-        new() {
-            Name = "Windows DNS Server - CVE-2025-23700",
-            Description = "Vulnerabilidade de execução remota de código no servidor DNS do Windows. Permite que atacante execute código arbitrário no contexto do serviço DNS.",
-            Category = "Segurança Crítica", Type = TweakType.Service, ServiceName = "DNS", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
-        },
-        new() {
-            Name = "Windows NTLM - CVE-2025-24089",
-            Description = "Vulnerabilidade de escalonamento de privilégios no NTLM. Permite que atacante local comprometa o hash NTLM de outro usuário no mesmo sistema.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0", ValueName = "RestrictSendingNTLMTraffic", HarmfulValue = 0, DefaultValue = 2
-        },
-        new() {
-            Name = "Windows BitLocker - CVE-2025-25076",
-            Description = "Vulnerabilidade de bypass de recurso de segurança no BitLocker. Permite que atacante desative proteção de unidade no criptografada.",
+            Name = "Política de BitLocker sem TPM",
+            Description = "BitLocker configurado para permitir criptografia sem TPM. Reduz a segurança da proteção de unidade, pois não utiliza hardware seguro para armazenar chaves.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\FVE", ValueName = "EnableBDEWithNoTPM", HarmfulValue = 0, DefaultValue = 1
         },
 
@@ -2090,7 +2014,7 @@ namespace KitLugia.Core
             Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "L1TFMitigation", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "Meltdown/L1TF (CVE-2018-3620) Mitigation Desativada",
+            Name = "Mitigação Meltdown/L1TF para CPUs Intel Desativada",
             Description = "Mitigação Meltdown/L1TF para kernels Intel desativada. Permite que processos não privilegiados leiam memória do kernel em CPUs vulneráveis.",
             Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "MeltdownMitigation", HarmfulValue = 0, DefaultValue = 1
         },
@@ -2113,6 +2037,11 @@ namespace KitLugia.Core
             Name = "Extended Process (ASLR Forçado para Alta Densidade)",
             Description = "ASLR (Address Space Layout Randomization) forçado para máxima randomização. Causa consumo excessivo de memória em aplicativos sem benefício de segurança adicional.",
             Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "MoveImages", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
+            Name = "Reset do Cache de RAM (SysMain/SuperFetch Desativado)",
+            Description = "SysMain (SuperFetch) gerencia o cache inteligente de RAM no Windows. Quando desativado por game boosters, o cache de aplicativos deixa de ser otimizado, causando acúmulo progressivo de RAM em standby que nunca é liberada. Reativá-lo restaura o gerenciamento de cache aos padrões do Windows.",
+            Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SysMain", ValueName = "Start", HarmfulValue = 4, DefaultValue = 3
         },
 
         // ==================================================================================
@@ -2711,7 +2640,6 @@ namespace KitLugia.Core
 
             // Reduz alocações e melhora performance em hot code paths
             var tweaksCopy = new List<ScannableTweak>(HarmfulTweaks.Count);
-            
 
             foreach (var tweak in HarmfulTweaks)
             {
@@ -2728,7 +2656,7 @@ namespace KitLugia.Core
             {
                 Logger.Log($"[TOGGLE] Iniciando alteração: {tweak.Name}");
                 Logger.Log($"[TOGGLE] Status atual: {tweak.Status}, Tipo: {tweak.Type}");
-                
+
                 bool applySafeValue = tweak.Status == TweakStatus.MODIFIED;
                 string action = applySafeValue ? "restaurado para o padrão seguro" : "alterado (personalizado)";
 
@@ -2875,7 +2803,7 @@ namespace KitLugia.Core
 
                         string mode = applySafeValue ? tweak.DefaultStartMode : tweak.HarmfulStartMode ?? "Disabled";
                         string scMode = mode.ToLower();
-                        
+
                         // Corrigir mapeamento de modos para o comando sc.exe
                         switch (scMode)
                         {
@@ -2892,7 +2820,7 @@ namespace KitLugia.Core
                                 scMode = "disabled";
                                 break;
                         }
-                        
+
                         string scCmd = $"config {tweak.ServiceName} start= {scMode}";
 
                         Logger.Log($"[TOGGLE] Executando: sc.exe {scCmd}");
@@ -2918,21 +2846,21 @@ namespace KitLugia.Core
                         if (string.IsNullOrEmpty(tweak.ValueName)) return (false, "BCD inválido.");
                         string bcdValue = (applySafeValue ? tweak.DefaultValue?.ToString() : tweak.HarmfulValue?.ToString()) ?? "";
                         string bcdCommand;
-                        
+
                         if (bcdValue == "delete")
                             bcdCommand = $"/deletevalue {tweak.ValueName}";
                         else
                             bcdCommand = $"/set {tweak.ValueName} {bcdValue}";
-                        
+
                         Logger.Log($"[TOGGLE] Executando BCD: bcdedit {bcdCommand}");
                         var (exitCode, output, error) = ProcessRunner.Run("bcdedit", bcdCommand, 10000);
-                        
+
                         if (exitCode != 0)
                         {
                             Logger.Log($"[TOGGLE] BCD falhou com código {exitCode}: {error}");
                             return (false, $"Falha ao modificar BCD: {error}");
                         }
-                        
+
                         Logger.Log($"[TOGGLE] BCD sucesso: {output}");
                         break;
 
@@ -3003,12 +2931,12 @@ namespace KitLugia.Core
                     if (configKey == null) return;
                     var allTweaks = GetAllTweaksDefinition();
                     int restoredCount = 0;
-                    
+
                     foreach (var tweak in allTweaks)
                     {
                         string valueKey = $"Tweak_{GetSafeKeyName(tweak)}";
                         string? savedStatus = configKey.GetValue(valueKey) as string;
-                        
+
                         if (!string.IsNullOrEmpty(savedStatus) && Enum.TryParse<TweakStatus>(savedStatus, out var status))
                         {
                             if (status == TweakStatus.MODIFIED)
@@ -3019,7 +2947,7 @@ namespace KitLugia.Core
                             }
                         }
                     }
-                    
+
                     Logger.Log($"Configurações restauradas: {restoredCount} tweaks");
                 }
             }
@@ -3034,19 +2962,19 @@ namespace KitLugia.Core
 
             // Típico: 20-50 tweaks
             var states = new Dictionary<string, bool>(50, StringComparer.OrdinalIgnoreCase);
-            
+
             try
             {
                 using (RegistryKey? configKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\KitLugia\Config", true))
                 {
                     if (configKey == null) return states;
                     var allTweaks = GetAllTweaksDefinition();
-                    
+
                     foreach (var tweak in allTweaks)
                     {
                         string valueKey = $"Tweak_{GetSafeKeyName(tweak)}";
                         string? savedStatus = configKey.GetValue(valueKey) as string;
-                        
+
                         if (!string.IsNullOrEmpty(savedStatus) && Enum.TryParse<TweakStatus>(savedStatus, out var status))
                         {
                             states[tweak.Name] = (status == TweakStatus.MODIFIED);
@@ -3058,7 +2986,7 @@ namespace KitLugia.Core
             {
                 Logger.Log($"Erro ao carregar estados: {ex.Message}");
             }
-            
+
             return states;
         }
 
@@ -3111,7 +3039,7 @@ namespace KitLugia.Core
         public static List<string> GetAppliedQuickToggles()
         {
             var appliedToggles = new List<string>();
-            
+
             try
             {
                 using (RegistryKey? configKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\KitLugia\QuickToggles", true))
@@ -3131,7 +3059,7 @@ namespace KitLugia.Core
             {
                 Logger.Log($"Erro ao carregar toggles: {ex.Message}");
             }
-            
+
             return appliedToggles;
         }
 
@@ -3142,56 +3070,56 @@ namespace KitLugia.Core
         private static PathProblem AnalyzePathProblems(string pathValue)
         {
             if (string.IsNullOrEmpty(pathValue)) return PathProblem.None;
-            
+
             var entries = pathValue.Split(';', StringSplitOptions.RemoveEmptyEntries);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var problems = PathProblem.None;
-            
+
             // Limite de entradas
             if (entries.Length > 50) problems |= PathProblem.TooManyEntries;
             if (pathValue.Length > 2048) problems |= PathProblem.PathTooLong;
-            
+
             foreach (var entry in entries)
             {
                 var clean = entry.Trim().Trim('"').Trim();
                 if (string.IsNullOrEmpty(clean)) continue;
-                
+
                 // Duplicado
                 if (!seen.Add(clean)) problems |= PathProblem.Duplicate;
-                
+
                 // Caminho relativo (vulnerabilidade)
                 if (clean.StartsWith('.') || clean.StartsWith(".."))
                     problems |= PathProblem.RelativePath;
-                
+
                 // Espaço sem aspas
                 if (clean.Contains(' ') && !clean.StartsWith('"'))
                     problems |= PathProblem.UnquotedSpace;
-                
+
                 // Caminho temporário
                 if (clean.Contains("\\Temp\\", StringComparison.OrdinalIgnoreCase) ||
                     clean.Contains("\\Tmp\\", StringComparison.OrdinalIgnoreCase))
                     problems |= PathProblem.TempPath;
-                
+
                 // Caminho de usuário sem variável (ex: C:\Users\fulano\AppData)
                 if (clean.Contains("\\Users\\", StringComparison.OrdinalIgnoreCase) &&
                     !clean.Contains("%USERPROFILE%"))
                     problems |= PathProblem.UserPathWithoutVariable;
-                
+
                 // Lixo de desenvolvimento
                 if (clean.Contains("\\node_modules\\") || clean.Contains("\\vendor\\") ||
                     clean.Contains("\\.git\\") || clean.Contains("\\dotnet\\sdk\\"))
                     problems |= PathProblem.DevelopmentJunk;
-                
+
                 // Sintaxe inválida
                 if (clean.Contains(',') || clean.Contains("\"\"") || clean.Contains("\\\\"))
                     problems |= PathProblem.SyntaxError;
-                
+
                 // Caminho longo (>260)
                 if (clean.Length > 260) problems |= PathProblem.LongPath;
-                
+
                 // Caracteres não ASCII (pode indicar corrupção)
                 if (clean.Any(c => c > 127)) problems |= PathProblem.EncodingIssue;
-                
+
                 // Verifica existência (expande variáveis)
                 try
                 {
@@ -3279,7 +3207,7 @@ namespace KitLugia.Core
         public static ExplorerProblem CheckExplorerProblems()
         {
             ExplorerProblem problems = ExplorerProblem.None;
-            
+
             // 1. Verificar pasta (Folder) - click duplo vai pra lugar errado
             // Registry: HKEY_CLASSES_ROOT\Folder\shell\open\command
             string folderDefaultCmd = Registry.GetValue(@"HKEY_CLASSES_ROOT\Folder\shell\open\command", "", null) as string ?? "";
@@ -3288,7 +3216,7 @@ namespace KitLugia.Core
             {
                 problems |= ExplorerProblem.DoubleClickFolderAssociationBroken;
             }
-            
+
             // 2. Verificar se a ação padrão da pasta está ausente
             string folderDefaultValue = Registry.GetValue(@"HKEY_CLASSES_ROOT\Folder\shell", "", null) as string ?? "";
             if (string.IsNullOrEmpty(folderDefaultValue) || 
@@ -3296,7 +3224,7 @@ namespace KitLugia.Core
             {
                 problems |= ExplorerProblem.DoubleClickFolderNotOpening;
             }
-            
+
             // 3. Verificar associação padrão de pastas
             string folderOpenCommand = Registry.GetValue(@"HKEY_CLASSES_ROOT\Folder\shell\open\command", "", null) as string ?? "";
             if (string.IsNullOrEmpty(folderOpenCommand) || 
@@ -3304,7 +3232,7 @@ namespace KitLugia.Core
             {
                 problems |= ExplorerProblem.DoubleClickFolderAssociationBroken;
             }
-            
+
             // 4. Verificar Directory (comportamento similar)
             string dirDefaultCmd = Registry.GetValue(@"HKEY_CLASSES_ROOT\Directory\shell\open\command", "", null) as string ?? "";
             if (!string.IsNullOrEmpty(dirDefaultCmd) && 
@@ -3312,7 +3240,7 @@ namespace KitLugia.Core
             {
                 problems |= ExplorerProblem.DoubleClickFolderAssociationBroken;
             }
-            
+
             // 5. Verificar exefile (arquivos executáveis)
             string exeOpenCommand = Registry.GetValue(@"HKEY_CLASSES_ROOT\exefile\shell\open\command", "", null) as string ?? "";
             if (string.IsNullOrEmpty(exeOpenCommand) || !exeOpenCommand.Contains("\"%1\"%*") &&
@@ -3320,7 +3248,7 @@ namespace KitLugia.Core
             {
                 problems |= ExplorerProblem.DoubleClickExeBroken;
             }
-            
+
             // 6. Verificar ContextMenu Handlers problemáticos
             using (RegistryKey? handlerKey = Registry.ClassesRoot.OpenSubKey(@"*\shellex\ContextMenuHandlers"))
             if (handlerKey != null)
@@ -3337,7 +3265,7 @@ namespace KitLugia.Core
                             problems |= ExplorerProblem.InvalidContextMenuHandler;
                             break;
                         }
-                        
+
                         // Verificar se o GUID existe em HKEY_CLASSES_ROOT\CLSID
                         if (guid.Length > 2 && guid.StartsWith("{") && guid.EndsWith("}"))
                         {
@@ -3348,7 +3276,7 @@ namespace KitLugia.Core
                                     problems |= ExplorerProblem.InvalidContextMenuHandler;
                                     break;
                                 }
-                                
+
                                 // Verificar se a DLL do handler existe
                                 using (RegistryKey? inprocKey = clsidKey.OpenSubKey("InprocServer32"))
                                 {
@@ -3371,7 +3299,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            
+
             // 7. Verificar extensões bloqueadas
             using (RegistryKey? blockedKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked"))
             if (blockedKey != null && blockedKey.ValueCount > 0)
@@ -3387,21 +3315,21 @@ namespace KitLugia.Core
                     }
                 }
             }
-            
+
             // 8. Verificar se menu de contexto do Explorer está desabilitado por política
             int? noViewContextMenu = Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", "NoViewContextMenu", 0) as int?;
             if (noViewContextMenu == 1)
             {
                 problems |= ExplorerProblem.ContextMenuItemsMissing;
             }
-            
+
             // 9. Verificar lixeira de extensões corrompidas (shell extensions desativadas)
             using (RegistryKey? disabledKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Disabled"))
             if (disabledKey != null && disabledKey.ValueCount > 5) // Muitas desativadas pode indicar problema
             {
                 problems |= ExplorerProblem.InvalidContextMenuHandler;
             }
-            
+
             return problems;
         }
 
@@ -3455,7 +3383,7 @@ namespace KitLugia.Core
                         // Registry.GetValue aceita ValueName vazio para ler o valor padrão
                         string valName = tweak.ValueName ?? "";
                         currentValue = Registry.GetValue(tweak.KeyPath, valName, null);
-                        
+
                         // Se for chave HKEY_CLASSES_ROOT, Registry.GetValue pode não funcionar
                         // Nesse caso, tentar abrir a chave diretamente
                         if (currentValue == null && tweak.KeyPath.StartsWith("HKEY_CLASSES_ROOT"))
@@ -3574,13 +3502,13 @@ namespace KitLugia.Core
                             }
                         }
                     }
-                    
+
                     tweak.Status = isHarmful ? TweakStatus.MODIFIED : TweakStatus.OK;
                 }
                 else if (tweak.Type == TweakType.Service)
                 {
                     if (string.IsNullOrEmpty(tweak.ServiceName)) return;
-                    
+
                     try
                     {
                         string? startMode = ServiceHelper.GetServiceStartMode(tweak.ServiceName);
@@ -3595,7 +3523,7 @@ namespace KitLugia.Core
 
                         bool matchesHarmful = startMode.Equals(tweak.HarmfulStartMode, StringComparison.OrdinalIgnoreCase);
                         tweak.Status = matchesHarmful ? TweakStatus.MODIFIED : TweakStatus.OK;
-                        
+
                         // Log apenas se houver problema ou verbosidade ativa
                         if (tweak.Status == TweakStatus.MODIFIED || Logger.VerboseCheckLogs)
                         {
@@ -3631,7 +3559,7 @@ namespace KitLugia.Core
                     {
                         // Caminho inválido - usa padrão
                     }
-                    
+
                     // Aceleração desativada se todos estiverem em zero (padrão gamer)
                     bool isModified = (speed == 0 && threshold1 == 0 && threshold2 == 0);
                     tweak.Status = isModified ? TweakStatus.MODIFIED : TweakStatus.OK;

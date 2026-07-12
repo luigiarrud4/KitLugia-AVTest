@@ -782,7 +782,7 @@ namespace KitLugia.Core
                 Category = "Sistema",
                 Icon = "🌐",
                 IsDangerous = false,
-                Description = "Corrige falhas de autenticação em conexões RDP e Azure Virtual Desktop após atualizações de 2026. KB5078127 e KB5074109.",
+                Description = "Corrige falhas de autenticação em conexões RDP e Azure Virtual Desktop após atualizações do Windows.",
                 Execute = () => {
                     Logger.Log("Reparando conexões RDP/Azure...");
                     SystemUtils.RunExternalProcess("netsh", "advfirewall firewall set rule group=\"Remote Desktop\" new enable=Yes", true);
@@ -813,7 +813,7 @@ namespace KitLugia.Core
                 Category = "Sistema",
                 Icon = "☁️",
                 IsDangerous = true,
-                Description = "Corrige problemas ao salvar arquivos em armazenamento na nuvem após atualizações de 2026. KB5078127 e KB5074109.",
+                Description = "Corrige problemas ao salvar arquivos em armazenamento na nuvem após atualizações do Windows.",
                 Execute = () => {
                     Logger.Log("Reparando salvamento em nuvem...");
                     SystemUtils.RunExternalProcess("cmd", "/c echo off | clip", true);

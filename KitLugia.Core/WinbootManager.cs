@@ -4262,5 +4262,178 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 return (false, 0, requiredGB, $"Erro ao verificar espaço: {ex.Message}");
             }
         }
+
+        // ======================================================================
+        // WINPE RUNTIME: PREPARAR PARTIÇÃO A E BOTAR NO WINPE
+        // ======================================================================
+
+        /// <summary>
+        /// Fase 1 (Windows): Shrink inicial, cria Partição A, copia WIM, agenda boot no WinPE
+        /// </summary>
+        public static async Task<(bool ok, string msg)> PrepareWinpeBoot(string driveLetter, long partASizeMB = 800)
+        {
+            try
+            {
+                Log("========== PREPARANDO BOOT WINPE (FASE 1) ==========");
+                string drive = driveLetter.Replace(":", "");
+
+                // 1. Fazer shrink inicial (libera espaço pra Partição A)
+                Log($"\n[1/5] Shrink inicial de {partASizeMB} MB em {driveLetter}:...");
+                bool shrinkOk = await ShrinkPartitionUsingWMI(driveLetter, partASizeMB);
+                if (!shrinkOk)
+                {
+                    // Fallback: tenta o RunOnce avançado
+                    Log("Shrink WMI falhou, tentando RunOnce avançado...");
+                    shrinkOk = await ShrinkPartitionUsingRunOnceAdvanced(driveLetter);
+                    if (!shrinkOk)
+                        return (false, "Não foi possível liberar espaço para a Partição A.");
+                }
+
+                // 2. Criar Partição A (NTFS, label KITLUGIA_WINPE)
+                Log($"\n[2/5] Criando Partição A ({partASizeMB} MB)...");
+                string script = $"select volume {drive}\n" +
+                                $"shrink desired={partASizeMB} minimum={partASizeMB}\n" +
+                                $"create partition primary\n" +
+                                $"format fs=ntfs quick label=KITLUGIA_WINPE\n" +
+                                $"assign letter=A\n" +
+                                $"exit";
+
+                string scriptPath = Path.Combine(Path.GetTempPath(), "create_part_a.txt");
+                File.WriteAllText(scriptPath, script);
+                var (dpCode, dpOut) = await RunProcessCaptured("diskpart.exe", $"/s \"{scriptPath}\"");
+                File.Delete(scriptPath);
+
+                if (dpCode != 0)
+                    return (false, $"Falha ao criar Partição A: {dpOut}");
+
+                // 3. Baixar WinPE WIM do GitHub Release (ou usar local)
+                Log($"\n[3/5] Preparando WinPE...");
+                string peDir = Path.Combine(KitLugiaInstallPath, "WinPE");
+                Directory.CreateDirectory(peDir);
+                string wimPath = Path.Combine(peDir, "boot.wim");
+                string sdiPath = Path.Combine(peDir, "boot.sdi");
+
+                if (!File.Exists(wimPath))
+                {
+                    Log("WinPE não encontrado localmente. Baixando do GitHub Releases...");
+                    // Usa o GitHubUpdater existente ou download direto
+                    string downloadUrl = "https://github.com/KitLugia/KitLugia/releases/latest/download/WinPE.7z";
+                    string archivePath = Path.Combine(peDir, "WinPE.7z");
+
+                    using (var client = new System.Net.WebClient())
+                    {
+                        client.DownloadProgressChanged += (s, e) =>
+                            Log($"  Download: {e.ProgressPercentage}% ({e.BytesReceived / 1024 / 1024} MB)");
+                        await client.DownloadFileTaskAsync(downloadUrl, archivePath);
+                    }
+
+                    // Extrai o 7z (precisa do 7za.exe junto com o app)
+                    string sevenZip = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7za.exe");
+                    if (!File.Exists(sevenZip))
+                        sevenZip = "tar"; // Windows 10+ tem tar nativo pra .7z?
+
+                    if (File.Exists(sevenZip))
+                    {
+                        var (extCode, extOut) = await RunProcessCaptured(sevenZip, $"x \"{archivePath}\" -o\"{peDir}\" -y", 120000);
+                        if (extCode != 0) return (false, $"Falha ao extrair WinPE: {extOut}");
+                    }
+                    else
+                    {
+                        // Fallback: tenta tar do Windows
+                        var (extCode, extOut) = await RunProcessCaptured("tar", $"-xf \"{archivePath}\" -C \"{peDir}\"", 120000);
+                        if (extCode != 0)
+                            return (false, $"Falha ao extrair WinPE: {extOut}");
+                    }
+
+                    File.Delete(archivePath);
+                }
+
+                // Verifica se os arquivos existem
+                if (!File.Exists(wimPath)) return (false, $"boot.wim não encontrado em: {wimPath}");
+                if (!File.Exists(sdiPath))
+                {
+                    // Copia boot.sdi do Windows se não existir
+                    string winSdi = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                        "Boot", "DVD", "PCAT", "boot.sdi");
+                    if (File.Exists(winSdi))
+                        File.Copy(winSdi, sdiPath);
+                    else
+                        return (false, "boot.sdi não encontrado. Copie de C:\\Windows\\Boot\\DVD\\PCAT\\boot.sdi");
+                }
+
+                // 4. Copiar WIM e SDI pra Partição A
+                Log($"\n[4/5] Copiando WinPE para partição A...");
+                string destDir = @"A:\";
+                string destWim = Path.Combine(destDir, "boot.wim");
+                string destSdi = Path.Combine(destDir, "boot.sdi");
+                string destScript = Path.Combine(destDir, "shrink_continue.cmd");
+
+                File.Copy(wimPath, destWim, true);
+                File.Copy(sdiPath, destSdi, true);
+
+                // Gera script de continuação que roda dentro do WinPE
+                var continueScript = WinpeBuilder.GenerateShrinkScriptContent(drive, 7000, true, "A:");
+                File.WriteAllText(destScript, continueScript, Encoding.ASCII);
+
+                // 5. Criar entrada de boot ramdisk
+                Log($"\n[5/5] Criando entrada de boot ramdisk...");
+                string? guid = await CreateRamdiskEntry("KitLugia WinPE - Shrink Avançado", "A", "\\boot.wim", "\\boot.sdi");
+                if (guid == null)
+                    return (false, "Falha ao criar entrada BCD para o WinPE.");
+
+                Log($"\n✅ WinPE preparado! GUID: {guid}");
+                Log($"   Na próxima reinicialização, selecione 'KitLugia WinPE - Shrink Avançado'");
+                Log($"   no menu de boot para continuar o shrink.");
+
+                return (true, $"WinPE preparado em A:\\. GUID: {guid}");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao preparar WinPE: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Fase 2 (dentro do WinPE): Continua o shrink com a partição offline
+        /// </summary>
+        public static async Task<(bool ok, string msg)> ContinueShrinkInWinpe(string targetDrive, long targetSizeMB)
+        {
+            try
+            {
+                Log("========== CONTINUANDO SHRINK NO WINPE (FASE 2) ==========");
+                string drive = targetDrive.Replace(":", "");
+
+                // Diskpart script completo
+                var dp = new StringBuilder();
+                dp.AppendLine($"select volume {drive}");
+
+                // Tenta shrink querymax primeiro
+                dp.AppendLine("shrink querymax");
+
+                // Executa o shrink
+                dp.AppendLine($"shrink desired={targetSizeMB}");
+
+                // Cria partição B
+                dp.AppendLine("create partition primary");
+                dp.AppendLine("format fs=ntfs quick label=KITLUGIA_BOOT");
+                dp.AppendLine("assign letter=B");
+                dp.AppendLine("exit");
+
+                string scriptPath = Path.Combine(Path.GetTempPath(), "winpe_shrink.txt");
+                File.WriteAllText(scriptPath, dp.ToString());
+                var (code, output) = await RunProcessCaptured("diskpart.exe", $"/s \"{scriptPath}\"");
+                File.Delete(scriptPath);
+
+                Log($"Diskpart concluído (código {code})");
+                Log(output);
+
+                return (code == 0, output);
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro no shrink WinPE: {ex.Message}");
+            }
+        }
     }
 }

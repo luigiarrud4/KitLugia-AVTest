@@ -403,6 +403,334 @@
                 </StackPanel>
             </Border>
 
+            <!-- GRUPO: STARTUP + SHUTDOWN -->
+            <TextBlock Text="Inicializa&#xE7;&#xE3;o e Desligamento" FontSize="16" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,25,0,15"/>
+            <Border CornerRadius="8" Padding="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#2A2A2E" Offset="0.0"/>
+                        <GradientStop Color="#242428" Offset="0.5"/>
+                        <GradientStop Color="#1E1E22" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#666666" Offset="0.0"/>
+                        <GradientStop Color="#555555" Offset="0.5"/>
+                        <GradientStop Color="#444444" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <StackPanel>
+
+                    <!-- Startup Delay -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove o atraso artificial que o Windows Explorer espera antes de carregar a inicialização (StartupDelayInMSec=0). Melhora o tempo de inicialização para área de trabalho, especialmente em SSDs. O atraso padrão varia de 0 a 10 segundos dependendo do hardware."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Remover Startup Delay" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Elimina atraso de carregamento do Explorer na inicializa&#xE7;&#xE3;o." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusStartupDelay" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkStartupDelay" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkStartupDelay_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Fast Startup (Hiberboot) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o Fast Startup (HiberbootEnabled=0), um híbrido entre hibernação e desligamento. Desativar resolve: drivers que não carregam corretamente, dual-boot com problemas, alterações no registro que não persistem, e certos erros de hardware. Recomendado para sistemas com SSD (a diferença de velocidade é mínima)."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Fast Startup (Hybrid Boot)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="For&#xE7;a desligamento completo. Resolve problemas de driver e registro." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusFastStartup" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkFastStartup" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkFastStartup_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Boot Menu Timeout -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define o timeout do menu de boot do Windows para 0 segundos via bcdedit. Acelera a inicialização ao pular automaticamente a tela de escolha de sistema operacional. Se você usa dual-boot (Linux + Windows), mantenha o valor padrão (30s) para ter tempo de escolher."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Boot Menu Timeout (0s)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Pula a tela de sele&#xE7;&#xE3;o de SO na inicializa&#xE7;&#xE3;o (bcdedit)." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusBootMenu" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkBootMenu" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBootMenu_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- NumLock on Startup -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define se o NumLock deve ser ativado automaticamente na inicialização do Windows. Quando ativado, o LED do NumLock acende e o teclado numérico funciona já no login. Útil para quem usa o teclado numérico para digitar senha."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="NumLock na Inicializa&#xE7;&#xE3;o" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Ativa o NumLock automaticamente ao ligar o PC." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusNumLock" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkNumLock" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNumLock_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <!-- ======= DESLIGAMENTO ======= -->
+                    <TextBlock Text="⏻ Desligamento" FontSize="13" FontWeight="Bold" Foreground="#AAAAAA" Margin="20,5,0,0"/>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- WaitToKillServiceTimeout -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Reduz o tempo que o Windows espera pelo fechamento de serviços em segundo plano ao desligar de 5s para 2s (WaitToKillServiceTimeout=2000). Acelera significativamente o desligamento. Não recomendado abaixo de 1000ms para evitar perda de dados."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="WaitToKillServiceTimeout (2s)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Reduz espera de serviços em 2s. Acelera desligamento." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusWaitToKillService" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkWaitToKillService" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkWaitToKillService_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- WaitToKillAppTimeout + HungAppTimeout + AutoEndTasks combinado -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Combinação de 3 tweaks: WaitToKillAppTimeout (fecha apps em 2s), HungAppTimeout (detecta apps travados em 1s) e AutoEndTasks (fecha automaticamente sem perguntar). Juntos eliminam a tela 'Aguardando...' no desligamento."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Fechamento R&#xE1;pido de Apps" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="WaitToKillApp + HungApp + AutoEndTasks. Adeus 'Aguardando...'." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusQuickAppKill" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkQuickAppKill" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkQuickAppKill_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- ClearPageFileAtShutdown -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Impede que o Windows limpe o arquivo de paginação (pagefile) ao desligar (ClearPageFileAtShutdown=0). A limpeza do pagefile adiciona segundos extras ao desligamento, especialmente em sistemas com muita RAM. Desativar acelera o desligamento sem impacto na estabilidade."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Limpeza do PageFile" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Evita limpeza do pagefile ao desligar. Acelera shutdown." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusClearPageFile" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkClearPageFile" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkClearPageFile_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- VerboseStatus -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Ativa mensagens detalhadas durante inicialização e desligamento (verbosestatus=1). Em vez do spinner genérico, você vê exatamente qual serviço está iniciando/parando. Útil para diagnosticar lentidão no boot/shutdown. Apenas informativo, não acelera o processo."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AAAAAA" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Mensagens Detalhadas (VerboseStatus)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Mostra servi&#xE7;os iniciando/parando no boot/shutdown." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1E1E22" BorderBrush="#555555" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusVerboseStatus" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkVerboseStatus" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkVerboseStatus_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
             <!-- GRUPO 2: SISTEMA -->
             <TextBlock Text="Sistema e Seguran&#xE7;a" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
             <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
@@ -1334,6 +1662,217 @@
                             <TextBlock x:Name="StatusInputQueue" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
                         </Border>
                         <CheckBox x:Name="ChkInputQueue" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkInputQueue_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
+            <!-- GRUPO: INTERFACE & EXPLORER -->
+            <TextBlock Text="Interface e Explorer" FontSize="16" FontWeight="Bold" Foreground="#E8B84E" Margin="0,30,0,15"/>
+            <Border CornerRadius="8" Padding="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#2A2418" Offset="0.0"/>
+                        <GradientStop Color="#221E14" Offset="0.5"/>
+                        <GradientStop Color="#1A1810" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#D4A84E" Offset="0.0"/>
+                        <GradientStop Color="#B8902E" Offset="0.5"/>
+                        <GradientStop Color="#A0781E" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <StackPanel>
+
+                    <!-- MenuShowDelay -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Remove o atraso de 400ms que o Windows adiciona aos menus contextuais e popups (MenuShowDelay=0). Os menus aparecem instantaneamente ao clicar com o botão direito. Efeito: interface mais responsiva e ágil."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Remover Delay de Menus (0ms)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Menus contextuais e popups instant&#xE2;neos ao clique direito." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusMenuDelay" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkMenuDelay" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMenuDelay_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- VisualFX (animações) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa animações visuais do Windows (VisualFXSetting=2) como fade, slide e zoom de janelas. Em sistemas mais fracos ou para quem prioriza responsividade, desativar efeitos visuais reduz uso de CPU/GPU e torna a interface mais rápida."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Anima&#xE7;&#xF5;es Visuais" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove efeitos fade/slide. M&#xE1;ximo desempenho visual." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusVisualFX" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkVisualFX" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkVisualFX_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Explorer LaunchTo (ComboBox) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Define para qual local o File Explorer abre quando iniciado. Opções: 'Acesso Rápido' (padrão), 'Este Computador' (acesso direto às unidades), 'Downloads' (acesso rápido a downloads). O Kit lê e mantém o valor atual selecionado automaticamente."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Abrir Explorer em" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Escolhe o local padr&#xE3;o ao abrir o File Explorer." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="0" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0" Height="28">
+                            <ComboBox x:Name="ChkExplorerLaunchTo" SelectedIndex="0" VerticalAlignment="Center" Width="130" Margin="4,0" FontSize="12" Foreground="#E8B84E" Background="#1A1810" BorderThickness="0" SelectionChanged="ChkExplorerLaunchTo_SelectionChanged"/>
+                        </Border>
+                        <CheckBox Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" IsEnabled="False" Opacity="0" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Icon Cache -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Aumenta o cache de ícones do Windows para 8192 KB (padrão é ~2048). Com um cache maior, o Explorer não precisa recarregar ícones de arquivos e pastas com tanta frequência, resultando em uma navegação mais rápida e sem demora para renderizar ícones."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Aumentar Cache de &#xCD;cones (8192KB)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Explorer renderiza &#xED;cones mais r&#xE1;pido sem recarregar." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusIconCache" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkIconCache" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkIconCache_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- PCA (Program Compatibility Assistant) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa o Program Compatibility Assistant (PCA), um serviço que monitora programas em busca de problemas de compatibilidade conhecidos. Desativar elimina notificações indesejadas e reduz processamento em segundo plano, especialmente ao executar instaladores ou programas antigos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar PCA (Compat. Assistant)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Elimina verifica&#xE7;&#xE3;o de compatibilidade em segundo plano." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusPCA" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkPCA" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPCA_Click" Margin="0,20,20,20"/>
                     </Grid>
 
                 </StackPanel>

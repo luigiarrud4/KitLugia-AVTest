@@ -14,6 +14,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -1221,6 +1222,151 @@ namespace KitLugia.Core
             {
                 Logger.Log($"ERRO na reversão agressiva: {ex.Message}");
             }
+        }
+
+        // ============================================================
+        // STARTUP TWEAKS
+        // ============================================================
+
+        // --- Startup Delay ---
+        public static void RevertStartupDelay()
+        {
+            try
+            {
+                RevertRegistryValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", "StartupDelayInMSec");
+                Logger.Log("Startup delay revertido para padrão.");
+            }
+            catch { }
+        }
+
+        // --- Fast Startup (Hybrid Boot / Hiberboot) ---
+        private const string PowerPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power";
+
+        public static bool IsFastStartupDisabled()
+        {
+            try
+            {
+                var val = Registry.GetValue(PowerPath, "HiberbootEnabled", -1);
+                return val != null && Convert.ToInt32(val) == 0;
+            }
+            catch { return false; }
+        }
+        public static void DisableFastStartup()
+        {
+            try
+            {
+                Registry.SetValue(PowerPath, "HiberbootEnabled", 0, RegistryValueKind.DWord);
+                Logger.Log("Fast Startup (Hiberboot) desativado.");
+            }
+            catch { }
+        }
+        public static void EnableFastStartup()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(PowerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("HiberbootEnabled", false);
+                Logger.Log("Fast Startup (Hiberboot) restaurado para padrão.");
+            }
+            catch { }
+        }
+
+        // --- Boot Menu Timeout ---
+        public static bool IsBootMenuTimeoutZero()
+        {
+            try
+            {
+                using var p = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "bcdedit",
+                        Arguments = "/enum {current}",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    }
+                };
+                p.Start();
+                string output = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(3000);
+                var match = Regex.Match(output, @"timeout\s+(\d+)", RegexOptions.IgnoreCase);
+                return match.Success && match.Groups[1].Value == "0";
+            }
+            catch { return false; }
+        }
+        public static void SetBootMenuTimeoutZero()
+        {
+            try
+            {
+                using var p = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "bcdedit",
+                        Arguments = "/timeout 0",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        Verb = "runas"
+                    }
+                };
+                p.Start();
+                p.WaitForExit(5000);
+                Logger.Log("Boot menu timeout definido para 0s.");
+            }
+            catch { }
+        }
+        public static void RevertBootMenuTimeout()
+        {
+            try
+            {
+                using var p = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "bcdedit",
+                        Arguments = "/timeout 30",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        Verb = "runas"
+                    }
+                };
+                p.Start();
+                p.WaitForExit(5000);
+                Logger.Log("Boot menu timeout restaurado para 30s.");
+            }
+            catch { }
+        }
+
+        // --- NumLock on Startup ---
+        public static bool IsNumLockOnStartupEnabled()
+        {
+            try
+            {
+                string path = @"HKEY_CURRENT_USER\Control Panel\Keyboard";
+                var val = Registry.GetValue(path, "InitialKeyboardIndicators", "0");
+                string? s = val?.ToString();
+                return s == "2" || s == "2147483650" || s == "80000002";
+            }
+            catch { return false; }
+        }
+        public static void EnableNumLockOnStartup()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_CURRENT_USER\Control Panel\Keyboard", "InitialKeyboardIndicators", "2", RegistryValueKind.String);
+                Logger.Log("NumLock on Startup ativado.");
+            }
+            catch { }
+        }
+        public static void DisableNumLockOnStartup()
+        {
+            try
+            {
+                Registry.SetValue(@"HKEY_CURRENT_USER\Control Panel\Keyboard", "InitialKeyboardIndicators", "0", RegistryValueKind.String);
+                Logger.Log("NumLock on Startup desativado.");
+            }
+            catch { }
         }
 
         // ============================================================
@@ -7787,6 +7933,950 @@ namespace KitLugia.Core
                 ApplyAutomaticVramTweak();
                 return (true, "VRAM ajustada automaticamente.");
             }
+        }
+
+        // ============================================================
+        // SHUTDOWN TWEAKS (WaitToKill, AutoEndTasks, ClearPageFile, VerboseStatus)
+        // ============================================================
+
+        private const string ControlPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control";
+        private const string DesktopPath = @"HKEY_CURRENT_USER\Control Panel\Desktop";
+        private const string MemMgmtPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
+        private const string PoliciesSystemPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+
+        // --- WaitToKillServiceTimeout: 2000ms ---
+        public static bool IsWaitToKillServiceOptimized()
+        {
+            try
+            {
+                var val = Registry.GetValue(ControlPath, "WaitToKillServiceTimeout", null) as string;
+                return val != null && int.TryParse(val, out var ms) && ms <= 2000;
+            }
+            catch { return false; }
+        }
+        public static void OptimizeWaitToKillService()
+        {
+            try { Registry.SetValue(ControlPath, "WaitToKillServiceTimeout", "2000", RegistryValueKind.String); }
+            catch { }
+        }
+        public static void RevertWaitToKillService()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(ControlPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("WaitToKillServiceTimeout", false);
+            }
+            catch { }
+        }
+
+        // --- WaitToKillAppTimeout (HKCU): 2000ms ---
+        public static bool IsWaitToKillAppOptimized()
+        {
+            try
+            {
+                var val = Registry.GetValue(DesktopPath, "WaitToKillAppTimeout", null) as string;
+                return val != null && int.TryParse(val, out var ms) && ms <= 2000;
+            }
+            catch { return false; }
+        }
+        public static void OptimizeWaitToKillApp()
+        {
+            try { Registry.SetValue(DesktopPath, "WaitToKillAppTimeout", "2000", RegistryValueKind.String); }
+            catch { }
+        }
+        public static void RevertWaitToKillApp()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(DesktopPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
+                key?.DeleteValue("WaitToKillAppTimeout", false);
+            }
+            catch { }
+        }
+
+        // --- HungAppTimeout (HKCU): 1000ms ---
+        public static bool IsHungAppTimeoutOptimized()
+        {
+            try
+            {
+                var val = Registry.GetValue(DesktopPath, "HungAppTimeout", null) as string;
+                return val != null && int.TryParse(val, out var ms) && ms <= 1000;
+            }
+            catch { return false; }
+        }
+        public static void OptimizeHungAppTimeout()
+        {
+            try { Registry.SetValue(DesktopPath, "HungAppTimeout", "1000", RegistryValueKind.String); }
+            catch { }
+        }
+        public static void RevertHungAppTimeout()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(DesktopPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
+                key?.DeleteValue("HungAppTimeout", false);
+            }
+            catch { }
+        }
+
+        // --- ClearPageFileAtShutdown: 0 (disabled) ---
+        public static bool IsClearPageFileDisabled()
+        {
+            try
+            {
+                var val = Registry.GetValue(MemMgmtPath, "ClearPageFileAtShutdown", null);
+                return val is int i && i == 0;
+            }
+            catch { return false; }
+        }
+        public static void DisableClearPageFile()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(MemMgmtPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
+                key?.SetValue("ClearPageFileAtShutdown", 0, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void EnableClearPageFile()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(MemMgmtPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("ClearPageFileAtShutdown", false);
+            }
+            catch { }
+        }
+
+        // --- VerboseStatus: 1 (verbose boot/shutdown messages) ---
+        public static bool IsVerboseStatusEnabled()
+        {
+            try
+            {
+                var val = Registry.GetValue(PoliciesSystemPath, "verbosestatus", null);
+                return val is int i && i == 1;
+            }
+            catch { return false; }
+        }
+        public static void EnableVerboseStatus()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(PoliciesSystemPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
+                key?.SetValue("verbosestatus", 1, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void DisableVerboseStatus()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(PoliciesSystemPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("verbosestatus", false);
+            }
+            catch { }
+        }
+
+        // --- Quick App Kill (combined: WaitToKillApp + HungApp + AutoEndTasks) ---
+        public static bool IsQuickAppKillApplied()
+        {
+            try
+            {
+                var wtk = Registry.GetValue(DesktopPath, "WaitToKillAppTimeout", null) as string;
+                var hung = Registry.GetValue(DesktopPath, "HungAppTimeout", null) as string;
+                var auto = Registry.GetValue(DesktopPath, "AutoEndTasks", null) as string;
+                return wtk == "2000" && hung == "1000" && auto == "1";
+            }
+            catch { return false; }
+        }
+        public static void ApplyQuickAppKill()
+        {
+            try
+            {
+                Registry.SetValue(DesktopPath, "WaitToKillAppTimeout", "2000", RegistryValueKind.String);
+                Registry.SetValue(DesktopPath, "HungAppTimeout", "1000", RegistryValueKind.String);
+                Registry.SetValue(DesktopPath, "AutoEndTasks", "1", RegistryValueKind.String);
+            }
+            catch { }
+        }
+        public static void RevertQuickAppKill()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(DesktopPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
+                key?.DeleteValue("WaitToKillAppTimeout", false);
+                key?.DeleteValue("HungAppTimeout", false);
+                key?.DeleteValue("AutoEndTasks", false);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // INTERFACE & EXPLORER TWEAKS
+        // ============================================================
+
+        private const string ExplorerAdvancedPath = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+        private const string ExplorerPath = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer";
+        private         const string DesktopCtrlPath = @"HKEY_CURRENT_USER\Control Panel\Desktop";
+        private const string VisualFxPath = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects";
+        private const string AppCompatPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\AppCompat";
+        private const string WindowMetricsPath = @"HKEY_CURRENT_USER\Control Panel\Desktop\WindowMetrics";
+
+        // --- MenuShowDelay: 0 (instant menus) ---
+        public static bool IsMenuShowDelayOptimized()
+        {
+            try
+            {
+                var val = Registry.GetValue(DesktopCtrlPath, "MenuShowDelay", null) as string;
+                return val == "0";
+            }
+            catch { return false; }
+        }
+        public static void OptimizeMenuShowDelay()
+        {
+            try { Registry.SetValue(DesktopCtrlPath, "MenuShowDelay", "0", RegistryValueKind.String); }
+            catch { }
+        }
+        public static void RevertMenuShowDelay()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(DesktopCtrlPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
+                key?.DeleteValue("MenuShowDelay", false);
+            }
+            catch { }
+        }
+
+        // --- VisualFX (best performance): setting VisualFXSetting=2 is not enough,
+        //     need to also disable MinAnimate, TaskbarAnimations, etc. ---
+        public static bool IsVisualFXOptimized()
+        {
+            try
+            {
+                var fx = Registry.GetValue(VisualFxPath, "VisualFXSetting", null);
+                if (!(fx is int i && i == 2)) return false;
+                var minAnimate = Registry.GetValue(WindowMetricsPath, "MinAnimate", null) as string;
+                if (minAnimate != "0") return false;
+                var taskbar = Registry.GetValue(ExplorerAdvancedPath, "TaskbarAnimations", null);
+                return taskbar is int t && t == 0;
+            }
+            catch { return false; }
+        }
+        public static void OptimizeVisualFX()
+        {
+            try
+            {
+                using var key1 = Registry.CurrentUser.CreateSubKey(VisualFxPath.Replace(@"HKEY_CURRENT_USER\", ""));
+                key1?.SetValue("VisualFXSetting", 2, RegistryValueKind.DWord);
+
+                using var key2 = Registry.CurrentUser.CreateSubKey(WindowMetricsPath.Replace(@"HKEY_CURRENT_USER\", ""));
+                key2?.SetValue("MinAnimate", "0", RegistryValueKind.String);
+
+                using var key3 = Registry.CurrentUser.CreateSubKey(ExplorerAdvancedPath.Replace(@"HKEY_CURRENT_USER\", ""));
+                key3?.SetValue("TaskbarAnimations", 0, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void RevertVisualFX()
+        {
+            try
+            {
+                using var key1 = Registry.CurrentUser.OpenSubKey(VisualFxPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
+                key1?.DeleteValue("VisualFXSetting", false);
+
+                using var key2 = Registry.CurrentUser.OpenSubKey(WindowMetricsPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
+                key2?.DeleteValue("MinAnimate", false);
+
+                using var key3 = Registry.CurrentUser.OpenSubKey(ExplorerAdvancedPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
+                key3?.DeleteValue("TaskbarAnimations", false);
+            }
+            catch { }
+        }
+
+        // --- Explorer LaunchTo (ComboBox): 1=ThisPC, 2=QuickAccess, 3=Downloads ---
+        public static int GetExplorerLaunchToIndex()
+        {
+            try
+            {
+                var val = Registry.GetValue(ExplorerAdvancedPath, "LaunchTo", null);
+                if (val is int i)
+                {
+                    if (i == 1) return 1; // This PC
+                    if (i == 2) return 0; // Quick Access / Home
+                    if (i == 3) return 2; // Downloads
+                }
+                return 0; // default = Quick Access
+            }
+            catch { return 0; }
+        }
+        public static void SetExplorerLaunchTo(int selectedIndex)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(ExplorerAdvancedPath.Replace(@"HKEY_CURRENT_USER\", ""));
+                int value;
+                switch (selectedIndex)
+                {
+                    case 1: value = 1; break; // This PC
+                    case 2: value = 3; break; // Downloads
+                    default: value = 2; break; // Quick Access / Home
+                }
+                key?.SetValue("LaunchTo", value, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+
+        // --- Disable PCA (Program Compatibility Assistant) ---
+        public static bool IsPCADisabled()
+        {
+            try
+            {
+                var val = Registry.GetValue(AppCompatPath, "DisablePCA", null);
+                return val is int i && i == 1;
+            }
+            catch { return false; }
+        }
+        public static void DisablePCA()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(AppCompatPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
+                key?.SetValue("DisablePCA", 1, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+        public static void EnablePCA()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(AppCompatPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("DisablePCA", false);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // CONTEXT MENU TWEAKS
+        // ============================================================
+
+        // --- Take Ownership (files + directories) ---
+        public static bool IsTakeOwnershipAdded()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\runas", "", null);
+                return val is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddTakeOwnership()
+        {
+            try
+            {
+                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\runas");
+                k1?.SetValue("", "Take Ownership");
+                k1?.SetValue("NoWorkingDirectory", "");
+                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\runas\command");
+                c1?.SetValue("", "cmd.exe /c takeown /f \"%1\" && icacls \"%1\" /grant administrators:F");
+
+                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\runas");
+                k2?.SetValue("", "Take Ownership");
+                k2?.SetValue("NoWorkingDirectory", "");
+                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\runas\command");
+                c2?.SetValue("", "cmd.exe /c takeown /f \"%1\" /r /d y && icacls \"%1\" /grant administrators:F /t");
+            }
+            catch { }
+        }
+        public static void RemoveTakeOwnership()
+        {
+            try
+            {
+                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\*\shell", true);
+                s1?.DeleteSubKeyTree("runas", false);
+                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\shell", true);
+                s2?.DeleteSubKeyTree("runas", false);
+            }
+            catch { }
+        }
+
+        // --- Force Close (exefile) ---
+        public static bool IsForceCloseAdded()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\exefile\shell\forceclose\command", "", null);
+                return val is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddForceClose()
+        {
+            try
+            {
+                using var k = Registry.CurrentUser.CreateSubKey(@"Software\Classes\exefile\shell\forceclose");
+                k?.SetValue("", "Force Close");
+                using var c = Registry.CurrentUser.CreateSubKey(@"Software\Classes\exefile\shell\forceclose\command");
+                c?.SetValue("", "taskkill /f /fi \"IMAGENAME eq %~nx1\"");
+            }
+            catch { }
+        }
+        public static void RemoveForceClose()
+        {
+            try
+            {
+                using var s = Registry.CurrentUser.OpenSubKey(@"Software\Classes\exefile\shell", true);
+                s?.DeleteSubKeyTree("forceclose", false);
+            }
+            catch { }
+        }
+
+        // --- CMD Here (background + drive) ---
+        public static bool IsCmdHereAdded()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\cmd_here\command", "", null);
+                return val is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddCmdHere()
+        {
+            try
+            {
+                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\cmd_here");
+                k1?.SetValue("", "CMD Here");
+                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\cmd_here\command");
+                c1?.SetValue("", "cmd.exe /s /k pushd \"%V\"");
+
+                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\cmd_here");
+                k2?.SetValue("", "CMD Here");
+                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\cmd_here\command");
+                c2?.SetValue("", "cmd.exe /s /k pushd \"%V\"");
+            }
+            catch { }
+        }
+        public static void RemoveCmdHere()
+        {
+            try
+            {
+                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\Background\shell", true);
+                s1?.DeleteSubKeyTree("cmd_here", false);
+                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
+                s2?.DeleteSubKeyTree("cmd_here", false);
+            }
+            catch { }
+        }
+
+        // --- PowerShell Here (background + drive) ---
+        public static bool IsPowerShellHereAdded()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\powershell_here\command", "", null);
+                return val is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddPowerShellHere()
+        {
+            try
+            {
+                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\powershell_here");
+                k1?.SetValue("", "PowerShell Here");
+                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\powershell_here\command");
+                c1?.SetValue("", "powershell.exe -NoExit -Command Set-Location -Path \"%V\"");
+
+                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\powershell_here");
+                k2?.SetValue("", "PowerShell Here");
+                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\powershell_here\command");
+                c2?.SetValue("", "powershell.exe -NoExit -Command Set-Location -Path \"%V\"");
+            }
+            catch { }
+        }
+        public static void RemovePowerShellHere()
+        {
+            try
+            {
+                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\Background\shell", true);
+                s1?.DeleteSubKeyTree("powershell_here", false);
+                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
+                s2?.DeleteSubKeyTree("powershell_here", false);
+            }
+            catch { }
+        }
+
+        // --- CMD as Admin (background + drive) ---
+        public static bool IsCmdAdminAdded()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\cmd_admin\command", "", null);
+                return val is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddCmdAdmin()
+        {
+            try
+            {
+                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\cmd_admin");
+                k1?.SetValue("", "CMD as Admin");
+                k1?.SetValue("HasLUAShield", "");
+                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\cmd_admin\command");
+                c1?.SetValue("", "powershell -Command \"Start-Process cmd -Verb RunAs -ArgumentList '/k pushd \\\"%V\\\"'\"");
+
+                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\cmd_admin");
+                k2?.SetValue("", "CMD as Admin");
+                k2?.SetValue("HasLUAShield", "");
+                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\cmd_admin\command");
+                c2?.SetValue("", "powershell -Command \"Start-Process cmd -Verb RunAs -ArgumentList '/k pushd \\\"%V\\\"'\"");
+            }
+            catch { }
+        }
+        public static void RemoveCmdAdmin()
+        {
+            try
+            {
+                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\Background\shell", true);
+                s1?.DeleteSubKeyTree("cmd_admin", false);
+                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
+                s2?.DeleteSubKeyTree("cmd_admin", false);
+            }
+            catch { }
+        }
+
+        // --- PowerShell as Admin (background + drive) ---
+        public static bool IsPowerShellAdminAdded()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\powershell_admin\command", "", null);
+                return val is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddPowerShellAdmin()
+        {
+            try
+            {
+                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\powershell_admin");
+                k1?.SetValue("", "PowerShell as Admin");
+                k1?.SetValue("HasLUAShield", "");
+                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\powershell_admin\command");
+                c1?.SetValue("", "powershell -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-NoExit -Command Set-Location \\\"%V\\\"'\"");
+
+                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\powershell_admin");
+                k2?.SetValue("", "PowerShell as Admin");
+                k2?.SetValue("HasLUAShield", "");
+                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\powershell_admin\command");
+                c2?.SetValue("", "powershell -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-NoExit -Command Set-Location \\\"%V\\\"'\"");
+            }
+            catch { }
+        }
+        public static void RemovePowerShellAdmin()
+        {
+            try
+            {
+                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\Background\shell", true);
+                s1?.DeleteSubKeyTree("powershell_admin", false);
+                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
+                s2?.DeleteSubKeyTree("powershell_admin", false);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // CONTEXT MENU SCAN, BACKUP & RESTORE
+        // ============================================================
+
+        public class ContextMenuEntry
+        {
+            public string Location { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string DisplayName { get; set; } = "";
+            public string Command { get; set; } = "";
+            public string Extended { get; set; } = "";
+            public string Icon { get; set; } = "";
+            public string Type { get; set; } = "shell";
+            public string Source { get; set; } = "HKCU";
+            public string Clsid { get; set; } = "";
+        }
+
+        public class ContextMenuBackupData
+        {
+            public DateTime BackupTime { get; set; }
+            public List<ContextMenuEntry> Entries { get; set; } = new();
+        }
+
+        private static readonly string[] ShellScanLocations =
+        {
+            @"*\shell",
+            @"AllFileSystemObjects\shell",
+            @"Directory\shell",
+            @"Directory\Background\shell",
+            @"Folder\shell",
+            @"Drive\shell",
+            @"DesktopBackground\shell",
+            @"exefile\shell",
+            @"batfile\shell",
+            @"cmdfile\shell",
+            @"regfile\shell",
+            @"LibraryFolder\shell",
+            @"LibraryFolder\Background\shell",
+            @"SystemFileAssociations\image\shell",
+            @"SystemFileAssociations\video\shell",
+            @"SystemFileAssociations\audio\shell",
+            @"SystemFileAssociations\directory.audio\shell",
+            @"SystemFileAssociations\directory.video\shell",
+            @"SystemFileAssociations\directory.image\shell",
+        };
+
+        private static readonly string[] ShellexScanLocations =
+        {
+            @"*\shellex\ContextMenuHandlers",
+            @"AllFileSystemObjects\shellex\ContextMenuHandlers",
+            @"Directory\shellex\ContextMenuHandlers",
+            @"Directory\Background\shellex\ContextMenuHandlers",
+            @"Folder\shellex\ContextMenuHandlers",
+            @"Drive\shellex\ContextMenuHandlers",
+            @"DesktopBackground\shellex\ContextMenuHandlers",
+            @"exefile\shellex\ContextMenuHandlers",
+            @"LibraryFolder\shellex\ContextMenuHandlers",
+            @"SystemFileAssociations\image\shellex\ContextMenuHandlers",
+            @"SystemFileAssociations\video\shellex\ContextMenuHandlers",
+            @"SystemFileAssociations\audio\shellex\ContextMenuHandlers",
+        };
+
+        private static readonly string[] Wow6432ScanLocations =
+        {
+            @"WOW6432Node\Classes\*\shellex\ContextMenuHandlers",
+            @"WOW6432Node\Classes\AllFileSystemObjects\shellex\ContextMenuHandlers",
+            @"WOW6432Node\Classes\Directory\shellex\ContextMenuHandlers",
+            @"WOW6432Node\Classes\Directory\Background\shellex\ContextMenuHandlers",
+            @"WOW6432Node\Classes\Folder\shellex\ContextMenuHandlers",
+            @"WOW6432Node\Classes\Drive\shellex\ContextMenuHandlers",
+        };
+
+        public static List<ContextMenuEntry> GetAllUserContextMenuEntries()
+        {
+            var entries = new List<ContextMenuEntry>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void AddIfNotSeen(ContextMenuEntry entry)
+            {
+                var key = entry.Location + "|" + entry.Name;
+                if (seen.Add(key))
+                    entries.Add(entry);
+            }
+
+            // === HKCU ===
+            foreach (var loc in ShellScanLocations)
+            {
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Classes\" + loc);
+                    if (key == null) continue;
+                    foreach (var sub in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(sub);
+                            if (subKey == null) continue;
+                            var displayName = subKey.GetValue("") as string ?? sub;
+                            var extended = subKey.GetValue("Extended") as string ?? "";
+                            var icon = subKey.GetValue("Icon") as string ?? "";
+                            string command = "";
+                            using var cmdKey = subKey.OpenSubKey("command");
+                            if (cmdKey != null)
+                                command = cmdKey.GetValue("") as string ?? "";
+                            if (string.IsNullOrEmpty(command))
+                            {
+                                using var delegateKey = subKey.OpenSubKey("DelegateExecute");
+                                if (delegateKey != null)
+                                    command = "[CLSID: " + (delegateKey.GetValue("") as string ?? "?") + "]";
+                            }
+                            AddIfNotSeen(new ContextMenuEntry
+                            {
+                                Location = loc, Name = sub, DisplayName = displayName,
+                                Command = command, Extended = extended, Icon = icon,
+                                Type = "shell", Source = "HKCU"
+                            });
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            foreach (var loc in ShellexScanLocations)
+            {
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Classes\" + loc);
+                    if (key == null) continue;
+                    foreach (var sub in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(sub);
+                            if (subKey == null) continue;
+                            var clsid = (subKey.GetValue("") as string ?? "").Trim();
+                            var displayName = ResolveClsidName(clsid) ?? sub;
+                            string dllPath = ResolveClsidDll(clsid);
+                            AddIfNotSeen(new ContextMenuEntry
+                            {
+                                Location = loc, Name = sub, DisplayName = displayName,
+                                Command = dllPath, Type = "shellex", Source = "HKCU",
+                                Clsid = clsid
+                            });
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            // === HKLM ===
+            foreach (var loc in ShellScanLocations)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(@"Software\Classes\" + loc);
+                    if (key == null) continue;
+                    foreach (var sub in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(sub);
+                            if (subKey == null) continue;
+                            var displayName = subKey.GetValue("") as string ?? sub;
+                            var extended = subKey.GetValue("Extended") as string ?? "";
+                            var icon = subKey.GetValue("Icon") as string ?? "";
+                            string command = "";
+                            using var cmdKey = subKey.OpenSubKey("command");
+                            if (cmdKey != null)
+                                command = cmdKey.GetValue("") as string ?? "";
+                            if (string.IsNullOrEmpty(command))
+                            {
+                                using var delegateKey = subKey.OpenSubKey("DelegateExecute");
+                                if (delegateKey != null)
+                                    command = "[CLSID: " + (delegateKey.GetValue("") as string ?? "?") + "]";
+                            }
+                            AddIfNotSeen(new ContextMenuEntry
+                            {
+                                Location = loc, Name = sub, DisplayName = displayName,
+                                Command = command, Extended = extended, Icon = icon,
+                                Type = "shell", Source = "HKLM"
+                            });
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            foreach (var loc in ShellexScanLocations)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(@"Software\Classes\" + loc);
+                    if (key == null) continue;
+                    foreach (var sub in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(sub);
+                            if (subKey == null) continue;
+                            var clsid = (subKey.GetValue("") as string ?? "").Trim();
+                            var displayName = ResolveClsidName(clsid) ?? sub;
+                            string dllPath = ResolveClsidDll(clsid);
+                            AddIfNotSeen(new ContextMenuEntry
+                            {
+                                Location = loc, Name = sub, DisplayName = displayName,
+                                Command = dllPath, Type = "shellex", Source = "HKLM",
+                                Clsid = clsid
+                            });
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            // === WOW6432Node (HKLM only, 32-bit COM on 64-bit Windows) ===
+            foreach (var loc in Wow6432ScanLocations)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(@"Software\Classes\" + loc);
+                    if (key == null) continue;
+                    foreach (var sub in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(sub);
+                            if (subKey == null) continue;
+                            var clsid = (subKey.GetValue("") as string ?? "").Trim();
+                            var displayName = ResolveClsidName(clsid) ?? sub;
+                            string dllPath = ResolveClsidDll(clsid);
+                            AddIfNotSeen(new ContextMenuEntry
+                            {
+                                Location = loc, Name = sub, DisplayName = displayName,
+                                Command = dllPath, Type = "shellex", Source = "HKLM",
+                                Clsid = clsid
+                            });
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            return entries;
+        }
+
+        private static string? ResolveClsidName(string clsid)
+        {
+            if (string.IsNullOrEmpty(clsid) || !clsid.StartsWith("{")) return null;
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\CLSID\" + clsid, "", null);
+                if (val is string s && !string.IsNullOrEmpty(s))
+                    return s;
+                val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\Software\Classes\CLSID\" + clsid, "", null);
+                if (val is string s2 && !string.IsNullOrEmpty(s2))
+                    return s2;
+            }
+            catch { }
+            return null;
+        }
+
+        private static string ResolveClsidDll(string clsid)
+        {
+            if (string.IsNullOrEmpty(clsid) || !clsid.StartsWith("{")) return "";
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\CLSID\" + clsid + @"\InProcServer32", "", null);
+                if (val is string s && !string.IsNullOrEmpty(s))
+                    return s;
+                val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\Software\Classes\CLSID\" + clsid + @"\InProcServer32", "", null);
+                if (val is string s2 && !string.IsNullOrEmpty(s2))
+                    return s2;
+            }
+            catch { }
+            return "";
+        }
+
+        private static string GetContextMenuBackupPath()
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KitLugia");
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            return Path.Combine(dir, "contextmenu_backup.json");
+        }
+
+        public static bool ContextMenuBackupExists()
+        {
+            try { return File.Exists(GetContextMenuBackupPath()); }
+            catch { return false; }
+        }
+
+        public static DateTime? GetContextMenuBackupTime()
+        {
+            try
+            {
+                var json = File.ReadAllText(GetContextMenuBackupPath());
+                var data = JsonSerializer.Deserialize<ContextMenuBackupData>(json);
+                return data?.BackupTime;
+            }
+            catch { return null; }
+        }
+
+        public static void BackupUserContextMenu()
+        {
+            try
+            {
+                var entries = GetAllUserContextMenuEntries().Where(e => e.Source == "HKCU").ToList();
+                var data = new ContextMenuBackupData
+                {
+                    BackupTime = DateTime.Now,
+                    Entries = entries
+                };
+                var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(GetContextMenuBackupPath(), json);
+            }
+            catch { }
+        }
+
+        public static (bool Success, string Message) RestoreUserContextMenu()
+        {
+            try
+            {
+                var path = GetContextMenuBackupPath();
+                if (!File.Exists(path))
+                    return (false, "Nenhum backup encontrado.");
+
+                var json = File.ReadAllText(path);
+                var data = JsonSerializer.Deserialize<ContextMenuBackupData>(json);
+                if (data == null || data.Entries.Count == 0)
+                    return (false, "Backup vazio ou invalido.");
+
+                int restored = 0;
+                foreach (var entry in data.Entries)
+                {
+                    try
+                    {
+                        var fullPath = @"Software\Classes\" + entry.Location;
+                        using var shellKey = Registry.CurrentUser.CreateSubKey(fullPath);
+                        if (shellKey == null) continue;
+
+                        using var entryKey = shellKey.CreateSubKey(entry.Name);
+                        if (entryKey == null) continue;
+
+                        if (!string.IsNullOrEmpty(entry.DisplayName) && entry.DisplayName != entry.Name)
+                            entryKey.SetValue("", entry.DisplayName);
+
+                        if (!string.IsNullOrEmpty(entry.Extended))
+                            entryKey.SetValue("Extended", entry.Extended);
+
+                        if (!string.IsNullOrEmpty(entry.Icon))
+                            entryKey.SetValue("Icon", entry.Icon);
+
+                        if (!string.IsNullOrEmpty(entry.Command) && entry.Type == "shell")
+                        {
+                            using var cmdKey = entryKey.CreateSubKey("command");
+                            cmdKey?.SetValue("", entry.Command);
+                        }
+
+                        restored++;
+                    }
+                    catch { }
+                }
+
+                return (true, $"{restored} de {data.Entries.Count} entradas restauradas.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao restaurar: {ex.Message}");
+            }
+        }
+
+        public static bool RemoveUserContextMenuEntry(string location, string name)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Classes\" + location, true);
+                if (key == null) return false;
+                key.DeleteSubKeyTree(name, false);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public static int GetContextMenuEntryCount()
+        {
+            try { return GetAllUserContextMenuEntries().Count; }
+            catch { return 0; }
         }
 
         #endregion

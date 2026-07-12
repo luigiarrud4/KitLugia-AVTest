@@ -14,6 +14,68 @@
                 <TextBlock Text="Gerencie teclado, mouse, acessibilidade, idioma, som, energia e mais — tudo integrado ao Windows." 
                            Foreground="#A0A0A0" FontSize="14" Margin="0,0,0,30" TextWrapping="Wrap"/>
 
+                <!-- CARAMEL BUTTON: Preview 1:1 do Menu de Contexto -->
+                <Button Click="BtnContextMenuPreview_Click" Margin="0,0,0,8" Padding="0" HorizontalAlignment="Stretch" Height="Auto" Cursor="Hand" ToolTip="Veja o menu de contexto exatamente como no Windows Explorer">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="BgBorder" CornerRadius="8" Background="#1A2A2A" BorderBrush="#44AAAA" BorderThickness="1" SnapsToDevicePixels="True">
+                                <Grid Margin="16,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#x1F9EA;" FontSize="24" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="Preview 1:1 do Menu de Contexto" FontSize="16" FontWeight="SemiBold" Foreground="#88DDCC"/>
+                                        <TextBlock Text="Simulador interativo — veja o menu exatamente como no Explorer e remova entradas indesejadas" FontSize="11" Foreground="#55AA99" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="&#x276F;" FontSize="20" Foreground="#44AAAA" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BgBorder" Property="Background" Value="#2A3A3A"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="BgBorder" Property="Background" Value="#3A4A4A"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <!-- CARAMEL BUTTON: Menu de Contexto (gerenciamento) -->
+                <Button Click="BtnContextMenu_Click" Margin="0,0,0,25" Padding="0" HorizontalAlignment="Stretch" Height="Auto" Cursor="Hand" ToolTip="Gerencie entradas do menu de contexto do Windows Explorer">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="BgBorder" CornerRadius="8" Background="#3A2A1A" BorderBrush="#CC8844" BorderThickness="1" SnapsToDevicePixels="True">
+                                <Grid Margin="16,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#x1F4CB;" FontSize="24" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="Menu de Contexto" FontSize="16" FontWeight="SemiBold" Foreground="#DDBB88"/>
+                                        <TextBlock Text="Adicione/remova entradas do clique direito (Take Ownership, Force Close, CMD/PowerShell aqui e como Admin)" FontSize="11" Foreground="#AA9955" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="&#x276F;" FontSize="20" Foreground="#CC8844" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BgBorder" Property="Background" Value="#4A3A2A"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="BgBorder" Property="Background" Value="#5A4A3A"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
                 <!-- ================================================================== -->
                 <!-- SECAO: DISPOSITIVOS (Teclado, Mouse, Som, Impressoras, Bluetooth) -->
                 <!-- ================================================================== -->
