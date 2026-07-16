@@ -269,6 +269,31 @@ public partial class AnswerFileOptions
     public string ProcessorArchitecture { get; set; } = "amd64";
 
     /// <summary>
+    /// Gets or sets whether the EULA page is hidden during OOBE.
+    /// </summary>
+    public bool HideEULAPage { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether the OEM registration screen is hidden during OOBE.
+    /// </summary>
+    public bool HideOEMRegistrationScreen { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether the wireless setup page is hidden during OOBE.
+    /// </summary>
+    public bool HideWirelessSetupInOOBE { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether online account screens are hidden during OOBE.
+    /// </summary>
+    public bool HideOnlineAccountScreens { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the "Protect your PC" recommended security settings option (1 = use recommended, 3 = no recommendations).
+    /// </summary>
+    public int ProtectYourPC { get; set; } = 1;
+
+    /// <summary>
     /// Gets or sets the system time zone.
     /// </summary>
     /// <value>

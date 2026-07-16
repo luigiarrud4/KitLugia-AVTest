@@ -30,12 +30,11 @@ namespace KitLugia.Core
         /// Verifica se a ISO foi criada pelo KitLugia ISO Editor
         /// Detecta o arquivo .kitlugia na raiz da ISO
         /// </summary>
-        public static bool IsKitLugiaIso(string isoPath)
+        public static async Task<bool> IsKitLugiaIso(string isoPath)
         {
             try
             {
-                // Montar ISO temporariamente para verificar
-                string driveLetter = Task.Run(() => MountIso(isoPath)).GetAwaiter().GetResult();
+                string driveLetter = await MountIso(isoPath);
                 if (string.IsNullOrEmpty(driveLetter))
                 {
                     return false;
@@ -44,8 +43,7 @@ namespace KitLugia.Core
                 string kitlugiaIdFile = Path.Combine(driveLetter, ".kitlugia");
                 bool isKitLugia = File.Exists(kitlugiaIdFile);
 
-                // Desmontar ISO
-                Task.Run(() => DismountIso(isoPath)).GetAwaiter().GetResult();
+                await DismountIso(isoPath);
 
                 if (isKitLugia)
                 {
@@ -76,7 +74,7 @@ namespace KitLugia.Core
         /// Detecta o idioma da ISO usando DISM /Get-WimInfo
         /// Retorna o código de idioma (ex: pt-BR, en-US, es-ES)
         /// </summary>
-        public static string DetectIsoLanguage(string isoPath, string? extractedDrive = null)
+        public static async Task<string> DetectIsoLanguage(string isoPath, string? extractedDrive = null)
         {
             try
             {
@@ -87,8 +85,7 @@ namespace KitLugia.Core
 
                 Log("Detectando idioma da ISO...");
 
-                // Montar ISO temporariamente
-                string driveLetter = Task.Run(() => MountIso(isoPath)).GetAwaiter().GetResult();
+                string driveLetter = await MountIso(isoPath);
                 if (string.IsNullOrEmpty(driveLetter))
                 {
                     Log("Falha ao montar ISO para detecção de idioma.");
@@ -96,7 +93,7 @@ namespace KitLugia.Core
                 }
 
                 string lang = DetectLanguageFromDrive(driveLetter);
-                Task.Run(() => DismountIso(isoPath)).GetAwaiter().GetResult();
+                await DismountIso(isoPath);
                 return lang;
             }
             catch (Exception ex)
@@ -268,7 +265,14 @@ namespace KitLugia.Core
                     InputLocale = GetInputLocaleFromLanguage(language),
                     GeoID = GetGeoIdFromLanguage(language),
                     TimeZone = timeZone,
-                    ProcessorArchitecture = "amd64"
+                    ProcessorArchitecture = "amd64",
+
+                    // OOBE
+                    HideEULAPage = hideEula,
+                    HideOEMRegistrationScreen = hideOEM,
+                    HideWirelessSetupInOOBE = hideWireless,
+                    HideOnlineAccountScreens = hideOnlineAccount,
+                    ProtectYourPC = protectYourPC ? 1 : 3
                 };
 
                 // Adicionar conta local se especificado
@@ -2280,7 +2284,8 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             foreach (var file in Directory.GetFiles(sourceDir))
             {
                 string target = Path.Combine(targetDir, Path.GetFileName(file));
-                try { File.Copy(file, target, true); } catch { }
+                try { File.Copy(file, target, true); }
+                catch (Exception ex) { Log($"Erro ao copiar arquivo {file} → {target}: {ex.Message}"); }
             }
             foreach (var directory in Directory.GetDirectories(sourceDir))
             {
@@ -3892,11 +3897,18 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                     
                     // Task para monitorar o processo e restaurar o registro quando fechar
                     _ = Task.Run(async () => {
-                        await p.WaitForExitAsync();
-                        Log("Setup do Windows fechado. Restaurando EditionID original...");
-                        SetEditionId(currentEditionId);
-                        await DismountIso(isoPath);
-                        Log("Processo de atualização finalizado.");
+                        try
+                        {
+                            await p.WaitForExitAsync();
+                            Log("Setup do Windows fechado. Restaurando EditionID original...");
+                            SetEditionId(currentEditionId);
+                            await DismountIso(isoPath);
+                            Log("Processo de atualização finalizado.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"Erro no pós-setup: {ex.Message}");
+                        }
                     });
                     
                     return true;
@@ -3921,6 +3933,24 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             public override string ToString() => $"{Name} ({Architecture} - {Version})";
         }
 
+        // Parse colon-delimited key-value pairs from DISM output (locale-independent)
+        private static List<string> ParseDismColonValues(string output)
+        {
+            var values = new List<string>();
+            foreach (var line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var m = Regex.Match(line.Trim(), @"^(.+?)\s*:\s*(.+)$");
+                if (!m.Success) continue;
+                string key = m.Groups[1].Value.Trim();
+                string val = m.Groups[2].Value.Trim();
+                // Skip section header lines (e.g. "Details for image : install.wim")
+                if (key.Contains("for image") || key.IndexOf("information", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                if (string.IsNullOrEmpty(val)) continue;
+                values.Add(val);
+            }
+            return values;
+        }
+
         public static async Task<List<WimEditionInfo>> GetIsoEditions(string isoPath)
         {
             var editions = new List<WimEditionInfo>();
@@ -3937,25 +3967,32 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 {
                     var (_, output) = await RunProcessCaptured("dism.exe", $"/Get-ImageInfo /ImageFile:\"{wimPath}\"");
                     
-                    // Parse DISM output
-                    var matches = Regex.Matches(output, @"Índice\s*:\s*(\d+).*?Nome\s*:\s*(.*?)(?=Descrição|Tamanho|Índice|$)", RegexOptions.Singleline);
-                    foreach (Match m in matches)
+                    // Parse DISM output: blocks separated by blank lines
+                    var blocks = output.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var block in blocks)
                     {
-                        var info = new WimEditionInfo { 
-                            Index = int.Parse(m.Groups[1].Value), 
-                            Name = m.Groups[2].Value.Trim() 
-                        };
+                        var vals = ParseDismColonValues(block);
+                        if (vals.Count < 2) continue;
+                        // First colon-value pair is Index (numeric), second is Name
+                        if (!int.TryParse(vals[0], out int idx)) continue;
+                        var info = new WimEditionInfo { Index = idx, Name = vals[1] };
                         
-                        // Pegar EditionID detalhado
+                        // Detailed info per index
                         var (_, detail) = await RunProcessCaptured("dism.exe", $"/Get-ImageInfo /ImageFile:\"{wimPath}\" /Index:{info.Index}");
-                        var edMatch = Regex.Match(detail, @"Edição\s*:\s*(.*)");
-                        if (edMatch.Success) info.EditionId = edMatch.Groups[1].Value.Trim();
-                        
-                        var archMatch = Regex.Match(detail, @"Arquitetura\s*:\s*(.*)");
-                        if (archMatch.Success) info.Architecture = archMatch.Groups[1].Value.Trim();
-
-                        var verMatch = Regex.Match(detail, @"Versão\s*:\s*(.*)");
-                        if (verMatch.Success) info.Version = verMatch.Groups[1].Value.Trim();
+                        var detailVals = ParseDismColonValues(detail);
+                        // Order: Index(0), Name(1), Description(2), Size(3), Edition(4), Architecture(5), Version(6)
+                        int detailIdx = 0;
+                        foreach (var dv in detailVals)
+                        {
+                            if (detailIdx == 0) { detailIdx++; continue; } // Index
+                            else if (detailIdx == 1) { detailIdx++; continue; } // Name
+                            else if (detailIdx == 2) { detailIdx++; continue; } // Description
+                            else if (detailIdx == 3) { detailIdx++; continue; } // Size
+                            else if (detailIdx == 4) info.EditionId = dv;
+                            else if (detailIdx == 5) info.Architecture = dv;
+                            else if (detailIdx == 6) { info.Version = dv; break; }
+                            detailIdx++;
+                        }
 
                         editions.Add(info);
                     }

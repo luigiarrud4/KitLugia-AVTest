@@ -214,7 +214,10 @@ namespace KitLugia.Core
 
                 Logger.Log($"📥 Baixando {asset.Name} ({asset.Size / 1024 / 1024}MB)...");
 
-                var downloadResponse = await _httpClient.GetAsync(asset.BrowserDownloadUrl);
+                using var downloadClient = new HttpClient();
+                downloadClient.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater");
+                downloadClient.Timeout = TimeSpan.FromMinutes(30);
+                var downloadResponse = await downloadClient.GetAsync(asset.BrowserDownloadUrl);
                 await using (var fileStream = File.Create(updatePath))
                 {
                     await downloadResponse.Content.CopyToAsync(fileStream);

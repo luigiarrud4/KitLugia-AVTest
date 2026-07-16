@@ -926,7 +926,7 @@ namespace KitLugia.GUI.Pages
                 
 
                 UpdateStatus("Detectando idioma da ISO...");
-                string detectedLanguage = WinbootManager.DetectIsoLanguage(selectedIsoPath, winbootDrive);
+                string detectedLanguage = await WinbootManager.DetectIsoLanguage(selectedIsoPath, winbootDrive);
                 string detectedTimeZone = WinbootManager.GetTimeZoneFromLanguage(detectedLanguage);
                 WinbootManager.Log($"Idioma detectado: {detectedLanguage} → Fuso: {detectedTimeZone}");
                 

@@ -290,17 +290,17 @@ public class AnswerFileGenerator
             }
         }
 
-        bool hideAccountScreens = Options.JoinDomain != null || Options.LocalAccounts.Count != 0;
+        bool hasAccounts = Options.JoinDomain != null || Options.LocalAccounts.Count != 0;
         Writer.WriteElements(new KeyValueList
         {
             { "OOBE", new KeyValueList
             {
-                { "ProtectYourPC", 1 },
-                { "HideEULAPage", true },
-                { "HideLocalAccountScreen", hideAccountScreens },
-                { "HideOEMRegistrationScreen", true },
-                { "HideOnlineAccountScreens", hideAccountScreens },
-                { "HideWirelessSetupInOOBE", hideAccountScreens }
+                { "ProtectYourPC", Options.ProtectYourPC },
+                { "HideEULAPage", Options.HideEULAPage },
+                { "HideLocalAccountScreen", hasAccounts || Options.HideOnlineAccountScreens },
+                { "HideOEMRegistrationScreen", Options.HideOEMRegistrationScreen },
+                { "HideOnlineAccountScreens", hasAccounts || Options.HideOnlineAccountScreens },
+                { "HideWirelessSetupInOOBE", hasAccounts || Options.HideWirelessSetupInOOBE }
             }
             }
         });
