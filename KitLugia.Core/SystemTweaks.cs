@@ -8486,6 +8486,181 @@ namespace KitLugia.Core
             catch { }
         }
 
+        // --- Open with Notepad (all files) ---
+        public static bool IsNotepadAdded()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\openwithnotepad", "", null);
+                return val is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddNotepad()
+        {
+            try
+            {
+                using var k = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\openwithnotepad");
+                k?.SetValue("", "Abrir com Bloco de Notas");
+                using var c = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\openwithnotepad\command");
+                c?.SetValue("", "notepad.exe \"%1\"");
+            }
+            catch { }
+        }
+        public static void RemoveNotepad()
+        {
+            try
+            {
+                using var s = Registry.CurrentUser.OpenSubKey(@"Software\Classes\*\shell", true);
+                s?.DeleteSubKeyTree("openwithnotepad", false);
+            }
+            catch { }
+        }
+
+        // --- Copy as Path (files + folders) ---
+        public static bool IsCopyAsPathAdded()
+        {
+            try
+            {
+                return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\copyaspath", "", null) is string s1 && !string.IsNullOrEmpty(s1)
+                    || Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\shell\copyaspath", "", null) is string s2 && !string.IsNullOrEmpty(s2);
+            }
+            catch { return false; }
+        }
+        public static void AddCopyAsPath()
+        {
+            try
+            {
+                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\copyaspath");
+                k1?.SetValue("", "Copiar como Caminho");
+                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\copyaspath\command");
+                c1?.SetValue("", "powershell -Command \"[System.Windows.Clipboard]::SetText('%~1')\"");
+                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\copyaspath");
+                k2?.SetValue("", "Copiar como Caminho");
+                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\copyaspath\command");
+                c2?.SetValue("", "powershell -Command \"[System.Windows.Clipboard]::SetText('%~1')\"");
+            }
+            catch { }
+        }
+        public static void RemoveCopyAsPath()
+        {
+            try
+            {
+                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\*\shell", true);
+                s1?.DeleteSubKeyTree("copyaspath", false);
+                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\shell", true);
+                s2?.DeleteSubKeyTree("copyaspath", false);
+            }
+            catch { }
+        }
+
+        public static string KitLugiaBaseFolder
+        {
+            get
+            {
+                try
+                {
+                    return AppDomain.CurrentDomain.BaseDirectory ?? "";
+                }
+                catch { }
+                return "";
+            }
+        }
+
+        // --- ForceStopUnlock (unlock locked files via Handle tool) ---
+        public static string GetForceStopUnlockFolder()
+        {
+            return System.IO.Path.Combine(KitLugiaBaseFolder, "External", "ForceStopUnlock");
+        }
+        public static string GetForceStopUnlockScriptPath()
+        {
+            return System.IO.Path.Combine(GetForceStopUnlockFolder(), "Unlock-File.ps1");
+        }
+
+        public static bool IsForceStopUnlockAdded()
+        {
+            try
+            {
+                return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock", "", null) is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddForceStopUnlock()
+        {
+            try
+            {
+                string scriptPath = GetForceStopUnlockScriptPath();
+                string cmd = $"powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File \"{scriptPath}\" \"%1\"";
+
+                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\forcestopunlock");
+                k1?.SetValue("", "Force Stop Unlock");
+                k1?.SetValue("Icon", "%SystemRoot%\\System32\\shell32.dll,276");
+                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\forcestopunlock\command");
+                c1?.SetValue("", cmd);
+
+                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\forcestopunlock");
+                k2?.SetValue("", "Force Stop Unlock");
+                k2?.SetValue("Icon", "%SystemRoot%\\System32\\shell32.dll,276");
+                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\forcestopunlock\command");
+                c2?.SetValue("", cmd);
+
+                using var k3 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\forcestopunlock");
+                k3?.SetValue("", "Force Stop Unlock");
+                k3?.SetValue("Icon", "%SystemRoot%\\System32\\shell32.dll,276");
+                using var c3 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\forcestopunlock\command");
+                c3?.SetValue("", cmd);
+            }
+            catch { }
+        }
+        public static void RemoveForceStopUnlock()
+        {
+            try
+            {
+                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\*\shell", true);
+                s1?.DeleteSubKeyTree("forcestopunlock", false);
+                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\shell", true);
+                s2?.DeleteSubKeyTree("forcestopunlock", false);
+                using var s3 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
+                s3?.DeleteSubKeyTree("forcestopunlock", false);
+            }
+            catch { }
+        }
+
+        // --- VS Code (Admin) context menu ---
+        public static bool IsVsCodeAdded()
+        {
+            try
+            {
+                return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\runascode", "", null) is string s && !string.IsNullOrEmpty(s);
+            }
+            catch { return false; }
+        }
+        public static void AddVsCode()
+        {
+            try
+            {
+                string? vsCodePath = Registry.GetValue(@"HKEY_CLASSES_ROOT\vscode\shell\open\command", "", null)?.ToString()?.Split('"')[1];
+                if (string.IsNullOrEmpty(vsCodePath)) return;
+
+                using var k = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\runascode");
+                k?.SetValue("", "Abrir com VS Code (Admin)");
+                k?.SetValue("HasLUAShield", "");
+                k?.SetValue("Icon", $"\"{vsCodePath}\",0");
+                using var c = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\runascode\command");
+                c?.SetValue("", $"powershell.exe -Command \"Start-Process '{vsCodePath}' -ArgumentList '\"\"%V\"\"' -Verb runas\"");
+            }
+            catch { }
+        }
+        public static void RemoveVsCode()
+        {
+            try
+            {
+                using var s = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\Background\shell", true);
+                s?.DeleteSubKeyTree("runascode", false);
+            }
+            catch { }
+        }
+
         // ============================================================
         // CONTEXT MENU SCAN, BACKUP & RESTORE
         // ============================================================

@@ -846,12 +846,14 @@ namespace KitLugia.GUI.Pages
         {
             string filter = TxtSearchService.Text.Trim().ToLower();
             bool showDangerous = ChkShowDangerous.IsChecked == true;
+            bool onlyThirdParty = ChkShowThirdParty.IsChecked == true;
 
             var filtered = _allServices.Where(s =>
             {
                 bool matchesText = string.IsNullOrEmpty(filter) || s.DisplayName.ToLower().Contains(filter) || s.Name.ToLower().Contains(filter);
                 bool matchesSafety = showDangerous || s.Safety != ServiceSafetyLevel.Dangerous;
-                return matchesText && matchesSafety;
+                bool matchesManufacturer = !onlyThirdParty || s.Manufacturer == "Terceiros";
+                return matchesText && matchesSafety && matchesManufacturer;
             }).ToList();
 
             GridServices.ItemsSource = filtered;
@@ -860,6 +862,7 @@ namespace KitLugia.GUI.Pages
 
         private void TxtSearchService_TextChanged(object sender, TextChangedEventArgs e) => ApplyServiceFilter();
         private void ChkShowDangerous_Click(object sender, RoutedEventArgs e) => ApplyServiceFilter();
+        private void ChkShowThirdParty_Click(object sender, RoutedEventArgs e) => ApplyServiceFilter();
         private async void BtnRefreshServices_Click(object sender, RoutedEventArgs e)
         {
             if (_isServiceOperation) return;
@@ -892,6 +895,7 @@ namespace KitLugia.GUI.Pages
 
         private void BtnSafeOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("Safe", "Seguro");
         private void BtnGamerOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("Gamer", "Gamer");
+        private void BtnGamerPlusOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("GamerPlus", "Gamer+");
         private void BtnRestoreServices_Click(object sender, RoutedEventArgs e) => RunServicePreset("Restore", "Padrão");
 
         // Menu de Contexto
@@ -924,24 +928,61 @@ namespace KitLugia.GUI.Pages
         #endregion
 
         // =========================================================
-        // ABA 3: TAREFAS AGENDADAS (NOVO)
+        // ABA 3: TAREFAS AGENDADAS
         // =========================================================
         #region Scheduled Tasks Logic
+
+        private List<ScheduledTaskInfo> _allTasks = new();
 
         private async Task LoadScheduledTasks(CancellationToken cancellationToken)
         {
             try
             {
                 var tasks = await Task.Run(() => BackgroundProcessManager.GetScheduledTasksStatus(), cancellationToken);
-                GridTasks.ItemsSource = tasks;
+                _allTasks = tasks;
+                ApplyTaskFilter();
             }
             catch (OperationCanceledException)
             {
-
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LoadScheduledTasks", ex.Message);
             }
         }
 
         private async Task LoadScheduledTasks() => await LoadScheduledTasks(_cts?.Token ?? CancellationToken.None);
+
+        private void ApplyTaskFilter()
+        {
+            try
+            {
+                string filter = "";
+                if (CboTaskFilter?.SelectedItem is ComboBoxItem item && item.Content is string s)
+                    filter = s;
+
+                var source = _allTasks ?? new();
+                var filtered = source.Where(t =>
+                {
+                    if (filter == "Apenas Microsoft") return t.Category == "Microsoft";
+                    return true;
+                }).ToList();
+
+                if (GridTasks != null)
+                    GridTasks.ItemsSource = filtered;
+                if (TxtTaskCount != null)
+                    TxtTaskCount.Text = $"{filtered.Count} tarefa{(filtered.Count == 1 ? "" : "s")}";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ApplyTaskFilter", ex.Message);
+            }
+        }
+
+        private void CboTaskFilter_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            ApplyTaskFilter();
+        }
 
         private async void BtnToggleTask_Click(object sender, RoutedEventArgs e)
         {
@@ -972,6 +1013,37 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private async Task RunTaskPreset(string presetName, string confirmMessage, string successLabel)
+        {
+            if (_isServiceOperation) return;
+            _isServiceOperation = true;
+            try
+            {
+                if (Application.Current.MainWindow is MainWindow mw)
+                {
+                    if (!await mw.ShowConfirmationDialog(confirmMessage)) return;
+                    var result = await Task.Run(() => BackgroundProcessManager.ApplyTaskPreset(presetName));
+                    mw.ShowSuccess(successLabel, result.Message);
+                    LoadScheduledTasks();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("RunTaskPreset", ex.Message);
+            }
+            finally
+            {
+                _isServiceOperation = false;
+            }
+        }
+
+        private void BtnDisableMSTasks_Click(object sender, RoutedEventArgs e)
+        {
+            _ = RunTaskPreset("DisableMicrosoft",
+                "Desativar todas as tarefas de telemetria e manutenção da Microsoft?",
+                "MICROSOFT");
+        }
+
         private async void BtnDisableAllTasks_Click(object sender, RoutedEventArgs e)
         {
             if (_isServiceOperation) return;
@@ -980,10 +1052,10 @@ namespace KitLugia.GUI.Pages
             {
                 if (Application.Current.MainWindow is MainWindow mw)
                 {
-                    if (!await mw.ShowConfirmationDialog("Isso desativará TODAS as tarefas de telemetria listadas.\nDeseja continuar?")) return;
+                    if (!await mw.ShowConfirmationDialog("Isso desativará TODAS as tarefas monitoradas (Microsoft + Terceiros).\nDeseja continuar?")) return;
 
                     var result = await Task.Run(() => BackgroundProcessManager.DisableTelemetryTasks());
-                    mw.ShowSuccess("TELEMETRIA", result.Message);
+                    mw.ShowSuccess("TODAS", result.Message);
                     LoadScheduledTasks();
                 }
             }
@@ -996,6 +1068,13 @@ namespace KitLugia.GUI.Pages
                 _isServiceOperation = false;
             }
         }
+
+        private void BtnRestoreAllTasks_Click(object sender, RoutedEventArgs e)
+        {
+            _ = RunTaskPreset("RestoreAll",
+                "Restaurar TODAS as tarefas monitoradas ao estado ativo?",
+                "RESTAURADO");
+        }
         #endregion
 
         // =========================================================
@@ -1005,21 +1084,20 @@ namespace KitLugia.GUI.Pages
 
         private async void BtnAnalyzeBoot_Click(object sender, RoutedEventArgs e)
         {
-            if (Application.Current.MainWindow is MainWindow mw)
+            if (_isServiceOperation) return;
+            _isServiceOperation = true;
+            try
             {
-                TxtBootTime.Text = "Analisando...";
-                mw.ShowInfo("AGUARDE", "Lendo logs de eventos do sistema...");
-
-                try
+                if (Application.Current.MainWindow is MainWindow mw)
                 {
+                    TxtBootTime.Text = "Analisando...";
+                    TxtBootDate.Text = "";
+                    mw.ShowInfo("AGUARDE", "Lendo logs de eventos do sistema...");
+
                     var result = await Task.Run(() => BootOptimizerManager.AnalyzeBootPerformance());
 
-                    if (!string.IsNullOrEmpty(result.ServiceStatusMessage))
-                    {
-                        mw.ShowError("AVISO", result.ServiceStatusMessage);
-                        TxtBootTime.Text = "N/A";
-                        return;
-                    }
+                    if (result.HasWarning)
+                        mw.ShowInfo("AVISO", result.ServiceStatusMessage);
 
                     if (result.TotalTimeEvent != null)
                     {
@@ -1032,9 +1110,6 @@ namespace KitLugia.GUI.Pages
                         TxtBootTime.Text = "Sem dados recentes";
                     }
 
-                    // Junta as duas listas para exibir na tabela
-
-                    // Típico: 10-30 itens de boot lento
                     var combinedList = new List<PerformanceEvent>(30);
                     combinedList.AddRange(result.SlowStartupItems);
                     combinedList.AddRange(result.HighImpactApps);
@@ -1045,13 +1120,18 @@ namespace KitLugia.GUI.Pages
                         mw.ShowSuccess("ÓTIMO", "Nenhum atraso significativo (>1s) encontrado no último boot.");
                     else
                         mw.ShowInfo("ANÁLISE", $"Encontrados {combinedList.Count} itens que impactaram o boot.");
-
                 }
-                catch (Exception ex)
-                {
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnAnalyzeBoot_Click", ex.Message);
+                if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowError("ERRO", ex.Message);
-                    TxtBootTime.Text = "Erro";
-                }
+                TxtBootTime.Text = "Erro";
+            }
+            finally
+            {
+                _isServiceOperation = false;
             }
         }
         #endregion

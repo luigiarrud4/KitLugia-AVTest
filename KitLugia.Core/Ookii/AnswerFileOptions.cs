@@ -224,6 +224,20 @@ public partial class AnswerFileOptions
     public string Language { get; set; } = "en-US";
 
     /// <summary>
+    /// Gets or sets the input locale (keyboard layout) identifier.
+    /// Use the full "LCID:KeyboardLayout" format (e.g., "0416:00000416" for Portuguese Brazil ABNT).
+    /// If not set, falls back to the Language property (language tag like "pt-BR").
+    /// </summary>
+    public string? InputLocale { get; set; }
+
+    /// <summary>
+    /// Gets or sets the geographic location (GeoID) for the region.
+    /// Maps to the "Region" setting in Windows (e.g., 104 for Brazil, 244 for United States).
+    /// If null or 0, Windows Setup uses its default (typically 244 - United States).
+    /// </summary>
+    public int? GeoID { get; set; }
+
+    /// <summary>
     /// Gets or sets the Windows product key.
     /// </summary>
     /// <value>

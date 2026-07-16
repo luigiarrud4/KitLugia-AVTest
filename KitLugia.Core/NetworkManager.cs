@@ -33,6 +33,13 @@ namespace KitLugia.Core
             }
         }
 
+        public static (bool Success, string Message) SetCustomDns(string primaryDns, string? secondaryDns)
+        {
+            if (!SystemUtils.IsAdmin())
+                return (false, "Acesso Negado!\nExecute como Administrador para alterar o DNS.");
+            return SetDnsServers("Custom", primaryDns, secondaryDns);
+        }
+
         /// <summary>
         /// Configura o algoritmo de controle de congestionamento TCP para CTCP (Compound TCP).
         /// O padrão (CUBIC) foca em largura de banda. CTCP foca em manter a janela de transmissão estável,

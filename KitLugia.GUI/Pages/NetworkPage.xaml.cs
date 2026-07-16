@@ -364,6 +364,58 @@ namespace KitLugia.GUI.Pages
         private void BtnDnsGoogle_Click(object sender, RoutedEventArgs e) => ApplyDns("Google");
         private void BtnDnsReset_Click(object sender, RoutedEventArgs e) => ApplyDns("DHCP");
 
+        private async void BtnBenchmarkDns_Click(object sender, RoutedEventArgs e)
+        {
+            BtnBenchmarkDns.IsEnabled = false;
+            TxtBenchmarkStatus.Text = "Testando provedores DNS...";
+            var providers = DnsBenchmark.GetDefaultProviders();
+            DnsProviderList.ItemsSource = providers;
+
+            var results = await Task.Run(() => DnsBenchmark.BenchmarkAsync(providers));
+            DnsProviderList.ItemsSource = results;
+
+            var fastest = results.FirstOrDefault(p => p.LatencyMs >= 0);
+            if (fastest != null)
+                TxtBenchmarkStatus.Text = $"Teste concluído! Mais rápido: {fastest.Name} ({fastest.LatencyMs:F0} ms)";
+            else
+                TxtBenchmarkStatus.Text = "Nenhum DNS respondeu ao teste.";
+            BtnBenchmarkDns.IsEnabled = true;
+        }
+
+        private async void BtnApplyDnsProvider_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is DnsProvider provider)
+            {
+                if (!(Application.Current.MainWindow is MainWindow mainWin)) return;
+                string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"DNS: {provider.Name}", "Network");
+                mainWin.ShowInfo("DNS", $"Aplicando {provider.Name} ({provider.Primary})...");
+                var result = await Task.Run(() => Toolbox.SetCustomDns(provider.Primary, provider.Secondary));
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
+                if (result.Success) mainWin.ShowSuccess("SUCESSO", result.Message);
+                else mainWin.ShowError("ERRO", result.Message);
+                LoadStatus();
+            }
+        }
+
+        private async void BtnApplyCustomDns_Click(object sender, RoutedEventArgs e)
+        {
+            var primary = TxtCustomDnsPrimary.Text?.Trim();
+            if (string.IsNullOrEmpty(primary))
+            {
+                if (Application.Current.MainWindow is MainWindow m)
+                    m.ShowError("DNS", "Digite o IP do DNS primário.");
+                return;
+            }
+            if (!(Application.Current.MainWindow is MainWindow mw)) return;
+            string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("DNS Customizado", "Network");
+            mw.ShowInfo("DNS", $"Aplicando DNS customizado ({primary})...");
+            var result = await Task.Run(() => Toolbox.SetCustomDns(primary, TxtCustomDnsSecondary.Text?.Trim()));
+            Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
+            if (result.Success) mw.ShowSuccess("SUCESSO", result.Message);
+            else mw.ShowError("ERRO", result.Message);
+            LoadStatus();
+        }
+
         private async void BtnFlushDns_Click(object sender, RoutedEventArgs e)
         {
             if (Application.Current.MainWindow is MainWindow mw)

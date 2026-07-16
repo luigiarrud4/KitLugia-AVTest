@@ -36,11 +36,8 @@ namespace KitLugia.GUI
             base.OnStartup(e);
 
 
-            // Deferred in tray mode so tray icon appears faster
-            if (StartMinimized)
-                _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
-            else
-                KitLugia.Core.StartupManager.CheckAndFixStartupMethods();
+            // Always run startup method check in background so the window appears first
+            _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
 
             var mainWindow = new MainWindow();
             

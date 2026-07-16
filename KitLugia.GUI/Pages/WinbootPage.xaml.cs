@@ -927,7 +927,8 @@ namespace KitLugia.GUI.Pages
 
                 UpdateStatus("Detectando idioma da ISO...");
                 string detectedLanguage = WinbootManager.DetectIsoLanguage(selectedIsoPath, winbootDrive);
-                WinbootManager.Log($"Idioma detectado: {detectedLanguage}");
+                string detectedTimeZone = WinbootManager.GetTimeZoneFromLanguage(detectedLanguage);
+                WinbootManager.Log($"Idioma detectado: {detectedLanguage} → Fuso: {detectedTimeZone}");
                 
                 // 3.5 Aplicar Customizações (Rufus-style + Automação)
                 if (!isMultiIso)
@@ -950,6 +951,7 @@ namespace KitLugia.GUI.Pages
                         safeMode,
                         downloadConfirmationCallback: (message) => Task.FromResult(ChkDownloadDotnet.IsChecked ?? true),
                         detectedLanguage: detectedLanguage,
+                        timeZone: detectedTimeZone,
                         disableDefender: disableDefender,
                         autoLogon: autoLogon,
                         remoteDesktop: remoteDesktop,

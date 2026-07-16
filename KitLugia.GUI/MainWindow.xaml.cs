@@ -152,6 +152,7 @@ namespace KitLugia.GUI
         Shrink,
         ContextMenu,
         ContextMenuPreview,
+        ForceStopUnlock,
     }
 
     public partial class MainWindow : Window, INotifyPropertyChanged
@@ -526,7 +527,8 @@ namespace KitLugia.GUI
             if (_uiDeferredInit) return;
             _uiDeferredInit = true;
 
-            SearchEngine.Initialize();
+            // Defer search engine init to Background so the splash screen renders first
+            Dispatcher.BeginInvoke(new Action(() => SearchEngine.Initialize()), DispatcherPriority.Background);
 
             _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
             _searchDebounceTimer.Tick += SearchDebounce_Tick;
@@ -903,6 +905,7 @@ namespace KitLugia.GUI
                 DiagnosticPage => PageType.Diagnostic,
                 ContextMenuPage => PageType.ContextMenu,
                 ContextMenuPreviewPage => PageType.ContextMenuPreview,
+                ForceStopUnlockPage => PageType.ForceStopUnlock,
                 _ => null
             };
         }
@@ -927,6 +930,7 @@ namespace KitLugia.GUI
                 PageType.Diagnostic => new DiagnosticPage(),
                 PageType.ContextMenu => new ContextMenuPage(),
                 PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
+                PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 _ => new DashboardPage()
             };
         }
@@ -1179,6 +1183,7 @@ namespace KitLugia.GUI
                 PageType.Shrink => new ShrinkPage(),
                 PageType.ContextMenu => new ContextMenuPage(),
                 PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
+                PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 _ => null
             };
 

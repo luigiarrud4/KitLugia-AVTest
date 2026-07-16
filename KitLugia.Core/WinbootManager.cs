@@ -176,25 +176,74 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Mapeia código de idioma para InputLocale (keyboard layout)
+        /// Mapeia código de idioma para InputLocale no formato "LCID:KeyboardLayout"
+        /// Fonte: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-input-locales-for-windows-language-packs
         /// </summary>
-        private static string GetInputLocaleFromLanguage(string language)
+        public static string GetInputLocaleFromLanguage(string language)
         {
             return language.ToUpper() switch
             {
-                "PT-BR" => "0416", // Português (Brasil)
-                "EN-US" => "0409", // Inglês (EUA)
-                "ES-ES" => "040A", // Espanhol (Espanha)
-                "FR-FR" => "040C", // Francês (França)
-                "DE-DE" => "0407", // Alemão (Alemanha)
-                "IT-IT" => "0410", // Italiano (Itália)
-                "JA-JP" => "0411", // Japonês
-                "KO-KR" => "0412", // Coreano
-                "ZH-CN" => "0804", // Chinês (Simplificado)
-                "ZH-TW" => "0404", // Chinês (Tradicional)
-                "RU-RU" => "0419", // Russo
-                "AR-SA" => "0401", // Árabe (Arábia Saudita)
-                _ => "0416" // Fallback para pt-BR
+                "PT-BR" => "0416:00000416", // Português (Brasil ABNT)
+                "EN-US" => "0409:00000409", // Inglês (EUA)
+                "ES-ES" => "040A:0000040A", // Espanhol (Espanha)
+                "FR-FR" => "040C:0000040C", // Francês (França)
+                "DE-DE" => "0407:00000407", // Alemão (Alemanha)
+                "IT-IT" => "0410:00000410", // Italiano (Itália)
+                "JA-JP" => "0411:00000411", // Japonês
+                "KO-KR" => "0412:00000412", // Coreano
+                "ZH-CN" => "0804:00000804", // Chinês (Simplificado)
+                "ZH-TW" => "0404:00000404", // Chinês (Tradicional)
+                "RU-RU" => "0419:00000419", // Russo
+                "AR-SA" => "0401:00000401", // Árabe (Arábia Saudita)
+                _ => "0416:00000416" // Fallback para pt-BR
+            };
+        }
+
+        /// <summary>
+        /// Mapeia código de idioma para GeoID (região geográfica)
+        /// Fonte oficial: https://learn.microsoft.com/en-us/windows/win32/intl/table-of-geographical-locations
+        /// </summary>
+        public static int GetGeoIdFromLanguage(string language)
+        {
+            return language.ToUpper() switch
+            {
+                "PT-BR" => 32,    // Brasil (0x20)
+                "EN-US" => 244,   // Estados Unidos (0xf4)
+                "ES-ES" => 217,   // Espanha (0xd9)
+                "FR-FR" => 84,    // França (0x54)
+                "DE-DE" => 94,    // Alemanha (0x5e)
+                "IT-IT" => 118,   // Itália (0x76)
+                "JA-JP" => 122,   // Japão (0x7a)
+                "KO-KR" => 134,   // Coreia (0x86)
+                "ZH-CN" => 45,    // China (0x2d)
+                "ZH-TW" => 237,   // Taiwan (0xed)
+                "RU-RU" => 203,   // Rússia (0xcb)
+                "AR-SA" => 205,   // Arábia Saudita (0xcd)
+                _ => 32           // Fallback para Brasil
+            };
+        }
+
+        /// <summary>
+        /// Mapeia código de idioma para fuso horário Windows
+        /// Use 'tzutil /l' para listar todos os fusos válidos
+        /// </summary>
+        public static string GetTimeZoneFromLanguage(string language)
+        {
+            return language.ToUpper() switch
+            {
+                "PT-BR" => "E. South America Standard Time",  // Brasil (BRT)
+                "EN-US" => "Eastern Standard Time",           // EUA (EST)
+                "ES-ES" => "Romance Standard Time",           // Espanha (CET)
+                "FR-FR" => "Romance Standard Time",           // França (CET)
+                "DE-DE" => "W. Europe Standard Time",         // Alemanha (CET)
+                "IT-IT" => "W. Europe Standard Time",         // Itália (CET)
+                "JA-JP" => "Tokyo Standard Time",             // Japão (JST)
+                "KO-KR" => "Korea Standard Time",             // Coreia (KST)
+                "ZH-CN" => "China Standard Time",             // China (CST)
+                "ZH-TW" => "Taipei Standard Time",            // Taiwan (TST)
+                "RU-RU" => "Russian Standard Time",           // Rússia (MSK)
+                "AR-SA" => "Arab Standard Time",              // Arábia Saudita (AST)
+                _ => "E. South America Standard Time"         // Fallback para Brasil
             };
         }
 
@@ -216,6 +265,8 @@ namespace KitLugia.Core
 
                     // Configurações de idioma e região
                     Language = language,
+                    InputLocale = GetInputLocaleFromLanguage(language),
+                    GeoID = GetGeoIdFromLanguage(language),
                     TimeZone = timeZone,
                     ProcessorArchitecture = "amd64"
                 };
@@ -1398,7 +1449,7 @@ namespace KitLugia.Core
             }
         }
 
-        public static async Task<bool> ApplyCustomizations(string winbootDrive, bool bypassRequirements, bool localAccount, bool disablePrivacy, bool injectKit, bool autoCleanup, string? customXmlPath, string? userName, string? password, bool fullAuto, uint targetDisk, uint targetPartition, string? injectedFilesPath = null, bool safeMode = false, Func<string, Task<bool>>? downloadConfirmationCallback = null, string detectedLanguage = "pt-BR",
+        public static async Task<bool> ApplyCustomizations(string winbootDrive, bool bypassRequirements, bool localAccount, bool disablePrivacy, bool injectKit, bool autoCleanup, string? customXmlPath, string? userName, string? password, bool fullAuto, uint targetDisk, uint targetPartition, string? injectedFilesPath = null, bool safeMode = false, Func<string, Task<bool>>? downloadConfirmationCallback = null, string detectedLanguage = "pt-BR", string timeZone = "E. South America Standard Time",
             bool disableDefender = false, bool autoLogon = true, bool remoteDesktop = false, bool showAllEditions = false, bool disableBitlocker = true, bool disableHibernate = false, bool disableCopilot = true, bool removeEdge = false, bool removeCortana = true, bool removeOneDrive = false, bool disableSpotlight = true, bool disableNews = true, bool disableChat = true,
             bool disableAutoUpdate = false, bool disableDeliveryOpt = true, bool delayUpdates = false, bool longPaths = true, bool disableLocation = true, bool disableActivity = true, bool disableAdID = true, bool disableErrorReporting = true, bool disableInkWorkspace = false,
             bool disableSmartScreen = false, bool disableDefenderSandbox = false, bool disableUAC = false, bool hideEula = true, bool hideOEM = true, bool hideWireless = true, bool hideOnlineAccount = true, bool protectYourPC = true, string computerName = "",
@@ -1464,7 +1515,7 @@ namespace KitLugia.Core
                             password: password, 
                             fullAuto: fullAuto, 
                             language: detectedLanguage, 
-                            timeZone: "E. South America Standard Time",
+                            timeZone: timeZone,
                             disableDefender: disableDefender,
                             autoLogon: autoLogon,
                             remoteDesktop: remoteDesktop,
@@ -1798,6 +1849,47 @@ namespace KitLugia.Core
                         // Script de auxílio para execução manual se precisarem shif+f10
                         string manualBypass = "@echo off\r\nregedit /s X:\\bypass.reg\r\nexit";
                         File.WriteAllText(Path.Combine(winbootDrive, "fix_tpm.bat"), manualBypass);
+
+                        // --- BypassNRO.cmd (Win11 25H2 build 26200.8737+ / Jul 2026) ---
+                        // A Microsoft removeu o BypassNRO.cmd ORIGINAL do OS a partir do build 26200.5516 (Mar 2025).
+                        // Porém, em releases STABLE 25H2 (build 26200.x, incluindo 26200.8737), este arquivo
+                        // AINDA é detectado se estiver presente. Recriamos ele em C:\Windows\System32\ para que
+                        // o comando "oobe\bypassnro" (Shift+F10) funcione — o cmd.exe está em \System32\oobe\
+                        // e resolve "..\bypassnro" = C:\Windows\System32\bypassnro.cmd.
+                        //
+                        // NOTA: Em 25H2, o método MAIS CONFIÁVEL é "start ms-cxh:localonly" (não requer reboot).
+                        // Este comando abre diretamente o diálogo de criação de conta local. Criamos também
+                        // o script OobeLocalOnly.cmd para esta alternativa.
+                        string oemSystem32 = Path.Combine(winbootDrive, "sources", "$OEM$", "$$", "System32");
+                        Directory.CreateDirectory(oemSystem32);
+                        File.WriteAllText(Path.Combine(oemSystem32, "BypassNRO.cmd"),
+                            "@echo off\r\n" +
+                            "reg add HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE /v BypassNRO /t REG_DWORD /d 1 /f\r\n" +
+                            "shutdown /r /t 0\r\n", Encoding.UTF8);
+                        Logger.Log("✅ BypassNRO.cmd recriado em $OEM$\\$$\\System32\\ para Win11 25H2+");
+
+                        // --- OobeLocalOnly.cmd (Win11 25H2+): Método ms-cxh:localonly ---
+                        // A partir do 25H2, o método preferido é "start ms-cxh:localonly" que abre o diálogo
+                        // de criação de conta local sem necessidade de reboot. Funciona em builds 26120+.
+                        // NOTA: Só foi removido no Insider build 26220.6772+ (Out 2025). No stable 26200.x funciona.
+                        File.WriteAllText(Path.Combine(oemSystem32, "OobeLocalOnly.cmd"),
+                            "@echo off\r\n" +
+                            "echo ============================================================\r\n" +
+                            "echo  Metodo alternativo para pular conta Microsoft no OOBE\r\n" +
+                            "echo ============================================================\r\n" +
+                            "echo.\r\n" +
+                            "echo  Opcao 1 - Criar conta local diretamente (recomendado):\r\n" +
+                            "start ms-cxh:localonly\r\n" +
+                            "echo.\r\n" +
+                            "echo  Se a opcao 1 nao funcionar, execute manualmente:\r\n" +
+                            "echo    reg add HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE /v BypassNRO /t REG_DWORD /d 1 /f\r\n" +
+                            "echo    shutdown /r /t 0\r\n" +
+                            "echo.\r\n" +
+                            "echo  Metodo enterprise (suportado oficialmente):\r\n" +
+                            "echo    Use unattend.xml com HideOnlineAccountScreens=true\r\n" +
+                            "echo ============================================================\r\n" +
+                            "pause\r\n", Encoding.UTF8);
+                        Logger.Log("✅ OobeLocalOnly.cmd criado em $OEM$\\$$\\System32\\ para Win11 25H2+");
                     }
 
                     // 4. Atalho de Restauração na Área de Trabalho (via $OEM$)

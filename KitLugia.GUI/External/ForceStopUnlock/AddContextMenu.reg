@@ -1,0 +1,30 @@
+Windows Registry Editor Version 5.00
+
+; Adiciona opção "Force Stop Unlock" ao menu de contexto para todos os arquivos
+; Esta opção permite liberar arquivos bloqueados por processos
+
+[HKEY_CLASSES_ROOT\*\shell\ForceStopUnlock]
+@="Force Stop Unlock"
+"Icon"="%SystemRoot%\\System32\\shell32.dll,276"
+"Position"="Middle"
+
+[HKEY_CLASSES_ROOT\*\shell\ForceStopUnlock\command]
+@="powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\\ForceStopUnlock\\Unlock-File.ps1\" \"%1\""
+
+; Adiciona opção "Force Stop Unlock" ao menu de contexto para pastas
+[HKEY_CLASSES_ROOT\Directory\shell\ForceStopUnlock]
+@="Force Stop Unlock"
+"Icon"="%SystemRoot%\\System32\\shell32.dll,276"
+"Position"="Middle"
+
+[HKEY_CLASSES_ROOT\Directory\shell\ForceStopUnlock\command]
+@="powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\\ForceStopUnlock\\Unlock-File.ps1\" \"%1\""
+
+; Adiciona opção "Force Stop Unlock" ao menu de contexto para drives
+[HKEY_CLASSES_ROOT\Drive\shell\ForceStopUnlock]
+@="Force Stop Unlock"
+"Icon"="%SystemRoot%\\System32\\shell32.dll,276"
+"Position"="Middle"
+
+[HKEY_CLASSES_ROOT\Drive\shell\ForceStopUnlock\command]
+@="powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\\ForceStopUnlock\\Unlock-File.ps1\" \"%1\"

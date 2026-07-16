@@ -184,14 +184,48 @@
             </Border>
         </StackPanel>
 
-        <!-- Overlay de atualização -->
+        <!-- Overlay de atualização com progresso real -->
         <Grid x:Name="OverlayBusy" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="⏳" FontSize="48" HorizontalAlignment="Center"/>
-                <TextBlock x:Name="TxtProgressStatus" Text="Baixando atualização..." FontSize="16" Foreground="White" Margin="0,10,0,0"/>
-                <ProgressBar Width="300" Height="6" Margin="0,10,0,0" IsIndeterminate="True"
-                             Foreground="{StaticResource AccentColor}" Background="#333"/>
-            </StackPanel>
+            <Border Background="#1A1A1A" CornerRadius="12" Padding="30" Width="420"
+                    BorderBrush="#FFD700" BorderThickness="1"
+                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="📥 Baixando Atualização" FontSize="18" FontWeight="Bold"
+                               Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+                    <!-- Barra de Progresso -->
+                    <Border Background="#333333" CornerRadius="6" Height="22" Margin="0,0,0,5">
+                        <Grid>
+                            <Border x:Name="ProgressFill" Background="#FFD700" CornerRadius="6"
+                                    HorizontalAlignment="Left" Width="0"/>
+                            <TextBlock x:Name="TxtProgressPercent" Text="0%"
+                                       FontSize="11" FontWeight="Bold" Foreground="#FFFFFF"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Status do download -->
+                    <TextBlock x:Name="TxtProgressStatus" Text="Iniciando download..."
+                               FontSize="13" Foreground="#E0E0E0" Margin="0,5,0,0"/>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" HorizontalAlignment="Left">
+                            <TextBlock Text="Velocidade" FontSize="10" Foreground="#888888"/>
+                            <TextBlock x:Name="TxtProgressSpeed" Text="-- MB/s"
+                                       FontSize="14" FontWeight="SemiBold" Foreground="#43A047"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                            <TextBlock Text="Transferido" FontSize="10" Foreground="#888888"/>
+                            <TextBlock x:Name="TxtProgressSize" Text="-- / --"
+                                       FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </Page>

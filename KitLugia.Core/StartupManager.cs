@@ -61,7 +61,28 @@ namespace KitLugia.Core
         private static StartupAppDetails? FindAppByName(string appName)
         {
             var all = GetCachedApps();
-            return all.FirstOrDefault(a => a.Name.Equals(appName, StringComparison.OrdinalIgnoreCase));
+
+            // Remove sufixo [Desabilitado] para busca
+            string cleanName = appName.Replace(" [Desabilitado]", "").Trim();
+
+            var exact = all.FirstOrDefault(a => a.Name.Equals(appName, StringComparison.OrdinalIgnoreCase)
+                                             || a.Name.Equals(cleanName, StringComparison.OrdinalIgnoreCase));
+            if (exact != null) return exact;
+
+            // Fallback: busca por nome de arquivo (sem extensão) no comando
+            var byFile = all.FirstOrDefault(a =>
+            {
+                if (string.IsNullOrEmpty(a.FullCommand)) return false;
+                string fileName = Path.GetFileNameWithoutExtension(a.FullCommand.Trim('"'));
+                return fileName.Equals(cleanName, StringComparison.OrdinalIgnoreCase)
+                    || fileName.Equals(appName, StringComparison.OrdinalIgnoreCase);
+            });
+            if (byFile != null) return byFile;
+
+            // Fallback: busca parcial
+            return all.FirstOrDefault(a =>
+                a.Name.IndexOf(appName, StringComparison.OrdinalIgnoreCase) >= 0
+                || a.Name.IndexOf(cleanName, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         #region Leitura e Análise
@@ -101,8 +122,20 @@ namespace KitLugia.Core
                         string key = MakeKey(name, exePath);
                         if (apps.ContainsKey(key)) continue;
 
-                        var value = approvedKey?.GetValue(Path.GetFileName(file)) as byte[];
-                        bool isEnabled = value == null || value.Length < 1 || value[0] == 2 || value[0] == 0;
+                        // Tenta ler o status do StartupApproved com .lnk e .ink
+                        string fileName = Path.GetFileName(file);
+                        byte[]? value = approvedKey?.GetValue(fileName) as byte[];
+                        if (value == null && fileName.EndsWith(".ink", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string lnkVariant = Path.ChangeExtension(fileName, ".lnk");
+                            value = approvedKey?.GetValue(lnkVariant) as byte[];
+                        }
+                        if (value == null && fileName.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string inkVariant = Path.ChangeExtension(fileName, ".ink");
+                            value = approvedKey?.GetValue(inkVariant) as byte[];
+                        }
+                        bool isEnabled = value == null || value.Length < 1 || (value[0] % 2 == 0);
 
                         var status = (exePath != null && elevatedTaskPaths.Contains(exePath)) ? StartupStatus.Elevated : (isEnabled ? StartupStatus.Enabled : StartupStatus.Disabled);
 
@@ -145,7 +178,35 @@ namespace KitLugia.Core
 
             processFolder(Environment.GetFolderPath(Environment.SpecialFolder.Startup), false);
             processFolder(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), true);
-            string[] regPaths = { @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce" };
+
+            // --- 1-B. PASTA AutorunsDisabled (itens desabilitados que foram movidos) ---
+            try
+            {
+                string disabledFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), "AutorunsDisabled");
+                if (Directory.Exists(disabledFolder))
+                {
+                    foreach (var file in Directory.GetFiles(disabledFolder))
+                    {
+                        try
+                        {
+                            string name = Path.GetFileNameWithoutExtension(file);
+                            string commandLine = GetCommandLineFromShortcut(file);
+                            ExtractCommandParts(commandLine, out string? exePath, out _);
+                            string key = MakeKey(name, exePath ?? commandLine);
+                            if (apps.ContainsKey(key)) continue;
+                            apps.Add(key, new StartupAppDetails($"{name} [Desabilitado]", commandLine, disabledFolder, StartupStatus.Disabled));
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+            string[] regPaths = {
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce",
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunServices",
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunServicesOnce"
+            };
             string[] policyPaths = { @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run" };
             processRegistryKeys(Registry.CurrentUser, "HKCU", regPaths);
             processRegistryKeys(Registry.CurrentUser, "HKCU", policyPaths);
@@ -155,9 +216,35 @@ namespace KitLugia.Core
             {
                 string[] wow64Paths = {
                     @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run",
-                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce"
+                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce",
+                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunServices",
+                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunServicesOnce"
                 };
                 processRegistryKeys(Registry.LocalMachine, @"HKLM\WOW6432Node", wow64Paths);
+                // Winlogon Userinit (HKLM) - contém lista de executáveis separados por vírgula
+                try
+                {
+                    using var userinitKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon");
+                    if (userinitKey != null)
+                    {
+                        string userinit = userinitKey.GetValue("Userinit") as string ?? "";
+                        if (!string.IsNullOrEmpty(userinit))
+                        {
+                            var parts = userinit.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var part in parts)
+                            {
+                                if (!part.Contains("userinit.exe", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    ExtractCommandParts(part, out string? upExePath, out _);
+                                    string upKey = MakeKey($"Userinit: {Path.GetFileName(part)}", upExePath ?? part);
+                                    if (!apps.ContainsKey(upKey))
+                                        apps.Add(upKey, new StartupAppDetails($"Userinit: {Path.GetFileName(part)}", part, @"HKLM\SOFTWARE\...\Winlogon\Userinit", StartupStatus.Enabled));
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
             }
 
             // --- 3. PROCESSAR TAREFAS DO AGENDADOR (KITLUGIA) ---
@@ -245,7 +332,60 @@ namespace KitLugia.Core
             }
             catch { }
 
-            // --- 4. TAREFAS EXTERNAS DO AGENDADOR (não-KitLUGIA) ---
+            // --- 4. WMI Win32_StartupCommand (captura apps de todas as origens, SEMPRE) ---
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(@"root\cimv2",
+                    "SELECT Name, Command, Location, User FROM Win32_StartupCommand");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    try
+                    {
+                        string? name = obj["Name"]?.ToString();
+                        string? command = obj["Command"]?.ToString();
+                        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(command)) continue;
+
+                        // Resolve .lnk/.ink shortcuts to full path
+                        string ext = Path.GetExtension(command);
+                        if ((ext.Equals(".lnk", StringComparison.OrdinalIgnoreCase) || ext.Equals(".ink", StringComparison.OrdinalIgnoreCase)) && !command.Contains("\\"))
+                        {
+                            string sf = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), command);
+                            if (File.Exists(sf)) command = GetCommandLineFromShortcut(sf);
+                        }
+
+                        string? location = obj["Location"]?.ToString();
+                        ExtractCommandParts(command, out string? exePath, out _);
+                        if (!string.IsNullOrEmpty(exePath) && exePath.Contains("system32", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        string key = MakeKey(name, exePath ?? command);
+                        if (!apps.ContainsKey(key))
+                            apps[key] = new StartupAppDetails(name, command, $"Startup: {location ?? "WMI"}", StartupStatus.Enabled);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            // --- 5. HKCU\...\Windows\Load e Windows\Run (apps antigos) ---
+            try
+            {
+                using var winKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows");
+                if (winKey != null)
+                {
+                    foreach (var valName in new[] { "Load", "Run" })
+                    {
+                        string cmd = winKey.GetValue(valName) as string ?? "";
+                        if (string.IsNullOrWhiteSpace(cmd)) continue;
+                        ExtractCommandParts(cmd, out string? exePath, out _);
+                        string k = MakeKey(Path.GetFileNameWithoutExtension(cmd), exePath ?? cmd);
+                        if (!apps.ContainsKey(k))
+                            apps[k] = new StartupAppDetails(Path.GetFileName(cmd), cmd, $"HKCU\\Windows\\{valName}", StartupStatus.Enabled);
+                    }
+                }
+            }
+            catch { }
+
+            // --- 6. TAREFAS EXTERNAS DO AGENDADOR (não-KitLUGIA) ---
             if (!fast)
             {
                 try
@@ -256,14 +396,12 @@ namespace KitLugia.Core
                         ExtractCommandParts(task.FullCommand, out string? exePath, out _);
                         string key = MakeKey(task.Name, exePath ?? task.FullCommand);
                         if (!apps.ContainsKey(key))
-                        {
                             apps[key] = task;
-                        }
                     }
                 }
                 catch { }
 
-                // --- 5. UWP / Modern Store Apps ---
+                // --- 7. UWP / Modern Store Apps (apenas Task Scheduler) ---
                 try
                 {
                     var uwpApps = GetUWPStartupApps();
@@ -272,12 +410,21 @@ namespace KitLugia.Core
                         ExtractCommandParts(app.FullCommand, out string? exePath, out _);
                         string key = MakeKey(app.Name, exePath ?? app.FullCommand);
                         if (!apps.ContainsKey(key))
-                        {
                             apps[key] = app;
-                        }
                     }
                 }
                 catch { }
+            }
+
+            // Remove WMI duplicates that have incomplete/broken paths
+            var wmiDuplicates = apps.Values
+                .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+                .SelectMany(g => g.Skip(1).Where(a => a.Location.StartsWith("Startup:") && (a.ExePath == null || a.ExePath == a.Name || a.ExePath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) || !a.ExePath.Contains("\\"))))
+                .ToList();
+            foreach (var dup in wmiDuplicates)
+            {
+                string dupKey = MakeKey(dup.Name, dup.FullCommand);
+                apps.Remove(dupKey);
             }
 
             // --- 6. RUNONCEEX (executado uma vez ao logon, depois removido) ---
@@ -351,6 +498,8 @@ namespace KitLugia.Core
 
         public static (bool Success, string Message) SetStartupItemState(string appName, bool enable, bool silentMode = false)
         {
+            // Limpa sufixo [Desabilitado] do nome
+            appName = appName.Replace(" [Desabilitado]", "").Trim();
             var startupApp = FindAppByName(appName);
             if (startupApp == null) return (false, "App não encontrado.");
 
@@ -361,12 +510,10 @@ namespace KitLugia.Core
                 {
                     using (var ts = new TaskService())
                     {
-                        // KitLugia tasks: by name prefix match
                         var task = ts.RootFolder.Tasks
                             .FirstOrDefault(t => t.Name.Contains(appName) && t.Name.StartsWith("KitLUGIA_"));
                         if (task == null)
                         {
-                            // External task: recursive search by exact task name
                             Microsoft.Win32.TaskScheduler.Task? FindTask(TaskFolder folder)
                             {
                                 var found = folder.Tasks.FirstOrDefault(t =>
@@ -406,194 +553,415 @@ namespace KitLugia.Core
                 }
             }
 
-            // CASO 2: Registro ou Pasta de Inicialização real
-            // Ignora labels WMI "Startup: ..." que não são caminhos de pasta reais
-            bool isStartupFolderPath = startupApp.Location.Contains("\\Startup") || startupApp.Location.Contains("\\Start Menu");
-            bool isRegistryPath = startupApp.Location.StartsWith("HKCU") || startupApp.Location.StartsWith("HKLM");
-            bool isWmiLabel = startupApp.Location.StartsWith("Startup:") && !isStartupFolderPath && !isRegistryPath;
+            // CASO 2: Registro ou Pasta de Inicialização
+            // Corrigido: detecta pastas de startup mesmo de labels WMI
+            string loc = startupApp.Location ?? "";
+            string? resolvedFolderPath = null;
+            string? resolvedRegHive = null;
+            string? resolvedRegPath = null;
+            string? resolvedValueName = null;
 
-            if ((isRegistryPath || isStartupFolderPath) && !isWmiLabel)
+            // Detecta pasta de inicialização (exclui AutorunsDisabled)
+            if ((loc.Contains("\\Startup") || loc.Contains("\\Start Menu")) && !loc.Contains("AutorunsDisabled"))
+                resolvedFolderPath = loc;
+            else if (loc.StartsWith("Startup: Startup", StringComparison.OrdinalIgnoreCase) || loc.Equals("Startup", StringComparison.OrdinalIgnoreCase))
+                resolvedFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+
+            // Detecta registro
+            if (loc.StartsWith("HKCU") || loc.StartsWith("HKLM"))
+            {
+                resolvedRegHive = loc.StartsWith("HKLM") ? "HKLM" : "HKCU";
+                int slashIdx = loc.IndexOf('\\');
+                if (slashIdx > 0)
+                    resolvedRegPath = loc.Substring(slashIdx + 1);
+                resolvedValueName = appName;
+            }
+
+            // Detecta WMI que na verdade referencia pasta de startup
+            if (loc.StartsWith("Startup:") && resolvedFolderPath == null)
+            {
+                string wmiLocation = loc.Replace("Startup:", "").Trim();
+                if (wmiLocation.Equals("Startup", StringComparison.OrdinalIgnoreCase))
+                    resolvedFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                else if (wmiLocation.StartsWith("HKU", StringComparison.OrdinalIgnoreCase) || wmiLocation.StartsWith("HKLM", StringComparison.OrdinalIgnoreCase))
+                {
+                    var allApps = GetStartupAppsWithDetails(true);
+                    var realEntry = allApps.FirstOrDefault(a =>
+                        a.Name.Equals(appName, StringComparison.OrdinalIgnoreCase) &&
+                        !a.Location.StartsWith("Startup:"));
+                    if (realEntry != null)
+                    {
+                        loc = realEntry.Location;
+                        if (loc.Contains("\\Startup"))
+                            resolvedFolderPath = loc;
+                        else if (loc.StartsWith("HK"))
+                        {
+                            resolvedRegHive = loc.StartsWith("HKLM") ? "HKLM" : "HKCU";
+                            int slashIdx = loc.IndexOf('\\');
+                            if (slashIdx > 0) resolvedRegPath = loc.Substring(slashIdx + 1);
+                            resolvedValueName = appName;
+                        }
+                    }
+                }
+            }
+
+            // --- EXECUTA A AÇÃO COM SUPORTE A MÚLTIPLOS MECANISMOS ---
+            bool anyActionTaken = false;
+            List<string> actionsTaken = new();
+
+            // --- AÇÃO ESPECIAL: RESTAURAR DE AutorunsDisabled ---
+            if (enable && loc.Contains("AutorunsDisabled"))
             {
                 try
                 {
-                    string regPath;
-                    RegistryKey baseKey;
-                    string valueNameToChange = appName;
+                    string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                    string disabledFolder = Path.Combine(startupFolder, "AutorunsDisabled");
+                    if (Directory.Exists(disabledFolder))
+                    {
+                        foreach (var file in Directory.GetFiles(disabledFolder, appName + ".*"))
+                        {
+                            string dest = Path.Combine(startupFolder, Path.GetFileName(file));
+                            if (!File.Exists(dest)) File.Move(file, dest);
+                            else File.Delete(file);
+                            anyActionTaken = true;
+                            actionsTaken.Add($"Restaurado de AutorunsDisabled: {Path.GetFileName(file)}");
+                        }
+                        foreach (var file in Directory.GetFiles(disabledFolder))
+                        {
+                            if (Path.GetFileNameWithoutExtension(file).Equals(appName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                string dest = Path.Combine(startupFolder, Path.GetFileName(file));
+                                if (!File.Exists(dest)) File.Move(file, dest);
+                                else File.Delete(file);
+                                anyActionTaken = true;
+                                actionsTaken.Add($"Restaurado de AutorunsDisabled: {Path.GetFileName(file)}");
+                            }
+                        }
+                    }
+                    // Atualiza localização para a pasta de startup correta
+                    resolvedFolderPath = startupFolder;
+                }
+                catch { }
+            }
 
-                    if (startupApp.Location.StartsWith("HKCU"))
-                    {
-                        baseKey = Registry.CurrentUser;
-                        regPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
-                    }
-                    else if (startupApp.Location.StartsWith("HKLM"))
-                    {
-                        baseKey = Registry.LocalMachine;
-                        regPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
-                    }
-                    else
-                    {
-                        baseKey = Registry.CurrentUser;
-                        regPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder";
-                        valueNameToChange = appName + ".lnk";
-                    }
-
+            // Ação A: Desabilitar via StartupApproved (RUN)
+            if (resolvedRegHive != null)
+            {
+                try
+                {
+                    RegistryKey baseKey = resolvedRegHive == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser;
+                    string approvedRegPath = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
                     byte[] valueToSet = enable ? new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } : new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-                    using (var key = baseKey.OpenSubKey(regPath, true) ?? baseKey.CreateSubKey(regPath))
+                    using (var key = baseKey.OpenSubKey(approvedRegPath, true) ?? baseKey.CreateSubKey(approvedRegPath))
                     {
-                        if (key.GetValue(valueNameToChange) != null)
+                        if (key.GetValue(resolvedValueName) != null)
                         {
-                            key.SetValue(valueNameToChange, valueToSet, RegistryValueKind.Binary);
+                            key.SetValue(resolvedValueName, valueToSet, RegistryValueKind.Binary);
+                            actionsTaken.Add($"StartupApproved[{resolvedValueName}]");
                         }
                         else
                         {
                             string fallbackName = GetFileNameFromCommandLine(startupApp.FullCommand);
                             key.SetValue(fallbackName, valueToSet, RegistryValueKind.Binary);
+                            actionsTaken.Add($"StartupApproved[{fallbackName}]");
+                            // Also try appName.lnk variant
+                            if (!fallbackName.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+                            {
+                                try { key.SetValue(appName + ".lnk", valueToSet, RegistryValueKind.Binary); } catch { }
+                            }
                         }
                     }
-                    InvalidateCache();
-                    return (true, silentMode ? "" : $"'{appName}' {(enable ? "Habilitado" : "Desabilitado")}.");
+
+                    // Also write to HKLM variant (in case the app has both)
+                    if (resolvedRegHive == "HKCU")
+                    {
+                        try
+                        {
+                            using var lmKey = Registry.LocalMachine.OpenSubKey(approvedRegPath, true);
+                            if (lmKey != null && lmKey.GetValue(resolvedValueName) != null)
+                            {
+                                lmKey.SetValue(resolvedValueName, valueToSet, RegistryValueKind.Binary);
+                            }
+                        }
+                        catch { }
+                    }
+
+                    anyActionTaken = true;
+                }
+                catch { }
+            }
+
+            // Ação B: Desabilitar via StartupApproved (StartupFolder)
+            if (resolvedFolderPath != null)
+            {
+                try
+                {
+                    string approvedRegPath = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder";
+                    byte[] valueToSet = enable ? new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } : new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+                    // Search for the correct entry name in StartupApproved
+                    using (var approvedKey = Registry.CurrentUser.OpenSubKey(approvedRegPath, true) ?? Registry.CurrentUser.CreateSubKey(approvedRegPath))
+                    {
+                        bool found = false;
+                        string fc = startupApp.FullCommand ?? "";
+                        string[] lnkNames = {
+                            appName + ".lnk",
+                            appName + ".ink",
+                            Path.GetFileName(fc.Trim('"')),
+                            GetFileNameFromCommandLine(fc)
+                        };
+
+                        foreach (var lnkName in lnkNames)
+                        {
+                            if (!string.IsNullOrEmpty(lnkName) && approvedKey.GetValue(lnkName) != null)
+                            {
+                                approvedKey.SetValue(lnkName, valueToSet, RegistryValueKind.Binary);
+                                actionsTaken.Add($"StartupApproved\\StartupFolder[{lnkName}]");
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (!found)
+                        {
+                            // Create the entry anyway with the .lnk extension
+                            approvedKey.SetValue(appName + ".lnk", valueToSet, RegistryValueKind.Binary);
+                            actionsTaken.Add($"StartupApproved\\StartupFolder[{appName}.lnk] (created)");
+                        }
+                    }
+
+                    // If disabling, also move the .lnk to AutorunsDisabled as a safety measure
+                    if (!enable)
+                    {
+                        try
+                        {
+                            string startupFolder = resolvedFolderPath;
+                            if (!Directory.Exists(startupFolder)) startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+
+                            string disabledDir = Path.Combine(startupFolder, "AutorunsDisabled");
+                            if (!Directory.Exists(disabledDir)) Directory.CreateDirectory(disabledDir);
+
+                            foreach (var pattern in new[] { $"{appName}.lnk", $"{appName}.ink", $"{appName}.url" })
+                            {
+                                string srcPath = Path.Combine(startupFolder, pattern);
+                                if (File.Exists(srcPath))
+                                {
+                                    string destPath = Path.Combine(disabledDir, pattern);
+                                    if (!File.Exists(destPath)) File.Move(srcPath, destPath);
+                                    else File.Delete(srcPath);
+                                    actionsTaken.Add($"Move to AutorunsDisabled: {pattern}");
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    anyActionTaken = true;
                 }
                 catch (Exception ex)
                 {
-                    return (false, $"Erro: {ex.Message}");
+                    return (false, $"Erro na pasta de inicialização: {ex.Message}");
                 }
             }
 
-            // CASO 2-B: WMI StartupCommand (não possui controle via StartupApproved)
-            if (isWmiLabel)
+            // Ação C: Remover entrada do registro RUN diretamente (quando desabilitando)
+            if (!enable)
+            {
+                string[] runPaths = {
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce",
+                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run",
+                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce",
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run"
+                };
+
+                foreach (var runPath in runPaths)
+                {
+                    try
+                    {
+                        using var key = Registry.CurrentUser.OpenSubKey(runPath, true);
+                        if (key != null)
+                        {
+                            foreach (string valName in key.GetValueNames())
+                            {
+                                if (valName.Equals(appName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    key.DeleteValue(valName, false);
+                                    actionsTaken.Add($"Removido HKLM\\{runPath}\\{valName}");
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
+                    try
+                    {
+                        using var key = Registry.LocalMachine.OpenSubKey(runPath, true);
+                        if (key != null)
+                        {
+                            foreach (string valName in key.GetValueNames())
+                            {
+                                if (valName.Equals(appName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    key.DeleteValue(valName, false);
+                                    actionsTaken.Add($"Removido HKLM\\{runPath}\\{valName}");
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            // Ação D: Para WMI-only items sem localização resolvida (fallback para Task Scheduler)
+            if (!anyActionTaken)
             {
                 try
                 {
                     string cmdLine = startupApp.FullCommand ?? "";
                     ExtractCommandParts(cmdLine, out string? exePath, out string? exeArgs);
-                    if (string.IsNullOrEmpty(exePath)) return (false, "Não foi possível extrair o executável.");
-
-                    string taskName = $"KitLUGIA_Fallback_{SanitizeTaskName(appName)}";
-                    if (!enable)
+                    if (!string.IsNullOrEmpty(exePath))
                     {
-                        using (var ts = new TaskService())
+                        string taskName = $"KitLUGIA_Fallback_{SanitizeTaskName(appName)}";
+                        if (!enable)
                         {
-                            var existing = ts.RootFolder.Tasks.FirstOrDefault(t => t.Name == taskName);
-                            if (existing != null)
+                            using (var ts = new TaskService())
                             {
-                                ts.RootFolder.DeleteTask(taskName);
-                                InvalidateCache();
-                                return (true, silentMode ? "" : $"Tarefa fallback '{appName}' removida.");
+                                var existing = ts.RootFolder.Tasks.FirstOrDefault(t => t.Name == taskName);
+                                if (existing != null)
+                                {
+                                    ts.RootFolder.DeleteTask(taskName);
+                                    actionsTaken.Add("Tarefa fallback removida");
+                                }
                             }
-                        }
-                    }
-                    else
-                    {
-                        using (var ts = new TaskService())
-                        {
-                            var td = ts.NewTask();
-                            td.RegistrationInfo.Description = $"KitLugia fallback para {appName}";
-                            td.Principal.LogonType = TaskLogonType.InteractiveToken;
-                            td.Actions.Add(new ExecAction(exePath, exeArgs, null));
-                            td.Triggers.Add(new LogonTrigger());
-                            td.Settings.Enabled = true;
-                            td.Settings.StartWhenAvailable = true;
-                            td.Settings.AllowHardTerminate = true;
-                            ts.RootFolder.RegisterTaskDefinition(taskName, td,
-                                TaskCreation.CreateOrUpdate, null, null, TaskLogonType.InteractiveToken);
-                            InvalidateCache();
-                        }
-                    }
-                    return (true, silentMode ? "" : $"'{appName}' {(enable ? "Habilitado" : "Desabilitado")} via tarefa KitLugia.");
-                }
-                catch (Exception ex)
-                {
-                    return (false, $"Erro ao criar tarefa fallback: {ex.Message}");
-                }
-            }
-
-            // CASO 3: UWP / Store Apps (via AppModel SystemAppData ou Explorer\StartupTasks)
-            if (startupApp.Location.Contains("UWP"))
-            {
-                try
-                {
-                    string fullCmd = startupApp.FullCommand ?? "";
-                    string? aumid = null;
-                    string? pkgFamily = null;
-                    string? taskId = null;
-
-                    // Parse o identificador do comando
-                    var match = System.Text.RegularExpressions.Regex.Match(fullCmd, @"^StartupTask:\s+(.+)$");
-                    if (match.Success)
-                    {
-                        string id = match.Groups[1].Value;
-                        if (id.Contains("!"))
-                        {
-                            int idx = id.IndexOf('!');
-                            pkgFamily = id.Substring(0, idx);
-                            taskId = id.Substring(idx + 1);
-                            // Se pkgFamily também contiver !, é um AUMID completo
-                            aumid = id;
                         }
                         else
                         {
-                            aumid = id;
-                        }
-                    }
-
-                    // Tenta via AppModel SystemAppData (caminho primário)
-                    bool registryChanged = false;
-                    if (pkgFamily != null && taskId != null)
-                    {
-                        string appModelPath = $@"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData\{pkgFamily}\{taskId}";
-                        using (var taskKey = Registry.CurrentUser.OpenSubKey(appModelPath, true))
-                        {
-                            if (taskKey != null)
+                            using (var ts = new TaskService())
                             {
-                                int newState = enable ? 2 : 1; // 2=Enabled, 1=DisabledByUser
-                                taskKey.SetValue("State", newState, RegistryValueKind.DWord);
-                                registryChanged = true;
+                                var td = ts.NewTask();
+                                td.RegistrationInfo.Description = $"KitLugia fallback para {appName}";
+                                td.Principal.LogonType = TaskLogonType.InteractiveToken;
+                                td.Actions.Add(new ExecAction(exePath, exeArgs, null));
+                                td.Triggers.Add(new LogonTrigger());
+                                td.Settings.Enabled = true;
+                                td.Settings.StartWhenAvailable = true;
+                                td.Settings.AllowHardTerminate = true;
+                                ts.RootFolder.RegisterTaskDefinition(taskName, td,
+                                    TaskCreation.CreateOrUpdate, null, null, TaskLogonType.InteractiveToken);
+                                actionsTaken.Add("Tarefa fallback criada");
                             }
                         }
+                        anyActionTaken = true;
                     }
-
-                    // Fallback: tenta Explorer\StartupTasks (caminho secundário)
-                    if (!registryChanged && aumid != null)
-                    {
-                        string startupTaskPath = $@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupTasks\{aumid}";
-                        using (var taskKey = Registry.CurrentUser.OpenSubKey(startupTaskPath, true) ??
-                                               Registry.CurrentUser.CreateSubKey(startupTaskPath))
-                        {
-                            if (taskKey != null)
-                            {
-                                int newState = enable ? 1 : 0;
-                                taskKey.SetValue("State", newState, RegistryValueKind.DWord);
-                                registryChanged = true;
-                            }
-                        }
-                    }
-
-                    if (registryChanged)
-                    {
-                        InvalidateCache();
-                        return (true, silentMode ? "" : $"'{appName}' {(enable ? "Habilitado" : "Desabilitado")} via UWP.");
-                    }
-
-                    // Se o caminho do registro não existe, cria uma tarefa KitLugia como fallback
-                    string? appAumid = aumid ?? (pkgFamily != null && taskId != null ? $"{pkgFamily}!{taskId}" : null);
-                    if (appAumid == null)
-                        return (false, "Não foi possível identificar o identificador UWP.");
-
-                    // Cria tarefa no agendador para iniciar o app via shell:appsFolder
-                    return CreateUWPFallbackTask(appName, appAumid, enable, silentMode);
                 }
-                catch (Exception ex)
+                catch { }
+            }
+
+            // Ação E: Se mesmo assim não funcionou, varredura completa de backup
+            if (!anyActionTaken && !enable)
+            {
+                try
                 {
-                    return (false, $"Erro ao alterar app UWP: {ex.Message}");
+                    // Brute-force: scan all Run/RunOnce for any value containing this name
+                    BruteForceDisableStartup(appName);
+                    actionsTaken.Add("Varredura completa (brute-force)");
+                    anyActionTaken = true;
+                }
+                catch { }
+            }
+
+            if (!anyActionTaken)
+                return (false, "Não foi possível encontrar o mecanismo de inicialização deste app.");
+
+            InvalidateCache();
+            string actionsSummary = string.Join("; ", actionsTaken);
+            return (true, silentMode ? "" : $"'{appName}' {(enable ? "Habilitado" : "Desabilitado")}. [{actionsSummary}]");
+        }
+
+        private static void BruteForceDisableStartup(string appName)
+        {
+            string[] runPaths = {
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce",
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run"
+            };
+
+            // Scan registry Run keys for any value containing the app name
+            foreach (var baseHive in new[] { Registry.CurrentUser, Registry.LocalMachine })
+            {
+                foreach (var runPath in runPaths)
+                {
+                    try
+                    {
+                        using var key = baseHive.OpenSubKey(runPath, true);
+                        if (key == null) continue;
+                        foreach (string valName in key.GetValueNames())
+                        {
+                            if (valName.IndexOf(appName, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                key.DeleteValue(valName, false);
+                            }
+                        }
+                    }
+                    catch { }
                 }
             }
 
-            return (false, "Localização não suportada.");
+            // Scan Startup folder for any file matching the name
+            string[] startupFolders = {
+                Environment.GetFolderPath(Environment.SpecialFolder.Startup),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup)
+            };
+
+            foreach (var folder in startupFolders)
+            {
+                try
+                {
+                    if (!Directory.Exists(folder)) continue;
+                    foreach (var file in Directory.GetFiles(folder))
+                    {
+                        string fileName = Path.GetFileNameWithoutExtension(file);
+                        if (fileName.Equals(appName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string disabledDir = Path.Combine(folder, "AutorunsDisabled");
+                            if (!Directory.Exists(disabledDir)) Directory.CreateDirectory(disabledDir);
+                            string dest = Path.Combine(disabledDir, Path.GetFileName(file));
+                            if (!File.Exists(dest)) File.Move(file, dest);
+                            else File.Delete(file);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Write StartupApproved\Run as disabled
+            try
+            {
+                byte[] disabledValue = { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                using var runApproved = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", true)
+                    ?? Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run");
+                runApproved?.SetValue(appName, disabledValue, RegistryValueKind.Binary);
+            }
+            catch { }
+
+            // Write StartupApproved\StartupFolder as disabled
+            try
+            {
+                byte[] disabledValue = { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                using var folderApproved = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder", true)
+                    ?? Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder");
+                folderApproved?.SetValue(appName + ".lnk", disabledValue, RegistryValueKind.Binary);
+            }
+            catch { }
         }
 
         public static (bool Success, string Message) RemoveStartupItem(string appName)
         {
+            appName = appName.Replace(" [Desabilitado]", "").Trim();
             var startupApp = FindAppByName(appName);
             if (startupApp == null) return (false, "Aplicativo não encontrado na lista.");
 
@@ -643,13 +1011,25 @@ namespace KitLugia.Core
                 }
                 else if (startupApp.Location.Contains("\\Startup") || startupApp.Location.Contains("\\Start Menu"))
                 {
-                    string lnkPath = Path.Combine(startupApp.Location, appName + ".lnk");
-                    if (File.Exists(lnkPath))
+                    // Tenta múltiplas extensões de atalho
+                    string[] extensions = { ".lnk", ".ink", ".url", ".pif", ".exe", ".bat", ".cmd", ".ps1" };
+                    bool deleted = false;
+                    foreach (var ext in extensions)
                     {
-                        File.Delete(lnkPath);
-                        InvalidateCache();
-                        return (true, $"Atalho '{appName}' deletado permanentemente.");
+                        string fullPath = Path.Combine(startupApp.Location, appName + ext);
+                        if (File.Exists(fullPath))
+                        {
+                            File.Delete(fullPath);
+                            deleted = true;
+                        }
                     }
+                    if (deleted)
+                    {
+                        InvalidateCache();
+                        return (true, $"Atalho/arquivo '{appName}' deletado permanentemente.");
+                    }
+
+                    // Fallback: busca por nome sem extensão
                     var looseFile = Directory.GetFiles(startupApp.Location, $"{appName}.*").FirstOrDefault();
                     if (looseFile != null)
                     {
@@ -763,7 +1143,6 @@ namespace KitLugia.Core
                                 t is LogonTrigger || t is BootTrigger || t is SessionStateChangeTrigger);
 
                             if (!hasStartupTrigger) continue;
-                            if (!task.Enabled) continue;
 
                             string fullCommand = "";
                             if (task.Definition.Actions.FirstOrDefault() is ExecAction action)
@@ -778,7 +1157,7 @@ namespace KitLugia.Core
                             string name = task.Name;
                             string location = folder.Path == "\\" ? "Agendador de Tarefas" : $"Agendador de Tarefas ({folder.Path})";
                             bool isElevated = task.Definition.Principal.RunLevel == TaskRunLevel.Highest;
-                            var status = isElevated ? StartupStatus.Elevated : StartupStatus.Enabled;
+                            var status = task.Enabled ? (isElevated ? StartupStatus.Elevated : StartupStatus.Enabled) : StartupStatus.Disabled;
                             apps.Add(new StartupAppDetails(name, fullCommand, location, status));
                         }
 
@@ -800,36 +1179,7 @@ namespace KitLugia.Core
         {
             var apps = new List<StartupAppDetails>();
 
-            // --- 1. WMI Win32_StartupCommand (captura alguns UWP + todos os clássicos) ---
-            try
-            {
-                using var searcher = new ManagementObjectSearcher(@"root\cimv2",
-                    "SELECT Name, Command, Location, User FROM Win32_StartupCommand");
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    try
-                    {
-                        string? name = obj["Name"]?.ToString();
-                        string? command = obj["Command"]?.ToString();
-                        string? location = obj["Location"]?.ToString();
-
-                        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(command)) continue;
-                        if (name is "OneDrive" or "SecurityHealth" or "MicrosoftEdgeAutoLaunch_") continue;
-
-                        string locLabel = !string.IsNullOrEmpty(location) ? location : "Win32_StartupCommand";
-                        ExtractCommandParts(command, out string? exePath, out _);
-
-                        if (!string.IsNullOrEmpty(exePath) && exePath.Contains("system32", StringComparison.OrdinalIgnoreCase))
-                            continue;
-
-                        apps.Add(new StartupAppDetails(name, command, $"Startup: {locLabel}", StartupStatus.Enabled));
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-
-            // --- 2. Task Scheduler subfolders com AppUserModelId ---
+            // --- Task Scheduler subfolders com AppUserModelId ---
             try
             {
                 using (var ts = new TaskService())
@@ -1548,23 +1898,67 @@ namespace KitLugia.Core
             {
                 path = commandLine.Substring(1, endQuote - 1);
                 if (endQuote < commandLine.Length - 1) args = commandLine.Substring(endQuote + 1).Trim();
+                if (!string.IsNullOrEmpty(path) && !path.Contains(".") && args == "")
+                {
+                    path = commandLine;
+                }
                 return;
             }
         }
 
-        int exeIndex = commandLine.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+        int exeIndex = -1;
+        string foundExt = "";
+        string[] knownExtensions = { ".exe", ".com", ".bat", ".cmd", ".ps1", ".vbs", ".jar", ".lnk", ".url", ".ink", ".scr", ".pif", ".msi", ".wsf", ".py", ".pl", ".rb" };
+
+        foreach (var ext in knownExtensions)
+        {
+            int idx = commandLine.IndexOf(ext, StringComparison.OrdinalIgnoreCase);
+            if (idx > 0)
+            {
+                int endOfExt = idx + ext.Length;
+                if (endOfExt >= commandLine.Length || commandLine[endOfExt] == ' ' || commandLine[endOfExt] == '"' || commandLine[endOfExt] == '\t')
+                {
+                    if (exeIndex < 0 || endOfExt > exeIndex + foundExt.Length)
+                    {
+                        exeIndex = idx;
+                        foundExt = ext;
+                    }
+                }
+            }
+        }
+
         if (exeIndex > 0)
         {
-            path = commandLine.Substring(0, exeIndex + 4).Trim();
-            if (commandLine.Length > exeIndex + 4) args = commandLine.Substring(exeIndex + 4).Trim();
+            path = commandLine.Substring(0, exeIndex + foundExt.Length).Trim();
+            if (commandLine.Length > exeIndex + foundExt.Length)
+            {
+                string rest = commandLine.Substring(exeIndex + foundExt.Length).Trim();
+                args = rest;
+            }
             return;
         }
 
+        // Fallback: verifica se é um caminho sem extensão (Windows auto-adiciona .exe)
         int firstSpace = commandLine.IndexOf(' ');
-        if (firstSpace > 0 && !System.IO.File.Exists(commandLine))
+        if (firstSpace > 0)
         {
-            path = commandLine.Substring(0, firstSpace);
-            args = commandLine.Substring(firstSpace + 1).Trim();
+            string candidate = commandLine.Substring(0, firstSpace);
+            if (candidate.Contains("\\") || candidate.Contains("/"))
+            {
+                path = candidate;
+                args = commandLine.Substring(firstSpace + 1).Trim();
+                return;
+            }
+            if (candidate.Contains("."))
+            {
+                path = candidate;
+                args = commandLine.Substring(firstSpace + 1).Trim();
+                return;
+            }
+        }
+        else if (commandLine.Contains("\\") || commandLine.Contains("/"))
+        {
+            path = commandLine;
             return;
         }
 
@@ -1579,7 +1973,13 @@ namespace KitLugia.Core
 
         private static string GetCommandLineFromShortcut(string shortcutPath)
         {
-            if (!shortcutPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) return $"\"{shortcutPath}\"";
+            string ext = Path.GetExtension(shortcutPath);
+            bool isShortcut = ext.Equals(".lnk", StringComparison.OrdinalIgnoreCase)
+                           || ext.Equals(".ink", StringComparison.OrdinalIgnoreCase)
+                           || ext.Equals(".url", StringComparison.OrdinalIgnoreCase)
+                           || ext.Equals(".pif", StringComparison.OrdinalIgnoreCase);
+            if (!isShortcut) return $"\"{shortcutPath}\"";
+
             try
             {
                 Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
@@ -1588,7 +1988,9 @@ namespace KitLugia.Core
                 dynamic shortcut = shell.CreateShortcut(shortcutPath);
                 string target = shortcut.TargetPath ?? "";
                 string args = shortcut.Arguments ?? "";
-                return $"\"{target}\" {args}".Trim();
+                if (!string.IsNullOrEmpty(target))
+                    return $"\"{target}\" {args}".Trim();
+                return $"\"{shortcutPath}\"";
             }
             catch { return $"\"{shortcutPath}\""; }
         }
@@ -2006,6 +2408,9 @@ namespace KitLugia.Core
                 {
                     try
                     {
+                        // Pequena pausa para o app terminar de iniciar antes de fazer I/O pesado
+                        System.Threading.Thread.Sleep(1500);
+
                         // 1. Verificar Registry Run (HKCU)
                         CheckRegistryRun(currentExe);
                         
@@ -2014,7 +2419,7 @@ namespace KitLugia.Core
                         
                         // 3. Verificar Startup Folder
                         CheckStartupFolder(currentExe);
-                        
+
                         Logger.Log("✅ Verificação de inicialização concluída com sucesso");
                     }
                     catch (Exception ex)

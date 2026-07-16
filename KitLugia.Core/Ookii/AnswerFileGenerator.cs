@@ -400,13 +400,20 @@ public class AnswerFileGenerator
         }
 
         using var component = WriteComponentStart(name);
-        Writer.WriteElements(new KeyValueList
+        var elements = new KeyValueList
         {
-            { "InputLocale", Options.Language },
+            { "InputLocale", Options.InputLocale ?? Options.Language },
             { "SystemLocale", Options.Language },
             { "UILanguage", Options.Language },
             { "UserLocale", Options.Language },
-        });
+        };
+
+        if (Options.GeoID.HasValue && Options.GeoID.Value > 0)
+        {
+            elements.Add("GeoID", Options.GeoID.Value);
+        }
+
+        Writer.WriteElements(elements);
     }
 
     internal void WriteCreatePartition(int order, string type, int? size = null)

@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.IO.Compression;
 
@@ -338,6 +339,48 @@ namespace KitLugia.Core
             catch (Exception ex)
             {
                 Logger.Log($"❌ Erro no auto-update check: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Baixa o asset ZIP com relatório de progresso (bytesReceived, totalBytes)
+        /// </summary>
+        public static async Task<string?> DownloadUpdateFileAsync(Asset asset, IProgress<(long bytesReceived, long totalBytes)>? progress = null, CancellationToken ct = default)
+        {
+            try
+            {
+                var tempDir = Path.GetTempPath();
+                var zipPath = Path.Combine(tempDir, "KitLugia_Update.zip");
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater");
+                client.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+                client.Timeout = TimeSpan.FromMinutes(30);
+
+                using var response = await client.GetAsync(asset.BrowserDownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+                response.EnsureSuccessStatusCode();
+
+                var totalBytes = response.Content.Headers.ContentLength ?? asset.Size;
+                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+                await using var fileStream = File.Create(zipPath);
+
+                var buffer = new byte[81920];
+                long bytesRead = 0;
+                int bytesJustRead;
+                while ((bytesJustRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, bytesJustRead, ct);
+                    bytesRead += bytesJustRead;
+                    progress?.Report((bytesRead, totalBytes));
+                }
+
+                Logger.Log($"✅ Download concluído via DownloadUpdateFileAsync: {zipPath}");
+                return zipPath;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"❌ Erro no download com progresso: {ex.Message}");
+                return null;
             }
         }
 

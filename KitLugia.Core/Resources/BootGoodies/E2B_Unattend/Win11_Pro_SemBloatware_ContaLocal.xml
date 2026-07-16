@@ -97,10 +97,13 @@
 				</Password>
 			</AutoLogon>
 			<OOBE>
-				<ProtectYourPC>3</ProtectYourPC>
+				<ProtectYourPC>1</ProtectYourPC>
 				<HideEULAPage>true</HideEULAPage>
-				<HideWirelessSetupInOOBE>false</HideWirelessSetupInOOBE>
-				<HideOnlineAccountScreens>false</HideOnlineAccountScreens>
+				<HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+				<HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+				<HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+				<SkipUserOOBE>true</SkipUserOOBE>
+				<SkipMachineOOBE>true</SkipMachineOOBE>
 			</OOBE>
 			<FirstLogonCommands>
 				<SynchronousCommand wcm:action="add">

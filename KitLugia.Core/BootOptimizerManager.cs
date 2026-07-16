@@ -22,23 +22,35 @@ namespace KitLugia.Core
             var result = new BootAnalysisResult();
 
             // 1. Verifica se o serviço de monitoramento do Windows está ativo
-            // Sem o serviço "pla" (Performance Logs & Alerts), o Windows não grava esses dados.
             if (SystemUtils.GetServiceStartMode("pla") == "Disabled")
             {
                 result.ServiceStatusMessage = "AVISO: O serviço 'Logs e Alertas de Desempenho' (pla) está desativado. O Windows não registrou detalhes do boot.";
+                result.HasWarning = true;
             }
 
             // 2. Busca os eventos brutos (ID 100 = Boot Total, 101-199 = Degradação por Apps)
             var allEvents = SystemTweaks.GetPerformanceEvents(100, 101, 199);
 
+            // [NB] allEvents pode vir vazio se PLA estiver desligado — tratamos isso na UI
+
             // Pega os apps de inicialização atuais para cruzar dados
             var startupApps = StartupManager.GetStartupAppsWithDetails(true);
+
+            // Extrai nomes de processo (sem caminho, sem extensão) para matching robusto
+            var startupAppNames = startupApps
+                .Select(s =>
+                {
+                    try { return System.IO.Path.GetFileNameWithoutExtension(s.FullCommand?.Trim('"') ?? s.Name); }
+                    catch { return s.Name; }
+                })
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // Define o evento principal (Tempo Total)
             result.TotalTimeEvent = allEvents.FirstOrDefault(e => e.EventId == 100);
 
             // 3. Filtra itens lentos (> 1 segundo) do último mês
-            // Agrupa por nome para pegar sempre a ocorrência mais recente de cada app
             var recentSlowItems = allEvents
                 .Where(e => e.EventId != 100 && e.TimeTaken > 1000 && e.TimeOfEvent >= DateTime.Now.AddMonths(-1))
                 .GroupBy(e => e.ItemName)
@@ -47,15 +59,13 @@ namespace KitLugia.Core
 
             // 4. Separação Inteligente:
 
-            // LISTA A: Itens que estão na sua inicialização automática (Otimizáveis)
-            // Ex: Discord, Steam, Spotify
+            // LISTA A: Itens que estão na sua inicialização automática
             result.SlowStartupItems = recentSlowItems
-                .Where(e => startupApps.Any(s => s.FullCommand.Contains(e.ItemName, StringComparison.OrdinalIgnoreCase)))
+                .Where(e => startupAppNames.Any(appName => e.ItemName.Contains(appName, StringComparison.OrdinalIgnoreCase)))
                 .OrderByDescending(e => e.TimeTaken)
                 .ToList();
 
-            // LISTA B: Itens que causaram lentidão, mas não iniciam sozinhos (Serviços do Sistema ou Apps abertos manualmente)
-            // Ex: Antivírus, Drivers de Vídeo, Windows Update
+            // LISTA B: Itens que causaram lentidão mas não são de inicialização automática
             result.HighImpactApps = recentSlowItems
                 .Where(e => !result.SlowStartupItems.Any(s => s.ItemName == e.ItemName))
                 .OrderByDescending(e => e.TimeTaken)

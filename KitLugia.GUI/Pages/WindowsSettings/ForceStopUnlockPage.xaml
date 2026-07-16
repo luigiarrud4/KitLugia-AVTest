@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.WindowsSettings.ForceStopUnlockPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Force Stop Unlock"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="800" HorizontalAlignment="Left">
+
+            <!-- TITLE -->
+            <TextBlock Text="&#x1F513; Force Stop Unlock" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="White"/>
+            <TextBlock Text="Libere arquivos bloqueados por processos no Windows diretamente pelo menu de contexto do Explorer." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,25" TextWrapping="Wrap"/>
+
+            <!-- TOGGLE CARD -->
+            <Border CornerRadius="10" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="20" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Width="48" Height="48" CornerRadius="10" Background="#222244" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="&#x1F513;" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtToggleTitle" Text="Force Stop Unlock no Menu de Contexto" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock x:Name="TxtToggleDesc" Text="Adiciona opção para liberar arquivos bloqueados com clique direito" FontSize="12" Foreground="#888" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <CheckBox x:Name="ChkEnable" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}"
+                              Cursor="Hand" VerticalAlignment="Center" Margin="16,0,0,0"
+                              Click="ChkEnable_Click"/>
+                </Grid>
+            </Border>
+
+            <!-- STATUS CARDS -->
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="15"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="&#x1F4E6; Handle Tool" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                        <TextBlock x:Name="TxtHandleStatus" Text="✅ Incluso no Kit" FontSize="12" Foreground="#88FF88"/>
+                        <TextBlock Text="handle64.exe (Sysinternals) já vem junto com o KitLugia" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="&#x1F4CB; Menu de Contexto" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                        <TextBlock x:Name="TxtMenuStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
+                        <TextBlock Text="Arquivos, pastas e unidades" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- INFO SECTION -->
+            <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="&#x2139;&#xFE0F; Como Funciona" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="18">
+                        <Run Text="1. "/><Run Text="Clique com botão direito" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" em qualquer arquivo, pasta ou unidade bloqueada no Explorer"/>
+                        <LineBreak/>
+                        <Run Text="2. "/><Run Text="Selecione &quot;Force Stop Unlock&quot;" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" no menu de contexto"/>
+                        <LineBreak/>
+                        <Run Text="3. "/><Run Text="O script identifica" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" o processo que está bloqueando o arquivo usando Handle tool (Sysinternals)"/>
+                        <LineBreak/>
+                        <Run Text="4. "/><Run Text="Tenta liberar o handle" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" ou encerra o processo bloqueador"/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- REQUIREMENTS -->
+            <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+                <StackPanel>
+                    <TextBlock Text="&#x26A0;&#xFE0F; Requisitos" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="18">
+                        <Run Text="• "/><Run Text="Windows 10 ou superior" Foreground="#CCC"/>
+                        <LineBreak/>
+                        <Run Text="• "/><Run Text="Permissões de Administrador" Foreground="#CCC"/><Run Text=" (necessário para liberar handles)"/>
+                        <LineBreak/>
+                        <Run Text="• "/><Run Text="Handle tool do Sysinternals" Foreground="#CCC"/><Run Text=" (já incluso no KitLugia)"/>
+                        <LineBreak/>
+                        <Run Text="• "/><Run Text="Use com cuidado" Foreground="#FF6F61" FontWeight="Bold"/><Run Text=" — encerrar processos do sistema pode causar instabilidade"/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -551,20 +551,44 @@ namespace KitLugia.GUI.Pages
 
                 KitLugia.Core.Logger.Log($"Baixando {asset.Name} ({asset.Size / 1024 / 1024}MB)");
 
-                var tempDir = Path.GetTempPath();
-                var zipPath = Path.Combine(tempDir, "KitLugia_Update.zip");
+                var totalSizeMB = asset.Size / 1024.0 / 1024.0;
+                var stopwatch = Stopwatch.StartNew();
+                long lastBytes = 0;
+                double lastTime = 0;
+                double smoothSpeedMBps = 0;
 
-                using (var httpClient = new HttpClient())
+                var progress = new Progress<(long bytesReceived, long totalBytes)>(p =>
                 {
-                    httpClient.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater");
-                    httpClient.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
-                    var response = await httpClient.GetAsync(asset.BrowserDownloadUrl);
-                    response.EnsureSuccessStatusCode();
-                    await using (var fileStream = File.Create(zipPath))
-                        await response.Content.CopyToAsync(fileStream);
+                    var percent = p.totalBytes > 0 ? (double)p.bytesReceived / p.totalBytes * 100 : 0.0;
+                    var elapsed = stopwatch.Elapsed.TotalSeconds;
+                    var deltaTime = elapsed - lastTime;
+
+                    if (deltaTime > 0.1)
+                    {
+                        var instantSpeedMBps = (p.bytesReceived - lastBytes) / 1024.0 / 1024.0 / deltaTime;
+                        smoothSpeedMBps = smoothSpeedMBps * 0.7 + instantSpeedMBps * 0.3;
+                        lastBytes = p.bytesReceived;
+                        lastTime = elapsed;
+                    }
+
+                    var pct = Math.Min(percent, 100);
+                    ProgressFill.Width = (pct / 100.0) * 360;
+                    TxtProgressPercent.Text = $"{pct:F0}%";
+                    TxtProgressSpeed.Text = $"{smoothSpeedMBps:F1} MB/s";
+                    TxtProgressSize.Text = $"{p.bytesReceived / 1024.0 / 1024.0:F1} MB / {p.totalBytes / 1024.0 / 1024.0:F1} MB";
+                    TxtProgressStatus.Text = $"Baixando... {p.bytesReceived / 1024 / 1024:F0} de {p.totalBytes / 1024 / 1024:F0} MB";
+                });
+
+                var zipPath = await GitHubUpdater.DownloadUpdateFileAsync(asset, progress);
+
+                if (zipPath == null)
+                {
+                    KitLugia.Core.Logger.Log("❌ Falha no download do arquivo");
+                    return false;
                 }
 
-                KitLugia.Core.Logger.Log("✅ Download concluído!");
+                stopwatch.Stop();
+                KitLugia.Core.Logger.Log($"✅ Download concluído em {stopwatch.Elapsed.TotalSeconds:F1}s (média: {totalSizeMB / stopwatch.Elapsed.TotalSeconds:F1} MB/s)");
 
                 int currentPid = Process.GetCurrentProcess().Id;
                 string currentExePath = Environment.ProcessPath ?? "";

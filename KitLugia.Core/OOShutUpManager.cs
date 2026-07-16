@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Versioning;
+using System.Text;
 
 namespace KitLugia.Core
 {
@@ -1522,6 +1523,38 @@ namespace KitLugia.Core
             catch { return false; }
         }
 
+        private static string _backupDir = "";
+
+        private static string GetBackupDir()
+        {
+            if (string.IsNullOrEmpty(_backupDir))
+            {
+                _backupDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "reg_backups");
+                Directory.CreateDirectory(_backupDir);
+            }
+            return _backupDir;
+        }
+
+        private static void BackupRegistryValue(string registryPath, string valueName)
+        {
+            try
+            {
+                var val = Registry.GetValue(registryPath, valueName, null);
+                if (val == null) return;
+
+                var hive = registryPath.StartsWith("HKEY_LOCAL_MACHINE") ? "HKLM" : "HKCU";
+                var subKey = registryPath.Substring(registryPath.IndexOf('\\') + 1);
+                var kind = val is int ? "dword" : "sz";
+                var data = val is int intVal ? $"dword:{intVal:X8}" : $"\"{val}\"";
+                var backup = $"Windows Registry Editor Version 5.00\r\n\r\n[{hive}\\\\{subKey}]\r\n\"{valueName}\"={data}\r\n";
+
+                var fileName = $"{subKey.Replace('\\', '_').Replace('/', '_')}_{valueName}.reg";
+                File.WriteAllText(Path.Combine(GetBackupDir(), fileName), backup, Encoding.UTF8);
+                Logger.Log($"Backup salvo: {fileName}");
+            }
+            catch { }
+        }
+
         public static bool ApplyPrivacySetting(PrivacySetting setting)
         {
             try
@@ -1532,6 +1565,7 @@ namespace KitLugia.Core
                     string modeStr = mode == 4 ? "disabled" : (mode == 2 ? "auto" : "demand");
                     SystemUtils.RunExternalProcess("sc", $"config \"{setting.ServiceName}\" start= {modeStr}", true);
                     if (mode == 4) SystemUtils.RunExternalProcess("sc", $"stop \"{setting.ServiceName}\"", true);
+                    Logger.Log($"✅ Service[{setting.ServiceName}] → {modeStr}");
                     return true;
                 }
                 else
@@ -1539,12 +1573,30 @@ namespace KitLugia.Core
                     string key = setting.RegistryPath;
                     string val = setting.ValueName;
                     object data = setting.SafeValue ?? 0;
-                    
+
+                    BackupRegistryValue(key, val);
+
                     RegistryKey hive = key.StartsWith("HKEY_LOCAL_MACHINE") ? Registry.LocalMachine : Registry.CurrentUser;
                     string subKey = key.Substring(key.IndexOf('\\') + 1);
 
+                    // Determinar o tipo correto do valor
+                    RegistryValueKind kind;
+                    if (data is int)
+                        kind = RegistryValueKind.DWord;
+                    else if (data is long)
+                        kind = RegistryValueKind.QWord;
+                    else if (data is string s)
+                    {
+                        kind = s.Length > 1 && s.StartsWith("hex:") ? RegistryValueKind.Binary
+                             : s.Contains(";") ? RegistryValueKind.MultiString
+                             : RegistryValueKind.String;
+                    }
+                    else
+                        kind = RegistryValueKind.DWord;
+
                     using var rk = hive.CreateSubKey(subKey, true);
-                    rk.SetValue(val, data, data is string ? RegistryValueKind.String : RegistryValueKind.DWord);
+                    rk.SetValue(val, data, kind);
+                    Logger.Log($"✅ Reg[{key}\\{val}] = {data} ({kind})");
                     return true;
                 }
             }

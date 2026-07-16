@@ -70,16 +70,10 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         // ===== ENERGIA =====
         private void BtnPowerSleep_Click(object sender, RoutedEventArgs e) => LaunchSettings("ms-settings:powersleep");
 
-        private void BtnContextMenuPreview_Click(object sender, RoutedEventArgs e)
+        private void BtnForceStopUnlock_Click(object sender, RoutedEventArgs e)
         {
             if (Application.Current.MainWindow is MainWindow mw)
-                mw.NavigateToPage(PageType.ContextMenuPreview);
-        }
-
-        private void BtnContextMenu_Click(object sender, RoutedEventArgs e)
-        {
-            if (Application.Current.MainWindow is MainWindow mw)
-                mw.NavigateToPage(PageType.ContextMenu);
+                mw.NavigateToPage(PageType.ForceStopUnlock);
         }
 
         private void BtnPowerPlan_Click(object sender, RoutedEventArgs e)

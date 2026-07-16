@@ -125,6 +125,92 @@
                 <TextBlock x:Name="TxtCurrentDnsIp" Text="Verificando..." Foreground="#AAAAAA" FontWeight="SemiBold"/>
             </StackPanel>
 
+            <!-- Seletor Avançado de DNS + Benchmark -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
+                <StackPanel Margin="15">
+                    <TextBlock Text="&#x1F50D; Testar e Selecionar DNS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                    
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Provedor" FontSize="11" FontWeight="Bold" Foreground="#AAA"/>
+                        <TextBlock Grid.Column="1" Text="DNS Primário" FontSize="11" FontWeight="Bold" Foreground="#AAA" Width="120" TextAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="Categoria" FontSize="11" FontWeight="Bold" Foreground="#AAA" Width="100" TextAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="Latência" FontSize="11" FontWeight="Bold" Foreground="#AAA" Width="80" TextAlignment="Center"/>
+                        <TextBlock Grid.Column="4" Text="" Width="60"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}" Margin="0,0,0,5"/>
+                    <ScrollViewer MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="DnsProviderList" ItemsSource="{Binding}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2,0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="60"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Foreground="#EEE" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Primary}" FontSize="11" Foreground="#999" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Category}" FontSize="11" Foreground="#888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding LatencyMs, StringFormat={}{0:F0} ms}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#FFD700"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding LatencyMs}" Value="-1">
+                                                            <Setter Property="Text" Value="-- ms"/>
+                                                            <Setter Property="Foreground" Value="#666"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <Button Grid.Column="4" Content="Aplicar" FontSize="10" Padding="4,2"
+                                                Foreground="White" Background="#FFD700" BorderThickness="0"
+                                                Cursor="Hand" Tag="{Binding}" Click="BtnApplyDnsProvider_Click"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="BtnBenchmarkDns" Content="&#x26A1; Testar Todos" Padding="12,6"
+                                Background="#2B2B2B" Foreground="White" BorderBrush="#555" BorderThickness="1"
+                                FontSize="12" Cursor="Hand" Click="BtnBenchmarkDns_Click"/>
+                        <TextBlock x:Name="TxtBenchmarkStatus" Text="" FontSize="11" Foreground="#888" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    </StackPanel>
+
+                    <!-- DNS Customizado -->
+                    <Separator Background="{StaticResource CardBorder}" Margin="0,10,0,10"/>
+                    <TextBlock Text="&#x1F4A1; DNS Customizado" FontSize="13" FontWeight="Bold" Foreground="#CCC" Margin="0,0,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtCustomDnsPrimary" Text="" FontSize="12" Padding="6,4"
+                                 Background="#222" Foreground="White" BorderBrush="#444" BorderThickness="1"
+                                 Margin="0,0,5,0" VerticalContentAlignment="Center"/>
+                        <TextBox x:Name="TxtCustomDnsSecondary" Text="" FontSize="12" Padding="6,4"
+                                 Background="#222" Foreground="White" BorderBrush="#444" BorderThickness="1"
+                                 Margin="5,0,5,0" VerticalContentAlignment="Center"/>
+                        <Button Grid.Column="2" x:Name="BtnApplyCustomDns" Content="Aplicar DNS" Padding="12,6"
+                                Foreground="White" Background="#43A047" BorderThickness="0"
+                                FontSize="12" Cursor="Hand" Click="BtnApplyCustomDns_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- SEÇÃO 1.5: CONTROLE DO ADAPTADOR (LIGAR/DESLIGAR/RESTART) -->
             <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,5,0,25">
                 <StackPanel>

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using KitLugia.Core;
@@ -21,11 +23,26 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 {
     public partial class ContextMenuPage : Page
     {
+        // --- ViewModel for the DataGrid ---
+        public class ContextMenuEntryView
+        {
+            public SystemTweaks.ContextMenuEntry Entry { get; }
+            public string DisplayName => Entry.DisplayName;
+            public string CommandText => string.IsNullOrEmpty(Entry.Command) ? "-" : Entry.Command;
+            public string TypeLabel => Entry.Type == "shellex" ? "ShellEx" : "Shell";
+            public string OriginLabel => Entry.Source == "HKLM" ? "Sistema" : "Usuário";
+            public string LocationPath => Entry.Location;
+            public bool IsSystem => Entry.Source == "HKLM";
+            public bool CanRemove => Entry.Source != "HKLM";
+
+            public ContextMenuEntryView(SystemTweaks.ContextMenuEntry entry) => Entry = entry;
+        }
+
         private bool _isLoading;
         private List<SystemTweaks.ContextMenuEntry> _allEntries = new();
-        private int _currentContextIndex = 0;
+        private ObservableCollection<ContextMenuEntryView> _filteredEntries = new();
+        private int _currentContextIndex;
 
-        // Cores reutilizaveis
         private static readonly SolidColorBrush BgTransparent = WpfBrushes.Transparent;
         private static readonly SolidColorBrush BgHover = new(Color.FromRgb(58, 58, 74));
         private static readonly SolidColorBrush TxtWhite = WpfBrushes.White;
@@ -35,7 +52,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         private static readonly SolidColorBrush BgRemove = new(Color.FromRgb(70, 25, 25));
         private static readonly SolidColorBrush FgRemove = new(Color.FromRgb(221, 80, 80));
 
-        // Contextos: (label, emoji-emoji, array de prefixes para matching no Location)
         private static readonly (string label, string emoji, string[] prefixes)[] ContextModes = {
             ("Arquivo (qualquer tipo)", "\U0001F4C4", new[] { @"*\shell", @"*\shellex", @"AllFileSystemObjects\shell", @"AllFileSystemObjects\shellex" }),
             ("Pasta", "\U0001F4C1", new[] { @"Directory\shell", @"Directory\shellex", @"Folder\shell", @"Folder\shellex" }),
@@ -46,7 +62,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             ("Todos objetos", "\U0001F5C2\uFE0F", new[] { @"AllFileSystemObjects\", @"*\shell", @"*\shellex" }),
         };
 
-        // Entradas "nativas" do Explorer (apenas visuais - nao removiveis)
         private static readonly (string label, string icon)[] NativeEntries = {
             ("Recortar", "\u2702"),
             ("Copiar", "\U0001F4CB"),
@@ -55,7 +70,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             ("Propriedades", "\u2699"),
         };
 
-        // Quick-add items: (key, displayName, emoji, addAction, removeAction, checkFunc)
         private record QuickAddItem(
             string Key,
             string DisplayName,
@@ -71,6 +85,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         public ContextMenuPage()
         {
             InitializeComponent();
+            GridEntries.ItemsSource = _filteredEntries;
             this.Loaded += async (s, e) =>
             {
                 BuildContextChips();
@@ -84,6 +99,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         {
             this.Unloaded -= ContextMenuPage_Unloaded;
             this.DataContext = null;
+            _filteredEntries.Clear();
         }
 
         private void ContextMenuPage_Unloaded(object sender, RoutedEventArgs e) => Cleanup();
@@ -139,51 +155,56 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         {
             if (idx < 0 || idx >= ContextModes.Length || idx == _currentContextIndex) return;
             _currentContextIndex = idx;
-
-            // Atualizar estilo dos chips
             for (int i = 0; i < ContextChips.Children.Count; i++)
             {
                 if (ContextChips.Children[i] is WpfButton chip)
                     ApplyChipStyle(chip, i == idx);
             }
-
             RebuildMenu();
         }
 
         // ================================================================
-        // BUILD: Quick-add items
+        // BUILD: Quick-add items (now with 10 items)
         // ================================================================
         private void BuildQuickAddItems()
         {
             _quickItems = new List<QuickAddItem>
             {
-                new("TakeOwnership", "Take Ownership", "Assumir controle de arquivos", "\U0001F511",
+                new("TakeOwnership", "Take Ownership", "Assumir controle total de arquivos e pastas", "\U0001F511",
                     SystemTweaks.AddTakeOwnership, SystemTweaks.RemoveTakeOwnership, SystemTweaks.IsTakeOwnershipAdded),
-                new("ForceClose", "Force Close", "Encerrar .exe forcado", "\u26D4",
+                new("ForceClose", "Force Close", "Forçar encerramento de processos .exe", "\u26D4",
                     SystemTweaks.AddForceClose, SystemTweaks.RemoveForceClose, SystemTweaks.IsForceCloseAdded),
-                new("CmdHere", "CMD Here", "Abrir Prompt nesta pasta", "\U0001F4BB",
+                new("CmdHere", "CMD Here", "Abrir Prompt de Comando na pasta atual", "\U0001F4BB",
                     SystemTweaks.AddCmdHere, SystemTweaks.RemoveCmdHere, SystemTweaks.IsCmdHereAdded),
-                new("PsHere", "PowerShell Here", "Abrir PowerShell nesta pasta", "\U0001F9EE",
+                new("PsHere", "PowerShell Here", "Abrir PowerShell na pasta atual", "\U0001F9EE",
                     SystemTweaks.AddPowerShellHere, SystemTweaks.RemovePowerShellHere, SystemTweaks.IsPowerShellHereAdded),
-                new("CmdAdmin", "CMD as Admin", "CMD como Administrador", "\U0001F6E1",
+                new("CmdAdmin", "CMD as Admin", "CMD como Administrador na pasta", "\U0001F6E1",
                     SystemTweaks.AddCmdAdmin, SystemTweaks.RemoveCmdAdmin, SystemTweaks.IsCmdAdminAdded),
-                new("PsAdmin", "PS as Admin", "PowerShell como Admin", "\U0001F6E1",
+                new("PsAdmin", "PS as Admin", "PowerShell como Admin na pasta", "\U0001F6E1",
                     SystemTweaks.AddPowerShellAdmin, SystemTweaks.RemovePowerShellAdmin, SystemTweaks.IsPowerShellAdminAdded),
+                new("Notepad", "Abrir com Bloco de Notas", "Editar qualquer arquivo no Notepad", "\U0001F4DD",
+                    SystemTweaks.AddNotepad, SystemTweaks.RemoveNotepad, SystemTweaks.IsNotepadAdded),
+                new("CopyAsPath", "Copiar como Caminho", "Copiar caminho completo do arquivo/pasta", "\U0001F4CB",
+                    SystemTweaks.AddCopyAsPath, SystemTweaks.RemoveCopyAsPath, SystemTweaks.IsCopyAsPathAdded),
+                new("VsCode", "VS Code (Admin)", "Abrir VS Code como Administrador na pasta", "\u2328\uFE0F",
+                    SystemTweaks.AddVsCode, SystemTweaks.RemoveVsCode, SystemTweaks.IsVsCodeAdded),
+                new("ForceStopUnlock", "Force Stop Unlock", "Desbloquear arquivos pelo menu de contexto", "\U0001F513",
+                    SystemTweaks.AddForceStopUnlock, SystemTweaks.RemoveForceStopUnlock, SystemTweaks.IsForceStopUnlockAdded),
             };
 
             QuickAddGrid.Children.Clear();
+            int total = _quickItems.Count;
+            int cols = total <= 6 ? 2 : 3;
+            QuickAddGrid.Columns = cols;
             foreach (var item in _quickItems)
-            {
-                var card = BuildQuickAddCard(item);
-                QuickAddGrid.Children.Add(card);
-            }
+                QuickAddGrid.Children.Add(BuildQuickAddCard(item));
         }
 
         private Border BuildQuickAddCard(QuickAddItem item)
         {
             var border = new Border
             {
-                Margin = new Thickness(5),
+                Margin = new Thickness(4),
                 Padding = new Thickness(14, 10, 10, 10),
                 CornerRadius = new CornerRadius(8),
                 Background = new SolidColorBrush(Color.FromRgb(26, 26, 36)),
@@ -196,7 +217,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Emoji
             var icon = new TextBlock
             {
                 Text = item.Emoji,
@@ -207,7 +227,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             Grid.SetColumn(icon, 0);
             grid.Children.Add(icon);
 
-            // Texto
             var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             stack.Children.Add(new TextBlock
             {
@@ -226,7 +245,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             Grid.SetColumn(stack, 1);
             grid.Children.Add(stack);
 
-            // Toggle switch
             var chk = new WpfCheckBox
             {
                 Style = (Style)FindResource("ToggleSwitchStyle"),
@@ -241,12 +259,11 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
             border.Child = grid;
             border.Tag = (chk, item);
-
             return border;
         }
 
         // ================================================================
-        // LOAD: Carregar tudo
+        // LOAD: Everything
         // ================================================================
         private async Task LoadAll()
         {
@@ -259,23 +276,15 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     bool backupExists = SystemTweaks.ContextMenuBackupExists();
                     DateTime? backupTime = SystemTweaks.GetContextMenuBackupTime();
 
-                    // Verificar toggles
-                    var states = _quickItems.Select(q => q.IsActive()).ToList();
-
                     Dispatcher.Invoke(() =>
                     {
-                        // Backup
                         UpdateBackupStatus(backupExists, backupTime);
-
-                        // Quick-add toggles
                         UpdateQuickAddStates();
-
-                        // Rebuild menu
+                        RefreshDataGrid();
                         RebuildMenu();
                     });
                 });
 
-                // Fazer backup automatico
                 await Task.Run(() => SystemTweaks.BackupUserContextMenu());
                 Dispatcher.Invoke(() =>
                 {
@@ -288,6 +297,82 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             finally { _isLoading = false; }
         }
 
+        // ================================================================
+        // DATAGRID: Filtering & Refresh
+        // ================================================================
+        private void RefreshDataGrid()
+        {
+            string filter = TxtSearch?.Text?.Trim() ?? "";
+            _filteredEntries.Clear();
+
+            var query = _allEntries.AsEnumerable();
+            if (!string.IsNullOrEmpty(filter))
+            {
+                var f = filter.ToLowerInvariant();
+                query = query.Where(e =>
+                    e.DisplayName.ToLowerInvariant().Contains(f) ||
+                    e.Location.ToLowerInvariant().Contains(f) ||
+                    e.Command.ToLowerInvariant().Contains(f) ||
+                    e.Name.ToLowerInvariant().Contains(f));
+            }
+
+            foreach (var entry in query.OrderBy(e => e.Source == "HKLM" ? 0 : 1)
+                                       .ThenBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase))
+            {
+                _filteredEntries.Add(new ContextMenuEntryView(entry));
+            }
+
+            // Atualizar contagem (total + nativas + usuario)
+            int total = _allEntries.Count;
+            int systemCount = _allEntries.Count(e => e.Source == "HKLM");
+            int userCount = total - systemCount;
+            TxtEntryCount.Text = $"{_filteredEntries.Count} exibidas | {systemCount} sistema / {userCount} usuário";
+        }
+
+        private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isLoading) return;
+            RefreshDataGrid();
+        }
+
+        private async void BtnRefreshTable_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            await LoadAll();
+        }
+
+        // ================================================================
+        // DATAGRID: Remove entry
+        // ================================================================
+        private async void BtnGridRemove_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading || sender is not WpfButton btn || btn.Tag is not SystemTweaks.ContextMenuEntry entry) return;
+            if (entry.Source == "HKLM") return;
+
+            _isLoading = true;
+            try
+            {
+                bool removed = false;
+                await Task.Run(() =>
+                {
+                    removed = SystemTweaks.RemoveUserContextMenuEntry(entry.Location, entry.Name);
+                });
+
+                if (removed)
+                {
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowSuccess("ENTRADA REMOVIDA", $"'{entry.DisplayName}' foi removida do menu de contexto.");
+                    await LoadAll();
+                    UpdateQuickAddStates();
+                }
+            }
+            catch { }
+            finally { _isLoading = false; }
+        }
+
+        // ================================================================
+        // UPDATE: Quick-add toggle states
+        // ================================================================
         private void UpdateQuickAddStates()
         {
             int activeCount = 0;
@@ -299,8 +384,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     chk.IsChecked = isActive;
                     chk.Foreground = isActive ? TxtGold : TxtMuted;
                     if (isActive) activeCount++;
-
-                    // Atualizar borda do card
                     border.BorderBrush = isActive
                         ? new SolidColorBrush(Color.FromRgb(255, 200, 0))
                         : new SolidColorBrush(Color.FromRgb(50, 50, 60));
@@ -310,7 +393,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         }
 
         // ================================================================
-        // REBUILD: Menu 1:1
+        // REBUILD: Simulated menu 1:1
         // ================================================================
         private void RebuildMenu()
         {
@@ -318,7 +401,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             EmptyHint.Visibility = Visibility.Collapsed;
             SimulatedMenu.Visibility = Visibility.Collapsed;
 
-            if (_allEntries.Count == 0 && _currentContextIndex < 0)
+            if (_allEntries.Count == 0 || _currentContextIndex < 0 || _currentContextIndex >= ContextModes.Length)
                 return;
 
             var mode = ContextModes[_currentContextIndex];
@@ -335,34 +418,19 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
             SimulatedMenu.Visibility = Visibility.Visible;
 
-            // Ordenar: shell primeiro, depois shellex
             var shell = matched.Where(e => e.Type == "shell").OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
             var shellex = matched.Where(e => e.Type == "shellex").OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
-            var hklm = matched.Where(e => e.Source != "HKCU").ToList();
 
-            // 1. Entradas personalizadas (shell)
             foreach (var e in shell)
                 MenuPanel.Children.Add(MakeMenuEntry(e));
-
-            // 2. Separador entre shell e shellex
             if (shell.Count > 0 && shellex.Count > 0)
                 MenuPanel.Children.Add(MakeSeparator());
-
-            // 3. Entradas shellex (COM-based)
             foreach (var e in shellex)
                 MenuPanel.Children.Add(MakeMenuEntry(e));
-
-            // 4. Separador
             MenuPanel.Children.Add(MakeSeparator());
-
-            // 5. Entradas nativas do Explorer (simulacao visual)
             foreach (var n in NativeEntries)
                 MenuPanel.Children.Add(MakeNativeEntry(n.label, n.icon));
-
-            // 6. Separador final
             MenuPanel.Children.Add(MakeSeparator());
-
-            // 7. "Mostrar mais opicoes" (Win11)
             MenuPanel.Children.Add(MakeFooterEntry());
         }
 
@@ -388,29 +456,17 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Texto do item
-            var tb = new TextBlock
-            {
-                Text = entry.DisplayName,
-                Foreground = isExtended ? TxtMuted : TxtWhite,
-                FontSize = 13,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            };
-
-            // Adicionar badge HKLM/EXT
             if (isHKLM || isExtended)
             {
                 var badgePanel = new StackPanel { Orientation = WpfOrientation.Horizontal };
-                var innerTb = new TextBlock
+                badgePanel.Children.Add(new TextBlock
                 {
                     Text = entry.DisplayName,
                     Foreground = isExtended ? TxtMuted : TxtWhite,
                     FontSize = 13,
                     VerticalAlignment = VerticalAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                };
-                badgePanel.Children.Add(innerTb);
+                });
 
                 if (isExtended)
                 {
@@ -424,13 +480,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                         Margin = new Thickness(6, 0, 0, 0),
                         VerticalAlignment = VerticalAlignment.Center,
                     };
-                    extBadge.Child = new TextBlock
-                    {
-                        Text = "EXT",
-                        FontSize = 8,
-                        FontWeight = FontWeights.Bold,
-                        Foreground = TxtMuted,
-                    };
+                    extBadge.Child = new TextBlock { Text = "EXT", FontSize = 8, FontWeight = FontWeights.Bold, Foreground = TxtMuted };
                     badgePanel.Children.Add(extBadge);
                 }
 
@@ -446,13 +496,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                         Margin = new Thickness(6, 0, 0, 0),
                         VerticalAlignment = VerticalAlignment.Center,
                     };
-                    lckBadge.Child = new TextBlock
-                    {
-                        Text = "HKLM",
-                        FontSize = 8,
-                        FontWeight = FontWeights.Bold,
-                        Foreground = new SolidColorBrush(Color.FromRgb(100, 150, 220)),
-                    };
+                    lckBadge.Child = new TextBlock { Text = "HKLM", FontSize = 8, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(100, 150, 220)) };
                     badgePanel.Children.Add(lckBadge);
                 }
 
@@ -461,11 +505,18 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
             else
             {
+                var tb = new TextBlock
+                {
+                    Text = entry.DisplayName,
+                    Foreground = TxtWhite,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                };
                 Grid.SetColumn(tb, 0);
                 grid.Children.Add(tb);
             }
 
-            // Botao remover
             var btn = new WpfButton
             {
                 Content = isHKLM ? "\U0001F512" : "\u2716",
@@ -489,7 +540,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             grid.Children.Add(btn);
 
             row.Child = grid;
-
             row.MouseEnter += (s, e) => { row.Background = BgHover; btn.Visibility = Visibility.Visible; };
             row.MouseLeave += (s, e) => { row.Background = BgTransparent; btn.Visibility = Visibility.Collapsed; };
 
@@ -509,53 +559,18 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             };
 
             var sp = new StackPanel { Orientation = WpfOrientation.Horizontal };
-            sp.Children.Add(new TextBlock
-            {
-                Text = iconEmoji,
-                FontSize = 14,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-            });
-            sp.Children.Add(new TextBlock
-            {
-                Text = label,
-                Foreground = TxtMuted,
-                FontSize = 13,
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-
+            sp.Children.Add(new TextBlock { Text = iconEmoji, FontSize = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+            sp.Children.Add(new TextBlock { Text = label, Foreground = TxtMuted, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
             row.Child = sp;
             return row;
         }
 
         private Border MakeFooterEntry()
         {
-            var row = new Border
-            {
-                Padding = new Thickness(12, 7, 12, 7),
-                MinHeight = 32,
-                CornerRadius = new CornerRadius(4),
-                Background = BgTransparent,
-                Cursor = WpfCursors.Arrow,
-            };
-
+            var row = new Border { Padding = new Thickness(12, 7, 12, 7), MinHeight = 32, CornerRadius = new CornerRadius(4), Background = BgTransparent, Cursor = WpfCursors.Arrow };
             var sp = new StackPanel { Orientation = WpfOrientation.Horizontal };
-            sp.Children.Add(new TextBlock
-            {
-                Text = "\u229E",
-                FontSize = 14,
-                Foreground = TxtMuted,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-            });
-            sp.Children.Add(new TextBlock
-            {
-                Text = "Mostrar mais opicoes",
-                Foreground = TxtMuted,
-                FontSize = 13,
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-
+            sp.Children.Add(new TextBlock { Text = "\u229E", FontSize = 14, Foreground = TxtMuted, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+            sp.Children.Add(new TextBlock { Text = "Mostrar mais opções", Foreground = TxtMuted, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
             row.Child = sp;
             return row;
         }
@@ -579,7 +594,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
             else
             {
-                BackupStatus.Text = "Nenhum backup disponivel.";
+                BackupStatus.Text = "Nenhum backup disponível.";
                 BtnRestoreBackup.Visibility = Visibility.Collapsed;
             }
         }
@@ -625,7 +640,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         }
 
         // ================================================================
-        // REMOVE ENTRY (do menu 1:1)
+        // REMOVE ENTRY (from simulated menu)
         // ================================================================
         private async void BtnRemoveEntry_Click(object sender, RoutedEventArgs e)
         {
@@ -636,10 +651,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 try
                 {
                     bool removed = false;
-                    await Task.Run(() =>
-                    {
-                        removed = SystemTweaks.RemoveUserContextMenuEntry(entry.Location, entry.Name);
-                    });
+                    await Task.Run(() => removed = SystemTweaks.RemoveUserContextMenuEntry(entry.Location, entry.Name));
 
                     if (removed)
                     {
@@ -666,19 +678,14 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             try
             {
                 bool targetActive = chk.IsChecked == true;
-
-                // Atualizar UI imediatamente
                 chk.Foreground = targetActive ? TxtGold : TxtMuted;
 
                 await Task.Run(() =>
                 {
-                    if (targetActive)
-                        item.Add();
-                    else
-                        item.Remove();
+                    if (targetActive) item.Add();
+                    else item.Remove();
                 });
 
-                // Refresh
                 await LoadAll();
                 UpdateQuickAddStates();
             }

@@ -67,7 +67,10 @@ namespace KitLugia.Core
         public bool BootTrayRunAsAdmin { get; set; } = true;
     }
 
-    public record ServiceInfo(string Name, string DisplayName, string Description, string Status, string StartMode, ServiceSafetyLevel Safety);
+    public record ServiceInfo(string Name, string DisplayName, string Description, string Status, string StartMode, ServiceSafetyLevel Safety)
+    {
+        public string Manufacturer { get; init; } = "Desconhecido";
+    }
 
     // --- DRIVER ITEM ---
     [SupportedOSPlatform("windows")]
@@ -149,13 +152,14 @@ namespace KitLugia.Core
     public record PerformanceEvent(int EventId, string ItemName, long TimeTaken, string EventType, DateTime? TimeOfEvent, string SubType = "");
     public record InstalledProgram(string Name, string Publisher, string Version);
     public record DriverInfo(string DeviceName, string Provider, string Version, DateTime DriverDate);
-    public record ScheduledTaskInfo(string Path, string Name, string Description, bool IsEnabled);
+    public record ScheduledTaskInfo(string Path, string Name, string Description, bool IsEnabled, string Category = "Microsoft");
     public record SystemStats(string CpuName, float CpuLoad, float CpuTemp, string GpuName, float GpuTemp, double GpuVramUsed, double RamUsed, double RamTotal, string OsName, TimeSpan Uptime, List<StorageInfo> StorageDevices);
     public record StorageInfo(string Name, string HealthStatus, float Temp, string DriveLetter);
 
     public record BootAnalysisResult
     {
         public string ServiceStatusMessage { get; set; } = string.Empty;
+        public bool HasWarning { get; set; }
         public PerformanceEvent? TotalTimeEvent { get; set; }
         public List<PerformanceEvent> SlowStartupItems { get; set; } = new();
         public List<PerformanceEvent> HighImpactApps { get; set; } = new();

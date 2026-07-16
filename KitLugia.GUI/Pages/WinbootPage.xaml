@@ -563,9 +563,17 @@
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
                                     <TextBlock Text="Fuso Horário:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
                                     <ComboBox x:Name="CmbAuTimeZone" Height="30" Style="{StaticResource DarkComboBoxStyle}">
-                                        <ComboBoxItem Content="Horário de Brasília" Tag="E. South America Standard Time" IsSelected="True"/>
-                                        <ComboBoxItem Content="UTC-3" Tag="E. South America Standard Time"/>
-                                        <ComboBoxItem Content="Pacific Standard Time" Tag="Pacific Standard Time"/>
+                                        <ComboBoxItem Content="Horário de Brasília (BRT)" Tag="E. South America Standard Time" IsSelected="True"/>
+                                        <ComboBoxItem Content="Eastern Time (EUA)" Tag="Eastern Standard Time"/>
+                                        <ComboBoxItem Content="Pacific Time (EUA)" Tag="Pacific Standard Time"/>
+                                        <ComboBoxItem Content="Europa Central (Espanha/França)" Tag="Romance Standard Time"/>
+                                        <ComboBoxItem Content="Europa Central (Alemanha/Itália)" Tag="W. Europe Standard Time"/>
+                                        <ComboBoxItem Content="Tóquio (Japão)" Tag="Tokyo Standard Time"/>
+                                        <ComboBoxItem Content="Seul (Coreia)" Tag="Korea Standard Time"/>
+                                        <ComboBoxItem Content="Pequim (China)" Tag="China Standard Time"/>
+                                        <ComboBoxItem Content="Taipé (Taiwan)" Tag="Taipei Standard Time"/>
+                                        <ComboBoxItem Content="Moscou (Rússia)" Tag="Russian Standard Time"/>
+                                        <ComboBoxItem Content="Riade (Arábia Saudita)" Tag="Arab Standard Time"/>
                                     </ComboBox>
                                 </StackPanel>
                             </Grid>
