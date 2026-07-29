@@ -955,7 +955,7 @@ namespace KitLugia.GUI.Pages
             var result = System.Windows.MessageBox.Show(
                 "Configurar bootsequence para Validation OS?\n\n" +
                 "Na proxima reinicializacao, o Validation OS sera carregado\n" +
-                "via RAMDISK com suporte a WPF.\n\n" +
+                "via RAMDISK com suporte WPF + WinXShell.\n\n" +
                 "Deseja reiniciar agora?",
                 "Testar Validation OS",
                 MessageBoxButton.YesNo,
@@ -965,6 +965,17 @@ namespace KitLugia.GUI.Pages
 
             try
             {
+                // Injeta WinXShell no WIM (se disponivel)
+                ShowBusy("INJETANDO WINXSHELL", "Adicionando WinXShell ao WIM VALOS...");
+                string wimPath = @"C:\KL_WINPE\validation_boot.wim";
+                bool shellInjected = await Task.Run(() =>
+                    WinpeBuilder.InjectWinXShellIntoWimAsync(wimPath));
+                if (shellInjected)
+                    ShowBusy("INJETANDO WINXSHELL", "WinXShell injetado. Preparando boot...");
+                else
+                    ShowBusy("INJETANDO WINXSHELL", "WinXShell nao encontrado. Boot sem shell GUI...");
+                await Task.Delay(1000);
+
                 // Procura GUID da entrada Validation OS no BCD
                 var psi = new ProcessStartInfo("bcdedit.exe", "/enum all")
                 {
