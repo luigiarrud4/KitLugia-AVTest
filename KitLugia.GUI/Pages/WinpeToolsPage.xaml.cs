@@ -523,6 +523,29 @@ namespace KitLugia.GUI.Pages
 
         #region Logs
 
+        private void TxtCopyOpLog_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var inline in TxtOpDesc.Inlines)
+                {
+                    if (inline is System.Windows.Documents.Run run)
+                        sb.Append(run.Text);
+                    else if (inline is System.Windows.Documents.LineBreak)
+                        sb.AppendLine();
+                }
+                string text = sb.ToString();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    System.Windows.Clipboard.SetText(text);
+                    TxtCopyOpLog.Text = "✅ Copiado!";
+                    _ = Task.Run(async () => { await Task.Delay(2000); Dispatcher.Invoke(() => TxtCopyOpLog.Text = "📋 Copiar log"); });
+                }
+            }
+            catch { }
+        }
+
         private void BtnCopyLog_Click(object sender, RoutedEventArgs e)
         {
             try

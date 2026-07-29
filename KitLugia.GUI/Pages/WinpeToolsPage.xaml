@@ -344,9 +344,19 @@
 
                     <!-- Detail log (scrollavel) -->
                     <Border Background="#0A0A0A" CornerRadius="6" Padding="8" MaxHeight="120" Margin="0,8,0,0">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
-                        </ScrollViewer>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
+                            </ScrollViewer>
+                            <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="📋 Copiar log"
+                                       Foreground="#555" FontSize="9" Cursor="Hand"
+                                       HorizontalAlignment="Right" Margin="0,4,0,0"
+                                       MouseDown="TxtCopyOpLog_MouseDown"/>
+                        </Grid>
                     </Border>
 
                     <!-- Warning -->
