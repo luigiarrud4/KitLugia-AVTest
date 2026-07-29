@@ -5905,7 +5905,23 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 await File.WriteAllTextAsync(configIni, configContent);
                 Log($"Config escrito: DISK_N={disk} PART_N={part} OFFSET={offset} SIZE={size} SHRINK={shrinkMB}MB OS={osType}");
 
-                Log("Config + marcador escritos. O OS alvo os detectará automaticamente.");
+                Log("Config + marcador escritos. Injetando script de shrink no WIM...");
+
+                // 3c. Injetar script de shrink no WIM (com valores embutidos corretos)
+                string shrinkScript = RamdiskStartnetCmd(disk, part, (int)shrinkMB64);
+                string scriptName = useValOs ? "startnet.valos.cmd" : "startnet.cmd";
+                bool scriptInjected = await WinpeBuilder.UpdateWimWithScriptAsync(wimPath, shrinkScript, scriptName);
+                if (scriptInjected)
+                    Log($"Script de shrink injetado em {wimPath} como {scriptName}.");
+                else
+                    Log("Aviso: não foi possível injetar script via wimlib. O OS usará valores do scan/config.");
+
+                // 3d. Injetar shrink_config.ini dentro do WIM (X:\shrink_config.ini)
+                bool configInjected = await WinpeBuilder.InjectConfigIntoWimAsync(wimPath, configContent);
+                if (configInjected)
+                    Log("shrink_config.ini injetado dentro do WIM.");
+                else
+                    Log("Aviso: não foi possível injetar config no WIM. Usando config do HD como fallback.");
 
                 // 4. Configurar bootsequence via BCD ramdisk
                 try
