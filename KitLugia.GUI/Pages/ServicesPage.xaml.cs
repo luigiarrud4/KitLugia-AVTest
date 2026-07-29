@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,6 +20,7 @@ namespace KitLugia.GUI.Pages
     {
         private List<ServiceInfo> _allServices = new();
         private List<StartupAppDetails> _allStartupApps = new();
+        private readonly object _startupAppsLock = new();
         private int _initialTabIndex = 0;
         private CancellationTokenSource? _cts;
         private string _addMode = "Normal";
@@ -118,21 +119,22 @@ namespace KitLugia.GUI.Pages
 
                 // FASE 1 (rápida): registro + pastas + tarefas KitLugia — sem Task Scheduler externo
                 var fast = await Task.Run(() => StartupManager.GetStartupAppsFast(), cancellationToken);
-                _allStartupApps = fast;
+                lock (_startupAppsLock) { _allStartupApps = fast; }
                 ApplyStartupFilter();
 
                 // FASE 2 (background): enriquecer com tarefas externas + UWP + Active Setup
                 TxtStartupLoadingStatus.Text = "Buscando mais apps...";
                 var full = await Task.Run(() => StartupManager.GetStartupAppsWithDetails(true), cancellationToken);
-                if (full.Count > _allStartupApps.Count)
+                lock (_startupAppsLock)
                 {
-                    _allStartupApps = full;
-                    ApplyStartupFilter();
+                    if (full.Count > _allStartupApps.Count)
+                    {
+                        _allStartupApps = full;
+                    }
                 }
+                ApplyStartupFilter();
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch { Logger.LogWarning("ServicesPage", "Exception suppressed"); }
             finally
             {
                 StartupLoadingOverlay.Visibility = Visibility.Collapsed;
@@ -143,11 +145,16 @@ namespace KitLugia.GUI.Pages
 
         private void ApplyStartupFilter()
         {
-            if (_allStartupApps == null || _allStartupApps.Count == 0) return;
+            List<StartupAppDetails> snapshot;
+            lock (_startupAppsLock)
+            {
+                if (_allStartupApps == null || _allStartupApps.Count == 0) return;
+                snapshot = new List<StartupAppDetails>(_allStartupApps);
+            }
 
             string filter = TxtSearchStartup.Text.ToLower().Trim();
 
-            var filtered = _allStartupApps
+            var filtered = snapshot
                 .Where(a =>
                     string.IsNullOrEmpty(filter) ||
                     a.Name.ToLower().Contains(filter) ||
@@ -388,6 +395,18 @@ namespace KitLugia.GUI.Pages
                 string args = TxtAddArgs.Text.Trim();
                 string finalCommand = string.IsNullOrEmpty(args) ? exePath : $"\"{exePath}\" {args}";
 
+                // Duplicate detection
+                bool exists;
+                lock (_startupAppsLock) { exists = _allStartupApps?.Any(a => a.Name.Equals(appName, StringComparison.OrdinalIgnoreCase)) ?? false; }
+                if (exists)
+                {
+                    if (Application.Current.MainWindow is MainWindow mw)
+                    {
+                        bool overwrite = await mw.ShowConfirmationDialog($"'{appName}' já existe na lista. Sobrescrever?");
+                        if (!overwrite) return;
+                    }
+                }
+
                 if (Application.Current.MainWindow is MainWindow mainWindow)
                 {
                     (bool Success, string Message) result = (false, "");
@@ -399,9 +418,9 @@ namespace KitLugia.GUI.Pages
                         {
                             case "Normal":
                                 string startupDir = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-                                string script = $"$s=(New-Object -COM WScript.Shell).CreateShortcut('{startupDir}\\{appName}.lnk');$s.TargetPath='{finalCommand}';$s.Save()";
-                                SystemUtils.RunExternalProcess("powershell", $"-Command \"{script}\"", hidden: true);
-                                return (true, $"'{appName}' adicionado à inicialização padrão.");
+                                string shortcutPath = System.IO.Path.Combine(startupDir, appName + ".lnk");
+                                bool created = StartupManager.CreateShortcut(shortcutPath, exePath, args, appName, System.IO.Path.GetDirectoryName(exePath) ?? "");
+                                return (created, created ? $"'{appName}' adicionado à inicialização padrão." : $"Erro ao criar atalho para '{appName}'.");
                             case "Admin":
                                 return StartupManager.CreateElevatedStartupTask(appName, exePath, args);
                             case "Delayed":
@@ -543,8 +562,10 @@ namespace KitLugia.GUI.Pages
 
                     var result = await Task.Run(() =>
                     {
-                        StartupManager.RemoveStartupItem(selectedApp.Name);
-                        return StartupManager.CreateElevatedStartupTask(selectedApp.Name, path, args);
+                        var taskResult = StartupManager.CreateElevatedStartupTask(selectedApp.Name, path, args);
+                        if (taskResult.Success)
+                            StartupManager.RemoveStartupItem(selectedApp.Name);
+                        return taskResult;
                     });
 
                     if (result.Success) { mw.ShowSuccess("ELEVADO COM SUCESSO", result.Message); await LoadStartupApps(); }
@@ -574,8 +595,10 @@ namespace KitLugia.GUI.Pages
 
                     var result = await Task.Run(() =>
                     {
-                        StartupManager.RemoveStartupItem(selectedApp.Name);
-                        return StartupManager.CreateElevatedDelayedStartupTask(selectedApp.Name, path, args);
+                        var taskResult = StartupManager.CreateElevatedDelayedStartupTask(selectedApp.Name, path, args);
+                        if (taskResult.Success)
+                            StartupManager.RemoveStartupItem(selectedApp.Name);
+                        return taskResult;
                     });
 
                     if (result.Success) { mw.ShowSuccess("ELEVADO (ATRASO) COM SUCESSO", result.Message); await LoadStartupApps(); }
@@ -834,10 +857,7 @@ namespace KitLugia.GUI.Pages
                 _allServices = services;
                 ApplyServiceFilter();
             }
-            catch (OperationCanceledException)
-            {
-
-            }
+            catch { Logger.LogWarning("ServicesPage", "Exception suppressed"); }
         }
 
         private async Task LoadServices() => await LoadServices(_cts?.Token ?? CancellationToken.None);
@@ -941,9 +961,6 @@ namespace KitLugia.GUI.Pages
                 var tasks = await Task.Run(() => BackgroundProcessManager.GetScheduledTasksStatus(), cancellationToken);
                 _allTasks = tasks;
                 ApplyTaskFilter();
-            }
-            catch (OperationCanceledException)
-            {
             }
             catch (Exception ex)
             {

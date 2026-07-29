@@ -377,10 +377,10 @@ namespace KitLugia.Core
                                 }
                             }
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             return issues;
@@ -420,7 +420,7 @@ namespace KitLugia.Core
                         ));
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             return issues;
@@ -471,10 +471,10 @@ namespace KitLugia.Core
                             ));
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return issues;
         }
@@ -514,10 +514,10 @@ namespace KitLugia.Core
                             ));
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return issues;
         }
 
@@ -582,10 +582,10 @@ namespace KitLugia.Core
                             }
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return issues;
         }
 
@@ -601,7 +601,7 @@ namespace KitLugia.Core
                 path = ExtractExePathFromCom(path);
                 return path;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         private static string ExtractExePathFromCom(string value)
@@ -657,7 +657,7 @@ namespace KitLugia.Core
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return issues;
         }
@@ -723,10 +723,10 @@ namespace KitLugia.Core
                                 ));
                             }
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return issues;
         }
@@ -805,7 +805,7 @@ namespace KitLugia.Core
 
             if (!process.WaitForExit(5000))
             {
-                try { process.Kill(); } catch { }
+                try { process.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 throw new InvalidOperationException("reg export excedeu o tempo limite.");
             }
 

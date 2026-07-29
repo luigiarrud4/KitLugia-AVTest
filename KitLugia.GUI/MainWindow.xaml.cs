@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -153,6 +153,8 @@ namespace KitLugia.GUI
         ContextMenu,
         ContextMenuPreview,
         ForceStopUnlock,
+        WinpeTools,
+        ReinstallPreserve,
     }
 
     public partial class MainWindow : Window, INotifyPropertyChanged
@@ -378,7 +380,7 @@ namespace KitLugia.GUI
                     ShowInfo("📶 GoodbyeDPI", "Ative o GoodbyeDPI para aplicar as novas configurações.");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // Ativa GoodbyeDPI (método auxiliar)
@@ -659,7 +661,7 @@ namespace KitLugia.GUI
                         Logger.Log($"KitLugia iniciado: {currentPath}");
                         TrayIconService.SetAutoStart(true);
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
                 
 
@@ -738,7 +740,7 @@ namespace KitLugia.GUI
                             });
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }) { IsBackground = true, Name = "ShowWindowMonitor" };
             _showWindowMonitor.Start();
@@ -906,6 +908,8 @@ namespace KitLugia.GUI
                 ContextMenuPage => PageType.ContextMenu,
                 ContextMenuPreviewPage => PageType.ContextMenuPreview,
                 ForceStopUnlockPage => PageType.ForceStopUnlock,
+                WinpeToolsPage => PageType.WinpeTools,
+                ReinstallPreservePage => PageType.ReinstallPreserve,
                 _ => null
             };
         }
@@ -931,6 +935,8 @@ namespace KitLugia.GUI
                 PageType.ContextMenu => new ContextMenuPage(),
                 PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
+                PageType.WinpeTools => new WinpeToolsPage(),
+                PageType.ReinstallPreserve => new ReinstallPreservePage(),
                 _ => new DashboardPage()
             };
         }
@@ -980,7 +986,7 @@ namespace KitLugia.GUI
                     if (item.IsToggle && item.CheckState != null)
                     {
                         try { item.IsActive = item.CheckState.Invoke(); }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 });
 
@@ -1184,6 +1190,8 @@ namespace KitLugia.GUI
                 PageType.ContextMenu => new ContextMenuPage(),
                 PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
+                PageType.WinpeTools => new WinpeToolsPage(),
+                PageType.ReinstallPreserve => new ReinstallPreservePage(),
                 _ => null
             };
 
@@ -1215,7 +1223,7 @@ namespace KitLugia.GUI
                         {
                             cleanupMethod.Invoke(previousPage, null);
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
 
@@ -1231,7 +1239,7 @@ namespace KitLugia.GUI
                         while (MainFrame.NavigationService.CanGoBack)
                             MainFrame.NavigationService.RemoveBackEntry();
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
             catch (Exception ex)
@@ -1422,7 +1430,7 @@ namespace KitLugia.GUI
                                     proc.Kill();
                                     proc.WaitForExit(5000);
                                 }
-                                catch { }
+                                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             }
                             _goodbyeDpiProcess = null;
                             Logger.Log("GOODBYEDPI: Processos externos encerrados");
@@ -1686,7 +1694,7 @@ namespace KitLugia.GUI
                     return currentName.Equals(pageName, StringComparison.OrdinalIgnoreCase);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return true; // em caso de erro, mostra o toast
         }
 
@@ -2439,7 +2447,7 @@ namespace KitLugia.GUI
                         });
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 System.IO.File.Delete(notificationFile);
             }
         }
@@ -2664,7 +2672,7 @@ namespace KitLugia.GUI
             {
                 e.Cancel = true; // Cancelar o fechamento
                 this.Hide(); // Minimizar para tray
-                try { _trayService?.ShowMinimizedNotification(); } catch { }
+                try { _trayService?.ShowMinimizedNotification(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 KitLugia.Core.Logger.Log("🔔 Janela minimizada para Tray (Close to Tray ativado)");
             }
             else
@@ -2685,7 +2693,7 @@ namespace KitLugia.GUI
         public void ForceShutdown()
         {
             _isShuttingDown = true;
-            try { _trayService?.Dispose(); } catch { }
+            try { _trayService?.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             Application.Current.Shutdown();
         }
 

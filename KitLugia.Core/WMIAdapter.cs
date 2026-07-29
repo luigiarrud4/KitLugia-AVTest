@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Management;
 using System.Net;
@@ -211,7 +211,7 @@ public sealed class WMIAdapter : IDisposable
                     return candidate;
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
         var possiblePaths = new[]
         {

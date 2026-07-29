@@ -135,11 +135,11 @@ namespace KitLugia.Core
                 long size = 0;
                 foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                 {
-                    try { size += new FileInfo(file).Length; } catch { }
+                    try { size += new FileInfo(file).Length; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
                 return size;
             }
-            catch { return 0; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private record BrowserDefinition(string Name, string Icon, List<string> CachePaths);

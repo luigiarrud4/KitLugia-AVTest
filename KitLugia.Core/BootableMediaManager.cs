@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -194,9 +194,9 @@ namespace KitLugia.Core
                             BusType = descriptor.BusType.ToString()
                         });
                     }
-                    catch { continue; }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); continue; }
                 }
-                catch { continue; }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); continue; }
             }
 
             return result.OrderBy(r => r.DriveLetter).ToList();
@@ -222,7 +222,7 @@ namespace KitLugia.Core
                             return volume;
                     }
                 }
-                catch { continue; }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); continue; }
             }
 
             return "";
@@ -284,7 +284,7 @@ exit";
                 var (exitCode, output, error) = await Task.Run(() =>
                     ProcessRunner.Run("diskpart", $"/s \"{scriptPath}\"", 60000));
 
-                try { File.Delete(scriptPath); } catch { }
+                try { File.Delete(scriptPath); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 return exitCode == 0
                     ? (true, $"Drive {driveLetter} formatado como {options.FileSystem}.")
@@ -345,10 +345,7 @@ exit";
                     await WinbootManager.DismountIso(isoPath);
                 }
             }
-            catch
-            {
-                return "Other";
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return "Other"; }
         }
 
         /// <summary>
@@ -398,7 +395,7 @@ exit";
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             // 2. Caminhos comuns do Windows ADK
             string[] adkCandidates =
@@ -511,16 +508,16 @@ exit";
                     await Task.Run(() =>
                         ProcessRunner.Run("bcdboot", $@"{efiLetter}:\Windows /s {efiLetter}: /f UEFI", 30000));
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 progress?.Report((100.0, "Concluído!"));
                 return (true, $"Dual-boot criado: FAT32(EFI) + NTFS(Dados) com {isoPaths.Count} ISO(s).");
             }
             finally
             {
-                try { File.Delete(scriptPath); } catch { }
-                try { SystemUtils.RunExternalProcess("diskpart", $"/c \"select volume {efiLetter}\" & \"remove letter={efiLetter}\"", true); } catch { }
-                try { SystemUtils.RunExternalProcess("diskpart", $"/c \"select volume {dataLetter}\" & \"remove letter={dataLetter}\"", true); } catch { }
+                try { File.Delete(scriptPath); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { SystemUtils.RunExternalProcess("diskpart", $"/c \"select volume {efiLetter}\" & \"remove letter={efiLetter}\"", true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { SystemUtils.RunExternalProcess("diskpart", $"/c \"select volume {dataLetter}\" & \"remove letter={dataLetter}\"", true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -531,12 +528,10 @@ exit";
         {
             try
             {
-                using var stream = File.OpenRead(filePath);
-                using var sha256 = System.Security.Cryptography.SHA256.Create();
-                byte[] hash = await Task.Run(() => sha256.ComputeHash(stream));
-                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                return await Task.Run(() => NativeSha256.ComputeHash(filePath) ?? "")
+                    .ConfigureAwait(false);
             }
-            catch { return ""; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return ""; }
         }
 
         /// <summary>

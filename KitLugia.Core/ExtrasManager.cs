@@ -38,7 +38,7 @@ del List.txt
             }
             finally
             {
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -102,7 +102,7 @@ del List.txt
                 using var key = Registry.ClassesRoot.OpenSubKey(keyPath);
                 return key != null;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -200,10 +200,7 @@ del List.txt
             {
                 return (int)(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", 2) ?? 2) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool AreExtensionsVisible()
@@ -212,10 +209,7 @@ del List.txt
             {
                 return (int)(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", 1) ?? 1) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) ToggleHiddenFiles()

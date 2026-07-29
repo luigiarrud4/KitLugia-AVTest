@@ -217,7 +217,7 @@ namespace KitLugia.Core
             OnLogMessage?.Invoke("🔒 Parando...");
             _cts?.Cancel();
 
-            try { _listener?.Stop(); } catch { }
+            try { _listener?.Stop(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             _listener = null;
 
             var sessions = _sessions.Values.ToArray();
@@ -225,7 +225,7 @@ namespace KitLugia.Core
 
             foreach (var session in sessions)
             {
-                try { session.Dispose(); } catch { }
+                try { session.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             _isRunning = false;
@@ -293,15 +293,13 @@ namespace KitLugia.Core
                         BytesTransferred += read;
                     }
                 }
-                catch (OperationCanceledException) { }
-                catch (IOException) { }
-                catch (ObjectDisposedException) { }
+                catch { Logger.LogWarning("HolePunchProxy", "Exception suppressed"); }
             }
 
             public void Dispose()
             {
-                try { _remoteClient?.Close(); } catch { }
-                try { _gameClient?.Close(); } catch { }
+                try { _remoteClient?.Close(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { _gameClient?.Close(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
     }

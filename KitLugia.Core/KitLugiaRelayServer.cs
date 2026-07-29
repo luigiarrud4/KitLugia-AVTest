@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
@@ -280,7 +280,7 @@ public sealed class RelaySession : IDisposable
         {
             client.Close();
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
     }
 
     /// <summary>
@@ -314,7 +314,7 @@ public sealed class RelaySession : IDisposable
                 var stream = _hostConnection.GetStream();
                 tasks.Add(stream.WriteAsync(packet, 0, packet.Length));
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         await Task.WhenAll(tasks);
@@ -361,7 +361,7 @@ public sealed class RelaySession : IDisposable
             {
                 client.Close();
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
     }
 }

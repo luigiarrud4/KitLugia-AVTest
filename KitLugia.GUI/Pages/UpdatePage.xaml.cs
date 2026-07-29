@@ -41,6 +41,9 @@ namespace KitLugia.GUI.Pages
                     KitLugia.Core.Logger.Log($"UpdatePage: Error loading version info: {ex.Message}");
                 }
             });
+
+            // Benchmark Rust native vs C# (roda em background)
+            Task.Run(() => Confidence.Benchmark());
         }
 
 
@@ -590,6 +593,21 @@ namespace KitLugia.GUI.Pages
                 stopwatch.Stop();
                 KitLugia.Core.Logger.Log($"✅ Download concluído em {stopwatch.Elapsed.TotalSeconds:F1}s (média: {totalSizeMB / stopwatch.Elapsed.TotalSeconds:F1} MB/s)");
 
+                // Extract ZIP in C# — avoids PowerShell in the batch (antivirus false positive)
+                var extractDir = Path.Combine(Path.GetTempPath(), $"KitLugia_Extract_{DateTime.Now.Ticks}");
+                KitLugia.Core.Logger.Log($"📂 Extraindo arquivos para {extractDir}...");
+                try
+                {
+                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractDir);
+                    KitLugia.Core.Logger.Log("✅ Extração concluída!");
+                }
+                catch (Exception ex)
+                {
+                    KitLugia.Core.Logger.Log($"❌ Falha ao extrair ZIP: {ex.Message}");
+                    File.Delete(zipPath);
+                    return false;
+                }
+
                 int currentPid = Process.GetCurrentProcess().Id;
                 string currentExePath = Environment.ProcessPath ?? "";
                 if (string.IsNullOrEmpty(currentExePath))
@@ -600,7 +618,7 @@ namespace KitLugia.GUI.Pages
                 if (newVersion.StartsWith("v"))
                     newVersion = newVersion.Substring(1);
 
-                string? batchPath = GitHubUpdater.GenerateUpdateBatch(zipPath, currentPid, currentExePath, currentVersion, newVersion);
+                string? batchPath = GitHubUpdater.GenerateUpdateBatch(extractDir, currentPid, currentExePath, currentVersion, newVersion);
                 if (batchPath == null)
                 {
                     KitLugia.Core.Logger.Log("❌ Falha ao gerar script de atualização!");

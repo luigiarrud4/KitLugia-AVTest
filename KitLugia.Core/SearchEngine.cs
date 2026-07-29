@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -102,7 +102,7 @@ namespace KitLugia.Core
                     });
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             // 3. TWEAKS DE SEGURANÇA (GUARDIAN)
             try
@@ -123,13 +123,13 @@ namespace KitLugia.Core
                                 var all = Guardian.GetHarmfulTweaksWithStatus();
                                 return all.FirstOrDefault(t => t.Name == tweak.Name)?.Status == TweakStatus.MODIFIED;
                             }
-                            catch { return false; }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
                         },
                         ExecuteAction = () => Guardian.ToggleTweak(tweak)
                     });
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             // 4. BLOATWARE (carregado em background)
             System.Threading.Tasks.Task.Run(() =>
@@ -153,7 +153,7 @@ namespace KitLugia.Core
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
 
             // 5. TWEAKS ESPECÍFICOS
@@ -219,38 +219,54 @@ namespace KitLugia.Core
             if (string.IsNullOrWhiteSpace(query)) return new List<GlobalSearchResult>(0);
 
             query = query.ToLower().Trim();
-            var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
             // Search com scoring
             var scored = new List<(GlobalSearchResult Item, int Score)>();
 
             lock (_dbLock)
             {
-                foreach (var item in _database)
+                if (NativeSearch.UseNative)
                 {
-                    int score = 0;
-                    string titleLower = item.Title.ToLower();
-                    string descLower = item.Description.ToLower();
-
-                    foreach (var word in words)
+                    foreach (var item in _database)
                     {
-                        if (titleLower == word) score += 100;
-                        else if (titleLower.StartsWith(word)) score += 80;
-                        else if (titleLower.Contains(" " + word)) score += 60;
-                        else if (titleLower.Contains(word)) score += 40;
-                        else if (descLower.StartsWith(word)) score += 30;
-                        else if (descLower.Contains(word)) score += 15;
-                        else { score = -1; break; }
-                    }
+                        int score = NativeSearch.Score(item.Title, item.Description, query);
+                        if (score <= 0) continue;
 
-                    if (score > 0)
-                    {
-                        // Bônus por tipo (navegação primeiro)
                         if (item.Type == SearchResultType.Navigation) score += 10;
                         else if (item.Type == SearchResultType.Tweak) score += 5;
 
                         item.Score = score;
                         scored.Add((item, score));
+                    }
+                }
+                else
+                {
+                    var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var item in _database)
+                    {
+                        int score = 0;
+                        string titleLower = item.Title.ToLower();
+                        string descLower = item.Description.ToLower();
+
+                        foreach (var word in words)
+                        {
+                            if (titleLower == word) score += 100;
+                            else if (titleLower.StartsWith(word)) score += 80;
+                            else if (titleLower.Contains(" " + word)) score += 60;
+                            else if (titleLower.Contains(word)) score += 40;
+                            else if (descLower.StartsWith(word)) score += 30;
+                            else if (descLower.Contains(word)) score += 15;
+                            else { score = -1; break; }
+                        }
+
+                        if (score > 0)
+                        {
+                            if (item.Type == SearchResultType.Navigation) score += 10;
+                            else if (item.Type == SearchResultType.Tweak) score += 5;
+
+                            item.Score = score;
+                            scored.Add((item, score));
+                        }
                     }
                 }
             }

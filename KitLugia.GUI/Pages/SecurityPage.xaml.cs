@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -189,7 +189,7 @@ namespace KitLugia.GUI.Pages
                 {
                     using var expKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Explorer");
                     if (expKey != null)
-                        try { expKey.DeleteValue("SmartScreenEnabled"); } catch { }
+                        try { expKey.DeleteValue("SmartScreenEnabled"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
                 else
                 {
@@ -354,7 +354,7 @@ namespace KitLugia.GUI.Pages
                 SystemUtils.RunExternalProcess("netsh", "advfirewall set allprofiles state on", hidden: true);
                 Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System", "EnableSmartScreen", 1, RegistryValueKind.DWord);
                 using (var expKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Explorer"))
-                    try { expKey?.DeleteValue("SmartScreenEnabled"); } catch { }
+                    try { expKey?.DeleteValue("SmartScreenEnabled"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 0, RegistryValueKind.DWord);
                 Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server", "fDenyTSConnections", 1, RegistryValueKind.DWord);
                 SystemUtils.RunExternalProcess("sc", "config RemoteRegistry start= disabled", hidden: true);
@@ -432,7 +432,7 @@ namespace KitLugia.GUI.Pages
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 3);
                 return val != null && Convert.ToInt32(val) == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static bool IsActivityHistoryDisabled()
@@ -442,7 +442,7 @@ namespace KitLugia.GUI.Pages
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System", "PublishUserActivities", 1);
                 return val != null && Convert.ToInt32(val) == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static bool IsAdIdDisabled()
@@ -452,7 +452,7 @@ namespace KitLugia.GUI.Pages
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled", 1);
                 return val != null && Convert.ToInt32(val) == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static bool IsLocationDisabled()
@@ -462,7 +462,7 @@ namespace KitLugia.GUI.Pages
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors", "DisableLocation", 0);
                 return val != null && Convert.ToInt32(val) == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static bool IsRemoteRegistryDisabled()
@@ -473,7 +473,7 @@ namespace KitLugia.GUI.Pages
                 var start = key?.GetValue("Start");
                 return start != null && Convert.ToInt32(start) == 4; // 4 = Disabled
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static bool IsRdpDisabled()
@@ -483,7 +483,7 @@ namespace KitLugia.GUI.Pages
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server", "fDenyTSConnections", 1);
                 return val != null && Convert.ToInt32(val) == 1;
             }
-            catch { return true; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return true; }
         }
 
         private static bool IsFirewallEnabled()
@@ -493,7 +493,7 @@ namespace KitLugia.GUI.Pages
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile", "EnableFirewall", 1);
                 return val == null || Convert.ToInt32(val) == 1;
             }
-            catch { return true; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return true; }
         }
 
         private static bool IsRealtimeProtectionDisabled()
@@ -503,7 +503,7 @@ namespace KitLugia.GUI.Pages
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection", "DisableRealtimeMonitoring", 0);
                 return val != null && Convert.ToInt32(val) == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static bool IsSmartScreenEnabled()
@@ -518,7 +518,7 @@ namespace KitLugia.GUI.Pages
                     return false;
                 return true;
             }
-            catch { return true; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return true; }
         }
 
         private static int GetUACLevel()
@@ -536,7 +536,7 @@ namespace KitLugia.GUI.Pages
                     _ => 1
                 };
             }
-            catch { return 1; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 1; }
         }
 
         private static void SetUACLevel(int level)
@@ -554,7 +554,7 @@ namespace KitLugia.GUI.Pages
                 Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System",
                     "ConsentPromptBehaviorAdmin", consentValue, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static string GetUACLevelName(int level) => level switch

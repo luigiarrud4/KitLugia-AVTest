@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -168,7 +168,7 @@ namespace KitLugia.GUI.Pages
                 if (clean.Length > 11) clean = clean[..11];
                 if (clean.Length > 0) TxtLabel.Text = clean;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ─── FORMAT ONLY (no ISO) ─────────────────────────────────

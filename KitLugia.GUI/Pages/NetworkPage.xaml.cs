@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -62,11 +62,11 @@ namespace KitLugia.GUI.Pages
         private void StartRefreshTimers()
         {
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-            _refreshTimer.Tick += async (s, e) => { try { await RefreshAdapterStatus(); } catch { } };
+            _refreshTimer.Tick += async (s, e) => { try { await RefreshAdapterStatus(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } };
             _refreshTimer.Start();
 
             _dnsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
-            _dnsTimer.Tick += async (s, e) => { try { await RefreshDnsStatus(); } catch { } };
+            _dnsTimer.Tick += async (s, e) => { try { await RefreshDnsStatus(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } };
             _dnsTimer.Start();
         }
 
@@ -83,7 +83,7 @@ namespace KitLugia.GUI.Pages
                 else
                     TxtRefreshStatus.Foreground = _colorDefault;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private async Task RefreshDnsStatus()
@@ -95,7 +95,7 @@ namespace KitLugia.GUI.Pages
                 var dnsInfo = await Task.Run(() => Toolbox.GetActiveDnsInfo());
                 await Dispatcher.InvokeAsync(() => UpdateDnsUi(dnsInfo.Provider, dnsInfo.DnsIp));
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -260,7 +260,7 @@ namespace KitLugia.GUI.Pages
                     UpdateLabel(StatusTcpRegistry, tcpRegistry, "Ativo", "Padr\u00e3o");
                 });
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void UpdateLabel(TextBlock label, bool isActive, string activeText, string defaultText)
@@ -313,7 +313,7 @@ namespace KitLugia.GUI.Pages
                 var dnsInfo = await Task.Run(() => Toolbox.GetActiveDnsInfo());
                 await Dispatcher.InvokeAsync(() => UpdateDnsUi(dnsInfo.Provider, dnsInfo.DnsIp));
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void UpdateDnsUi(string provider, string ip)
@@ -367,6 +367,7 @@ namespace KitLugia.GUI.Pages
         private async void BtnBenchmarkDns_Click(object sender, RoutedEventArgs e)
         {
             BtnBenchmarkDns.IsEnabled = false;
+            PgbBenchmark.Visibility = Visibility.Visible;
             TxtBenchmarkStatus.Text = "Testando provedores DNS...";
             var providers = DnsBenchmark.GetDefaultProviders();
             DnsProviderList.ItemsSource = providers;
@@ -374,9 +375,11 @@ namespace KitLugia.GUI.Pages
             var results = await Task.Run(() => DnsBenchmark.BenchmarkAsync(providers));
             DnsProviderList.ItemsSource = results;
 
+            PgbBenchmark.Visibility = Visibility.Collapsed;
+
             var fastest = results.FirstOrDefault(p => p.LatencyMs >= 0);
             if (fastest != null)
-                TxtBenchmarkStatus.Text = $"Teste concluído! Mais rápido: {fastest.Name} ({fastest.LatencyMs:F0} ms)";
+                TxtBenchmarkStatus.Text = $"Teste conclu\u00eddo! Mais r\u00e1pido: {fastest.Name} ({fastest.LatencyMs:F0} ms)";
             else
                 TxtBenchmarkStatus.Text = "Nenhum DNS respondeu ao teste.";
             BtnBenchmarkDns.IsEnabled = true;

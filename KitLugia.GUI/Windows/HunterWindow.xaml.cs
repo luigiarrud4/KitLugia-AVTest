@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -193,7 +193,7 @@ namespace KitLugia.GUI.Windows
                         _currentHwnd = hWnd;
                         UpdateInfo(hWnd);
                     }
-                    try { var p = Process.GetProcessById((int)pid); name = p.ProcessName; try { path = p.MainModule?.FileName ?? ""; } catch { } } catch { }
+                    try { var p = Process.GetProcessById((int)pid); name = p.ProcessName; try { path = p.MainModule?.FileName ?? ""; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
             ShowInfo(pos.X, pos.Y, name, path);
@@ -921,7 +921,7 @@ namespace KitLugia.GUI.Windows
                                 if (nm != null && nm.IndexOf(_detectedName, StringComparison.OrdinalIgnoreCase) >= 0)
                                 { rdn = nm; rus = sk?.GetValue("UninstallString") as string ?? ""; rpb = sk?.GetValue("Publisher") as string ?? ""; var loc = sk?.GetValue("InstallLocation") as string; if (!string.IsNullOrEmpty(loc)) ril = loc; break; }
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 return (dn: rdn, us: rus, pb: rpb, il: ril);
             });
             string dn = regResult.dn, us = regResult.us, pb = regResult.pb;
@@ -986,7 +986,7 @@ namespace KitLugia.GUI.Windows
             if (_detectedPid == 0) return;
             await Task.Run(() =>
             {
-                try { var p = Process.GetProcessById((int)_detectedPid); p.Kill(); p.WaitForExit(3000); } catch { }
+                try { var p = Process.GetProcessById((int)_detectedPid); p.Kill(); p.WaitForExit(3000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
         }
 
@@ -994,25 +994,25 @@ namespace KitLugia.GUI.Windows
         {
             await Task.Run(() =>
             {
-                try { var p = Process.GetProcessById((int)_detectedPid); p.Kill(); p.WaitForExit(3000); } catch { }
+                try { var p = Process.GetProcessById((int)_detectedPid); p.Kill(); p.WaitForExit(3000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             if (!string.IsNullOrEmpty(_detectedPath))
                 await Task.Run(() =>
                 {
-                    try { string d = Path.GetDirectoryName(_detectedPath) ?? ""; if (Directory.Exists(d)) Directory.Delete(d, true); } catch { }
+                    try { string d = Path.GetDirectoryName(_detectedPath) ?? ""; if (Directory.Exists(d)) Directory.Delete(d, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
         }
 
         private void BtnOpenFolder_Click(object? sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(_detectedPath))
-                try { Process.Start("explorer.exe", $"/select,\"{_detectedPath}\""); } catch { }
+                try { Process.Start("explorer.exe", $"/select,\"{_detectedPath}\""); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void BtnProperties_Click(object? sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(_detectedPath) && File.Exists(_detectedPath))
-                try { Process.Start("explorer.exe", $"/select,\"{_detectedPath}\""); } catch { }
+                try { Process.Start("explorer.exe", $"/select,\"{_detectedPath}\""); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             else if (!string.IsNullOrEmpty(_detectedName))
                 MessageBox.Show($"Nome: {_detectedName}\nCaminho: {_detectedPath}", "Propriedades", MessageBoxButton.OK, MessageBoxImage.Information);
         }

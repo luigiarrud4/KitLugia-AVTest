@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -316,7 +316,7 @@ namespace KitLugia.GUI.Pages
                     ShowToast(enable ? "GameBoost ativado" : "GameBoost desativado");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static string AnalisarTeste(TestPhase baseline, TestPhase semGb, TestPhase restaurado)

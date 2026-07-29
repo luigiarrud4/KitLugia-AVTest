@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -11,6 +11,7 @@ using Microsoft.Win32;
 
 using Color = System.Windows.Media.Color;
 using Application = System.Windows.Application;
+using KitLugia.Core;
 
 namespace KitLugia.GUI.Pages
 {
@@ -190,7 +191,7 @@ namespace KitLugia.GUI.Pages
                 if (key == null) return defaultValue;
                 return Convert.ToInt32(key.GetValue(valueName, defaultValue));
             }
-            catch { return defaultValue; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return defaultValue; }
         }
 
         private static int ReadRegCuDword(string keyPath, string valueName, int defaultValue = 0)
@@ -202,7 +203,7 @@ namespace KitLugia.GUI.Pages
                 if (key == null) return defaultValue;
                 return Convert.ToInt32(key.GetValue(valueName, defaultValue));
             }
-            catch { return defaultValue; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return defaultValue; }
         }
 
         private static bool ReadRegCuCursorMask()
@@ -216,7 +217,7 @@ namespace KitLugia.GUI.Pages
                 if (mask == null || mask.Length < 1) return true;
                 return (mask[0] & 0x10) == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static string ReadBcdedit(string parameter)
@@ -244,7 +245,7 @@ namespace KitLugia.GUI.Pages
                 }
                 return "";
             }
-            catch { return ""; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return ""; }
         }
 
         private void ShowInfo(string title, string message)
@@ -405,7 +406,7 @@ namespace KitLugia.GUI.Pages
                         p?.WaitForExit(5000);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             UpdateLabel(StatusFlushNetworkCache, true, "Cache Limpo!");
             btn.Content = "Feito!";
@@ -481,7 +482,7 @@ namespace KitLugia.GUI.Pages
                 using var p = Process.Start(psi);
                 p?.WaitForExit(5000);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- SERVICOS ---
@@ -783,7 +784,7 @@ namespace KitLugia.GUI.Pages
                             TryDeleteFile(file);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             UpdateTransientLabel(StatusCleanWuCache, true, "Cache Limpo!");
             btn.Content = "Feito!";
@@ -808,7 +809,7 @@ namespace KitLugia.GUI.Pages
                             TryDeleteFile(file);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             UpdateTransientLabel(StatusCleanRecent, true, "Itens Limpos!");
             btn.Content = "Feito!";
@@ -835,7 +836,7 @@ namespace KitLugia.GUI.Pages
                             TryDeleteFile(file);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             UpdateTransientLabel(StatusCleanIeCache, true, "Cache Limpo!");
             btn.Content = "Feito!";
@@ -865,7 +866,7 @@ namespace KitLugia.GUI.Pages
                             TryDeleteDirectory(dir);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             UpdateTransientLabel(StatusCleanDumpsLogs, true, "Limpos!");
             btn.Content = "Feito!";
@@ -909,7 +910,7 @@ namespace KitLugia.GUI.Pages
             {
                 Services.BackgroundTaskTracker.Instance.UpdateTaskProgress(taskId, "Etapa 3/3: SFC /scannow...");
                 try { sfcExitCode = await RunSfcProcessAsync(btn, token, taskId); }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             else if (!dismOk && !token.IsCancellationRequested)
             {
@@ -1126,7 +1127,7 @@ namespace KitLugia.GUI.Pages
                 await p.WaitForExitAsync(token);
                 return p.ExitCode == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private void UpdateDismUi(System.Windows.Controls.Button btn)
@@ -1423,12 +1424,12 @@ namespace KitLugia.GUI.Pages
 
         private static void TryDeleteFile(string path)
         {
-            try { File.Delete(path); } catch { }
+            try { File.Delete(path); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void TryDeleteDirectory(string path)
         {
-            try { Directory.Delete(path, true); } catch { }
+            try { Directory.Delete(path, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void DeleteFilesInDir(string dir)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -279,10 +279,7 @@ public sealed class UniversalTunnelAdapter : IDisposable
 
             return null;
         }
-        catch
-        {
-            return null;
-        }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
     }
 
     /// <summary>
@@ -315,10 +312,7 @@ public sealed class UniversalTunnelAdapter : IDisposable
 
             return null;
         }
-        catch
-        {
-            return null;
-        }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
     }
 
     /// <summary>
@@ -429,7 +423,7 @@ public sealed class UniversalTunnelAdapter : IDisposable
             _isRunning = false;
             _publicUrl = null;
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
     }
 
     /// <summary>

@@ -253,6 +253,21 @@ namespace KitLugia.Core
                     Logger.Log("✅ Hash verificado com sucesso!");
                 }
 
+                // Extract ZIP in C# so the batch doesn't need PowerShell
+                var extractDir = Path.Combine(tempDir, $"KitLugia_Extract_{DateTime.Now.Ticks}");
+                Logger.Log($"📂 Extraindo arquivos para {extractDir}...");
+                try
+                {
+                    System.IO.Compression.ZipFile.ExtractToDirectory(updatePath, extractDir);
+                    Logger.Log("✅ Extração concluída!");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"❌ Falha ao extrair ZIP: {ex.Message}");
+                    File.Delete(updatePath);
+                    return false;
+                }
+
                 int currentPid = Process.GetCurrentProcess().Id;
                 string currentExePath = Environment.ProcessPath
                     ?? Path.ChangeExtension(Assembly.GetEntryAssembly()?.Location ?? "", ".exe")
@@ -264,7 +279,7 @@ namespace KitLugia.Core
                 string currentVersion = GetCurrentVersion().ToString();
                 string newVersion = ParseVersion(release.TagName).ToString();
 
-                string? batchPath = GenerateUpdateBatch(updatePath, currentPid, currentExePath, currentVersion, newVersion);
+                string? batchPath = GenerateUpdateBatch(extractDir, currentPid, currentExePath, currentVersion, newVersion);
                 if (batchPath == null)
                 {
                     Logger.Log("❌ Falha ao gerar script de atualização!");
@@ -299,10 +314,7 @@ namespace KitLugia.Core
                 var version = assembly.GetName().Version;
                 return version ?? new Version("1.0.0");
             }
-            catch
-            {
-                return new Version("1.0.0");
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new Version("1.0.0"); }
         }
 
         private static Version ParseVersion(string tag)
@@ -312,18 +324,12 @@ namespace KitLugia.Core
                 var cleanTag = tag.StartsWith("v") ? tag.Substring(1) : tag;
                 return Version.Parse(cleanTag);
             }
-            catch
-            {
-                return new Version("1.0.0");
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new Version("1.0.0"); }
         }
 
         private static string ComputeSha256(string filePath)
         {
-            using var sha256 = SHA256.Create();
-            using var stream = File.OpenRead(filePath);
-            byte[] hash = sha256.ComputeHash(stream);
-            return Convert.ToHexStringLower(hash);
+            return NativeSha256.ComputeHash(filePath) ?? "";
         }
 
         public static async Task StartAutoUpdateCheck()
@@ -387,7 +393,7 @@ namespace KitLugia.Core
             }
         }
 
-        public static string? GenerateUpdateBatch(string zipPath, int pid, string exePath, string oldVersion, string newVersion)
+        public static string? GenerateUpdateBatch(string extractDir, int pid, string exePath, string oldVersion, string newVersion)
         {
             try
             {
@@ -402,7 +408,7 @@ echo ================================================
 echo          KIT LUGIA - ATUALIZACAO
 echo ================================================
 echo.
-echo [1/4] Aguardando fechamento do KitLugia...
+echo [1/3] Aguardando fechamento do KitLugia...
 :wait
 tasklist /fi ""PID eq {pid}"" 2>nul | findstr /i ""{pid}"" >nul
 if not errorlevel 1 (
@@ -411,31 +417,21 @@ if not errorlevel 1 (
 )
 echo  OK - KitLugia fechado.
 echo.
-echo [2/4] Extraindo arquivos...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ""try {{ Expand-Archive -Path '{zipPath.Replace("'", "''")}' -DestinationPath '{appDir.Replace("'", "''")}' -Force; exit 0 }} catch {{ echo $_; pause; exit 1 }}""
+echo [2/3] Instalando arquivos...
+xcopy ""{extractDir}"" ""{appDir}"" /E /Y /Q
 if errorlevel 1 (
-    echo  ERRO - Falha ao extrair arquivos.
+    echo  ERRO - Falha ao copiar arquivos.
     pause
     exit /b 1
 )
-echo  OK - Arquivos extraidos.
+echo  OK - Arquivos instalados.
 echo.
-echo [3/4] Limpando temporarios...
-if exist ""%~dp0KitLugia.Updater.exe"" del /q ""%~dp0KitLugia.Updater.exe"" 2>nul
-if exist ""%~dp0KitLugia.Updater.dll"" del /q ""%~dp0KitLugia.Updater.dll"" 2>nul
-if exist ""%~dp0update.log"" del /q ""%~dp0update.log"" 2>nul
-echo  OK - Temporarios removidos.
-echo.
-rem Write UPDATE_COMPLETE.txt
-echo {{""OldVersion"":""{oldVersion}"",""NewVersion"":""{newVersion}""}} > ""%~dp0UPDATE_COMPLETE.txt""
-echo [4/4] Iniciando nova versao...
-start """" ""%~dp0KitLugia.GUI.exe""
+echo [3/3] Iniciando nova versao...
+start """" ""{exePath}""
 echo.
 echo ================================================
 echo     ATUALIZACAO CONCLUIDA!
 echo ================================================
-timeout /t 3 /nobreak >nul
-del ""%~f0""
 ";
 
                 File.WriteAllText(batchPath, batch);

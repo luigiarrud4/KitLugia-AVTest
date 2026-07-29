@@ -234,4 +234,19 @@ namespace KitLugia.Core
         public string GpuName { get; init; } = "";
         public DateTime ScanDate { get; init; }
     }
+
+    /// <summary>
+    /// Opções para o Fresh Install com preservação de dados via WinPE.
+    /// </summary>
+    public class PreservationOptions
+    {
+        public string TargetDrive { get; set; } = "C";
+        public string IsoPath { get; set; } = "";
+        public string EditionIndex { get; set; } = "1";
+        public bool PreserveUsers { get; set; } = true;
+        public bool PreserveProgramFiles { get; set; }
+        public bool PreserveRegistry { get; set; }
+        public bool PreservePersonalization { get; set; } = true;
+        public bool PreserveDrivers { get; set; } = true;
+    }
 }

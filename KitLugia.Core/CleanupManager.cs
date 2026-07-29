@@ -317,7 +317,7 @@ namespace KitLugia.Core
                         totalBytes += GetDirectorySizeSafe(recyclePath);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return totalBytes;
         }
@@ -329,10 +329,10 @@ namespace KitLugia.Core
             {
                 foreach (var filePath in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                 {
-                    try { size += new FileInfo(filePath).Length; } catch { }
+                    try { size += new FileInfo(filePath).Length; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return size;
         }
 

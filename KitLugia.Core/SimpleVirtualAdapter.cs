@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
@@ -226,7 +226,7 @@ public sealed class SimpleVirtualAdapter : IDisposable
                 return ip.Trim();
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
         return null;
     }
@@ -244,10 +244,7 @@ public sealed class SimpleVirtualAdapter : IDisposable
             var adapters = NetworkInterface.GetAllNetworkInterfaces();
             return adapters.Any(a => a.Name.Equals(_virtualAdapterName, StringComparison.OrdinalIgnoreCase));
         }
-        catch
-        {
-            return false;
-        }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
     }
 
     /// <summary>

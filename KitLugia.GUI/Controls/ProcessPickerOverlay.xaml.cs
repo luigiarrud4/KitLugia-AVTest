@@ -23,6 +23,7 @@ using Orientation = System.Windows.Controls.Orientation;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using VerticalAlignment = System.Windows.VerticalAlignment;
 using Image = System.Windows.Controls.Image;
+using KitLugia.Core;
 
 namespace KitLugia.GUI.Controls
 {
@@ -68,7 +69,7 @@ namespace KitLugia.GUI.Controls
                 _selectedEntry = null;
                 await RefreshAsync();
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
@@ -111,7 +112,7 @@ namespace KitLugia.GUI.Controls
 
                         long ramMB = proc.WorkingSet64 / (1024 * 1024);
                         string? exePath = null;
-                        try { exePath = proc.MainModule?.FileName; } catch { }
+                        try { exePath = proc.MainModule?.FileName; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                         if (grouped.TryGetValue(name, out var existing))
                         {
@@ -130,11 +131,11 @@ namespace KitLugia.GUI.Controls
                             };
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     finally { proc.Dispose(); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return grouped.Values
                 .OrderByDescending(e => e.TotalRamMB)
@@ -218,7 +219,7 @@ namespace KitLugia.GUI.Controls
                             Dispatcher.Invoke(() => img.Source = src);
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
             }
             iconBorder.Child = img;
@@ -516,7 +517,7 @@ namespace KitLugia.GUI.Controls
                         if (!string.IsNullOrEmpty(info.FileDescription))
                             return info.FileDescription;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
                 // Capitaliza
                 return ProcessName.Length > 0

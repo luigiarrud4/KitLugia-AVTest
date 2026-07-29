@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -203,10 +203,7 @@ public sealed class PlayitTunnelAdapter : IDisposable
             // Assinatura MZ = 0x4D5A ("MZ")
             return buffer[0] == 0x4D && buffer[1] == 0x5A;
         }
-        catch
-        {
-            return false;
-        }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
     }
 
     /// <summary>
@@ -316,7 +313,7 @@ public sealed class PlayitTunnelAdapter : IDisposable
             _isRunning = false;
             _publicUrl = null;
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
     }
 
     /// <summary>

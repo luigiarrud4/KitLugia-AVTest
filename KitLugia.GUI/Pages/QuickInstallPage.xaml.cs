@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using MessageBox = System.Windows.MessageBox;
+using KitLugia.Core;
 
 namespace KitLugia.GUI.Pages
 {
@@ -37,7 +38,7 @@ namespace KitLugia.GUI.Pages
         {
             this.Loaded -= QuickInstallPage_Loaded;
             if (_extractPath != null && Directory.Exists(_extractPath))
-                try { Directory.Delete(_extractPath, true); } catch { }
+                try { Directory.Delete(_extractPath, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private async Task<(int ExitCode, string Output, string Error)> Run(string file, string args, int timeoutMs = 300000)
@@ -64,7 +65,7 @@ namespace KitLugia.GUI.Pages
                 {
                     if (await Task.WhenAny(allTask, Task.Delay(timeoutMs)) != allTask)
                     {
-                        try { proc.Kill(entireProcessTree: true); } catch { }
+                        try { proc.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         return (-1, "", "TIMEOUT");
                     }
                 }
@@ -91,10 +92,10 @@ namespace KitLugia.GUI.Pages
                         if (TxtLog.Parent is ScrollViewer sv)
                             sv.ScrollToBottom();
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void SetBusy(bool busy)
@@ -108,7 +109,7 @@ namespace KitLugia.GUI.Pages
                     CmbTargetDrive.IsEnabled = !busy;
                     ProgressArea.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
         }
 
@@ -174,7 +175,7 @@ namespace KitLugia.GUI.Pages
 
                         TxtWinpeHint.Visibility = winPe ? Visibility.Visible : Visibility.Collapsed;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
             }
             catch (Exception ex)
@@ -191,7 +192,7 @@ namespace KitLugia.GUI.Pages
                 return winDir.StartsWith("X:", StringComparison.OrdinalIgnoreCase)
                     || !File.Exists(Path.Combine(winDir, "explorer.exe"));
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private void ChkOriginalMode_Checked(object sender, RoutedEventArgs e)
@@ -410,7 +411,7 @@ namespace KitLugia.GUI.Pages
                             }
                         }
 
-                        try { Directory.Delete(backupRoot, true); } catch { }
+                        try { Directory.Delete(backupRoot, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         Log("Restore concluído.");
                     }
                     catch (Exception ex)
@@ -455,7 +456,7 @@ namespace KitLugia.GUI.Pages
                     MessageBox.Show($"Erro: {ex.Message}\n\nDetalhes no log.", "Falha",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             finally
             {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -222,7 +222,7 @@ namespace KitLugia.GUI.Pages
                 var color = (Color)ColorConverter.ConvertFromString(hex);
                 double lum = (0.299 * color.R + 0.587 * color.G + 0.114 * color.B) / 255;
                 return lum < 0.5;
-            } catch { return true; }
+            } catch { Logger.LogWarning("Unknown", "Exception suppressed"); return true; }
         }
 
         private void GridPartitions_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -754,7 +754,7 @@ namespace KitLugia.GUI.Pages
                         {
                             await Task.Delay(2000);
                             await PartitionManager.ApplyVolumeImage(tempWim, $"{letter}\\", UpdateProgress);
-                            try { File.Delete(tempWim); } catch { }
+                            try { File.Delete(tempWim); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             SetActionBusy(false); ShowSuccess("Sucesso", "Movida.");
                             LoadDisks(); return;
                         }

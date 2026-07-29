@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ServiceProcess;
 
 namespace KitLugia.Core
@@ -71,10 +71,7 @@ namespace KitLugia.Core
                     return sc.Status == ServiceControllerStatus.Running;
                 }
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -95,10 +92,7 @@ namespace KitLugia.Core
                     return true;
                 }
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -119,10 +113,7 @@ namespace KitLugia.Core
                     return true;
                 }
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
     }
 }

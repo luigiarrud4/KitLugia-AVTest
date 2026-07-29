@@ -162,10 +162,7 @@ namespace KitLugia.GUI.Pages
                 Win32Api.GetWindowText(hwnd, sb, sb.Capacity);
                 return sb.ToString();
             }
-            catch
-            {
-                return "";
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return ""; }
         }
 
         private double GetCpuUsage(Process proc)
@@ -177,7 +174,7 @@ namespace KitLugia.GUI.Pages
                 System.Threading.Thread.Sleep(100);
                 return counter.NextValue() / Environment.ProcessorCount;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return 0;
         }
 

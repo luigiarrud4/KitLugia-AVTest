@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -233,7 +233,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return GetPlaceholderReleases();
         }
@@ -287,7 +287,7 @@ namespace KitLugia.Core
                 if (version != null)
                     return $"{version.Major}.{version.Minor}.{version.Build}";
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return "2.0.x";
         }
 

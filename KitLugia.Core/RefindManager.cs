@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -117,7 +117,7 @@ menuentry ""EFI Shell"" {{
                 string markerPath = Path.Combine(espDrive, ESP_KITLUGIA_DIR, MARKER_FILE);
                 return File.Exists(markerPath);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static async Task TriggerReboot()
@@ -130,7 +130,7 @@ menuentry ""EFI Shell"" {{
             for (char letter = 'S'; letter <= 'Z'; letter++)
             {
                 string drive = $"{letter}:";
-                try { if (new DriveInfo(drive).IsReady) continue; } catch { }
+                try { if (new DriveInfo(drive).IsReady) continue; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 var (exit, _) = await RunProcessCaptured("mountvol", $"{drive} /S");
                 if (exit != 0) continue;
@@ -154,7 +154,7 @@ menuentry ""EFI Shell"" {{
             for (char letter = 'S'; letter <= 'Z'; letter++)
             {
                 string drive = $"{letter}:";
-                try { if (new DriveInfo(drive).IsReady) continue; } catch { }
+                try { if (new DriveInfo(drive).IsReady) continue; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 var psi = new System.Diagnostics.ProcessStartInfo("mountvol", $"{drive} /S")
                 {
@@ -204,7 +204,7 @@ menuentry ""EFI Shell"" {{
 
                 if (!proc.WaitForExit(timeoutMs))
                 {
-                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    try { proc.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     return (-1, "TIMEOUT");
                 }
 

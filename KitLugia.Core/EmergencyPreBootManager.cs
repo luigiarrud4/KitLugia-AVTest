@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -217,10 +217,7 @@ menuentry ""KitLugia Recovery"" {{
                 await DismountEspAsync(espDrive);
                 return exists;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static async Task TriggerReboot()
@@ -238,7 +235,7 @@ menuentry ""KitLugia Recovery"" {{
                 {
                     if (new DriveInfo(drive).IsReady) continue;
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 var (exit, output) = await RunProcessCaptured("mountvol", $"{drive} /S");
                 if (exit != 0) continue;
@@ -295,7 +292,7 @@ menuentry ""KitLugia Recovery"" {{
                 {
                     if (!proc.WaitForExit(timeoutMs))
                     {
-                        try { proc.Kill(entireProcessTree: true); } catch { }
+                        try { proc.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         return (-1, "TIMEOUT: Processo excedeu o limite de tempo.");
                     }
                 }

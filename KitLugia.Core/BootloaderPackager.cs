@@ -165,7 +165,7 @@ namespace KitLugia.Core
             for (char c = 'S'; c <= 'Z'; c++)
             {
                 string drive = $"{c}:";
-                try { if (new DriveInfo(drive).IsReady) continue; } catch { }
+                try { if (new DriveInfo(drive).IsReady) continue; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 using var proc = new System.Diagnostics.Process();
                 proc.StartInfo.FileName = "mountvol";
@@ -293,7 +293,7 @@ menuentry ""{safeName} (Fallback)"" {{
             foreach (var file in Directory.GetFiles(sourceDir))
             {
                 string target = Path.Combine(targetDir, Path.GetFileName(file));
-                try { File.Copy(file, target, true); } catch { }
+                try { File.Copy(file, target, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             foreach (var directory in Directory.GetDirectories(sourceDir))
             {

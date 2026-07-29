@@ -1,0 +1,411 @@
+<Page x:Class="KitLugia.GUI.Pages.WinpeToolsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      d:DesignHeight="750" d:DesignWidth="1050"
+      Title="WinPE Tools">
+
+    <Page.Resources>
+        <Style x:Key="StepCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="15"/>
+        </Style>
+        <Style x:Key="GreenButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1A4A1A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#33D4AF37"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#226622"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#0D330D"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.3"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="25,20,25,15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- HEADER -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="WinPE Tools" FontSize="24" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
+                <TextBlock Text="Shrink sem limitações via WinPE RAMDISK" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,2,0,0"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Border x:Name="BdrWinpeStatus" Background="#222233" BorderBrush="#4488FF" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,0,10,0">
+                    <TextBlock x:Name="TxtWinpeStatus" Text="Verificando..." FontSize="11" Foreground="#8888FF"/>
+                </Border>
+                <Button Content="Atualizar" Click="BtnRefresh_Click" Style="{StaticResource SecondaryButtonStyle}" Width="90" Height="32" FontSize="11" Margin="0,0,6,0"/>
+                <Button Content="Voltar" Click="BtnBack_Click" Style="{StaticResource SecondaryButtonStyle}" Width="80" Height="32" FontSize="11"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- MAIN -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="280"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+                <StackPanel>
+
+                    <!-- STEP 1: PREPARAR WINPE -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="BtnPrepareWinpe" Content="PREPARAR" Click="BtnPrepareWinpe_Click"
+                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="120" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnRemoveWinpe" Content="REMOVER" Click="BtnRemoveWinpe_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="90"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- STEP 1B: VALIDATION OS -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="1b. VALIDATION OS" FontSize="15" FontWeight="Bold" Foreground="#66BBFF"/>
+                                    <Border Background="#224488" CornerRadius="4" Padding="6,1" Margin="8,0,0,0">
+                                        <TextBlock Text="WPF OK!" FontSize="9" FontWeight="Bold" Foreground="#66BBFF"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Windows 11 leve da Microsoft com suporte oficial a WPF/.NET. Boot RAMDISK + bootsequence." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="BtnPrepareValos" Content="PREPARAR" Click="BtnPrepareValos_Click"
+                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="120" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnBootValos" Content="TESTAR" Click="BtnBootValos_Click"
+                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="11" FontWeight="Bold" Width="90" Margin="0,0,8,0"
+                                        IsEnabled="False"/>
+                                <Button x:Name="BtnRemoveValos" Content="REMOVER" Click="BtnRemoveValos_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="80"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- PARTITION LIST + SHRINK ACTION -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="2. SELECIONAR PARTICAO" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtPartCount" Text="" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Partition list -->
+                            <ListView x:Name="ListPartitions" Grid.Row="1"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      Foreground="White"
+                                      SelectionMode="Single"
+                                      SelectionChanged="ListPartitions_SelectionChanged"
+                                      MaxHeight="320"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      FontSize="13">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                        <Setter Property="BorderBrush" Value="#1A333333"/>
+                                        <Setter Property="Padding" Value="6,5"/>
+                                        <Setter Property="MinHeight" Value="34"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="#22D4AF37"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#11FFFFFF"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="55"/>
+                                                <ColumnDefinition Width="36"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding DiskLabel}" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding DriveLetter}" FontWeight="Bold" FontSize="15" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Label}" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding SizeString}" FontSize="12" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding FreeSpaceString}" Foreground="#88FF88" FontSize="11" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="5" Text="{Binding FileSystem}" Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+
+                            <!-- Bottom: target info + shrink button -->
+                            <Border Grid.Row="2" Background="#112222" BorderThickness="0,1,0,0" BorderBrush="#33D4AF37" Padding="10" Margin="0,10,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel x:Name="PanelTargetInfo" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtTargetInfo" Text="Nenhuma particao selecionada" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                        <TextBlock x:Name="TxtShrinkReady" Text="" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                    </StackPanel>
+                                    <Button x:Name="BtnShrinkWinpe" Grid.Column="1"
+                                            Content="INICIAR SHRINK"
+                                            Click="BtnShrinkWinpe_Click"
+                                            Style="{StaticResource GreenButtonStyle}"
+                                            Height="40" FontSize="13" FontWeight="Bold"
+                                            Width="180" Margin="10,0,0,0"
+                                            IsEnabled="False"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- LOGS -->
+                    <Border Style="{StaticResource StepCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="3. LOGS DO WINPE" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Resultados da ultima execucao do shrink via WinPE." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button x:Name="BtnCopyLog" Content="COPIAR LOG" Click="BtnCopyLog_Click" Style="{StaticResource GoldButtonStyle}" Height="32" FontSize="10" FontWeight="Bold" Width="100" Margin="0,0,6,0"/>
+                                <Button Content="VER LOGS" Click="BtnCheckWinpeLogs_Click" Style="{StaticResource SecondaryButtonStyle}" Height="32" FontSize="11" Width="90"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBox x:Name="TxtWinpeLog" Grid.Row="1" IsReadOnly="True" FontFamily="Consolas" FontSize="9"
+                                 Foreground="#0F0" Background="#0A0A0A" BorderThickness="0" MinHeight="60" MaxHeight="120"
+                                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Focusable="True"
+                                 Text="Nenhum log." Margin="0,8,0,0">
+                            <TextBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copiar" Click="BtnCopyLog_Click"/>
+                                    <MenuItem Header="Copiar tudo" Click="BtnCopyLog_Click"/>
+                                </ContextMenu>
+                            </TextBox.ContextMenu>
+                        </TextBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- Custom WinPE ISO -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,10,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="ISO" FontSize="16" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Margin="8,0">
+                                    <TextBlock Text="WINPE CUSTOMIZADO (TESTE)" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock x:Name="TxtCustomIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="9" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <Button x:Name="BtnLoadCustomIso" Grid.Column="2" Content="Carregar ISO" Click="BtnLoadCustomIso_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="10" Width="100"/>
+                            </Grid>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                                <Button x:Name="BtnPrepareCustomWinpe" Content="PREPARAR CUSTOM" Click="BtnPrepareCustomWinpe_Click"
+                                        Style="{StaticResource GoldButtonStyle}" Height="30" FontSize="10" FontWeight="Bold" Width="140"
+                                        IsEnabled="False" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnRemoveCustomWinpe" Content="REMOVER" Click="BtnRemoveCustomWinpe_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="10" Foreground="#FF8888" BorderBrush="#552222" Width="90"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- RIGHT SIDEBAR -->
+            <Border Grid.Column="1" Style="{StaticResource SubtleCardStyle}" Padding="15">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Como usar" FontSize="15" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12">
+                            1. Clique PREPARAR WINPE
+                               Baixa + customiza + cria boot RAMDISK
+                               (sem reboot)
+
+                            2. Selecione a particao na lista
+                               Botao INICIAR SHRINK sera habilitado
+
+                            3. Defina o tamanho e confirme
+                               O app agenda reboot para WinPE
+                               WinPE executa o shrink e volta
+                        </TextBlock>
+                        <Separator Background="#222" Margin="0,0,0,8"/>
+                        <TextBlock Text="Dicas" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" FontSize="11" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,4">
+                            WinPE + config em C:\Program Files\KitLugia\WinPE\
+                            Logs em C:\KitLugia_WinPE_Log.txt
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- STATUS BAR -->
+        <Border Grid.Row="2" Margin="0,8,0,0">
+            <TextBlock x:Name="TxtStatusBar" Text="Pronto" Foreground="#888" FontSize="11"/>
+        </Border>
+
+        <!-- BUSY OVERLAY WITH REAL PROGRESS BAR (igual ao UpdatePage) -->
+        <Grid x:Name="OverlayBusy" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
+            <Border Background="#1A1A1A" CornerRadius="12" Padding="30" Width="520"
+                    BorderBrush="#FFD700" BorderThickness="1"
+                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                <StackPanel>
+                    <TextBlock x:Name="TxtOpTitle" Text="EXECUTANDO" FontSize="18" FontWeight="Bold"
+                               Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+                    <!-- Barra de Progresso Real (mesmo estilo do UpdatePage) -->
+                    <Border Background="#333333" CornerRadius="6" Height="22" Margin="0,0,0,5">
+                        <Grid>
+                            <Border x:Name="ProgressFill" Background="#FFD700" CornerRadius="6"
+                                    HorizontalAlignment="Left" Width="0"/>
+                            <TextBlock x:Name="TxtProgressPercent" Text="0%"
+                                       FontSize="11" FontWeight="Bold" Foreground="#FFFFFF"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Steps / Status -->
+                    <TextBlock x:Name="TxtProgressStep" Text="Inicializando..."
+                               FontSize="11" Foreground="#FFD700" Margin="0,2,0,0" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TxtProgressStatus" Text="Aguarde..."
+                               FontSize="13" Foreground="#E0E0E0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+
+                    <!-- Detail log (scrollavel) -->
+                    <Border Background="#0A0A0A" CornerRadius="6" Padding="8" MaxHeight="120" Margin="0,8,0,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- Warning -->
+                    <Border Background="#22FF3D00" BorderBrush="#88FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,8,0,0" Visibility="Visible">
+                        <TextBlock Text="ACAO CRITICA: NAO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Cancel button (visivel durante a operacao) -->
+                    <Button x:Name="BtnCancelOp" Content="CANCELAR" Click="BtnCancelOp_Click"
+                            Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="34"
+                            HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="#FF8888" BorderBrush="#552222"/>
+
+                    <StackPanel x:Name="PanelOpFooter" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0" Visibility="Collapsed">
+                        <Button Content="FECHAR" Click="BtnCloseOverlay_Click" Style="{StaticResource GoldButtonStyle}" Width="160" Height="38"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- SHRINK CONFIRM OVERLAY -->
+        <Grid x:Name="OverlayShrink" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15"
+                    Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25">
+                <StackPanel>
+                    <TextBlock x:Name="TxtShrinkTitle" Text="EXECUTAR SHRINK AVANCADO NO WINPE" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="TxtShrinkDesc" Text="O WinPE sera acionado para executar o shrink sem limitacoes." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                    <Border Background="#112222" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="10" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Particao alvo:" FontSize="10" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock x:Name="TxtShrinkTargetInfo" Text="-" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="QUANTIDADE A REDUZIR (MB):" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,6"/>
+                    <TextBox x:Name="TxtShrinkMb" Style="{StaticResource DarkTextBoxStyle}" FontSize="18" Padding="10,8" Text="0" Margin="0,0,0,10"/>
+                    <UniformGrid Columns="4" Margin="0,0,0,12">
+                        <Button Content="25%" Click="BtnShrinkPercent_Click" Tag="25" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,4,0" Height="30"/>
+                        <Button Content="50%" Click="BtnShrinkPercent_Click" Tag="50" Style="{StaticResource SecondaryButtonStyle}" Margin="4,0,4,0" Height="30"/>
+                        <Button Content="75%" Click="BtnShrinkPercent_Click" Tag="75" Style="{StaticResource SecondaryButtonStyle}" Margin="4,0,4,0" Height="30"/>
+                        <Button Content="MAX." Click="BtnShrinkMax_Click" Style="{StaticResource GoldButtonStyle}" Margin="4,0,0,0" Height="34" FontWeight="Bold"/>
+                    </UniformGrid>
+
+                    <Border Background="#112222" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="10" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="SISTEMA PARA EXECUTAR O SHRINK:" FontSize="10" Foreground="{StaticResource TextMuted}"/>
+                            <RadioButton x:Name="RadioWinpe" GroupName="ShrinkOs" Content="WinPE Padrao" IsChecked="True"
+                                         Checked="RadioShrinkOs_Checked" FontSize="12" Foreground="White" Margin="0,4,0,0"/>
+                            <RadioButton x:Name="RadioValos" GroupName="ShrinkOs" Content="Validation OS" IsChecked="False"
+                                         Checked="RadioShrinkOs_Checked" FontSize="12" Foreground="White" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="TxtOsStatus" Text="" Foreground="{StaticResource TextMuted}" FontSize="9" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="CANCELAR" Click="BtnCancelShrink_Click" Style="{StaticResource SecondaryButtonStyle}" Width="100" Height="36" Margin="0,0,10,0"/>
+                        <Button Content="INICIAR" Click="BtnConfirmShrinkWinpe_Click" Style="{StaticResource GoldButtonStyle}" Width="160" Height="38" FontWeight="Bold"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

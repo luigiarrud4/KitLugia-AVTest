@@ -35,7 +35,6 @@ namespace KitLugia.GUI
 
             base.OnStartup(e);
 
-
             // Always run startup method check in background so the window appears first
             _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
 

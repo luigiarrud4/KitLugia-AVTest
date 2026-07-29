@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -37,10 +37,7 @@ namespace KitLugia.Core
                     string json = File.ReadAllText(FilePath);
                     return JsonSerializer.Deserialize<List<LeftoverJunkEntry>>(json) ?? new List<LeftoverJunkEntry>();
                 }
-                catch
-                {
-                    return new List<LeftoverJunkEntry>();
-                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<LeftoverJunkEntry>(); }
             }
         }
 

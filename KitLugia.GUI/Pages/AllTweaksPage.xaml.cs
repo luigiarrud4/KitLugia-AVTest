@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -68,7 +68,7 @@ namespace KitLugia.GUI.Pages
                             string[] keys = { @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\0cc5b647-c1df-4637-891a-dec35c318583", @"SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\ea4be0c1-7c65-46f8-8c17-f298766665d9" };
                             foreach (var k in keys) { using var rk = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(k, true); rk?.DeleteValue("ValueMax", false); rk?.DeleteValue("ValueMin", false); }
                             return true;
-                        } catch { return false; }
+                        } catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
                     }),
 
                 new("Timer Coalescing", "Desativa coalescência de timers para maior precisão.", "Performance (CPU)", "SystemTweaks",
@@ -76,7 +76,7 @@ namespace KitLugia.GUI.Pages
                     () => { var r = SystemTweaks.DisableTimerCoalescing(); return r.Success; },
                     () => {
                         try { using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\kernel", true); k?.DeleteValue("CoalescingTimerInterval", false); return true; }
-                        catch { return false; }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
                     }),
 
                 new("Win32 Priority Separation", "Ajusta prioridade de processos em foreground para gaming.", "Performance (CPU)", "SystemTweaks",
@@ -89,7 +89,7 @@ namespace KitLugia.GUI.Pages
                     () => { var r = SystemTweaks.EnableGlobalTimerResolution(); return r.Success; },
                     () => {
                         try { using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Power", true); k?.DeleteValue("GlobalTimerResolutionRequests", false); return true; }
-                        catch { return false; }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
                     }),
 
                 new("System Responsiveness (Gaming)", "Define responsividade do sistema para máxima performance em jogos.", "Performance (CPU)", "SystemTweaks",
@@ -767,7 +767,7 @@ namespace KitLugia.GUI.Pages
 
         public void Refresh()
         {
-            try { IsActive = CheckState(); } catch { }
+            try { IsActive = CheckState(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

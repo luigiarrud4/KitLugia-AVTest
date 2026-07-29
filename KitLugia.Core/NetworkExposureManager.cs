@@ -292,7 +292,7 @@ public sealed class NetworkExposureManager : IDisposable
                     return (true, externalPort);
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return (false, 0);
     }
@@ -318,7 +318,7 @@ public sealed class NetworkExposureManager : IDisposable
                     return (true, actualPort);
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return (false, 0);
     }
@@ -375,7 +375,7 @@ public sealed class NetworkExposureManager : IDisposable
                 mapping.IsActive = false;
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
     }
 
     // ------------------------------------------------------------
@@ -447,10 +447,7 @@ public sealed class NetworkExposureManager : IDisposable
             var completedTask = await Task.WhenAny(connectTask, Task.Delay(timeoutMs));
             return completedTask == connectTask && tcpClient.Connected;
         }
-        catch
-        {
-            return false;
-        }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
     }
 
     public IReadOnlyList<PortMapping> GetActiveMappings() => _activeMappings.AsReadOnly();
@@ -498,7 +495,7 @@ public sealed class NetworkExposureManager : IDisposable
     // ------------------------------------------------------------
     public void Dispose()
     {
-        try { _ = CloseAllPortsAsync(); } catch { }
+        try { _ = CloseAllPortsAsync(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         _discoveryCts?.Cancel();
         _discoveryCts?.Dispose();
     }
@@ -559,7 +556,7 @@ public class UPnPDiscoverer
                 }
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return null;
     }
@@ -617,7 +614,7 @@ public class UPnPDevice
                 return ip;
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return null;
     }
@@ -652,7 +649,7 @@ public class UPnPDevice
             
             return response.IsSuccessStatusCode && !responseBody.Contains("error");
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return false;
     }
@@ -679,7 +676,7 @@ public class UPnPDevice
             var response = await client.PostAsync(_serviceControlUrl, content);
             return response.IsSuccessStatusCode;
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return false;
     }
@@ -708,7 +705,7 @@ public class UPnPDevice
                 _serviceControlUrl = new Uri(baseUri, controlPath).ToString();
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
     }
 }
 
@@ -745,7 +742,7 @@ public class NatPmpDiscoverer
                 }
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return null;
     }
@@ -781,7 +778,7 @@ public class NatPmpDiscoverer
                 }
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         return null;
     }
 }
@@ -816,7 +813,7 @@ public class NatPmpDevice
                 return new IPAddress(ipBytes);
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return null;
     }
@@ -866,7 +863,7 @@ public class NatPmpDevice
                 return actualPort > 0 ? actualPort : requestedExternalPort;
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return 0;
     }

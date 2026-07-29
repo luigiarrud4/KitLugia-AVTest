@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -77,7 +77,7 @@ namespace KitLugia.Core
                 }));
                 return true;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool ImportExtensions(string sourceDir, string browserName)
@@ -132,7 +132,7 @@ namespace KitLugia.Core
 
                 return false;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool TransferExtensions(string sourceBrowser, string targetBrowser, IProgress<string>? progress = null)
@@ -165,10 +165,10 @@ namespace KitLugia.Core
 
                 return true;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
             finally
             {
-                try { Directory.Delete(temp, true); } catch { }
+                try { Directory.Delete(temp, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -202,7 +202,7 @@ namespace KitLugia.Core
                         p.Kill();
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             Thread.Sleep(1000);
 
@@ -245,16 +245,16 @@ namespace KitLugia.Core
                             string? errMsg = errDoc.RootElement.GetProperty("error").GetProperty("message").GetString();
                             System.Diagnostics.Debug.WriteLine($"CDP error for {versionDir}: {errMsg}");
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
 
                     cmdId++;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally
             {
-                try { proc.CloseMainWindow(); if (!proc.WaitForExit(5000)) proc.Kill(); } catch { }
+                try { proc.CloseMainWindow(); if (!proc.WaitForExit(5000)) proc.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -303,7 +303,7 @@ namespace KitLugia.Core
                 string procName = Path.GetFileNameWithoutExtension(def.ExecutablePath);
                 return System.Diagnostics.Process.GetProcessesByName(procName).Length > 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static List<ExportBackupInfo> ListBackups()
@@ -377,7 +377,7 @@ namespace KitLugia.Core
                     string? iconPath = FindExtensionIcon(versionDir, root);
                     results.Add(new ExtensionInfo(extId, name, version, desc, versionDir, browserName, "Chromium", size) { IconPath = iconPath });
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return results;
         }
@@ -456,7 +456,7 @@ namespace KitLugia.Core
                         prop.TryGetProperty("message", out var msg))
                         return msg.GetString() ?? key;
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             string localesDir = Path.Combine(versionDir, "_locales");
@@ -473,7 +473,7 @@ namespace KitLugia.Core
                             prop.TryGetProperty("message", out var msg))
                             return msg.GetString() ?? key;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
             return key;
@@ -487,7 +487,7 @@ namespace KitLugia.Core
         private static long DirSize(string dir)
         {
             try { return Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length); }
-            catch { return 0; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private static string FormatSize(long bytes)

@@ -240,7 +240,7 @@ public sealed class LanConnectionManager : IDisposable
                 }
             }
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         
         return (string.Empty, 0);
     }

@@ -698,6 +698,12 @@
                             <RadioButton x:Name="BtnDrivers"   GroupName="Menu" Tag="&#x1F4BE;" Content="Drivers" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnRepairs"   GroupName="Menu" Tag="&#x1F527;" Content="Reparos AIO" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnServices"  GroupName="Menu" Tag="&#x1F6E1;&#xFE0F;" Content="Servi&#xE7;os" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
+                            <!-- BOT&#xC3;O FRESH INSTALL (WinPE) -->
+                            <RadioButton x:Name="BtnReinstallPreserve" GroupName="Menu" Tag="&#x1F504;" Content="Fresh Install + Dados" 
+                                         Style="{StaticResource NavButtonStyle}" 
+                                         Foreground="{StaticResource AccentColor}"
+                                         Click="NavButton_Click"
+                                         ToolTip="Instalar Windows novo preservando dados do usu&#xE1;rio"/>
                         </StackPanel>
                     </ScrollViewer>
 
@@ -715,7 +721,6 @@
                                      Foreground="{StaticResource AccentColor}"
                                      Click="NavButton_Click"
                                      ToolTip="GameBoost Inteligente - Algoritmo ProBalance Style"/>
-                        
                         <!-- BOT&#xC3;O DIAGN&#xD3;STICO -->
                         <RadioButton x:Name="BtnDiagnostic" GroupName="Menu" Tag="&#x1F52C;" Content="Diagn&#xF3;stico (Debug)" 
                                      Style="{StaticResource NavButtonStyle}" 

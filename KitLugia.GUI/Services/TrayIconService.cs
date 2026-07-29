@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Diagnostics;
 using System.Windows.Forms;
@@ -113,7 +113,7 @@ namespace KitLugia.GUI.Services
                 }
                 finally { Marshal.FreeHGlobal(buffer); }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false;
         }
 
@@ -701,7 +701,7 @@ namespace KitLugia.GUI.Services
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\TraySettings");
                 return (int)(key?.GetValue("IsTrayEnabled", 0) ?? 0) == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -781,10 +781,7 @@ namespace KitLugia.GUI.Services
 
                 return string.Equals(registryPath, currentPath, StringComparison.OrdinalIgnoreCase);
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -856,7 +853,7 @@ namespace KitLugia.GUI.Services
                                     regKey.DeleteValue("KitLugia", false);
                                 }
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                             // Verificar se tarefa já existe com caminho correto
                             var existingTask = ts.GetTask("KitLugia");
@@ -1150,7 +1147,7 @@ namespace KitLugia.GUI.Services
                 using var bootKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\StartupApps");
                 if (bootKey != null) bootAppCount = bootKey.ValueCount;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             string bootCountStr = bootAppCount > 0 ? $"{bootAppCount} apps" : "vazio";
             var itemBootTrayAdmin = new ToolStripMenuItem($"🛡️ Boot Tray: Iniciar (Admin)");
             itemBootTrayAdmin.ToolTipText = $"Inicia os apps do Boot Tray com privilégios de Administrador ({bootCountStr})";
@@ -1197,7 +1194,7 @@ namespace KitLugia.GUI.Services
                     Dispose();
                     Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             };
             menu.Items.Add(itemRestartAdmin);
 
@@ -1214,7 +1211,7 @@ namespace KitLugia.GUI.Services
                     if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownFinished)
                         Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             };
             menu.Items.Add(itemRestartNormal);
 
@@ -1243,7 +1240,7 @@ namespace KitLugia.GUI.Services
                     _ = System.Threading.Tasks.Task.Run(() =>
                     {
                         try { RunSafetyProfiler(); }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     });
 
                     if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
@@ -1290,10 +1287,10 @@ namespace KitLugia.GUI.Services
                             Win32Api.SendMessage(proc.MainWindowHandle, Win32Api.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public void SaveSettings()
@@ -1330,7 +1327,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("RamLimiterIntervalMs", RamLimiterIntervalMs);
                 key.SetValue("GameBarPresenceWriterDisabled", GameBarPresenceWriterDisabled ? 1 : 0);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -1425,7 +1422,7 @@ namespace KitLugia.GUI.Services
 
                 _monitorTimer.Interval = TimeSpan.FromSeconds(MonitorIntervalSeconds);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void RunSafetyProfiler()
@@ -1444,7 +1441,7 @@ namespace KitLugia.GUI.Services
                     _stutterBackoffCycles = 1; // Start with caution
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void ApplyTrayEnabledState(bool enabled)
@@ -1486,7 +1483,7 @@ namespace KitLugia.GUI.Services
                 _monitorTimer?.Stop();
                 KitLugia.Core.Logger.Log("⏸️ TrayIcon: Monitoramento pausado (janela perdeu foco)");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -1500,7 +1497,7 @@ namespace KitLugia.GUI.Services
                     KitLugia.Core.Logger.Log("▶️ TrayIcon: Monitoramento retomado (janela ganhou foco)");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void MonitorTick(object? sender, EventArgs e)
@@ -1642,11 +1639,11 @@ namespace KitLugia.GUI.Services
                             }
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void ApplyFireminOptimizations()
@@ -1673,15 +1670,15 @@ namespace KitLugia.GUI.Services
                             {
                                 MemoryOptimizer.EmptyProcessWorkingSet(proc.Id);
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             finally { proc.Dispose(); }
                         }
                         profile.LastTrimTime = DateTime.Now;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void LogStats(MemoryOptimizer.MemoryInfo stats)
@@ -1697,7 +1694,7 @@ namespace KitLugia.GUI.Services
 
                 sw.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{stats.Percent},{stats.UsedGB:F2},{stats.FreeGB:F2},{_lastCleanDurationMs},{_stutterBackoffCycles}");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private bool _lastFocusState = false;
@@ -1727,7 +1724,7 @@ namespace KitLugia.GUI.Services
             }
             catch (System.ComponentModel.Win32Exception) { /* Processo encerrou - ignorar */ }
             catch (ArgumentException) { /* PID inválido - ignorar */ }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void SetWindowsFocusAssist(bool enable)
@@ -1742,7 +1739,7 @@ namespace KitLugia.GUI.Services
                     key.SetValue("NOC_GLOBAL_SETTING_TOASTS_ENABLED", enable ? 0 : 1, Microsoft.Win32.RegistryValueKind.DWord);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void DetectAndTrimLeaks(int systemUsagePercent, MemoryOptimizer.MemoryInfo stats)
@@ -1782,11 +1779,11 @@ namespace KitLugia.GUI.Services
                             MemoryOptimizer.EmptyProcessWorkingSet(proc.Id);
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     finally { proc.Dispose(); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private uint _lastBoostedPid = 0;
@@ -1992,7 +1989,7 @@ namespace KitLugia.GUI.Services
 
                         SetEcoQoS(oldProc.Handle, true);
                     }
-                    catch { } // Processo pode ter sido fechado
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); } // Processo pode ter sido fechado
                 }
 
                 _lastBoostedPid = pid;
@@ -2023,7 +2020,7 @@ namespace KitLugia.GUI.Services
 
                 SetEcoQoS(proc.Handle, false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // Timer para verificação rápida do foreground (alternativa estável ao hook)
@@ -2135,7 +2132,7 @@ namespace KitLugia.GUI.Services
                         {
                             RevertBoost(_currentBoostedPid);
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
 
                     // Aplica boost ao novo processo
@@ -2148,7 +2145,7 @@ namespace KitLugia.GUI.Services
                         string logTitle = string.IsNullOrEmpty(windowTitle) ? $"Process {pid}" : windowTitle;
                         KitLugia.Core.Logger.Log($"🎮 GameBoost (Timer): Boost aplicado ao processo PID: {pid} - {logTitle}");
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
                 else
                 {
@@ -2181,10 +2178,7 @@ namespace KitLugia.GUI.Services
 
                 return true;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
 
@@ -2202,7 +2196,7 @@ namespace KitLugia.GUI.Services
 
                 return windowWidth >= screenWidth - 10 && windowHeight >= screenHeight - 10;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
 
@@ -2240,7 +2234,7 @@ namespace KitLugia.GUI.Services
                         break;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2411,19 +2405,19 @@ namespace KitLugia.GUI.Services
                     }
                 }
 
-                try { Win32Api.SetProcessIoPriority(proc.Handle, config.IoPriorityLevel == 0 ? 2 : 3); } catch { }
-                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { }
-                try { Win32Api.SetThreadMemoryPriority(proc.Handle, (uint)(config.ThreadMemoryPriority == 0 ? 5 : 3)); } catch { }
-                try { SetEcoQoS(proc.Handle, config.EcoQoSEnabled); } catch { }
+                try { Win32Api.SetProcessIoPriority(proc.Handle, config.IoPriorityLevel == 0 ? 2 : 3); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetThreadMemoryPriority(proc.Handle, (uint)(config.ThreadMemoryPriority == 0 ? 5 : 3)); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { SetEcoQoS(proc.Handle, config.EcoQoSEnabled); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 if (config.GameClassInfo)
                 {
-                    try { Win32Api.SetProcessGameClassInfo(proc.Handle, true); } catch { }
+                    try { Win32Api.SetProcessGameClassInfo(proc.Handle, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 KitLugia.Core.Logger.Log($"✅ GameBoost [PERSONALIZADO]: {name} otimizado com sucesso!");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         [System.Diagnostics.Conditional("DEBUG")]
@@ -2462,13 +2456,13 @@ namespace KitLugia.GUI.Services
                 {
                     KitLugia.Core.Logger.Log($"⚠️ V1: Acesso negado à prioridade do processo {name} (PID: {pid}) - processo protegido");
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-                try { Win32Api.SetProcessIoPriority(proc.Handle, 3); } catch { }
-                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { }
-                try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL); } catch { }
+                try { Win32Api.SetProcessIoPriority(proc.Handle, 3); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2497,16 +2491,16 @@ namespace KitLugia.GUI.Services
                         proc.PriorityClass = ProcessPriorityClass.High;
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-                try { Win32Api.SetProcessIoPriority(proc.Handle, 3); } catch { }
-                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { }
-                try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL); } catch { }
-                try { SetEcoQoS(proc.Handle, false); } catch { }
+                try { Win32Api.SetProcessIoPriority(proc.Handle, 3); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { SetEcoQoS(proc.Handle, false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 ApplyProBalanceV2(pid);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2539,16 +2533,16 @@ namespace KitLugia.GUI.Services
                         proc.PriorityClass = ProcessPriorityClass.High;
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-                try { Win32Api.SetProcessIoPriority(proc.Handle, 3); } catch { }
-                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { }
-                try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL); } catch { }
-                try { SetEcoQoS(proc.Handle, false); } catch { }
+                try { Win32Api.SetProcessIoPriority(proc.Handle, 3); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { SetEcoQoS(proc.Handle, false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 ApplyProBalanceV3(pid);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2589,7 +2583,7 @@ namespace KitLugia.GUI.Services
 
                 KitLugia.Core.Logger.Log("🌐 GameBoost V3: Network prioritizado (throttling reduzido)");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2780,7 +2774,7 @@ namespace KitLugia.GUI.Services
                             {
                                 Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL);
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                             KitLugia.Core.Logger.Log($"🔼 ProBalance Global: {name} (PID: {pid}) restaurado para Normal");
                         }
@@ -2824,7 +2818,7 @@ namespace KitLugia.GUI.Services
                     _cpuTimeCache[pid] = (now, currentCpu);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return 0;
         }
 
@@ -2872,12 +2866,12 @@ namespace KitLugia.GUI.Services
                     proc.PriorityClass = ProcessPriorityClass.Normal;
                 }
 
-                try { Win32Api.SetProcessIoPriority(proc.Handle, 2); } catch { }
-                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { }
-                try { SetEcoQoS(proc.Handle, true); } catch { }
-                try { Win32Api.SetProcessGameClassInfo(proc.Handle, false); } catch { }
+                try { Win32Api.SetProcessIoPriority(proc.Handle, 2); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { SetEcoQoS(proc.Handle, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessGameClassInfo(proc.Handle, false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2902,7 +2896,7 @@ namespace KitLugia.GUI.Services
 
                 Marshal.FreeHGlobal(ptr);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2915,7 +2909,7 @@ namespace KitLugia.GUI.Services
                     ApplyProBalance(_currentBoostedPid);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -2960,7 +2954,7 @@ namespace KitLugia.GUI.Services
 
                 KitLugia.Core.Logger.Log("🎮 GameBoost desativado (SetWinEventHook Kernel Hook)");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void CheckAndCleanStandby(int systemUsagePercent)
@@ -2975,7 +2969,7 @@ namespace KitLugia.GUI.Services
                     MemoryOptimizer.Optimize(MemoryOptimizer.CleaningMode.Normal);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private bool IsTaskbarWindow(IntPtr hwnd)
@@ -3102,7 +3096,7 @@ namespace KitLugia.GUI.Services
                 // Cleanup old icon
                 if (oldIcon != null)
                 {
-                    try { Win32Api.DestroyIcon(oldIcon.Handle); } catch { }
+                    try { Win32Api.DestroyIcon(oldIcon.Handle); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 bmp.Dispose();
@@ -3267,7 +3261,7 @@ namespace KitLugia.GUI.Services
 
             if (_currentIcon != null)
             {
-                try { Win32Api.DestroyIcon(_currentIcon.Handle); } catch { }
+                try { Win32Api.DestroyIcon(_currentIcon.Handle); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 _currentIcon = null;
             }
         }
@@ -3568,7 +3562,7 @@ namespace KitLugia.GUI.Services
                             if ((uint)proc.Id == foregroundPid)
                                 anyForeground = true;
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
 
                     // Atualiza estado
@@ -3579,7 +3573,7 @@ namespace KitLugia.GUI.Services
                     // Não trima se o processo está em foreground — evita stutters visíveis
                     if (anyForeground)
                     {
-                        foreach (var proc in processes) try { proc.Dispose(); } catch { }
+                        foreach (var proc in processes) try { proc.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         continue;
                     }
 
@@ -3634,7 +3628,7 @@ namespace KitLugia.GUI.Services
                                     trimmedCount++;
                                 }
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
 
                         limit.LastTrimTime = DateTime.Now;
@@ -3657,9 +3651,9 @@ namespace KitLugia.GUI.Services
                             limit.ConsecutiveTrimCount = 0;
                     }
 
-                    foreach (var proc in processes) try { proc.Dispose(); } catch { }
+                    foreach (var proc in processes) try { proc.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -3731,7 +3725,7 @@ namespace KitLugia.GUI.Services
                             if (Win32Api.AssignProcessToJobObject(hJob, proc.Handle))
                                 assigned++;
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         proc.Dispose();
                     }
 
@@ -3740,7 +3734,7 @@ namespace KitLugia.GUI.Services
                     else
                         Win32Api.CloseHandle(hJob);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -4063,10 +4057,7 @@ namespace KitLugia.GUI.Services
                 }
                 return $"PID:{processId}";
             }
-            catch
-            {
-                return $"PID:{processId}";
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return $"PID:{processId}"; }
         }
         
         
@@ -4093,10 +4084,7 @@ namespace KitLugia.GUI.Services
                 
                 return true;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         
         /// <summary>

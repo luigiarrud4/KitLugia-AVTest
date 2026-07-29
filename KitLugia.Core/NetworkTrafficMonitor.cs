@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -145,7 +145,7 @@ namespace KitLugia.Core
                 }
                 finally { Marshal.FreeHGlobal(buffer); }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -181,7 +181,7 @@ namespace KitLugia.Core
                         using var proc = Process.GetProcessById((int)pid);
                         procName = proc.ProcessName;
                     }
-                    catch { continue; }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); continue; }
                     if (string.IsNullOrEmpty(procName)) continue;
 
                     // Lê performance counters de IO
@@ -237,7 +237,7 @@ namespace KitLugia.Core
 
                 _lastSampleTime = now;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return snapshot;
         }
@@ -257,7 +257,7 @@ namespace KitLugia.Core
                         using var proc = Process.GetProcessById((int)pid);
                         activeNames.Add(proc.ProcessName);
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 foreach (var key in _ioReadCounters.Keys.ToList())
@@ -269,7 +269,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>

@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
+using KitLugia.Core;
 
 namespace KitLugia.GUI.Converters
 {
@@ -15,10 +16,7 @@ namespace KitLugia.GUI.Converters
                 {
                     return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
                 }
-                catch
-                {
-                    return Colors.Gray;
-                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); return Colors.Gray; }
             }
             return Colors.Gray;
         }

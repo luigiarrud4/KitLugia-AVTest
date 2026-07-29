@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -77,7 +77,7 @@ namespace KitLugia.GUI.Pages
                         foreach (var t in allTweaks)
                             guardianStatuses[t.Name] = t.Status == TweakStatus.MODIFIED;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                     foreach (var item in toggleItems)
                     {
@@ -95,10 +95,10 @@ namespace KitLugia.GUI.Pages
                             _statusCache[item.Title] = state;
                             item.IsActive = state;
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }, token);
         }
 

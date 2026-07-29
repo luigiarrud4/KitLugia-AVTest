@@ -1,4 +1,4 @@
-// using IWshRuntimeLibrary; // Removed as it was causing build errors and appears unused
+﻿// using IWshRuntimeLibrary; // Removed as it was causing build errors and appears unused
 using Microsoft.Win32;
 using Microsoft.Win32.TaskScheduler;
 using System;
@@ -289,10 +289,10 @@ namespace KitLugia.Core
                             InstallDate = ""
                         });
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return appStatuses.OrderBy(a => a.DisplayName).ToList();
         }
 
@@ -319,7 +319,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return null;
         }
 
@@ -354,7 +354,7 @@ namespace KitLugia.Core
                     var pm = new Windows.Management.Deployment.PackageManager();
                     Task.Run(() => pm.RemovePackageAsync(packageFullName).AsTask().GetAwaiter().GetResult()).GetAwaiter().GetResult();
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 // Remove leftover files from LocalAppData
                 try
@@ -364,11 +364,11 @@ namespace KitLugia.Core
                     {
                         foreach (var dir in Directory.GetDirectories(localPackages, $"{packageNameBase}*"))
                         {
-                            try { Directory.Delete(dir, true); } catch { }
+                            try { Directory.Delete(dir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 // Remove leftover files from WindowsApps
                 try
@@ -394,12 +394,12 @@ namespace KitLugia.Core
 
                             if (!isProtected)
                             {
-                                try { Directory.Delete(dir, true); } catch { }
+                                try { Directory.Delete(dir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             }
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 // Remove provisioned package via WMI
                 try
@@ -423,10 +423,10 @@ namespace KitLugia.Core
                             process.Start();
                             process.WaitForExit(30000);
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 return (true, "Deep Uninstall concluído com sucesso");
             }
@@ -466,7 +466,7 @@ namespace KitLugia.Core
                     var pm = new Windows.Management.Deployment.PackageManager();
                     await pm.RemovePackageAsync(packageFullName);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 await Task.Delay(800);
 
@@ -477,11 +477,11 @@ namespace KitLugia.Core
                     {
                         foreach (var dir in Directory.GetDirectories(localPackages, $"{packageNameBase}*"))
                         {
-                            try { Directory.Delete(dir, true); } catch { }
+                            try { Directory.Delete(dir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 try
                 {
@@ -506,12 +506,12 @@ namespace KitLugia.Core
 
                             if (!isProtected)
                             {
-                                try { Directory.Delete(dir, true); } catch { }
+                                try { Directory.Delete(dir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             }
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 try
                 {
@@ -534,10 +534,10 @@ namespace KitLugia.Core
                             process.Start();
                             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 return (true, "Deep Uninstall concluído com sucesso");
             }
@@ -613,7 +613,7 @@ namespace KitLugia.Core
                 RegistryKey baseKey = k.StartsWith("HKEY_LOCAL") ? Registry.LocalMachine : Registry.CurrentUser;
                 using var r = baseKey.OpenSubKey(sub, true); r?.DeleteValue(v, false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static bool IsLastClickInstalled() => (int?)Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "LastActiveClick", 0) == 1;
@@ -637,7 +637,7 @@ namespace KitLugia.Core
                     Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae252}", false);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static bool IsMemoryUsageEnabled() => (int?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "MemoryUsage", 0) == 2;
@@ -680,7 +680,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static void ApplyExtremeVisuals()
@@ -699,7 +699,7 @@ namespace KitLugia.Core
                 }
                 Registry.SetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop\WindowMetrics", "MinAnimate", "0", RegistryValueKind.String);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static bool IsExtremeVisualsApplied()
@@ -717,7 +717,7 @@ namespace KitLugia.Core
                     return true;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false;
         }
         #endregion
@@ -781,7 +781,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control", true);
                 key?.SetValue("WaitToKillServiceTimeout", timeout, RegistryValueKind.String);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         #region Turbo Boot (Task Scheduler)
@@ -797,7 +797,7 @@ namespace KitLugia.Core
                 // Turbo Boot = tarefa KitLugia com prioridade High
                 return task.Enabled && task.Definition.Settings.Priority == ProcessPriorityClass.High;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void ToggleTurboBoot(bool enable)
@@ -878,7 +878,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\kernel", "GlobalTimerResolutionRequests", 0);
                 return val != null && Convert.ToInt32(val) == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) ToggleTimerResolution()
@@ -940,7 +940,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return names;
         }
 
@@ -965,7 +965,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return result;
         }
 
@@ -1009,7 +1009,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return null;
         }
 
@@ -1024,7 +1024,7 @@ namespace KitLugia.Core
                 using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController");
                 return searcher.Get().Cast<ManagementObject>().ToList();
             }
-            catch { return new List<ManagementObject>(); }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<ManagementObject>(); }
         }
 
         public static ManagementObject? GetPrimaryGpu()
@@ -1040,7 +1040,7 @@ namespace KitLugia.Core
                     obj.Dispose();
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return null;
         }
 
@@ -1052,7 +1052,7 @@ namespace KitLugia.Core
                 if (string.IsNullOrEmpty(gpuDescription)) return null;
                 return FindGpuRegistryPathByDescription(gpuDescription);
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         /// <summary>
@@ -1098,7 +1098,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
             return null;
         }
 
@@ -1170,7 +1170,7 @@ namespace KitLugia.Core
                 Registry.SetValue(key, "GDIProcessHandleQuota", 10000, RegistryValueKind.DWord);
                 Registry.SetValue(key, "USERProcessHandleQuota", 10000, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static void RevertVramTweaks()
@@ -1207,7 +1207,7 @@ namespace KitLugia.Core
                         intelKey?.DeleteSubKeyTree("GMM", false);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 // 3. Reverte Quotas (GDI/USER)
                 using (var winKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows", true))
@@ -1236,7 +1236,7 @@ namespace KitLugia.Core
                 RevertRegistryValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", "StartupDelayInMSec");
                 Logger.Log("Startup delay revertido para padrão.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Fast Startup (Hybrid Boot / Hiberboot) ---
@@ -1249,7 +1249,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(PowerPath, "HiberbootEnabled", -1);
                 return val != null && Convert.ToInt32(val) == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void DisableFastStartup()
         {
@@ -1258,7 +1258,7 @@ namespace KitLugia.Core
                 Registry.SetValue(PowerPath, "HiberbootEnabled", 0, RegistryValueKind.DWord);
                 Logger.Log("Fast Startup (Hiberboot) desativado.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void EnableFastStartup()
         {
@@ -1268,7 +1268,7 @@ namespace KitLugia.Core
                 key?.DeleteValue("HiberbootEnabled", false);
                 Logger.Log("Fast Startup (Hiberboot) restaurado para padrão.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Boot Menu Timeout ---
@@ -1293,7 +1293,7 @@ namespace KitLugia.Core
                 var match = Regex.Match(output, @"timeout\s+(\d+)", RegexOptions.IgnoreCase);
                 return match.Success && match.Groups[1].Value == "0";
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void SetBootMenuTimeoutZero()
         {
@@ -1314,7 +1314,7 @@ namespace KitLugia.Core
                 p.WaitForExit(5000);
                 Logger.Log("Boot menu timeout definido para 0s.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertBootMenuTimeout()
         {
@@ -1335,7 +1335,7 @@ namespace KitLugia.Core
                 p.WaitForExit(5000);
                 Logger.Log("Boot menu timeout restaurado para 30s.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- NumLock on Startup ---
@@ -1348,7 +1348,7 @@ namespace KitLugia.Core
                 string? s = val?.ToString();
                 return s == "2" || s == "2147483650" || s == "80000002";
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void EnableNumLockOnStartup()
         {
@@ -1357,7 +1357,7 @@ namespace KitLugia.Core
                 Registry.SetValue(@"HKEY_CURRENT_USER\Control Panel\Keyboard", "InitialKeyboardIndicators", "2", RegistryValueKind.String);
                 Logger.Log("NumLock on Startup ativado.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void DisableNumLockOnStartup()
         {
@@ -1366,7 +1366,7 @@ namespace KitLugia.Core
                 Registry.SetValue(@"HKEY_CURRENT_USER\Control Panel\Keyboard", "InitialKeyboardIndicators", "0", RegistryValueKind.String);
                 Logger.Log("NumLock on Startup desativado.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -1385,7 +1385,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.CreateSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
                 key?.SetValue("FrameQueueMode", 0, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertFrameQueue()
         {
@@ -1394,7 +1394,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("FrameQueueMode", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- EnablePreemption: 1 = Allow GPU preemption ---
@@ -1406,7 +1406,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.CreateSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
                 key?.SetValue("EnablePreemption", 1, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertGpuPreemption()
         {
@@ -1415,7 +1415,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("EnablePreemption", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- DisableGpuIdle: 1 = GPU never idles ---
@@ -1427,7 +1427,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.CreateSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
                 key?.SetValue("DisableGpuIdle", 1, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertGpuIdleSchedule()
         {
@@ -1436,7 +1436,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(GpuSchedulerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("DisableGpuIdle", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- GPU Power Latency: 1 = Priority to latency ---
@@ -1448,7 +1448,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.CreateSubKey(GpuPowerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
                 key?.SetValue("Latency", 1, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertGpuPowerLatency()
         {
@@ -1457,7 +1457,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(GpuPowerPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("Latency", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -1472,7 +1472,7 @@ namespace KitLugia.Core
             {
                 Registry.SetValue(GpuDriversPath, "HwSchMode", 2, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertHags()
         {
@@ -1481,7 +1481,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(GpuDriversPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("HwSchMode", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -1494,7 +1494,7 @@ namespace KitLugia.Core
             {
                 Registry.SetValue(GpuDriversPath, "TdrDelay", 10, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertTdrDelay()
         {
@@ -1503,7 +1503,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(GpuDriversPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("TdrDelay", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -1518,7 +1518,7 @@ namespace KitLugia.Core
             {
                 Registry.SetValue(MemManagementPath, "IoPageLockLimit", 8192, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertIoPageLockLimit()
         {
@@ -1527,7 +1527,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(MemManagementPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("IoPageLockLimit", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -1544,7 +1544,7 @@ namespace KitLugia.Core
                 int kbd = (int?)Registry.GetValue(KbdclassPath, "KeyboardDataQueueSize", 0) ?? 0;
                 return mouse >= 200 || kbd >= 200;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void IncreaseInputQueueSize()
         {
@@ -1553,7 +1553,7 @@ namespace KitLugia.Core
                 Registry.SetValue(MouclassPath, "MouseDataQueueSize", 200, RegistryValueKind.DWord);
                 Registry.SetValue(KbdclassPath, "KeyboardDataQueueSize", 200, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertInputQueueSize()
         {
@@ -1564,7 +1564,7 @@ namespace KitLugia.Core
                 using var kk = Registry.LocalMachine.OpenSubKey(KbdclassPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 kk?.DeleteValue("KeyboardDataQueueSize", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static bool IsGamingOptimized() => (int?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games", "GPU Priority", 0) == 8;
@@ -1578,7 +1578,7 @@ namespace KitLugia.Core
                 Registry.SetValue(p, "Scheduling Category", "High", RegistryValueKind.String);
                 Registry.SetValue(p, "SFIO Priority", "High", RegistryValueKind.String);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static void RevertGamingOptimizations()
@@ -1591,7 +1591,7 @@ namespace KitLugia.Core
                 Registry.SetValue(p, "Scheduling Category", "Medium", RegistryValueKind.String);
                 Registry.SetValue(p, "SFIO Priority", "Normal", RegistryValueKind.String);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static bool IsMpoDisabled() => (int?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Dwm", "OverlayTestMode", 0) == 5;
@@ -1623,7 +1623,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(keyPath);
                 return key != null && (int?)key.GetValue("MSISupported") == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) ToggleGpuMsiMode(string pnpDeviceId)
@@ -1650,7 +1650,7 @@ namespace KitLugia.Core
             {
                 Registry.SetValue(@"HKEY_CURRENT_USER\System\GameConfigStore", "GameDVR_Enabled", enable ? 1 : 0);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         #endregion
 
@@ -1667,7 +1667,7 @@ namespace KitLugia.Core
                 using var searcher = new ManagementObjectSearcher(query);
                 return searcher.Get().Cast<ManagementObject>().ToList();
             }
-            catch { return new List<ManagementObject>(); }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<ManagementObject>(); }
         }
 
         public static void SetDnsServers(string provider, string? primaryDns, string? secondaryDns)
@@ -1684,7 +1684,7 @@ namespace KitLugia.Core
                         adapter.InvokeMethod("SetDNSServerSearchOrder", param, null);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -1706,7 +1706,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return null;
         }
 
@@ -1725,7 +1725,7 @@ namespace KitLugia.Core
                 var value = key.GetValue("*InterruptModeration")?.ToString();
                 return value == "0";
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void ToggleNetworkDriverOptimizations(string regPath)
@@ -1748,7 +1748,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static bool IsTcpIpLatencyTweakApplied()
@@ -1766,7 +1766,7 @@ namespace KitLugia.Core
                 var value = key.GetValue("TcpAckFrequency");
                 return value != null && value is int intValue && intValue == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) ToggleTcpIpLatencyTweak()
@@ -1810,7 +1810,7 @@ namespace KitLugia.Core
                                           i.GetIPProperties().GatewayAddresses.Any());
                 return activeInterface != null ? $@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{activeInterface.Id}" : null;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
         #endregion
 
@@ -1877,8 +1877,8 @@ namespace KitLugia.Core
                 bool googleOk = false, cfOk = false;
                 using (var ping = new Ping())
                 {
-                    try { googleOk = ping.Send("8.8.8.8", 3000)?.Status == IPStatus.Success; } catch { }
-                    try { cfOk = ping.Send("1.1.1.1", 3000)?.Status == IPStatus.Success; } catch { }
+                    try { googleOk = ping.Send("8.8.8.8", 3000)?.Status == IPStatus.Success; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    try { cfOk = ping.Send("1.1.1.1", 3000)?.Status == IPStatus.Success; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
                 if (googleOk && cfOk)
                     return new NetworkDiagnosticResult { TestName = "Teste de Conectividade", Success = true, Details = "Conectividade com internet está funcionando (Google DNS e Cloudflare DNS)", Recommendation = "Sua conexão com internet está normal" };
@@ -1918,8 +1918,8 @@ namespace KitLugia.Core
             try
             {
                 bool googleOk = false, msOk = false;
-                try { googleOk = System.Net.Dns.GetHostAddresses("google.com").Any(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork); } catch { }
-                try { msOk = System.Net.Dns.GetHostAddresses("microsoft.com").Any(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork); } catch { }
+                try { googleOk = System.Net.Dns.GetHostAddresses("google.com").Any(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { msOk = System.Net.Dns.GetHostAddresses("microsoft.com").Any(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 return new NetworkDiagnosticResult
                 {
                     TestName = "Resolução DNS",
@@ -2012,7 +2012,7 @@ namespace KitLugia.Core
                 bool tcpOk = false;
                 using (var tcp = new System.Net.Sockets.TcpClient())
                 {
-                    try { tcp.Connect("8.8.8.8", 53); tcpOk = true; } catch { }
+                    try { tcp.Connect("8.8.8.8", 53); tcpOk = true; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
                 return new NetworkDiagnosticResult
                 {
@@ -2036,7 +2036,7 @@ namespace KitLugia.Core
                 int running = 0;
                 foreach (var svc in serviceNames)
                 {
-                    using (var sc = new ServiceController(svc)) { try { if (sc.Status == ServiceControllerStatus.Running) running++; } catch { } }
+                    using (var sc = new ServiceController(svc)) { try { if (sc.Status == ServiceControllerStatus.Running) running++; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } }
                 }
                 return new NetworkDiagnosticResult
                 {
@@ -2082,12 +2082,12 @@ namespace KitLugia.Core
                         var adapters = searcher.Get().Cast<ManagementObject>().ToList();
                         foreach (var adapter in adapters)
                         {
-                            try { adapter.InvokeMethod("Disable", null); } catch { }
+                            try { adapter.InvokeMethod("Disable", null); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                         System.Threading.Thread.Sleep(2000);
                         foreach (var adapter in adapters)
                         {
-                            try { adapter.InvokeMethod("Enable", null); } catch { }
+                            try { adapter.InvokeMethod("Enable", null); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                     }
                     results.Add("Adaptadores de rede resetados");
@@ -2110,7 +2110,7 @@ namespace KitLugia.Core
                 // 5. Reiniciar serviços de rede
                 foreach (string svc in new[] { "Netlogon", "LanmanWorkstation" })
                 {
-                    try { using (var sc = new ServiceController(svc)) { if (sc.Status == ServiceControllerStatus.Running) { sc.Stop(); sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10)); } sc.Start(); sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10)); } } catch { }
+                    try { using (var sc = new ServiceController(svc)) { if (sc.Status == ServiceControllerStatus.Running) { sc.Stop(); sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10)); } sc.Start(); sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10)); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
                 results.Add("Serviços de rede reiniciados");
                 
@@ -2260,7 +2260,7 @@ namespace KitLugia.Core
                 SystemUtils.RunExternalProcess("netsh", "int ip reset", true);
                 SystemUtils.RunExternalProcess("netsh", "winsock reset", true);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static void AutoTuneNetworkAdapter()
@@ -2269,7 +2269,7 @@ namespace KitLugia.Core
             {
                 SystemUtils.RunExternalProcess("netsh", "int tcp set global autotuninglevel=normal", true);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -2315,7 +2315,7 @@ namespace KitLugia.Core
 
                             optimizedCount++;
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
 
 
@@ -2397,7 +2397,7 @@ namespace KitLugia.Core
 
                             revertedCount++;
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
 
 
@@ -2883,10 +2883,7 @@ namespace KitLugia.Core
                     "StartupDelayInMSec", 0);
                 return Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsShutdownSpeedOptimized()
@@ -2897,10 +2894,7 @@ namespace KitLugia.Core
                     "WaitToKillServiceTimeout", 5000);
                 return Convert.ToInt32(value) == 2000;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsNetworkThrottlingDisabled()
@@ -2913,10 +2907,7 @@ namespace KitLugia.Core
 
                 return valueLong == 0xFFFFFFFF || valueLong != 10;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsWiFi7Optimized()
@@ -2927,10 +2918,7 @@ namespace KitLugia.Core
                     "WiFi7Optimization", 0);
                 return Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsBluetoothLEOptimized()
@@ -2941,10 +2929,7 @@ namespace KitLugia.Core
                     "LEAudioOptimization", 0);
                 return Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsProtectedPrintModeEnabled()
@@ -2955,10 +2940,7 @@ namespace KitLugia.Core
                     "ProtectedPrint", 0);
                 return Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsPersonalDataEncryptionEnabled()
@@ -2969,10 +2951,7 @@ namespace KitLugia.Core
                     "PersonalDataEncryption", 0);
                 return Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsSudoEnabled()
@@ -2983,10 +2962,7 @@ namespace KitLugia.Core
                     "EnableSudo", 0);
                 return Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         #endregion
@@ -3161,7 +3137,7 @@ namespace KitLugia.Core
                     return val != null && Convert.ToInt32(val) >= 30; // Considerando 31 como otimizado
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false;
         }
 
@@ -3219,7 +3195,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false; // Não modificado ou erro
         }
 
@@ -3364,10 +3340,7 @@ namespace KitLugia.Core
 
                 return (acResult == 0 && acValue == 0) && (dcResult == 0 && dcValue == 0);
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) DisableHardDiskDisplayTimeout()
@@ -3490,10 +3463,7 @@ namespace KitLugia.Core
                 return diskAcOk && diskAc == 0 && diskDcOk && diskDc == 0
                     && monAcOk && monAc == 0 && monDcOk && monDc == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) ApplyBitsumHighestPerformanceSettings()
@@ -3713,7 +3683,7 @@ namespace KitLugia.Core
                     return val != null && Convert.ToInt32(val) == 38;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false;
         }
 
@@ -4634,10 +4604,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\System\GameConfigStore", "GameDVR_Enabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableAutoEndTasks()
@@ -4673,10 +4640,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "AutoEndTasks", "0");
                 return value != null && value.ToString() == "1";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAeDebug()
@@ -4710,10 +4674,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AeDebug", "Auto", "1");
                 return value != null && value.ToString() == "0";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAnimationEffectMaxMin()
@@ -4747,10 +4708,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop\WindowMetrics", "MinAnimate", "1");
                 return value != null && value.ToString() == "0";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAutoDefragIdle()
@@ -4784,10 +4742,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\OptimalLayout", "EnableAutoLayout", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableBootOptimize()
@@ -4821,10 +4776,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Dfrg\BootOptimizeFunction", "Enable", "N");
                 return value != null && value.ToString() == "N";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableCustomInking()
@@ -4858,10 +4810,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\WindowsInkWorkspace", "AllowWindowsInkWorkspace", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableCrashAutoReboot()
@@ -4895,10 +4844,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl", "AutoReboot", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableErrorReporting()
@@ -4932,10 +4878,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting", "Disabled", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableGoogleUpdateTask()
@@ -5003,10 +4946,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Personalization", "NoLockScreen", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableLowDiskSpaceChecks()
@@ -5040,10 +4980,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", "NoLowDiskSpaceChecks", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableMemoryPagination()
@@ -5077,10 +5014,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "DisablePagingExecutive", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableMenuShowDelay()
@@ -5114,10 +5048,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "MenuShowDelay", "400");
                 return value != null && value.ToString() == "0";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableMicrosoftEdgeUpdateTask()
@@ -5178,10 +5109,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters", "EnablePrefetcher", 3);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableScheduledDefrag()
@@ -5256,10 +5184,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer", "link", "000000");
                 return value != null && value.ToString() == "00000000";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableIoPageLockLimit()
@@ -5293,10 +5218,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "IoPageLockLimit", 0);
                 return value != null && Convert.ToInt32(value) > 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableLinkResolveIgnoreLinkInfo()
@@ -5332,10 +5254,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", "NoResolveSearch", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableMouseHoverTime()
@@ -5369,10 +5288,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "MouseHoverTime", "400");
                 return value != null && value.ToString() == "0";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableNoInternetOpenWith()
@@ -5406,10 +5322,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings", "MimeExclusionListForCache", "");
                 return value != null && !string.IsNullOrEmpty(value.ToString());
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableNoResolveSearch()
@@ -5443,10 +5356,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", "NoResolveSearch", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableNoResolveTrack()
@@ -5480,10 +5390,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", "NoResolveTrack", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableNumLockonStartup()
@@ -5517,10 +5424,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_USERS\.DEFAULT\Control Panel\Keyboard", "InitialKeyboardIndicators", "0");
                 return value != null && value.ToString() == "2";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableOptimizeNetworkTransfer()
@@ -5554,10 +5458,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", "NetworkThrottlingIndex", 10);
                 return value != null && Convert.ToInt64(value) == 0xffffffff;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableOptimizeProcessorPerformance()
@@ -5591,10 +5492,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\bc5038f7-23e0-4960-96da-33abaf5935ec", "Default", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableOptimizeRefreshPolicy()
@@ -5628,10 +5526,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Update", "UpdateMode", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableShutdownAcceleration()
@@ -5665,10 +5560,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control", "WaitToKillServiceTimeout", "5000");
                 return value != null && value.ToString() == "1000";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableSnippingPrintScreen()
@@ -5702,10 +5594,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Keyboard", "PrintScreenKeyForSnippingEnabled", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         // PRIVACY
@@ -5740,10 +5629,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableMSACloudSearch()
@@ -5777,10 +5663,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search", "CloudSearchEnabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAADCloudSearch()
@@ -5814,10 +5697,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search", "RestrictCloudSearch", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableDeviceSearchHistory()
@@ -5851,10 +5731,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search", "DeviceHistoryEnabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableDiagTrack()
@@ -5888,10 +5765,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 3);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DiagnosticDataOff()
@@ -5925,10 +5799,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 3);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAdsOnLockScreen()
@@ -5962,10 +5833,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAutoInstallationApps()
@@ -5999,10 +5867,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SilentInstalledAppsEnabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAutoplay()
@@ -6036,10 +5901,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers", "DisableAutoplay", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableVBSCodeIntegrity()
@@ -6073,10 +5935,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity", "Enabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableOfferSuggestions()
@@ -6110,10 +5969,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "ContentDeliveryAllowed", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisablePersonalizedAdsStoreApps()
@@ -6147,10 +6003,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableRemoteRegAccess()
@@ -6184,10 +6037,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurePipeServers\winreg", "RemoteRegAccess", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableSettingsAppSuggestions()
@@ -6223,10 +6073,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "ContentDeliveryAllowed", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableTailoredExperiences()
@@ -6260,10 +6107,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Privacy", "TailoredExperiencesWithDiagnosticDataEnabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableTipsAndSuggestions()
@@ -6299,10 +6143,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableWCE()
@@ -6336,10 +6177,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting", "Disabled", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableVisualStudioTelemetry()
@@ -6377,10 +6215,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\VSCommon\17.0\SQM", "OptIn", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableWindowsFeedback()
@@ -6416,10 +6251,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Siuf\Rules", "NumberOfSIUFInPeriod", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         // EXPLORER
@@ -6454,10 +6286,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoComplete", "AutoSuggest", "Yes");
                 return value != null && value.ToString() == "No";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAppendCompletion()
@@ -6491,10 +6320,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoComplete", "Append Completion", "Yes");
                 return value != null && value.ToString() == "No";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void ShowExtensions()
@@ -6528,10 +6354,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void ShowHidden()
@@ -6565,10 +6388,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", 2);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void ShowHiddenSystem()
@@ -6602,10 +6422,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowSuperHidden", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void ShowThisPC()
@@ -6639,10 +6456,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FolderDescriptions\{A52BBA46-E9E1-435f-B3D9-28DAA648C0F6}", "PropertyBag", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void OpenFileExplorerThisPC()
@@ -6676,10 +6490,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "LaunchTo", 2);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void IncreaseIconCache()
@@ -6713,10 +6524,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", "Max Cached Icons", "500");
                 return value != null && Convert.ToInt32(value) > 500;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableRecentFiles()
@@ -6750,10 +6558,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_TrackDocs", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableFrequentFolders()
@@ -6787,10 +6592,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_TrackProgs", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableSyncProviderNotifications()
@@ -6824,10 +6626,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowSyncProviderNotifications", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         // START MENU
@@ -6862,10 +6661,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void HideMostUsedApps()
@@ -6899,10 +6695,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_RecentDocs", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void HideStartMenuRecentlyAdded()
@@ -6936,10 +6729,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_ShowRecentApps", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void HideStartMenuRecentlyOpened()
@@ -6973,10 +6763,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_TrackDocs", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void HideStartMenuAccountNotifications()
@@ -7010,10 +6797,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_AccountNotifications", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void HideStartMenuRecommendations()
@@ -7047,10 +6831,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_IrisRecommendations", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         // OPTIONAL
@@ -7087,10 +6868,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableClassicContextMenu()
@@ -7124,10 +6902,7 @@ namespace KitLugia.Core
                 var key = Registry.CurrentUser.OpenSubKey(@"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32");
                 return key != null;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void EnableAUOptions()
@@ -7161,10 +6936,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU", "NoAutoUpdate", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableAutoWindowsUpdates()
@@ -7200,10 +6972,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU", "NoAutoUpdate", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableHibernate()
@@ -7249,10 +7018,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableHybridSleep()
@@ -7288,10 +7054,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\94ACACD1-32AF-449B-9A99-2D291A88E8B3", "ACSettingIndex", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisablePrintSpooler()
@@ -7351,10 +7114,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Spooler", "Start", 2);
                 return value != null && Convert.ToInt32(value) == 4;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableSleep()
@@ -7390,10 +7150,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\29F6C1DB-86DA-48C5-9FDB-F2B67B1F44DA", "ACSettingIndex", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableSystemRestore()
@@ -7440,10 +7197,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore", "RPSessionInterval", 0);
                 return value == null || Convert.ToInt32(value) < 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableTurnOffDisplay()
@@ -7477,10 +7231,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "ScreenSaveActive", "1");
                 return value != null && value.ToString() == "0";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void HideWindowsSecurityNotifications()
@@ -7514,10 +7265,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings", "C_SecurityAndMaintenance", 1);
                 return value != null && Convert.ToInt32(value) == 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void HideWindowsSecurityNoncriticalNotifications()
@@ -7551,10 +7299,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows Defender Security Center\Notifications", "DisableNonCriticalNotifications", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableWindowsSearch()
@@ -7614,10 +7359,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WSearch", "Start", 2);
                 return value != null && Convert.ToInt32(value) == 4;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void UninstallOneDrive()
@@ -7744,10 +7486,7 @@ namespace KitLugia.Core
 
                 return true;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static void DisableMSDefender()
@@ -7787,10 +7526,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender", "DisableAntiSpyware", 0);
                 return value != null && Convert.ToInt32(value) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         #endregion
@@ -7813,7 +7549,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return ("Desconhecido", 0, 0);
         }
 
@@ -7824,7 +7560,7 @@ namespace KitLugia.Core
                 var names = GetAllGpuNames();
                 return names.Count > 0 ? names[0] : "N/A";
             }
-            catch { return "N/A"; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return "N/A"; }
         }
 
         public static int GetVramAppliedMb()
@@ -7838,7 +7574,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(regPath, "DedicatedSegmentSize", 0);
                 return val != null ? Convert.ToInt32(val) : 0;
             }
-            catch { return 0; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         #endregion
@@ -7852,7 +7588,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache", 0);
                 return val != null && Convert.ToInt64(val) > 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsVramTweakApplied()
@@ -7866,7 +7602,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(regPath, "DedicatedSegmentSize", 0);
                 return val != null && Convert.ToInt32(val) > 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsNagleAlgorithmDisabled()
@@ -7881,7 +7617,7 @@ namespace KitLugia.Core
                 var tcpNoDelay = key.GetValue("TCPNoDelay");
                 return tcpNoDelay != null && Convert.ToInt32(tcpNoDelay) == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static bool IsCoreParkingDisabled()
@@ -7904,7 +7640,7 @@ namespace KitLugia.Core
                 }
                 return true;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) ToggleAutoCacheTweak()
@@ -7952,12 +7688,12 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(ControlPath, "WaitToKillServiceTimeout", null) as string;
                 return val != null && int.TryParse(val, out var ms) && ms <= 2000;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void OptimizeWaitToKillService()
         {
             try { Registry.SetValue(ControlPath, "WaitToKillServiceTimeout", "2000", RegistryValueKind.String); }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertWaitToKillService()
         {
@@ -7966,7 +7702,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(ControlPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("WaitToKillServiceTimeout", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- WaitToKillAppTimeout (HKCU): 2000ms ---
@@ -7977,12 +7713,12 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(DesktopPath, "WaitToKillAppTimeout", null) as string;
                 return val != null && int.TryParse(val, out var ms) && ms <= 2000;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void OptimizeWaitToKillApp()
         {
             try { Registry.SetValue(DesktopPath, "WaitToKillAppTimeout", "2000", RegistryValueKind.String); }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertWaitToKillApp()
         {
@@ -7991,7 +7727,7 @@ namespace KitLugia.Core
                 using var key = Registry.CurrentUser.OpenSubKey(DesktopPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
                 key?.DeleteValue("WaitToKillAppTimeout", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- HungAppTimeout (HKCU): 1000ms ---
@@ -8002,12 +7738,12 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(DesktopPath, "HungAppTimeout", null) as string;
                 return val != null && int.TryParse(val, out var ms) && ms <= 1000;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void OptimizeHungAppTimeout()
         {
             try { Registry.SetValue(DesktopPath, "HungAppTimeout", "1000", RegistryValueKind.String); }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertHungAppTimeout()
         {
@@ -8016,7 +7752,7 @@ namespace KitLugia.Core
                 using var key = Registry.CurrentUser.OpenSubKey(DesktopPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
                 key?.DeleteValue("HungAppTimeout", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- ClearPageFileAtShutdown: 0 (disabled) ---
@@ -8027,7 +7763,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(MemMgmtPath, "ClearPageFileAtShutdown", null);
                 return val is int i && i == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void DisableClearPageFile()
         {
@@ -8036,7 +7772,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.CreateSubKey(MemMgmtPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
                 key?.SetValue("ClearPageFileAtShutdown", 0, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void EnableClearPageFile()
         {
@@ -8045,7 +7781,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(MemMgmtPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("ClearPageFileAtShutdown", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- VerboseStatus: 1 (verbose boot/shutdown messages) ---
@@ -8056,7 +7792,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(PoliciesSystemPath, "verbosestatus", null);
                 return val is int i && i == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void EnableVerboseStatus()
         {
@@ -8065,7 +7801,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.CreateSubKey(PoliciesSystemPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
                 key?.SetValue("verbosestatus", 1, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void DisableVerboseStatus()
         {
@@ -8074,7 +7810,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(PoliciesSystemPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("verbosestatus", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Quick App Kill (combined: WaitToKillApp + HungApp + AutoEndTasks) ---
@@ -8087,7 +7823,7 @@ namespace KitLugia.Core
                 var auto = Registry.GetValue(DesktopPath, "AutoEndTasks", null) as string;
                 return wtk == "2000" && hung == "1000" && auto == "1";
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void ApplyQuickAppKill()
         {
@@ -8097,7 +7833,7 @@ namespace KitLugia.Core
                 Registry.SetValue(DesktopPath, "HungAppTimeout", "1000", RegistryValueKind.String);
                 Registry.SetValue(DesktopPath, "AutoEndTasks", "1", RegistryValueKind.String);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertQuickAppKill()
         {
@@ -8108,7 +7844,7 @@ namespace KitLugia.Core
                 key?.DeleteValue("HungAppTimeout", false);
                 key?.DeleteValue("AutoEndTasks", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -8130,12 +7866,12 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(DesktopCtrlPath, "MenuShowDelay", null) as string;
                 return val == "0";
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void OptimizeMenuShowDelay()
         {
             try { Registry.SetValue(DesktopCtrlPath, "MenuShowDelay", "0", RegistryValueKind.String); }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertMenuShowDelay()
         {
@@ -8144,7 +7880,7 @@ namespace KitLugia.Core
                 using var key = Registry.CurrentUser.OpenSubKey(DesktopCtrlPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
                 key?.DeleteValue("MenuShowDelay", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- VisualFX (best performance): setting VisualFXSetting=2 is not enough,
@@ -8160,7 +7896,7 @@ namespace KitLugia.Core
                 var taskbar = Registry.GetValue(ExplorerAdvancedPath, "TaskbarAnimations", null);
                 return taskbar is int t && t == 0;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void OptimizeVisualFX()
         {
@@ -8175,7 +7911,7 @@ namespace KitLugia.Core
                 using var key3 = Registry.CurrentUser.CreateSubKey(ExplorerAdvancedPath.Replace(@"HKEY_CURRENT_USER\", ""));
                 key3?.SetValue("TaskbarAnimations", 0, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RevertVisualFX()
         {
@@ -8190,7 +7926,7 @@ namespace KitLugia.Core
                 using var key3 = Registry.CurrentUser.OpenSubKey(ExplorerAdvancedPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
                 key3?.DeleteValue("TaskbarAnimations", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Explorer LaunchTo (ComboBox): 1=ThisPC, 2=QuickAccess, 3=Downloads ---
@@ -8207,7 +7943,7 @@ namespace KitLugia.Core
                 }
                 return 0; // default = Quick Access
             }
-            catch { return 0; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
         public static void SetExplorerLaunchTo(int selectedIndex)
         {
@@ -8223,7 +7959,7 @@ namespace KitLugia.Core
                 }
                 key?.SetValue("LaunchTo", value, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Disable PCA (Program Compatibility Assistant) ---
@@ -8234,7 +7970,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(AppCompatPath, "DisablePCA", null);
                 return val is int i && i == 1;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void DisablePCA()
         {
@@ -8243,7 +7979,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.CreateSubKey(AppCompatPath.Replace(@"HKEY_LOCAL_MACHINE\", ""));
                 key?.SetValue("DisablePCA", 1, RegistryValueKind.DWord);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void EnablePCA()
         {
@@ -8252,7 +7988,7 @@ namespace KitLugia.Core
                 using var key = Registry.LocalMachine.OpenSubKey(AppCompatPath.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
                 key?.DeleteValue("DisablePCA", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -8267,7 +8003,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\runas", "", null);
                 return val is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddTakeOwnership()
         {
@@ -8285,7 +8021,7 @@ namespace KitLugia.Core
                 using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\runas\command");
                 c2?.SetValue("", "cmd.exe /c takeown /f \"%1\" /r /d y && icacls \"%1\" /grant administrators:F /t");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveTakeOwnership()
         {
@@ -8296,7 +8032,7 @@ namespace KitLugia.Core
                 using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\shell", true);
                 s2?.DeleteSubKeyTree("runas", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Force Close (exefile) ---
@@ -8307,7 +8043,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\exefile\shell\forceclose\command", "", null);
                 return val is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddForceClose()
         {
@@ -8318,7 +8054,7 @@ namespace KitLugia.Core
                 using var c = Registry.CurrentUser.CreateSubKey(@"Software\Classes\exefile\shell\forceclose\command");
                 c?.SetValue("", "taskkill /f /fi \"IMAGENAME eq %~nx1\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveForceClose()
         {
@@ -8327,7 +8063,7 @@ namespace KitLugia.Core
                 using var s = Registry.CurrentUser.OpenSubKey(@"Software\Classes\exefile\shell", true);
                 s?.DeleteSubKeyTree("forceclose", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- CMD Here (background + drive) ---
@@ -8338,7 +8074,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\cmd_here\command", "", null);
                 return val is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddCmdHere()
         {
@@ -8354,7 +8090,7 @@ namespace KitLugia.Core
                 using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\cmd_here\command");
                 c2?.SetValue("", "cmd.exe /s /k pushd \"%V\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveCmdHere()
         {
@@ -8365,7 +8101,7 @@ namespace KitLugia.Core
                 using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
                 s2?.DeleteSubKeyTree("cmd_here", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- PowerShell Here (background + drive) ---
@@ -8376,7 +8112,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\powershell_here\command", "", null);
                 return val is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddPowerShellHere()
         {
@@ -8392,7 +8128,7 @@ namespace KitLugia.Core
                 using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\powershell_here\command");
                 c2?.SetValue("", "powershell.exe -NoExit -Command Set-Location -Path \"%V\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemovePowerShellHere()
         {
@@ -8403,7 +8139,7 @@ namespace KitLugia.Core
                 using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
                 s2?.DeleteSubKeyTree("powershell_here", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- CMD as Admin (background + drive) ---
@@ -8414,7 +8150,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\cmd_admin\command", "", null);
                 return val is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddCmdAdmin()
         {
@@ -8432,7 +8168,7 @@ namespace KitLugia.Core
                 using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\cmd_admin\command");
                 c2?.SetValue("", "powershell -Command \"Start-Process cmd -Verb RunAs -ArgumentList '/k pushd \\\"%V\\\"'\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveCmdAdmin()
         {
@@ -8443,7 +8179,7 @@ namespace KitLugia.Core
                 using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
                 s2?.DeleteSubKeyTree("cmd_admin", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- PowerShell as Admin (background + drive) ---
@@ -8454,7 +8190,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\powershell_admin\command", "", null);
                 return val is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddPowerShellAdmin()
         {
@@ -8472,7 +8208,7 @@ namespace KitLugia.Core
                 using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\powershell_admin\command");
                 c2?.SetValue("", "powershell -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-NoExit -Command Set-Location \\\"%V\\\"'\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemovePowerShellAdmin()
         {
@@ -8483,7 +8219,7 @@ namespace KitLugia.Core
                 using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
                 s2?.DeleteSubKeyTree("powershell_admin", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Open with Notepad (all files) ---
@@ -8494,7 +8230,7 @@ namespace KitLugia.Core
                 var val = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\openwithnotepad", "", null);
                 return val is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddNotepad()
         {
@@ -8505,7 +8241,7 @@ namespace KitLugia.Core
                 using var c = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\openwithnotepad\command");
                 c?.SetValue("", "notepad.exe \"%1\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveNotepad()
         {
@@ -8514,7 +8250,7 @@ namespace KitLugia.Core
                 using var s = Registry.CurrentUser.OpenSubKey(@"Software\Classes\*\shell", true);
                 s?.DeleteSubKeyTree("openwithnotepad", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- Copy as Path (files + folders) ---
@@ -8525,7 +8261,7 @@ namespace KitLugia.Core
                 return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\copyaspath", "", null) is string s1 && !string.IsNullOrEmpty(s1)
                     || Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\shell\copyaspath", "", null) is string s2 && !string.IsNullOrEmpty(s2);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddCopyAsPath()
         {
@@ -8540,7 +8276,7 @@ namespace KitLugia.Core
                 using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\copyaspath\command");
                 c2?.SetValue("", "powershell -Command \"[System.Windows.Clipboard]::SetText('%~1')\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveCopyAsPath()
         {
@@ -8551,7 +8287,7 @@ namespace KitLugia.Core
                 using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\shell", true);
                 s2?.DeleteSubKeyTree("copyaspath", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static string KitLugiaBaseFolder
@@ -8562,7 +8298,7 @@ namespace KitLugia.Core
                 {
                     return AppDomain.CurrentDomain.BaseDirectory ?? "";
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 return "";
             }
         }
@@ -8583,7 +8319,7 @@ namespace KitLugia.Core
             {
                 return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock", "", null) is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddForceStopUnlock()
         {
@@ -8610,7 +8346,7 @@ namespace KitLugia.Core
                 using var c3 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\forcestopunlock\command");
                 c3?.SetValue("", cmd);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveForceStopUnlock()
         {
@@ -8623,7 +8359,7 @@ namespace KitLugia.Core
                 using var s3 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
                 s3?.DeleteSubKeyTree("forcestopunlock", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- VS Code (Admin) context menu ---
@@ -8633,7 +8369,7 @@ namespace KitLugia.Core
             {
                 return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\runascode", "", null) is string s && !string.IsNullOrEmpty(s);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
         public static void AddVsCode()
         {
@@ -8649,7 +8385,7 @@ namespace KitLugia.Core
                 using var c = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\Background\shell\runascode\command");
                 c?.SetValue("", $"powershell.exe -Command \"Start-Process '{vsCodePath}' -ArgumentList '\"\"%V\"\"' -Verb runas\"");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
         public static void RemoveVsCode()
         {
@@ -8658,7 +8394,7 @@ namespace KitLugia.Core
                 using var s = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\Background\shell", true);
                 s?.DeleteSubKeyTree("runascode", false);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ============================================================
@@ -8778,10 +8514,10 @@ namespace KitLugia.Core
                                 Type = "shell", Source = "HKCU"
                             });
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             foreach (var loc in ShellexScanLocations)
@@ -8806,10 +8542,10 @@ namespace KitLugia.Core
                                 Clsid = clsid
                             });
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             // === HKLM ===
@@ -8845,10 +8581,10 @@ namespace KitLugia.Core
                                 Type = "shell", Source = "HKLM"
                             });
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             foreach (var loc in ShellexScanLocations)
@@ -8873,10 +8609,10 @@ namespace KitLugia.Core
                                 Clsid = clsid
                             });
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             // === WOW6432Node (HKLM only, 32-bit COM on 64-bit Windows) ===
@@ -8902,10 +8638,10 @@ namespace KitLugia.Core
                                 Clsid = clsid
                             });
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             return entries;
@@ -8923,7 +8659,7 @@ namespace KitLugia.Core
                 if (val is string s2 && !string.IsNullOrEmpty(s2))
                     return s2;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return null;
         }
 
@@ -8939,7 +8675,7 @@ namespace KitLugia.Core
                 if (val is string s2 && !string.IsNullOrEmpty(s2))
                     return s2;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return "";
         }
 
@@ -8953,7 +8689,7 @@ namespace KitLugia.Core
         public static bool ContextMenuBackupExists()
         {
             try { return File.Exists(GetContextMenuBackupPath()); }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static DateTime? GetContextMenuBackupTime()
@@ -8964,7 +8700,7 @@ namespace KitLugia.Core
                 var data = JsonSerializer.Deserialize<ContextMenuBackupData>(json);
                 return data?.BackupTime;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         public static void BackupUserContextMenu()
@@ -8980,7 +8716,7 @@ namespace KitLugia.Core
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(GetContextMenuBackupPath(), json);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static (bool Success, string Message) RestoreUserContextMenu()
@@ -9025,7 +8761,7 @@ namespace KitLugia.Core
 
                         restored++;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 return (true, $"{restored} de {data.Entries.Count} entradas restauradas.");
@@ -9045,13 +8781,13 @@ namespace KitLugia.Core
                 key.DeleteSubKeyTree(name, false);
                 return true;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static int GetContextMenuEntryCount()
         {
             try { return GetAllUserContextMenuEntries().Count; }
-            catch { return 0; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         #endregion

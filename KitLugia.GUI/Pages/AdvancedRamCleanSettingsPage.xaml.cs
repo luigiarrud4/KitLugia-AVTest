@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
@@ -110,7 +110,7 @@ namespace KitLugia.GUI.Pages
                         ["DangerLevel"] = (int)key.GetValue("DangerLevel", 90)
                     };
                 }
-                catch { return null; }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
             });
 
             if (data == null) return;

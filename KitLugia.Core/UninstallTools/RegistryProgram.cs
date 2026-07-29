@@ -150,10 +150,7 @@ namespace KitLugia.Core.UninstallTools
                 var value = key.GetValue(name);
                 return value?.ToString();
             }
-            catch
-            {
-                return null;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         private static int GetIntSafe(RegistryKey key, string name)
@@ -164,10 +161,7 @@ namespace KitLugia.Core.UninstallTools
                 if (value == null) return 0;
                 return Convert.ToInt32(value);
             }
-            catch
-            {
-                return 0;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private static string? GetAboutUrl(RegistryKey uninstallerKey)

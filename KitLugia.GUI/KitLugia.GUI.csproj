@@ -75,4 +75,13 @@
 		<ProjectReference Include="..\KitLugia.Core\KitLugia.Core.csproj" />
 	</ItemGroup>
 
+  <!-- Rust native DLL -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\rust_native\target\release\rust_native.dll')">
+    <Content Include="..\rust_native\target\release\rust_native.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>rust_native.dll</Link>
+    </Content>
+  </ItemGroup>
+
 </Project>

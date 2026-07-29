@@ -106,7 +106,7 @@ namespace KitLugia.Core
                 SetDeviceGammaRamp(hDC, ref ramp);
                 return (true, "Cores resetadas (Linear).");
             }
-            catch { return (false, "Erro ao resetar."); }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return (false, "Erro ao resetar."); }
             finally { if (hDC != IntPtr.Zero) ReleaseDC(IntPtr.Zero, hDC); }
         }
 
@@ -126,7 +126,7 @@ namespace KitLugia.Core
                             key.DeleteValue("NvidiaColorCorrection", false);
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                     // 2. Para serviços conflitantes
                     SystemUtils.RunExternalProcess("cmd.exe", @"/c schtasks /Change /TN ""\Microsoft\Windows\WindowsColorSystem\Calibration Loader"" /Disable", true);
@@ -158,7 +158,7 @@ namespace KitLugia.Core
                     using var key = Registry.LocalMachine.OpenSubKey(regPath.Replace("HKEY_LOCAL_MACHINE\\", ""));
                     pnpId = key?.GetValue("MatchingDeviceId")?.ToString() ?? "";
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             
             if (string.IsNullOrEmpty(pnpId)) return (false, "Não foi possível obter o ID da GPU.");
@@ -179,7 +179,7 @@ namespace KitLugia.Core
 
         public static void OpenNvidiaControlPanel()
         {
-            try { Process.Start(new ProcessStartInfo("cmd", "/c start shell:AppsFolder\\NVIDIACorp.NVIDIAControlPanel_56jybvy8sckqj!NVIDIACorp.NVIDIAControlPanel") { CreateNoWindow = true }); } catch { }
+            try { Process.Start(new ProcessStartInfo("cmd", "/c start shell:AppsFolder\\NVIDIACorp.NVIDIAControlPanel_56jybvy8sckqj!NVIDIACorp.NVIDIAControlPanel") { CreateNoWindow = true }); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static void OpenWindowsColorManagement()

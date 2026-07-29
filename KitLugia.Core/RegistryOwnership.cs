@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -255,10 +255,7 @@ namespace KitLugia.Core
 
                 return AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
             finally
             {
                 if (tokenHandle != IntPtr.Zero)

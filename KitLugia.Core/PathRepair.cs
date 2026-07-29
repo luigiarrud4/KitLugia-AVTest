@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -42,7 +42,7 @@ namespace KitLugia.Core
             if (string.IsNullOrWhiteSpace(CleanValue)) return false;
             if (CleanValue.Contains('%') && CleanValue.IndexOf('%') < CleanValue.LastIndexOf('%')) return true;
             try { return Directory.Exists(ExpandedValue); }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
     }
 

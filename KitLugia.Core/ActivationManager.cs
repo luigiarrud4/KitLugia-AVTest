@@ -90,7 +90,7 @@ namespace KitLugia.Core
         public static bool IsInternetConnected()
         {
             try { return InternetGetConnectedState(out _, 0); }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>

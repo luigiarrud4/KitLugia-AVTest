@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Security;
-using System.Text.RegularExpressions;
 
 namespace KitLugia.Core
 {
@@ -55,8 +54,12 @@ namespace KitLugia.Core
         #region Definições de Tweaks (Lista Completa e Detalhada)
 
     // Mudei de private para internal/static acessível via método abaixo
+    [ThreadStatic]
+    private static RegistryBatch? _currentBatch;
+
     private static readonly List<ScannableTweak> HarmfulTweaks = new()
     {
+
         // ==================================================================================
         // 1. SEGURANÇA CRÍTICA DO SISTEMA
         // ==================================================================================
@@ -1412,37 +1415,37 @@ new() {
             Name = "PATH do Sistema Incompleto",
             Description = "Variável PATH do sistema sem caminhos essenciais do Windows. Causa 'command not found' para ferramentas do sistema.",
             Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = false,
-            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = null, DefaultValue = null
+            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "INCOMPLETE", DefaultValue = null
         },
         new() {
             Name = "PATH do Usuário Incompleto",
             Description = "PATH do usuário sem caminhos de ferramentas de desenvolvimento instaladas. Causa falhas ao executar dotnet, git, node, etc.",
-            Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = false,
-            KeyPath = @"HKEY_CURRENT_USER\Environment", ValueName = "Path", HarmfulValue = null, DefaultValue = null
+            Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = true,
+            KeyPath = @"HKEY_CURRENT_USER\Environment", ValueName = "Path", HarmfulValue = "INCOMPLETE", DefaultValue = null
         },
         new() {
             Name = "PATH com Entradas Duplicadas",
             Description = "Múltiplas entradas idênticas no PATH. Causa lentidão na busca de executáveis e comportamento imprevisível de qual programa será executado.",
             Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = true,
-            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = null, DefaultValue = null
+            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "DUPLICATE", DefaultValue = null
         },
         new() {
             Name = "PATH com Caminhos Inexistentes",
             Description = "Entradas no PATH que apontam para pastas que não existem. Causa erros 'file not found' e lentidão no sistema.",
             Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = false,
-            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = null, DefaultValue = null
+            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "MISSING", DefaultValue = null
         },
         new() {
             Name = "PATH com Lixo de Desenvolvimento",
             Description = "Caminhos de SDKs internos e ferramentas de build no PATH. Causa poluição e lentidão na busca de executáveis.",
             Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = true,
-            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = null, DefaultValue = null
+            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "DEV_JUNK", DefaultValue = null
         },
         new() {
             Name = "PATH Vulnerável a Hijacking",
             Description = "PATH com ordem incorreta que permite hijacking de executáveis. Vulnerabilidade crítica de segurança que permite execução de malware.",
             Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = false,
-            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = null, DefaultValue = null
+            KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "VULNERABLE", DefaultValue = null
         },
         new() {
             Name = "TEMP/TMP (Variável de Ambiente Inválida)",
@@ -1486,7 +1489,7 @@ new() {
         new() {
             Name = "Variável de Ambiente PATH Corrompida",
             Description = "Variável PATH com entradas inválidas ou mal formatadas. Causa erro 'X is not recognized as an internal or external command' mesmo com programas instalados.",
-            Category = "Perfil de Usuário", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "", DefaultValue = @"%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\"
+            Category = "Perfil de Usuário", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "CORRUPTED", DefaultValue = @"%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\"
         },
         new() {
             Name = "TEMP/TMP (Variável de Ambiente Inválida)",
@@ -2629,7 +2632,6 @@ new() {
 
         #region Métodos Públicos (Interface Gráfica)
 
-        // *** NOVO: EXPOE A LISTA DE TWEAKS PARA A BUSCA ***
         public static List<ScannableTweak> GetAllTweaksDefinition()
         {
             return HarmfulTweaks;
@@ -2637,16 +2639,23 @@ new() {
 
         public static List<ScannableTweak> GetHarmfulTweaksWithStatus()
         {
-
-            // Reduz alocações e melhora performance em hot code paths
             var tweaksCopy = new List<ScannableTweak>(HarmfulTweaks.Count);
 
-            foreach (var tweak in HarmfulTweaks)
+            using var batch = new RegistryBatch();
+            _currentBatch = batch;
+            try
             {
-                CheckTweak(tweak);
-                // Criar uma cópia shallow do tweak para evitar modificação acidental da lista estática
-                tweaksCopy.Add(tweak);
+                foreach (var tweak in HarmfulTweaks)
+                {
+                    CheckTweak(tweak);
+                    tweaksCopy.Add(tweak);
+                }
             }
+            finally
+            {
+                _currentBatch = null;
+            }
+
             return tweaksCopy;
         }
 
@@ -3030,10 +3039,7 @@ new() {
                     return value != null && value is int intValue && intValue == 1;
                 }
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static List<string> GetAppliedQuickToggles()
@@ -3071,11 +3077,13 @@ new() {
         {
             if (string.IsNullOrEmpty(pathValue)) return PathProblem.None;
 
+            if (NativePath.UseNative)
+                return NativePath.Analyze(pathValue);
+
             var entries = pathValue.Split(';', StringSplitOptions.RemoveEmptyEntries);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var problems = PathProblem.None;
 
-            // Limite de entradas
             if (entries.Length > 50) problems |= PathProblem.TooManyEntries;
             if (pathValue.Length > 2048) problems |= PathProblem.PathTooLong;
 
@@ -3084,43 +3092,25 @@ new() {
                 var clean = entry.Trim().Trim('"').Trim();
                 if (string.IsNullOrEmpty(clean)) continue;
 
-                // Duplicado
                 if (!seen.Add(clean)) problems |= PathProblem.Duplicate;
-
-                // Caminho relativo (vulnerabilidade)
                 if (clean.StartsWith('.') || clean.StartsWith(".."))
                     problems |= PathProblem.RelativePath;
-
-                // Espaço sem aspas
                 if (clean.Contains(' ') && !clean.StartsWith('"'))
                     problems |= PathProblem.UnquotedSpace;
-
-                // Caminho temporário
                 if (clean.Contains("\\Temp\\", StringComparison.OrdinalIgnoreCase) ||
                     clean.Contains("\\Tmp\\", StringComparison.OrdinalIgnoreCase))
                     problems |= PathProblem.TempPath;
-
-                // Caminho de usuário sem variável (ex: C:\Users\fulano\AppData)
                 if (clean.Contains("\\Users\\", StringComparison.OrdinalIgnoreCase) &&
                     !clean.Contains("%USERPROFILE%"))
                     problems |= PathProblem.UserPathWithoutVariable;
-
-                // Lixo de desenvolvimento
                 if (clean.Contains("\\node_modules\\") || clean.Contains("\\vendor\\") ||
                     clean.Contains("\\.git\\") || clean.Contains("\\dotnet\\sdk\\"))
                     problems |= PathProblem.DevelopmentJunk;
-
-                // Sintaxe inválida
                 if (clean.Contains(',') || clean.Contains("\"\"") || clean.Contains("\\\\"))
                     problems |= PathProblem.SyntaxError;
-
-                // Caminho longo (>260)
                 if (clean.Length > 260) problems |= PathProblem.LongPath;
-
-                // Caracteres não ASCII (pode indicar corrupção)
                 if (clean.Any(c => c > 127)) problems |= PathProblem.EncodingIssue;
 
-                // Verifica existência (expande variáveis)
                 try
                 {
                     var expanded = Environment.ExpandEnvironmentVariables(clean);
@@ -3137,6 +3127,10 @@ new() {
 
         private static bool CheckPathProblems(string pathValue, string? problemType, string? keyPath = null)
         {
+            // Registry.GetValue expande REG_EXPAND_SZ, mas RegistryKey.GetValue (via batch) não.
+            // Normalizar para garantir que %SystemRoot% etc. estejam expandidos.
+            pathValue = Environment.ExpandEnvironmentVariables(pathValue);
+
             // Para PATH Incompleto (ou quando problemType é null), verificar se faltam caminhos essenciais
             if (problemType == "INCOMPLETE" || problemType == null)
             {
@@ -3189,13 +3183,14 @@ new() {
             var pathProblems = AnalyzePathProblems(pathValue);
             return problemType switch
             {
-                "CORRUPTED" => pathProblems != PathProblem.None,
+                "CORRUPTED" => (pathProblems & (PathProblem.MissingDirectory | PathProblem.SyntaxError |
+                               PathProblem.RelativePath | PathProblem.TooManyEntries |
+                               PathProblem.PathTooLong | PathProblem.EncodingIssue)) != 0,
                 "DUPLICATE" => (pathProblems & PathProblem.Duplicate) != 0,
                 "MISSING" => (pathProblems & PathProblem.MissingDirectory) != 0,
                 "DEV_JUNK" => (pathProblems & PathProblem.DevelopmentJunk) != 0,
                 "VULNERABLE" => (pathProblems & (PathProblem.MissingDirectory | PathProblem.RelativePath |
-                                  PathProblem.UnquotedSpace | PathProblem.TempPath |
-                                  PathProblem.UserPathWithoutVariable)) != 0,
+                                  PathProblem.TempPath)) != 0,
                 _ => false
             };
         }
@@ -3380,24 +3375,60 @@ new() {
                     object? currentValue = null;
                     try
                     {
-                        // Registry.GetValue aceita ValueName vazio para ler o valor padrão
                         string valName = tweak.ValueName ?? "";
-                        currentValue = Registry.GetValue(tweak.KeyPath, valName, null);
 
-                        // Se for chave HKEY_CLASSES_ROOT, Registry.GetValue pode não funcionar
-                        // Nesse caso, tentar abrir a chave diretamente
-                        if (currentValue == null && tweak.KeyPath.StartsWith("HKEY_CLASSES_ROOT"))
+                        if (_currentBatch != null)
                         {
-                            try
+                            var (val, err) = _currentBatch.GetValue(tweak.KeyPath, valName);
+                            if (err != null)
                             {
-                                string checkPath = tweak.KeyPath.Replace(@"HKEY_CLASSES_ROOT\", "");
-                                using var checkKey = Registry.ClassesRoot.OpenSubKey(checkPath);
-                                if (checkKey != null)
+                                if (err is SecurityException se2)
                                 {
-                                    currentValue = checkKey.GetValue(valName);
+                                    if (Logger.VerboseCheckLogs)
+                                        Logger.Log($"[SECURITY] Acesso negado em '{tweak.Name}': {se2.Message}");
+                                    tweak.Status = TweakStatus.NOT_FOUND;
+                                    return;
                                 }
+                                if (err is UnauthorizedAccessException uae2)
+                                {
+                                    if (Logger.VerboseCheckLogs)
+                                        Logger.Log($"[ACCESS] Sem permissão em '{tweak.Name}': {uae2.Message}");
+                                    tweak.Status = TweakStatus.NOT_FOUND;
+                                    return;
+                                }
+                                if (err is ArgumentException ae2)
+                                {
+                                    if (Logger.VerboseCheckLogs)
+                                        Logger.Log($"[PATH] Caminho inválido em '{tweak.Name}': {ae2.Message}");
+                                    tweak.Status = TweakStatus.NOT_FOUND;
+                                    return;
+                                }
+                                if (err is InvalidCastException ice2)
+                                {
+                                    Logger.Log($"[ERROR] Falha de conversão em '{tweak.Name}': {ice2.Message}");
+                                    tweak.Status = TweakStatus.ERROR;
+                                    return;
+                                }
+                                throw err;
                             }
-                            catch { /* ignora */ }
+                            currentValue = val;
+                        }
+                        else
+                        {
+                            currentValue = Registry.GetValue(tweak.KeyPath, valName, null);
+
+                            // HKCR fallback: Registry.GetValue pode não funcionar
+                            if (currentValue == null && tweak.KeyPath.StartsWith("HKEY_CLASSES_ROOT"))
+                            {
+                                try
+                                {
+                                    string checkPath = tweak.KeyPath.Replace(@"HKEY_CLASSES_ROOT\", "");
+                                    using var checkKey = Registry.ClassesRoot.OpenSubKey(checkPath);
+                                    if (checkKey != null)
+                                        currentValue = checkKey.GetValue(valName);
+                                }
+                                catch { /* ignora */ }
+                            }
                         }
                     }
                     catch (System.Security.SecurityException se)
@@ -3649,10 +3680,10 @@ new() {
                 if (!File.Exists(profile)) continue;
                 foreach (string line in File.ReadAllLines(profile))
                 {
-                    var m = Regex.Match(line.Trim(), @"Set-Alias\s+-Name\s+(\S+)\s+-Value\s+""([^""]+)""", RegexOptions.IgnoreCase);
+                    var m = NativeRegex.Match(line.Trim(), @"Set-Alias\s+-Name\s+(\S+)\s+-Value\s+""([^""]+)""", caseInsensitive: true);
                     if (m.Success)
                     {
-                        string target = Environment.ExpandEnvironmentVariables(m.Groups[2].Value);
+                        string target = Environment.ExpandEnvironmentVariables(m.Groups[2]);
                         if (!File.Exists(target)) return true;
                     }
                 }
@@ -3670,11 +3701,11 @@ new() {
                 bool changed = false;
                 foreach (string line in lines)
                 {
-                    var m = Regex.Match(line.Trim(), @"Set-Alias\s+-Name\s+(\S+)\s+-Value\s+""([^""]+)""", RegexOptions.IgnoreCase);
+                    var m = NativeRegex.Match(line.Trim(), @"Set-Alias\s+-Name\s+(\S+)\s+-Value\s+""([^""]+)""", caseInsensitive: true);
                     if (m.Success)
                     {
-                        string target = Environment.ExpandEnvironmentVariables(m.Groups[2].Value);
-                        string aliasName = m.Groups[1].Value;
+                        string target = Environment.ExpandEnvironmentVariables(m.Groups[2]);
+                        string aliasName = m.Groups[1];
                         if (!File.Exists(target))
                         {
                             changed = true;
@@ -3690,5 +3721,91 @@ new() {
         }
 
         #endregion
+
+        private sealed class RegistryBatch : IDisposable
+        {
+            private readonly Dictionary<string, (RegistryKey? Key, Exception? Error)> _cache = new(StringComparer.OrdinalIgnoreCase);
+
+            public (object? Value, Exception? Error) GetValue(string keyPath, string valueName)
+            {
+                if (!_cache.TryGetValue(keyPath, out var entry))
+                {
+                    entry = OpenKey(keyPath);
+                    _cache[keyPath] = entry;
+                }
+
+                if (entry.Error != null)
+                    return (null, entry.Error);
+
+                if (entry.Key == null)
+                    return (null, null);
+
+                try
+                {
+                    return (entry.Key.GetValue(valueName), null);
+                }
+                catch (Exception ex)
+                {
+                    return (null, ex);
+                }
+            }
+
+            private static (RegistryKey? Key, Exception? Error) OpenKey(string keyPath)
+            {
+                try
+                {
+                    RegistryKey baseKey;
+                    string subPath;
+
+                    if (keyPath.StartsWith("HKEY_LOCAL_MACHINE\\", StringComparison.Ordinal))
+                    {
+                        baseKey = Registry.LocalMachine;
+                        subPath = keyPath[19..];
+                    }
+                    else if (keyPath.StartsWith("HKLM\\", StringComparison.Ordinal))
+                    {
+                        baseKey = Registry.LocalMachine;
+                        subPath = keyPath[5..];
+                    }
+                    else if (keyPath.StartsWith("HKEY_CURRENT_USER\\", StringComparison.Ordinal))
+                    {
+                        baseKey = Registry.CurrentUser;
+                        subPath = keyPath[18..];
+                    }
+                    else if (keyPath.StartsWith("HKCU\\", StringComparison.Ordinal))
+                    {
+                        baseKey = Registry.CurrentUser;
+                        subPath = keyPath[5..];
+                    }
+                    else if (keyPath.StartsWith("HKEY_CLASSES_ROOT\\", StringComparison.Ordinal))
+                    {
+                        baseKey = Registry.ClassesRoot;
+                        subPath = keyPath[19..];
+                    }
+                    else if (keyPath.StartsWith("HKCR\\", StringComparison.Ordinal))
+                    {
+                        baseKey = Registry.ClassesRoot;
+                        subPath = keyPath[5..];
+                    }
+                    else
+                    {
+                        return (null, new ArgumentException($"Unknown hive prefix in: {keyPath}"));
+                    }
+
+                    var key = baseKey.OpenSubKey(subPath);
+                    return (key, null);
+                }
+                catch (SecurityException ex) { return (null, ex); }
+                catch (UnauthorizedAccessException ex) { return (null, ex); }
+                catch (ArgumentException ex) { return (null, ex); }
+            }
+
+            public void Dispose()
+            {
+                foreach (var (key, _) in _cache.Values)
+                    key?.Dispose();
+                _cache.Clear();
+            }
+        }
     }
 }

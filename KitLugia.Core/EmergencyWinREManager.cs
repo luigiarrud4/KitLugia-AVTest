@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -42,7 +42,7 @@ namespace KitLugia.Core
 
                 progressCallback?.Invoke(20, "Montando imagem WIM via DISM...");
                 var (exitMount, _) = await RunDismAsync(
-                    $"/Mount-Image /ImageFile:\"{targetWim}\" /Index:1 /MountDir:\"{MountDir}\"");
+                    $"/Mount-Image /ImageFile:\"{targetWim}\" /Index:1 /MountDir:\"{MountDir}\" /Optimize");
                 if (exitMount != 0)
                     return (false, $"Falha ao montar WIM. Código: {exitMount}");
 
@@ -230,7 +230,7 @@ exit
                 {
                     if (!proc.WaitForExit(timeoutMs))
                     {
-                        try { proc.Kill(entireProcessTree: true); } catch { }
+                        try { proc.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         return (-1, "TIMEOUT: Processo excedeu o limite de tempo.");
                     }
                 }

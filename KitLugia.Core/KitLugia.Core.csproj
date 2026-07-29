@@ -44,7 +44,8 @@
     </Content>
   </ItemGroup>
 
-  <!-- Referências a bibliotecas externas para ISO Editor (via NuGet) -->
-  <!-- Microsoft.Wim, Microsoft.Dism e DiscUtils instalados via NuGet -->
-
+  <!-- Rust native DLL for confidence/sift4 benchmarking -->
+  <Target Name="CopyRustNative" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\rust_native\target\release\rust_native.dll" DestinationFolder="$(OutputPath)" Condition="Exists('$(MSBuildThisFileDirectory)..\rust_native\target\release\rust_native.dll')" />
+  </Target>
 </Project>

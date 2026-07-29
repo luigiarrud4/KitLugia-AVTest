@@ -1,0 +1,1044 @@
+﻿using KitLugia.Core;
+using KitLugia.GUI.Helpers;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
+using System.Windows.Threading;
+
+namespace KitLugia.GUI.Pages
+{
+    public partial class WinpeToolsPage : Page
+    {
+        private List<DiskInfoEx> _disks = new();
+        private PartitionInfoEx _selectedPartition;
+        private bool _isLoading;
+        private bool _winpeReady;
+        private bool _valosReady;
+        private string _customIsoBootWimPath;
+        private int _lastProgressPct;
+
+        // Cores para logs
+        private static readonly SolidColorBrush _infoBrush = new(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88));
+        private static readonly SolidColorBrush _errorBrush = new(System.Windows.Media.Color.FromRgb(0xFF, 0x69, 0x4B));
+        private static readonly SolidColorBrush _successBrush = new(System.Windows.Media.Color.FromRgb(0x32, 0xCD, 0x32));
+
+        // Rastreamento do último par LineBreak+Run para HandleLogReplace
+        private Inline? _lastLogBreak;
+        private Inline? _lastLogRun;
+
+        // Cancelamento de operação em andamento
+        private CancellationTokenSource? _cts;
+
+        // Throttle para logs
+        private readonly List<string> _logQueue = new();
+        private readonly object _logLock = new();
+        private System.Windows.Threading.DispatcherTimer _logTimer;
+
+        // Mapa de passos para progresso real
+        private static readonly (Regex Pattern, int Pct, string Label)[] _progressSteps =
+        {
+            (new Regex(@"Resolvendo WinPE base", RegexOptions.IgnoreCase),                                5,  "Baixando WinPE base..."),
+            (new Regex(@"Download.*WinPE|Baixando WinPE", RegexOptions.IgnoreCase),                     10, "Baixando WinPE base..."),
+            (new Regex(@"WinPE base não encontrado", RegexOptions.IgnoreCase),                           5,  "Baixando WinPE base..."),
+            (new Regex(@"Copiando base para", RegexOptions.IgnoreCase),                                 25, "Copiando WinPE base..."),
+            (new Regex(@"Resolvendo boot\.sdi", RegexOptions.IgnoreCase),                               30, "Resolvendo boot.sdi..."),
+            (new Regex(@"(Customizando|customizar) boot\.wim", RegexOptions.IgnoreCase),                35, "Customizando boot.wim..."),
+            (new Regex(@"boot\.wim customizado", RegexOptions.IgnoreCase),                              50, "Customizando boot.wim..."),
+            (new Regex(@"boot_base\.wim.*cache", RegexOptions.IgnoreCase),                              55, "Salvando cache..."),
+            (new Regex(@"Criando entrada BCD ramdisk", RegexOptions.IgnoreCase),                        60, "Criando entrada BCD..."),
+            (new Regex(@"Entrada BCD ramdisk criada|BCD.*criada", RegexOptions.IgnoreCase),             75, "Entrada BCD criada!"),
+            (new Regex(@"WinPE ramdisk pronto", RegexOptions.IgnoreCase),                               90, "WinPE pronto!"),
+            (new Regex(@"GetDiskPartitionInfo", RegexOptions.IgnoreCase),                               10, "Detectando partição..."),
+            (new Regex(@"Marcador escrito", RegexOptions.IgnoreCase),                                   30, "Escrevendo marcador..."),
+            (new Regex(@"Config escrito", RegexOptions.IgnoreCase),                                     45, "Configuração salva..."),
+            (new Regex(@"Bootsequence configurado", RegexOptions.IgnoreCase),                           65, "Configurando boot..."),
+            (new Regex(@"Reiniciando em 10 segundos", RegexOptions.IgnoreCase),                         80, "Reiniciando em 10s..."),
+            (new Regex(@"WinPE configurado", RegexOptions.IgnoreCase),                                  90, "Shrink agendado!"),
+            (new Regex(@"Removendo entrada BCD", RegexOptions.IgnoreCase),                              30, "Removendo BCD..."),
+            (new Regex(@"C:\\KL_WINPE\\ deletado|KL_WINPE deletado", RegexOptions.IgnoreCase),          70, "Removendo arquivos..."),
+            (new Regex(@"Remocao WinPE concluida", RegexOptions.IgnoreCase),                            100,"WinPE removido!"),
+            (new Regex(@"SUCESSO|sucesso|Sucesso", RegexOptions.IgnoreCase),                            100,"Concluído!"),
+            (new Regex(@"ERRO|Falha|falha|Erro", RegexOptions.IgnoreCase),                              -1, "Erro!"),
+
+            // Validation OS steps
+            (new Regex(@"Resolvendo ISO.*Validation OS|ISO.*Validation OS", RegexOptions.IgnoreCase),     5,  "Resolvendo ISO..."),
+            (new Regex(@"ISO encontrado.*cache|ISO já existe", RegexOptions.IgnoreCase),                  5,  "ISO em cache"),
+            (new Regex(@"Baixando.*ISO|Download.*ISO", RegexOptions.IgnoreCase),                         10, "Baixando ISO..."),
+            (new Regex(@"ISO baixado com sucesso", RegexOptions.IgnoreCase),                             30, "ISO baixado!"),
+            (new Regex(@"Montando ISO.*WinVOS|extraindo WinVOS", RegexOptions.IgnoreCase),               35, "Montando ISO e extraindo WIM..."),
+            (new Regex(@"WinVOS\.wim copiado", RegexOptions.IgnoreCase),                                 45, "WIM copiado!"),
+            (new Regex(@"Adicionando suporte WPF|WPF support", RegexOptions.IgnoreCase),                 50, "Adicionando suporte WPF..."),
+            (new Regex(@"Suporte WPF adicionado", RegexOptions.IgnoreCase),                              65, "Suporte WPF OK!"),
+            (new Regex(@"startnet\.valos\.cmd criado", RegexOptions.IgnoreCase),                         70, "Script de boot criado!"),
+            (new Regex(@"Salvando alterações no WIM|WIM salvo com sucesso", RegexOptions.IgnoreCase),    75, "Salvando WIM..."),
+            (new Regex(@"Resolvendo boot\.sdi", RegexOptions.IgnoreCase),                                80, "Resolvendo boot.sdi..."),
+            (new Regex(@"Criando entrada BCD ramdisk|BCD.*Validation OS", RegexOptions.IgnoreCase),      85, "Criando entrada BCD..."),
+            (new Regex(@"Bootsequence configurado", RegexOptions.IgnoreCase),                            95, "Bootsequence configurado!"),
+            (new Regex(@"Validation OS preparado com sucesso", RegexOptions.IgnoreCase),                100, "Validation OS pronto!"),
+        };
+
+        public WinpeToolsPage()
+        {
+            InitializeComponent();
+            _logTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(200)
+            };
+            _logTimer.Tick += FlushLogQueue;
+            Loaded += OnLoaded;
+            Unloaded += (_, _) =>
+            {
+                _logTimer.Stop();
+                try { WinbootManager.OnLogUpdate -= QueueLogUpdate; } catch { }
+                try { WinbootManager.OnLogReplace -= HandleLogReplace; } catch { }
+            };
+        }
+
+        private async void OnLoaded(object s, RoutedEventArgs e)
+        {
+            WinbootManager.OnLogUpdate += QueueLogUpdate;
+            WinbootManager.OnLogReplace += HandleLogReplace;
+            _logTimer.Start();
+            await RefreshDisksAsync();
+            await CheckWinpeStatusAsync();
+        }
+
+        private void QueueLogUpdate(string logLine)
+        {
+            lock (_logLock)
+            {
+                _logQueue.Add(logLine);
+            }
+        }
+
+        private void HandleLogReplace(string logLine)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var inlines = TxtOpDesc.Inlines;
+                if (_lastLogBreak != null) { inlines.Remove(_lastLogBreak); _lastLogBreak = null; }
+                if (_lastLogRun != null) { inlines.Remove(_lastLogRun); _lastLogRun = null; }
+                AppendColoredLog(logLine);
+                AtualizarStatus(logLine);
+            }, DispatcherPriority.Background);
+        }
+
+        private void AtualizarStatus(string logLine)
+        {
+            foreach (var (pattern, pct, label) in _progressSteps)
+            {
+                if (pattern.IsMatch(logLine))
+                {
+                    if (pct >= 0)
+                    {
+                        _lastProgressPct = Math.Max(_lastProgressPct, pct);
+                        UpdateProgressBar(_lastProgressPct, label);
+                        TxtProgressStep.Text = label;
+                    }
+                    else
+                    {
+                        ProgressFill.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x3D, 0x00));
+                        TxtProgressPercent.Text = "ERRO";
+                        TxtProgressStep.Text = label;
+                    }
+                    break;
+                }
+            }
+            var clean = logLine;
+            var m = Regex.Match(logLine, @"^\[\d{2}:\d{2}:\d{2}\]\s*(.+)");
+            if (m.Success) clean = m.Groups[1].Value;
+            if (!string.IsNullOrEmpty(clean) && clean.Length < 120)
+                TxtProgressStatus.Text = clean;
+        }
+
+        private void FlushLogQueue(object? sender, EventArgs e)
+        {
+            string[] batch;
+            lock (_logLock)
+            {
+                if (_logQueue.Count == 0) return;
+                batch = _logQueue.ToArray();
+                _logQueue.Clear();
+            }
+
+            foreach (var logLine in batch)
+            {
+                AppendColoredLog(logLine);
+                AtualizarStatus(logLine);
+            }
+
+            ScrollOverlayToBottom();
+        }
+
+        private void AppendColoredLog(string text)
+        {
+            var color = IsErrorText(text) ? _errorBrush
+                : text.Contains("✅") || text.Contains("sucesso", StringComparison.OrdinalIgnoreCase)
+                    ? _successBrush : _infoBrush;
+            _lastLogBreak = new LineBreak();
+            _lastLogRun = new Run(text) { Foreground = color };
+            TxtOpDesc.Inlines.Add(_lastLogBreak);
+            TxtOpDesc.Inlines.Add(_lastLogRun);
+        }
+
+        private void ScrollOverlayToBottom()
+        {
+            if (TxtOpDesc.Parent is ScrollViewer sv)
+                sv.ScrollToBottom();
+            else if (TxtOpDesc.Parent is Border b && b.Child is ScrollViewer sv2)
+                sv2.ScrollToBottom();
+        }
+
+        private void UpdateProgressBar(int pct, string label)
+        {
+            var width = Math.Min(pct / 100.0, 1.0) * 440.0;
+            ProgressFill.Width = width;
+            TxtProgressPercent.Text = $"{Math.Min(pct, 100)}%";
+            TxtProgressStep.Text = label;
+        }
+
+        #region Disk Loading
+
+        private async Task RefreshDisksAsync()
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+
+            try
+            {
+                TxtStatusBar.Text = "Carregando discos...";
+                var result = await Task.Run(() => PartitionManager.GetAllDisks());
+                _disks = result ?? new();
+                PopulatePartitionList();
+                TxtStatusBar.Text = $"{_disks.Count} disco(s) carregados.";
+            }
+            catch (Exception ex)
+            {
+                TxtStatusBar.Text = $"Erro: {ex.Message}";
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        private void PopulatePartitionList()
+        {
+            var items = new List<PartitionListItem>();
+            foreach (var disk in _disks)
+            {
+                if (disk.Partitions == null) continue;
+                foreach (var part in disk.Partitions)
+                {
+                    items.Add(new PartitionListItem
+                    {
+                        DiskLabel = $"DISCO {disk.Index}",
+                        DriveLetter = part.DriveLetter ?? "-",
+                        Label = part.Label ?? "",
+                        FileSystem = part.FileSystem ?? "",
+                        SizeString = $"{(part.Size / (1024.0 * 1024 * 1024)):F1} GB",
+                        FreeSpaceString = part.IsUnallocated ? "-" : $"{(part.FreeSpace / (1024.0 * 1024 * 1024)):F1} GB",
+                        IsUnallocated = part.IsUnallocated,
+                        Tag = part
+                    });
+                }
+            }
+            ListPartitions.ItemsSource = items;
+            TxtPartCount.Text = $"{items.Count} particoes";
+        }
+
+        private void ListPartitions_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ListPartitions.SelectedItem is PartitionListItem item && item.Tag is PartitionInfoEx part)
+            {
+                _selectedPartition = part;
+                TxtTargetInfo.Text = $"{part.DriveLetter}:  {(part.Size / (1024.0 * 1024 * 1024)):F1} GB  {(part.FreeSpace / (1024.0 * 1024 * 1024)):F1} GB livre";
+                TxtShrinkReady.Text = $"Sistema de arquivos: {part.FileSystem}";
+            }
+            else
+            {
+                _selectedPartition = null;
+                TxtTargetInfo.Text = "Nenhuma particao selecionada";
+                TxtShrinkReady.Text = "";
+            }
+            UpdateShrinkButton();
+        }
+
+        private void UpdateShrinkButton()
+        {
+            bool hasPartition = _selectedPartition != null && !string.IsNullOrEmpty(_selectedPartition.DriveLetter);
+            BtnShrinkWinpe.IsEnabled = (_winpeReady || _valosReady) && hasPartition;
+        }
+
+        #endregion
+
+        #region WinPE Detection
+
+        private async Task CheckWinpeStatusAsync()
+        {
+            try
+            {
+                bool found = await Task.Run(() => WinbootManager.IsWinpeReady());
+                _winpeReady = found;
+
+                if (found)
+                {
+                    BdrWinpeStatus.Background = (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#223322");
+                    TxtWinpeStatus.Text = "WinPE pronto";
+                    TxtWinpeStatus.Foreground = (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#88FF88");
+                    BtnRemoveWinpe.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    BdrWinpeStatus.Background = (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#222233");
+                    TxtWinpeStatus.Text = "WinPE nao preparado";
+                    TxtWinpeStatus.Foreground = (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#8888FF");
+                    BtnRemoveWinpe.Visibility = Visibility.Collapsed;
+                }
+
+                UpdateShrinkButton();
+            }
+            catch
+            {
+                TxtWinpeStatus.Text = "Erro ao verificar";
+            }
+
+            // Verifica Validation OS
+            try
+            {
+                _valosReady = await Task.Run(() => WinbootManager.IsValidationOsReady());
+                BtnBootValos.IsEnabled = _valosReady;
+            }
+            catch { }
+            UpdateShrinkButton();
+        }
+
+        #endregion
+
+        #region Step 1: Preparar WinPE
+
+        private async void BtnPrepareWinpe_Click(object sender, RoutedEventArgs e)
+        {
+            ShowBusy("PREPARANDO WINPE",
+                "Baixando e configurando WinPE no disco local...\n\n" +
+                "1. Baixar WinPE base (se necessario)\n" +
+                "2. Customizar com script de shrink\n" +
+                "3. Configurar entrada de boot RAMDISK\n\n" +
+                "O PC NAO sera reiniciado agora.\n" +
+                "Nenhuma particao extra sera criada.");
+
+            try
+            {
+                UpdateStatus("Aguarde...");
+
+                var (ok, msg) = await Task.Run(() =>
+                    WinbootManager.PrepareWinpeBoot());
+
+                if (ok)
+                {
+                    ShowBusyResult($"WinPE preparado com sucesso!\n\n{msg}\n\n" +
+                        "O WinPE esta pronto em C:\\Program Files\\KitLugia\\WinPE\\\n" +
+                        "Agora selecione a particao alvo e clique em INICIAR SHRINK.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha ao preparar WinPE.\n{msg}");
+                }
+
+                await CheckWinpeStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        private async void BtnRemoveWinpe_Click(object sender, RoutedEventArgs e)
+        {
+            var result = System.Windows.MessageBox.Show(
+                "Remover WinPE?\n\n" +
+                "Isso vai:\n" +
+                "Remover a entrada de boot RAMDISK do BCD\n" +
+                "Deletar C:\\KL_WINPE\\ (boot.wim, boot.sdi)\n" +
+                "Limpar arquivos de configuracao\n\n" +
+                "O WinPE nao estara mais disponivel para shrink.\n" +
+                "Deseja continuar?",
+                "Remover WinPE",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            ShowBusy("REMOVENDO WINPE", "Limpando artefatos do WinPE...");
+            try
+            {
+                bool ok = await Task.Run(() => WinbootManager.RemoveWinpeAsync());
+                ShowBusyResult(ok
+                    ? "WinPE removido com sucesso.\n\n" +
+                      "Entrada BCD removida, arquivos deletados."
+                    : "Falha ao remover WinPE.");
+                await CheckWinpeStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Step 2: Shrink via WinPE (com reboot)
+
+        private void BtnShrinkWinpe_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_winpeReady && !_valosReady)
+            {
+                ShowToast("Nenhum sistema preparado. Execute PREPARAR WINPE ou VALIDATION OS primeiro.");
+                return;
+            }
+
+            if (_selectedPartition == null)
+            {
+                ShowToast("Selecione uma particao na lista.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(_selectedPartition.DriveLetter))
+            {
+                ShowToast("Particao sem letra de unidade.");
+                return;
+            }
+
+            TxtShrinkTargetInfo.Text = $"{_selectedPartition.DriveLetter}:  " +
+                $"{(double)_selectedPartition.Size / 1024 / 1024 / 1024:F1} GB  " +
+                $"{(double)_selectedPartition.FreeSpace / 1024 / 1024 / 1024:F1} GB livre";
+
+            // Atualiza status dos radios conforme o que está instalado
+            RadioWinpe.IsEnabled = _winpeReady;
+            RadioValos.IsEnabled = _valosReady;
+
+            // Pré-seleciona o que estiver disponível (WinPE prefere)
+            if (_winpeReady)
+                RadioWinpe.IsChecked = true;
+            else if (_valosReady)
+                RadioValos.IsChecked = true;
+
+            UpdateOsStatusText();
+
+            long maxMB = Math.Max(1024, (long)(_selectedPartition.FreeSpace / (1024L * 1024) * 0.8));
+            TxtShrinkMb.Text = Math.Min(maxMB, (long)(_selectedPartition.Size / (1024L * 1024) * 0.5)).ToString();
+
+            OverlayShrink.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateOsStatusText()
+        {
+            // Pode ser chamado durante InitializeComponent (RadioButton Checked event)
+            // quando TxtOsStatus ainda nao foi criado
+            if (TxtOsStatus == null) return;
+            var parts = new List<string>();
+            if (_winpeReady) parts.Add("WinPE pronto");
+            if (_valosReady) parts.Add("Validation OS pronto");
+            TxtOsStatus.Text = parts.Count > 0
+                ? string.Join(" | ", parts)
+                : "Nenhum OS preparado. Execute PREPARAR primeiro.";
+        }
+
+        private void RadioShrinkOs_Checked(object sender, RoutedEventArgs e)
+        {
+            UpdateOsStatusText();
+        }
+
+        private async void BtnConfirmShrinkWinpe_Click(object sender, RoutedEventArgs e)
+        {
+            bool useValOs = RadioValos.IsChecked == true;
+            if (!useValOs && !_winpeReady)
+            {
+                ShowToast("WinPE nao esta instalado. Selecione Validation OS ou execute PREPARAR WINPE.");
+                return;
+            }
+            if (useValOs && !_valosReady)
+            {
+                ShowToast("Validation OS nao esta instalado. Selecione WinPE ou execute PREPARAR VALIDATION OS.");
+                return;
+            }
+
+            if (_selectedPartition == null) return;
+
+            if (!long.TryParse(TxtShrinkMb.Text, out long shrinkMb) || shrinkMb < 256)
+            {
+                ShowToast("Digite um valor valido (min. 256 MB).");
+                return;
+            }
+
+            string drive = _selectedPartition.DriveLetter;
+            OverlayShrink.Visibility = Visibility.Collapsed;
+
+            string osName = useValOs ? "VALIDATION OS" : "WINPE";
+            ShowBusy($"AGENDANDO SHRINK VIA {osName}",
+                $"Escrevendo configuracao e agendando reboot...\n\n" +
+                $"Alvo: {drive.Replace(":", "").Trim()}: | Reduzir: {shrinkMb} MB\n" +
+                $"OS: {osName}\n\n" +
+                $"O PC sera reiniciado em 10 segundos.\n" +
+                $"O {osName} executara o shrink automaticamente.");
+
+            try
+            {
+                UpdateStatus($"Escrevendo config na particao {drive.Replace(":", "").Trim()}...");
+
+                var token = _cts?.Token ?? CancellationToken.None;
+                var (ok, msg) = await Task.Run(() =>
+                    WinbootManager.ScheduleWinpeShrink(drive, shrinkMb, useValOs ? "validationos" : "winpe"), token);
+
+                if (ok)
+                {
+                    ShowBusyResult($"{msg}\n\n" +
+                        $"Apos o reboot, o {osName} sera executado.\n" +
+                        $"Ao voltar ao Windows, clique em VER LOGS.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha: {msg}");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                ShowBusyResult("Operacao cancelada pelo usuario.");
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Logs
+
+        private void BtnCopyLog_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string text = TxtWinpeLog.Text;
+                if (!string.IsNullOrEmpty(text) && text != "Nenhum log.")
+                {
+                    System.Windows.Clipboard.SetText(text);
+                    TxtStatusBar.Text = "Log copiado para a área de transferência.";
+                }
+                else
+                {
+                    TxtStatusBar.Text = "Nada para copiar.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TxtStatusBar.Text = $"Erro ao copiar: {ex.Message}";
+            }
+        }
+
+        private async void BtnCheckWinpeLogs_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                TxtWinpeLog.Text = "Lendo logs...";
+
+                var logs = await Task.Run(() => WinbootManager.ReadAllWinpeLogs());
+
+                if (logs == null || logs.Count == 0)
+                {
+                    TxtWinpeLog.Text = "Nenhum log encontrado.\n\n" +
+                        $"{WinbootManager.WinpePersistentLogPath}\n" +
+                        "Execute o shrink via WinPE primeiro.";
+                    return;
+                }
+
+                TxtWinpeLog.Text = string.Join("\n\n=== PROXIMO ARQUIVO ===\n\n", logs.Values);
+                TxtStatusBar.Text = $"{logs.Count} arquivo(s) de log.";
+            }
+            catch (Exception ex)
+            {
+                TxtWinpeLog.Text = $"Erro: {ex.Message}";
+            }
+        }
+
+        #endregion
+
+        #region Shrink Overlay Helpers
+
+        private async void BtnShrinkPercent_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPartition == null) return;
+            if (!(sender is FrameworkElement fe && fe.Tag is string pct && int.TryParse(pct, out int pctVal))) return;
+
+            long totalMB = (long)(_selectedPartition.Size / (1024L * 1024));
+            long shrinkMB = (long)(totalMB * pctVal / 100.0);
+            long maxMB = 1024;
+
+            try { maxMB = await Task.Run(() => PartitionManager.GetMaxShrinkMb(_selectedPartition.DriveLetter)); }
+            catch { maxMB = Math.Max(1024, (long)(_selectedPartition.FreeSpace / (1024L * 1024) * 0.8)); }
+
+            TxtShrinkMb.Text = Math.Min(shrinkMB, maxMB).ToString();
+        }
+
+        private async void BtnShrinkMax_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPartition == null) return;
+
+            long maxMB = 1024;
+            try { maxMB = await Task.Run(() => PartitionManager.GetMaxShrinkMb(_selectedPartition.DriveLetter)); }
+            catch { maxMB = Math.Max(1024, (long)(_selectedPartition.FreeSpace / (1024L * 1024) * 0.8)); }
+
+            TxtShrinkMb.Text = maxMB.ToString();
+        }
+
+        private void BtnCancelShrink_Click(object sender, RoutedEventArgs e)
+            => OverlayShrink.Visibility = Visibility.Collapsed;
+
+        #endregion
+
+        #region Busy Overlay (com barra de progresso real)
+
+        private void ShowBusy(string title, string description)
+        {
+            _cts?.Cancel();
+            _cts = new CancellationTokenSource();
+            OverlayBusy.Visibility = Visibility.Visible;
+            TxtOpTitle.Text = title;
+            TxtOpDesc.Inlines.Clear();
+            _lastLogBreak = _lastLogRun = null;
+            TxtOpDesc.Inlines.Add(new Run(description) { Foreground = _infoBrush });
+            TxtProgressPercent.Text = "0%";
+            TxtProgressStep.Text = "Inicializando...";
+            TxtProgressStatus.Text = "Aguarde...";
+            ProgressFill.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00));
+            ProgressFill.Width = 0;
+            _lastProgressPct = 0;
+            PanelOpFooter.Visibility = Visibility.Collapsed;
+        }
+
+        private void UpdateStatus(string status)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                AppendColoredLog(status);
+                if (status.Length < 120)
+                    TxtProgressStatus.Text = status;
+                ScrollOverlayToBottom();
+            }, DispatcherPriority.Background);
+        }
+
+        private void ShowBusyResult(string result)
+        {
+            UpdateProgressBar(100, "Concluído");
+            TxtProgressStatus.Text = result;
+            TxtOpDesc.Inlines.Add(new LineBreak());
+            TxtOpDesc.Inlines.Add(new LineBreak());
+            var resultColor = IsErrorText(result) ? _errorBrush : _successBrush;
+            TxtOpDesc.Inlines.Add(new Run(result) { Foreground = resultColor });
+            PanelOpFooter.Visibility = Visibility.Visible;
+
+            if (IsErrorText(result))
+            {
+                ProgressFill.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x3D, 0x00));
+                TxtProgressPercent.Text = "FALHA";
+                TxtProgressStep.Text = "Erro na operação";
+            }
+        }
+
+        private static bool IsErrorText(string text)
+            => text.Contains("Erro", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("Falha", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("❌");
+
+        private void BtnCancelOp_Click(object sender, RoutedEventArgs e)
+        {
+            _cts?.Cancel();
+            ShowToast("Cancelando operacao...");
+        }
+
+        private void BtnCloseOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
+            OverlayBusy.Visibility = Visibility.Collapsed;
+            TxtOpDesc.Inlines.Clear();
+            _lastLogBreak = _lastLogRun = null;
+            _lastProgressPct = 0;
+        }
+
+        #endregion
+
+        #region Navigation & Helpers
+
+        private void BtnBack_Click(object sender, RoutedEventArgs e) => NavigateToPage(PageType.Dashboard);
+
+        private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            _selectedPartition = null;
+            await RefreshDisksAsync();
+            await CheckWinpeStatusAsync();
+        }
+
+        private void ShowToast(string message) => TxtStatusBar.Text = message;
+
+        private void NavigateToPage(PageType type)
+            => (Window.GetWindow(this) as MainWindow)?.NavigateToPage(type);
+
+        private async void BtnLoadCustomIso_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Arquivos ISO|*.iso",
+                Title = "Selecione um ISO de WinPE customizado (ex: Sergei Strelec)"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            string isoPath = dlg.FileName;
+            _customIsoBootWimPath = null;
+            TxtCustomIsoPath.Text = $"Extraindo {System.IO.Path.GetFileName(isoPath)}...";
+            BtnPrepareCustomWinpe.IsEnabled = false;
+
+            try
+            {
+                string tempWim = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(), "KitLugia", "custom_boot.wim");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(tempWim)!);
+
+                string? result = await ExtractBootWimFromIsoAsync(isoPath, tempWim);
+                if (result != null)
+                {
+                    _customIsoBootWimPath = tempWim;
+                    TxtCustomIsoPath.Text = System.IO.Path.GetFileName(isoPath);
+                    BtnPrepareCustomWinpe.IsEnabled = true;
+                    ShowToast($"ISO carregado: {System.IO.Path.GetFileName(isoPath)}. Clique PREPARAR CUSTOM para testar.");
+                }
+                else
+                {
+                    TxtCustomIsoPath.Text = $"Falha: {System.IO.Path.GetFileName(isoPath)}";
+                    ShowToast("Falha ao extrair boot.wim do ISO.");
+                }
+            }
+            catch (Exception ex)
+            {
+                TxtCustomIsoPath.Text = $"Erro: {System.IO.Path.GetFileName(isoPath)}";
+                ShowToast($"Erro: {ex.Message}");
+            }
+        }
+
+        private async Task<string?> ExtractBootWimFromIsoAsync(string isoPath, string destPath)
+        {
+            string mountScript = $"Mount-DiskImage -ImagePath '{isoPath}' -StorageType ISO -Access ReadOnly";
+            var (mc, mo) = await RunProcessAsync("powershell.exe",
+                $"-NoProfile -Command \"{mountScript}\"", 60000);
+            if (mc != 0)
+            {
+                Debug.WriteLine($"Falha ao montar ISO: {mo}");
+                ShowToast("Falha ao montar ISO");
+                return null;
+            }
+
+            try
+            {
+                string getLetter = $"(Get-DiskImage -ImagePath '{isoPath}' | Get-Volume).DriveLetter";
+                var (lc, lo) = await RunProcessAsync("powershell.exe",
+                    $"-NoProfile -Command \"{getLetter}\"", 30000);
+                string driveLetter = (lc == 0 ? lo?.Trim() : null) ?? "";
+                if (string.IsNullOrEmpty(driveLetter) || driveLetter.Length > 2)
+                {
+                    Debug.WriteLine($"Falha ao obter letra do drive: {lo}");
+                    ShowToast("Falha ao montar ISO");
+                    return null;
+                }
+
+                string letter = driveLetter[0].ToString();
+                string sourcesWim = $@"{letter}:\sources\boot.wim";
+
+                if (!File.Exists(sourcesWim))
+                {
+                    Debug.WriteLine($"boot.wim nao encontrado em {sourcesWim}");
+                    ShowToast("boot.wim nao encontrado no ISO");
+                    return null;
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                File.Copy(sourcesWim, destPath, true);
+                Debug.WriteLine($"boot.wim copiado de {sourcesWim} para {destPath}");
+
+                return destPath;
+            }
+            finally
+            {
+                await RunProcessAsync("powershell.exe",
+                    $"-NoProfile -Command \"Dismount-DiskImage -ImagePath '{isoPath}'\"", 30000);
+            }
+        }
+
+        private async Task<(int ExitCode, string Output)> RunProcessAsync(string filename, string args, int timeoutMs = 60000)
+        {
+            var psi = new ProcessStartInfo(filename, args)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            var proc = Process.Start(psi);
+            if (proc == null) return (-1, "");
+            var output = await proc.StandardOutput.ReadToEndAsync();
+            var error = await proc.StandardError.ReadToEndAsync();
+            if (timeoutMs > 0)
+            {
+                if (!proc.WaitForExit(timeoutMs))
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    return (-1, "TIMEOUT");
+                }
+            }
+            else
+            {
+                proc.WaitForExit();
+            }
+            return (proc.ExitCode, output + error);
+        }
+
+        #endregion
+
+        #region Custom ISO
+
+        private async void BtnPrepareCustomWinpe_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_customIsoBootWimPath) || !File.Exists(_customIsoBootWimPath))
+            {
+                ShowToast("Carregue um ISO primeiro.");
+                return;
+            }
+
+            ShowBusy("PREPARANDO CUSTOM WINPE",
+                "Copiando boot.wim e configurando entrada BCD...\n\n" +
+                "O bootsequence sera configurado para o proximo reboot.\n" +
+                "O shrink NAO sera incluido - apenas teste do WinPE.");
+
+            try
+            {
+                var (ok, msg, guid) = await Task.Run(() =>
+                    WinbootManager.PrepareCustomWinpeBoot(_customIsoBootWimPath));
+
+                if (ok && guid != null)
+                {
+                    ShowBusyResult($"Custom WinPE pronto!\n\n{msg}\n\n" +
+                        "O sistema sera reiniciado em 10s para testar o WinPE customizado.\n" +
+                        "Apos o teste, use REMOVER para limpar a entrada BCD.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha ao preparar Custom WinPE.\n{msg}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        private async void BtnRemoveCustomWinpe_Click(object sender, RoutedEventArgs e)
+        {
+            var result = System.Windows.MessageBox.Show(
+                "Remover Custom WinPE?\n\n" +
+                "Isso vai:\n" +
+                "Remover a entrada de boot Custom WinPE do BCD\n" +
+                "Deletar C:\\KL_WINPE\\custom_boot.wim\n\n" +
+                "Deseja continuar?",
+                "Remover Custom WinPE",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            ShowBusy("REMOVENDO CUSTOM WINPE", "Limpando artefatos...");
+            try
+            {
+                bool ok = await Task.Run(() => WinbootManager.RemoveCustomWinpe());
+                ShowBusyResult(ok
+                    ? "Custom WinPE removido com sucesso.\nEntrada BCD removida, arquivos deletados."
+                    : "Nenhuma entrada BCD custom encontrada para remover.");
+                _customIsoBootWimPath = null;
+                TxtCustomIsoPath.Text = "Nenhum ISO carregado";
+                BtnPrepareCustomWinpe.IsEnabled = false;
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Validation OS
+
+        private async void BtnPrepareValos_Click(object sender, RoutedEventArgs e)
+        {
+            ShowBusy("PREPARANDO VALIDATION OS",
+                "Baixando e configurando Validation OS (WinVOS) no disco local...\n\n" +
+                "1. Baixar ISO (se necessario)\n" +
+                "2. Extrair WinVOS.wim\n" +
+                "3. Adicionar suporte WPF\n" +
+                "4. Criar script de inicializacao\n" +
+                "5. Configurar entrada de boot RAMDISK\n\n" +
+                "O bootsequence sera configurado para o proximo reboot.\n" +
+                "Nenhuma particao extra sera criada.");
+
+            try
+            {
+                var (ok, msg) = await Task.Run(() =>
+                    WinbootManager.PrepareValidationOs());
+
+                if (ok)
+                {
+                    ShowBusyResult($"Validation OS pronto!\n\n{msg}\n\n" +
+                        "Reinicie o PC para testar. O menu de boot aparecera com a opcao\n" +
+                        "'KitLugia Validation OS (WPF Test)'.\n\n" +
+                        "Use o botao TESTAR para boot unico agora.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha ao preparar Validation OS.\n{msg}");
+                }
+
+                await CheckWinpeStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        private async void BtnBootValos_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_valosReady)
+            {
+                ShowToast("Validation OS nao encontrado. Execute PREPARAR primeiro.");
+                return;
+            }
+
+            var result = System.Windows.MessageBox.Show(
+                "Configurar bootsequence para Validation OS?\n\n" +
+                "Na proxima reinicializacao, o Validation OS sera carregado\n" +
+                "via RAMDISK com suporte a WPF.\n\n" +
+                "Deseja reiniciar agora?",
+                "Testar Validation OS",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                // Procura GUID da entrada Validation OS no BCD
+                var psi = new ProcessStartInfo("bcdedit.exe", "/enum all")
+                {
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = Process.Start(psi);
+                if (proc == null) { ShowToast("Falha ao executar bcdedit."); return; }
+                string enumOut = await proc.StandardOutput.ReadToEndAsync();
+                await proc.WaitForExitAsync();
+
+                if (proc.ExitCode == 0)
+                {
+                    string? foundGuid = null;
+                    var lines = enumOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        var trimmed = line.Trim();
+                        if (trimmed.StartsWith("identifier", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var parts = trimmed.Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                            foundGuid = parts.Length > 1 ? parts[1].Trim() : null;
+                        }
+                        else if (trimmed.StartsWith("description", StringComparison.OrdinalIgnoreCase) &&
+                                 trimmed.Contains("Validation OS", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (foundGuid != null)
+                            {
+                                var bsProc = Process.Start(new ProcessStartInfo("bcdedit.exe",
+                                    $"/bootsequence {foundGuid}")
+                                { UseShellExecute = false, CreateNoWindow = true });
+                                if (bsProc != null) await bsProc.WaitForExitAsync();
+
+                                if (bsProc?.ExitCode == 0)
+                                {
+                                    ShowBusy("REINICIANDO",
+                                        "Bootsequence configurado. Reiniciando em 5 segundos...\n" +
+                                        "Apos o reboot, o Validation OS sera carregado.");
+                                    await Task.Delay(5000);
+                                    Process.Start("shutdown.exe", "/r /t 0");
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ShowToast("Entrada BCD do Validation OS nao encontrada. Execute PREPARAR novamente.");
+            }
+            catch (Exception ex)
+            {
+                ShowToast($"Erro: {ex.Message}");
+            }
+        }
+
+        private async void BtnRemoveValos_Click(object sender, RoutedEventArgs e)
+        {
+            var result = System.Windows.MessageBox.Show(
+                "Remover Validation OS?\n\n" +
+                "Isso vai:\n" +
+                "Remover a entrada de boot do BCD\n" +
+                "Deletar C:\\KL_WINPE\\validation_boot.wim\n\n" +
+                "Deseja continuar?",
+                "Remover Validation OS",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            ShowBusy("REMOVENDO VALIDATION OS", "Limpando artefatos...");
+            try
+            {
+                bool ok = await Task.Run(() => WinbootManager.RemoveValidationOs());
+                ShowBusyResult(ok
+                    ? "Validation OS removido com sucesso.\nEntrada BCD removida, arquivos deletados."
+                    : "Nenhuma entrada BCD do Validation OS encontrada para remover.");
+                await CheckWinpeStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        #endregion
+    }
+
+    public class PartitionListItem
+    {
+        public string DiskLabel { get; set; }
+        public string DriveLetter { get; set; }
+        public string Label { get; set; }
+        public string FileSystem { get; set; }
+        public string SizeString { get; set; }
+        public string FreeSpaceString { get; set; }
+        public bool IsUnallocated { get; set; }
+        public object Tag { get; set; }
+    }
+}

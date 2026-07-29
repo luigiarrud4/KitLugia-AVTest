@@ -12,6 +12,7 @@ using System.Net.NetworkInformation;
 using Microsoft.Win32;
 using System.IO;
 using System.Text.RegularExpressions;
+using KitLugia.Core;
 
 namespace KitLugia.GUI.Pages
 {
@@ -125,7 +126,7 @@ namespace KitLugia.GUI.Pages
                         .Take(50)
                         .ToList();
                 }
-                catch { return new List<ProcessMonitorInfo>(); }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<ProcessMonitorInfo>(); }
             });
 
             try
@@ -283,10 +284,7 @@ namespace KitLugia.GUI.Pages
 
                 return totalActivity / (1024 * 1024); // Converter para MB
             }
-            catch
-            {
-                return 0;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private void ActivateUltraPerformanceMode()
@@ -500,10 +498,7 @@ namespace KitLugia.GUI.Pages
                     }
                 }
             }
-            catch
-            {
-                return "N/A";
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return "N/A"; }
             return "N/A";
         }
 

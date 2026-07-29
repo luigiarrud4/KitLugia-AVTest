@@ -241,10 +241,7 @@ namespace KitLugia.Core
                 }
                 return 0;
             }
-            catch
-            {
-                return 0;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private static double GetIsrTime()
@@ -256,10 +253,7 @@ namespace KitLugia.Core
                 double dpcTime = GetDpcTime();
                 return dpcTime * 0.5;
             }
-            catch
-            {
-                return 0;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private static long GetHardPageFaultCount()
@@ -269,10 +263,7 @@ namespace KitLugia.Core
                 using var proc = Process.GetCurrentProcess();
                 return proc.WorkingSet64 / 4096; // Estimativa aproximada
             }
-            catch
-            {
-                return 0;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private static void CollectDriverStats()
@@ -726,10 +717,7 @@ namespace KitLugia.Core
                 var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\PriorityControl", "Win32PrioritySeparation", 24);
                 return value is int intVal ? intVal : 24;
             }
-            catch
-            {
-                return 24;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 24; }
         }
 
         private static void RestoreState(SystemStateSnapshot state)

@@ -1,56 +1,98 @@
 ﻿using System;
+using System.IO;
 
 namespace KitLugia.Core
 {
-    // Classe estática simples para enviar mensagens do Core para a GUI
     public static class Logger
     {
-        // Toggle para remover limite de 500 linhas do console
+        private static readonly string LogFilePath;
+        private static readonly object LogLock = new();
+
         public static bool DisableOutputLimit = false;
-        
-        // Controle de verbosidade para reduzir spam
         public static bool VerboseCheckLogs = false;
-        
-        // Evento que a GUI vai "escutar"
         public static event Action<string>? OnLogReceived;
+
+        static Logger()
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var logDir = Path.Combine(appData, "KitLugia", "Logs");
+            Directory.CreateDirectory(logDir);
+            LogFilePath = Path.Combine(logDir, "KitLugia.log");
+        }
+
+        private static void WriteToFile(string level, string message)
+        {
+            try
+            {
+                lock (LogLock)
+                {
+                    var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}";
+                    File.AppendAllText(LogFilePath, line + Environment.NewLine);
+                }
+            }
+            catch
+            {
+                // Se falhar ao escrever no arquivo, não podemos fazer nada
+            }
+        }
 
         public static void Log(string message)
         {
-            // Dispara o evento se houver alguém escutando
+            WriteToFile("INFO", message);
             OnLogReceived?.Invoke(message);
         }
 
         public static void LogProcess(string filename, string args)
         {
-            OnLogReceived?.Invoke($"[EXEC] {filename} {args}");
+            var msg = $"[EXEC] {filename} {args}";
+            WriteToFile("EXEC", msg);
+            OnLogReceived?.Invoke(msg);
         }
 
         public static void LogRegistry(string key, string value, object data)
         {
-            OnLogReceived?.Invoke($"[REG] Setando '{value}' = '{data}' em {key}");
+            var msg = $"[REG] Setando '{value}' = '{data}' em {key}";
+            WriteToFile("REG", msg);
+            OnLogReceived?.Invoke(msg);
         }
 
         public static void LogError(string context, string error)
         {
-            OnLogReceived?.Invoke($"[ERRO] ({context}): {error}");
+            var msg = $"[ERRO] ({context}): {error}";
+            WriteToFile("ERROR", msg);
+            OnLogReceived?.Invoke(msg);
         }
-        
-        // Comando para ativar/desativar o limite de linhas via console
+
+        public static void LogWarning(string context, string message)
+        {
+            var msg = $"[AVISO] ({context}): {message}";
+            WriteToFile("WARN", msg);
+            OnLogReceived?.Invoke(msg);
+        }
+
         public static void ToggleOutputLimit()
         {
             DisableOutputLimit = !DisableOutputLimit;
-            OnLogReceived?.Invoke(DisableOutputLimit ? 
-                "🔓 LIMITE DE 500 LINHAS REMOVIDO - Logs completos serão capturados" : 
-                "🔒 LIMITE DE 500 LINHAS ATIVADO - Logs serão truncados");
+            var msg = DisableOutputLimit
+                ? "LIMITE DE 500 LINHAS REMOVIDO - Logs completos serao capturados"
+                : "LIMITE DE 500 LINHAS ATIVADO - Logs serao truncados";
+            WriteToFile("TOGGLE", msg);
+            OnLogReceived?.Invoke(msg);
         }
-        
-        // Comando para controlar verbosidade de logs CHECK
+
         public static void ToggleVerboseCheck()
         {
             VerboseCheckLogs = !VerboseCheckLogs;
-            OnLogReceived?.Invoke(VerboseCheckLogs ? 
-                "📝 Logs CHECK detalhados ATIVADOS - Mostra todas as verificações" : 
-                "📝 Logs CHECK detalhados DESATIVADOS - Mostra apenas erros e mudanças");
+            var msg = VerboseCheckLogs
+                ? "Logs CHECK detalhados ATIVADOS - Mostra todas as verificacoes"
+                : "Logs CHECK detalhados DESATIVADOS - Mostra apenas erros e mudancas";
+            WriteToFile("TOGGLE", msg);
+            OnLogReceived?.Invoke(msg);
+        }
+
+        public static string GetLogPath()
+        {
+            return LogFilePath;
         }
     }
 }

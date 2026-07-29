@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using KitLugia.Core;
 
 namespace KitLugia.Updater;
 
@@ -78,7 +79,7 @@ public partial class MainWindow : Window
                         mainProcess.WaitForExit(5000);
                     }
                 }
-                catch (ArgumentException) { }
+                catch { Logger.LogWarning("MainWindow", "Exception suppressed"); }
             });
             SetStepDone(1, true);
             await Task.Delay(500);
@@ -106,8 +107,8 @@ public partial class MainWindow : Window
             AddStep("🧹", "Limpando temporários...", false);
             await Task.Run(() =>
             {
-                try { Directory.Delete(extractDir, true); } catch { }
-                try { File.Delete(zipPath); } catch { }
+                try { Directory.Delete(extractDir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { File.Delete(zipPath); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             SetStepDone(4, true);
 
@@ -248,7 +249,7 @@ public partial class MainWindow : Window
             if (File.Exists(exePath))
                 return FileVersionInfo.GetVersionInfo(exePath).FileVersion ?? "0.0.0.0";
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         return "0.0.0.0";
     }
 
@@ -258,7 +259,7 @@ public partial class MainWindow : Window
         {
             File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
         }
-        catch { }
+        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
     }
 }
 

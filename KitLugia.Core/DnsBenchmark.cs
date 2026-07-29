@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -35,6 +35,17 @@ namespace KitLugia.Core
                 new() { Name = "UncensoredDNS",     Primary = "91.239.100.100", Secondary = "89.233.43.71",  Category = "Privacidade" },
                 new() { Name = "Yandex DNS",        Primary = "77.88.8.8",    Secondary = "77.88.8.1",    Category = "Padrão" },
                 new() { Name = "SafeDNS",           Primary = "195.46.39.39",  Secondary = "195.46.39.40",  Category = "Familiar" },
+                new() { Name = "Gcore DNS",         Primary = "185.158.177.177", Secondary = "185.158.178.178", Category = "Privacidade" },
+                new() { Name = "Alternate DNS",     Primary = "198.101.242.72", Secondary = "23.253.163.53", Category = "Padr\u00e3o" },
+                new() { Name = "Level 3 DNS",       Primary = "209.244.0.3",  Secondary = "209.244.0.4",  Category = "Padr\u00e3o" },
+                new() { Name = "Oracle Dyn",        Primary = "216.146.35.35", Secondary = "216.146.36.36", Category = "Padr\u00e3o" },
+                new() { Name = "Cloudflare Familia", Primary = "1.1.1.3",   Secondary = "1.0.0.3",     Category = "Familiar" },
+                new() { Name = "Cloudflare Malware", Primary = "1.1.1.2",  Secondary = "1.0.0.2",     Category = "Seguran\u00e7a" },
+                new() { Name = "DNSForge",          Primary = "185.228.168.168", Secondary = "185.228.169.168", Category = "Seguran\u00e7a" },
+                new() { Name = "Mullvad DNS",       Primary = "194.242.2.2",  Secondary = "194.242.2.3",  Category = "Privacidade" },
+                new() { Name = "LibreDNS",          Primary = "37.235.1.174",  Secondary = "37.235.1.177", Category = "Privacidade" },
+                new() { Name = "Hurricane Electric", Primary = "75.75.75.75", Secondary = "75.75.76.76", Category = "Padr\u00e3o" },
+                new() { Name = "puntCAT",           Primary = "169.239.202.202", Secondary = "169.239.203.203", Category = "Privacidade" },
             };
         }
 
@@ -60,10 +71,7 @@ namespace KitLugia.Core
                 var reply = await client.SendPingAsync(IPAddress.Parse(ip), 3000);
                 return reply.Status == System.Net.NetworkInformation.IPStatus.Success ? reply.RoundtripTime : -1;
             }
-            catch
-            {
-                return -1;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return -1; }
         }
     }
 }

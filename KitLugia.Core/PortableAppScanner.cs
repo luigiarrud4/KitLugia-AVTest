@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -69,7 +69,7 @@ namespace KitLugia.Core
                         if (entry != null) results.Add(entry);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             return results.OrderByDescending(r => r.Confidence)
@@ -161,11 +161,11 @@ namespace KitLugia.Core
                                         paths.Add(Path.GetFullPath(installPath).TrimEnd('\\'));
                                 }
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             return paths;
@@ -254,10 +254,7 @@ namespace KitLugia.Core
                     Confidence = confidence
                 };
             }
-            catch
-            {
-                return null;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
     }
 }

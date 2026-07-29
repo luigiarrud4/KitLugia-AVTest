@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,7 +10,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.VisualBasic.FileIO;
 
@@ -70,7 +69,7 @@ namespace KitLugia.Core
             if (!string.IsNullOrEmpty(displayName))
             {
                 targetNames.Add(SanitizeName(displayName));
-                string compressed = Regex.Replace(displayName, @"[\s\-_.]+", "");
+                string compressed = NativeRegex.Replace(displayName, @"[\s\-_.]+", "");
                 if (compressed.Length >= 3) targetNames.Add(compressed);
             }
 
@@ -81,7 +80,7 @@ namespace KitLugia.Core
                     string dir = Path.GetFileName(installLocation.TrimEnd('\\', '/'));
                     if (!string.IsNullOrEmpty(dir)) targetNames.Add(dir);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             if (extraExeNames != null)
@@ -104,11 +103,11 @@ namespace KitLugia.Core
                             if (ProtectedProcessNames.Contains(proc.ProcessName)) continue;
                             KillProcessGracefully(proc);
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         finally { proc.Dispose(); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -124,7 +123,7 @@ namespace KitLugia.Core
                     proc.WaitForExit(2000);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static async Task<UninstallResult> DeepUninstallProgram(string displayName, string uninstallString, string installLocation, string publisher, string displayIcon, bool createRestorePoint = true, IProgress<string>? progress = null)
@@ -180,7 +179,7 @@ namespace KitLugia.Core
                                 if (!foundActualUninstaller)
                                 {
                                     result.Errors.Add("Uninstall string points to main app exe — no silent uninstall available. Force-deleting.");
-                                    try { proc.Kill(); } catch { }
+                                    try { proc.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                                     proc.WaitForExit(2000);
                                 }
                                 else
@@ -275,7 +274,7 @@ namespace KitLugia.Core
                     foreach (var sub in Directory.EnumerateDirectories(dir))
                         snapshot.Add(sub);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             return snapshot;
@@ -491,7 +490,7 @@ namespace KitLugia.Core
                 if (!string.IsNullOrEmpty(loc))
                     return Path.GetDirectoryName(loc)?.TrimEnd('\\') ?? "";
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return AppContext.BaseDirectory.TrimEnd('\\');
         }
 
@@ -511,7 +510,7 @@ namespace KitLugia.Core
                             if (!string.IsNullOrEmpty(p))
                                 set.Add(p.TrimEnd('\\'));
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
 
             // CSIDL / SpecialFolders
@@ -592,7 +591,7 @@ namespace KitLugia.Core
                 if (winDir != null && !set.Contains(winDir.TrimEnd('\\')))
                     set.Add(winDir.TrimEnd('\\'));
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return set;
         }
@@ -668,7 +667,7 @@ namespace KitLugia.Core
                             results.Add(dir);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return results.OrderBy(f => f).ToList();
         }
@@ -716,7 +715,7 @@ namespace KitLugia.Core
                     foreach (var d in Directory.EnumerateDirectories(installLocation, "*", System.IO.SearchOption.AllDirectories))
                         results.Add(d);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             // Safe mode: only install dir + exact AppData name matches
@@ -963,7 +962,7 @@ namespace KitLugia.Core
                 // Depth 2 under known shell roots (Desktop\file.lnk is depth 2 = OK — individual files)
                 // Only block depth 1 for these
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false;
         }
 
@@ -1125,7 +1124,7 @@ namespace KitLugia.Core
                                     if (dirCreated < installDate.Value.AddDays(-1))
                                         match = false;
                                 }
-                                catch { }
+                                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             }
                         }
                     }
@@ -1147,7 +1146,7 @@ namespace KitLugia.Core
                         ScanFolderConfidence(dir, displayName, publisher, installDate, results, otherInstallLocations, depth + 1, maxDepth);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -1179,7 +1178,7 @@ namespace KitLugia.Core
                             fvi.ProductName.IndexOf(displayName, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                     // 2. Check digital signature (Authenticode)
                     try
@@ -1189,10 +1188,10 @@ namespace KitLugia.Core
                             cert.Subject.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return false;
         }
@@ -1227,13 +1226,13 @@ namespace KitLugia.Core
                             break;
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 // If executables exist but NONE match the app → likely unrelated
                 return hasExecutables && !anyMatch;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static void ScanUninstallerSpecific(string installLocation, string displayIcon, string displayName, HashSet<string> results)
@@ -1271,7 +1270,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void ScanStartupFolders(string displayName, HashSet<string> results)
@@ -1296,7 +1295,7 @@ namespace KitLugia.Core
                         if (Confidence.Generate(displayName, name) >= 70) results.Add(f);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -1323,7 +1322,7 @@ namespace KitLugia.Core
                             results.Add(f);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -1343,7 +1342,7 @@ namespace KitLugia.Core
                             results.Add(f);
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -1381,7 +1380,7 @@ namespace KitLugia.Core
                         results.Add(pfFile);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -1431,7 +1430,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ── Registry Scanning ──────────────────────────────────────
@@ -1610,7 +1609,7 @@ namespace KitLugia.Core
                             ScanHiveForNames($@"{uh}\Software\Microsoft\Windows\CurrentVersion\Run", displayName, r, installLocation);
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }));
             }
 
@@ -1692,7 +1691,7 @@ namespace KitLugia.Core
                         results.Add($@"{hiveKey}\{name}");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void ScanSoftwareRecursive(string hiveKey, string displayName, HashSet<string> results, string[]? exclusions = null, int depth = 0, string installLocation = "")
@@ -1729,7 +1728,7 @@ namespace KitLugia.Core
                     ScanSoftwareRecursive(full, displayName, results, exclusions, depth + 1, installLocation);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void ScanMsiUserData(string displayName, HashSet<string> results, string installLocation = "")
@@ -1744,7 +1743,7 @@ namespace KitLugia.Core
                         ScanHiveForNames($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\{sid}\{sub}", displayName, results, installLocation);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void ScanFirewallRules(string displayName, HashSet<string> results)
@@ -1768,7 +1767,7 @@ namespace KitLugia.Core
                         results.Add($@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules\{valName}");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -1834,7 +1833,7 @@ namespace KitLugia.Core
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -1865,7 +1864,7 @@ namespace KitLugia.Core
                         results.Add($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications\{sub}");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -1895,7 +1894,7 @@ namespace KitLugia.Core
                         results.Add($@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Internet Explorer\LowRegistry\Audio\PolicyConfig\PropertyStore\{subName}");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -1932,7 +1931,7 @@ namespace KitLugia.Core
                         results.Add($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Tracing\{name}");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void ScanUserAssist(string displayName, HashSet<string> results)
@@ -1957,7 +1956,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static string Rot13(string input)
@@ -2004,10 +2003,10 @@ namespace KitLugia.Core
                             if (!string.IsNullOrEmpty(loc) && Directory.Exists(loc))
                                 locations.Add(Path.GetFullPath(loc).TrimEnd('\\'));
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return locations.ToList();
         }
@@ -2041,10 +2040,10 @@ namespace KitLugia.Core
                             if (dn.Trim().Length >= 3)
                                 names.Add(dn.Trim());
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return names;
         }
@@ -2083,7 +2082,7 @@ namespace KitLugia.Core
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return null;
         }
@@ -2124,7 +2123,7 @@ namespace KitLugia.Core
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return null;
         }
@@ -2223,7 +2222,7 @@ namespace KitLugia.Core
                 File.WriteAllLines(logFile, logEntries);
                 result.DeletionLogFile = logFile;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static string? BackupFileItem(string fullPath)
@@ -2261,7 +2260,7 @@ namespace KitLugia.Core
                 }
                 return null;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         /// <summary>
@@ -2281,7 +2280,7 @@ namespace KitLugia.Core
                 using var proc = Process.Start(psi);
                 proc?.WaitForExit(10000);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -2311,7 +2310,7 @@ namespace KitLugia.Core
                     File.Copy(backupPath, originalPath, true);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ── Value-based Registry Match ─────────────────────────────
@@ -2348,7 +2347,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false;
         }
 
@@ -2376,10 +2375,10 @@ namespace KitLugia.Core
                         if (sk != null && KeyHasValueReferencing(sk, installLocation, displayName))
                             results.Add($@"{hiveKey}\{name}");
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -2399,7 +2398,7 @@ namespace KitLugia.Core
                         results.Add($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\Folders\{valName}");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -2435,11 +2434,11 @@ namespace KitLugia.Core
                                 }
                             }
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ── Helpers ────────────────────────────────────────────────
@@ -2477,10 +2476,10 @@ namespace KitLugia.Core
         private static string SanitizeName(string name)
         {
             if (string.IsNullOrEmpty(name)) return "";
-            name = Regex.Replace(name, @"\s+\d+[\d.]*\d$", "");
-            name = Regex.Replace(name, @"\s+(Inc|LLC|Ltd|Limited|Corp|Corporation|GmbH|SAS|SRL|SA|Pty|Ltee)\.?$", "", RegexOptions.IgnoreCase);
-            name = Regex.Replace(name, @"\s*\([^)]*\)$", "");
-            name = Regex.Replace(name, @"[™©®]", "");
+            name = NativeRegex.Replace(name, @"\s+\d+[\d.]*\d$", "");
+            name = NativeRegex.Replace(name, @"\s+(Inc|LLC|Ltd|Limited|Corp|Corporation|GmbH|SAS|SRL|SA|Pty|Ltee)\.?$", "");
+            name = NativeRegex.Replace(name, @"\s*\([^)]*\)$", "");
+            name = NativeRegex.Replace(name, @"[™©®]", "");
             return name.Trim().TrimEnd('.');
         }
 
@@ -2512,13 +2511,12 @@ namespace KitLugia.Core
                     string name = Path.GetFileName(f);
                     if (!knownUninstallers.Contains(name, StringComparer.OrdinalIgnoreCase))
                     {
-                        var match = Regex.Match(name, @"^unins\d{3}\.exe$", RegexOptions.IgnoreCase);
-                        if (match.Success)
+                        if (NativeRegex.IsMatch(name, @"^unins\d{3}\.exe$"))
                             knownUninstallers = [..knownUninstallers, name];
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             // Parse what the registry currently points to
             var (regFile, regArgs) = ParseCommandLine(registryUninstallString ?? "");
@@ -2555,7 +2553,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             // If the registry already points to a known uninstaller INSIDE the install dir,
             // prefer the registry version (it may have important switches).
@@ -2609,7 +2607,7 @@ namespace KitLugia.Core
                             return $@"{hive}\{keyPath}\{sub}";
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return null;
         }
@@ -2640,7 +2638,7 @@ namespace KitLugia.Core
                             return true;
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return false;
         }
@@ -2695,7 +2693,7 @@ namespace KitLugia.Core
                 SRSetRestorePointW(ref info, out _);
                 return true;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         // ── Registry .reg Backup ─────────────────────────────────
@@ -2739,7 +2737,7 @@ namespace KitLugia.Core
                 File.WriteAllText(backupFile, sb.ToString(), Encoding.Unicode);
                 return backupFile;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         private static void ExportKeyToReg(StringBuilder sb, string fullPath, RegistryKey key, int maxItems = 500, CancellationToken ct = default)
@@ -2818,7 +2816,7 @@ namespace KitLugia.Core
                 File.WriteAllText(backupFile, currentPath, Encoding.Unicode);
                 return backupFile;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         /// <summary>
@@ -2888,11 +2886,11 @@ namespace KitLugia.Core
                         5000,
                         out _);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 return true;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -2914,7 +2912,7 @@ namespace KitLugia.Core
                 if (key == null) return false;
                 return key.GetValueNames().Contains(leafName, StringComparer.OrdinalIgnoreCase);
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -2979,7 +2977,7 @@ namespace KitLugia.Core
                 File.WriteAllText(backupFile, sb.ToString(), Encoding.Unicode);
                 return backupFile;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         /// <summary>
@@ -3090,7 +3088,7 @@ namespace KitLugia.Core
                 sc.Start();
                 sc.WaitForExit(3000);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             try
             {
                 using var sc = new System.Diagnostics.Process();
@@ -3101,7 +3099,7 @@ namespace KitLugia.Core
                 sc.Start();
                 sc.WaitForExit(3000);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -3139,7 +3137,7 @@ namespace KitLugia.Core
                 if (proc != null && !proc.HasExited)
                     KillProcessGracefully(proc);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -3155,7 +3153,7 @@ namespace KitLugia.Core
             if (!string.IsNullOrEmpty(displayName))
             {
                 targetNames.Add(SanitizeName(displayName));
-                string compressed = Regex.Replace(displayName, @"[\s\-_.]+", "");
+                string compressed = NativeRegex.Replace(displayName, @"[\s\-_.]+", "");
                 if (compressed.Length >= 3) targetNames.Add(compressed);
             }
 
@@ -3166,7 +3164,7 @@ namespace KitLugia.Core
                     string dir = Path.GetFileName(installLocation.TrimEnd('\\', '/'));
                     if (!string.IsNullOrEmpty(dir)) targetNames.Add(dir);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             if (extraExeNames != null)
@@ -3190,11 +3188,11 @@ namespace KitLugia.Core
                             if (ProtectedProcessNames.Contains(proc.ProcessName)) continue;
                             KillProcessGracefully(proc);
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         finally { proc.Dispose(); }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             // Phase 2: Try WMI once for child process cleanup (capped at 2s via task timeout)
@@ -3221,7 +3219,7 @@ namespace KitLugia.Core
                                         parentToChildren[ppid].Add(pid);
                                     }
                                 }
-                                catch { }
+                                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             }
 
                             // Collect descendants of killed PIDs
@@ -3244,14 +3242,14 @@ namespace KitLugia.Core
                                         KillProcessGracefully(proc);
                                     }
                                 }
-                                catch { }
+                                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             }
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     });
                     wmiTask.Wait(2000);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
         }
 
@@ -3291,7 +3289,7 @@ namespace KitLugia.Core
                     foreach (var f in Directory.GetFiles(installLocation, "*.dll", System.IO.SearchOption.TopDirectoryOnly))
                         exes.Add(f);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             // DisplayIcon
@@ -3360,7 +3358,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return related;
         }
 
@@ -3468,7 +3466,7 @@ namespace KitLugia.Core
                 using var key = hive.OpenSubKey(subKey, false);
                 return key != null;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static void ScanComClsidEntries(string baseClassesPath, string normalizedInstall, HashSet<string> results, Dictionary<string, string> comEntries)
@@ -3561,10 +3559,10 @@ namespace KitLugia.Core
                                 TryAddKey($@"{baseClassesPath}\{indepProgId}", results);
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void ScanComTypeLibEntries(string baseClassesPath, string normalizedInstall, HashSet<string> results, Dictionary<string, string> comEntries)
@@ -3619,10 +3617,10 @@ namespace KitLugia.Core
                         if (!comEntries.ContainsKey(guid))
                             comEntries[guid] = normalizedFile;
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private static void ScanComInterfaceEntries(string baseClassesPath, HashSet<string> results, Dictionary<string, string> comEntries, Dictionary<string, string> interfaceToClsid)
@@ -3654,10 +3652,10 @@ namespace KitLugia.Core
                             interfaceToClsid[ifGuid] = proxyClsid;
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -3672,7 +3670,7 @@ namespace KitLugia.Core
                 if (hive == null || string.IsNullOrEmpty(subKey)) return null;
                 return hive.OpenSubKey(subKey, false);
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         /// <summary>
@@ -3687,7 +3685,7 @@ namespace KitLugia.Core
                 using var key = hive.OpenSubKey(subKey, false);
                 if (key != null) results.Add(fullPath);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ── Empty Directory / Questionable Name Detection ──────────
@@ -3717,7 +3715,7 @@ namespace KitLugia.Core
                 }
                 return true;
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -3761,7 +3759,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // ── Quiet Uninstall String Generation ─────────────────────
@@ -3781,11 +3779,11 @@ namespace KitLugia.Core
             if (lower.Contains("msiexec") || lower.Contains(".msi"))
             {
                 // Extract the product code (GUID) from the string
-                var msiMatch = Regex.Match(uninstallString, @"\{[0-9A-Fa-f\-]{36}\}");
+                var msiMatch = NativeRegex.Match(uninstallString, @"\{[0-9A-Fa-f\-]{36}\}");
                 if (msiMatch.Success)
                     return $"msiexec /x {msiMatch.Value} /qn /norestart";
                 // Also check for /I{guid} pattern
-                var iMatch = Regex.Match(uninstallString, @"/I\{[0-9A-Fa-f\-]{36}\}");
+                var iMatch = NativeRegex.Match(uninstallString, @"/I\{[0-9A-Fa-f\-]{36}\}");
                 if (iMatch.Success)
                     return $"msiexec /x {iMatch.Value[3..]} /qn /norestart";
             }
@@ -3894,10 +3892,10 @@ namespace KitLugia.Core
                             return false;
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return true;
         }
 
@@ -3927,17 +3925,17 @@ namespace KitLugia.Core
                             list.Add((proc, proc.TotalProcessorTime, now));
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return list;
         }
     }
 
     // ── Confidence Scoring ──────────────────────────────────────
 
-    internal static class Confidence
+    public static class Confidence
     {
         // Generic words that should never produce a strong match on their own
         private static readonly HashSet<string> GenericWords = new(StringComparer.OrdinalIgnoreCase)
@@ -4036,10 +4034,10 @@ namespace KitLugia.Core
 
         private static string CleanName(string name)
         {
-            name = Regex.Replace(name, @"\s+(Inc|LLC|Ltd|Limited|Corp|Corporation|GmbH|SAS|SRL|SA|Pty|Ltee)\.?$", "", RegexOptions.IgnoreCase);
-            name = Regex.Replace(name, @"\s*\([^)]*\)$", "");
-            name = Regex.Replace(name, @"[™©®]", "");
-            name = Regex.Replace(name, @"\s+", " ").Trim();
+            name = NativeRegex.Replace(name, @"\s+(Inc|LLC|Ltd|Limited|Corp|Corporation|GmbH|SAS|SRL|SA|Pty|Ltee)\.?$", "");
+            name = NativeRegex.Replace(name, @"\s*\([^)]*\)$", "");
+            name = NativeRegex.Replace(name, @"[™©®]", "");
+            name = NativeRegex.Replace(name, @"\s+", " ").Trim();
             return name;
         }
 
@@ -4069,6 +4067,110 @@ namespace KitLugia.Core
             }
             lcss += localCs;
             return (int)Math.Round((double)(Math.Max(l1, l2) - lcss + trans));
+        }
+
+        // ── Rust native backend ─────────────────────────────────────
+        private const string RustDll = "rust_native.dll";
+
+        [DllImport(RustDll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+        private static extern int sift4_distance_ffi(string s1, string s2, int maxOffset);
+
+        [DllImport(RustDll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+        private static extern int confidence_generate_ffi(string displayName, string folderName);
+
+        private static readonly bool UseNative;
+
+        static Confidence()
+        {
+            try
+            {
+                int test = sift4_distance_ffi("test", "test", 5);
+                UseNative = (test == 0);
+                if (UseNative)
+                    Logger.Log("🧪 Rust native DLL carregada com sucesso!");
+            }
+            catch
+            {
+                UseNative = false;
+                Logger.Log("ℹ️ Rust native DLL não encontrada — usando implementação C#");
+            }
+        }
+
+        public static void Benchmark()
+        {
+            var pairs = new (string display, string folder)[]
+            {
+                ("Adobe Reader", "Adobe"),
+                ("Google Chrome", "Google"),
+                ("Mozilla Firefox", "Firefox"),
+                ("Microsoft Office", "Microsoft Office"),
+                ("Java Runtime", "Java"),
+                ("Steam Client", "Steam"),
+                ("Discord", "Discord"),
+                ("Spotify Premium", "Spotify"),
+                ("VLC Media Player", "VLC"),
+                ("7-Zip", "7-Zip"),
+                ("Notepad++", "NotepadPP"),
+                ("WinRAR", "WinRAR"),
+                ("Audacity", "Audacity"),
+                ("FileZilla FTP", "FileZilla"),
+                ("qBittorrent", "qBittorrent"),
+                ("Visual Studio Code", "VSCode"),
+                ("Git", "Git"),
+                ("Python 3.12", "Python"),
+                ("Node.js", "NodeJS"),
+                ("Docker Desktop", "Docker"),
+                ("Slack Technologies", "Slack"),
+                ("Zoom", "Zoom"),
+                ("TeamViewer", "TeamViewer"),
+                ("Oracle VM VirtualBox", "VirtualBox"),
+                ("VMware Workstation", "VMware"),
+            };
+
+            const int Iterations = 10000;
+
+            // ── C# benchmark ──
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < Iterations; i++)
+            {
+                foreach (var p in pairs)
+                {
+                    int _ = Confidence.Generate(p.display, p.folder);
+                }
+            }
+            sw.Stop();
+            long csMs = sw.ElapsedMilliseconds;
+
+            // ── Rust benchmark ──
+            if (!UseNative)
+            {
+                Logger.Log($"\n═══ BENCHMARK ═══");
+                Logger.Log($"C#:     {Iterations} iterações × {pairs.Length} pares = {csMs} ms");
+                Logger.Log($"Média:  {csMs / (double)Iterations:F4} ms por iteração");
+                Logger.Log($"Rust:   DLL não disponível — não foi possível testar");
+                return;
+            }
+
+            sw.Restart();
+            for (int i = 0; i < Iterations; i++)
+            {
+                foreach (var p in pairs)
+                {
+                    int _ = confidence_generate_ffi(p.display, p.folder);
+                }
+            }
+            sw.Stop();
+            long rustMs = sw.ElapsedMilliseconds;
+
+            Logger.Log($"\n═══════════════ BENCHMARK ═══════════════");
+            Logger.Log($"Iters: {Iterations} × {pairs.Length} pares = {Iterations * pairs.Length} chamadas");
+            Logger.Log($"");
+            Logger.Log($"C#  Sift4:    {csMs,8} ms  |  {(double)Iterations * pairs.Length / csMs * 1000,8:F0} op/s");
+            Logger.Log($"Rust native:  {rustMs,8} ms  |  {(double)Iterations * pairs.Length / rustMs * 1000,8:F0} op/s");
+            Logger.Log($"");
+            double ratio = (double)csMs / rustMs;
+            Logger.Log($"Speedup:      {ratio:F2}×  (Rust é {(ratio >= 1 ? "mais rápido" : "mais lento")})");
+            Logger.Log($"===========================================");
         }
     }
 }

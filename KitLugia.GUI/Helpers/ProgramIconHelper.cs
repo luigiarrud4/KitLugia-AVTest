@@ -6,6 +6,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using KitLugia.Core;
 
 namespace KitLugia.GUI.Helpers
 {
@@ -108,7 +109,7 @@ namespace KitLugia.GUI.Helpers
                     if (icon != null) return icon;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return null;
         }
@@ -163,7 +164,7 @@ namespace KitLugia.GUI.Helpers
                             }
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 // ExtractAssociatedIcon com índice específico
@@ -181,7 +182,7 @@ namespace KitLugia.GUI.Helpers
                                 result = IconToBitmapSource(icon);
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 // Se não achou e o caminho não existe, tenta localizar o arquivo
@@ -192,7 +193,7 @@ namespace KitLugia.GUI.Helpers
                         result = GetIconFromFile(foundPath, iconIndex);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             lock (CacheLock)
             {
@@ -245,7 +246,7 @@ namespace KitLugia.GUI.Helpers
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return null;
         }
@@ -266,7 +267,7 @@ namespace KitLugia.GUI.Helpers
                 bitmap.Freeze();
                 return bitmap;
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         private static BitmapSource? IconToBitmapSource(System.Drawing.Icon icon)
@@ -288,7 +289,7 @@ namespace KitLugia.GUI.Helpers
                     return bitmapImage;
                 }
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         public static BitmapSource? GetGenericIcon()
@@ -312,7 +313,7 @@ namespace KitLugia.GUI.Helpers
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return null;
         }

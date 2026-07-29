@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -64,7 +64,7 @@ namespace KitLugia.Core
                     watcher.EnableRaisingEvents = true;
                     _watchers.Add(watcher);
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             _registrySnapshot = null;
@@ -81,7 +81,7 @@ namespace KitLugia.Core
                     watcher.EnableRaisingEvents = false;
                     watcher.Dispose();
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             _watchers.Clear();
         }
@@ -177,11 +177,11 @@ namespace KitLugia.Core
                                     snapshot[displayKey] = installDate;
                                 }
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             return snapshot;

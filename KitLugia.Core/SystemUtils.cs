@@ -28,10 +28,7 @@ namespace KitLugia.Core
                 var principal = new WindowsPrincipal(identity);
                 return principal.IsInRole(WindowsBuiltInRole.Administrator);
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static string? GetServiceStartMode(string serviceName)
@@ -43,7 +40,7 @@ namespace KitLugia.Core
                 s.Get();
                 return s["StartMode"]?.ToString();
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         public static double GetTotalSystemRamGB()
@@ -59,7 +56,7 @@ namespace KitLugia.Core
                     return totalRamKB / 1048576.0;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             try
             {
@@ -68,7 +65,7 @@ namespace KitLugia.Core
                 if (NativeMethods.GlobalMemoryStatusEx(ref memStatus))
                     return memStatus.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return 0;
         }
@@ -124,7 +121,7 @@ namespace KitLugia.Core
                     var exitTask = process.WaitForExitAsync();
                     if (await Task.WhenAny(exitTask, Task.Delay(120000)).ConfigureAwait(false) != exitTask)
                     {
-                        try { process.Kill(entireProcessTree: true); } catch { }
+                        try { process.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         return "[TIMEOUT] Processo excedeu 120 segundos.";
                     }
                     
@@ -169,7 +166,7 @@ namespace KitLugia.Core
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\Paths");
                 if (key?.GetValue("Winget") is string saved) return saved;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return null;
         }
@@ -262,7 +259,7 @@ namespace KitLugia.Core
                 using var searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem");
                 if (!searcher.Get().Cast<ManagementObject>().Any()) errors.Add("- WMI não está retornando dados.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             try
             {
@@ -270,7 +267,7 @@ namespace KitLugia.Core
                 Registry.CurrentUser.CreateSubKey(testKey)?.Close();
                 Registry.CurrentUser.DeleteSubKey(testKey);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             string[] requiredTools = { "sc.exe", "ipconfig.exe", "bcdedit.exe", "powershell.exe", "sfc.exe", "dism.exe", "powercfg.exe", "compact.exe" };
             foreach (var tool in requiredTools)
@@ -296,10 +293,7 @@ namespace KitLugia.Core
                 if (key == null) return null;
                 return key.GetValue(valueName);
             }
-            catch
-            {
-                return null;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         public static void SetRegistryValue(RegistryKey hive, string subKey, string valueName, object value, RegistryValueKind kind)

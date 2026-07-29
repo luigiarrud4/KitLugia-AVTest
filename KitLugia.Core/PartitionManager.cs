@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -76,7 +76,7 @@ namespace KitLugia.Core
                 await RunProcess("sc", "config vds start= demand");
                 await RunProcess("net", "start vds");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- DISK ENUMERATION (WMI) ---
@@ -168,12 +168,12 @@ namespace KitLugia.Core
                                             }
                                         }
                                     }
-                                    catch { }
+                                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                                     diskInfo.Partitions.Add(partInfo);
                                 }
                             }
                         }
-                        catch { }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                         // Sort partitions by offset and fill Gaps
                         diskInfo.Partitions = diskInfo.Partitions.OrderBy(p => p.StartingOffset).ToList();
@@ -208,7 +208,7 @@ namespace KitLugia.Core
                 }
                 return "MBR"; // Default se não achar GPT explícito
             }
-            catch { return "Desconhecido"; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return "Desconhecido"; }
         }
 
         private static void FetchPartitionsForDisk(DiskInfoEx diskInfo)
@@ -285,7 +285,7 @@ namespace KitLugia.Core
                     part.Size = (ulong)drive.TotalSize;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- FORMAT PARTITION ---
@@ -789,10 +789,7 @@ namespace KitLugia.Core
                 }
                 return false;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         // --- REMOVE DRIVE LETTER ---
@@ -899,7 +896,7 @@ namespace KitLugia.Core
                     await Task.Run(() => File.Delete(path));
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // --- DISK DETAIL INFO ---
@@ -968,7 +965,7 @@ namespace KitLugia.Core
             progressCallback?.Invoke(80, "Restaurando dados...");
             bool applyOk = await ApplyVolumeImage(tempWim, $"{newLetter}\\", progressCallback);
             
-            try { File.Delete(tempWim); } catch { }
+            try { File.Delete(tempWim); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             if (applyOk) Log("Movimentação concluída com sucesso.");
             return applyOk;
@@ -1158,7 +1155,7 @@ namespace KitLugia.Core
                 proc.BeginErrorReadLine();
                 if (!proc.WaitForExit(300000))
                 {
-                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    try { proc.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     fullOutput.AppendLine("[TIMEOUT] Processo excedeu 5 minutos e foi encerrado.");
                 }
 

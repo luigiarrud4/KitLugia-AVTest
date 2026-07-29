@@ -1,0 +1,374 @@
+<Page x:Class="KitLugia.GUI.Pages.ReinstallPreservePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      d:DesignHeight="750" d:DesignWidth="1050"
+      Title="Fresh Install + Preservação">
+
+    <Page.Resources>
+        <ControlTemplate x:Key="GameBoostComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="36" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="5" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L5,5 L10,0" IsHitTestVisible="False"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#2A2A2A" />
+                    <Setter TargetName="Border" Property="BorderBrush" Value="#666666" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#222222"/>
+            <Setter Property="BorderBrush" Value="#444444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton" Template="{StaticResource GameBoostComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Cursor="Hand"/>
+                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide" StaysOpen="False">
+                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#222222" BorderThickness="1" BorderBrush="#444444" CornerRadius="5"/>
+                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="StepCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="15"/>
+        </Style>
+        <Style x:Key="GreenButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1A4A1A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#33D4AF37"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#226622"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#0D330D"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.3"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="WarningBoxStyle" TargetType="Border">
+            <Setter Property="Background" Value="#1A331100"/>
+            <Setter Property="BorderBrush" Value="#55FFAA00"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="25,20,25,15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- HEADER -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Fresh Install + Preservação de Dados" FontSize="24" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
+                <TextBlock Text="Instale um Windows novo sem perder seus arquivos, programas e configurações" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,2,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Voltar" Click="BtnBack_Click" Style="{StaticResource SecondaryButtonStyle}" Width="80" Height="32" FontSize="11" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- MAIN -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="280"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+                <StackPanel>
+
+                    <!-- STEP 1: PREPARAR WINPE -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="WinPE pronto para boot — necessário para mover dados e instalar o Windows offline." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="BdrWinpeStatus" Background="#222233" BorderBrush="#4488FF" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,0,10,0">
+                                    <TextBlock x:Name="TxtWinpeStatus" Text="Verificando..." FontSize="11" Foreground="#8888FF"/>
+                                </Border>
+                                <Button x:Name="BtnPrepareWinpe" Content="PREPARAR" Click="BtnPrepareWinpe_Click"
+                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="120"/>
+                                <Button x:Name="BtnRemoveWinpe" Content="REMOVER" Click="BtnRemoveWinpe_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="90" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- STEP 2: ISO DO WINDOWS -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="2. SELECIONAR ISO DO WINDOWS" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock x:Name="TxtIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="10" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" x:Name="BtnLoadIso" Content="CARREGAR ISO" Click="BtnLoadIso_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Width="140"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- STEP 3: CONFIG & EXECUTAR -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="3. CONFIGURAR OPERAÇÃO" FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                            <TextBlock Text="Selecione o que preservar:" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,6"/>
+
+                            <!-- Options -->
+                            <Border Style="{StaticResource WarningBoxStyle}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <CheckBox x:Name="ChkPreserveUsers" Content="Perfis de usuário (Desktop, Documentos, Downloads, AppData)" IsChecked="True"
+                                              Foreground="White" FontSize="11" Margin="0,2,0,0"/>
+                                    <CheckBox x:Name="ChkPreserveProgramFiles" Content="Program Files (binários — apps sem registro não abrem, só portáteis)" IsChecked="False"
+                                              Foreground="#AAAAAA" FontSize="11" Margin="0,6,0,0"/>
+                                    <CheckBox x:Name="ChkPreserveRegistry" Content="Registry de programas (permite que apps instaladas funcionem — Estratégia C)" IsChecked="False"
+                                              Foreground="#FFAA44" FontSize="11" Margin="0,6,0,0"/>
+                                    <CheckBox x:Name="ChkPreservePersonalization" Content="Personalização (tema, wallpaper, taskbar, WiFi, bookmarks)" IsChecked="True"
+                                              Foreground="White" FontSize="11" Margin="0,6,0,0"/>
+                                    <CheckBox x:Name="ChkPreserveDrivers" Content="Drivers do sistema atual" IsChecked="True"
+                                              Foreground="White" FontSize="11" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- ISO Edition selector (appears after ISO is loaded) -->
+                            <Border x:Name="PanelEdition" Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Edição:" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="CboEdition" Grid.Column="1" Style="{StaticResource DarkComboBoxStyle}" FontSize="12" Height="30"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Background="#1A1A1A" BorderBrush="#444" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Partição alvo:" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="CboTargetDrive" Grid.Column="1" Style="{StaticResource DarkComboBoxStyle}" FontSize="12" Height="30"/>
+                                    <Button x:Name="BtnRefreshDisks" Grid.Column="2" Content="ATUALIZAR" Click="BtnRefreshDisks_Click"
+                                            Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="10" Width="90" Margin="10,0,0,0"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Background="#11FF3D00" BorderBrush="#33FF3D00" BorderThickness="1" CornerRadius="6" Padding="10">
+                                <StackPanel>
+                                    <TextBlock Text="⚠️ ATENÇÃO" FontSize="11" FontWeight="Bold" Foreground="#FFAA44"/>
+                                    <TextBlock Text="O WinPE será acionado e o PC será reiniciado. O Windows atual será substituído pelo novo. Backup dos dados será feito automaticamente em C:\!." Foreground="#CCCCCC" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- EXECUTE BUTTON -->
+                    <Border Style="{StaticResource StepCardStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="4. INICIAR" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock x:Name="TxtReadyStatus" Text="Carregue um ISO e selecione as opções acima." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <Button x:Name="BtnStart" Grid.Column="1" Content="INICIAR FRESH INSTALL"
+                                    Click="BtnStart_Click"
+                                    Style="{StaticResource GreenButtonStyle}"
+                                    Height="44" FontSize="14" FontWeight="Bold"
+                                    Width="200" IsEnabled="False"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- STATUS LOG -->
+                    <Border Style="{StaticResource StepCardStyle}" Margin="0,10,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <StackPanel Grid.Row="0">
+                                <TextBlock Text="LOG DA OPERAÇÃO" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Resultados da última execução." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <TextBox x:Name="TxtOperationLog" Grid.Row="1" IsReadOnly="True" FontFamily="Consolas" FontSize="9"
+                                     Foreground="#0F0" Background="#0A0A0A" BorderThickness="0" MinHeight="60" MaxHeight="150"
+                                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                                     Text="Nenhuma operação executada ainda." Margin="0,8,0,0"/>
+                        </Grid>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- RIGHT SIDEBAR -->
+            <Border Grid.Column="1" Style="{StaticResource SubtleCardStyle}" Padding="15">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Como funciona" FontSize="15" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
+
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <Run FontWeight="Bold" Foreground="White">Passo 1 — Preparar WinPE</Run>
+                            <LineBreak/>
+                            Baixa e configura o ambiente WinPE offline.
+                        </TextBlock>
+
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <Run FontWeight="Bold" Foreground="White">Passo 2 — Carregar ISO</Run>
+                            <LineBreak/>
+                            Selecione o ISO do Windows que será instalado.
+                        </TextBlock>
+
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <Run FontWeight="Bold" Foreground="White">Passo 3 — Mover Dados</Run>
+                            <LineBreak/>
+                            WinPE move Users, ProgramData, registry para C:\!
+                            e aplica o Windows novo via DISM.
+                        </TextBlock>
+
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <Run FontWeight="Bold" Foreground="White">Passo 4 — Merge Registry</Run>
+                            <LineBreak/>
+                            Se ativado, mescla o registry antigo com o novo
+                            para preservar programas instalados.
+                        </TextBlock>
+
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <Run FontWeight="Bold" Foreground="White">Passo 5 — Restaurar + Reboot</Run>
+                            <LineBreak/>
+                            Dados são devolvidos e o PC reinicia no Windows novo
+                            com tudo preservado.
+                        </TextBlock>
+
+                        <Separator Background="#222" Margin="0,0,0,8"/>
+
+                        <TextBlock Text="Estratégias" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" FontSize="11" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,4">
+                            <Run FontWeight="Bold" Foreground="#88FF88">A — Segura:</Run> Users, dados, drivers.
+                            <LineBreak/>
+                            <Run FontWeight="Bold" Foreground="#FFAA44">B — Registry HKCU:</Run> Personalização, WiFi, bookmarks.
+                            <LineBreak/>
+                            <Run FontWeight="Bold" Foreground="#FF6644">C — Completa:</Run> Tudo + Program Files + merge registry.
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- STATUS BAR -->
+        <Border Grid.Row="2" Margin="0,8,0,0">
+            <TextBlock x:Name="TxtStatusBar" Text="Pronto" Foreground="#888" FontSize="11"/>
+        </Border>
+
+        <!-- BUSY OVERLAY -->
+        <Grid x:Name="OverlayBusy" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15"
+                    Width="650" MaxHeight="500" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" x:Name="TxtOpTitle" Text="EXECUTANDO" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10" HorizontalAlignment="Center"/>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="320" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock x:Name="TxtOpDesc" Text="Aguarde..." Foreground="White" FontSize="12" FontFamily="Consolas" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                            <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{StaticResource AccentColor}" Background="#1A1A1A" BorderThickness="0" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="TxtOpStatus" Text="Processando..." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap"/>
+                            <Border Background="#22FF3D00" BorderBrush="#88FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,10,0,0">
+                                <TextBlock Text="ACAO CRITICA: NAO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="2" x:Name="PanelOpFooter" Orientation="Horizontal" HorizontalAlignment="Center" Visibility="Collapsed">
+                        <Button Content="FECHAR" Click="BtnCloseOverlay_Click" Style="{StaticResource GoldButtonStyle}" Width="160" Height="38"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- CONFIRM OVERLAY -->
+        <Grid x:Name="OverlayConfirm" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
+            <Border Background="{StaticResource CardBackground}" BorderBrush="#FFAA00" BorderThickness="1" CornerRadius="15"
+                    Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25">
+                <StackPanel>
+                    <TextBlock Text="⚠️ CONFIRMAR OPERAÇÃO" FontSize="18" FontWeight="Bold" Foreground="#FFAA44" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="TxtConfirmSummary" Text="" Foreground="White" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                    <Border Background="#11FF3D00" BorderBrush="#33FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,12">
+                        <TextBlock Text="O WinPE será acionado e o PC será reiniciado. Esta operação substitui o Windows atual." Foreground="#FFAA44" FontSize="10" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <CheckBox x:Name="ChkConfirm" Content="Sim, eu entendi. Quero continuar." Foreground="#FFAA44" FontSize="11" Margin="0,0,0,12" Checked="ChkConfirm_Checked" Unchecked="ChkConfirm_Unchecked"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="CANCELAR" Click="BtnCancelConfirm_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="36" Margin="0,0,10,0"/>
+                        <Button x:Name="BtnConfirmGo" Content="INICIAR" Click="BtnConfirmGo_Click"
+                                Style="{StaticResource GreenButtonStyle}" Width="160" Height="38" FontWeight="Bold" IsEnabled="False"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

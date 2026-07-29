@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -135,6 +135,8 @@ namespace KitLugia.GUI.Pages
         private void BtnGoToGames_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Windows);
         private void BtnGoToWinTune_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.WinTune);
         private void BtnGoToShrink_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Shrink);
+        private void BtnGoToWinpeTools_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.WinpeTools);
+        private void BtnGoToReinstallPreserve_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.ReinstallPreserve);
         private void BtnGoToTools_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools);
         private void BtnGoToPowerPlans_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools, 0);
 
@@ -350,7 +352,7 @@ namespace KitLugia.GUI.Pages
                 ChkStartWithWindows.IsChecked = autoStart;
                 ChkCrAutoStart.IsChecked = autoStart;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
 
@@ -392,7 +394,7 @@ namespace KitLugia.GUI.Pages
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void BtnCancelQuickMenu_Click(object sender, RoutedEventArgs e)
@@ -414,7 +416,7 @@ namespace KitLugia.GUI.Pages
 
                 if (CmbGpu.Items.Count > 0) CmbGpu.SelectedIndex = 0;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private async void BtnApplyCustomOptimization_Click(object sender, RoutedEventArgs e)
@@ -542,7 +544,7 @@ namespace KitLugia.GUI.Pages
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             var customOption = new ComboBoxItem { Content = "⚙️ Personalizar...", Tag = "custom", Foreground = System.Windows.Media.Brushes.Gold };
             CmbGameEngine.Items.Add(customOption);
@@ -637,7 +639,7 @@ namespace KitLugia.GUI.Pages
                     KitLugia.Core.Logger.Log($"🎮 Dashboard: GameBoost {(ChkGameBoost.IsChecked == true ? "ativado" : "desativado")}");
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         // Lógica compartilhada de execução

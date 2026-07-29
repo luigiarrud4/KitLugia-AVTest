@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -47,7 +47,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     });
                 });
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -74,7 +74,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
                 await RefreshStatus();
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 

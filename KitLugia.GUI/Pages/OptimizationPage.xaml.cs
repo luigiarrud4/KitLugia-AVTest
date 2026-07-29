@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -343,7 +343,7 @@ namespace KitLugia.GUI.Pages
                 System.Threading.Thread.Sleep(100);
                 return counter.NextValue();
             }
-            catch { return 0; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
 
         private void ShowResult(string message)

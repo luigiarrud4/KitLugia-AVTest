@@ -129,7 +129,7 @@ namespace KitLugia.Core
                 using var proc = Process.GetProcessById(pid);
                 SetProcessWorkingSetSize(proc.Handle, (IntPtr)(-1), (IntPtr)(-1));
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static (bool Success, string Message) Optimize() => Optimize(CleaningMode.Normal);
@@ -182,11 +182,11 @@ namespace KitLugia.Core
                             {
                                 SetProcessWorkingSetSize(proc.Handle, (IntPtr)(-1), (IntPtr)(-1));
                             }
-                            catch { }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                             finally { proc.Dispose(); }
                         }
                     }
-                    catch { }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
                 string[] modeNames = { "Leve", "Normal", "Alta", "Bruta" };

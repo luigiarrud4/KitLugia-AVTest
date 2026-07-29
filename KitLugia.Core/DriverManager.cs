@@ -183,14 +183,14 @@ namespace KitLugia.Core
                 var result = InstallDriversFromFolder(tempFolder);
 
                 // Limpeza
-                try { Directory.Delete(tempFolder, true); } catch { }
+                try { Directory.Delete(tempFolder, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 return result;
             }
             catch (Exception ex)
             {
                 Logger.LogError("SmartInstall", ex.Message);
-                try { if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true); } catch { }
+                try { if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 return (false, $"Erro na extração: {ex.Message}");
             }
         }
@@ -380,7 +380,7 @@ namespace KitLugia.Core
                 Logger.Log("Abrindo configurações do Windows Update...");
                 Process.Start(new ProcessStartInfo("ms-settings:windowsupdate-action") { UseShellExecute = true });
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public static void ExportDriverListToTxt(string filePath)

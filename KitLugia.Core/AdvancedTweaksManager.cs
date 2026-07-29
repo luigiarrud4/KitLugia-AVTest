@@ -34,7 +34,7 @@ namespace KitLugia.Core
                     using var key = Registry.LocalMachine.OpenSubKey(regPath.Replace("HKEY_LOCAL_MACHINE\\", ""));
                     pnpDeviceId = key?.GetValue("MatchingDeviceId")?.ToString() ?? string.Empty;
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
             // Se não conseguirmos o ID do dispositivo, não podemos prosseguir.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -293,7 +293,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     UpdateBackupStatus(bk, bt);
                 });
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -366,7 +366,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     UpdateQuickAddStates();
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -612,7 +612,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowSuccess("BACKUP", "Backup salvo com sucesso.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -635,7 +635,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
                 await LoadAll();
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -661,7 +661,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                         UpdateQuickAddStates();
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 finally { _isLoading = false; }
             }
         }
@@ -689,7 +689,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 await LoadAll();
                 UpdateQuickAddStates();
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
     }

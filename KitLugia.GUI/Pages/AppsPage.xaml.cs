@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -832,10 +832,7 @@ namespace KitLugia.GUI.Pages
 
                 return null;
             }
-            catch
-            {
-                return null;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         private void TxtSearchPrograms_TextChanged(object sender, TextChangedEventArgs e)
@@ -2068,7 +2065,7 @@ namespace KitLugia.GUI.Pages
             bool ok = BrowserExtensionManager.ImportExtensions(dlg.SelectedPath, target);
             if (ok)
             {
-                try { BrowserExtensionManager.RegisterExtensionsViaCdpPipe(target); } catch { }
+                try { BrowserExtensionManager.RegisterExtensionsViaCdpPipe(target); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             MessageBox.Show(ok
                 ? $"Extensões importadas para {target} com sucesso!"
@@ -2138,7 +2135,7 @@ namespace KitLugia.GUI.Pages
                 if (Directory.Exists(ext.SourcePath))
                     Directory.Delete(ext.SourcePath, true);
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             var current = ExtensionsList.ItemsSource as IList<ExtensionInfo>;
             if (current != null)

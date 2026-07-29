@@ -451,6 +451,16 @@
                     ToolTip="Reduzir partição e criar ambiente de recuperação UEFI com rEFInd + Alpine"
                     Click="BtnGoToShrink_Click"/>
 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F9F0;"
+                    Content="WinPE Tools (Partition Shrink)"
+                    ToolTip="Operações de partição via WinPE — shrink sem limitações do Windows ativo"
+                    Click="BtnGoToWinpeTools_Click"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F504;"
+                    Content="Fresh Install + Preservação de Dados"
+                    ToolTip="Instalar Windows novo via WinPE preservando perfis, programas e registry (Estratégia C)"
+                    Click="BtnGoToReinstallPreserve_Click"/>
+
             </StackPanel>
         </ScrollViewer>
 

@@ -257,10 +257,7 @@ namespace KitLugia.Core
                 var rssValue = Registry.GetValue(tcpParams, "EnableRSS", 0);
                 return Convert.ToInt32(rssValue) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -275,10 +272,7 @@ namespace KitLugia.Core
                 var taskOffloadValue = Registry.GetValue(tcpParams, "EnableTaskOffload", 1);
                 return Convert.ToInt32(taskOffloadValue) == 1;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -293,10 +287,7 @@ namespace KitLugia.Core
                 var congestionProvider = Registry.GetValue(tcpParams, "CongestionProvider", "")?.ToString();
                 return congestionProvider?.ToLower() == "ctcp";
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -337,10 +328,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
             return false;
         }
 
@@ -390,10 +378,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
             return false;
         }
 
@@ -497,10 +482,7 @@ namespace KitLugia.Core
                 // Se algum valor estiver definido, considera que tweaks estão aplicados
                 return tcp1323Opts != null || maxUserPort != null || tcpTimedWaitDelay != null || sizReqBuf != null;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -770,13 +752,13 @@ namespace KitLugia.Core
         {
             var steps = new List<string>();
 
-            try { SystemUtils.RunExternalProcess("ipconfig", "/flushdns", hidden: true); steps.Add("Cache DNS limpo"); } catch { }
-            try { SystemUtils.RunExternalProcess("netsh", "winsock reset", hidden: true); steps.Add("Winsock resetado"); } catch { }
-            try { SystemUtils.RunExternalProcess("netsh", "int ip reset", hidden: true); steps.Add("TCP/IP resetado"); } catch { }
-            try { SystemUtils.RunExternalProcess("arp", "-d *", hidden: true); steps.Add("Tabela ARP esvaziada"); } catch { }
-            try { SystemUtils.RunExternalProcess("netsh", "winhttp reset proxy", hidden: true); steps.Add("Proxy winhttp resetado"); } catch { }
-            try { SystemUtils.RunExternalProcess("cmdkey", "/list", hidden: true); SystemUtils.RunExternalProcess("cmdkey", "/delete:*", hidden: true); steps.Add("Credenciais de rede limpas"); } catch { }
-            try { SystemUtils.RunExternalProcess("certutil", "-urlcache * delete", hidden: true); steps.Add("Cache SSL limpo"); } catch { }
+            try { SystemUtils.RunExternalProcess("ipconfig", "/flushdns", hidden: true); steps.Add("Cache DNS limpo"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { SystemUtils.RunExternalProcess("netsh", "winsock reset", hidden: true); steps.Add("Winsock resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { SystemUtils.RunExternalProcess("netsh", "int ip reset", hidden: true); steps.Add("TCP/IP resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { SystemUtils.RunExternalProcess("arp", "-d *", hidden: true); steps.Add("Tabela ARP esvaziada"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { SystemUtils.RunExternalProcess("netsh", "winhttp reset proxy", hidden: true); steps.Add("Proxy winhttp resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { SystemUtils.RunExternalProcess("cmdkey", "/list", hidden: true); SystemUtils.RunExternalProcess("cmdkey", "/delete:*", hidden: true); steps.Add("Credenciais de rede limpas"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { SystemUtils.RunExternalProcess("certutil", "-urlcache * delete", hidden: true); steps.Add("Cache SSL limpo"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return "✓ " + string.Join("\n✓ ", steps);
         }
@@ -786,8 +768,8 @@ namespace KitLugia.Core
             var safe = CleanNetworkSafe();
             var steps = new List<string>(safe.Split('\n').Select(l => l.TrimStart('✓', ' ')).Where(l => l.Length > 0));
 
-            try { SystemUtils.RunExternalProcess("netsh", "advfirewall reset", hidden: true); steps.Add("Firewall resetado"); } catch { }
-            try { SystemUtils.RunExternalProcess("netsh", "advfirewall set allprofiles state on", hidden: true); steps.Add("Firewall reativado"); } catch { }
+            try { SystemUtils.RunExternalProcess("netsh", "advfirewall reset", hidden: true); steps.Add("Firewall resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { SystemUtils.RunExternalProcess("netsh", "advfirewall set allprofiles state on", hidden: true); steps.Add("Firewall reativado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return "✓ " + string.Join("\n✓ ", steps);
         }

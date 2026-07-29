@@ -102,7 +102,7 @@ namespace KitLugia.GUI.Services
                     _ = PerformIntelligentCleanup();
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -141,10 +141,7 @@ namespace KitLugia.GUI.Services
 
                 return (before, after, freed);
             }
-            catch
-            {
-                return (before, before, 0);
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return (before, before, 0); }
         }
 
         // Mantém o método antigo para compatibilidade (chama o novo)
@@ -177,7 +174,7 @@ namespace KitLugia.GUI.Services
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return pages;
         }
@@ -199,7 +196,7 @@ namespace KitLugia.GUI.Services
                     FindPagesInVisualTree(child, pages);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -218,7 +215,7 @@ namespace KitLugia.GUI.Services
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -230,10 +227,7 @@ namespace KitLugia.GUI.Services
             {
                 return page.IsVisible;
             }
-            catch
-            {
-                return false;
-            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         /// <summary>
@@ -270,7 +264,7 @@ namespace KitLugia.GUI.Services
                         GCSettings.LatencyMode = oldMode;
                     }
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
         }
         

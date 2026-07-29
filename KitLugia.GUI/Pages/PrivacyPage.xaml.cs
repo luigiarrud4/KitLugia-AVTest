@@ -1,4 +1,4 @@
-using KitLugia.Core;
+﻿using KitLugia.Core;
 using KitLugia.GUI.Services;
 using System;
 using System.Collections.Generic;
@@ -491,9 +491,9 @@ namespace KitLugia.GUI.Pages
                     // Aplica mudança em background
                     var model = _model;
                     if (value)
-                        Task.Run(() => { try { OOShutUpManager.ApplyPrivacySetting(model); } catch { } });
+                        Task.Run(() => { try { OOShutUpManager.ApplyPrivacySetting(model); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } });
                     else
-                        Task.Run(() => { try { OOShutUpManager.RevertPrivacySetting(model); } catch { } });
+                        Task.Run(() => { try { OOShutUpManager.RevertPrivacySetting(model); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } });
 
                     _refreshCallback?.Invoke();
                     _categoryRefreshCallback?.Invoke();
@@ -507,7 +507,7 @@ namespace KitLugia.GUI.Pages
         public bool CheckRegistryState()
         {
             try { return OOShutUpManager.IsPrivacySettingApplied(_model); }
-            catch { return _isEnabled; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return _isEnabled; }
         }
 
         public void Refresh()

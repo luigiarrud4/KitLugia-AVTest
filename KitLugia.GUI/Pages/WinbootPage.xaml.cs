@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -86,7 +86,7 @@ namespace KitLugia.GUI.Pages
                 int recommendedIndex = profiles.FindIndex(p => p.IsRecommended);
                 ComboAutomationProfiles.SelectedIndex = recommendedIndex >= 0 ? recommendedIndex : 0;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void ComboAutomationProfiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -560,6 +560,44 @@ namespace KitLugia.GUI.Pages
             {
                 System.Windows.MessageBox.Show("Selecione uma partição de origem.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
+            }
+
+            // Verificação prévia de espaço
+            var selPart = ComboPartitions.SelectedItem as PartitionInfo;
+            if (selPart != null)
+            {
+                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
+                int requiredMb = requiredGb * 1024;
+                long freeMb = (long)(selPart.FreeSpace / (1024L * 1024));
+                string selDrive = selPart.DriveLetter.Replace(":", "");
+                string sysDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
+
+                bool isSystemDrive = selDrive.Equals(sysDrive, StringComparison.OrdinalIgnoreCase);
+
+                if (isSystemDrive || freeMb < requiredMb * 2)
+                {
+                    string msg = isSystemDrive
+                        ? $"⚠️ A partição selecionada ({selPart.DriveLetter}) é a partição do sistema.\n\n" +
+                          $"O Windows não permite reduzir a partição do sistema enquanto está em uso.\n" +
+                          $"É necessário usar o Shrink via WinPE (boot externo)."
+                        : $"⚠️ A partição {selPart.DriveLetter} pode não ter espaço contíguo suficiente.\n" +
+                          $"Livre: {freeMb / 1024} GB | Necessário: ~{requiredGb} GB\n\n" +
+                          $"O shrink normal pode falhar. Recomenda-se usar o Shrink via WinPE primeiro.";
+
+                    var choice = System.Windows.MessageBox.Show(
+                        $"{msg}\n\n" +
+                        $"Deseja abrir a ferramenta WinPE Shrink agora?\n" +
+                        $"(Após concluir o shrink, volte aqui para criar o boot.)",
+                        "Espaço Insuficiente",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+
+                    if (choice == MessageBoxResult.Yes)
+                    {
+                        (Window.GetWindow(this) as MainWindow)?.NavigateToPage(PageType.WinpeTools);
+                        return;
+                    }
+                }
             }
 
             try

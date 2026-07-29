@@ -41,7 +41,7 @@ namespace KitLugia.Core
                 // TODO: Implementar consulta WMI para MSStorageDriver_FailurePredictStatus
                 return true; 
             }
-            catch { return true; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return true; }
         }
 
         private static bool VerifyFileSystem(string drive)
@@ -52,7 +52,7 @@ namespace KitLugia.Core
                 string output = SystemUtils.RunExternalProcess("chkdsk", drive.Substring(0, 2), true);
                 return !output.Contains("detected problems") && !output.Contains("erros");
             }
-            catch { return false; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         private static long GetFreeSpaceBytes(string drive)
@@ -62,7 +62,7 @@ namespace KitLugia.Core
                 var dInfo = new DriveInfo(drive.Substring(0, 1));
                 return dInfo.AvailableFreeSpace;
             }
-            catch { return 0; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
         }
     }
 }

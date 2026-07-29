@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -155,7 +155,7 @@ namespace KitLugia.Core
         private void WorkerLoop()
         {
             try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High; }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             QueryPerformanceCounter(out long prevCounter);
             Thread.SpinWait(1000);
@@ -328,12 +328,12 @@ namespace KitLugia.Core
                     .Where(p =>
                     {
                         try { return p.TotalProcessorTime.TotalMilliseconds > 0 && p.Id != 0 && p.SessionId != 0; }
-                        catch { return false; }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
                     })
                     .OrderByDescending(p =>
                     {
                         try { return p.TotalProcessorTime.TotalMilliseconds; }
-                        catch { return 0.0; }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0.0; }
                     })
                     .Take(3)
                     .ToList();
@@ -365,11 +365,11 @@ namespace KitLugia.Core
                     finally
                     {
                         foreach (var p in sorted)
-                            try { p.Dispose(); } catch { }
+                            try { p.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public string[] GetRecommendations()
@@ -555,11 +555,11 @@ namespace KitLugia.Core
                     }
                     finally
                     {
-                        foreach (var p in procs) try { p.Dispose(); } catch { }
+                        foreach (var p in procs) try { p.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         private void SampleAudiodg()
@@ -588,7 +588,7 @@ namespace KitLugia.Core
                     }
                     finally
                     {
-                        foreach (var p in procs) try { p.Dispose(); } catch { }
+                        foreach (var p in procs) try { p.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
 
@@ -599,7 +599,7 @@ namespace KitLugia.Core
                     _audiodgMb = mb;
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public void RunDiagnostics()
@@ -630,7 +630,7 @@ namespace KitLugia.Core
 
                 _diagnosticsRun = true;
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         public void ClearHistory()

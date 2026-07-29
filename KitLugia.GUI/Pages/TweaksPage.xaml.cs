@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Threading.Tasks;
@@ -762,7 +762,7 @@ namespace KitLugia.GUI.Pages
                 var val = key.GetValue(valueName);
                 return val is int i ? i : defaultValue;
             }
-            catch { return defaultValue; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return defaultValue; }
         }
 
         private static int ReadRegDwordHive(RegistryHive hive, string subKey, string valueName, int defaultValue = 0)
@@ -775,7 +775,7 @@ namespace KitLugia.GUI.Pages
                 var val = key.GetValue(valueName);
                 return val is int i ? i : defaultValue;
             }
-            catch { return defaultValue; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return defaultValue; }
         }
 
         private static string? ReadRegString(string keyPath, string valueName)
@@ -787,7 +787,7 @@ namespace KitLugia.GUI.Pages
                 var val = key.GetValue(valueName);
                 return val?.ToString();
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         private static string? ReadRegStringHive(RegistryHive hive, string subKey, string valueName)
@@ -800,7 +800,7 @@ namespace KitLugia.GUI.Pages
                 var val = key.GetValue(valueName);
                 return val?.ToString();
             }
-            catch { return null; }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
         private static bool IsSmartScreenSystemDisabled()
@@ -905,15 +905,15 @@ namespace KitLugia.GUI.Pages
                     Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System",
                         "EnableSmartScreen", 1, RegistryValueKind.DWord);
                     using (var expKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Explorer"))
-                        try { expKey?.DeleteValue("SmartScreenEnabled", false); } catch { }
+                        try { expKey?.DeleteValue("SmartScreenEnabled", false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     using (var appKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\AppHost"))
                         appKey?.SetValue("EnableWebContentEvaluation", 1, RegistryValueKind.DWord);
                     Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\MicrosoftEdge\PhishingFilter",
                         "EnabledV9", 1, RegistryValueKind.DWord);
                     using (var attKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Attachments"))
-                        try { attKey?.DeleteValue("SaveZoneInformation", false); } catch { }
+                        try { attKey?.DeleteValue("SaveZoneInformation", false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     using (var defKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows Defender\Spynet"))
-                        try { defKey?.DeleteValue("SpynetReporting", false); } catch { }
+                        try { defKey?.DeleteValue("SpynetReporting", false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             });
             ChkSmartScreenSystem.IsEnabled = true;
@@ -949,11 +949,11 @@ namespace KitLugia.GUI.Pages
                     expKey?.DeleteValue("SmartScreenEnabled", false);
                     using (var attKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Attachments"))
                     {
-                        try { attKey?.DeleteValue("SaveZoneInformation", false); } catch { }
-                        try { attKey?.DeleteValue("ScanWithAntiVirus", false); } catch { }
+                        try { attKey?.DeleteValue("SaveZoneInformation", false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        try { attKey?.DeleteValue("ScanWithAntiVirus", false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                     using (var attKey2 = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Policies\Attachments"))
-                        try { attKey2?.DeleteValue("ScanWithAntiVirus", false); } catch { }
+                        try { attKey2?.DeleteValue("ScanWithAntiVirus", false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             });
             ChkSmartScreenExplorer.IsEnabled = true;
@@ -1172,7 +1172,7 @@ namespace KitLugia.GUI.Pages
                             ? $"VRAM ajustada em {gpuName}"
                             : $"VRAM removida de {gpuName}");
                 }
-                catch { }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 finally { _isLoading = false; }
             }
         }
@@ -1194,7 +1194,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "FrameQueueMode: Low Latency" : "FrameQueueMode: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1214,7 +1214,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "Preempção de GPU ativada" : "Preempção de GPU: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1234,7 +1234,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "GPU Idle desativado" : "GPU Idle: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1254,7 +1254,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "GPU Power Latency: Priorizar Latência" : "GPU Power Latency: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1285,7 +1285,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("CACHE CPU", targetActive ? "Cache L2/L3 configurado conforme sua CPU." : "Cache L2/L3 restaurado para padrão.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1312,7 +1312,7 @@ namespace KitLugia.GUI.Pages
                         mw.ShowInfo("NAGLE", result.Message);
                 }
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1343,7 +1343,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("CORE PARKING", targetActive ? "Core Parking desativado. Todos os núcleos permanecem ativos." : "Core Parking restaurado para padrão.");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1363,7 +1363,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "HAGS ativado (HwSchMode=2)" : "HAGS: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1383,7 +1383,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "TDR Delay aumentado para 10s" : "TDR Delay: Padrão (2s)");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1403,7 +1403,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("MEMÓRIA", targetActive ? "IoPageLockLimit=8192 KB" : "IoPageLockLimit: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1423,7 +1423,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("INPUT", targetActive ? "Fila de input aumentada para 200" : "Fila de input: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1443,7 +1443,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "Startup delay removido (0ms)" : "Startup delay: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1463,7 +1463,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "Fast Startup desativado (desligamento completo)" : "Fast Startup: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1483,7 +1483,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "Boot menu timeout: 0s" : "Boot menu timeout: 30s");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1503,7 +1503,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "NumLock ativado na inicialização" : "NumLock desativado na inicialização");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1523,7 +1523,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "WaitToKillService: 2s" : "WaitToKillService: Padrão (5s)");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1543,7 +1543,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "Quick App Kill: Ativado" : "Quick App Kill: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1563,7 +1563,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "Limpeza de PageFile: Desativada" : "Limpeza de PageFile: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1583,7 +1583,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "VerboseStatus: Ativado (mensagens detalhadas)" : "VerboseStatus: Oculto");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1603,7 +1603,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("INTERFACE", targetActive ? "MenuShowDelay: 0ms (instantâneo)" : "MenuShowDelay: Padrão (400ms)");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1623,7 +1623,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("INTERFACE", targetActive ? "Animações visuais: Desativadas" : "Animações visuais: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1639,7 +1639,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("EXPLORER", $"Explorer abre em: {label}");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1659,7 +1659,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("EXPLORER", targetActive ? "Cache de ícones: 8192 KB" : "Cache de ícones: Padrão");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
 
@@ -1679,7 +1679,7 @@ namespace KitLugia.GUI.Pages
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SISTEMA", targetActive ? "PCA: Desativado" : "PCA: Ativo (padrão)");
             }
-            catch { }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
         }
     }
