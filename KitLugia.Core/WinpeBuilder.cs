@@ -117,39 +117,25 @@ namespace KitLugia.Core
             AddIfNotEmpty(dirs, Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location));
             try { AddIfNotEmpty(dirs, Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory)?.FullName); } catch { }
 
-            Log($"[DIAG] FindBundledWimlib: {string.Join(", ", dirs)}");
-
             foreach (var d in dirs)
             {
-                string p = Path.Combine(d, "Resources", "App", "Wimlib", "wimlib-imagex.exe");
-                Log($"[DIAG]   trying: {p} => {File.Exists(p)}");
-                if (File.Exists(p)) return p;
+                string path = Path.Combine(d, "Resources", "App", "Wimlib", "wimlib-imagex.exe");
+                if (File.Exists(path)) return path;
             }
             foreach (var d in dirs)
             {
-                string p = Path.Combine(d, "wimlib-imagex.exe");
-                Log($"[DIAG]   trying (bare): {p} => {File.Exists(p)}");
-                if (File.Exists(p)) return p;
+                string path = Path.Combine(d, "wimlib-imagex.exe");
+                if (File.Exists(path)) return path;
             }
-
-            Log("[DIAG]   --- not found in any path, starting recursive search ---");
             foreach (var d in dirs)
             {
                 try
                 {
                     foreach (var f in Directory.EnumerateFiles(d, "wimlib-imagex.exe", SearchOption.AllDirectories))
-                    {
-                        Log($"[DIAG]   recursive FOUND: {f}");
                         return f;
-                    }
                 }
-                catch (Exception ex)
-                {
-                    Log($"[DIAG]   recursive error in {d}: {ex.Message}");
-                }
+                catch { }
             }
-
-            Log("[DIAG]   FAILED: wimlib-imagex.exe not found anywhere");
             return null;
         }
 
@@ -487,7 +473,7 @@ namespace KitLugia.Core
 
                 ReportProgress(10, $"Montando {wimPath} em {mountDir}...");
                 var (code1, out1) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
+                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" ", 180000);
                 sb.AppendLine(out1);
                 if (code1 != 0 && !out1.Contains("already mounted") && !out1.Contains("remotely"))
                     return (false, $"Falha ao montar WIM (código {code1}): {out1}");
@@ -570,7 +556,7 @@ namespace KitLugia.Core
                 Directory.CreateDirectory(mountDir);
 
                 var (mntCode, mntOut) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
+                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" ", 180000);
                 if (mntCode != 0 && !mntOut.Contains("already mounted"))
                 {
                     Log($"Falha ao montar WIM para flat: {mntOut}");
@@ -628,7 +614,7 @@ namespace KitLugia.Core
                 Directory.CreateDirectory(mountDir);
 
                 var (mntCode, mntOut) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
+                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" ", 180000);
                 if (mntCode != 0 && !mntOut.Contains("already mounted"))
                 {
                     Log($"Falha ao montar WIM para {scriptName}: {mntOut}");
@@ -660,22 +646,61 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Monta o boot.wim e injeta shrink_config.ini na raiz (acessível como X:\shrink_config.ini no ramdisk).
+        /// Injetar shrink_config.ini na raiz do WIM. Tenta wimlib primeiro, depois DISM.
         /// </summary>
         public static async Task<bool> InjectConfigIntoWimAsync(string wimPath, string configContent)
+        {
+            string? wimlibExe = FindBundledWimlib();
+            if (wimlibExe != null)
+            {
+                string tmpDir = Path.Combine(WinpeCacheDir, "wimlib_cfg");
+                try
+                {
+                    if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
+                    Directory.CreateDirectory(tmpDir);
+
+                    string tmpFile = Path.Combine(tmpDir, "shrink_config.ini");
+                    await File.WriteAllTextAsync(tmpFile, configContent, Encoding.ASCII);
+
+                    Log("Usando wimlib-imagex para injetar shrink_config.ini na raiz do WIM...");
+                    string args = $"update \"{wimPath}\" 1"
+                        + $" --command=\"add {tmpFile} /shrink_config.ini\"";
+                    var (code, output) = await RunProcess(wimlibExe, args, 180000);
+                    if (code == 0)
+                    {
+                        Log("shrink_config.ini adicionado ao WIM via wimlib-imagex.");
+                        return true;
+                    }
+                    Log($"wimlib falhou para config ({code}), tentando DISM: {output.Trim()}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"wimlib exceção para config: {ex.Message}. Tentando DISM...");
+                }
+                finally
+                {
+                    try { if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true); } catch { }
+                }
+            }
+
+            // Fallback: DISM mount+commit
+            return await InjectConfigIntoWimDismAsync(wimPath, configContent);
+        }
+
+        private static async Task<bool> InjectConfigIntoWimDismAsync(string wimPath, string configContent)
         {
             string mountDir = Path.Combine(WinpeCacheDir, "mount_cfg");
             try
             {
                 if (Directory.Exists(mountDir))
                 {
-                    try { Directory.Delete(mountDir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    try { Directory.Delete(mountDir, true); } catch { }
                     await RunDism("dism.exe", "/Cleanup-Mountpoints", 30000);
                 }
                 Directory.CreateDirectory(mountDir);
 
                 var (mntCode, mntOut) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
+                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
                 if (mntCode != 0 && !mntOut.Contains("already mounted"))
                 {
                     Log($"Falha ao montar WIM para config: {mntOut}");
@@ -684,7 +709,7 @@ namespace KitLugia.Core
 
                 string cfgPath = Path.Combine(mountDir, "shrink_config.ini");
                 await File.WriteAllTextAsync(cfgPath, configContent, Encoding.ASCII);
-                Log($"shrink_config.ini injetado em boot.wim");
+                Log("shrink_config.ini injetado em boot.wim");
 
                 var (cmtCode, cmtOut) = await RunDism("dism.exe",
                     $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
@@ -699,16 +724,239 @@ namespace KitLugia.Core
             catch (Exception ex)
             {
                 Log($"Erro ao injetar config no boot.wim: {ex.Message}");
-                try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); } catch { }
                 return false;
             }
         }
 
         /// <summary>
-        /// Monta o boot.wim UMA ÚNICA VEZ e injeta TANTO startnet.cmd quanto shrink_config.ini.
+        /// Injetar diskpart.exe do host no WIM via wimlib (VALOS não inclui nativamente).
+        /// </summary>
+        public static async Task<bool> InjectDiskpartIntoWimAsync(string wimPath)
+        {
+            string hostDp = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "diskpart.exe");
+            if (!File.Exists(hostDp))
+            {
+                Log($"diskpart.exe não encontrado em {hostDp}");
+                return false;
+            }
+
+            string? wimlibExe = FindBundledWimlib();
+            if (wimlibExe == null)
+            {
+                Log("wimlib não disponível para injetar diskpart.exe");
+                return false;
+            }
+
+            Log($"Injetando diskpart.exe ({new FileInfo(hostDp).Length / 1024} KB) via wimlib...");
+            string args = $"update \"{wimPath}\" 1"
+                + $" --command=\"add {hostDp} /Windows/System32/diskpart.exe\"";
+
+            var (code, output) = await RunProcess(wimlibExe, args, 60000);
+            if (code == 0)
+                Log("diskpart.exe injetado no WIM com sucesso.");
+            else
+                Log($"Falha ao injetar diskpart.exe (código {code}): {output}");
+
+            return code == 0;
+        }
+
+        /// <summary>
+        /// Configura o registro offline do VALOS para executar startnet.valos.cmd.
+        /// Aciona tanto Winlogon Shell quanto SYSTEM\Setup\CmdLine para garantir
+        /// que o script rode independente do mecanismo de boot do VALOS.
+        /// </summary>
+        public static async Task<bool> ConfigureValosShellAsync(string wimPath)
+        {
+            string mountDir = Path.Combine(WinpeCacheDir, "mount_valos_shell");
+            try
+            {
+                if (Directory.Exists(mountDir))
+                {
+                    try { Directory.Delete(mountDir, true); } catch { }
+                    await RunDism("dism.exe", "/Cleanup-Mountpoints", 30000);
+                }
+                Directory.CreateDirectory(mountDir);
+
+                var (mntCode, mntOut) = await RunDism("dism.exe",
+                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
+                if (mntCode != 0 && !mntOut.Contains("already mounted"))
+                {
+                    Log($"Falha ao montar WIM para configurar shell VALOS: {mntOut}");
+                    return false;
+                }
+
+                string cmd = "cmd /k C:\\Windows\\System32\\startnet.valos.cmd";
+                string systemPath = Path.Combine(mountDir, "Windows", "System32", "config");
+
+                // ── SOFTWARE hive: Winlogon Shell ──
+                string swHive = Path.Combine(systemPath, "SOFTWARE");
+                if (File.Exists(swHive))
+                {
+                    Log("Carregando hive SOFTWARE para Winlogon Shell...");
+                    var (loadCode, loadOut) = await RunProcess("reg.exe",
+                        $"load HKLM\\VALOS_SW \"{swHive}\"", 30000);
+                    if (loadCode == 0)
+                    {
+                        var (addCode, addOut) = await RunProcess("reg.exe",
+                            "add \"HKLM\\VALOS_SW\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" "
+                            + $"/v Shell /t REG_SZ /d \"{cmd}\" /f", 30000);
+                        if (addCode == 0)
+                            Log("Winlogon Shell configurado.");
+                        else
+                            Log($"Aviso: Shell key falhou: {addOut}");
+
+                        await RunProcess("reg.exe", "unload HKLM\\VALOS_SW", 30000);
+                    }
+                    else
+                        Log($"Aviso: não foi possível carregar SOFTWARE hive: {loadOut}");
+                }
+
+                // ── SYSTEM hive: Setup\CmdLine (usado por winpeshl/winlogon no WinPE) ──
+                string sysHive = Path.Combine(systemPath, "SYSTEM");
+                if (File.Exists(sysHive))
+                {
+                    Log("Carregando hive SYSTEM para Setup\\CmdLine...");
+                    var (loadCode2, loadOut2) = await RunProcess("reg.exe",
+                        $"load HKLM\\VALOS_SYS \"{sysHive}\"", 30000);
+                    if (loadCode2 == 0)
+                    {
+                        // Diagnostico: valor atual
+                        var (qCode, qOut) = await RunProcess("reg.exe",
+                            "query \"HKLM\\VALOS_SYS\\Setup\" /v CmdLine", 15000);
+                        Log($"Setup\\CmdLine atual: {(qCode == 0 ? qOut.Trim() : "(não configurado)")}");
+
+                        // Define nosso script como CmdLine
+                        var (setCode, setOut) = await RunProcess("reg.exe",
+                            "add \"HKLM\\VALOS_SYS\\Setup\" "
+                            + $"/v CmdLine /t REG_SZ /d \"{cmd}\" /f", 30000);
+                        if (setCode == 0)
+                            Log("SYSTEM\\Setup\\CmdLine configurado como fallback.");
+                        else
+                            Log($"Aviso: Setup\\CmdLine falhou: {setOut}");
+
+                        await RunProcess("reg.exe", "unload HKLM\\VALOS_SYS", 30000);
+                    }
+                    else
+                        Log($"Aviso: não foi possível carregar SYSTEM hive: {loadOut2}");
+                }
+
+                var (cmtCode, cmtOut) = await RunDism("dism.exe",
+                    $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
+                if (cmtCode != 0)
+                {
+                    Log($"Falha ao commitar WIM: {cmtOut}");
+                    return false;
+                }
+
+                Log("Registro VALOS configurado (Winlogon Shell + SYSTEM\\Setup\\CmdLine).");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log($"Erro ao configurar registro VALOS: {ex.Message}");
+                try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); } catch { }
+                return false;
+            }
+        }
+
+        private const string WINXSHELL_URL = "https://github.com/luigiarrud4/KitLugia-WinPE/releases/download/v1.0/WinXShell.exe";
+        private static readonly string WINXSHELL_CACHE = @"C:\KL_WINPE\WinXShell.exe";
+
+        /// <summary>
+        /// Obtém WinXShell.exe: tenta local (vários paths), cache, depois download.
+        /// </summary>
+        public static async Task<string?> ResolveWinXShellAsync()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string[] candidates = [
+                // Caminho absoluto já conhecido
+                @"C:\KL_WINPE\WinXShell.exe",
+                // Projeto (debug): KitLugia.Core\bin\Debug\net10.0\ -> ..\..\..\..\KitLugia.WinPE\WinXShell\
+                Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "KitLugia.WinPE", "WinXShell", "WinXShell.exe")),
+                // Publicado: BaseDirectory\KitLugia.WinPE\WinXShell\
+                Path.Combine(baseDir, "KitLugia.WinPE", "WinXShell", "WinXShell.exe"),
+                // Alternate: BaseDirectory\Resources\WinXShell\
+                Path.Combine(baseDir, "Resources", "WinXShell", "WinXShell.exe"),
+            ];
+
+            foreach (var c in candidates)
+            {
+                var fi = new FileInfo(c);
+                if (fi.Exists && fi.Length > 100000)
+                {
+                    Log($"WinXShell encontrado: {fi.FullName} ({fi.Length / 1024} KB)");
+                    return fi.FullName;
+                }
+            }
+
+            Log("WinXShell não encontrado localmente. Tentando download...");
+            try
+            {
+                using var http = new HttpClient();
+                http.Timeout = TimeSpan.FromMinutes(5);
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("KitLugia/1.0");
+                using var resp = await http.GetAsync(WINXSHELL_URL,
+                    HttpCompletionOption.ResponseHeadersRead);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    Log($"Falha no download WinXShell (HTTP {resp.StatusCode})");
+                    return null;
+                }
+
+                string dest = Path.Combine(WinpeCacheDir, "WinXShell.exe");
+                var dir = Path.GetDirectoryName(dest);
+                if (dir != null) Directory.CreateDirectory(dir);
+
+                await using var fs = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
+                await using var stream = await resp.Content.ReadAsStreamAsync();
+                await stream.CopyToAsync(fs);
+                Log($"WinXShell baixado: {dest} ({new FileInfo(dest).Length / 1024} KB)");
+                return dest;
+            }
+            catch (Exception ex)
+            {
+                Log($"Erro ao baixar WinXShell: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Injeta WinXShell.exe no WIM via wimlib.
+        /// </summary>
+        public static async Task<bool> InjectWinXShellIntoWimAsync(string wimPath)
+        {
+            string? src = await ResolveWinXShellAsync();
+            if (src == null)
+            {
+                Log("WinXShell não disponível. Pulando injeção.");
+                return false;
+            }
+
+            string? wimlibExe = FindBundledWimlib();
+            if (wimlibExe == null)
+            {
+                Log("wimlib não disponível para injetar WinXShell.");
+                return false;
+            }
+
+            Log($"Injetando WinXShell.exe no WIM...");
+            string args = $"update \"{wimPath}\" 1"
+                + $" --command=\"add {src} /Windows/System32/WinXShell.exe\"";
+            var (code, output) = await RunProcess(wimlibExe, args, 60000);
+            if (code == 0)
+                Log("WinXShell.exe injetado no WIM com sucesso.");
+            else
+                Log($"Falha ao injetar WinXShell (código {code}): {output}");
+
+            return code == 0;
+        }
+
+        /// <summary>
+        /// Monta o boot.wim UMA ÚNICA VEZ e injeta script + shrink_config.ini.
         /// Evita duas montagens/commits separados para o mesmo WIM.
         /// </summary>
-        public static async Task<bool> InjectBootFilesIntoWimAsync(string wimPath, string startnetContent, string configContent)
+        public static async Task<bool> InjectBootFilesIntoWimAsync(string wimPath, string startnetContent, string configContent, string scriptName = "startnet.cmd")
         {
             string mountDir = Path.Combine(WinpeCacheDir, "mount_cfg");
             try
@@ -721,24 +969,24 @@ namespace KitLugia.Core
                 Directory.CreateDirectory(mountDir);
 
                 var (mntCode, mntOut) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
+                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" ", 180000);
                 if (mntCode != 0 && !mntOut.Contains("already mounted"))
                 {
                     Log($"Falha ao montar WIM para boot files: {mntOut}");
                     return false;
                 }
 
-                // startnet.cmd
+                // Script
                 string system32 = Path.Combine(mountDir, "Windows", "System32");
                 Directory.CreateDirectory(system32);
-                string startnetPath = Path.Combine(system32, "startnet.cmd");
+                string startnetPath = Path.Combine(system32, scriptName);
                 await File.WriteAllTextAsync(startnetPath, startnetContent, Encoding.ASCII);
 
                 // shrink_config.ini
                 string cfgPath = Path.Combine(mountDir, "shrink_config.ini");
                 await File.WriteAllTextAsync(cfgPath, configContent, Encoding.ASCII);
 
-                Log($"startnet.cmd + shrink_config.ini injetados em boot.wim (1 montagem)");
+                Log($"{scriptName} + shrink_config.ini injetados em boot.wim (1 montagem)");
 
                 var (cmtCode, cmtOut) = await RunDism("dism.exe",
                     $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
@@ -1260,7 +1508,7 @@ namespace KitLugia.Core
                 // Montar
                 sb.AppendLine("Montando boot.wim...");
                 var (code1, out1) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{bootWim}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 120000);
+                    $"/Mount-Image /ImageFile:\"{bootWim}\" /index:1 /MountDir:\"{mountDir}\" ", 120000);
                 sb.AppendLine(out1);
                 if (code1 != 0 && !out1.Contains("remotely"))
                     return (false, $"Falha ao montar WIM (código {code1})");
@@ -1557,7 +1805,7 @@ namespace KitLugia.Core
 
             try { File.Delete(tmpScript); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-            if (code == 0 && output.Contains("Successfully updated WIM"))
+            if (code == 0)
             {
                 Log($"{scriptName} adicionado ao WIM via wimlib-imagex com sucesso.");
                 return true;
@@ -1611,7 +1859,7 @@ namespace KitLugia.Core
             // Limpeza
             try { File.Delete(tmpStartnet); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-            if (code == 0 && output.Contains("Successfully updated WIM"))
+            if (code == 0)
             {
                 Log("boot.wim atualizado via wimlib-imagex com sucesso.");
                 return true;

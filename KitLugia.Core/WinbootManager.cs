@@ -5093,8 +5093,29 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 bool wimlibOk = await WinpeBuilder.UpdateWimWithScriptAsync(
                     wimPath, valosContent, "startnet.valos.cmd");
 
+                // 3b. Substituir startnet.cmd por bridge que chama startnet.valos.cmd
+                Log("[3a/5] Substituindo startnet.cmd (bridge para startnet.valos.cmd)...");
+                string bridgeContent = @"@echo off
+if exist X:\Windows\System32\startnet.valos.cmd (
+    call X:\Windows\System32\startnet.valos.cmd
+    goto :end
+)
+if exist C:\Windows\System32\startnet.valos.cmd (
+    call C:\Windows\System32\startnet.valos.cmd
+    goto :end
+)
+echo startnet.valos.cmd nao encontrado. KitLugia nao configurado.
+echo Execute 'PREPARAR VALIDATION OS' novamente.
+:end";
+                await WinpeBuilder.UpdateWimWithScriptAsync(
+                    wimPath, bridgeContent, "startnet.cmd");
+
+                // 3b. Injetar diskpart.exe (VALOS não inclui nativamente)
+                Log("[3b/5] Injetando diskpart.exe no WIM...");
+                await WinpeBuilder.InjectDiskpartIntoWimAsync(wimPath);
+
                 // 4. Adicionar suporte WPF (só via DISM, se encontrarmos o CAB)
-                Log("[3b/5] Verificando suporte WPF (Microsoft-WinVOS-WPF-Support)...");
+                Log("[3c/5] Verificando suporte WPF (Microsoft-WinVOS-WPF-Support)...");
                 ct.ThrowIfCancellationRequested();
 
                 string[] cabSearchPaths = [
@@ -5127,7 +5148,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                         Directory.CreateDirectory(mountDir);
 
                         var (mntCode, mntOut) = await RunProcessCaptured("dism.exe",
-                            $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
+                            $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
                         if (mntCode == 0 || mntOut.Contains("already mounted"))
                         {
                             Log($"Adicionando pacote WPF: {wpfCab}");
@@ -5186,7 +5207,7 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                         Directory.CreateDirectory(mountDir);
 
                         var (mntCode, mntOutStr) = await RunProcessCaptured("dism.exe",
-                            $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
+                            $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
                         if (mntCode == 0 || mntOutStr.Contains("already mounted"))
                         {
                             var (pkgCode, _) = await RunProcessCaptured("dism.exe",
@@ -5225,6 +5246,11 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 {
                     Log("Pacote WPF não encontrado. O Validation OS vai bootar sem interface WPF.");
                 }
+
+                // 3d. Configurar Winlogon Shell registry no VALOS (sem isso startnet.valos.cmd nunca executa)
+                Log("[3d/5] Configurando Winlogon Shell para startnet.valos.cmd...");
+                ct.ThrowIfCancellationRequested();
+                await WinpeBuilder.ConfigureValosShellAsync(wimPath);
 
                 // 4. Resolver boot.sdi
                 Log("[4/5] Resolvendo boot.sdi...");
@@ -5378,12 +5404,42 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             sb.AppendLine("    wpeutil reboot");
             sb.AppendLine("  )");
             sb.AppendLine(")");
+            sb.AppendLine("if exist C:\\shrink_config.ini (");
+            sb.AppendLine("  for /f \"tokens=1,2 delims==\" %%a in (C:\\shrink_config.ini) do (");
+            sb.AppendLine("    if /i \"%%a\"==\"DISK_N\" set DISK_N=%%b");
+            sb.AppendLine("    if /i \"%%a\"==\"PART_N\" set PART_N=%%b");
+            sb.AppendLine("    if /i \"%%a\"==\"SHRINK_MB\" set SHRINK_MB=%%b");
+            sb.AppendLine("  )");
+            sb.AppendLine("  if not \"!PART_N!\"==\"0\" (");
+            sb.AppendLine("    echo ============================================");
+            sb.AppendLine("    echo  KitLugia Validation OS - Shrink Mode");
+            sb.AppendLine("    echo ============================================");
+            sb.AppendLine("    echo select disk !DISK_N! > C:\\shrink.txt");
+            sb.AppendLine("    echo select partition !PART_N! >> C:\\shrink.txt");
+            sb.AppendLine("    echo shrink desired=!SHRINK_MB! >> C:\\shrink.txt");
+            sb.AppendLine("    diskpart /s C:\\shrink.txt");
+            sb.AppendLine("    echo Shrink done. Rebooting...");
+            sb.AppendLine("    echo [KitLugia Validation OS Shrink] > C:\\result.log");
+            sb.AppendLine("    echo Status: OK >> C:\\result.log");
+            sb.AppendLine("    wpeutil reboot");
+            sb.AppendLine("  )");
+            sb.AppendLine(")");
             sb.AppendLine();
             sb.AppendLine("rem --- Normal boot (no shrink) ---");
             sb.AppendLine("echo ============================================");
             sb.AppendLine("echo  KitLugia - Validation OS");
             sb.AppendLine("echo ============================================");
             sb.AppendLine("echo.");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Se WinXShell.exe estiver presente, lanca como GUI ---");
+            sb.AppendLine("if exist C:\\Windows\\System32\\WinXShell.exe (");
+            sb.AppendLine("    start \"\" C:\\Windows\\System32\\WinXShell.exe");
+            sb.AppendLine("    goto :done");
+            sb.AppendLine(")");
+            sb.AppendLine("if exist X:\\Windows\\System32\\WinXShell.exe (");
+            sb.AppendLine("    start \"\" X:\\Windows\\System32\\WinXShell.exe");
+            sb.AppendLine("    goto :done");
+            sb.AppendLine(")");
             sb.AppendLine();
             sb.AppendLine("rem --- Tenta iniciar o app KitLugia (WPF) ---");
             sb.AppendLine("set APP_PATH=X:\\KitLugia\\KitLugia.exe");
@@ -5446,9 +5502,9 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             sb.AppendLine("set DISK_N=!EMBED_DISK_N!");
             sb.AppendLine("set PART_N=!EMBED_PART_N!");
             sb.AppendLine("set SHRINK_MB=!EMBED_SHRINK_MB!");
-            sb.AppendLine("if not \"!DISK_N!\"==\"0\" if not \"!PART_N!\"==\"0\" goto :run");
+            sb.AppendLine("if not \"!PART_N!\"==\"0\" goto :run");
             sb.AppendLine();
-            sb.AppendLine("rem --- Fallback: read shrink_config.ini from WIM ---");
+            sb.AppendLine("rem --- Fallback: read shrink_config.ini from RAM disk (X: or C:) ---");
             sb.AppendLine("if exist X:\\shrink_config.ini (");
             sb.AppendLine("  for /f \"tokens=1,2 delims==\" %%a in (X:\\shrink_config.ini) do (");
             sb.AppendLine("    if /i \"%%a\"==\"DISK_N\" set DISK_N=%%b");
@@ -5456,7 +5512,15 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             sb.AppendLine("    if /i \"%%a\"==\"SHRINK_MB\" set SHRINK_MB=%%b");
             sb.AppendLine("  )");
             sb.AppendLine(")");
-            sb.AppendLine("if not \"!DISK_N!\"==\"0\" if not \"!PART_N!\"==\"0\" goto :run");
+            sb.AppendLine("if not \"!PART_N!\"==\"0\" goto :run");
+            sb.AppendLine("if exist C:\\shrink_config.ini (");
+            sb.AppendLine("  for /f \"tokens=1,2 delims==\" %%a in (C:\\shrink_config.ini) do (");
+            sb.AppendLine("    if /i \"%%a\"==\"DISK_N\" set DISK_N=%%b");
+            sb.AppendLine("    if /i \"%%a\"==\"PART_N\" set PART_N=%%b");
+            sb.AppendLine("    if /i \"%%a\"==\"SHRINK_MB\" set SHRINK_MB=%%b");
+            sb.AppendLine("  )");
+            sb.AppendLine(")");
+            sb.AppendLine("if not \"!PART_N!\"==\"0\" goto :run");
             sb.AppendLine();
             sb.AppendLine("echo Scanning for KL_SHRINK_TARGET.dat marker...");
             sb.AppendLine("for /l %%d in (0,1,3) do (");
@@ -5931,21 +5995,24 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
                 Log("Config + marcador escritos. Injetando script de shrink no WIM...");
 
-                // 3c. Injetar script de shrink no WIM via DISM (wimlib não suporta segunda modificação)
+                // 3c. Injetar script + config no WIM via wimlib (rápido, sem montar)
                 string shrinkScript = RamdiskStartnetCmd(disk, part, (int)shrinkMB64);
                 string scriptName = useValOs ? "startnet.valos.cmd" : "startnet.cmd";
-                bool scriptInjected = await WinpeBuilder.InjectStartnetCmdIntoWimAsync(wimPath, shrinkScript, scriptName);
-                if (scriptInjected)
-                    Log($"Script de shrink injetado em {wimPath} como {scriptName}.");
+                bool scriptOk = await WinpeBuilder.UpdateWimWithScriptAsync(wimPath, shrinkScript, scriptName);
+                bool configOk = await WinpeBuilder.InjectConfigIntoWimAsync(wimPath, configContent);
+                if (scriptOk && configOk)
+                {
+                    Log($"Script ({scriptName}) + shrink_config.ini injetados no WIM via wimlib.");
+                }
                 else
-                    Log("Aviso: não foi possível injetar script via DISM. O OS usará valores do scan/config.");
-
-                // 3d. Injetar shrink_config.ini dentro do WIM (X:\shrink_config.ini)
-                bool configInjected = await WinpeBuilder.InjectConfigIntoWimAsync(wimPath, configContent);
-                if (configInjected)
-                    Log("shrink_config.ini injetado dentro do WIM.");
-                else
-                    Log("Aviso: não foi possível injetar config no WIM. Usando config do HD como fallback.");
+                {
+                    Log("wimlib incompleto; usando DISM mount/commit único como fallback.");
+                    bool bothInjected = await WinpeBuilder.InjectBootFilesIntoWimAsync(wimPath, shrinkScript, configContent, scriptName);
+                    if (bothInjected)
+                        Log($"Script ({scriptName}) + config injetados no WIM via DISM.");
+                    else
+                        Log("Aviso: não foi possível injetar script/config no WIM.");
+                }
 
                 // 4. Configurar bootsequence via BCD ramdisk
                 try
