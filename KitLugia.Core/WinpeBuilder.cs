@@ -870,6 +870,8 @@ namespace KitLugia.Core
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string[] candidates = [
+                // Junto do executável (copiado pelo csproj)
+                Path.Combine(baseDir, "WinXShell.exe"),
                 // Caminho absoluto já conhecido
                 @"C:\KL_WINPE\WinXShell.exe",
                 // Projeto (debug): KitLugia.Core\bin\Debug\net10.0\ -> ..\..\..\..\KitLugia.WinPE\WinXShell\
@@ -1835,29 +1837,31 @@ namespace KitLugia.Core
             }
 
             Log($"Usando wimlib-imagex para modificar {wimPath} sem montar...");
+            EnsureFileWritable(wimPath);
 
             string system32Path = "/Windows/System32";
 
-            // Cria startnet.cmd temporário
             string tmpDir = Path.Combine(Path.GetTempPath(), "KitLugia_Wimlib");
             Directory.CreateDirectory(tmpDir);
             string tmpStartnet = Path.Combine(tmpDir, "startnet.cmd");
             await File.WriteAllTextAsync(tmpStartnet, startnetContent, Encoding.ASCII);
 
-            // Escape spaces in temp path for wimlib's --command parser
             string escapedTmpStartnet = tmpStartnet.Contains(' ')
                 ? $"\"{tmpStartnet}\""
                 : tmpStartnet;
 
-            // Monta comando: delete winpe.jpg + add startnet.cmd
-            string args = $"update \"{wimPath}\" 1"
-                + $" --command=\"delete {system32Path}/winpe.jpg\""
-                + $" --command=\"add {escapedTmpStartnet} {system32Path}/startnet.cmd\"";
+            // wimlib >= 1.14 só aceita um --command por invocação.
+            // Usa --command-file com um arquivo de comandos.
+            string cmdFile = Path.Combine(tmpDir, "wimlib_cmds.txt");
+            await File.WriteAllTextAsync(cmdFile,
+                $"delete {system32Path}/winpe.jpg\n" +
+                $"add {escapedTmpStartnet} {system32Path}/startnet.cmd\n");
 
+            string args = $"update \"{wimPath}\" 1 --command-file=\"{cmdFile}\"";
             var (code, output) = await RunProcess(wimlibExe, args, 60000);
 
-            // Limpeza
             try { File.Delete(tmpStartnet); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            try { File.Delete(cmdFile); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             if (code == 0)
             {
