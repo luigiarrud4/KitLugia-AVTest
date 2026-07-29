@@ -5356,6 +5356,30 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             sb.AppendLine("@echo off");
             sb.AppendLine("setlocal enabledelayedexpansion");
             sb.AppendLine("wpeinit");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Shrink mode: if shrink_config.ini exists, run shrink ---");
+            sb.AppendLine("if exist X:\\shrink_config.ini (");
+            sb.AppendLine("  for /f \"tokens=1,2 delims==\" %%a in (X:\\shrink_config.ini) do (");
+            sb.AppendLine("    if /i \"%%a\"==\"DISK_N\" set DISK_N=%%b");
+            sb.AppendLine("    if /i \"%%a\"==\"PART_N\" set PART_N=%%b");
+            sb.AppendLine("    if /i \"%%a\"==\"SHRINK_MB\" set SHRINK_MB=%%b");
+            sb.AppendLine("  )");
+            sb.AppendLine("  if not \"!PART_N!\"==\"0\" (");
+            sb.AppendLine("    echo ============================================");
+            sb.AppendLine("    echo  KitLugia Validation OS - Shrink Mode");
+            sb.AppendLine("    echo ============================================");
+            sb.AppendLine("    echo select disk !DISK_N! > X:\\shrink.txt");
+            sb.AppendLine("    echo select partition !PART_N! >> X:\\shrink.txt");
+            sb.AppendLine("    echo shrink desired=!SHRINK_MB! >> X:\\shrink.txt");
+            sb.AppendLine("    diskpart /s X:\\shrink.txt");
+            sb.AppendLine("    echo Shrink done. Rebooting...");
+            sb.AppendLine("    echo [KitLugia Validation OS Shrink] > X:\\result.log");
+            sb.AppendLine("    echo Status: OK >> X:\\result.log");
+            sb.AppendLine("    wpeutil reboot");
+            sb.AppendLine("  )");
+            sb.AppendLine(")");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Normal boot (no shrink) ---");
             sb.AppendLine("echo ============================================");
             sb.AppendLine("echo  KitLugia - Validation OS");
             sb.AppendLine("echo ============================================");
@@ -5907,14 +5931,14 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
                 Log("Config + marcador escritos. Injetando script de shrink no WIM...");
 
-                // 3c. Injetar script de shrink no WIM (com valores embutidos corretos)
+                // 3c. Injetar script de shrink no WIM via DISM (wimlib não suporta segunda modificação)
                 string shrinkScript = RamdiskStartnetCmd(disk, part, (int)shrinkMB64);
                 string scriptName = useValOs ? "startnet.valos.cmd" : "startnet.cmd";
-                bool scriptInjected = await WinpeBuilder.UpdateWimWithScriptAsync(wimPath, shrinkScript, scriptName);
+                bool scriptInjected = await WinpeBuilder.InjectStartnetCmdIntoWimAsync(wimPath, shrinkScript, scriptName);
                 if (scriptInjected)
                     Log($"Script de shrink injetado em {wimPath} como {scriptName}.");
                 else
-                    Log("Aviso: não foi possível injetar script via wimlib. O OS usará valores do scan/config.");
+                    Log("Aviso: não foi possível injetar script via DISM. O OS usará valores do scan/config.");
 
                 // 3d. Injetar shrink_config.ini dentro do WIM (X:\shrink_config.ini)
                 bool configInjected = await WinpeBuilder.InjectConfigIntoWimAsync(wimPath, configContent);

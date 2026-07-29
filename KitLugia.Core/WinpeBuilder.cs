@@ -581,7 +581,7 @@ namespace KitLugia.Core
         /// Monta o boot.wim e substitui o startnet.cmd por um novo com valores embutidos.
         /// Mais robusto que config separado: os valores ficam no proprio script.
         /// </summary>
-        public static async Task<bool> InjectStartnetCmdIntoWimAsync(string wimPath, string startnetContent)
+        public static async Task<bool> InjectStartnetCmdIntoWimAsync(string wimPath, string startnetContent, string scriptName = "startnet.cmd")
         {
             string mountDir = Path.Combine(WinpeCacheDir, "mount_cfg");
             try
@@ -597,21 +597,21 @@ namespace KitLugia.Core
                     $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" /Optimize", 180000);
                 if (mntCode != 0 && !mntOut.Contains("already mounted"))
                 {
-                    Log($"Falha ao montar WIM para startnet.cmd: {mntOut}");
+                    Log($"Falha ao montar WIM para {scriptName}: {mntOut}");
                     return false;
                 }
 
                 string system32 = Path.Combine(mountDir, "Windows", "System32");
                 Directory.CreateDirectory(system32);
-                string startnetPath = Path.Combine(system32, "startnet.cmd");
-                await File.WriteAllTextAsync(startnetPath, startnetContent, Encoding.ASCII);
-                Log($"startnet.cmd substituido em boot.wim");
+                string scriptPath = Path.Combine(system32, scriptName);
+                await File.WriteAllTextAsync(scriptPath, startnetContent, Encoding.ASCII);
+                Log($"{scriptName} substituido em boot.wim");
 
                 var (cmtCode, cmtOut) = await RunDism("dism.exe",
                     $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
                 if (cmtCode != 0)
                 {
-                    Log($"Falha ao commitar WIM com startnet.cmd: {cmtOut}");
+                    Log($"Falha ao commitar WIM com {scriptName}: {cmtOut}");
                     return false;
                 }
 
@@ -619,7 +619,7 @@ namespace KitLugia.Core
             }
             catch (Exception ex)
             {
-                Log($"Erro ao injetar startnet.cmd no boot.wim: {ex.Message}");
+                Log($"Erro ao injetar {scriptName} no boot.wim: {ex.Message}");
                 try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 return false;
             }
@@ -1511,10 +1511,15 @@ namespace KitLugia.Core
             string tmpScript = Path.Combine(tmpDir, scriptName);
             await File.WriteAllTextAsync(tmpScript, scriptContent, Encoding.ASCII);
 
-            string args = $"update \"{wimPath}\" 1"
-                + $" --command=\"add {tmpScript} {system32Path}/{scriptName}\"";
+            // Escape spaces in temp path for wimlib's --command parser
+            string escapedTmpScript = tmpScript.Contains(' ')
+                ? $"\"{tmpScript}\""
+                : tmpScript;
 
-            var (code, output) = await RunProcess(wimlibExe, args, 300000, Path.GetDirectoryName(wimlibExe)!);
+            string args = $"update \"{wimPath}\" 1 --rebuild"
+                + $" --command=\"add {escapedTmpScript} {system32Path}/{scriptName}\"";
+
+            var (code, output) = await RunProcess(wimlibExe, args, 60000);
 
             try { File.Delete(tmpScript); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
@@ -1557,10 +1562,15 @@ namespace KitLugia.Core
             string tmpStartnet = Path.Combine(tmpDir, "startnet.cmd");
             await File.WriteAllTextAsync(tmpStartnet, startnetContent, Encoding.ASCII);
 
+            // Escape spaces in temp path for wimlib's --command parser
+            string escapedTmpStartnet = tmpStartnet.Contains(' ')
+                ? $"\"{tmpStartnet}\""
+                : tmpStartnet;
+
             // Monta comando: delete winpe.jpg + add startnet.cmd + rebuild (elimina espaço ocioso)
             string args = $"update \"{wimPath}\" 1 --rebuild"
                 + $" --command=\"delete {system32Path}/winpe.jpg\""
-                + $" --command=\"add {tmpStartnet} {system32Path}/startnet.cmd\"";
+                + $" --command=\"add {escapedTmpStartnet} {system32Path}/startnet.cmd\"";
 
             var (code, output) = await RunProcess(wimlibExe, args, 60000);
 
