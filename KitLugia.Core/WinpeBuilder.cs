@@ -115,17 +115,34 @@ namespace KitLugia.Core
             AddIfNotEmpty(dirs, Path.GetDirectoryName(Environment.ProcessPath));
             AddIfNotEmpty(dirs, Environment.CurrentDirectory);
             AddIfNotEmpty(dirs, Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location));
+            // Also try parent of BaseDirectory (running from subfolder)
+            try { AddIfNotEmpty(dirs, Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory)?.FullName); } catch { }
 
+            // 1) Try Resources/App/Wimlib/wimlib-imagex.exe in each known dir
             foreach (var d in dirs)
             {
                 string path = Path.Combine(d, "Resources", "App", "Wimlib", "wimlib-imagex.exe");
                 if (File.Exists(path)) return path;
             }
+
+            // 2) Try bare wimlib-imagex.exe in each known dir
             foreach (var d in dirs)
             {
                 string path = Path.Combine(d, "wimlib-imagex.exe");
                 if (File.Exists(path)) return path;
             }
+
+            // 3) Recursive search from each known dir (depth 3 max)
+            foreach (var d in dirs)
+            {
+                try
+                {
+                    foreach (var f in Directory.EnumerateFiles(d, "wimlib-imagex.exe", SearchOption.AllDirectories))
+                        return f;
+                }
+                catch { }
+            }
+
             return null;
         }
 
