@@ -1452,7 +1452,7 @@ namespace KitLugia.Core
         // ======================================================================
         // UTILITÁRIO: Executar qualquer processo com log e timeout
         // ======================================================================
-        private static async Task<(int ExitCode, string Output)> RunProcess(string filename, string args, int timeoutMs = 180000)
+        private static async Task<(int ExitCode, string Output)> RunProcess(string filename, string args, int timeoutMs = 180000, string? workingDirectory = null)
         {
             Log($"  > {filename} {args}");
             var psi = new ProcessStartInfo(filename, args)
@@ -1463,6 +1463,7 @@ namespace KitLugia.Core
                 CreateNoWindow = true,
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8,
+                WorkingDirectory = workingDirectory ?? Path.GetDirectoryName(filename) ?? "",
             };
 
             var proc = Process.Start(psi);
@@ -1510,10 +1511,10 @@ namespace KitLugia.Core
             string tmpScript = Path.Combine(tmpDir, scriptName);
             await File.WriteAllTextAsync(tmpScript, scriptContent, Encoding.ASCII);
 
-            string args = $"update \"{wimPath}\" 1 --rebuild"
+            string args = $"update \"{wimPath}\" 1"
                 + $" --command=\"add {tmpScript} {system32Path}/{scriptName}\"";
 
-            var (code, output) = await RunProcess(wimlibExe, args, 60000);
+            var (code, output) = await RunProcess(wimlibExe, args, 300000, Path.GetDirectoryName(wimlibExe)!);
 
             try { File.Delete(tmpScript); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
