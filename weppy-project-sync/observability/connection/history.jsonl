@@ -126,3 +126,4 @@
 {"timestamp":"2026-07-25T00:49:45.411Z","type":"mcp","status":"registered","instanceId":"b8956940-3bbb-4a21-98de-2e81930fe1b2","message":"MCP registered — opencode","aiClientName":"opencode"}
 {"timestamp":"2026-07-29T03:13:15.432Z","type":"mcp","status":"registered","instanceId":"c9a15d80-89d3-47e6-b364-ee8049b7812c","message":"MCP registered — c9a15d80-89d3-47e6-b364-ee8049b7812c"}
 {"timestamp":"2026-07-29T03:13:17.860Z","type":"mcp","status":"registered","instanceId":"4840694f-ede7-4164-836f-d12a1267288a","message":"MCP registered — 4840694f-ede7-4164-836f-d12a1267288a"}
+{"timestamp":"2026-07-29T15:54:53.471Z","type":"mcp","status":"registered","instanceId":"8e8f0a8a-2df3-4cce-84a2-8ce04d87a34a","message":"MCP registered — 8e8f0a8a-2df3-4cce-84a2-8ce04d87a34a"}
