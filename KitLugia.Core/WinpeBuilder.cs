@@ -109,20 +109,30 @@ namespace KitLugia.Core
         // Resolve o wimlib-imagex.exe embutido (modifica WIM sem montar via DISM).
         private static string? FindBundledWimlib()
         {
-            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                AppDomain.CurrentDomain.BaseDirectory,
-                Path.GetDirectoryName(typeof(WinpeBuilder).Assembly.Location) ?? "",
-            };
-            var exePath = Environment.ProcessPath;
-            if (!string.IsNullOrEmpty(exePath))
-                dirs.Add(Path.GetDirectoryName(exePath) ?? "");
-            var candidates = new List<string>();
+            HashSet<string> dirs = new(StringComparer.OrdinalIgnoreCase);
+            AddIfNotEmpty(dirs, AppDomain.CurrentDomain.BaseDirectory);
+            AddIfNotEmpty(dirs, Path.GetDirectoryName(typeof(WinpeBuilder).Assembly.Location));
+            AddIfNotEmpty(dirs, Path.GetDirectoryName(Environment.ProcessPath));
+            AddIfNotEmpty(dirs, Environment.CurrentDirectory);
+            AddIfNotEmpty(dirs, Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location));
+
             foreach (var d in dirs)
-                if (!string.IsNullOrEmpty(d))
-                    candidates.Add(Path.Combine(d, "Resources", "App", "Wimlib", "wimlib-imagex.exe"));
-            foreach (var p in candidates) if (File.Exists(p)) return p;
+            {
+                string path = Path.Combine(d, "Resources", "App", "Wimlib", "wimlib-imagex.exe");
+                if (File.Exists(path)) return path;
+            }
+            foreach (var d in dirs)
+            {
+                string path = Path.Combine(d, "wimlib-imagex.exe");
+                if (File.Exists(path)) return path;
+            }
             return null;
+        }
+
+        private static void AddIfNotEmpty(HashSet<string> set, string? value)
+        {
+            if (!string.IsNullOrEmpty(value))
+                set.Add(value);
         }
 
         // Procura recursivamente por boot.wim no cache, retorna o primeiro com tamanho válido.
@@ -1516,7 +1526,7 @@ namespace KitLugia.Core
                 ? $"\"{tmpScript}\""
                 : tmpScript;
 
-            string args = $"update \"{wimPath}\" 1 --rebuild"
+            string args = $"update \"{wimPath}\" 1"
                 + $" --command=\"add {escapedTmpScript} {system32Path}/{scriptName}\"";
 
             var (code, output) = await RunProcess(wimlibExe, args, 60000);
@@ -1567,8 +1577,8 @@ namespace KitLugia.Core
                 ? $"\"{tmpStartnet}\""
                 : tmpStartnet;
 
-            // Monta comando: delete winpe.jpg + add startnet.cmd + rebuild (elimina espaço ocioso)
-            string args = $"update \"{wimPath}\" 1 --rebuild"
+            // Monta comando: delete winpe.jpg + add startnet.cmd
+            string args = $"update \"{wimPath}\" 1"
                 + $" --command=\"delete {system32Path}/winpe.jpg\""
                 + $" --command=\"add {escapedTmpStartnet} {system32Path}/startnet.cmd\"";
 
@@ -1615,7 +1625,7 @@ namespace KitLugia.Core
             if (ownWimlib != null)
             {
                 Log($"Injetando wimlib-imagex.exe + libwim-15.dll em {wimPath} via wimlib-imagex update...");
-                string args = $"update \"{wimPath}\" 1 --rebuild"
+                string args = $"update \"{wimPath}\" 1"
                     + $" --command=\"add {wimlibExe} {system32}/wimlib-imagex.exe\""
                     + $" --command=\"add {dllPath} {system32}/libwim-15.dll\"";
 
