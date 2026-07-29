@@ -109,12 +109,18 @@ namespace KitLugia.Core
         // Resolve o wimlib-imagex.exe embutido (modifica WIM sem montar via DISM).
         private static string? FindBundledWimlib()
         {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string[] candidates =
+            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                Path.Combine(baseDir, "Resources", "App", "Wimlib", "wimlib-imagex.exe"),
-                Path.Combine(Path.GetDirectoryName(typeof(WinpeBuilder).Assembly.Location) ?? "", "Resources", "App", "Wimlib", "wimlib-imagex.exe"),
+                AppDomain.CurrentDomain.BaseDirectory,
+                Path.GetDirectoryName(typeof(WinpeBuilder).Assembly.Location) ?? "",
             };
+            var exePath = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exePath))
+                dirs.Add(Path.GetDirectoryName(exePath) ?? "");
+            var candidates = new List<string>();
+            foreach (var d in dirs)
+                if (!string.IsNullOrEmpty(d))
+                    candidates.Add(Path.Combine(d, "Resources", "App", "Wimlib", "wimlib-imagex.exe"));
             foreach (var p in candidates) if (File.Exists(p)) return p;
             return null;
         }
