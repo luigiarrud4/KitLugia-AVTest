@@ -367,3 +367,9 @@ KitLugia.Core/Resources/KitLugia.Updater.exe
 
 # antiX ISO (removed from bundle; must be downloaded manually)
 KitLugia.Core/Resources/BootGoodies/antix/
+
+# Large build artifacts
+WinPE_ISO/
+KL_WINPE/
+*.iso
+*.wim
