@@ -257,6 +257,7 @@ namespace KitLugia.GUI.Pages
                 bool unparkCpuEnabled = false;
                 bool closeToTray = false;
                 bool proBalance = false;
+                bool foregroundBoost = true;
                 
                 if (mw?.TrayService != null)
                 {
@@ -266,6 +267,7 @@ namespace KitLugia.GUI.Pages
                     autoStartEnabled = Services.TrayIconService.IsAutoStartEnabled();
                     closeToTray = mw.TrayService.CloseToTray;
                     proBalance = mw.TrayService.ProBalance;
+                    foregroundBoost = mw.TrayService.ForegroundBoostEnabled;
                 }
                 
                 // Tenta carregar do JSON (se existir)
@@ -290,6 +292,8 @@ namespace KitLugia.GUI.Pages
                                 closeToTray = GetPropertyValue<bool>(settings["closeToTray"]);
                             if (settings.ContainsKey("proBalance"))
                                 proBalance = GetPropertyValue<bool>(settings["proBalance"]);
+                            if (settings.ContainsKey("foregroundBoost"))
+                                foregroundBoost = GetPropertyValue<bool>(settings["foregroundBoost"]);
                         }
                     }
                     catch (Exception ex)
@@ -307,6 +311,7 @@ namespace KitLugia.GUI.Pages
                     closeToTray = mw.TrayService.CloseToTray;
                     gameBoostEnabled = mw.TrayService.GamePriorityEnabled;
                     proBalance = mw.TrayService.ProBalance;
+                    foregroundBoost = mw.TrayService.ForegroundBoostEnabled;
                 }
 
 
@@ -319,6 +324,7 @@ namespace KitLugia.GUI.Pages
                 if (ChkUnparkCpu != null) ChkUnparkCpu.IsChecked = unparkCpuEnabled;
                 if (ChkCloseToTray != null) ChkCloseToTray.IsChecked = closeToTray;
                 if (ChkProBalance != null) ChkProBalance.IsChecked = proBalance;
+                if (TglForegroundBoost != null) TglForegroundBoost.IsChecked = foregroundBoost;
 
 
                 string gameBarPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe");
@@ -343,6 +349,16 @@ namespace KitLugia.GUI.Pages
                 }
                 
                 if (ChkGameBarPresenceWriter != null) ChkGameBarPresenceWriter.IsChecked = gameBarDisabled;
+
+                // Restaura toggles das otimizações da comunidade (Reddit)
+                if (mw?.TrayService != null)
+                {
+                    if (TglSmartScreen != null) TglSmartScreen.IsChecked = mw.TrayService.SmartScreenDisabled;
+                    if (TglEdgeUpdate != null) TglEdgeUpdate.IsChecked = mw.TrayService.EdgeUpdateDisabled;
+                    if (TglCompatTelRunner != null) TglCompatTelRunner.IsChecked = mw.TrayService.CompatTelRunnerDisabled;
+                    if (TglSearchIndexer != null) TglSearchIndexer.IsChecked = mw.TrayService.SearchIndexerDisabled;
+                    if (TglTextInputHost != null) TglTextInputHost.IsChecked = mw.TrayService.TextInputHostDisabled;
+                }
 
                 // Restaura estado do Download Boost
                 if (TglDownloadBoost != null && mw?.TrayService != null)
@@ -420,11 +436,17 @@ namespace KitLugia.GUI.Pages
                 if (mw?.TrayService != null)
                 {
                     mw.TrayService.GamePriorityEnabled = TglGameBoost?.IsChecked == true;
+                    mw.TrayService.ForegroundBoostEnabled = TglForegroundBoost?.IsChecked == true;
                     mw.TrayService.SetTrayEnabled(ChkTrayIcon?.IsChecked == true);
                     mw.TrayService.CloseToTray = ChkCloseToTray?.IsChecked == true;
                     mw.TrayService.ProBalance = ChkProBalance?.IsChecked == true;
                     mw.TrayService.UnparkCpuEnabled = ChkUnparkCpu?.IsChecked == true;
                     mw.TrayService.GameBarPresenceWriterDisabled = ChkGameBarPresenceWriter?.IsChecked == true;
+                    mw.TrayService.SmartScreenDisabled = TglSmartScreen?.IsChecked == true;
+                    mw.TrayService.EdgeUpdateDisabled = TglEdgeUpdate?.IsChecked == true;
+                    mw.TrayService.CompatTelRunnerDisabled = TglCompatTelRunner?.IsChecked == true;
+                    mw.TrayService.SearchIndexerDisabled = TglSearchIndexer?.IsChecked == true;
+                    mw.TrayService.TextInputHostDisabled = TglTextInputHost?.IsChecked == true;
                     mw.TrayService.DownloadBoostEnabled = TglDownloadBoost?.IsChecked == true;
                     var boostLevel = CboDownloadBoostMode.SelectedIndex switch
                     {
@@ -449,7 +471,13 @@ namespace KitLugia.GUI.Pages
                     { "autoStartEnabled", ChkStartWithWindows?.IsChecked == true },
                     { "unparkCpuEnabled", ChkUnparkCpu?.IsChecked == true },
                     { "closeToTray", ChkCloseToTray?.IsChecked == true },
-                    { "proBalance", ChkProBalance?.IsChecked == true }
+                    { "proBalance", ChkProBalance?.IsChecked == true },
+                    { "foregroundBoost", TglForegroundBoost?.IsChecked == true },
+                    { "smartScreenDisabled", TglSmartScreen?.IsChecked == true },
+                    { "edgeUpdateDisabled", TglEdgeUpdate?.IsChecked == true },
+                    { "compatTelRunnerDisabled", TglCompatTelRunner?.IsChecked == true },
+                    { "searchIndexerDisabled", TglSearchIndexer?.IsChecked == true },
+                    { "textInputHostDisabled", TglTextInputHost?.IsChecked == true }
                 };
                 
                 string json = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
@@ -648,6 +676,95 @@ namespace KitLugia.GUI.Pages
             {
                 KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar ProBalance: {ex.Message}");
                 ChkProBalance.IsEnabled = true;
+            }
+        }
+
+        // NOVO: Toggle "Boost do App Ativo" - prioridade temporária do foreground com reversão
+        private void TglForegroundBoost_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                bool newState = TglForegroundBoost?.IsChecked == true;
+                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
+
+                if (trayService != null)
+                {
+                    trayService.ForegroundBoostEnabled = newState;
+                    trayService.SaveSettings();
+                    KitLugia.Core.Logger.Log($"🚀 GameBoost: Boost do App Ativo {(newState ? "ativado" : "desativado")}");
+
+                    // Re-aplica ao foreground atual (boost ou revert imediato)
+                    if (newState)
+                    {
+                        ReapplyBoostToCurrentForeground();
+                    }
+                    else
+                    {
+                        trayService.RevertCurrentBoost();
+                    }
+                }
+
+                SaveGameBoostSettings();
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar Boost do App Ativo: {ex.Message}");
+            }
+        }
+
+        private async void TglCommunityProcess_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                if (sender is not ToggleButton tgl || tgl.Tag is not string name) return;
+                bool disable = tgl.IsChecked == true;
+                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
+                if (trayService == null) return;
+
+                // Atualiza a preferência correspondente no service
+                switch (name)
+                {
+                    case "SmartScreen": trayService.SmartScreenDisabled = disable; break;
+                    case "EdgeUpdate": trayService.EdgeUpdateDisabled = disable; break;
+                    case "CompatTelRunner": trayService.CompatTelRunnerDisabled = disable; break;
+                    case "SearchIndexer": trayService.SearchIndexerDisabled = disable; break;
+                    case "TextInputHost": trayService.TextInputHostDisabled = disable; break;
+                }
+                trayService.SaveSettings();
+
+                await Task.Run(() => trayService.ApplyCommunityProcessToggle(name, disable));
+                KitLugia.Core.Logger.Log($"📋 Comunidade: {name} {(disable ? "desativado" : "restaurado")}");
+
+                SaveGameBoostSettings();
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar {(sender as FrameworkElement)?.Tag}: {ex.Message}");
+            }
+        }
+
+        private void BtnShowMoreProcesses_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (PanelMoreProcesses.Visibility == Visibility.Collapsed)
+                {
+                    PanelMoreProcesses.Visibility = Visibility.Visible;
+                    BtnShowMoreProcesses.Content = "\u25B2 Mostrar menos";
+                }
+                else
+                {
+                    PanelMoreProcesses.Visibility = Visibility.Collapsed;
+                    BtnShowMoreProcesses.Content = "\u25BC Mostrar mais";
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao alternar painel: {ex.Message}");
             }
         }
 

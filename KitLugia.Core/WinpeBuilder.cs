@@ -107,7 +107,7 @@ namespace KitLugia.Core
         }
 
         // Resolve o wimlib-imagex.exe embutido (modifica WIM sem montar via DISM).
-        private static string? FindBundledWimlib()
+        internal static string? FindBundledWimlib()
         {
             HashSet<string> dirs = new(StringComparer.OrdinalIgnoreCase);
             AddIfNotEmpty(dirs, AppDomain.CurrentDomain.BaseDirectory);
@@ -383,6 +383,7 @@ namespace KitLugia.Core
             string cfg = Path.Combine(WinpeConfigDir, "shrink_config.ini");
             var sb = new StringBuilder();
             sb.AppendLine("@echo off");
+            sb.AppendLine("setlocal enabledelayedexpansion");
             sb.AppendLine("wpeinit");
             sb.AppendLine("powercfg /s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c >nul 2>&1");
             sb.AppendLine("echo ============================================");
@@ -399,12 +400,11 @@ namespace KitLugia.Core
             sb.AppendLine("set SHRINK_MB=8000");
             sb.AppendLine($"if exist \"{cfg}\" (");
             sb.AppendLine($"  set /p TARGET_DRIVE=<\"{cfg}\"");
-            sb.AppendLine($"  for /f \"skip=1 delims=\" %%a in (\"{cfg}\") do set SHRINK_MB=%%a");
+            sb.AppendLine($"  for /f \"usebackq skip=1 delims=\" %%a in (\"{cfg}\") do set SHRINK_MB=%%a");
             sb.AppendLine("  echo Config lido: drive=!TARGET_DRIVE! size=!SHRINK_MB! MB");
             sb.AppendLine(") else (");
             sb.AppendLine("  echo Aviso: config nao encontrado. Usando C: 8000MB.");
             sb.AppendLine(")");
-            sb.AppendLine("setlocal enabledelayedexpansion");
             sb.AppendLine("echo.");
             sb.AppendLine("echo --- Diagnostico ---");
             sb.AppendLine("fsutil fsinfo ntfsinfo !TARGET_DRIVE!:");
@@ -663,8 +663,8 @@ namespace KitLugia.Core
                     await File.WriteAllTextAsync(tmpFile, configContent, Encoding.ASCII);
 
                     Log("Usando wimlib-imagex para injetar shrink_config.ini na raiz do WIM...");
-                    string args = $"update \"{wimPath}\" 1"
-                        + $" --command=\"add {tmpFile} /shrink_config.ini\"";
+                    string escapedTmpFile = tmpFile.Contains(' ') ? $"\"{tmpFile}\"" : tmpFile;
+                    string args = $"update \"{wimPath}\" 1 --command=\"add {escapedTmpFile} /shrink_config.ini\"";
                     var (code, output) = await RunProcess(wimlibExe, args, 180000);
                     if (code == 0)
                     {
@@ -759,6 +759,63 @@ namespace KitLugia.Core
                 Log($"Falha ao injetar diskpart.exe (código {code}): {output}");
 
             return code == 0;
+        }
+
+        /// <summary>
+        /// Injeta 7z.exe (+7z.dll se existir) no WIM em C:\Windows\System32\
+        /// para o startnet.cmd do Fresh Install extrair o ISO no proprio WinPE
+        /// (apos deletar o Windows antigo, quando o host nao conseguiu extrair por falta de espaco).
+        /// </summary>
+        public static async Task<bool> Inject7zIntoWimAsync(string wimPath)
+        {
+            string? sevenZip = FindSevenZipExe();
+            if (sevenZip == null)
+            {
+                Log("7z.exe nao encontrado no host para injetar no WinPE.");
+                return false;
+            }
+
+            string? wimlibExe = FindBundledWimlib();
+            if (wimlibExe == null)
+            {
+                Log("wimlib nao disponivel para injetar 7z.exe");
+                return false;
+            }
+
+            string sevenZipDir = Path.GetDirectoryName(sevenZip) ?? "";
+            string dll = Path.Combine(sevenZipDir, "7z.dll");
+            string dllArg = File.Exists(dll) ? $" --command=\"add {dll} /Windows/System32/7z.dll\"" : "";
+
+            Log($"Injetando 7z.exe ({new FileInfo(sevenZip).Length / 1024} KB) via wimlib...");
+            string args = $"update \"{wimPath}\" 1"
+                + $" --command=\"add {sevenZip} /Windows/System32/7z.exe\""
+                + dllArg;
+
+            var (code, output) = await RunProcess(wimlibExe, args, 60000);
+            if (code == 0)
+                Log("7z.exe injetado no WIM com sucesso.");
+            else
+                Log($"Falha ao injetar 7z.exe (código {code}): {output}");
+
+            return code == 0;
+        }
+
+        private static string? FindSevenZipExe()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string[] candidates =
+            {
+                Path.Combine(baseDir, "Resources", "App", "7Zip", "7z.exe"),
+                Path.Combine(Path.GetDirectoryName(typeof(WinpeBuilder).Assembly.Location) ?? "", "Resources", "App", "7Zip", "7z.exe"),
+                @"C:\Program Files\7-Zip\7z.exe",
+                @"C:\Program Files (x86)\7-Zip\7z.exe",
+            };
+            foreach (var p in candidates)
+            {
+                if (File.Exists(p))
+                    return Path.GetFullPath(p);
+            }
+            return null;
         }
 
         /// <summary>
@@ -1460,7 +1517,7 @@ namespace KitLugia.Core
             sb.AppendLine($"fsutil fsinfo ntfsinfo {targetDrive}:");
             sb.AppendLine("echo.");
             sb.AppendLine("echo --- QueryMax do shrink ---");
-            sb.AppendLine("echo select volume %systemdrive% > %TEMP%\\shrink.txt");
+            sb.AppendLine($"echo select volume {targetDrive} > %TEMP%\\shrink.txt");
             sb.AppendLine("echo shrink querymax >> %TEMP%\\shrink.txt");
             sb.AppendLine("diskpart /s %TEMP%\\shrink.txt");
             sb.AppendLine("echo.");
@@ -1850,18 +1907,10 @@ namespace KitLugia.Core
                 ? $"\"{tmpStartnet}\""
                 : tmpStartnet;
 
-            // wimlib >= 1.14 só aceita um --command por invocação.
-            // Usa --command-file com um arquivo de comandos.
-            string cmdFile = Path.Combine(tmpDir, "wimlib_cmds.txt");
-            await File.WriteAllTextAsync(cmdFile,
-                $"delete {system32Path}/winpe.jpg\n" +
-                $"add {escapedTmpStartnet} {system32Path}/startnet.cmd\n");
-
-            string args = $"update \"{wimPath}\" 1 --command-file=\"{cmdFile}\"";
+            string args = $"update \"{wimPath}\" 1 --command=\"add {escapedTmpStartnet} {system32Path}/startnet.cmd\"";
             var (code, output) = await RunProcess(wimlibExe, args, 60000);
 
             try { File.Delete(tmpStartnet); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { File.Delete(cmdFile); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             if (code == 0)
             {
@@ -1896,16 +1945,20 @@ namespace KitLugia.Core
 
             string system32 = "/Windows/System32";
 
-            // Tenta wimlib update injection primeiro (rápido, sem montar)
             string? ownWimlib = FindBundledWimlib();
             if (ownWimlib != null)
             {
                 Log($"Injetando wimlib-imagex.exe + libwim-15.dll em {wimPath} via wimlib-imagex update...");
-                string args = $"update \"{wimPath}\" 1"
-                    + $" --command=\"add {wimlibExe} {system32}/wimlib-imagex.exe\""
-                    + $" --command=\"add {dllPath} {system32}/libwim-15.dll\"";
+                string tmpDir = Path.Combine(Path.GetTempPath(), "KitLugia_WimlibInject");
+                Directory.CreateDirectory(tmpDir);
+                string cmdFile = Path.Combine(tmpDir, "wimlib_cmds.txt");
+                await File.WriteAllTextAsync(cmdFile,
+                    $"add \"{wimlibExe}\" {system32}/wimlib-imagex.exe\n" +
+                    $"add \"{dllPath}\" {system32}/libwim-15.dll\n");
+                string args = $"update \"{wimPath}\" 1 --command-file=\"{cmdFile}\"";
 
                 var (code, output) = await RunProcess(ownWimlib, args, 120000);
+                try { File.Delete(cmdFile); } catch { }
                 if (code == 0)
                 {
                     Log("wimlib-imagex + libwim-15.dll injetados no boot.wim via wimlib.");

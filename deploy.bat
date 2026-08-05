@@ -2,6 +2,11 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 
+:: Garante git e gh no PATH, mesmo se o PATH estiver quebrado
+if not "%GIT_EXE%"=="" set "PATH=%GIT_EXE%;%PATH%"
+if exist "C:\Program Files\Git\cmd\git.exe" set "PATH=C:\Program Files\Git\cmd;C:\Program Files\Git\bin;%PATH%"
+if exist "C:\Program Files\GitHub CLI\gh.exe" set "PATH=C:\Program Files\GitHub CLI;%PATH%"
+
 echo ===== KitLugia Deploy =====
 
 :: Pede a versao (Enter = manter ultima)

@@ -117,6 +117,7 @@
                     <RowDefinition Height="Auto"/>  <!-- Card 3: Comportamento ao Fechar -->
                     <RowDefinition Height="Auto"/>  <!-- Card 4: Motor Selection -->
                     <RowDefinition Height="Auto"/>  <!-- Card 5: GameBar Presence Writer -->
+                    <RowDefinition Height="Auto"/>  <!-- Card 5.5: Otimizações da Comunidade (Reddit) -->
                     <RowDefinition Height="Auto"/>  <!-- Card 6: Download Boost -->
                     <RowDefinition Height="Auto"/>  <!-- Conte&#xFA;do -->
                 </Grid.RowDefinitions>
@@ -331,11 +332,153 @@
                         <TextBlock Text="&#x2022; Elimina telemetria de presen&#xE7;a de jogos" FontSize="11" Foreground="#CCC"/>
                     </StackPanel>
                 </Border>
+
+                <Button x:Name="BtnShowMoreProcesses" Content="&#x25BC; Mostrar mais" Click="BtnShowMoreProcesses_Click"
+                        Style="{StaticResource SecondaryButtonStyle}" Margin="0,10,0,0" Height="34" HorizontalAlignment="Center" Padding="20,0"/>
+
+                <!-- Painel "Mostrar mais": processos conhecidos do Reddit que podem ser desativados -->
+                <Border x:Name="PanelMoreProcesses" Background="#111" CornerRadius="5" Padding="15" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="&#x1F50D; Processos que a comunidade do Reddit costuma desativar"
+                                       FontSize="13" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                            <TextBlock Text="Para quem curte otimizar o Windows ao extremo e remover processos em segundo plano sem quebrar o sistema, a comunidade do Reddit (especialmente em subreddits como r/Windows10, r/Windows11, r/pcmasterrace e comunidades de benchmarking/tweaking) debate bastante sobre quais .exe valem a pena mexer. Aqui est&#xE3;o os execut&#xE1;veis mais citados que as pessoas costumam desativar ou renomear para deixar o sistema mais leve:" FontSize="11" Foreground="#CCC" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                            <!-- 1. SmartScreen -->
+                            <TextBlock Text="1. SmartScreen.exe (Windows Defender SmartScreen)" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; O que faz: analisa arquivos baixados da internet e execut&#xE1;veis para avisar se s&#xE3;o desconhecidos ou potencialmente perigosos." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Por que mexer: a cada programa ou instalador novo ele faz uma checagem de rede com servidores da Microsoft. Em PCs mais fracos, causa um atraso vis&#xED;vel (delay) de segundos ao abrir softwares ou jogos." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Impacto: o Windows abre execut&#xE1;veis instantaneamente." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x26A0;&#xFE0F; Aviso de seguran&#xE7;a: voc&#xEA; perde o aviso autom&#xE1;tico sobre arquivos potencialmente maliciosos baixados do navegador." FontSize="11" Foreground="#FFD700" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                            <!-- 2. MicrosoftEdgeUpdate -->
+                            <TextBlock Text="2. MicrosoftEdgeUpdate.exe (Servi&#xE7;o de Atualiza&#xE7;&#xE3;o do Edge)" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; O que faz: fica rodando em segundo plano checando se h&#xE1; novas vers&#xE3;o do Microsoft Edge." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Por que mexer: mesmo usando outro navegador (Chrome, Firefox, Brave) ou nunca abrindo o Edge, esse atualizador cria tarefas agendadas (MicrosoftEdgeUpdateTaskMachineCore/UA) que acordam de tempos em tempos para consumir CPU, disco e rede." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Impacto: para de rodar verifica&#xE7;&#xF5;es silenciosas em segundo plano." FontSize="11" Foreground="#BBB" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                            <!-- 3. CompatTelRunner -->
+                            <TextBlock Text="3. CompatTelRunner.exe (Microsoft Compatibility Telemetry)" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; O que faz: coleta dados de diagn&#xF3;stico e compatibilidade do sistema e envia para a Microsoft para ajudar em futuras atualiza&#xE7;&#xF5;es do Windows." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Por que mexer: &#xE9; lend&#xE1;rio no Reddit por causar uso de 100% de disco (HDD) ou picos inesperados de CPU no meio de jogos ou tarefas pesadas." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Impacto: redu&#xE7;&#xE3;o dr&#xE1;stica de picos de uso de disco e leitura/escrita em segundo plano." FontSize="11" Foreground="#BBB" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                            <!-- 4. SearchIndexer -->
+                            <TextBlock Text="4. SearchIndexer.exe (Indexador do Windows Search)" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; O que faz: indexa continuamente seus arquivos e pastas para que as buscas no Menu Iniciar sejam instant&#xE2;neas." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Por que mexer: fica lendo o disco constantemente enquanto voc&#xEA; edita, baixa ou move arquivos. Em SSDs r&#xE1;pidos, &#xE9; praticamente desnecess&#xE1;rio, pois a busca j&#xE1; &#xE9; r&#xE1;pida o suficiente sem indexa&#xE7;&#xE3;o cont&#xED;nua." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Impacto: reduz escritas e leituras desnecess&#xE1;rias no SSD/HD, liberando RAM e CPU." FontSize="11" Foreground="#BBB" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                            <!-- 5. TextInputHost -->
+                            <TextBlock Text="5. TextInputHost.exe (Processo do Painel de Emojis e Teclado Virtual)" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; O que faz: gerencia o teclado virtual do Windows, a barra de emojis (Win + .) e a digita&#xE7;&#xE3;o por voz." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Por que mexer: frequentemente apresenta vazamento de mem&#xF3;ria (memory leak) em algumas builds do Windows 10/11, ficando aberto consumindo RAM e ciclos de CPU sem estar em uso." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x2022; Impacto: libera mem&#xF3;ria e evita stutters aleat&#xF3;rios. Nota: se precisar do atalho de emojis Win + ., ele deixar&#xE1; de abrir." FontSize="11" Foreground="#BBB" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                            <!-- Dica -->
+                            <Border Background="#1A2A1A" CornerRadius="5" Padding="12" Margin="0,2,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F6E0;&#xFE0F; Dica de Abordagem (M&#xE9;todo Recomendado)" FontSize="12" FontWeight="Bold" Foreground="#7CFC00" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Em vez de renomear os arquivos manualmente na pasta System32 (o que pode dar trabalho com permiss&#xF5;es do Windows TrustedInstaller ou ser revertido em grandes atualiza&#xE7;&#xF5;es), a recomenda&#xE7;&#xE3;o padr&#xE3;o da comunidade &#xE9; desativar via Servi&#xE7;os (services.msc) ou pelo Agendador de Tarefas (taskschd.msc)." FontSize="11" Foreground="#CCC" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                                    <TextBlock Text="&#x2022; Para a telemetria, desativar o servi&#xE7;o DiagTrack (Servi&#xE7;o de Experi&#xEA;ncias do Usu&#xE1;rio Conectado e Telemetria) desliga o CompatTelRunner.exe sem precisar alterar o arquivo f&#xED;sico." FontSize="11" Foreground="#CCC" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                                    <TextBlock Text="&#x2022; Ferramentas conhecidas da comunidade como o O&amp;O ShutUp10+ ou o script Chris Titus Tech Windows Utility automatizam esse processo sem risco de corromper o sistema." FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- &#x1F525; CARD 5.5: OTIMIZA&#xC7;&#xD5;ES DA COMUNIDADE (REDDIT) -->
+        <Border Grid.Row="5" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="0,0,0,15">
+            <StackPanel>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="&#x1F465; Otimiza&#xE7;&#xF5;es da Comunidade (Reddit)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
+                        <TextBlock Text="&#x26A1; Desativa processos conhecidos sem renomear arquivos do System32 (via servi&#xE7;os, tarefas agendadas e registro)" FontSize="11" Foreground="#FFD700" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                        <TextBlock Text="M&#xE9;todo recomendado pela comunidade: sobrevive a Windows Update sem quebrar o sistema." FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- SmartScreen -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="SmartScreen.exe (Windows Defender SmartScreen)" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Remove o delay ao abrir programas novos (checagem de rede com a Microsoft)" FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ToggleButton x:Name="TglSmartScreen" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
+                                  Checked="TglCommunityProcess_Click" Unchecked="TglCommunityProcess_Click" Tag="SmartScreen"/>
+                </Grid>
+
+                <!-- MicrosoftEdgeUpdate -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="MicrosoftEdgeUpdate.exe (Atualizador do Edge)" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Para de rodar tarefas agendadas de atualiza&#xE7;&#xE3;o silenciosas em background" FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ToggleButton x:Name="TglEdgeUpdate" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
+                                  Checked="TglCommunityProcess_Click" Unchecked="TglCommunityProcess_Click" Tag="EdgeUpdate"/>
+                </Grid>
+
+                <!-- CompatTelRunner -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="CompatTelRunner.exe (Telemetria da Microsoft)" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Elimina picos de 100% de disco/CPU (Desativa DiagTrack + AllowTelemetry=0)" FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ToggleButton x:Name="TglCompatTelRunner" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
+                                  Checked="TglCommunityProcess_Click" Unchecked="TglCommunityProcess_Click" Tag="CompatTelRunner"/>
+                </Grid>
+
+                <!-- SearchIndexer -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="SearchIndexer.exe (Indexador do Windows Search)" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Reduz leituras/escritas desnecess&#xE1;rias no SSD/HD (desativa servi&#xE7;o WSearch)" FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ToggleButton x:Name="TglSearchIndexer" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
+                                  Checked="TglCommunityProcess_Click" Unchecked="TglCommunityProcess_Click" Tag="SearchIndexer"/>
+                </Grid>
+
+                <!-- TextInputHost -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="TextInputHost.exe (Emojis e Teclado Virtual)" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Evita vazamento de mem&#xF3;ria. Nota: emoji (Win + .) e teclado virtual deixam de abrir" FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ToggleButton x:Name="TglTextInputHost" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
+                                  Checked="TglCommunityProcess_Click" Unchecked="TglCommunityProcess_Click" Tag="TextInputHost"/>
+                </Grid>
             </StackPanel>
         </Border>
 
         <!-- DOWNLOAD BOOST - CARD 6 -->
-        <Border Grid.Row="5" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="0,0,0,15">
+        <Border Grid.Row="6" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="0,0,0,15">
             <StackPanel>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -393,7 +536,7 @@
         </Border>
 
         <!-- CONTE&#xDA;DO -->
-        <StackPanel Grid.Row="6" Margin="0,0,0,30">
+        <StackPanel Grid.Row="7" Margin="0,0,0,30">
 
             <!-- ALGORITMO INFO -->
             <TextBlock Text="&#x2699;&#xFE0F; Algoritmo ProBalance Style" FontSize="18" FontWeight="Bold" 
@@ -495,6 +638,42 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+
+                    <!-- BOOST DO APP ATIVO -->
+                    <Grid Margin="0,15,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Background="Transparent" BorderThickness="0" Width="24" Height="24"
+                                        Cursor="Help" Margin="0,0,6,0" VerticalAlignment="Center"
+                                        ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                                    <Button.ToolTip>
+                                        <ToolTip Content="Adiciona ao motor autom&#xE1;tico o boost tempor&#xE1;rio de prioridade do processo ativo: enquanto o app estiver em foreground ele roda mais r&#xE1;pido (prioridade mais alta) e ao perder o foco a prioridade volta ao normal automaticamente. O perfil personalizado define o n&#xED;vel exato (1-20)."/>
+                                    </Button.ToolTip>
+                                    <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="Transparent">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Opacity" Value="1"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                                <TextBlock Text="&#x1F53A; BOOST DO APP ATIVO" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                            </StackPanel>
+                            <TextBlock Text="Prioridade do processo ativo aumenta enquanto em foco e reverte ao sair" FontSize="11" Foreground="#888"/>
+                        </StackPanel>
+                        <ToggleButton x:Name="TglForegroundBoost" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
+                                      Checked="TglForegroundBoost_Click" Unchecked="TglForegroundBoost_Click"/>
+                    </Grid>
                 </StackPanel>
             </Border>
 

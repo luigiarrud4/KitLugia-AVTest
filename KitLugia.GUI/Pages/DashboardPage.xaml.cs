@@ -136,7 +136,11 @@ namespace KitLugia.GUI.Pages
         private void BtnGoToWinTune_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.WinTune);
         private void BtnGoToShrink_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Shrink);
         private void BtnGoToWinpeTools_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.WinpeTools);
-        private void BtnGoToReinstallPreserve_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.ReinstallPreserve);
+        private void BtnGoToReinstallPreserve_Click(object sender, RoutedEventArgs e) =>
+            NavigationHelper.NavigateTo(PageType.ReinstallPreserve);
+
+        private void BtnGoToWindowsUpdate_Click(object sender, RoutedEventArgs e) =>
+            NavigationHelper.NavigateTo(PageType.WindowsUpdate);
         private void BtnGoToTools_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools);
         private void BtnGoToPowerPlans_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools, 0);
 

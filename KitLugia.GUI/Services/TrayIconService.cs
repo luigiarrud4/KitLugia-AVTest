@@ -526,6 +526,14 @@ namespace KitLugia.GUI.Services
         
 
         public bool GameBarPresenceWriterDisabled { get; set; } = false;
+
+        // Otimizações da comunidade (Reddit) - aplicadas uma vez no startup conforme preferência
+        public bool SmartScreenDisabled { get; set; } = false;
+        public bool EdgeUpdateDisabled { get; set; } = false;
+        public bool CompatTelRunnerDisabled { get; set; } = false;
+        public bool SearchIndexerDisabled { get; set; } = false;
+        public bool TextInputHostDisabled { get; set; } = false;
+
         public bool IsInitialized { get; private set; } = false;
 
         // RAM Limiter - Variáveis e configurações
@@ -666,6 +674,7 @@ namespace KitLugia.GUI.Services
 
         // Background Features
         public bool GamePriorityEnabled { get; set; } = false;
+        public bool ForegroundBoostEnabled { get; set; } = true;
         public bool StandbyCleanEnabled { get; set; } = false;
         public bool MemoryLeakDetectionEnabled { get; set; } = false;
         public bool DpcMonitorEnabled { get; set; } = false;
@@ -1057,6 +1066,7 @@ namespace KitLugia.GUI.Services
             LoadSettings();
 
             System.Threading.Tasks.Task.Run(() => AutoFixGameBarPresenceWriter());
+            System.Threading.Tasks.Task.Run(() => AutoFixCommunityProcesses());
 
             try
             {
@@ -1305,6 +1315,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("Interval", MonitorIntervalSeconds);
                 key.SetValue("CleaningMode", (int)SelectedCleaningMode);
                 key.SetValue("GamePriority", GamePriorityEnabled ? 1 : 0);
+                key.SetValue("ForegroundBoost", ForegroundBoostEnabled ? 1 : 0);
                 key.SetValue("StandbyClean", StandbyCleanEnabled ? 1 : 0);
                 key.SetValue("AntiLeak", MemoryLeakDetectionEnabled ? 1 : 0);
                 key.SetValue("FocusAssist", FocusAssistEnabled ? 1 : 0);
@@ -1326,12 +1337,18 @@ namespace KitLugia.GUI.Services
                 key.SetValue("AdvancedMonitorIntervalMs", AdvancedMonitorIntervalMs);
                 key.SetValue("RamLimiterIntervalMs", RamLimiterIntervalMs);
                 key.SetValue("GameBarPresenceWriterDisabled", GameBarPresenceWriterDisabled ? 1 : 0);
+                key.SetValue("SmartScreenDisabled", SmartScreenDisabled ? 1 : 0);
+                key.SetValue("EdgeUpdateDisabled", EdgeUpdateDisabled ? 1 : 0);
+                key.SetValue("CompatTelRunnerDisabled", CompatTelRunnerDisabled ? 1 : 0);
+                key.SetValue("SearchIndexerDisabled", SearchIndexerDisabled ? 1 : 0);
+                key.SetValue("TextInputHostDisabled", TextInputHostDisabled ? 1 : 0);
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
-        /// Auto-fix: se o usuário desativou GameBarPresenceWriter antes e o Windows recriou o .exe, re-desativa
+        /// Auto-fix: se o usuário desativou GameBarPresenceWriter antes e o Windows recriou o .exe, re-desativa.
+        /// Roda apenas na inicialização do kit — sem timer/watcher de fundo.
         /// </summary>
         private void AutoFixGameBarPresenceWriter()
         {
@@ -1343,7 +1360,7 @@ namespace KitLugia.GUI.Services
                 string gameBarPath = Path.Combine(system32, "GameBarPresenceWriter.exe");
                 string backupPath = Path.Combine(system32, "GameBarPresenceWriter.exe.bak");
 
-                // Se o .exe existe E o .bak também, Windows recriou - precisa re-desativar
+                // Se o .exe existe E o .bak também, Windows recriou - joga o antigo fora e renomeia o novo
                 if (File.Exists(gameBarPath) && File.Exists(backupPath))
                 {
                     KitLugia.Core.Logger.Log("⚠️ GameBarPresenceWriter: Windows recriou o .exe - re-desativando...");
@@ -1381,6 +1398,160 @@ namespace KitLugia.GUI.Services
             }
         }
 
+        /// <summary>
+        /// Aplica/desfaz uma otimização da comunidade (Reddit) pelo método correto do processo:
+        /// - SmartScreen: política EnableSmartScreen + Explorer SmartScreenEnabled (registro)
+        /// - MicrosoftEdgeUpdate: serviços edgeupdate/edgeupdatem + tarefas agendadas MachineCore/UA
+        /// - CompatTelRunner: serviço DiagTrack + tarefas Compatibility Appraiser/ProgramDataUpdater
+        /// - SearchIndexer: serviço WSearch
+        /// - TextInputHost: IFEO (Image File Execution Options) apontando para systray (bloqueio sem renomear)
+        /// Nenhum arquivo é renomeado (TrustedInstaller reverte rename em updates; registro/serviços persistem).
+        /// </summary>
+        public void ApplyCommunityProcessToggle(string name, bool disable)
+        {
+            try
+            {
+                switch (name)
+                {
+                    case "SmartScreen":
+                        ApplySmartScreen(disable);
+                        break;
+                    case "EdgeUpdate":
+                        ApplyEdgeUpdate(disable);
+                        break;
+                    case "CompatTelRunner":
+                        ApplyCompatTelRunner(disable);
+                        break;
+                    case "SearchIndexer":
+                        ApplySearchIndexer(disable);
+                        break;
+                    case "TextInputHost":
+                        ApplyTextInputHost(disable);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Community toggle {name}: {ex.Message}");
+            }
+        }
+
+        private void ApplySmartScreen(bool disable)
+        {
+            if (disable)
+            {
+                using var polKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\System");
+                polKey?.SetValue("EnableSmartScreen", 0, RegistryValueKind.DWord);
+                using var expKey = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer");
+                expKey?.SetValue("SmartScreenEnabled", "Off", RegistryValueKind.String);
+                KitLugia.Core.Logger.Log("🛡️ SmartScreen desativado (política EnableSmartScreen=0 + Explorer=Off)");
+            }
+            else
+            {
+                using var polKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\System", true);
+                polKey?.DeleteValue("EnableSmartScreen", false);
+                using var expKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer", true);
+                expKey?.DeleteValue("SmartScreenEnabled", false);
+                KitLugia.Core.Logger.Log("🔄 SmartScreen restaurado");
+            }
+        }
+
+        private void ApplyEdgeUpdate(bool disable)
+        {
+            string[] services = { "edgeupdate", "edgeupdatem" };
+            string[] tasks = { "MicrosoftEdgeUpdateTaskMachineCore", "MicrosoftEdgeUpdateTaskMachineUA" };
+
+            if (disable)
+            {
+                foreach (var svc in services)
+                    SystemUtils.RunExternalProcess("sc", $"config {svc} start= disabled", true, true, true);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Disable", true, true, true);
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM MicrosoftEdgeUpdate.exe", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ MicrosoftEdgeUpdate desativado (serviços + tarefas agendadas)");
+            }
+            else
+            {
+                foreach (var svc in services)
+                    SystemUtils.RunExternalProcess("sc", $"config {svc} start= auto", true, true, true);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Enable", true, true, true);
+                KitLugia.Core.Logger.Log("🔄 MicrosoftEdgeUpdate restaurado");
+            }
+        }
+
+        private void ApplyCompatTelRunner(bool disable)
+        {
+            string[] tasks = { @"Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
+                               @"Microsoft\Windows\Application Experience\ProgramDataUpdater",
+                               @"Microsoft\Windows\Application Experience\StartupAppTask" };
+
+            if (disable)
+            {
+                SystemUtils.RunExternalProcess("sc", "config DiagTrack start= disabled", true, true, true);
+                using var polKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\DataCollection");
+                polKey?.SetValue("AllowTelemetry", 0, RegistryValueKind.DWord);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Disable", true, true, true);
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM CompatTelRunner.exe", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ CompatTelRunner desativado (DiagTrack + AllowTelemetry=0 + tarefas)");
+            }
+            else
+            {
+                SystemUtils.RunExternalProcess("sc", "config DiagTrack start= auto", true, true, true);
+                using var polKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\DataCollection", true);
+                polKey?.DeleteValue("AllowTelemetry", false);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Enable", true, true, true);
+                KitLugia.Core.Logger.Log("🔄 CompatTelRunner restaurado");
+            }
+        }
+
+        private void ApplySearchIndexer(bool disable)
+        {
+            if (disable)
+            {
+                SystemUtils.RunExternalProcess("sc", "config WSearch start= disabled", true, true, true);
+                SystemUtils.RunExternalProcess("sc", "stop WSearch", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ SearchIndexer desativado (serviço WSearch)");
+            }
+            else
+            {
+                SystemUtils.RunExternalProcess("sc", "config WSearch start= delayed-auto", true, true, true);
+                KitLugia.Core.Logger.Log("🔄 SearchIndexer restaurado (delayed-auto)");
+            }
+        }
+
+        private void ApplyTextInputHost(bool disable)
+        {
+            const string ifeoPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\TextInputHost.exe";
+            if (disable)
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(ifeoPath);
+                key?.SetValue("Debugger", "%SystemRoot%\\system32\\systray.exe", RegistryValueKind.String);
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM TextInputHost.exe", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ TextInputHost bloqueado via IFEO (emoji Win+. e teclado virtual desativados)");
+            }
+            else
+            {
+                Registry.LocalMachine.DeleteSubKeyTree(ifeoPath, false);
+                KitLugia.Core.Logger.Log("🔄 TextInputHost restaurado (IFEO removido)");
+            }
+        }
+
+        /// <summary>
+        /// Auto-fix: aplica uma única vez no startup as otimizações da comunidade salvas.
+        /// Idempotente — se já desativado, não faz nada de novo.
+        /// </summary>
+        private void AutoFixCommunityProcesses()
+        {
+            if (SmartScreenDisabled) ApplyCommunityProcessToggle("SmartScreen", true);
+            if (EdgeUpdateDisabled) ApplyCommunityProcessToggle("EdgeUpdate", true);
+            if (CompatTelRunnerDisabled) ApplyCommunityProcessToggle("CompatTelRunner", true);
+            if (SearchIndexerDisabled) ApplyCommunityProcessToggle("SearchIndexer", true);
+            if (TextInputHostDisabled) ApplyCommunityProcessToggle("TextInputHost", true);
+        }
+
         public void LoadSettings()
         {
             try
@@ -1399,6 +1570,7 @@ namespace KitLugia.GUI.Services
                 MonitorIntervalSeconds = (int)key.GetValue("Interval", 30);
                 SelectedCleaningMode = (MemoryOptimizer.CleaningMode)(int)key.GetValue("CleaningMode", (int)MemoryOptimizer.CleaningMode.Normal);
                 GamePriorityEnabled = (int)key.GetValue("GamePriority", 0) == 1;
+                ForegroundBoostEnabled = (int)key.GetValue("ForegroundBoost", 1) == 1;
                 StandbyCleanEnabled = (int)key.GetValue("StandbyClean", 0) == 1;
                 MemoryLeakDetectionEnabled = (int)key.GetValue("AntiLeak", 0) == 1;
                 FocusAssistEnabled = (int)key.GetValue("FocusAssist", 0) == 1;
@@ -1419,6 +1591,11 @@ namespace KitLugia.GUI.Services
                 AdvancedMonitorIntervalMs = (int)key.GetValue("AdvancedMonitorIntervalMs", 2000);
                 RamLimiterIntervalMs = (int)key.GetValue("RamLimiterIntervalMs", 1000);
                 GameBarPresenceWriterDisabled = (int)key.GetValue("GameBarPresenceWriterDisabled", 0) == 1;
+                SmartScreenDisabled = (int)key.GetValue("SmartScreenDisabled", 0) == 1;
+                EdgeUpdateDisabled = (int)key.GetValue("EdgeUpdateDisabled", 0) == 1;
+                CompatTelRunnerDisabled = (int)key.GetValue("CompatTelRunnerDisabled", 0) == 1;
+                SearchIndexerDisabled = (int)key.GetValue("SearchIndexerDisabled", 0) == 1;
+                TextInputHostDisabled = (int)key.GetValue("TextInputHostDisabled", 0) == 1;
 
                 _monitorTimer.Interval = TimeSpan.FromSeconds(MonitorIntervalSeconds);
             }
@@ -1979,7 +2156,7 @@ namespace KitLugia.GUI.Services
                     {
                         using var oldProc = Process.GetProcessById((int)_lastBoostedPid);
                         // Restaura CPUPriority
-                        if (oldProc.PriorityClass != _lastOriginalPriority)
+                        if (ForegroundBoostEnabled && oldProc.PriorityClass != _lastOriginalPriority)
                             oldProc.PriorityClass = _lastOriginalPriority;
 
                         // Restaura I/O Normal (2) e Page Priority Default (5)
@@ -2008,7 +2185,7 @@ namespace KitLugia.GUI.Services
                 _lastOriginalPriority = proc.PriorityClass;
 
                 // Tweak 1: CPU Priority para High ou AboveNormal
-                if (proc.PriorityClass != ProcessPriorityClass.High && proc.PriorityClass != ProcessPriorityClass.RealTime)
+                if (ForegroundBoostEnabled && proc.PriorityClass != ProcessPriorityClass.High && proc.PriorityClass != ProcessPriorityClass.RealTime)
                 {
                     proc.PriorityClass = ProcessPriorityClass.High;
                 }
@@ -2382,12 +2559,15 @@ namespace KitLugia.GUI.Services
                 bool elevated = false;
                 try
                 {
-                    if (proc.PriorityClass != targetPriority && targetPriority != ProcessPriorityClass.RealTime)
-                        proc.PriorityClass = targetPriority;
-                    else if (targetPriority == ProcessPriorityClass.RealTime && proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        try { proc.PriorityClass = ProcessPriorityClass.RealTime; }
-                        catch { proc.PriorityClass = ProcessPriorityClass.High; }
+                        if (proc.PriorityClass != targetPriority && targetPriority != ProcessPriorityClass.RealTime)
+                            proc.PriorityClass = targetPriority;
+                        else if (targetPriority == ProcessPriorityClass.RealTime && proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            try { proc.PriorityClass = ProcessPriorityClass.RealTime; }
+                            catch { proc.PriorityClass = ProcessPriorityClass.High; }
+                        }
                     }
                 }
                 catch (System.ComponentModel.Win32Exception) when (!elevated)
@@ -2398,8 +2578,11 @@ namespace KitLugia.GUI.Services
                         elevated = true;
                         try
                         {
-                            proc.PriorityClass = targetPriority;
-                            KitLugia.Core.Logger.Log($"✅ Prioridade aplicada com privilégios elevados: {name}");
+                            if (ForegroundBoostEnabled)
+                            {
+                                proc.PriorityClass = targetPriority;
+                                KitLugia.Core.Logger.Log($"✅ Prioridade aplicada com privilégios elevados: {name}");
+                            }
                         }
                         catch { KitLugia.Core.Logger.Log($"⚠️ Mesmo elevado, falha ao alterar {name} (PPL bloqueia)"); }
                     }
@@ -2446,10 +2629,13 @@ namespace KitLugia.GUI.Services
 
                 try
                 {
-                    if (proc.PriorityClass != ProcessPriorityClass.High &&
-                        proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        proc.PriorityClass = ProcessPriorityClass.High;
+                        if (proc.PriorityClass != ProcessPriorityClass.High &&
+                            proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            proc.PriorityClass = ProcessPriorityClass.High;
+                        }
                     }
                 }
                 catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 5)
@@ -2485,10 +2671,13 @@ namespace KitLugia.GUI.Services
 
                 try
                 {
-                    if (proc.PriorityClass != ProcessPriorityClass.High &&
-                        proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        proc.PriorityClass = ProcessPriorityClass.High;
+                        if (proc.PriorityClass != ProcessPriorityClass.High &&
+                            proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            proc.PriorityClass = ProcessPriorityClass.High;
+                        }
                     }
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2527,10 +2716,13 @@ namespace KitLugia.GUI.Services
 
                 try
                 {
-                    if (proc.PriorityClass != ProcessPriorityClass.High &&
-                        proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        proc.PriorityClass = ProcessPriorityClass.High;
+                        if (proc.PriorityClass != ProcessPriorityClass.High &&
+                            proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            proc.PriorityClass = ProcessPriorityClass.High;
+                        }
                     }
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2861,9 +3053,15 @@ namespace KitLugia.GUI.Services
             {
                 using var proc = Process.GetProcessById((int)pid);
 
-                if (proc.PriorityClass == ProcessPriorityClass.High)
+                // Restaura prioridade para Normal ao sair do foreground
+                if (ForegroundBoostEnabled)
                 {
-                    proc.PriorityClass = ProcessPriorityClass.Normal;
+                    if (proc.PriorityClass == ProcessPriorityClass.High ||
+                        proc.PriorityClass == ProcessPriorityClass.RealTime ||
+                        proc.PriorityClass == ProcessPriorityClass.AboveNormal)
+                    {
+                        proc.PriorityClass = ProcessPriorityClass.Normal;
+                    }
                 }
 
                 try { Win32Api.SetProcessIoPriority(proc.Handle, 2); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2913,11 +3111,36 @@ namespace KitLugia.GUI.Services
         }
 
 
+        // Reverte o boost do foreground atual (usado ao desligar o toggle "Boost do App Ativo")
+        public void RevertCurrentBoost()
+        {
+            try
+            {
+                if (_currentBoostedPid != 0)
+                {
+                    RevertBoost(_currentBoostedPid);
+                    _currentBoostedPid = 0;
+                }
+
+                if (_lastBoostedPid != 0)
+                {
+                    try
+                    {
+                        using var oldProc = Process.GetProcessById((int)_lastBoostedPid);
+                        if (oldProc.PriorityClass != _lastOriginalPriority)
+                            oldProc.PriorityClass = _lastOriginalPriority;
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    _lastBoostedPid = 0;
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
         public void ShutdownGameBoost()
         {
             try
             {
-
                 if (_useWinEventHook && _winEventHook != IntPtr.Zero)
                 {
                     Win32Api.UnhookWinEvent(_winEventHook);

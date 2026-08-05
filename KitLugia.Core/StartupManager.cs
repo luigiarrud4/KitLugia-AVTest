@@ -9,6 +9,7 @@ using System.Management;
 using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.Text;
+using System.Xml.Linq;
 
 namespace KitLugia.Core
 {
@@ -1434,12 +1435,149 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return familyName; }
         }
 
+        // --- Resolução de apps empacotados (UWP/MSIX) para o "Abrir Local do Arquivo" ---
+        // Cache por Package Family Name -> localizações de instalação unidas por '|' (a primeira não-neutral
+        // fica à frente: a pasta _neutral_ só guarda recursos/manifest, o payload real fica na de arquitetura).
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string?> PackagedAppInstallCache = new();
+        private const int PackageQueryTimeoutMs = 20000;
+
+        /// <summary>
+        /// Todas as pastas de instalação (InstallLocation) de um pacote pelo Package Family Name.
+        /// Ordenadas com a pasta de arquitetura (payload real) à frente da _neutral_. Vazia se não instalado.
+        /// </summary>
+        private static List<string> GetAllPackagedAppInstallLocations(string packageFamilyName)
+        {
+            var list = new List<string>();
+            if (string.IsNullOrWhiteSpace(packageFamilyName)) return list;
+
+            if (!PackagedAppInstallCache.TryGetValue(packageFamilyName, out string? joined))
+            {
+                joined = null;
+                try
+                {
+                    string pkg = packageFamilyName.Replace("'", "''");
+                    string cmd = $"$p = Get-AppxPackage -PackageTypeFilter All | Where-Object {{ $_.PackageFamilyName -eq '{pkg}' }}; if ($p) {{ $p.InstallLocation -join '|' }}";
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"{cmd}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    using var p = Process.Start(psi);
+                    if (p == null) return list;
+                    string? outText = p.StandardOutput.ReadToEnd();
+                    string? errText = p.StandardError.ReadToEnd();
+                    if (!p.WaitForExit(PackageQueryTimeoutMs)) { try { p.Kill(); } catch { } }
+                    joined = (outText ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(joined)) joined = null;
+                }
+                catch { Logger.LogWarning("Unknown", "GetAllPackagedAppInstallLocations failed"); }
+
+                PackagedAppInstallCache[packageFamilyName] = joined;
+            }
+
+            if (string.IsNullOrWhiteSpace(joined)) return list;
+            foreach (string raw in joined.Split('|'))
+            {
+                string loc = raw.Trim();
+                if (!string.IsNullOrEmpty(loc) && System.IO.Directory.Exists(loc)) list.Add(loc);
+            }
+            // Pastas de arquitetura (x64/arm64/x86) têm o payload real — vêm antes da _neutral_
+            list.Sort((a, b) =>
+                (a.Contains("_neutral_", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+              - (b.Contains("_neutral_", StringComparison.OrdinalIgnoreCase) ? 1 : 0));
+            return list;
+        }
+
+        /// <summary>
+        /// Melhor pasta de instalação do pacote (a de arquitetura, que contém os arquivos reais).
+        /// Retorna null se o pacote não estiver instalado.
+        /// </summary>
+        public static string? GetPackagedAppInstallLocation(string packageFamilyName)
+        {
+            var all = GetAllPackagedAppInstallLocations(packageFamilyName);
+            return all.Count > 0 ? all[0] : null;
+        }
+
+        /// <summary>
+        /// Resolve o executável real de um app empacotado (UWP/MSIX/FullTrust) a partir do InstallLocation
+        /// e do identificador da tarefa (ou Id da Application no manifest). Lê o AppxManifest.xml do pacote.
+        /// Retorna o caminho completo do .exe, ou null se não for possível resolver.
+        /// </summary>
+        public static string? ResolvePackagedAppExecutable(string packageFamilyName, string taskOrAppId)
+        {
+            if (string.IsNullOrWhiteSpace(taskOrAppId)) return null;
+            string targetId = taskOrAppId.Trim();
+
+            // O payload pode estar em qualquer pasta do pacote (x64, neutral, arm64...) — varre todas
+            foreach (string installLocation in GetAllPackagedAppInstallLocations(packageFamilyName))
+            {
+                string manifestPath = Path.Combine(installLocation, "AppxManifest.xml");
+                if (!File.Exists(manifestPath)) continue;
+
+                try
+                {
+                    var doc = XDocument.Load(manifestPath);
+                    if (doc.Root == null) continue;
+
+                    // 1) Acha a Application que contém um StartupTask com TaskId == targetId e pega seu Executable
+                    foreach (var app in doc.Root.Descendants().Where(d => d.Name.LocalName == "Application"))
+                    {
+                        var task = app.Descendants().FirstOrDefault(d => d.Name.LocalName == "StartupTask");
+                        if (task == null) continue;
+
+                        var taskIdAttr = task.Attribute("TaskId");
+                        if (taskIdAttr != null && string.Equals(taskIdAttr.Value.Trim(), targetId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var exe = BuildLocalExePath(app, installLocation);
+                            if (exe != null) return exe;
+                        }
+                    }
+
+                    // 2) Fallback: Application cujo Id == targetId
+                    foreach (var app in doc.Root.Descendants().Where(d => d.Name.LocalName == "Application"))
+                    {
+                        var idAttr = app.Attribute("Id");
+                        if (idAttr == null) continue;
+                        if (!string.Equals(idAttr.Value.Trim(), targetId, StringComparison.OrdinalIgnoreCase)) continue;
+
+                        var exe = BuildLocalExePath(app, installLocation);
+                        if (exe != null) return exe;
+                    }
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+
+            return null;
+        }
+
+        private static string? BuildLocalExePath(XElement app, string installLocation)
+        {
+            try
+            {
+                var execAttr = app.Attribute("Executable");
+                if (execAttr == null || string.IsNullOrWhiteSpace(execAttr.Value)) return null;
+
+                string rel = execAttr.Value.Replace('/', '\\').TrimStart('\\');
+                if (string.IsNullOrEmpty(rel)) return null;
+
+                string full = Path.GetFullPath(Path.Combine(installLocation, rel));
+                if (File.Exists(full)) return full;
+                return null;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
+        }
+
         private static void AddUWPStartupTasksFromRegistry(RegistryKey hive, string subKeyPath, string location, List<StartupAppDetails> apps)
         {
             try
             {
-                using var tasksKey = hive.OpenSubKey(subKeyPath);
-                if (tasksKey == null) return;
+                using var tasksKey = hive.OpenSubKey(subKeyPath);                if (tasksKey == null) return;
 
                 foreach (var subKeyName in tasksKey.GetSubKeyNames())
                 {

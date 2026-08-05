@@ -267,6 +267,235 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        // --- Abrir Local do Arquivo ---
+        private void BtnOpenStartupLocation_Click(object sender, RoutedEventArgs e)
+        {
+            OpenStartupFileLocation(GridStartup.SelectedItem as StartupAppDetails);
+        }
+
+        private void MenuOpenLocation_Click(object sender, RoutedEventArgs e)
+        {
+            OpenStartupFileLocation(GridStartup.SelectedItem as StartupAppDetails);
+        }
+
+        // Botão direito seleciona a linha sob o cursor ANTES de abrir o menu de contexto,
+        // evitando que as ações (incluindo "Abrir Local") operem no item errado.
+        private void GridStartup_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            try
+            {
+                if (e.OriginalSource is not System.Windows.DependencyObject dep) return;
+                var row = ItemsControl.ContainerFromElement(GridStartup, dep) as DataGridRow;
+                if (row == null || row.Item is not StartupAppDetails) return;
+
+                if (!row.IsSelected)
+                {
+                    row.IsSelected = true;
+                    GridStartup.SelectedItem = row.Item;
+                }
+                row.Focus();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("GridStartup_PreviewMouseRightButtonDown", ex.Message);
+            }
+        }
+
+        // Método único e totalmente guardado: NUNCA deixa o kit crashar ao abrir o local do arquivo.
+        private void OpenStartupFileLocation(StartupAppDetails? app)
+        {
+            var mw = Application.Current.MainWindow as MainWindow;
+            try
+            {
+                if (app == null)
+                {
+                    mw?.ShowError("ERRO", "Nenhum item selecionado na lista de inicialização.");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(app.FullCommand) && string.IsNullOrWhiteSpace(app.ExePath))
+                {
+                    mw?.ShowError("ERRO", $"Não foi possível extrair um caminho de arquivo para \"{app.Name}\".");
+                    return;
+                }
+
+                string path = app.ExePath;
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    mw?.ShowError("ERRO", $"Não foi possível extrair um caminho de arquivo para \"{app.Name}\".");
+                    return;
+                }
+
+                // 1) Expandir variáveis de ambiente (ex.: %ProgramFiles%...) e remover aspas residuais
+                string full = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"', '\''));
+
+                // 1.5) Itens UWP/MSIX ("StartupTask: FamilyName!TaskId") — resolvem pelo manifest do pacote
+                if (full.StartsWith("StartupTask:", StringComparison.OrdinalIgnoreCase))
+                {
+                    OpenPackagedAppLocation(full, app.Name, mw);
+                    return;
+                }
+
+                // 2) URI web não tem "local" físico — informar em vez de tentar abrir
+                if (Uri.TryCreate(full, UriKind.Absolute, out Uri? uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeFtp))
+                {
+                    mw?.ShowInfo("LINK", $"Este item é um link, não um arquivo local:\n{full}");
+                    return;
+                }
+
+                // 3) Caminho existe: arquivo -> Explorer selecionando o arquivo; pasta -> abre a pasta
+                if (System.IO.File.Exists(full)) { LaunchExplorerSelect(full); return; }
+                if (System.IO.Directory.Exists(full)) { LaunchExplorerFolder(full); return; }
+
+                // 4) Nome simples (ex.: "cmd.exe") -> busca no PATH do sistema
+                if (!full.Contains('\\') && !full.Contains('/'))
+                {
+                    string? inPath = FindInEnvironmentPath(full);
+                    if (inPath != null)
+                    {
+                        if (System.IO.File.Exists(inPath)) { LaunchExplorerSelect(inPath); return; }
+                        if (System.IO.Directory.Exists(inPath)) { LaunchExplorerFolder(inPath); return; }
+                    }
+                }
+
+                // 5) Arquivo não existe no disco -> sobe até a pasta pai existente mais próxima
+                string? probe = System.IO.Path.GetDirectoryName(full);
+                while (!string.IsNullOrEmpty(probe) && !System.IO.Directory.Exists(probe))
+                    probe = System.IO.Path.GetDirectoryName(probe);
+
+                if (!string.IsNullOrEmpty(probe) && System.IO.Directory.Exists(probe))
+                {
+                    LaunchExplorerFolder(probe);
+                    mw?.ShowInfo("PASTA PAI", $"O arquivo \"{full}\" não foi encontrado no disco.\nAbrindo a pasta existente mais próxima:\n{probe}");
+                    return;
+                }
+
+                // 6) Não foi possível resolver nada
+                mw?.ShowError("ERRO", $"Não foi possível localizar o arquivo ou a pasta:\n{full}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("OpenStartupFileLocation", ex.Message);
+                mw?.ShowError("ERRO", $"Erro ao abrir o local do arquivo:\n{ex.Message}");
+            }
+        }
+
+        // Resolve e abre o local de um item "StartupTask: FamilyName!TaskId" (app UWP/MSIX).
+        // Nunca deixa o kit crashar: todo caminho de falha vira toast informativo.
+        private static void OpenPackagedAppLocation(string fullCommand, string displayName, MainWindow? mw)
+        {
+            try
+            {
+                const string prefix = "StartupTask:";
+                string after = fullCommand.Substring(prefix.Length).Trim().Trim('"', '\'');
+                int bang = after.IndexOf('!');
+                if (bang <= 0)
+                {
+                    mw?.ShowError("ERRO", $"Identificador de tarefa inválido:\n{fullCommand}");
+                    return;
+                }
+
+                string familyName = after.Substring(0, bang).Trim();
+                string taskId = after.Substring(bang + 1).Trim();
+                if (string.IsNullOrWhiteSpace(familyName) || string.IsNullOrWhiteSpace(taskId))
+                {
+                    mw?.ShowError("ERRO", $"Identificador de tarefa inválido:\n{fullCommand}");
+                    return;
+                }
+
+                string? install = StartupManager.GetPackagedAppInstallLocation(familyName);
+                if (string.IsNullOrWhiteSpace(install))
+                {
+                    mw?.ShowInfo("NÃO INSTALADO", $"O pacote \"{familyName}\" não está instalado para este usuário.");
+                    return;
+                }
+
+                // 1) Tenta o executável real do pacote (via AppxManifest.xml)
+                string? exe = StartupManager.ResolvePackagedAppExecutable(familyName, taskId);
+                if (!string.IsNullOrWhiteSpace(exe) && System.IO.File.Exists(exe))
+                {
+                    LaunchExplorerSelect(exe);
+                    if (IsUnderWindowsApps(exe))
+                        mw?.ShowInfo("PACOTE", $"Este app empacotado fica em pasta protegida do sistema.\nSe o Explorer negar acesso, use a guia \"Segurança\" para assumir a propriedade da pasta:\n{exe}");
+                    return;
+                }
+
+                // 2) Fallback: abre a pasta de instalação do pacote
+                if (System.IO.Directory.Exists(install))
+                {
+                    LaunchExplorerFolder(install);
+                    string msg = IsUnderWindowsApps(install)
+                        ? $"Executável não resolvido no manifest de \"{displayName}\".\nPasta protegida do sistema — se o Explorer negar acesso, assuma a propriedade (guia Segurança):\n{install}"
+                        : $"Executável não resolvido no manifest de \"{displayName}\".\nAbrindo a pasta de instalação:\n{install}";
+                    mw?.ShowInfo("PACOTE", msg);
+                    return;
+                }
+
+                mw?.ShowError("ERRO", $"Não foi possível localizar o aplicativo:\n{fullCommand}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("OpenPackagedAppLocation", ex.Message);
+                mw?.ShowError("ERRO", $"Erro ao resolver o aplicativo empacotado:\n{ex.Message}");
+            }
+        }
+
+        private static bool IsUnderWindowsApps(string path)
+        {
+            try
+            {
+                return path.StartsWith(@"C:\Program Files\WindowsApps", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private static void LaunchExplorerSelect(string filePath)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LaunchExplorerSelect", ex.Message);
+            }
+        }
+
+        private static void LaunchExplorerFolder(string folder)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LaunchExplorerFolder", ex.Message);
+            }
+        }
+
+        private static string? FindInEnvironmentPath(string fileName)
+        {
+            try
+            {
+                string? pathVar = Environment.GetEnvironmentVariable("PATH");
+                if (string.IsNullOrWhiteSpace(pathVar)) return null;
+
+                foreach (string dir in pathVar.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (string.IsNullOrWhiteSpace(dir)) continue;
+                    try
+                    {
+                        string candidate = System.IO.Path.Combine(dir.Trim('"'), fileName);
+                        if (System.IO.File.Exists(candidate)) return candidate;
+                    }
+                    catch { /* diretório inválido do PATH — ignora e segue */ }
+                }
+            }
+            catch { }
+            return null;
+        }
+
         // --- Adicionar Novo ---
         private void BtnAddStartup_Click(object sender, RoutedEventArgs e)
         {
@@ -481,6 +710,13 @@ namespace KitLugia.GUI.Pages
                     MenuMoveToTurboBoot_Normal.Visibility = System.Windows.Visibility.Visible;
                     MenuRemoveFromTurboBoot.Visibility = System.Windows.Visibility.Collapsed;
                 }
+            }
+
+            // "Abrir Local do Arquivo" só fica disponível quando há um caminho extraível
+            if (MenuOpenLocation != null)
+            {
+                var app = GridStartup.SelectedItem as StartupAppDetails;
+                MenuOpenLocation.IsEnabled = app != null && !string.IsNullOrWhiteSpace(app.ExePath);
             }
         }
 

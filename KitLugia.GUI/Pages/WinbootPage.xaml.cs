@@ -1057,7 +1057,7 @@ namespace KitLugia.GUI.Pages
                 }
                 else
                 {
-                    // Linux / Generic Multi-ISO - Modo INTEGRADO (Strelec Style)
+                    // Linux / Generic Multi-ISO
                     UpdateStatus("Aplicando Turbo Boot (Patch Linux)...");
                     await WinbootManager.PatchLinuxConfig(winbootDrive);
 
@@ -1068,8 +1068,8 @@ namespace KitLugia.GUI.Pages
                     }
                     else
                     {
-                        // Fallback para Legacy
-                        bootGuid = "{kitlugia-linux-legacy}";
+                        UpdateStatus("Criando entrada BCD Legacy (BootSector)...");
+                        bootGuid = await WinbootManager.CreateLegacyBootEntry(winbootDrive);
                     }
                 }
 
@@ -1092,15 +1092,7 @@ namespace KitLugia.GUI.Pages
 
                 if (!bootInfo.Value.IsWim)
                 {
-                    if (bootGuid == "{kitlugia-uefi-jump}")
-                    {
-                        msg += " 🚀 MODO UNIVERSAL ATIVADO (SALTO DIRETO) 🚀 \n\n" +
-                               "1. Reinicie o computador agora\n" +
-                               "2. O KitLugia configurou um salto direto para o Linux.\n" +
-                               "3. O PC entrará no menu do Linux AUTOMATICAMENTE!\n\n" +
-                               "DICA: Você não precisa apertar F12 nem usar a Tela Azul.";
-                    }
-                    else if (bootGuid == "{kitlugia-refind-esp}")
+                    if (bootGuid == "{kitlugia-refind-esp}")
                     {
                         msg += " 🚀 MODO rEFInd (GERENCIADOR DE BOOT UNIVERSAL) 🚀 \n\n" +
                                "1. Reinicie o computador agora\n" +
@@ -1111,11 +1103,11 @@ namespace KitLugia.GUI.Pages
                     }
                     else if (bootGuid == "{kitlugia-manual-f12}")
                     {
-                        msg += " ⚠️ MODO MANUAL (PONTE NÃO DISPONÍVEL) ⚠️ \n\n" +
+                        msg += " MODO MANUAL (PONTE NAO DISPONIVEL) \n\n" +
                                "1. Reinicie o computador\n" +
                                "2. Aperte F12 (ou DEL/F2) durante o boot\n" +
-                               "3. Selecione a partição KITLUGIA no menu da BIOS\n\n" +
-                               "CAUSA: Não foi possível configurar o Menu de Boot automático (BCD).";
+                               "3. Selecione a particao KITLUGIA no menu da BIOS\n\n" +
+                               "CAUSA: Nao foi possivel configurar o Menu de Boot automatico (BCD).";
                     }
                     else
                     {

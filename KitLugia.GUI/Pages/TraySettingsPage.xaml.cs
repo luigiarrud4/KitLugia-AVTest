@@ -25,6 +25,7 @@ namespace KitLugia.GUI.Pages
 
         private bool _isCleaningNow;
         private bool _isLoading;
+        private int _processFilter; // 0=todos, 1=só rodando, 2=só parados
         private KitLugia.GUI.Controls.ProcessPickerOverlay? _currentPicker;
 
         private static readonly System.Windows.Media.FontFamily _emojiFont =
@@ -425,7 +426,30 @@ namespace KitLugia.GUI.Pages
             TxtNoLimits.Visibility = limits.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
             foreach (var limit in limits)
+            {
+                // Filtro por estado do processo
+                if (_processFilter == 1 && !IsProcessRunning(limit.ProcessName)) continue;
+                if (_processFilter == 2 && IsProcessRunning(limit.ProcessName)) continue;
+
                 ProcessLimitsPanel.Children.Add(BuildLimitRow(limit));
+            }
+        }
+
+        private static bool IsProcessRunning(string processName)
+        {
+            if (string.IsNullOrWhiteSpace(processName)) return false;
+            try
+            {
+                return System.Diagnostics.Process.GetProcessesByName(processName).Length > 0;
+            }
+            catch { return false; }
+        }
+
+        private void CmbProcessFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ProcessLimitsPanel == null || CmbProcessFilter == null) return; // XAML ainda montando
+            _processFilter = CmbProcessFilter.SelectedIndex < 0 ? 0 : CmbProcessFilter.SelectedIndex;
+            LoadProcessLimits();
         }
 
         private void TxtRamLimiterInterval_LostFocus(object sender, RoutedEventArgs e)
