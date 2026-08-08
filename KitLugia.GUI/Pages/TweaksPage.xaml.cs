@@ -1313,6 +1313,9 @@ namespace KitLugia.GUI.Pages
                 else
                 {
                     UpdateLabel(StatusRmCacheLoc, targetActive, "Aplicado", "Padrão");
+                    InfoRmCacheLoc.Text = targetActive
+                        ? $"Aplicado: {Environment.ProcessorCount} núcleos lógicos (NVIDIA)."
+                        : "Configurado com o numero de nucleos logicos.";
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowInfo("RMCACHELOC", result.Message);
                 }

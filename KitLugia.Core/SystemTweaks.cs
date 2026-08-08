@@ -7863,8 +7863,10 @@ namespace KitLugia.Core
                 var match = key.GetValue("MatchingDeviceId")?.ToString() ?? "";
                 if (match.StartsWith(@"pci\ven_10de", StringComparison.OrdinalIgnoreCase)) return true;
 
-                // Gatilho 3: DLLs do driver user-mode instaladas (nvlddmkm/nvldumd)
-                var drv = key.GetValue("InstalledDisplayDrivers")?.ToString() ?? "";
+                // Gatilho 3: DLLs do driver user-mode instaladas (nvlddmkm/nvldumd).
+                // REG_MULTI_SZ retorna string[] — juntar antes de procurar.
+                var drvObj = key.GetValue("InstalledDisplayDrivers");
+                string drv = drvObj is string[] drvArr ? string.Join(",", drvArr) : drvObj?.ToString() ?? "";
                 if (drv.IndexOf("nvlddmkm", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     drv.IndexOf("nvldumd", StringComparison.OrdinalIgnoreCase) >= 0) return true;
 
