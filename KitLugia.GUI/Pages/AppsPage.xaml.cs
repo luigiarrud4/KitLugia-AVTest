@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -17,6 +17,7 @@ using KitLugia.Core;
 using KitLugia.Core.UninstallTools;
 using KitLugia.GUI.Controls;
 using KitLugia.GUI.Helpers;
+using KitLugia.GUI.Services;
 
 // --- CORREÇÃO DOS CONFLITOS DE AMBIGUIDADE ---
 using Button = System.Windows.Controls.Button;
@@ -68,6 +69,11 @@ namespace KitLugia.GUI.Pages
         private int _reviewRegDeleted;
         private DeepUninstaller.UninstallResult? _reviewResult;
         private TaskCompletionSource<bool>? _confirmTcs;
+
+        // Scans em segundo plano: programas com scan pendente (impede dupla remoção)
+        private readonly HashSet<string> _scanningPrograms = new(StringComparer.OrdinalIgnoreCase);
+        // Fila de reviews: scans que terminaram enquanto outro review estava aberto
+        private readonly Queue<(ProgramViewModel Program, DeepUninstaller.UninstallResult Result)> _pendingReviews = new();
 
         public AppsPage()
         {
@@ -300,7 +306,7 @@ namespace KitLugia.GUI.Pages
                 if (token.IsCancellationRequested) return;
                 try
                 {
-                    var icon = AppIconHelper.GetAppIcon(items[i].Pkg, 32) ?? AppIconHelper.GetGenericStoreIcon();
+                    var icon = AppIconHelper.GetAppIcon(items[i].Pkg, 32, items[i].App.Aumid) ?? AppIconHelper.GetGenericStoreIcon();
                     results[i] = (items[i].Index, icon);
                 }
                 catch
@@ -381,58 +387,23 @@ namespace KitLugia.GUI.Pages
                             TxtBloatwareProgress.Text = msg;
                     });
 
-                    bloatProgress.Report($"Pré-scan de {app.DisplayName}...");
-                    var (preFiles, preReg) = await Task.Run(() => DeepUninstaller.ScanLeftovers(app.DisplayName, ""));
-                    var preFileSet = new HashSet<string>(preFiles.Select(e => e.Path), StringComparer.OrdinalIgnoreCase);
-                    var preRegSet = new HashSet<string>(preReg.Select(e => e.Path), StringComparer.OrdinalIgnoreCase);
-
-                    string baseName = app.PackageName.Split('_')[0];
-                    string pkgFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages", baseName);
-                    if (Directory.Exists(pkgFolder))
-                        preFileSet.Add(pkgFolder);
-
                     bloatProgress.Report($"Removendo {app.DisplayName}...");
                     var result = await SystemTweaks.DeepRemoveBloatwareAppAsync(app.PackageName, app.DisplayName);
 
-                    bloatProgress.Report($"Pós-scan de {app.DisplayName}...");
-                    var (postFiles, postReg) = await Task.Run(() => DeepUninstaller.ScanLeftovers(app.DisplayName, ""));
-                    var postFileSet = new HashSet<string>(postFiles.Select(e => e.Path), StringComparer.OrdinalIgnoreCase);
-                    var postRegSet = new HashSet<string>(postReg.Select(e => e.Path), StringComparer.OrdinalIgnoreCase);
+                    bloatProgress.Report($"Verificando resíduos de {app.DisplayName}...");
+                    var (leftFiles, leftReg) = await Task.Run(() => DeepUninstaller.ScanUwpLeftovers(app.PackageName, app.DisplayName));
 
-                    // Diff Revo-style: confirmed = items that existed before AND still exist after
-                    var confirmedFiles = postFileSet.Intersect(preFileSet).ToList();
-                    var confirmedReg = postRegSet.Intersect(preRegSet).ToList();
-                    // Heuristic = items found only after removal
-                    var heuristicFiles = postFileSet.Except(preFileSet).ToList();
-                    var heuristicReg = postRegSet.Except(preRegSet).ToList();
-
-                    // Package folder was in pre-scan (deleted by uninstaller) → add to confirmed
-                    if (preFileSet.Contains(pkgFolder) && !confirmedFiles.Contains(pkgFolder, StringComparer.OrdinalIgnoreCase))
-                        confirmedFiles.Add(pkgFolder);
-
-                    var scanResult = new DeepUninstaller.UninstallResult
-                    {
-                        LeftoverFiles = confirmedFiles,
-                        LeftoverRegistry = confirmedReg,
-                        HeuristicFiles = heuristicFiles,
-                        HeuristicRegistry = heuristicReg,
-                        BaselineFileCount = preFileSet.Count,
-                        BaselineRegistryCount = preRegSet.Count,
-                    };
-
-                    // Save leftovers to junk tab silently
-                    if (confirmedFiles.Count > 0 || confirmedReg.Count > 0 || heuristicFiles.Count > 0 || heuristicReg.Count > 0)
+                    // Salva resíduos focados na aba "Resíduos" (localizações determinísticas do pacote)
+                    if (leftFiles.Count > 0 || leftReg.Count > 0)
                     {
                         LeftoverJunkManager.Add(new LeftoverJunkEntry
                         {
                             AppName = app.DisplayName,
                             Date = DateTime.Now,
-                            LeftoverFiles = confirmedFiles,
-                            LeftoverRegistry = confirmedReg,
-                            HeuristicFiles = heuristicFiles,
-                            HeuristicRegistry = heuristicReg,
-                            BaselineFileCount = preFileSet.Count,
-                            BaselineRegistryCount = preRegSet.Count
+                            LeftoverFiles = leftFiles,
+                            LeftoverRegistry = leftReg,
+                            BaselineFileCount = leftFiles.Count,
+                            BaselineRegistryCount = leftReg.Count
                         });
                     }
 
@@ -443,7 +414,8 @@ namespace KitLugia.GUI.Pages
                     if (result.Success)
                         MessageBox.Show($"✅ {app.DisplayName} removido com sucesso!", "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
                     else
-                        MessageBox.Show($"⚠️ Falha ao remover {app.DisplayName}.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show($"⚠️ Falha ao remover {app.DisplayName}.\n\n{result.Message}",
+                            "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
 
                     await Task.Delay(500);
                     await LoadBloatware();
@@ -574,30 +546,13 @@ namespace KitLugia.GUI.Pages
                     int completedCount = 0;
 
                     BloatwareLoadingPanel.Visibility = Visibility.Visible;
-                    if (TxtBloatwareProgress != null)
-                        TxtBloatwareProgress.Text = $"Pré-scan {0}/{total}...";
 
-                    // Pré-scan Revo-style para cada app (paralelo)
+                    // Pós-scan LEVE e focado por pacote (localizações determinísticas)
                     IProgress<string> batchProgress = new Progress<string>(msg =>
                     {
                         if (TxtBloatwareProgress != null)
                             TxtBloatwareProgress.Text = msg;
                     });
-
-                    var preScanResults = await Task.WhenAll(selectedApps.Select(async app =>
-                    {
-                        batchProgress.Report($"Pré-scan {app.DisplayName}...");
-                        var (preFiles, preReg) = await Task.Run(() => DeepUninstaller.ScanLeftovers(app.DisplayName, ""));
-                        var preFileSet = new HashSet<string>(preFiles.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
-                        var preRegSet = new HashSet<string>(preReg.Select(r => r.Path), StringComparer.OrdinalIgnoreCase);
-                        string baseName = app.PackageName.Split('_')[0];
-                        string pkgFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages", baseName);
-                        if (Directory.Exists(pkgFolder))
-                            preFileSet.Add(pkgFolder);
-                        return new { App = app, PreFileSet = preFileSet, PreRegSet = preRegSet, PkgFolder = pkgFolder };
-                    }));
-
-                    var preScanLookup = preScanResults.ToDictionary(r => r.App.PackageName);
 
                     batchProgress.Report($"Removendo 0/{total}...");
 
@@ -628,45 +583,29 @@ namespace KitLugia.GUI.Pages
                     foreach (var app in removed)
                         app.IsInstalled = false;
 
-                    // Pós-scan Revo-style para apps removidos (paralelo)
+                    // Pós-scan LEVE e focado para apps removidos (paralelo)
                     if (removed.Count > 0)
                     {
                         var postScanTasks = removed.Select(async app =>
                         {
-                            batchProgress.Report($"Pós-scan {app.DisplayName}...");
-                            var (postFiles, postReg) = await Task.Run(() => DeepUninstaller.ScanLeftovers(app.DisplayName, ""));
-                            return new { App = app, PostFiles = postFiles, PostReg = postReg };
+                            batchProgress.Report($"Verificando resíduos de {app.DisplayName}...");
+                            var (leftFiles, leftReg) = await Task.Run(() => DeepUninstaller.ScanUwpLeftovers(app.PackageName, app.DisplayName));
+                            return new { App = app, LeftFiles = leftFiles, LeftReg = leftReg };
                         });
                         var postScanResults = await Task.WhenAll(postScanTasks);
 
                         foreach (var ps in postScanResults)
                         {
-                            if (!preScanLookup.TryGetValue(ps.App.PackageName, out var pre)) continue;
-
-                            var postFileSet = new HashSet<string>(ps.PostFiles.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
-                            var postRegSet = new HashSet<string>(ps.PostReg.Select(r => r.Path), StringComparer.OrdinalIgnoreCase);
-
-                            var confirmedFiles = postFileSet.Intersect(pre.PreFileSet).ToList();
-                            var confirmedReg = postRegSet.Intersect(pre.PreRegSet).ToList();
-                            var heuristicFiles = postFileSet.Except(pre.PreFileSet).ToList();
-                            var heuristicReg = postRegSet.Except(pre.PreRegSet).ToList();
-
-                            if (pre.PreFileSet.Contains(pre.PkgFolder) &&
-                                !confirmedFiles.Contains(pre.PkgFolder, StringComparer.OrdinalIgnoreCase))
-                                confirmedFiles.Add(pre.PkgFolder);
-
-                            if (confirmedFiles.Count > 0 || confirmedReg.Count > 0 || heuristicFiles.Count > 0 || heuristicReg.Count > 0)
+                            if (ps.LeftFiles.Count > 0 || ps.LeftReg.Count > 0)
                             {
                                 LeftoverJunkManager.Add(new LeftoverJunkEntry
                                 {
                                     AppName = ps.App.DisplayName,
                                     Date = DateTime.Now,
-                                    LeftoverFiles = confirmedFiles,
-                                    LeftoverRegistry = confirmedReg,
-                                    HeuristicFiles = heuristicFiles,
-                                    HeuristicRegistry = heuristicReg,
-                                    BaselineFileCount = pre.PreFileSet.Count,
-                                    BaselineRegistryCount = pre.PreRegSet.Count
+                                    LeftoverFiles = ps.LeftFiles,
+                                    LeftoverRegistry = ps.LeftReg,
+                                    BaselineFileCount = ps.LeftFiles.Count,
+                                    BaselineRegistryCount = ps.LeftReg.Count
                                 });
                             }
                         }
@@ -863,88 +802,194 @@ namespace KitLugia.GUI.Pages
         private async void BtnProgramRemove_Click(object sender, RoutedEventArgs e)
         {
             if (_isAppOperation) return;
+            if (sender is not Button btn || btn.Tag is not ProgramViewModel program) return;
+
+            if (_scanningPrograms.Contains(program.DisplayName))
+            {
+                MessageBox.Show($"O scan de resíduos de \"{program.DisplayName}\" ainda está em andamento em segundo plano.\nQuando terminar, a revisão será aberta automaticamente.",
+                    "Scan em andamento", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             _isAppOperation = true;
             try
             {
-                if (sender is Button btn && btn.Tag is ProgramViewModel program)
+                // Feedback visual IMEDIATO: botão mostra "⏳" antes de qualquer bloqueio
+                btn.Content = "⏳";
+                btn.IsEnabled = false;
+
+                // Confirmação simples
+                if (!await ShowConfirmAsync(
+                    $"Remover {program.DisplayName}?\n\n" +
+                    "O app será desinstalado e os resíduos ficarão disponíveis na revisão de limpeza posterior.",
+                    "Remover App"))
                 {
-                    // Feedback visual IMEDIATO: botão mostra "⏳" antes de qualquer bloqueio
-                    btn.Content = "⏳";
-                    btn.IsEnabled = false;
-
-                    // Confirmação simples
-                    if (!await ShowConfirmAsync(
-                        $"Remover {program.DisplayName}?\n\n" +
-                        "O app será desinstalado e os resíduos ficarão disponíveis na aba \"Resíduos\" para limpeza posterior.",
-                        "Remover App"))
-                    {
-                        btn.Content = "REMOVER";
-                        btn.IsEnabled = true;
-                        return;
-                    }
-
-                    ProgramsLoadingPanel.Visibility = Visibility.Visible;
-
-                    IProgress<string> progress = new Progress<string>(msg =>
-                    {
-                        if (TxtProgramsProgress != null)
-                            TxtProgramsProgress.Text = msg;
-                    });
-
-                    progress.Report($"Removendo {program.DisplayName}...");
-
-                    // Run DeepUninstall (uninstall + scan) entirely on background thread
-                    var scanResult = await Task.Run(() =>
-                    {
-                        var result = DeepUninstaller.DeepUninstallProgram(
-                            program.DisplayName, program.UninstallString,
-                            program.InstallLocation, program.Publisher, program.DisplayIcon, false, progress).GetAwaiter().GetResult();
-                        return result;
-                    });
-
-                    if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
-                    ProgramsLoadingPanel.Visibility = Visibility.Collapsed;
                     btn.Content = "REMOVER";
                     btn.IsEnabled = true;
-
-                    // Save leftovers to junk tab silently
-                    int leftoversCount = scanResult.LeftoverFiles.Count + scanResult.LeftoverRegistry.Count;
-                    int heuristicCount = scanResult.HeuristicFiles.Count + scanResult.HeuristicRegistry.Count;
-                    if (leftoversCount > 0 || heuristicCount > 0)
-                    {
-                        LeftoverJunkManager.Add(new LeftoverJunkEntry
-                        {
-                            AppName = program.DisplayName,
-                            Date = DateTime.Now,
-                            LeftoverFiles = scanResult.LeftoverFiles,
-                            LeftoverRegistry = scanResult.LeftoverRegistry,
-                            HeuristicFiles = scanResult.HeuristicFiles,
-                            HeuristicRegistry = scanResult.HeuristicRegistry,
-                            BaselineFileCount = scanResult.BaselineFileCount,
-                            BaselineRegistryCount = scanResult.BaselineRegistryCount
-                        });
-                    }
-
-                    string msgResult = scanResult.UninstallSuccess
-                        ? $"✅ {program.DisplayName} desinstalado com sucesso!"
-                        : $"⚠️ {program.DisplayName} pode não ter sido completamente desinstalado.";
-                    if (leftoversCount > 0)
-                        msgResult += $"\n\n🗑️ {leftoversCount} resíduo(s) salvos na aba \"Resíduos\".";
-                    MessageBox.Show(msgResult, "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    // Remove from list
-                    FilteredProgramsCollection?.Remove(program);
-                    ProgramsCollection?.Remove(program);
+                    return;
                 }
+
+                ProgramsLoadingPanel.Visibility = Visibility.Visible;
+
+                IProgress<string> progress = new Progress<string>(msg =>
+                {
+                    if (TxtProgramsProgress != null)
+                        TxtProgramsProgress.Text = msg;
+                });
+
+                progress.Report($"Desinstalando {program.DisplayName}...");
+
+                // FASE 1 — apenas DESINSTALAÇÃO (rápida). O scan pesado roda em background.
+                var result = await Task.Run(() =>
+                {
+                    var r = new DeepUninstaller.UninstallResult();
+                    return DeepUninstaller.RunUninstallPhaseAsync(
+                        r, program.DisplayName, program.UninstallString,
+                        program.InstallLocation, program.Publisher, program.DisplayIcon, false, progress, captureBaseline: false);
+                });
+
+                if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
+                ProgramsLoadingPanel.Visibility = Visibility.Collapsed;
+
+                // Libera a UI IMEDIATAMENTE (desinstalação concluída, scan em background):
+                // o usuário pode continuar desinstalando outros apps sem esperar.
+                btn.Content = "REMOVER";
+                btn.IsEnabled = true;
+                StartBackgroundScan(program, result);
             }
             catch (Exception ex)
             {
                 Logger.LogError("BtnProgramRemove_Click", ex.ToString());
+                MessageBox.Show($"Erro ao desinstalar:\n\n{ex}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                btn.Content = "REMOVER";
+                btn.IsEnabled = true;
             }
             finally
             {
                 _isAppOperation = false;
             }
+        }
+
+        /// <summary>
+        /// Inicia o escaneamento de resíduos (FASE 2) em segundo plano usando o
+        /// BackgroundTaskTracker (notificação com barra de progresso do kit).
+        /// A UI fica livre: o usuário pode desinstalar outros apps enquanto escaneia.
+        /// </summary>
+        private void StartBackgroundScan(ProgramViewModel program, DeepUninstaller.UninstallResult uninstallResult)
+        {
+            if (!_scanningPrograms.Add(program.DisplayName)) return;
+
+            string taskId = BackgroundTaskTracker.Instance.RegisterTask($"Escaneando resíduos: {program.DisplayName}", "Apps");
+
+            IProgress<string> scanProgress = new Progress<string>(msg =>
+            {
+                // Encaminha o progresso PERCENTUAL para o tracker (barra da notificação).
+                // O UpdateBackgroundTaskIndicator extrai o número do texto para renderizar a barra.
+                if (!string.IsNullOrEmpty(msg))
+                {
+                    int pct = MapScanStagePercent(msg);
+                    BackgroundTaskTracker.Instance.UpdateTaskProgress(taskId, $"{pct}% — {msg}");
+                }
+            });
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var scanResult = await DeepUninstaller.RunScanPhaseAsync(
+                        uninstallResult, program.DisplayName, program.UninstallString,
+                        program.InstallLocation, program.Publisher, program.DisplayIcon, false, scanProgress)
+                        .ConfigureAwait(false);
+
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (FilteredProgramsCollection == null)
+                        {
+                            // Página foi descarregada enquanto escaneava — só encerra a tarefa.
+                            BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Página fechada — scan concluído.");
+                            return;
+                        }
+
+                        _scanningPrograms.Remove(program.DisplayName);
+                        int leftoversCount = scanResult.LeftoverFiles.Count + scanResult.LeftoverRegistry.Count;
+                        BackgroundTaskTracker.Instance.CompleteTask(taskId, true, $"Resíduos encontrados: {leftoversCount}");
+
+                        if (leftoversCount > 0)
+                            EnqueueOrShowReview(program, scanResult);
+                        else
+                            RemoveProgramAfterSuccessfulScan(program, scanResult);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"BackgroundScan:{program.DisplayName}", ex.ToString());
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        _scanningPrograms.Remove(program.DisplayName);
+                        BackgroundTaskTracker.Instance.CompleteTask(taskId, false, ex.Message);
+                        MessageBox.Show($"Falha ao escanear resíduos de \"{program.DisplayName}\":\n\n{ex}",
+                            "Erro no scan", MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+                }
+            });
+        }
+
+        private void EnqueueOrShowReview(ProgramViewModel program, DeepUninstaller.UninstallResult scanResult)
+        {
+            // Se já está mostrando outro review, enfileira para abrir quando o atual fechar.
+            if (ReviewPanel.Visibility == Visibility.Visible)
+            {
+                _pendingReviews.Enqueue((program, scanResult));
+                ShowBackgroundTaskToast($"Scan de {program.DisplayName} concluído — em fila de revisão.");
+                return;
+            }
+
+            var classifiedFiles = scanResult.LeftoverFiles
+                .Select(f => new ScanEntry { Path = f, Safety = DeepUninstaller.ClassifyFileSafety(program.DisplayName, program.InstallLocation, f) })
+                .ToList();
+            var classifiedReg = scanResult.LeftoverRegistry
+                .Select(r => new ScanEntry { Path = r, Safety = DeepUninstaller.ClassifyRegistrySafety(program.DisplayName, program.InstallLocation, r) })
+                .ToList();
+            _reviewProgramContext = program;
+            ShowReviewPanel(program.DisplayName, scanResult, classifiedFiles, classifiedReg);
+        }
+
+        private void RemoveProgramAfterSuccessfulScan(ProgramViewModel program, DeepUninstaller.UninstallResult scanResult)
+        {
+            if (scanResult.UninstallSuccess)
+            {
+                FilteredProgramsCollection?.Remove(program);
+                ProgramsCollection?.Remove(program);
+                MessageBox.Show($"\"{program.DisplayName}\" desinstalado com sucesso! Nenhum resíduo encontrado.",
+                    "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show($"\"{program.DisplayName}\" pode não ter sido completamente desinstalado.\nNenhum resíduo foi detectado.",
+                    "Atenção", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void ShowBackgroundTaskToast(string message)
+        {
+            if (System.Windows.Application.Current.MainWindow is MainWindow w)
+                w.ShowInfo("Deep Cleanup", message);
+        }
+
+        /// <summary>
+        /// Mapeia a etapa do scan (mensagens de <see cref="DeepUninstaller.RunScanPhaseAsync"/>)
+        /// para um percentual para a barra de progresso da notificação de background.
+        /// </summary>
+        private static int MapScanStagePercent(string message)
+        {
+            // Ordem real das etapas no RunScanPhaseAsync:
+            //   arquivos -> registro -> tarefas agendadas -> variáveis de ambiente
+            if (message.Contains("de arquivos", StringComparison.OrdinalIgnoreCase)) return 20;
+            if (message.Contains("do registro", StringComparison.OrdinalIgnoreCase)) return 55;
+            if (message.Contains("tarefas agendadas", StringComparison.OrdinalIgnoreCase)) return 75;
+            if (message.Contains("variáveis de ambiente", StringComparison.OrdinalIgnoreCase)) return 90;
+            if (message.Contains("aplicando exclusões", StringComparison.OrdinalIgnoreCase)) return 95;
+            return 5;
         }
 
         private async void BtnRemoveProgramsSelected_Click(object sender, RoutedEventArgs e)
@@ -1000,7 +1045,7 @@ namespace KitLugia.GUI.Pages
                         {
                             result = await Task.Run(() => DeepUninstaller.DeepUninstallProgram(
                                 program.DisplayName, program.UninstallString,
-                                program.InstallLocation, program.Publisher, program.DisplayIcon, false, batchProgress));
+                                program.InstallLocation, program.Publisher, program.DisplayIcon, false, batchProgress, captureBaseline: false));
                         }
                         finally
                         {
@@ -1656,6 +1701,9 @@ namespace KitLugia.GUI.Pages
                 : "Desinstalação pode não ter sido totalmente bem-sucedida. Resíduos encontrados:";
             ReviewInfoCount.Text = $"{_reviewFileItems.Count} arquivo(s), {_reviewRegItems.Count} registro(s)";
 
+            if (scanResult.DataFoldersCaptured.Count > 0)
+                ReviewInfoText.Text += $"\nPasta(s) de dados capturadas (padrão ADCU/ADAU): {scanResult.DataFoldersCaptured.Count} (ex.: {scanResult.DataFoldersCaptured.FirstOrDefault()})";
+
             UpdateReviewCounts();
             NormalContent.Visibility = Visibility.Collapsed;
             ReviewPanel.Visibility = Visibility.Visible;
@@ -1806,6 +1854,58 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private void BtnReviewExcludeFiles_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isAppOperation) return;
+            var selected = _reviewFileItems.Where(f => f.IsSelected && !f.IsNavigational).ToList();
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("Selecione ao menos um item para adicionar à lista de exclusões.",
+                    "Aviso", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (MessageBox.Show($"Adicionar {selected.Count} caminho(s) à lista de exclusões?\n\nEles nunca mais aparecerão no deep scan deste app (e de nenhum outro).",
+                "Ignorar Sempre", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            var selectedSet = new HashSet<string>(selected.Select(f => f.FullPath), StringComparer.OrdinalIgnoreCase);
+            foreach (var p in selectedSet)
+                DeepUninstaller.AddUserExclusion(p);
+
+            _reviewFileItems = _reviewFileItems.Where(f => !selectedSet.Contains(f.FullPath)).ToList();
+            ReviewFileList.ItemsSource = null;
+            ReviewFileList.ItemsSource = _reviewFileItems;
+            UpdateReviewCounts();
+            BtnReviewDeleteFiles.IsEnabled = _reviewFileItems.Any(f => f.IsSelected && f.CanDelete);
+        }
+
+        private void BtnReviewExcludeReg_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isAppOperation) return;
+            var selected = _reviewRegItems.Where(r => r.IsSelected && !r.IsNavigational).ToList();
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("Selecione ao menos uma chave para adicionar à lista de exclusões.",
+                    "Aviso", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (MessageBox.Show($"Adicionar {selected.Count} chave(s) de registro à lista de exclusões?\n\nElas nunca mais aparecerão no deep scan deste app (e de nenhum outro).",
+                "Ignorar Sempre", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            var selectedSet = new HashSet<string>(selected.Select(r => r.FullPath), StringComparer.OrdinalIgnoreCase);
+            foreach (var p in selectedSet)
+                DeepUninstaller.AddUserExclusion(p);
+
+            _reviewRegItems = _reviewRegItems.Where(r => !selectedSet.Contains(r.FullPath)).ToList();
+            ReviewRegList.ItemsSource = null;
+            ReviewRegList.ItemsSource = _reviewRegItems;
+            UpdateReviewCounts();
+            BtnReviewDeleteReg.IsEnabled = _reviewRegItems.Any(r => r.IsSelected && r.CanDelete);
+        }
+
         private void ToggleKeep_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (sender is FrameworkElement fe && fe.DataContext is AppCleanupItem item)
@@ -1898,19 +1998,46 @@ namespace KitLugia.GUI.Pages
                 var sb = new System.Text.StringBuilder();
                 sb.AppendLine("=== ARQUIVOS E PASTAS ===");
                 foreach (var f in _reviewFileItems)
-                    sb.AppendLine(f.FullPath);
+                {
+                    sb.AppendLine(DescribeReviewRow(f));
+                }
                 sb.AppendLine();
                 sb.AppendLine("=== REGISTRO ===");
                 foreach (var r in _reviewRegItems)
-                    sb.AppendLine(r.FullPath);
+                {
+                    sb.AppendLine(DescribeReviewRow(r));
+                }
 
                 System.Windows.Clipboard.SetText(sb.ToString());
-                ReviewStatusText.Text = $"📋 {_reviewFileItems.Count + _reviewRegItems.Count} caminho(s) copiados para área de transferência!";
+                int markedCount = _reviewFileItems.Count(f => f.IsSelected && f.CanDelete && !f.IsNavigational) +
+                                  _reviewRegItems.Count(r => r.IsSelected && r.CanDelete && !r.IsNavigational);
+                ReviewStatusText.Text = $"📋 {_reviewFileItems.Count + _reviewRegItems.Count} caminho(s) copiados ({markedCount} marcados para deletar)!";
             }
             catch (Exception ex)
             {
                 Logger.LogError("BtnReviewCopy_Click", ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Renders one review row for the copy-to-clipboard log with an explicit
+        /// eligibility prefix so it is clear what the kit will delete:
+        ///   [DELETAR] item selected and deletable
+        ///   [SELECIONAR] item exists but not selected (unchecked)
+        ///   [INFO] real leftover not deletable by default
+        ///   [NAV] tree navigation node (folder path, never deleted)
+        /// </summary>
+        private static string DescribeReviewRow(AppCleanupItem item)
+        {
+            if (item == null || string.IsNullOrEmpty(item.FullPath)) return "";
+            if (item.IsNavigational)
+                return "[NAV] " + item.FullPath;
+            bool selected = item.IsSelected && item.CanDelete;
+            if (selected)
+                return "[DELETAR] " + item.FullPath;
+            if (item.CanDelete)
+                return "[SELECIONAR] " + item.FullPath;  // unchecked but eligible
+            return "[INFO] " + item.FullPath;            // not eligible (mark as Kept to bypass)
         }
 
         private void BtnReviewBack_Click(object sender, RoutedEventArgs e)
@@ -1964,6 +2091,13 @@ namespace KitLugia.GUI.Pages
                 _reviewBloatwareContext.IsInstalled = false;
                 _ = LoadBloatware();
                 _reviewBloatwareContext = null;
+            }
+
+            // Fila de reviews (scans em background): mostra o próximo pendente em vez de fechar.
+            if (_pendingReviews.Count > 0)
+            {
+                var (nextProgram, nextResult) = _pendingReviews.Dequeue();
+                EnqueueOrShowReview(nextProgram, nextResult);
             }
         }
 
@@ -2180,6 +2314,26 @@ namespace KitLugia.GUI.Pages
         public bool IsFolder { get; set; }
         public bool IsNavigational { get; set; }
         public CleanupSafety SafetyLevel { get; set; } = CleanupSafety.Safe;
+
+        /// <summary>
+        /// Collapsed version of FullPath for the second line of each review row:
+        /// keeps drive + first segment and the last two segments, replacing the
+        /// middle with "..." so long paths don't stretch the row. Hovering shows
+        /// the full path via ToolTip="{Binding FullPath}".
+        /// </summary>
+        public string ShortPath
+        {
+            get
+            {
+                string p = FullPath;
+                if (p.Length <= 52) return p;
+                var segs = p.Split('\\');
+                if (segs.Length <= 3) return p;
+                string tail = segs[segs.Length - 2] + "\\" + segs[segs.Length - 1];
+                string head = segs[0] + (segs.Length > 1 ? "\\" + segs[1] : "");
+                return head + "\\...\\" + tail;
+            }
+        }
 
         public bool IsBold => !IsNavigational && SafetyLevel != CleanupSafety.Uncertain;
         public bool CanDelete => !IsNavigational && SafetyLevel != CleanupSafety.Uncertain && !_isKept;

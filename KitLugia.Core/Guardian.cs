@@ -2718,6 +2718,11 @@ new() {
                             else if (pathType == "User")
                             {
                                 var installedPaths = PathRepair.GetInstalledProgramPaths();
+                                // Fallback dinamico: se o registro falhou, escanear os .exe no disco
+                                if (installedPaths.Count == 0)
+                                {
+                                    installedPaths = PathRepair.RecoverFromExecutableScan();
+                                }
                                 var (userPath, addedPaths) = PathRepair.EnsureUserPathMinimum(repairedPath, installedPaths);
                                 repairedPath = userPath;
                                 foreach (var added in addedPaths)

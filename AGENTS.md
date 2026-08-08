@@ -1,4 +1,4 @@
-﻿# KitLugia — AGENTS.md
+# KitLugia — AGENTS.md
 
 ## Estado atual do projeto (29/07/2026)
 
@@ -797,7 +797,8 @@ so parseado quando a condicao e TRUE, por isso o "OK" anterior enganava).
 
 Verificacao: build 0 erros; script regenerado roda de ponta a ponta sem
 "inesperado" (chega ao branch de erro do marcador ausente); subrotina
-merge_registry forca-parseada com eg load falho (errorlevel 1) = OK.
+merge_registry forca-parseada com 
+eg load falho (errorlevel 1) = OK.
 Os 4 echo com parens restantes no script (L32/L81/L237/L412) sao TOP-LEVEL
 (fora de bloco) - seguros.
 
@@ -829,3 +830,520 @@ Verificacao:
 
 **A TESTAR (VMware)**: SCHEDULE fresh install 2x seguidas (2o run com Z:\! leftover) ->
 WinPE deve escolher letra livre, renomear backup antigo, aplicar, bootloader OK.
+### Sessao 05/08 - PC Manager Deep Uninstall: analise binaria COMPLETA (app nao estava instalado!)
+
+Pedido do usuario: descobrir como funciona o "Deep Uninstall" do Microsoft PC Manager
+(Store) inspecionando os binarios com o IDA Pro.
+
+1. **PC Manager NAO estava instalado** (o usuario achava que tinha instalado): zero
+   vestigios - `Get-AppxPackage -AllUsers`, varredura em WindowsApps, LocalAppData\Packages,
+   AppRepository, menu Iniciar, winget list. Instalado via winget msstore:
+   `winget install --id 9PM860492SZD -e --source msstore --silent` (v3.22.3.0).
+   Binarios copiados para `%TEMP%\opencode\pcmp\`. PARA TESTAR/WEB: PC Manager esta no
+   host (installado para o usuario lugia).
+
+2. **IDA Pro NAO serve para este caso**: o plugin de uninstall e assembly .NET
+   (`MSPCManager.dll` usa PresentationFramework; `Microsoft.WIC.PCManager.Plugin.Uninstall.dll`
+   238 KB e o core). Ferramenta certa: **ilspycmd** (instalado global:
+   `dotnet tool install --global ilspycmd`; binario em `%USERPROFILE%\.dotnet\tools\ilspycmd.exe`).
+   Decompilado: `%TEMP%\opencode\pcmp\src\uninstall\...decompiled.cs` (8578 linhas).
+
+3. **COMO FUNCIONA o Deep Uninstall (achados)**:
+   - **NAO usa snapshot pre/pos global** (diferente do Revo). Confirma a reforma do
+     KitLugia (captureBaseline:false).
+   - Lista de apps: SO 4 chaves Uninstall (HKLM + Wow6432Node + HKCU); exige DisplayName,
+     UninstallString, !IsSystemComponent, install dir com .exe.
+   - FileScanner: BFS na `InstalledPath` (InstallLocation reg ou dir do uninstaller),
+     profundidade 9, pula symlinks, filtro de extensao opcional. **NUNCA varre AppData/
+     Roaming/ProgramData globalmente** - pastas de dados sao cobertas por RULES por app.
+   - RegistryScanner: deleta SO a propria chave Uninstall (BaseKeyType\MiddleKey\EndingKey).
+   - **Allowlist**: so apps cujo EndingKey (sufixo da chave) casa `ResidualRule.AppUninstallKey`
+     da config (`UninstallOptions.json` / cloud, reload dinamico) viram `IsResidualApp`
+     e ganham o scan de residuos. `ResidualRule`: AppUninstallKey[], InstallPathFolder[],
+     Depth, FileExtension[], FileCount, EmptyFolder. Guardas: FileCount limit + folder match.
+   - Delecao por item com fail types (IsOccupied/NoPermission/PathTooLong/etc),
+     progresso 0->95->100 via observer; telemtria WM_Uninstaller_Residual_*.
+   - UninstallRegistryMonitor: RegNotifyChangeKeyValue nas chaves Uninstall (detecta
+     remocao/confirma desinstalacao; dispara popup "residuos encontrados").
+   - Extras hardcoded: CleanupApps (QQ游戏, 7-Zip), CmdApplication (MsiExec/Sunlogin/ActiveX).
+   - Documentacao completa: **`docs/PC_MANAGER_DEEP_UNINSTALL_ANALYSIS.md`**.
+
+4. **Proximos passos (opcional)**: adotar allowlist de regras por app no KitLugia
+   (JSON com AppUninstallKey/InstallPathFolder/Depth/FileExtension/FileCount) para refinar
+   o ScanUwpLeftovers/LeftoverJunkManager sem varrer AppData globalmente.
+
+### Sessao 05/08 (cont.) - Revo Uninstaller: analise binaria (IDA Pro, x64 nativo MFC/SQLite)
+
+Pedido do usuario: mesmo tratamento do PC Manager para o Revo real
+(`C:\Program Files\VS Revo Group\Revo Uninstaller`). Documentacao completa:
+**`docs/REVO_UNINSTALLER_ANALYSIS.md`**.
+
+**Revo e NATIVO x64 (MFC 7-14 + Prof-UIS + SQLite embutido), NAO .NET** - ao contrario
+do PC Manager, IDA Pro e a ferramenta certa (nao ilspycmd). `idat.exe -B` em
+`RevoUnin.exe` gerou .asm (110 MB) + .i64 (187 MB). A analise in-DB ficou lenta
+(load do .i64 > 5 min; IDA 9 sem `ida_bytes.find_binary`/`idc.find_str`; strings
+Delphi sao UTF-16 com prefixo de tamanho, fora do Strings window) -> **pivot para
+parsing off-line em Python 3.11** (`%TEMP%\opencode\revo\pe_scan.py` acha xrefs no
+.text por LEA RIP-relativo; `extract_funcs.py`/`func_strings.py`/`scan_density.py`
+extraem funcoes do .asm) - caminho que funciona e documentado em docs/REVO...md.
+
+**ACHADOS**:
+1. **Dispatcher CLI** (sub_140178EB0): /leftovers /continue /chactivation /hunter
+   /forcedfolder /update /implog /settings /updatesubscription SC + arg KeepFiles
+   (10 chars, preserva arquivos). /leftovers exige pNum>4 (exe, flt, + 3 alvos).
+2. **SEM snapshot global** (igual PC Manager). Scan pos-uninstall com 3 fontes de alvo:
+   (a) marcadores **ADCU/ADAU** = `\VS Revo Group\Revo Uninstaller\ADCU`/`ADAU`
+   (AppData Current User / All Users) gravados por app - 16+ call sites;
+   (b) caminho de instalacao; (c) **Registry Classes scan completo**.
+3. **Scanner de Registry Classes** (sub_14018D6C0): CLSID/Interface/Applications/
+   TypeLib/AppID/Mime/SystemFileAssociations/Record/Media Type/Local Settings/
+   ActivatableClasses + WOW6432Node, checando InprocServer32/LocalServer32/DefaultIcon/
+   OpenWithProgIds - acha referencias ao dir do app desinstalado (scan profundo).
+4. **SQLite embutido**: resultados do scan persistidos em banco; `SCAN %S`/
+   `SCAN %d CONSTANT ROW%s` = sqlite3_trace_v2. Leitura/progresso incremental.
+5. **Config** (chave `Uninstaller\`, sub_14017F960/7FB20): Create System Restore
+   Pont, FastLoadMode, StopRunExe (mata processos), DelToBin (deleta p/ Recycle Bin,
+   `%s:\$Recycle.Bin\%s`), Select leftovers by default, Use Reg Install Date,
+   Show System Components, Disable scan after uninstall, Maximize uninstall wizard.
+6. **Exclusoes**: `Uninstaller\RegExclude`, `Junk Files\Exclude\`, `Junk Files\Include\`
+   (CDlgAddTracedRegExclude). Cleaner de browsers usa chaves `Junk Files\General\*`.
+7. **Arquivador de autoruns**: strings `Registry: HKLM/HKCU Run/RunOnce/RunServices/
+   RunOnceEx/32bit`, espelhados em `SOFTWARE\VS Revo Group\Revo Uninstaller\...`.
+8. `AppData Invalid.` = MessageBoxW + ExitProcess (erro fatal quando AppData invalido).
+
+**COMPARATIVO Revo x PC Manager x KitLugia** em docs/REVO...md. Liesoes p/ KitLugia:
+1. **Marcadores ADCU/ADAU = mecanismo mais barato e preciso** para mirar AppData por
+   app no pos-scan (gravar paths na listagem/instalacao, usar no removal) - sem varrer
+   todo o AppData.
+2. Config em chave propria com toggles (DelToBin, StopRunExe, Select leftovers,
+   Disable scan) espelha o padrao de toggles que o Kit ja usa p/ GameBoost.
+3. SQLite como buffer de resultados do scan = progresso incremental, sem re-scan total.
+4. Registry Classes scan (CLSID/TypeLib/Interface) so como "scan profundo" opcional.
+5. Exclusoes (RegExclude) + filtro "ignore < 24h acesso" sao refinamentos baratos.
+
+Artefatos: `%TEMP%\opencode\revo\` (RevoUnin.exe.asm/.i64, pe_scan.py, scan_density.py,
+func_strings.py, funcs_out.txt, dump_*.py). Binarios originais intocados (somente leitura).
+
+### Sessao 05/08 (cont.) - AppsPage: ReviewPanel estilo Revo "conectado" ao uninstall
+
+Pedido do usuario: "quando voce clica para limpar o app ele mostra na tela o caminho
+direto dos itens que vai remover, igual ao Revo Uninstaller; cruzando Revo + PC Manager
+p/ um desinstalador mais solido; refazer o AppsPage para funcionar melhor (visual pode
+manter)".
+
+**Investigacao**: o Kit JA tinha o motor Revo-style completo mas ORFAO:
+- `DeepUninstaller.DeepUninstallProgram(...)` roda uninstall + p-scan (arquivos via
+  ScanLeftoverFiles, registro via ScanLeftoverRegistry, scheduled tasks, env vars) e
+  retorna `UninstallResult` com LeftoverFiles/LeftoverRegistry (+Heuristic* quando
+  captureBaseline=true). `ClassifyFileSafety`/`ClassifyRegistrySafety` (publicas)
+  classificam cada item em CleanupSafety (Safe/Moderate/Uncertain).
+- `AppsPage.xaml` tem o grid `ReviewPanel` (linha 916) com 2 tabs (Arquivos/Registro),
+  cada item mostrando `DisplayPath` (nome) + `FullPath` (caminho COMPLETO, linha 1054),
+  icone de pasta/arquivo, indicador de seguranca, `IsKept`, checboxes.
+- `AppsPage.xaml.cs` tem `ShowReviewPanel(...)` (linha 1571), `BuildFileItems`/
+  `BuildRegistryItems` (tree condensada com items navegacionais), `UpdateReviewCounts`,
+  `BtnReviewDeleteFiles/Reg` (deleta SO o marcado, ignora informativos), `BtnReviewRestore`
+  (restaura backup), `BtnReviewCopy` (copia caminhos), `BtnReviewBack` (volta salvando
+  o restante na aba Residuo + remove da lista se tudo deletado).
+- **O REVIEW NUNCA ERA CHAMADO**: `ShowReviewPanel` so tinha a definicao (rg == 1 match).
+  O fluxo individual (`BtnProgramRemove_Click`) desinstalava, guardava leftovers numa
+  entrada da aba Residuos silenciosamente e mostrava MessageBox — sem tela de caminhos.
+
+**CORRECAO (`BtnProgramRemove_Click`, AppsPage.xaml.cs ~linha 837)**:
+1. Se houver leftovers (arquivo+registro > 0): classifica cada item com
+   `ClassifyFileSafety`/`ClassifyRegistrySafety` (passa installLocation para o reviewer
+   marcar Safe os que estao dentro do instalador), captura `_reviewProgramContext`,
+   e chama `ShowReviewPanel(...)` — usuario ve os caminhos diretos, marca o que
+   deletar, e so o que estiver selecionado (e CanDelete) e removido.
+2. Sem leftovers: MessageBox simples de sucesso + remove da lista (fluxo original).
+
+O ciclo de seguranca ja existia: `BtnReviewBack` salva o restante na aba
+Residuo e, quando tudo for deletado, remove o programa da lista (`_reviewProgramContext`).
+
+Ex referencias para continuar: `ClassifyFileSafety` (DeepUninstaller.cs:482),
+`ClassifyRegistrySafety` (530), `ShowReviewPanel` (AppsPage.xaml.cs:1571),
+`BtnReviewBack_Click` (1848), XAML `ReviewPanel` (AppsPage.xaml:916).
+
+Build: 0 erros / 122 warnings (baseline nullable pre-existentes).
+
+**A TESTAR (VM)**: abrir AppsPage -> REMOVER um app com lixo -> deve abrir o grid
+com os caminhos completos, marcar/desmarcar, deletar so o marcado, Remover registro,
+botao Restaurar (backup), e confirmar que ao voltar so um app sai da lista.
+
+### Sessao 05/08 (cont.) - Performance: leitura duplicada no ScanFolderConfidence
+
+Sintoma: o usuario pediu de novo o fluxo e se o desinstalador esta MAIS RAPIDO.
+
+Fluxo verificado (AppsPage.xaml.cs): BtnProgramRemove_Click -> DeepUninstallProgram
+com captureBaseline:false (SEM snapshot pre/post global - padrao Revo/PCM, ja era o
+maior economia) -> leftover != 0 -> classifica e abre ShowReviewPanel (estilo Revo).
+Build de ontem: 0 erros / 122 warnings.
+
+Gargalo restante encontrado (DeepUninstaller.cs): `ScanFolderConfidence` fazia 2 passadas
+de leitura de binarios por pasta:
+- `VerifyFolderByContent` (linha ~1182): FileVersionInfo + Authenticode de cada .exe/.dll.
+- `HasUnrelatedExecutables` (linha ~1206): relia o MESMO FileVersionInfo de todos
+  os executaveis para a penalty ExecutablesArePresent.
+
+**CORRECAO**: unificadas em UMA `ProbeFolderBinaries` (retorna (VerifiedMatch,
+HasUnrelated)):
+1. Uma unica passada de FileVersionInfo por arquivo (corta ~50% das leituras).
+2. Authenticode (`X509Certificate.CreateFromSignedFile`, caro) SO roda quando o
+   FileVersionInfo ainda nao confirmou o match (antes era por arquivo em cada passada).
+3. Semantica preservada: HasUnrelated = hasExecutables && !anyFviMatch (igual), e o
+   gated `match && !contentMatch && probe.HasUnrelated` mantem a penalty BCU.
+4. Chamado em ScanFolderConfidence (linha ~1182) com `probe.HasUnrelated` (linha ~1206).
+
+Build: 0 erros / 0 avisos (Core e GUI completo - app fechado p/ desbloqueio MSB3021).
+
+**A TESTAR (VM)**: desinstalar um app com muitas subpastas em AppData/ProgramFiles
+-> garantir que o conjunto de leftovers nao muda (falsos positivos/negativos
+inalterados) e o scan termine mais rapido (menos leituras de metadados).
+
+### Sessao 06/08 - Implementacao dos achados Revo no DeepUninstaller (comparacao Revo x Kit)
+
+Pedido do usuario: "implemente tudo que descobriu" para comparar DIRETO no host
+(desinstalar o mesmo app no Revo e no Kit e comparar os achados nas listas).
+
+1. **ADCU/ADAU markers (Revo)**: `CaptureDataFoldersForApp(displayName, publisher)`
+   (DeepUninstaller.cs) varre APENAS a raiz de Roaming/LocalAppData/ProgramData
+   e captura pastas cujo nome casa com displayName/publisher (exato/StartsWith/
+   contem - `TokensMatch`). CHAMADO em `DeepUninstallProgram` e `ForceDeleteProgram`
+   apos o scan: se a pasta ainda existe apos a desinstalacao -> adicionada ao
+   `LeftoverFiles` e registrada em `result.DataFoldersCaptured`. Preciso e barato
+   (sem deep-walk global), espelha o "marcador ADCU/ADAU" do Revo sem necessidade
+   de rastrear instalacao.
+
+2. **RegExclude (Revo) persistente**: lista de exclusoes do usuario em registro
+   `HKCU\Software\KitLugia\DeepUninstall\Exclude` (MultiString). O burdenoff:
+   `GetUserExclusions`/`AddUserExclusion`/`RemoveUserExclusion`/`ClearUserExclusions`
+   (publicos). Aplicada em `ScanLeftoverFiles` E `ScanLeftoverRegistry` (filtro
+   final que remove resultados que casam com exclusao). `IsExcludedPath` suporta
+   prefixo exato, subpasta e wildcard basico '*' / '?'.
+
+3. **UI "Ignorar Sempre"** no ReviewPanel (AppsPage): botao novo em cada tab
+   (arquivos e registro) -> chama `AddUserExclusion` para os itens selecionados
+   e os remove da lista atual. Espelha o RegExclude do Revo.
+
+4. **DataFoldersCaptured visivel**: `ShowReviewPanel` mostra quantas pastas de
+   dados foram capturadas e o primeiro exemplo no ReviewInfoText.
+
+Build: 0 erros / ==... 122 warnings (baseline). Proximo: testar no VM
+comparando Revo x Kit no mesmo app.
+
+### Sessao 06/08 (cont.) - BUG: remocao UWP "falhava feio" silenciosamente
+
+Sintoma: abrir AppsPage > bloatware (UWP) > REMOVER um app. O `DeepRemoveBloatwareAppAsync`
+(SystemTweaks.cs) engolia TODOS os erros do `RemovePackageAsync` (catch vazio) e SEMPRE
+retornava (true, "...sucesso") mesmo quando nada era removido - era impossivel saber o motivo.
+Apps provisionados / que exigem -AllUsers falhavam mudos.
+
+**CORRECAO (SystemTweaks.DeepRemoveBloatwareAppAsync)**:
+1. `RemovePackageAsync` agora AWAITA o `DeploymentResult` e le `dr.ErrorText`; falha ->
+   registrada em `errors`. Antes: catch vazio engolia tudo.
+2. Fallback: `Remove-AppxPackage -AllUsers -Package '<fullname>'` (robusto p/ apps
+   provisionados) com guarda de ExitCode + stderr.
+3. VERIFICACAO REAL no fim: `FindPackages(packageNameBase)` (casa por PACKAGE NAME, nao
+   FullName!) -> se ainda instalado e sem erro conhecido, marca erro. Retorna (false, msg).
+4. UI (AppsPage.BtnBloatwareAction_Click): MessageBox de falha agora mostra `result.Message`.
+5. `FindPackages(packageFullName)` corrigido -> `FindPackages(packageNameBase)` (FullName
+   nunca casa na API PackageManager).
+
+Build: 0 erros / 104 warnings (baseline). Steps anteriores (DISM provisioned, limpeza
+LocalAppData\Packages e WindowsApps) mantidos.
+
+### Sessao 06/08 (cont.) - FLOOD de "Exception suppressed" durante scan de residuos (VS Code/zcode)
+
+Sintoma: ao desinstalar o zcode (VS Code), durante "Escaneando resíduos..." o log explodia
+com centenas de `[AVISO] (Unknown): Exception suppressed` (~1/s por ~10s). Cada arquivo ou
+pasta inacessivel (acesso negado em subpastas, metadados corrompidos em binarios) disparava
+um LogWarning individual nos catchs do scan - sem nenhuma informacao util.
+
+**CORRECOES**:
+1. **Rate limiter no Logger.cs**: `LogWarning` com mensagem contendo "Exception suppressed"
+   passa por `ShouldSuppressRepeated` (janela de 60s): loga a 1a ocorrencia, depois so
+   um resumo a cada 100 repeticoes da MESMA mensagem/contexto. Flood de 200+ vira ~2 linhas.
+2. **ProbeFolderBinaries (DeepUninstaller.cs)**: catchs do FileVersionInfo/Authenticode
+   agora silenciosos (sem LogWarning por arquivo) + contador `fviFailures`; no fim loga UMA
+   linha com o total e o motivo real ("Acesso negado/metadados corrompidos em N binarios de X").
+3. **ScanFolderConfidence**: `Directory.GetDirectories` movido para try proprio com log do
+   `ex.Message` real (rate-limited) e `return` - antes o catch generico engolia e continuava.
+
+Build: 0 erros / 122 warnings (baseline). Proximo: reproduzir o scan do zcode e conferir
+que o log fica limpo (1-2 avisos no maximo) e que o motivo real aparece quando houver falha.
+
+### Sessao 06/08 (cont.) - Usabilidade do Review: ShortPath + Copiar com marcacao
+
+Feedback do usuario apos testar o review do zcode (VS Code):
+1. **Caminhos longos**: `AppCleanupItem.ShortPath` (AppsPage.xaml.cs) colapsa o caminho
+   para `C:\Users\Lugia\...\Local\@zcodedesktop-updater\pending` (>52 chars: primeiro +
+   ultimos 2 segmentos com "..."), ToolTip mantem o FullPath. Aplicado nas 2 tabs
+   (Arquivos/Registro) via `Text="{Binding ShortPath}"`.
+2. **Copiar anotado**: `BtnReviewCopy_Click` agora anexa " MARCADO PARA DELETAR" a cada
+   item selecionado (mesmo filtro do delete: IsSelected && CanDelete && !IsNavigational);
+   itens nao marcados saem sem sufixo. Status mostra "(N marcados para deletar)".
+3. **Velocidade do scan** (DeepUninstaller.cs):
+   - `ProbeFolderBinaries`: cap de 12 executaveis por pasta (MaxProbeFiles); HasUnrelated
+     so e afirmado quando a pasta foi 100% sondada (evita falso negativo em pasta gigante).
+   - `ScanFolderConfidence`: gate `nameMatch || HasNameRelation(displayName, dirName)`
+     ANTES do probe caro — pastas sem relacao nenhuma de nome nao leem FileVersionInfo.
+     `HasNameRelation` = token do app (>=4 chars, fora de ForbiddenScanFolderNames)
+     contido no nome da pasta (pega "@zcodedesktop-updater" -> zcode).
+4. **BUG de exclusoes nao carregadas**: `ScanLeftoverFiles`/`ScanLeftoverRegistry`
+   usavam `_userExclusions.Count > 0` sem `LoadExclusionsIfNeeded()` — na 1a execucao
+   da sessao a lista em memoria estava vazia e as exclusoes salvas eram IGNORADAS.
+   Corrigido: ambos chamam `GetUserExclusions()` (que carrega do registro) antes do gate.
+5. **SEGURANCA (review Revo/PCM)**: `CaptureDataFoldersForApp` usava publisher como
+   token de nome — publisher generico ("Microsoft") casaria `%AppData%\Microsoft`
+   (compartilhada por dezenas de apps) como "dado do app". Corrigido: publisher em
+   `GenericPublishers` nunca vira token; so o displayName discrimina. Espelha o
+   ADCU/ADAU do Revo que grava paths EXATOS, nao heuristica por publisher.
+
+Build Core: 0 erros / 18 warnings. GUI: 0 erros (so MSB3021 quando app aberto).
+
+### Sessao 06/08 (cont.) — Scan de residuos: reg_scan_ffi (Rust) DEBUGADO e funcional
+
+Sintoma: `reg_scan_ffi` retornava resultados INCONSISTENTES (n=0 / n=1 / n=3 em
+processos diferentes) mesmo com a mesma DLL (SHA256 identico), apesar do C#
+`.NET` abrir `HKLM\SOFTWARE` sem problema. O scan nativo era estavelmente 0
+enquanto o P/Invoke C# puro funcionava.
+
+**CAUSA RAIZ 1 (a mais importante)**: `fn wide(s)` produzia UTF-16 SEM o
+terminador NUL (`s.encode_utf16().collect()`). Todas as chamadas a
+`RegOpenKeyExW`(e as demais APIs de registro) liam alem do buffer procurando
+um zero — comportamento dependente do alocador: quando o heap acontecia de
+ter zero depois, "funcionava" (n=1); quando nao, `open_full_path` retornava 0
+e o scan resultava vazio. .NET P/Invoke anexa o NUL automaticamente, por isso
+o C# sempre funcionava. `open_key`, `scan_key`, `debug` etc. todos usavam
+`wide()`. **Corrigido**: `wide()` agora faz `v.push(0)`.
+
+**CAUSA RAIZ 2**: `confidence_generate_impl` fazia fatiamentos por byte
+`display_name[..folder_name.len()]` / `folder_name[..display_name.len()]` que
+PANICAM ("end byte index ... is not a char boundary; it is inside '™'") quando
+o corte caia dentro de um caractere multi-byte (ex: pastas com '™' no nome).
+`panic = "abort"` no release matava o processo inteiro. Corrigido: usa
+`.get(..len).is_some_and(...)`, que retorna None no corte invalido (seguro).
+
+**Correcoes no lado C#**:
+1. `NativeRegistry.cs` REEscrito: marshalling de `StringBuilder` remove-se no
+   primeiro `\0` (inutil para multi-string NUL-terminado) — agora usa
+   `IntPtr` buffer + `Marshal.PtrToStringUni` com avanco por `len+1`. Probe
+   de `UseNative` em ctor estatico chamava `Scan` (que gate) antes de ser
+   setado — o probe agora chama `reg_scan_ffi` diretamente com buffer IntPtr.
+2. Tres pontos de integracao (DeepUninstaller) continuam: `ScanHiveForNames`
+   (mode 0), `ScanSoftwareRecursive` (mode 1, depth==0), `ScanHiveByValues`
+   (mode 2), cada um com fallback C# se `NativeRegistry.Scan` retorna null.
+
+**TESTADO (06/08, host)**: DLL nova no `rust_native\target\release`, copiadas
+para bin Core Debug/Release + GUI Debug/Release. Resultados DETERMINISTICOS:
+- `reg_scan_ffi("HKEY_LOCAL_MACHINE\SOFTWARE", FN)
+  "7-Zip"/install, mode 1` -> n=2: `SOFTWARE\7-Zip` + `SOFTWARE\Classes\CLSID\{23170F69...}` (CLSID real do 7-Zip, match por valor) — repetido 6x idempotente.
+- `mode 2` CLSID -> n=1 (o mesmo CLSID). `mode 0` Run + "x" -> n=0.
+- `mode 1` na arvore inteira de SOFTWARE com nome sem match: n=0, 3x, sem crash
+  (stress nao panica).
+- C# wrapper (`KitLugia.Core.NativeRegistry`) idem via harness dotnet console
+  (`UseNative: True`, 3 linhas de scan compativeis).
+- Build Core Debug/Release: 0 erros / 18 warnings (baseline nullable).
+
+Obs: `clean_name` usa regex (RE_TRIM_PUBLISHER etc.) — nao afeta. Demais
+exports FFI intocados.
+
+### Sessao 06/08 (cont.) — Scan nativo agora CONSISTE com o C#
+
+Flags para lembrar:
+
+- `wide()` = `encode_utf16 + push(0)` — SEMPRE NUL-terminated. Nunca passar
+  um `Vec<u16>` sem terminator para Advapi32.
+- `read` de string do FFI: usar `Marshal.PtrToStringUni(IntPtr.Add(buf, pos*2))`
+  com `pos += len + 1`; `StringBuilder` como buffer de saida do reg_scan_ffi
+  estava errado.
+- `confidence_generate_impl` nao usa mais indexacao por `..len()` — usar
+  `get(..).is_some_and`.
+
+### Proxima sessao (05/08 cont.)
+- [x] ~~Conectar o ReviewPanel (Revo-style) ao fluxo de desinstalacao individual~~ (FEITO)
+- [x] ~~Eliminar leitura duplicada de FileVersionInfo (VerifyFolder x HasUnrelated)~~ (FEITO: ProbeFolderBinaries)
+- [x] ~~Implementar achados do Revo: ADCU/ADAU markers + RegExclude + "Ignorar Sempre"~~ (FEITO 06/08)
+- [ ] Testar no app: REMOVER app -> review abre com caminhos diretos -> deletar
+- [ ] Comparar direto: Revo x Kit no mesmo app (listas de leftovers) - PREFERENCIALMENTE PRONTO p/ o ZCode (ver sessao 06/08 noite)
+- [ ] (opcional) Mesmo fluxo no batch (remover N apps -> abrir review consolidado por app)
+- [ ] (opcional) Allowlist de residuos por app no KitLugia (estilo PC Manager ResidualRule)
+- [ ] (opcional) Marcadores de path de dados por app no ScanUwpLeftovers (estilo Revo ADCU/ADAU)
+
+### Sessao 06/08 (noite) - CAUSA RAIZ: scan de registro achava 0 no ZCode (Revo achava 4)
+
+**Sintoma**: desinstalar ZCode (VS Code fork) via kit -> review abria com 0 residuos de
+registro, mas o Revo achava: `HKCU\Software\Classes\CLSID\{538D58C6-2C65-4374-B215-C229163232B7}`
+(LocalServer32 -> ZCode.exe), `Directory\shell\ZCode.OpenInZCode`, `Drive\shell\ZCode.OpenInZCode`
+(command), e `HKCU\Software\Classes\zcode` (URL Protocol + shell\open\command).
+
+**Causa raiz (3 bugs, todos em DeepUninstaller.cs)**:
+1. **`ScanComByFilePath` abortava tudo com `!Directory.Exists(installLocation)`**
+   (linha ~3904). O ZCode instalava em `...\Programs\ZCode` e DEPOIS da uninstall o
+   diretorio NAO existia mais -> o scan COM inteiro (CLSID/TypeLib/Interface) morria
+   antes de comecar. Residual com exe deletado e o caso mais comum de scan pos-uninstall.
+2. **`ScanComClsidEntries`/`ScanComTypeLibEntries` exigiam `File.Exists(filePath)`**
+   (linhas ~4026/4114) -> CLSID que aponta p/ exe ja deletado era pulado.
+3. **Escopo**: classPathsNominal so tinha HKLM pra `Directory\shell`/`*\shell` (nunca
+   HKCU), nao cobria `Drive\shell`/`Directory\Background\shell`, nao cobria protocolos
+   URL custom (`Classes\zcode`), e `guidHivesNominal` nao tinha os hives HKCU
+   (CLSID/AppID/Interface/TypeLib) para varredura por valor.
+
+**Correcao (generica, estilo Revo, sem hardcode por app)**:
+- Removido o gate `Directory.Exists` e `File.Exists` - o match e so por prefixo de path
+  (`StartsWith(normalizedInstall)`), que ja e seguro (nao da falso positivo).
+- `guidHivesNominal`/`guidHivesExtra`: todos os hives HKCU (Classes\CLSID/AppID/Interface/TypeLib)
+  + `HKCU\Classes\Directory\shell`/`Drive\shell`/`Background\shell` + `HKCU\SOFTWARE\Classes` raiz.
+- NOVOS `ScanContextMenuHandlers` (escaneia `Directory\shell`, `Drive\shell`, `*\shell`,
+  `Directory\Background\shell` - le subchave `command` e bate path) e `ScanProtocolHandlers`
+  (so keys com valor `URL Protocol` + `shell\open\command` referenciando install; filtra
+  nomes >32 chars / com ponto para nao varrer os milhares de ProgID/extensoes).
+- Helper `CommandStringReferencesInstall(cmd, normalizedInstall)` (primeiro token com
+  path, seguro).
+- Chamados dentro de `ScanComByFilePath` (agora com param `displayName`), por raiz HKLM/HKCU.
+
+**TESTADO (host, 06/08 noite, harness reflection em ZCode 3.2.2, install dir DELETADO)**:
+- `ScanComByFilePath`: 1249 ms -> **4 itens** (CLSID + Directory\shell + Drive\shell + zcode).
+- `ScanLeftoverRegistry` FULL (Moderate): **4 itens**, deterministico em 2+ runs (~4.6 s).
+- Antes: 0 itens. Agora bate com o achado do Revo.
+- Build solucao: 0 erros / 122 warnings (baseline nullable).
+
+Flags aprendidas (evitar regressao):
+- COM match SEM `File.Exists`: um leftover com exe deletado ainda e um residuo valido.
+- `ScanHiveByValues`/`ScanSoftwareRecursive` JA aceitam installLocation; o problema era o
+  gate no caminho COM que matava o scan todo.
+- O fluxo do review (`BtnProgramRemove_Click`) chama `DeepUninstallProgram`
+  (captureBaseline:false) -> `ScanLeftoverRegistry` com displayName + installLocation.
+
+### Sessao 06/08 (madrugada) - installLocation vazio no GUI: ResolveInstallLocation (registro-primeiro)
+
+**Sintoma**: o harness (com path passado explicitamente) achava os 4 itens do Revo, mas o
+GUI real do ZCode mostrava REGISTRO vazio (arquivos apareciam). Log: `ScanLeftoverFiles:
+1005 ms (4 itens)`, `[REG] ComByFilePath: 26 ms` (early-return), `ScanLeftoverRegistry:
+931 ms (0 itens)`.
+
+**Causa raiz**: `program.InstallLocation` vazio no GUI -> `RunScanPhaseAsync` recebia
+`installLocation=""` -> `ScanComByFilePath`/scan de registro por path abortava antes de
+começar. `GetInstallLocationFromRegistry` retorna null quando a chave Uninstall nao tem
+InstallLocation OU o dir nao existe mais (pos-uninstall). Na VM/teste manual o path era
+passado direto, por isso o harness "funcionava" e o GUI nao.
+
+**Correcoes (DeepUninstaller.cs)**:
+1. `InferInvitoDirectory` (novo): infer de partir de leftovers de ARQUIVOS que ainda
+   existem (DCU/ADAU-style) — leaf name match + under Programs + hasExe.
+2. `ExtractInstallDirFromRegistryPaths` (novo, MAIS FORTE): varre VALUES do registro que
+   ainda apontam p/ o exe do app — CLSID `LocalServer32`/`InprocServer32` (SUBKEY, nao
+   valor! `GetValue("LocalServer32")` retorna null; abrir subchave e ler `(default)`),
+   `shell\open\command` (tambem subkey `(default)`), `URL Protocol` de Classes, e
+   DisplayIcon/InstallLocation/UninstallString das chaves Uninstall. Sem `Directory.Exists`
+   — funciona MESMO quando a pasta foi deletada (caso pos-uninstall).
+3. `ResolveInstallLocation`: registry-primeiro, leftovers-depois. Aplicado nos 3 fluxos
+   (`RunScanPhaseAsync` L276, `DeepUninstallProgram` obsoleto L534, `ScanLeftovers` L585).
+4. Adicionado `using System.Text.RegularExpressions` (nao existia!). `BuildDisplayTokens`
+   split agnostico de versão no nome. Quirks: altura de ":", 65+).
+
+**TESTADO (host, harness reflection)**: `ScanLeftovers('ZCode 3.2.2', pub empty,
+Moderate)` agora retorna **FILES 1 / REGISTRY 4** (CLSID + Directory\shell +
+Drive\shell + zcode) — identico ao Revo, MESMO com installLocation vazio e instalavel
+deletado. `ExtractInstallDirFromRegistryPaths` -> `C:\...\Local\Programs\ZCode` (recover
+do CLSID HKCU LocalServer32). Build solucao: 0 erros / 104 warnings (baseline).
+
+Flags para lembrar:
+- `LocalServer32` de CLSID e `shell\open\command` de protocolo/verb sao **SUBKEYS** cujo
+  exe esta no valor `(default)` — usar `OpenSubKey(nome)?.GetValue(null)`, nao
+  `GetValue(nome)`.
+- Quando installLocation chega vazio, SEMPRE tenta o path scan de formagra antes de
+  desistir: o registro guarda o dir/exec exato que os leftovers COM ainda apontam.
+- Re-testar no GUI: remover ZCode de novo e conferir que o review agora abre com os
+  4 residuos de registro (REGISTRO nao vazio).
+
+### Sessao 08/08 - PathRepair robusto (nunca remove caminhos bons) + Auto-start universal
+
+Pedido do usuario: "deixe o PathRepair mais robusto: que ele adicione e nunca remova caminhos bons".
+Segundo pedido: auto-start (iniciar com o Windows) e "arquivos do appdata" nao funcionavam
+em instalacao nova (botao verde Otimizacao Inteligente no DashboardPage marca ChkStartWithWindows
+e chama SetAutoStart).
+
+1. **PathRepair.cs endurecido (Core)**:
+   - `RepairPathEntries` (caso Missing/`.dotnet\tools`): se `Directory.CreateDirectory` falhar,
+     a entrada agora e MANTIDA no PATH (`repaired.Add(entry.CleanValue)` sempre) — antes era
+     removida silenciosamente.
+   - `EnsureSystemPathMinimum`: minimos adicionados entram no `seen` (evita duplicar).
+   - `EnsureUserPathMinimum` (~L352): ignora caminhos que ainda nao existem (exceto vars `%...%`).
+   - `RecoverFromExecutableScan` (~L390): try/catch por alvo; filtro `avoidSubstrings`
+     (`node_modules`, `\.git\`, `\sdk\`, `\examples\`, `\test\`, `\tests\`, `\cache\`,
+     `\scratch\`, `\resources\app\`); valida `Directory.Exists`.
+2. **GeneralRepairManager.cs (~L1216)** ("Reparar PATH do Sistema"): bloco User PATH agora
+   **adiciona de verdade** os programas faltantes via `EnsureUserPathMinimum(fmtPath, recovered)`
+   dentro de try/catch; `SetEnvironmentVariable` se `fmtChanged || addedPaths.Count > 0`;
+   typo `errMsg` corrigido (era `{errMsg}` na interpolacao).
+   Local: manual na RepairsPage (`GetAllRepairs`) E automatico no Guardian (Guardian.cs:2709,
+   mesmo fluxo de metodos — RepairPathEntries -> EnsureSystemPathMinimum -> EnsureUser +
+   RecoverFromExecutableScan fallback).
+3. **Valorant overlay (bug "tela escura sem cliques")**: 2 causas corrigidas —
+   (a) scan sincrono na UI thread (`RunExternalProcess` e bloqueante) congelava a janela:
+       cada check agora roda em `Task.Run`; guard `_isClosed` faz o X funcionar durante o scan;
+   (b) `_isRunningRepair` ficava `true` apos o fluxo do Valorant (return sem reset) e traia
+       todos os outros reparos — resetado antes do `ShowValorantDiagnosticPanel(); return;`.
+   "Aplicar Reparo" (bcdedit hypervisorlaunchtype + 2 reg DeviceGuard) movido para
+   `ApplyValorantRepairAsync` (Task.Run).
+4. **Auto-start universal (TrayIconService.cs)** — causa raiz: auto-start dependia SO de
+   Task Scheduler com `RunLevel.Highest`, que em conta sem admin "registra" a tarefa mas ela
+   NUNCA dispara (falha silenciosa); fallback Registry existia mas era pos-falha, e o .lnk na
+   pasta Startup (que fica no AppData) NUNCA era criado. Novo desenho com 3 metodos sem duplicar o boot:
+   - `IsAutoStartEnabled()`: retorna true se QUALQUER metodo ativo apontar para o exe atual
+     (1) Registry HKCU `Run` (universal, com/sem admin) (2) pasta Startup `.lnk` e
+     (3) Task Scheduler best-effort. Retorna versao antiga de task como mismatch.
+   - `SetAutoStart(enable=true)`: metodo 1 = HKCU Run (universal); metodo 2 = .lnk na pasta
+     Startup so se o Registry falhar; metodo 3 = Task Scheduler SOMENTE elevado
+     (`IsRunningElevated()` via WindowsIdentity) — ao criar/habilitar a tarefa remove
+     Registry + .lnk para nao duplicar a execucao no boot. Mutex global do Program.cs
+     (KitLugia_SingleInstance) cobre qualquer duplicidade residual.
+   - `SetAutoStart(false)`: remove os 3 (task + registry + lnk), nunca deixa lixo.
+   - Helpers novos: `SetRegistryEntry`, `SetStartupShortcut` (reusa
+     `StartupManager.CreateShortcut` do Core), `IsRunningElevated`.
+Build (GUI, 08/08): **0 erros / 104 warnings (baseline)**.
+
+**A TESTAR**: marcar "Iniciar com o Windows" no Dashboard (botao verde) -> conferir
+Registry Run `HKCU\...\Run\KitLugia` OU pasta Startup `KitLugia.lnk` criada -> reiniciar ->
+kit abre com --tray. Em maquina sem admin o checkbox deve continuar aceso apos reboot.
+
+### Sessao 08/08 (cont.) — RmCacheLoc (NVIDIA) + auto-start antes do logon
+
+Pedido do usuario: (1) adicionar `RmCacheLoc` na TweaksPage (card L2/L3) "e ele precisa
+so colocar o numero de processadores logicos"; (2) o kit iniciar junto do boot do
+Windows, nao so no logon ("alguns apps iniciam antes de eu fazer logon").
+
+1. **RmCacheLoc** (pesquisa web confirmou: valor do driver NVIDIA — Resource Manager,
+   prefixo `Rm`; aparece nos .inf oficiais como `HKR,,RmCacheLoc`; guias de otimizacao
+   usam o numero de nucleos LOGICOS da CPU). `SystemTweaks.cs`:
+   - `FindNvidiaAdapterRegPaths()` (novo, resolver generico) — varre DUAS arvores e
+     retorna TODOS os caminhos NVIDIA (filtro `DriverDesc` ou
+     `HardwareInformation.AdapterString` contendo "NVIDIA"):
+     (a) PnP software key `Control\Class\{4d36e968-...}\00xx` (aceite 0000 OU 0004,
+         subchaves numericas), o caminho canonico escrito pelos INF do driver;
+     (b) espelho `Control\Video\{GUID}\0000` (o Windows cria um por adaptador).
+     Testado no host: achou `Class\0000` (RTX 5070 Ti) + `Video\{3E046CDA-9115-11F1-
+     8047-0E12A5BE7880}\0000` (o caminho real do regedit do usuario).
+   - `IsRmCacheLocSet()` — true se QUALQUER caminho NVIDIA tiver DWORD > 0.
+   - `ApplyRmCacheLocTweak()` — grava `RmCacheLoc = Environment.ProcessorCount`
+     (DWord) em TODOS os caminhos encontrados (nunca erra o alvo). Requer admin (HKLM).
+   - `RevertRmCacheLocTweak()` — deleta o valor em todos os caminhos.
+   - `ToggleRmCacheLocTweak()` — padrao ToggleAutoCacheTweak (mensagem com o numero aplicado).
+2. **UI TweaksPage**: nova linha "RmCacheLoc (NVIDIA)" dentro do card Cache de CPU
+   (acima do Nagle): botao info, `InfoRmCacheLoc` (status do valor), `StatusRmCacheLoc`
+   e toggle `ChkRmCacheLoc` (handler espelhando `ChkL2Cache_Click` via
+   `ToggleRmCacheLocTweak`). LoadSettings carrega `IsRmCacheLocSet()`.
+3. **Auto-start no boot** (`TrayIconService.SetAutoStart`, bloco task admin):
+   - Adicionado `BootTrigger { Delay = TimeSpan.Zero }` junto ao `LogonTrigger` — a task
+     registra "ao iniciar" alem de "no logon" (com Fast Startup/auto-login inicia o mais
+     cedo possivel; `ExecutionTimeLimit=0` + Priority High mantidos).
+   - `td.Settings.MultipleInstances = TaskInstancesPolicy.IgnoreNew` — evita processo
+     duplo caso Boot e Logon disparem na mesma janela. Obs: enum na API TaskScheduler
+     2.12.2 e `TaskInstancesPolicy` (nao `TaskMultipleInstancesPolicy` — sem build).
+
+Build: **0 erros / 104 warnings (baseline)**.
+
+**A TESTAR**: TweaksPage -> toggle RmCacheLoc -> conferir `regedit` na subchave NVIDIA
+(0000/0001...) com `RmCacheLoc = N`; reiniciar e ver task agendada disparando no boot
+(taskchd.msc > KitLugia > Triggers: "Ao iniciar o computador" + "Ao fazer logon").

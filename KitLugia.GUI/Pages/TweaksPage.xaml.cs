@@ -78,6 +78,7 @@ namespace KitLugia.GUI.Pages
                 bool gdiScaling = SystemTweaks.IsGdiScalingDisabled();
 
                 bool l2CacheSet = SystemTweaks.IsSecondLevelDataCacheSet();
+                bool rmCacheLocSet = SystemTweaks.IsRmCacheLocSet();
                 bool nagleDisabled = SystemTweaks.IsNagleAlgorithmDisabled();
                 bool coreParkingDisabled = SystemTweaks.IsCoreParkingDisabled();
                 var cpuInfo = SystemTweaks.GetCpuInfo();
@@ -187,6 +188,12 @@ namespace KitLugia.GUI.Pages
                     // Hardware & Rede
                     ChkL2Cache.IsChecked = l2CacheSet;
                     UpdateLabel(StatusL2Cache, l2CacheSet, "Aplicado", "Padrão");
+
+                    ChkRmCacheLoc.IsChecked = rmCacheLocSet;
+                    UpdateLabel(StatusRmCacheLoc, rmCacheLocSet, "Aplicado", "Padrão");
+                    InfoRmCacheLoc.Text = rmCacheLocSet
+                        ? $"Aplicado: {Environment.ProcessorCount} núcleos lógicos (NVIDIA)."
+                        : "Configurado com o numero de nucleos logicos.";
 
                     string cacheStr = cacheKb > 0 ? $"{cacheKb} KB" : "Não definido";
                     InfoCpu.Text = $"CPU: {cpuInfo.Name}  |  L2: {cpuInfo.L2CacheKb} KB  |  L3: {cpuInfo.L3CacheKb} KB  |  Registry: {cacheStr}";
@@ -1284,6 +1291,31 @@ namespace KitLugia.GUI.Pages
                 UpdateLabel(StatusL2Cache, targetActive, "Aplicado", "Padrão");
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("CACHE CPU", targetActive ? "Cache L2/L3 configurado conforme sua CPU." : "Cache L2/L3 restaurado para padrão.");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkRmCacheLoc_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkRmCacheLoc.IsChecked == true;
+                var result = await Task.Run(() => SystemTweaks.ToggleRmCacheLocTweak());
+                if (!result.Success)
+                {
+                    ChkRmCacheLoc.IsChecked = !targetActive;
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowError("RMCACHELOC", result.Message);
+                }
+                else
+                {
+                    UpdateLabel(StatusRmCacheLoc, targetActive, "Aplicado", "Padrão");
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowInfo("RMCACHELOC", result.Message);
+                }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }

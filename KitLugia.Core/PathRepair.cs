@@ -242,13 +242,14 @@ namespace KitLugia.Core
                             try
                             {
                                 Directory.CreateDirectory(entry.ExpandedValue);
-                                repaired.Add(entry.CleanValue);
                                 actions.Add($"Criada pasta: {entry.CleanValue}");
                             }
                             catch
                             {
-                                actions.Add($"FALHA ao criar pasta: {entry.CleanValue}");
+                                actions.Add($"[AVISO] FALHA ao criar pasta (mantida no PATH): {entry.CleanValue}");
                             }
+                            // Nunca remover entrada existente: mantida mesmo se a criacao falhar
+                            repaired.Add(entry.CleanValue);
                         }
                         else
                         {
@@ -320,7 +321,12 @@ namespace KitLugia.Core
                     string cExpanded = Environment.ExpandEnvironmentVariables(c).TrimEnd('\\');
                     if (cExpanded.Equals(expanded, StringComparison.OrdinalIgnoreCase)) { found = true; break; }
                 }
-                if (!found) result.Add(m);
+                if (!found)
+                {
+                    // Marca como visto para evitar duplicar com entradas atuais equivalentes
+                    seen.Add(m);
+                    result.Add(m);
+                }
             }
 
             foreach (var c in currentEntries)
@@ -341,7 +347,14 @@ namespace KitLugia.Core
             foreach (var kvp in installedPaths)
             {
                 string pathToAdd = kvp.Value;
+                if (string.IsNullOrWhiteSpace(pathToAdd)) continue;
                 string expanded = pathToAdd.TrimEnd('\\');
+                // Nunca adicionar caminho que nao existe (exceto variaveis de ambiente)
+                if (!expanded.Contains('%') && !Directory.Exists(expanded))
+                {
+                    addedPaths.Add($"Ignorado (diretorio nao existe): {pathToAdd}");
+                    continue;
+                }
                 bool found = false;
 
                 foreach (var c in currentEntries)
@@ -366,9 +379,73 @@ namespace KitLugia.Core
             return (string.Join(";", result), addedPaths);
         }
 
+        public static Dictionary<string, string> RecoverFromExecutableScan()
+        {
+            // Recuperacao baseada no disco: procura .exe conhecidos e retorna dir pai
+            var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string[] searchRoots = new[] {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            };
+            var targets = new (string Name, string Pattern)[] {
+                ("winget", "winget.exe"), ("node", "node.exe"), ("npm", "npm.cmd"),
+                ("git", "git.exe"), ("7z", "7z.exe"), ("pwsh", "pwsh.exe"),
+                ("dotnet", "dotnet.exe"), ("cargo", "cargo.exe")
+            };
+            // Subpastas que provavelmente NAO sao o local de instalacao principal do programa
+            string[] avoidSubstrings = new[] {
+                "node_modules", "\\.git\\", "\\.svn\\", "\\sdk\\", "\\examples\\",
+                "\\test\\", "\\tests\\", "\\cache\\", "\\scratch\\", "\\resources\\app\\"
+            };
+            foreach (var root in searchRoots)
+            {
+                if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
+                foreach (var (name, pattern) in targets)
+                {
+                    if (found.ContainsKey(name)) continue;
+                    try
+                    {
+                        // try/catch por alvo: falha num subdiretorio nao aborta os demais
+                        var matches = Directory.GetFiles(root, pattern, SearchOption.AllDirectories);
+                        if (matches.Length == 0) continue;
+                        // Prefere o match cujo diretorio nao esteja em subpasta suspeita
+                        string? best = null;
+                        foreach (var m in matches)
+                        {
+                            var dir = Path.GetDirectoryName(m);
+                            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                            string lower = dir.ToLowerInvariant();
+                            if (avoidSubstrings.Any(s => lower.Contains(s))) continue;
+                            best = dir;
+                            break;
+                        }
+                        best ??= Path.GetDirectoryName(matches[0]);
+                        if (!string.IsNullOrEmpty(best) && Directory.Exists(best))
+                        {
+                            found[name] = best;
+                        }
+                    }
+                    catch
+                    {
+                        // Sem acesso (ou erro transiente): continua para os outros alvos/raizes
+                    }
+                }
+            }
+            return found;
+        }
+
         public static Dictionary<string, string> GetInstalledProgramPaths()
         {
             var paths = new Dictionary<string, string>();
+            // Tenta recuperacao dinamica por executaveis (funciona mesmo quando registro falha)
+            var recovered = RecoverFromExecutableScan();
+            foreach (var kvp in recovered)
+            {
+                if (!paths.ContainsKey(kvp.Key)) paths[kvp.Key] = kvp.Value;
+            }
+
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);

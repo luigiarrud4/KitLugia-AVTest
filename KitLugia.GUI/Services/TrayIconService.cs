@@ -714,7 +714,9 @@ namespace KitLugia.GUI.Services
         }
 
         /// <summary>
-        /// Verifica se o auto-start está habilitado e se o caminho da tarefa corresponde à versão atual
+        /// Verifica se o auto-start está habilitado em QUALQUER um dos 3 métodos:
+        /// HKCU Run (universal), pasta Startup (.lnk no AppData) ou Task Scheduler.
+        /// Retorna true se qualquer um apontar para o executável atual.
         /// </summary>
         public static bool IsAutoStartEnabled()
         {
@@ -723,36 +725,59 @@ namespace KitLugia.GUI.Services
                 string currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 if (string.IsNullOrEmpty(currentPath)) return false;
 
-                // 1. Verificar Task Scheduler primeiro
-                using (var ts = new TaskService())
-                {
-                    var task = ts.GetTask("KitLugia");
-                    if (task != null)
-                    {
-                        if (!task.Enabled) return false;
+                // 1. HKCU Run — método universal, funciona com e sem admin
+                if (CheckRegistryAutoStart(currentPath)) return true;
 
-                        foreach (var action in task.Definition.Actions)
+                // 2. Pasta Startup (.lnk no %APPDATA%\...\Startup) — sem depender de serviço
+                if (CheckStartupFolderAutoStart(currentPath)) return true;
+
+                // 3. Task Scheduler (best-effort; pode não disparar em conta sem admin)
+                try
+                {
+                    using (var ts = new TaskService())
+                    {
+                        var task = ts.GetTask("KitLugia");
+                        if (task != null && task.Enabled)
                         {
-                            if (action is ExecAction execAction)
+                            foreach (var action in task.Definition.Actions)
                             {
-                                string taskPath = execAction.Path;
-                                if (string.Equals(taskPath, currentPath, StringComparison.OrdinalIgnoreCase))
-                                    return true;
-                                else
-                                    KitLugia.Core.Logger.Log($"⚠️ Auto-Start aponta para versão antiga: {taskPath} != {currentPath}");
+                                if (action is ExecAction execAction)
+                                {
+                                    string taskPath = execAction.Path;
+                                    if (string.Equals(taskPath, currentPath, StringComparison.OrdinalIgnoreCase))
+                                        return true;
+                                    else
+                                        KitLugia.Core.Logger.Log($"⚠️ Auto-Start aponta para versão antiga: {taskPath} != {currentPath}");
+                                }
                             }
                         }
                     }
                 }
+                catch { /* Task Scheduler indisponível — ignorar */ }
 
-                // 2. Fallback: verificar Registry Run key (caso SetAutoStart tenha caído no fallback)
-                return CheckRegistryAutoStart(currentPath);
+                return false;
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.LogError("IsAutoStartEnabled", $"Erro: {ex.Message}");
-                return CheckRegistryAutoStart();
+                return false;
             }
+        }
+
+        private static bool CheckStartupFolderAutoStart(string currentPath)
+        {
+            try
+            {
+                string startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                string lnk = System.IO.Path.Combine(startup, "KitLugia.lnk");
+                if (!File.Exists(lnk)) return false;
+
+                dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+                dynamic shortcut = shell.CreateShortcut(lnk);
+                string target = shortcut.TargetPath?.ToString() ?? "";
+                return string.Equals(target, currentPath, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
         }
 
         private static bool CheckRegistryAutoStart(string? currentPath = null)
@@ -842,62 +867,89 @@ namespace KitLugia.GUI.Services
                 string path = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 if (string.IsNullOrEmpty(path)) return;
 
+                if (!enable)
+                {
+                    // ===== DESLIGAR: remove os 3 métodos — nunca deixa lixo =====
+                    try
+                    {
+                        using var ts = new TaskService();
+                        var t = ts.GetTask("KitLugia");
+                        if (t != null)
+                        {
+                            ts.RootFolder.DeleteTask("KitLugia");
+                            KitLugia.Core.Logger.Log("✅ Tarefa agendada removida");
+                        }
+                    }
+                    catch { /* Task Scheduler indisponível — registry/lnk abaixo resolvem */ }
+                    SetRegistryEntry(false, path);
+                    SetStartupShortcut(false, path);
+                    KitLugia.Core.Logger.Log("✅ Auto-start desativado (Registry / Startup / Task limpos)");
+                    return;
+                }
 
                 CleanupOldTask();
 
+                // ===== MÉTODO 1 (universal): HKCU Run — funciona com ou sem admin =====
+                bool regOk = SetRegistryEntry(true, path);
+                if (regOk)
+                    KitLugia.Core.Logger.Log($"✅ Auto-start via Registry Run: {path} --tray");
+                else
+                    KitLugia.Core.Logger.Log($"⚠️ Registry Run falhou, tentando pasta Startup...");
 
-                try
+                // ===== MÉTODO 2 (fallback): .lnk na pasta Startup (fica no AppData) =====
+                if (!regOk)
                 {
-                    using (var ts = new TaskService())
-                    {
-                        if (enable)
-                        {
-                            // Remover entrada antiga do Registry se existir
-                            try
-                            {
-                                using var regKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
-                                if (regKey?.GetValue("KitLugia") != null)
-                                {
-                                    KitLugia.Core.Logger.Log("Removendo entrada antiga do Registry...");
-                                    regKey.DeleteValue("KitLugia", false);
-                                }
-                            }
-                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    bool lnkOk = SetStartupShortcut(true, path);
+                    KitLugia.Core.Logger.Log(lnkOk
+                        ? $"✅ Auto-start via pasta Startup: {path}"
+                        : "❌ Falha ao criar atalho na pasta Startup");
+                }
 
-                            // Verificar se tarefa já existe com caminho correto
+                // ===== MÉTODO 3 (elevado, best-effort): Task Scheduler =====
+                // Só quando o app roda como admin: registro com RunLevel.Highest sem
+                // privilégios "registra" a tarefa mas ela NUNCA dispara (falha silenciosa).
+                // Se a tarefa for criada/habilitada, remove Registry + .lnk para não duplicar o boot.
+                if (IsRunningElevated())
+                {
+                    try
+                    {
+                        using (var ts = new TaskService())
+                        {
                             var existingTask = ts.GetTask("KitLugia");
+
+                            // Tarefa existente com caminho correto → apenas habilitar e usar ela
                             if (existingTask != null)
                             {
-                                // Verificar se o caminho já está correto
                                 bool pathMatches = false;
                                 foreach (var action in existingTask.Definition.Actions)
                                 {
-                                    if (action is ExecAction execAction)
+                                    if (action is ExecAction execAction &&
+                                        string.Equals(execAction.Path, path, StringComparison.OrdinalIgnoreCase))
                                     {
-                                        if (string.Equals(execAction.Path, path, StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            pathMatches = true;
-                                            break;
-                                        }
+                                        pathMatches = true;
+                                        break;
                                     }
                                 }
 
-                                if (pathMatches)
+                                // Só reutiliza se a task antiga já tiver os 2 triggers (Boot + Logon).
+                                // Task criada ANTES da sessao 08/08 (so LogonTrigger) nao tem o
+                                // "inicia junto do boot" — nesse caso cai fora e e recriada abaixo.
+                                if (pathMatches && TaskHasBootTrigger(existingTask))
                                 {
-                                    KitLugia.Core.Logger.Log("✅ Tarefa já existe com caminho correto, apenas habilitando...");
                                     existingTask.Enabled = true;
                                     existingTask.RegisterChanges();
-                                    KitLugia.Core.Logger.Log("✅ Tarefa agendada habilitada: " + path);
+                                    SetRegistryEntry(false, path);
+                                    SetStartupShortcut(false, path);
+                                    KitLugia.Core.Logger.Log("✅ Tarefa agendada existente habilitada (substitui Registry/Startup)");
                                     return;
                                 }
-                                else
-                                {
-                                    KitLugia.Core.Logger.Log("🔄 Tarefa existe com caminho incorreto, recriando...");
-                                    ts.RootFolder.DeleteTask("KitLugia");
-                                }
+                                KitLugia.Core.Logger.Log((pathMatches
+                                    ? "🔄 Tarefa existe sem BootTrigger, recriando com boot+logon..."
+                                    : "🔄 Tarefa existe com caminho incorreto, recriando..."));
+                                ts.RootFolder.DeleteTask("KitLugia");
                             }
 
-                            // Criar nova tarefa com privilégios admin + alta prioridade de boot
+                            // Criar nova tarefa com privilégios de logon + prioridade de boot
                             var td = ts.NewTask();
                             td.RegistrationInfo.Description = "KitLugia Auto-Startup (Admin Mode)";
                             td.Principal.RunLevel = TaskRunLevel.Highest;
@@ -908,59 +960,38 @@ namespace KitLugia.GUI.Services
                             td.Settings.AllowHardTerminate = false;
 
                             // ★ OTIMIZAÇÃO TIPO WALLPAPER ENGINE: Priority High (1) = HIGH_PRIORITY_CLASS
-                            // Padrão do Task Scheduler é 7 (BELOW_NORMAL) — lento demais para boot
-                            bool turboBoot = SystemTweaks.IsTurboBootEnabled();
-                            td.Settings.Priority = turboBoot ? ProcessPriorityClass.High : ProcessPriorityClass.Normal;
+                            // Sempre High — requisito do usuário: kit inicia "junto com o sistema" sem fome de CPU
+                            // (padrão do Task Scheduler é 7 = BELOW_NORMAL, que atrasa o boot do app)
+                            td.Settings.Priority = ProcessPriorityClass.High;
 
-                            // ★ Restart on failure: se o processo morrer nos primeiros 30s depois do logon, tentar 2x
                             td.Settings.RestartCount = 2;
                             td.Settings.RestartInterval = TimeSpan.FromMinutes(1);
 
-                            // Trigger: Logon imediato para inicialização rápida
-                            var trigger = new LogonTrigger
-                            {
-                                Delay = TimeSpan.Zero,
-                                Enabled = true
-                            };
+                            var trigger = new LogonTrigger { Delay = TimeSpan.Zero, Enabled = true };
                             td.Triggers.Add(trigger);
 
-                            // Action: Executar com --tray
+                            // BootTrigger: inicia junto do boot do Windows (nao so no logon).
+                            // Com InteractiveToken o agendador dispara a task o mais cedo
+                            // possivel (com Fast Startup / auto-login, antes da sessao pronta).
+                            // MultipleInstances = IgnoreNew evita processo duplo caso Logon
+                            // e Boot disparem na mea sequencia.
+                            td.Triggers.Add(new BootTrigger { Delay = TimeSpan.Zero, Enabled = true });
+                            td.Settings.MultipleInstances = TaskInstancesPolicy.IgnoreNew;
+
                             td.Actions.Add(new ExecAction(path, "--tray", Path.GetDirectoryName(path)));
 
-                            // Registrar tarefa
                             ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
-                            KitLugia.Core.Logger.Log($"✅ Tarefa agendada com privilégios admin criada: {path}" +
-                                $" (Priority: {(turboBoot ? "High" : "Normal")})");
-                        }
-                        else
-                        {
-                            // Remover tarefa
-                            var task = ts.GetTask("KitLugia");
-                            if (task != null)
-                            {
-                                ts.RootFolder.DeleteTask("KitLugia");
-                                KitLugia.Core.Logger.Log("✅ Tarefa agendada removida");
-                            }
+
+                            // Tarefa é o método ativo → remove os demais para não duplicar o boot
+                            SetRegistryEntry(false, path);
+                            SetStartupShortcut(false, path);
+                            KitLugia.Core.Logger.Log($"✅ Tarefa agendada admin criada: {path} (Priority: High)");
                         }
                     }
-                }
-                catch (Exception taskEx)
-                {
-                    KitLugia.Core.Logger.Log($"ERRO no Task Scheduler: {taskEx.Message}");
-
-                    // Fallback para Registry (sem privilégios admin)
-                    KitLugia.Core.Logger.Log("Usando fallback Registry Run (sem privilégios admin)...");
-                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
-                    if (key != null)
+                    catch (Exception taskEx)
                     {
-                        if (enable)
-                        {
-                            key.SetValue("KitLugia", $"\"{path}\" --tray");
-                        }
-                        else
-                        {
-                            key.DeleteValue("KitLugia", false);
-                        }
+                        // Registry (ou .lnk) já garantiram o auto-start — apenas registra
+                        KitLugia.Core.Logger.Log($"⚠️ Task Scheduler indisponível ({taskEx.Message}) — usando Registry/Startup já criado");
                     }
                 }
             }
@@ -968,6 +999,74 @@ namespace KitLugia.GUI.Services
             {
                 KitLugia.Core.Logger.Log($"SetAutoStart ERROR: {ex.Message}");
             }
+        }
+
+        /// <summary>Grava/remove a entrada HKCU Run (método universal, sem admin).</summary>
+        private static bool SetRegistryEntry(bool enable, string path)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true)
+                                ?? Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+                if (key == null) return false;
+                if (enable)
+                    key.SetValue("KitLugia", $"\"{path}\" --tray");
+                else
+                    key.DeleteValue("KitLugia", false);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogWarning("SetRegistryEntry", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>Cria/remove o atalho na pasta Startup (fica no AppData, não depende de serviço).</summary>
+        private static bool SetStartupShortcut(bool enable, string path)
+        {
+            try
+            {
+                string startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                string lnk = Path.Combine(startup, "KitLugia.lnk");
+                if (enable)
+                {
+                    if (!Directory.Exists(startup)) Directory.CreateDirectory(startup);
+                    return KitLugia.Core.StartupManager.CreateShortcut(lnk, path, "--tray", "KitLugia Auto-Startup", Path.GetDirectoryName(path) ?? "");
+                }
+                if (File.Exists(lnk)) File.Delete(lnk);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogWarning("SetStartupShortcut", ex.Message);
+                return false;
+            }
+        }
+
+        private static bool IsRunningElevated()
+        {
+            try
+            {
+                using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+            catch { return false; }
+        }
+
+        private static bool TaskHasBootTrigger(Microsoft.Win32.TaskScheduler.Task task)
+        {
+            try
+            {
+                foreach (var trigger in task.Definition.Triggers)
+                {
+                    if (trigger is Microsoft.Win32.TaskScheduler.BootTrigger)
+                        return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         // Adaptive Data
