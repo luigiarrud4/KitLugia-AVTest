@@ -641,6 +641,7 @@ namespace KitLugia.GUI.Services
             public bool IsVip { get; set; } = false;
             public DateTime LastTrimTime { get; set; } = DateTime.MinValue;
             public long LastKnownWs { get; set; } = 0;
+            public long LastSeenTick { get; set; } = 0;
         }
 
 
@@ -1397,6 +1398,7 @@ namespace KitLugia.GUI.Services
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    finally { proc.Dispose(); }
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -1447,49 +1449,52 @@ namespace KitLugia.GUI.Services
 
         /// <summary>
         /// Auto-fix: se o usuário desativou GameBarPresenceWriter antes e o Windows recriou o .exe, re-desativa.
-        /// Roda apenas na inicialização do kit — sem timer/watcher de fundo.
+        /// Roda na inicialização do kit e pode ser chamado pela UI (público).
+        /// Não depende SÓ da flag salva: a existência do .bak já é prova de que o usuário desativou.
         /// </summary>
-        private void AutoFixGameBarPresenceWriter()
+        public void AutoFixGameBarPresenceWriter()
         {
-            if (!GameBarPresenceWriterDisabled) return;
-
             try
             {
                 string system32 = Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32");
                 string gameBarPath = Path.Combine(system32, "GameBarPresenceWriter.exe");
                 string backupPath = Path.Combine(system32, "GameBarPresenceWriter.exe.bak");
 
-                // Se o .exe existe E o .bak também, Windows recriou - joga o antigo fora e renomeia o novo
-                if (File.Exists(gameBarPath) && File.Exists(backupPath))
+                bool exeExists = File.Exists(gameBarPath);
+                bool bakExists = File.Exists(backupPath);
+
+                // Nada a fazer: preferência não é desativar E nunca houve .bak
+                if (!GameBarPresenceWriterDisabled && !bakExists) return;
+
+                // Já desativado (só .bak) — nada a fazer
+                if (bakExists && !exeExists) return;
+
+                // Chegou aqui: .exe existe e o usuário quer desativado (flag salva OU .bak antigo)
+                if (!exeExists) return;
+
+                KitLugia.Core.Logger.Log("⚠️ GameBarPresenceWriter: Windows recriou o .exe - re-desativando...");
+
+                // Matar processo antes de mexer no arquivo
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM GameBarPresenceWriter.exe", true);
+                System.Threading.Thread.Sleep(500);
+
+                if (bakExists)
                 {
-                    KitLugia.Core.Logger.Log("⚠️ GameBarPresenceWriter: Windows recriou o .exe - re-desativando...");
-
-                    // Take ownership
-                    SystemUtils.RunExternalProcess("takeown", $"/f \"{gameBarPath}\"", true);
-                    SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
-
-                    // Matar processo
-                    SystemUtils.RunExternalProcess("taskkill", "/F /IM GameBarPresenceWriter.exe", true);
-                    System.Threading.Thread.Sleep(500);
-
-                    // Excluir .bak antigo
-                    File.Delete(backupPath);
-
-                    // Renomear .exe → .bak
-                    File.Move(gameBarPath, backupPath);
-                    KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter re-desativado automaticamente na inicialização.");
+                    try
+                    {
+                        SystemUtils.RunExternalProcess("takeown", $"/f \"{backupPath}\"", true);
+                        SystemUtils.RunExternalProcess("icacls", $"\"{backupPath}\" /grant *S-1-3-4:F /t /c /l", true);
+                        File.Delete(backupPath);
+                    }
+                    catch (Exception ex) { KitLugia.Core.Logger.Log($"⚠️ GameBarPresenceWriter: erro ao limpar .bak antigo: {ex.Message}"); }
                 }
-                else if (File.Exists(gameBarPath) && !File.Exists(backupPath))
-                {
-                    // Nunca foi desativado antes, mas o usuário quer desativar
-                    KitLugia.Core.Logger.Log("ℹ️ GameBarPresenceWriter ativo - desativando conforme preferência salva...");
-                    SystemUtils.RunExternalProcess("takeown", $"/f \"{gameBarPath}\"", true);
-                    SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
-                    SystemUtils.RunExternalProcess("taskkill", "/F /IM GameBarPresenceWriter.exe", true);
-                    System.Threading.Thread.Sleep(500);
-                    File.Move(gameBarPath, backupPath);
-                    KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter desativado conforme preferência.");
-                }
+
+                // Take ownership do .exe e renomeia para .bak
+                SystemUtils.RunExternalProcess("takeown", $"/f \"{gameBarPath}\"", true);
+                SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
+
+                File.Move(gameBarPath, backupPath);
+                KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter re-desativado (renomeado para .bak).");
             }
             catch (Exception ex)
             {
@@ -1685,8 +1690,8 @@ namespace KitLugia.GUI.Services
 
                 EnableSmartAlerts = (int)key.GetValue("EnableSmartAlerts", 1) == 1;
                 EnableBehaviorAnalysis = (int)key.GetValue("EnableBehaviorAnalysis", 1) == 1;
-                HighRamThresholdMB = (long)key.GetValue("HighRamThresholdMB", 2048);
-                HighCpuThresholdPercent = (double)key.GetValue("HighCpuThresholdPercent", 80.0);
+                HighRamThresholdMB = ReadLongSetting(key, "HighRamThresholdMB", 2048);
+                HighCpuThresholdPercent = ReadDoubleSetting(key, "HighCpuThresholdPercent", 80.0);
                 AdvancedMonitorIntervalMs = (int)key.GetValue("AdvancedMonitorIntervalMs", 2000);
                 RamLimiterIntervalMs = (int)key.GetValue("RamLimiterIntervalMs", 1000);
                 GameBarPresenceWriterDisabled = (int)key.GetValue("GameBarPresenceWriterDisabled", 0) == 1;
@@ -1698,7 +1703,57 @@ namespace KitLugia.GUI.Services
 
                 _monitorTimer.Interval = TimeSpan.FromSeconds(MonitorIntervalSeconds);
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ LoadSettings: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        // Leitura defensiva de settings: o registro pode guardar int/long/double/string
+        // de formas diferentes (REG_DWORD, REG_QWORD, REG_BINARY, REG_SZ) — nunca
+        // castar direto, senão UM valor com tipo errado aborta o LoadSettings inteiro
+        // e o resto das preferências cai para default silenciosamente.
+        private static long ReadLongSetting(Microsoft.Win32.RegistryKey key, string name, long def)
+        {
+            try
+            {
+                var v = key.GetValue(name);
+                if (v == null) return def;
+                return v switch
+                {
+                    long l => l,
+                    int i => i,
+                    double d => (long)d,
+                    string s when long.TryParse(s, out var l2) => l2,
+                    string s when double.TryParse(s, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var d2) => (long)d2,
+                    byte[] b when b.Length == 8 => BitConverter.ToInt64(b, 0),
+                    byte[] b when b.Length == 4 => BitConverter.ToInt32(b, 0),
+                    _ => def
+                };
+            }
+            catch { return def; }
+        }
+
+        private static double ReadDoubleSetting(Microsoft.Win32.RegistryKey key, string name, double def)
+        {
+            try
+            {
+                var v = key.GetValue(name);
+                if (v == null) return def;
+                return v switch
+                {
+                    double d => d,
+                    int i => i,
+                    long l => l,
+                    string s when double.TryParse(s, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var d2) => d2,
+                    byte[] b when b.Length == 8 => BitConverter.ToDouble(b, 0),
+                    byte[] b when b.Length == 4 => BitConverter.ToInt32(b, 0),
+                    _ => def
+                };
+            }
+            catch { return def; }
         }
 
         private void RunSafetyProfiler()
@@ -1780,6 +1835,8 @@ namespace KitLugia.GUI.Services
         {
             try
             {
+                _monitorTickCounter = unchecked(_monitorTickCounter + 1);
+
                 // 0. Download Boost Auto-Detection
                 if (DownloadBoostEnabled)
                 {
@@ -1899,6 +1956,7 @@ namespace KitLugia.GUI.Services
                         profile.TotalCyclesVisible++;
                         if (proc.Id == foregroundPid) profile.CyclesForeground++;
                         profile.LastKnownWs = proc.WorkingSet64;
+                        profile.LastSeenTick = _monitorTickCounter;
 
                         // Promotion logic:
                         // 1. Known browsers/apps
@@ -1911,12 +1969,33 @@ namespace KitLugia.GUI.Services
                             if (isKnownVip || isHeavyUse)
                             {
                                 profile.IsVip = true;
-                                // Log promotion event indirectly via CSV later or debug
+                                // Log promotion indirectly via CSV (later or debug)
                             }
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    finally { proc.Dispose(); }
+                }
 
+                PruneDeadProcessProfiles();
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        private long _monitorTickCounter = 0;
+
+        private void PruneDeadProcessProfiles()
+        {
+            try
+            {
+                if (_processProfiles.Count <= 60) return;
+
+                // Remove perfis que nao foram vistos nos ultimos 60 ticks (30min a 30s/tick)
+                var cutoff = _monitorTickCounter - 60;
+                foreach (var key in _processProfiles.Keys.ToList())
+                {
+                    if (_processProfiles.TryGetValue(key, out var p) && p.LastSeenTick < cutoff)
+                        _processProfiles.TryRemove(key, out _);
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2523,9 +2602,11 @@ namespace KitLugia.GUI.Services
                 if (systemProcess == IntPtr.Zero)
                 {
                     // Fallback: tenta lsass.exe (Local Security Authority)
-                    var lsass = Process.GetProcessesByName("lsass").FirstOrDefault();
-                    if (lsass != null)
-                        systemProcess = Win32Api.OpenProcess(Win32Api.PROCESS_QUERY_INFORMATION, false, lsass.Id);
+                    using (var lsass = Process.GetProcessesByName("lsass").FirstOrDefault())
+                    {
+                        if (lsass != null)
+                            systemProcess = Win32Api.OpenProcess(Win32Api.PROCESS_QUERY_INFORMATION, false, lsass.Id);
+                    }
                 }
 
                 if (systemProcess == IntPtr.Zero) return false;
@@ -3037,6 +3118,7 @@ namespace KitLugia.GUI.Services
                             }
                         }
                         catch (Exception ex) { ConditionalLog.LogOnce("ProBalanceThrottle", ex); }
+                        finally { proc.Dispose(); }
                     }
                 }
             });
@@ -4370,16 +4452,8 @@ namespace KitLugia.GUI.Services
         /// </summary>
         private string GetMainWindowTitle(int processId)
         {
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("explorer"))
-                {
-                    // Implementação simplificada - poderia usar EnumWindows para mais precisão
-                    return $"PID:{processId}";
-                }
-                return $"PID:{processId}";
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return $"PID:{processId}"; }
+            // Implementação simplificada - poderia usar EnumWindows para mais precisão
+            return $"PID:{processId}";
         }
         
         

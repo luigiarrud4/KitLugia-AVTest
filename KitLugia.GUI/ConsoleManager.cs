@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
+using KitLugia.GUI.Logging;
 
 // --- CORREÇÃO CRÍTICA: Resolve a ambiguidade ---
 using Application = System.Windows.Application;
@@ -12,19 +13,21 @@ namespace KitLugia.GUI
 {
     public static class ConsoleManager
     {
-        // A lista de linhas de texto que aparecerá no terminal
+        // Linhas que aparecem no terminal. Limitada a um teto alto (MaxMirrorLines)
+        // apenas para a UI virtualizada nunca precisar materializar tudo.
         public static ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
 
         // Evento para avisar a UI para rolar para o final
         public static event Action? OnLogAdded;
 
-
         public static bool IsDebugEnabled { get; set; } = false;
 
         private static readonly ConcurrentQueue<string> _pending = new();
         private static bool _flushScheduled;
-        private const int MaxLines = 500;
         private const int BatchSize = 50;
+        // Teto do espelho em memória. O arquivo guarda tudo (LogStore) — "copiar tudo"
+        // não depende deste teto. 20k linhas na memória = ~3 MB, sem estourar RAM.
+        private const int MaxMirrorLines = LogStore.MaxInMemoryLines;
 
         private static void ScheduleFlush()
         {
@@ -50,13 +53,15 @@ namespace KitLugia.GUI
 
             foreach (var line in batch)
             {
+                // Sempre persiste tudo no disco (completo, sem limite artificial de 500).
+                LogStore.AppendLine(line);
                 Logs.Add(line);
             }
 
-            // Trim excess
-            if (!KitLugia.Core.Logger.DisableOutputLimit && Logs.Count > MaxLines)
+            // Trim do espelho da UI: remove do INÍCIO mantendo as mais recentes.
+            if (Logs.Count > MaxMirrorLines)
             {
-                int remove = Logs.Count - MaxLines;
+                int remove = Logs.Count - MaxMirrorLines;
                 for (int i = 0; i < remove; i++)
                     Logs.RemoveAt(0);
             }
@@ -83,29 +88,32 @@ namespace KitLugia.GUI
             {
                 Logs.Clear();
                 _pending.Clear();
+                LogStore.Clear();
             }));
         }
-        
+
         // Método para otimizar performance - retorna logs recentes
         public static List<string> GetRecentLogs(int count)
         {
             var recentLogs = new List<string>();
             int startIndex = Math.Max(0, Logs.Count - count);
-            
+
             for (int i = startIndex; i < Logs.Count; i++)
             {
                 recentLogs.Add(Logs[i]);
             }
-            
+
             return recentLogs;
         }
 
-        // Comando para controlar limite de logs via console
+        // O limite de 500 linhas foi substituído pela virtualização + LogStore completo.
+        // Mantido pelo console por compatibilidade; agora informa a realidade.
         public static void HandleConsoleCommand(string command)
         {
             if (command.Trim().ToLower() == "loglimit")
             {
-                KitLugia.Core.Logger.ToggleOutputLimit();
+                WriteLine("🔓 Logs são ILIMITADOS por design: arquivo completo em disco + virtualização na interface.");
+                WriteLine($"📁 Arquivo de log: {LogStore.FilePath}");
             }
         }
     }

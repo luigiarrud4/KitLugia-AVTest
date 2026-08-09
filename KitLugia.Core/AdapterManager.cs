@@ -124,7 +124,7 @@ namespace KitLugia.Core
                                     connectionName = name;
                             }
                         }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        catch { /* chave Connection ausente — usa DriverDesc como nome */ }
 
                         var customMac = adapterKey.GetValue("NetworkAddress")?.ToString() ?? "";
                         var speed = adapterKey.GetValue("*Speed")?.ToString() ?? "";
@@ -139,7 +139,7 @@ namespace KitLugia.Core
                             if (!string.IsNullOrWhiteSpace(macResult) && macResult.Length >= 12)
                                 liveMac = macResult.Trim().ToUpper().Replace("-", "").Replace(":", "");
                         }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        catch { /* Get-NetAdapter indisponível/sem permissão — cai para o registro */ }
 
                         // Se falhou Get-NetAdapter, tenta registro NetworkAddress (custom)
                         // Se ambos falham, usa "00" como placeholder
@@ -153,7 +153,7 @@ namespace KitLugia.Core
                                 hidden: true);
                             isUp = statusResult.Trim().Equals("True", StringComparison.OrdinalIgnoreCase);
                         }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        catch { /* mesmo fallback do MAC */ }
 
                         var permanentMac = GetPermanentMac(subKeyName, netCfgInstanceId, connectionName);
                         var (supportsSpoofing, _) = CheckNetworkAddressSupport(subKeyName);
@@ -171,10 +171,17 @@ namespace KitLugia.Core
                             SupportsSpoofing = supportsSpoofing
                         });
                     }
-                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    catch (Exception ex)
+                    {
+                        // Perfil de rede corrompido/sem permissão — pula e segue para o próximo
+                        KitLugia.Core.Logger.Log($"ℹ️ AdapterManager: {subKeyName}: {ex.GetType().Name}: {ex.Message}");
+                    }
                 }
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"ℹ️ AdapterManager (enumeração): {ex.Message}");
+            }
 
             return adapters;
         }

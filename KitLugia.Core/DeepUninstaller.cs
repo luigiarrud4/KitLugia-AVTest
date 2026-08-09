@@ -3178,12 +3178,77 @@ namespace KitLugia.Core
                     {
                         string fileName = Path.GetFileNameWithoutExtension(data) ?? "";
                         if (!string.IsNullOrEmpty(fileName) && Confidence.Generate(displayName, fileName) >= 85)
+                        {
+                            // Guarda contra falsos positivos de nome-único:
+                            // 1. Valores sem separador de caminho ("Display") sao descricoes de classe,
+                            //    nao referencias a arquivo — nunca casam como residuo.
+                            // 2. Um LEAF que e apenas a PRIMEIRA palavra do displayName
+                            //    ("Display" em "Display Driver Uninstaller") NAO e evidencia:
+                            //    "display.js" (npm), "...\ME\Display" (Intel) e CLSID "Display"
+                            //    seriam falsos positivos sem esse guard.
+                            if (!IsPathLikeValue(data))
+                                continue;
+
+                                string[] displayTokens = SplitNameTokens(displayName);
+                                if (displayTokens.Length >= 2 &&
+                                    displayTokens[0].Length >= 4 &&
+                                    fileName.Equals(displayTokens[0], StringComparison.OrdinalIgnoreCase))
+                                {
+                                    // Leaf igual a primeira palavra-do-nome: exige um token adicional
+                                    // no DATA ou que o leaf coincida com o nome COMPLETO.
+                                    bool strong = displayName.Contains(fileName, StringComparison.OrdinalIgnoreCase) &&
+                                                  displayTokens.Length >= 3 &&
+                                                  displayTokens.Take(2).All(t => data.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0);
+                                    if (!strong)
+                                        continue;
+                                    // Um leaf que e apenas a primeira palavra so conta quando aponta
+                                    // para um EXECUTAVEL (.exe/.dll/.com/.bat/.cmd/.scr/.ps1):
+                                    // "...\Drivers\Display.ico" (Realtek) e "...\display.js" (npm)
+                                    // passariam no strong acima por substring ("Drivers" contem "Driver").
+                                    string ext = Path.GetExtension(data) ?? "";
+                                    bool executableExt = ext.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
+                                                         ext.Equals(".dll", StringComparison.OrdinalIgnoreCase) ||
+                                                         ext.Equals(".com", StringComparison.OrdinalIgnoreCase) ||
+                                                         ext.Equals(".bat", StringComparison.OrdinalIgnoreCase) ||
+                                                         ext.Equals(".cmd", StringComparison.OrdinalIgnoreCase) ||
+                                                         ext.Equals(".scr", StringComparison.OrdinalIgnoreCase) ||
+                                                         ext.Equals(".ps1", StringComparison.OrdinalIgnoreCase);
+                                    if (!executableExt)
+                                        continue;
+                                }
+
                             return true;
+                        }
                     }
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return false;
+        }
+
+        /// <summary>
+        /// Verdadeiro se o valor parece um caminho (tem barra, ou extensão de arquivo,
+        /// ou termina com nome de arquivo). Valores nus como "Display" (descrição de
+        /// classe COM) sao rejeitados — nao sao referência a arquivo nenhum.
+        /// </summary>
+        private static bool IsPathLikeValue(string data)
+        {
+            if (string.IsNullOrEmpty(data)) return false;
+            if (data.IndexOf('\\') >= 0 || data.IndexOf('/') >= 0) return true;
+            if (Path.HasExtension(data)) return true;
+            // Registry-rooted refs como "22:\Software\..." sao paths de MSI (com barra)
+            return System.Text.RegularExpressions.Regex.IsMatch(data, @"^\d+:[\\/]");
+        }
+
+        /// <summary>
+        /// Divide o displayName em tokens (>= 3 chars) ignorando pontuacao comum.
+        /// </summary>
+        private static string[] SplitNameTokens(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return Array.Empty<string>();
+            return System.Text.RegularExpressions.Regex.Split(name, @"[^\w\-]")
+                .Where(t => t.Length >= 4)
+                .ToArray();
         }
 
         /// <summary>

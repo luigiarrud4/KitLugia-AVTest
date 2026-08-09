@@ -1,0 +1,47 @@
+# EditorConfig — KitLugia
+# https://editorconfig.org
+# Garante que QUALQUER arquivo novo (aba, página, classe) já nasça com
+# encoding UTF-8 + BOM — resolvendo de vez o mojibake recorrente (Â·, Ã³, etc.)
+# que acontecia quando ferramentas legadas (PowerShell 5.1, VS, editores ANSI)
+# releem arquivos sem BOM como Windows-1252.
+
+root = true
+
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C# — estilo do projeto (Consolas, 4 espaços, Allman)
+[*.cs]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*.xaml]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*.{cmd,bat,ps1}]
+charset = utf-8-bom
+end_of_line = crlf
+indent_style = space
+indent_size = 4
+
+# Arquivos já existentes que NÃO devem ser tocados na normalização
+# (o gitattributes preserva o CRLF; aqui só evitamos encoding)
+[*.md]
+charset = utf-8
+trim_trailing_whitespace = false
+
+# Binários / arquivos gerados
+[*.{png,jpg,jpeg,gif,ico,bin,wim,esd,iso}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[*.sln]
+indent_style = tab

@@ -1093,7 +1093,14 @@ namespace KitLugia.GUI.Pages
                 _allServices = services;
                 ApplyServiceFilter();
             }
-            catch { Logger.LogWarning("ServicesPage", "Exception suppressed"); }
+            catch (OperationCanceledException)
+            {
+                // Navegação rápida cancela o load — normal, não é erro
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("ServicesPage", $"Exception suppressed: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         private async Task LoadServices() => await LoadServices(_cts?.Token ?? CancellationToken.None);
@@ -1197,6 +1204,10 @@ namespace KitLugia.GUI.Pages
                 var tasks = await Task.Run(() => BackgroundProcessManager.GetScheduledTasksStatus(), cancellationToken);
                 _allTasks = tasks;
                 ApplyTaskFilter();
+            }
+            catch (OperationCanceledException)
+            {
+                // Navegação rápida cancela o load — normal, não é erro
             }
             catch (Exception ex)
             {

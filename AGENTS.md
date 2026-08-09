@@ -1347,3 +1347,281 @@ Build: **0 erros / 104 warnings (baseline)**.
 **A TESTAR**: TweaksPage -> toggle RmCacheLoc -> conferir `regedit` na subchave NVIDIA
 (0000/0001...) com `RmCacheLoc = N`; reiniciar e ver task agendada disparando no boot
 (taskchd.msc > KitLugia > Triggers: "Ao iniciar o computador" + "Ao fazer logon").
+### Sessao 08/08 (cont.) - RmCacheLoc aplicado + TESTADO no host (460 FPS) + Logger com origem
+
+API TESTS com RmCacheLoc no host: toggle ON -> subchave NVIDIA (RTX 5070 Ti)
+com RmCacheLoc = 24 (logicos); jogo cravado 460 FPS (antes ~150-260).
+Origem da chave: **driver NVIDIA Resource Manager** - aparece nos .inf oficiais
+como `HKR,,RmCacheLoc`; otimizacoes usam o numero de nucleos LOGICOS.
+
+`Exception suppressed`: CAUSA RAIZ explicada - o projeto tem ~600 catchs
+defensivos genericos (`catch { Logger.LogWarning("Unknown", "Exception suppressed"); }`)
+sem variavel `ex` (engolem exception benigna de acesso negado/metadado quebrado).
+O LogWarning NAO dizia de onde vinha (contexto fixo "Unknown").
+
+**CORRECAO (Logger.cs)**: LogWarning ganhou parametros `[CallerFilePath]` /
+`[CallerLineNumber]` / `[CallerMemberName]` opcionais (Caller* do compilador) -
+quando a mensagem contem "Exception suppressed", o log anexa
+`[origem: Arquivo.cs:NNN Metodo]` SEM precisar editar nenhum call site.
+O rate limiter (janela 60s + resumo /100) continua por chave context|message
+(mensagem agora com origem = key mais especifica por site).
+
+**TESTADO**: harness console temporario com 5 throws -> 1 linha no log:
+`[AVISO] (Unknown): Exception suppressed [origem: Program.cs:17 Repeater]`.
+Build: 0 erros.
+
+### Sessao 08/08 (cont.) - Log virtualizado: fim do limite de 500 linhas (inspiracao ChatGPT)
+
+Sintoma: quando o log passava de 500 linhas (ou removia o limite via checkbox "Sem
+Limite"), o programa e o PC travavam. Causa: GlobalConsole usava um TextBox cujo
+`Text` era RECONSTRUIDO por completo a cada update (`string.Join` + `TxtLog.Text`, O(n^2))
+e o trim do ConsoleManager derrubava linhas antigas ("Limite 500").
+
+**Nova arquitetura (store completo no disco + anel em RAM + UI virtualizada)**:
+
+1. **`KitLugia.GUI\Logging\LogStore.cs`** (novo): armazenamento desacoplado da UI -
+   - Persistencia COMPLETA em disco: `%LOCALAPPDATA%\KitLugia\Logs\KitLugiaConsole.log`
+     (append, sem limite de linhas). Rotacao a 64MB (renomeia para `.old` e recomeca);
+     `GetFullText()` le `.old` + atual em ordem cronologica.
+   - Anel em memoria com teto `MaxInMemoryLines = 20000` (~3MB) - a RAM NUNCA explode.
+   - `TotalLines` (contagem), `GetRecent(n)` (para a UI, sem ler disco no caminho quente).
+
+2. **ConsoleManager reescrito**: sem limite artificial. `WriteLine` -> LogStore.AppendLine
+   (tudo vai ao disco) + Logs.Add (espelho da UI, teto 20k, remove do inicio).
+   `loglimit` agora informa que logs sao ilimitados por design + caminho do arquivo.
+
+3. **GlobalConsole.xaml/.cs reescrito**: TextBox -> **ListBox virtualizado**
+   (`VirtualizingStackPanel` + `Recycling`, CanContentScroll, SelectionMode=Extended):
+   - Renderiza SO ~30 linhas visiveis, por mais que o log tenha.
+   - **Auto-scroll inteligente**: `_stickToBottom` - so rola para o fim se o usuario
+     estiver no rodape (delta <= 24px); se subir para investigar, NAO puxa de volta.
+   - **Busca** (TxtSearch) via `ICollectionView.Filter` (filtrar sobre o espelho, nao
+     recria itens). Esc limpa a busca. Ctrl+A seleciona tudo; Ctrl+C copia selecao.
+   - **COPIAR SELECAO**: only selected items (separados por quebra).
+   - **COPIAR TUDO**: le `LogStore.GetFullText()` em background (arquivo completo,
+     sem depender da UI) e joga no clipboard - 100k linhas copiavel SEM travar.
+   - TxtCount mostra "N linhas em disco � M na memoria". Chiado do checkbox "Sem Limite"
+     removido (nao faz mais sentido - virtualizacao tornou o limite obsoleto).
+
+**TESTADO (harness console ref Classic)**: 30k linhas -> `GetFullText` retorna as
+30.000 (rotacao .old concatena direito); `GetRecent(3)` = ultimas 3; RAM estavel
+(delta 2MB com 50k linhas adicionais); rotacao 64MB dispara e nao quebra.
+Build GUI: 0 erros / 104 warnings (baseline).
+
+A testar no app: abrir console -> rodar algo verboso (shrink/scan) -> conferir
+scroll suave com milhares de linhas, subir p/ investigar sem freeze, COPIAR TUDO com
+~50k linhas instantaneo, busca filtra sem re-bind.
+
+### Sessao 08/08 (cont.) - Fix: mojibake no contador + Ctrl+C da selecao sem clicar no botao
+
+1. **Mojibake "773 linhas em disco A. 773 na memoria" visto pelo usuario (host)**:
+   - Causa: durante o build anterior, um `Set-Content -Encoding UTF8` do PowerShell
+     releu o GlobalConsole.xaml.cs como ANSI e RE-ENCODED os chars (., o -> e.I
+     duplo-encoding real no arquivo). O contador era "N linhas em disco . N na
+     memoria" com o char U+00B7 (middle dot) e acentos.
+   - Correcao: arquivo reescrito em UTF-8 puro; o contador agora usa ASCII puro
+     "N linhas em disco | M na memoria" (nunca mais quebra por encoding).
+   - Scan de TODO o codigo (KitLugia.GUI + KitLugia.Core) por padroes de
+     duplo-encoding (C3 C3 83 / C2 83, e pares "é","ã","ó","·"...) - ZERO
+     resultados: o resto do codigo tem acentos legitimos (sem "erros ao redor").
+
+2. **Ctrl+C agora copia a selecao sem clicar no botao**: handler movido para
+   `PreviewKeyDown` (tunneling) do UserControl inteiro - dispara com o foco em
+   QUALQUER parte do console (barra, botoes, busca), nao so no ListBox. Esc limpa
+   a busca; Ctrl+A seleciona tudo (exceto quando o foco esta no TextBox de busca,
+   que mantem comportamento nativo).
+
+### Sessao 08/08 (cont.) - Menu de contexto no console + .editorconfig anti-mojibake
+
+**Pedido do usuario**: (1) opcoes de botao direito no log (copiar selecionados,
+copiar tudo, selecionar tudo, limpar); (2) resolver o problema recorrente de
+UTF-8 - paginas/arquivos novos devem ja nascer com encoding correto.
+
+1. **Menu de contexto (GlobalConsole.xaml)**: ListBox.ContextMenu com 4 itens
+   escuros (folder #1E1E1E): Copiar selecao (Ctrl+C), Copiar tudo, Selecionar tudo
+   (Ctrl+A), Limpar console. Handlers Mnu* no .cs reusam os botoes existentes.
+
+2. **`.editorconfig` criado na raiz (NOVO)**: `root = true`, charset utf-8-bom
+   para *.cs/*.xaml/*.ps1 (BOM evita que PowerShell 5.1 e apps antigos releiam
+   como ANSI/Windows-1252), CRLF, tudo com 4 espacos, trim de espacos, final
+   newline. O Visual Studio/VS Code/Rider passam a salvar arquivos novos ja em
+   UTF-8+BOM automaticamente - o mojibake recorrente (A., o -> e.I, A�, A�)
+   deixa de acontecer ao criar novas paginas/classes.
+
+### Sessao 08/08 (cont.) - Auditoria de RAM: vazamentos de Process.GetProcesses sem Dispose
+
+Pedido do usuario: investigar por que a RAM do Kit e "aleatoria" (60MB idle, ate
+200MB em algumas paginas, e o GC limpa sozinho) e otimizar.
+
+**Causas raiz encontradas (2 grupos)**:
+
+1. **`Process.GetProcesses()` chamado sem `Dispose()`** — cada enumeracao cria
+   centenas de objetos `Process` que penduram handles nativos ate o GC rodar.
+   Locais corrigidos (TrayIconService.cs):
+   - `UpdateProcessProfiles` (MonitorTick, a cada 30s) — laço principal de tracker
+     de processos: agora `finally { proc.Dispose(); }` por item.
+   - `ShutdownTurboCharge`, `DetectAndTrimLeaks` (ja tinha), loop ProBalance
+     (throttle) — adicionado Dispose.
+   - `EnsureSystemProcess` (lsass fallback): `using (var lsass = ...FirstOrDefault())`.
+   - `GetMainWindowTitle` — loop inutil (sempre retornava "PID:x"); removida a
+     enumeracao de "explorer" inteira (era dead code + leak).
+   - ProcessMonitorPage.xaml.cs: os 3 pontos (`UpdateTimer_Tick`'s Task.Run,
+     `UpdateProcessList`, `RefreshProcessesAsync`) reescritos de LINQ (`Where.
+     Select` sobre Process) para `foreach` + `try/catch/finally Dispose`, com
+     `OrderByDescending(CpuUsage).Take(50)` preservado. Isto roda a cada 2s!
+   - `ApplyProcessRamLimits`/`ApplyProcessCpuLimits` (Job Objects) ja faziam
+     Dispose corretamente (sem mudanca).
+   - Line 4402 removed: `GetMainWindowTitle` dead code con enumeracao.
+2. **`_processProfiles` (ConcurrentDictionary) nunca podava processos mortos**:
+   perfil de TODO processo que ja teve janela ficava pra sempre na memoria.
+   - Novo campo `ProcessProfile.LastSeenTick` + `_monitorTickCounter` incrementado
+     no inicio do `MonitorTick`.
+   - Novo `PruneDeadProcessProfiles()`: a cada tick, so age se `Count > 60`;
+     remove perfis com `LastSeenTick` mais velho que 60 ticks (30+min a 30s/tick).
+
+3. `MemoryOptimizer.cs:109` — comentario mojibake `ðŸ"¥ CORREA‡AƒO` (encoding),
+   removido byte-level via PowerShell (substituiu 1657 bytes maliciosos) — CUIDADO:
+   byte surgery e perigoso, uso em windows com git checkout.
+
+Build: 0 erros / 104 warnings (baseline).
+
+**A TESTAR (host/VM)**: deixar o app aberto 1h+ com monitor ativo e conferir no
+Process Explorer/PerfMon que o Working Set fica estavel (~60-120MB) sem picos
+aleatorios de 200MB+; abrir ProcessMonitorPage por 5min e conferir RAM estavel
+com a lista atualizando a cada 2s (antes cada tick vazava N objetos).
+
+### Sessao 08/08 (cont.) - Log console sujo (132k de X) + GameBarPresenceWriter esquecido
+
+**Sintoma 1 (log vazando)**: console mostrava poucas linhas mas COPIAR TUDO colava
+132.121 linhas cheias de `X`/linhas de teste. Causa: (a) harness de teste do LogStore
+sujo escreveu ~132k linhas no arquivo REAL `%LOCALAPPDATA%\KitLugia\Logs\KitLugiaConsole.log`
+(com `.old` de 67 MB da rotacao); (b) `LogStore.Clear()` so truncava o atual e NAO
+apagava o `.old`; (c) o construtor do LogStore nunca zerava os arquivos.
+
+**Correcoes (LogStore.cs)**:
+1. `Clear()` agora tambem deleta o `.old` (`File.Delete(_filePath + ".old")`).
+2. Construtor estatico agora chama **`ResetAllFiles()`** — trunca o arquivo atual e
+   apaga o `.old` a cada inicializacao do kit: **log de sessao zerado no boot**, o
+   lixo de sessoes passadas nao vaza mais no "copiar tudo".
+3. `.old` de 67 MB ja deletado do host.
+
+**Sintoma 2 (GameBarPresenceWriter)**: o kit logava "Windows recriou
+GameBarPresenceWriter.exe - precisa desativar novamente" mas NAO re-renomeava.
+
+**Correcoes (TrayIconService.cs + GameBoostPage.xaml.cs)**:
+1. `AutoFixGameBarPresenceWriter` agora `public` e age quando o `.exe` existe E
+   (preferencia `GameBarPresenceWriterDisabled` ativa OU `.bak` existe — a existencia
+   do `.bak` ja e prova de que o usuario desativou) — re-takeown, matar o processo,
+   apagar `.bak` antigo e renomear `.exe` -> `.bak`.
+2. `GameBoostPage.LoadSettings` (bloco da flag): quando `.exe` e `.bak` existem
+   juntos, nao so loga — dispara `Task.Run(() => tray.AutoFixGameBarPresenceWriter())`
+   para a pagina reaplicar a renomeacao na hora, e marca o checkbox como desativado
+   (preferencia voltada para `GameBarPresenceWriterDisabled`).
+
+Build: 0 erros / 122 warnings (baseline).
+
+**A TESTAR (host)**: reiniciar o kit e conferir que o GameBarPresenceWriter re-desativado
+na inicializacao; conferir console "copiar tudo" com so a sessao atual; conferir
+na pagina que a reaplicacao ocorre mesmo sem tocar no checkbox.
+
+### Sessao 08/08 (cont.) - "Exception suppressed" com CAUSA REAL (nao so origem) + LoadSettings bug
+
+**Sintoma (host, 21:44)**: log de boot mostrava `[AVISO] (Unknown): Exception suppressed
+[origem: TrayIconService.cs:1706 LoadSettings]` + SystemTweaks.cs:331/363, ServicesPage.cs:1096,
+BrowserCacheManager.cs:142, AdapterManager.cs:174 (antes: contexto fixo "Unknown" sem causa).
+
+**CAUSA RAIZ (LoadSettings, TrayIconService.cs)**: `HighRamThresholdMB = (long)key.GetValue(...)`
+e `HighCpuThresholdPercent = (double)key.GetValue(...)` faziam CAST DIRETO do objeto do
+registro. `Registry.SetValue` com `double` grava REG_BINARY (byte[8]) e `long` como REG_QWORD;
+o cast `(long)/(double)` de um blob/string NUNCA funciona e estoura `InvalidCastException` no
+primeiro valor com tipo inesperado — e o `catch { Logger.LogWarning("Unknown", ...) }` engolia
+tudo, ABORTANDO o LoadSettings inteiro: TODAS as preferências depois da linha ~1693 caíam
+para default silenciosamente (GameBarPresenceWriterDisabled, SmartScreenDisabled, etc.).
+
+**Correcoes (TrayIconService.cs)**:
+1. **Helpers novos `ReadLongSetting`/`ReadDoubleSetting`** (apos o LoadSettings): leitura
+   defensiva — aceita long/int/double/string/byte[] (REG_DWORD/QWORD/BINARY/SZ) e cai no
+   default se nada casar. Usados em HighRamThresholdMB / HighCpuThresholdPercent.
+2. Catch do LoadSettings: `catch (Exception ex) { Logger.Log($"⚠️ LoadSettings: {ex.GetType().Name}: {ex.Message}") }`
+   — se algo ainda falhar, o log mostra o MOTIVO real, nao "Exception suppressed" anonimo.
+
+**Outros pontos que apareciam no log -> causa real visivel**:
+- `SystemTweaks.GetUwpDisplayName` (331) / `BuildAumid` (363): catches com
+  `$"Exception suppressed (manifest UWP): {ex.Message}"` (erro benigno: algum pacote
+  com AppxManifest inacessivel) — silenciado para suportar o principal, mantendo causa.
+- `ServicesPage.LoadServices` (1096): `OperationCanceledException` silenciado (navegacao
+  livre cancela o load - normal); outros erros logam `{Tipo}: {Message}`.
+- `BrowserCacheManager.GetDirectorySize` (142): inner/file inacessiveis silenciosos;
+  UnauthorizedAccess/IOException -> return 0 sem LOG (pasta protegida — normal); outros
+  erros logam caminho+mensagem.
+- `AdapterManager` (127/142/156/174/177): Get-NetAdapter/ConnectionKey falhas sao EUs
+  esperados (sem permissao) -> silent; perfil por subchave / enumeracao: log informativo
+  `ℹ️ AdapterManager: ...` com tipo+mensagem (nao Warning).
+
+Build: 0 erros / 122 warnings (baseline).
+
+**A TESTAR (host)**: abrir o kit -> conferir que NENHUM `Exception suppressed` anonimo
+aparece no boot (LoadSettings loga correto), SmartAlerts mostram 2048MB/80% (que ja caiam
+p/ default), pagina Services/Cache/Adapters sem avisos falsos.
+
+### Proximas pendencias abertas (mais antigas)
+- Testar no app: toggle "Boost do App Ativo" + perfil personalizado
+- Testar GameBarPresenceWriter / toggles da comunidade apos reboot
+
+
+### Sessao 09/08 - Shrink marker-only + log 100% limpo + downgrade riscado
+
+**Downgrade de build (25H2/26200.8973): ABANDONADO.** O usuario testou e a Microsoft
+realmente travou (o patch da setupcompat.dll nao e mais suficiente na midia nova).
+Ferramenta `KitLugia.GUI\Tools\Downgrade\` mantida mas NUNCA mais usada. Riscado das
+pendencias definitivamente.
+
+**Shrink simplificado para marcador-only (WinbootManager.RamdiskStartnetCmd)**:
+Validado pelo usuario no PC e notebook: a verificacao inicial (C: check, embedded
+disk/part, shrink_config.ini, scan SOFTWARE hive) SEMPRE falha ou erra o alvo - a
+discrepancia DISK/PART entre host WMI e diskpart e universal. O que SEMPRE funcionou
+nos 2 maquinas foi o marcador `KL_SHRINK_TARGET.dat`. O script gerado agora:
+1. SO marca em `for /l disk 0-3 x partition 1-8` procurando `Z:\KL_SHRINK_TARGET.dat`
+2. Le SHRINK_MB do marcador, DISK_N/PART_N sao os do PROPRIO diskpart (nunca WMI)
+3. Nada encontrado -> `Status: FAIL` + reboot (sem shrink).
+Removidos: `:run_vol_c`, bloco embedded E_DISK/E_PART, leitura de shrink_config.ini,
+scan de SOFTWARE hive. Assinatura mantida (parametros sobram sem uso).
+
+**Log 100% limpo na inicializacao (build 0 erros/0 avisos Core)**:
+- `SystemTweaks.GetUwpDisplayName`/`BuildAumid`: silenciados de vez (pacote UWP com
+  AppxManifest inacessivel e normal; fallback GetStartAppsFriendlyNames cobre o nome).
+- `AppIconHelper.cs` (187/217): silenciado (pasta de app protegida -> icone fica sem).
+- `MemoryOptimizer.cs` (132): silenciado (processo morreu entre scan e trim - racing).
+- `ServicesPage.LoadScheduledTasks`: OperationCanceledException silenciado (navegacao
+  rapida cancela - nao e erro; LoadServices ja tinha o mesmo tratamento).
+
+**GameBarPresenceWriter = metodo padrao de renomeio**: o usuario confirmou que
+funciona. Para renomear qualquer outro executavel do Windows (gamebar, etc.), copiar
+o padrao de `AutoFixGameBarPresenceWriter` (TrayIconService): preferencia salva em
+registry TraySettings + JSON, re-takeown + taskkill + renomear .exe -> .bak (excluindo
+.bak anterior), reaplicado no Initialize via Task.Run, com re-renomeio se o Windows
+recriar o .exe (no LoadSettings da GameBoostPage se .exe e .bak existem juntos).
+
+**Boost do App Ativo (GameBoost) - explicacao de separacao**: o toggle e separado do
+motor v1/v2/v3 porque o motor aplica prioridade GLOBAL por processo/perfil, enquanto o
+"Boost do App Ativo" e um governador de FOREGROUND dirigido por SetWinEventHook
+(foco): aplica prioridade custom (Normal/High/RealTime) ao processo com janela ativa
+e REVERTE ao perder o foco - um comportorado sobre o motor, nao um perfil. Persistencia
+separada (TraySettings\ForegroundBoost). Usuario validou: funciona.
+
+**Auto-start validado (log real)**: Registry Run + Task Scheduler existente
+habilitada (a task substitui Registry/Startup); SeDebugPrivilege OK; 5/5 RAM limits
+carregados; SmartAlerts com 2048MB/80% (load correto apos fix do cast).
+
+### Pendencias abertas (revisadas 09/08)
+- [ ] Shrink marker-only: re-testar na VM (SCHEDULE -> reboot -> "Found marker" no log)
+- [ ] Fresh Install completo na VM (backup -> deleta Windows antigo -> apply -> bootloader)
+- [ ] PartitionsPage com Storage UI: validar flags IsSystem/IsBoot/IsSystemFlag + mover letra
+- [ ] CleanDisk via IOCTL (IOCTL_DISK_DELETE_DRIVE_LAYOUT) em disco de teste (VM)
+- [ ] RAM estavel 1h+ (fix do Dispose do Process.GetProcesses aguardando validacao)
+- [ ] Review desinstalador (estilo Revo): testar remover app com lixo + "Ignorar Sempre"
+- [ ] Console virtualizado: rodar scan verboso com milhares de linhas sem freeze
+- [x] ~~Downgrade de build~~ (ABANDONADO - Microsoft travou; ferramenta mantida)
+- [x] ~~Toggle Boost do App Ativo~~ (validado no host)
+- [x] ~~Auto-start universal~~ (validado: Registry Run + task existente)
+- [x] ~~GameBarPresenceWriter~~ (validado: renomeia .bak no boot)

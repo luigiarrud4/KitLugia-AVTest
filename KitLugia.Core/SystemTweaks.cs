@@ -328,7 +328,7 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch { /* pacote UWP com manifesto inacessível/instalação quebrada — nome do fallback GetStartAppsFriendlyNames cobre */ }
             return null;
         }
 
@@ -360,7 +360,7 @@ namespace KitLugia.Core
 
                 return $"{family}!{appId}";
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
+            catch { /* pacote UWP com manifesto inacessível — AUMID cai para null */ return null; }
         }
 
         private static Dictionary<string, string>? _startAppsFriendlyNames;

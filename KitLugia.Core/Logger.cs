@@ -63,16 +63,29 @@ namespace KitLugia.Core
             OnLogReceived?.Invoke(msg);
         }
 
-        public static void LogWarning(string context, string message)
+        public static void LogWarning(string context, string message,
+            [System.Runtime.CompilerServices.CallerFilePath] string? sourceFile = null,
+            [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0,
+            [System.Runtime.CompilerServices.CallerMemberName] string? sourceMember = null)
         {
-            var msg = $"[AVISO] ({context}): {message}";
-            if (message.Contains("Exception suppressed", StringComparison.OrdinalIgnoreCase) &&
-                ShouldSuppressRepeated(context, message))
+            // Anexa a LOCALIZACAO exata (arquivo:linha metodo) ao warning sem precisar
+            // editar os ~600 call sites — o Caller* e preenchido pelo compilador.
+            // Antes, "Exception suppressed" nao dizia DE ONDE veio; agora identifica
+            // o catch que falhou (ex: SystemTweaks.cs:123 AplicarTweak).
+            string detail = message;
+            if (sourceFile != null && message.IndexOf("Exception suppressed", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                detail = $"{message} [origem: {Path.GetFileName(sourceFile)}:{sourceLine} {sourceMember}]";
+            }
+
+            if (detail.Contains("Exception suppressed", StringComparison.OrdinalIgnoreCase) &&
+                ShouldSuppressRepeated(context, detail))
             {
                 return;
             }
-            WriteToFile("WARN", msg);
-            OnLogReceived?.Invoke(msg);
+            var fullMsg = $"[AVISO] ({context}): {detail}";
+            WriteToFile("WARN", fullMsg);
+            OnLogReceived?.Invoke(fullMsg);
         }
 
         // Rate limiter for the flood of "Exception suppressed" warnings produced by the

@@ -329,19 +329,31 @@ namespace KitLugia.GUI.Pages
 
                 string gameBarPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe");
                 string backupPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe.bak");
+                bool prefersDisabled = mw?.TrayService?.GameBarPresenceWriterDisabled == true;
                 bool gameBarDisabled = File.Exists(backupPath) && !File.Exists(gameBarPath);
-                
+
 
                 if (File.Exists(gameBarPath) && File.Exists(backupPath))
                 {
                     gameBarDisabled = false;
-                    KitLugia.Core.Logger.Log("⚠️ Windows recriou GameBarPresenceWriter.exe - precisa desativar novamente");
+                    KitLugia.Core.Logger.Log("⚠️ Windows recriou GameBarPresenceWriter.exe - re-desativando...");
+
+                    // Re-aplica a renomeação agora (o .bak prova que o usuário já tinha desativado)
+                    var tray = mw?.TrayService;
+                    if (tray != null)
+                    {
+                        System.Threading.Tasks.Task.Run(() => tray.AutoFixGameBarPresenceWriter());
+                        gameBarDisabled = true; // checkbox volta para "desativado"
+                    }
                 }
-                
+                else if (File.Exists(backupPath) && !File.Exists(gameBarPath))
+                {
+                    gameBarDisabled = true;
+                }
 
                 if (gameBarDisabled)
                 {
-                    KitLugia.Core.Logger.Log("✅. GameBarPresenceWriter está desativado (.bak)");
+                    KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter está desativado (.bak)");
                 }
                 else
                 {

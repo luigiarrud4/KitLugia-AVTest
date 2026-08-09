@@ -184,7 +184,7 @@ namespace KitLugia.GUI.Helpers
                         return file;
                 }
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch { /* pasta de app protegida — ícone fica sem imagem */ }
 
             return null;
         }
@@ -214,7 +214,7 @@ namespace KitLugia.GUI.Helpers
                     }
                 }
             }
-            catch { Logger.LogWarning("AppIconHelper", "Exception suppressed"); }
+            catch { /* subpasta protegida — tenta o próximo app */ }
 
             return null;
         }
