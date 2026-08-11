@@ -1257,7 +1257,7 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Remove TODAS as entradas BCD criadas pelo KitLugia (WinPE, Validation OS, shrink, flat).
+        /// Remove TODAS as entradas BCD criadas pelo KitLugia (WinPE, shrink, flat).
         /// Público — usado pelo botão "Limpar BCD" na WinpeToolsPage.
         /// </summary>
         public static async Task<(bool ok, string msg)> CleanupAllBcdEntriesAsync()
@@ -2036,16 +2036,13 @@ namespace KitLugia.Core
                                     Log($"Baixando .NET Runtime de: {dotnetUrl}");
                                     Log("Isso pode levar alguns minutos (tamanho aproximado: 50MB)...");
 
-                                    using (var client = new System.Net.WebClient())
+                                    using (var http = new System.Net.Http.HttpClient())
+                                    using (var response = await http.GetAsync(dotnetUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
+                                    using (var inStream = await response.Content.ReadAsStreamAsync())
+                                    using (var outStream = new FileStream(tempDownloadPath, FileMode.Create, FileAccess.Write))
                                     {
-                                        client.DownloadProgressChanged += (sender, e) =>
-                                        {
-                                            if (e.ProgressPercentage % 10 == 0 && e.ProgressPercentage > 0)
-                                            {
-                                                Log($"Download: {e.ProgressPercentage}% ({e.BytesReceived / 1024 / 1024}MB / {e.TotalBytesToReceive / 1024 / 1024}MB)");
-                                            }
-                                        };
-                                        client.DownloadFile(dotnetUrl, tempDownloadPath);
+                                        response.EnsureSuccessStatusCode();
+                                        await inStream.CopyToAsync(outStream);
                                     }
 
                                     // Copia para Resources para uso futuro
@@ -5070,603 +5067,6 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             return removed > 0;
         }
 
-        // ======================================================================
-        // === VALIDATION OS (WinVOS) — preparo e remoção ======================
-        // ======================================================================
-        // Validation OS é um Windows 11 leve da Microsoft com suporte oficial a
-        // WPF/.NET via Microsoft-WinVOS-WPF-Support (≥2504).
-        //
-        // URL oficial: https://aka.ms/DownloadValidationOS  (AMD64)
-        //              https://aka.ms/DownloadValidationOS_arm64  (ARM64)
-        //
-        // Fluxo: download ISO → mount → copiar WinVOS.wim → add WPF support →
-        // BCD ramdisk → bootsequence one-time.
-        // ======================================================================
-
-        private const string VALIDATION_ISO_URL = "https://aka.ms/DownloadValidationOS";
-        private const string VALIDATION_GITHUB_URL = "https://github.com/luigiarrud4/KitLugia-WinPE/releases/download/v1.0/VALOS-base.7z";
-        private const string VALIDATION_ISO_CACHE = @"C:\KL_WINPE\VALIDATIONOS.iso";
-        private const string VALIDATION_WIM_PATH = @"C:\KL_WINPE\validation_boot.wim";
-
-        /// <summary>
-        /// Prepara Validation OS para boot via RAMDISK com suporte WPF.
-        /// Baixa ISO (se necessário), extrai WinVOS.wim, adiciona WPF support,
-        /// cria entrada BCD ramdisk e configura bootsequence one-time.
-        /// </summary>
-        public static async Task<(bool ok, string msg)> PrepareValidationOs(CancellationToken ct = default)
-        {
-            try
-            {
-                Log("========== PREPARANDO VALIDATION OS (WinVOS) ==========");
-
-                string klWinpe = @"C:\KL_WINPE";
-                Directory.CreateDirectory(klWinpe);
-                string isoPath = VALIDATION_ISO_CACHE;
-                string wimPath = VALIDATION_WIM_PATH;
-
-                // 1. Obter base do Validation OS
-                Log("[1/5] Resolvendo base do Validation OS...");
-                ct.ThrowIfCancellationRequested();
-
-                // Tenta GitHub release primeiro (VALOS-base.7z contém boot.wim + boot.sdi prontos)
-                string valos7z = Path.Combine(klWinpe, "VALOS-base.7z");
-                string? sevenZip = WinpeBuilder.FindBundled7Zip();
-
-                if (!File.Exists(wimPath) && File.Exists(valos7z) && sevenZip != null)
-                {
-                    Log("VALOS-base.7z encontrado em cache. Extraindo...");
-                    var (extracted, foundWim) = await TryExtract7z(sevenZip, valos7z, klWinpe);
-                    wimPath = foundWim ?? wimPath;
-                    // Garante que o WIM esteja no local esperado (copia se encontrou em outro path)
-                    if (File.Exists(wimPath) && !wimPath.Equals(VALIDATION_WIM_PATH, StringComparison.OrdinalIgnoreCase))
-                    {
-                        File.Copy(wimPath, VALIDATION_WIM_PATH, true);
-                        wimPath = VALIDATION_WIM_PATH;
-                        Log($"WIM copiado para o local esperado: {wimPath}");
-                    }
-                    if (!extracted)
-                        Log("WIM não encontrado após extração. Tentando outras fontes...");
-                }
-
-                if (!File.Exists(wimPath))
-                {
-                    // Tenta baixar VALOS-base.7z do GitHub
-                    Log("Tentando download do GitHub Release (VALOS-base.7z)...");
-                    try
-                    {
-                        using var httpClient = new HttpClient();
-                        httpClient.Timeout = TimeSpan.FromMinutes(15);
-                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("KitLugia/1.0");
-                        using var resp = await httpClient.GetAsync(VALIDATION_GITHUB_URL,
-                            HttpCompletionOption.ResponseHeadersRead, ct);
-                        if (resp.IsSuccessStatusCode)
-                        {
-                            long total = resp.Content.Headers.ContentLength ?? 0;
-                            Log($"VALOS-base.7z encontrado ({(total > 0 ? $"{total / 1024 / 1024} MB" : "tamanho desconhecido")}). Baixando...");
-
-                            {
-                                await using var fs = new FileStream(valos7z, FileMode.Create, FileAccess.Write, FileShare.None);
-                                await using var stream = await resp.Content.ReadAsStreamAsync(ct);
-                                var buffer = new byte[8 * 1024 * 1024];
-                                long read = 0;
-                                int n;
-                                while ((n = await stream.ReadAsync(buffer.AsMemory(), ct)) > 0)
-                                {
-                                    await fs.WriteAsync(buffer.AsMemory(0, n), ct);
-                                    read += n;
-                                    if (total > 0)
-                                        LogReplace($"Download: {read / (1024 * 1024)} MB / {total / (1024 * 1024)} MB");
-                                }
-                                Log("VALOS-base.7z baixado.");
-                            }
-
-                            if (sevenZip != null)
-                            {
-                                var (success, foundWim) = await TryExtract7z(sevenZip, valos7z, klWinpe);
-                                if (success && foundWim != null)
-                                {
-                                    wimPath = foundWim;
-                                    Log($"WIM pronto: {wimPath}");
-                                }
-                                else
-                                    Log("WIM não encontrado. Tentando ISO da Microsoft...");
-                            }
-                            else
-                            {
-                                Log("7-Zip não encontrado. Tentando ISO da Microsoft...");
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"GitHub Release falhou: {ex.Message}. Tentando ISO da Microsoft...");
-                    }
-                }
-
-                // Fallback: tenta baixar ISO da Microsoft
-                if (!File.Exists(wimPath) && !File.Exists(isoPath))
-                {
-                    Log("Tentando download da ISO da Microsoft...");
-                    Log("URL: " + VALIDATION_ISO_URL);
-                    Log("Nota: Pode exigir aceitação de licença.");
-
-                    try
-                    {
-                        using var httpClient = new HttpClient();
-                        httpClient.Timeout = TimeSpan.FromMinutes(15);
-                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("KitLugia/1.0");
-                        using var resp = await httpClient.GetAsync(VALIDATION_ISO_URL,
-                            HttpCompletionOption.ResponseHeadersRead, ct);
-                        if (!resp.IsSuccessStatusCode)
-                            return (false,
-                                $"Falha ao baixar Validation OS (HTTP {(int)resp.StatusCode}).\n" +
-                                $"Baixe manualmente e salve o ISO em: {isoPath}\n" +
-                                $"Ou crie VALOS-base.7z com o script Build-ValidationOS.ps1\n" +
-                                $"e faça upload para GitHub Releases.");
-
-                        long total = resp.Content.Headers.ContentLength ?? 0;
-                        Log($"ISO encontrado ({(total > 0 ? $"{total / 1024 / 1024} MB" : "tamanho desconhecido")}). Baixando...");
-
-                        await using var fs = new FileStream(isoPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                        await using var stream = await resp.Content.ReadAsStreamAsync(ct);
-                        var buffer = new byte[8 * 1024 * 1024];
-                        long read = 0;
-                        int n;
-                        while ((n = await stream.ReadAsync(buffer.AsMemory(), ct)) > 0)
-                        {
-                            await fs.WriteAsync(buffer.AsMemory(0, n), ct);
-                            read += n;
-                            if (total > 0)
-                                LogReplace($"Download: {read / (1024 * 1024)} MB / {total / (1024 * 1024)} MB");
-                        }
-                        Log("ISO baixado com sucesso.");
-                    }
-                    catch (OperationCanceledException) { return (false, "Download cancelado."); }
-                    catch (Exception ex)
-                    {
-                        return (false,
-                            $"Download falhou: {ex.Message}\n\n" +
-                            $"Opções:\n" +
-                            $"1. Baixe o ISO manualmente: {VALIDATION_ISO_URL}\n" +
-                            $"   Salve em: {isoPath}\n" +
-                            $"2. Ou use Build-ValidationOS.ps1 para criar VALOS-base.7z\n" +
-                            $"   https://github.com/luigiarrud4/KitLugia-WinPE/releases");
-                    }
-                }
-                else if (!File.Exists(wimPath) && File.Exists(isoPath))
-                {
-                    Log("ISO encontrado em cache.");
-                }
-
-                // 2. Se não temos o WIM ainda, extrai do ISO
-                if (!File.Exists(wimPath) && File.Exists(isoPath))
-                {
-                    Log("[2/5] Montando ISO e extraindo WinVOS.wim...");
-                    ct.ThrowIfCancellationRequested();
-
-                    string? driveLetter = null;
-                    try
-                    {
-                        driveLetter = await MountIso(isoPath);
-                        if (string.IsNullOrEmpty(driveLetter))
-                            return (false, "Falha ao montar ISO do Validation OS.");
-
-                        Log($"ISO montado em {driveLetter}:");
-
-                        string[] searchPaths = [
-                            Path.Combine(driveLetter, "sources", "WinVOS.wim"),
-                            Path.Combine(driveLetter, "WinVOS.wim"),
-                            Path.Combine(driveLetter, "ValidationOS.wim"),
-                            Path.Combine(driveLetter, "sources", "ValidationOS.wim"),
-                        ];
-
-                        string? sourceWim = null;
-                        foreach (var sp in searchPaths)
-                        {
-                            if (File.Exists(sp))
-                            {
-                                sourceWim = sp;
-                                break;
-                            }
-                        }
-
-                        if (sourceWim == null)
-                        {
-                            Log("WinVOS.wim não encontrado. Listando arquivos da ISO:");
-                            foreach (var f in Directory.GetFiles(driveLetter, "*.wim", SearchOption.AllDirectories))
-                                Log($"  {f}");
-                            return (false,
-                                "WinVOS.wim não encontrado na ISO. " +
-                                "Verifique se o ISO é do Validation OS (não WinPE normal).");
-                        }
-
-                        Log($"WinVOS.wim encontrado: {sourceWim} ({(new FileInfo(sourceWim).Length / 1024 / 1024)} MB)");
-                        File.Copy(sourceWim, wimPath, true);
-                        Log($"WinVOS.wim copiado para {wimPath}");
-                    }
-                    finally
-                    {
-                        if (!string.IsNullOrEmpty(driveLetter))
-                            await DismountIso(isoPath);
-                    }
-                }
-                else if (File.Exists(wimPath))
-                {
-                    Log($"[2/5] WIM já existe em {wimPath} ({new FileInfo(wimPath).Length / 1024 / 1024} MB). Pulando extração.");
-                }
-
-                // 3. Injetar startnet.valos.cmd via wimlib (rápido, sem montar)
-                Log("[3/5] Injetando startnet.valos.cmd no WIM...");
-                ct.ThrowIfCancellationRequested();
-
-                WinpeBuilder.EnsureFileWritable(wimPath);
-                string valosContent = ValidationOsStartnetCmd();
-                bool wimlibOk = await WinpeBuilder.UpdateWimWithScriptAsync(
-                    wimPath, valosContent, "startnet.valos.cmd");
-
-                // 3b. Substituir startnet.cmd por bridge que chama startnet.valos.cmd
-                Log("[3a/5] Substituindo startnet.cmd (bridge para startnet.valos.cmd)...");
-                string bridgeContent = @"@echo off
-if exist X:\Windows\System32\startnet.valos.cmd (
-    call X:\Windows\System32\startnet.valos.cmd
-    goto :end
-)
-if exist C:\Windows\System32\startnet.valos.cmd (
-    call C:\Windows\System32\startnet.valos.cmd
-    goto :end
-)
-echo startnet.valos.cmd nao encontrado. KitLugia nao configurado.
-echo Execute 'PREPARAR VALIDATION OS' novamente.
-:end";
-                await WinpeBuilder.UpdateWimWithScriptAsync(
-                    wimPath, bridgeContent, "startnet.cmd");
-
-                // 3b. Injetar diskpart.exe (VALOS não inclui nativamente)
-                Log("[3b/5] Injetando diskpart.exe no WIM...");
-                await WinpeBuilder.InjectDiskpartIntoWimAsync(wimPath);
-
-                // 4. Adicionar suporte WPF (só via DISM, se encontrarmos o CAB)
-                Log("[3c/5] Verificando suporte WPF (Microsoft-WinVOS-WPF-Support)...");
-                ct.ThrowIfCancellationRequested();
-
-                string[] cabSearchPaths = [
-                    Path.Combine(klWinpe, "VALOS_EXTRAS", "CAB", "Microsoft-WinVOS-WPF-Support-Package.cab"),
-                    Path.Combine(klWinpe, "Microsoft-WinVOS-WPF-Support-Package.cab"),
-                ];
-                string? wpfCab = null;
-                foreach (var cab in cabSearchPaths)
-                {
-                    if (File.Exists(cab))
-                    {
-                        wpfCab = cab;
-                        break;
-                    }
-                }
-
-                if (wpfCab != null && !wimlibOk)
-                {
-                    Log("Pacote WPF encontrado, mas wimlib não está disponível. Usando DISM mount+commit...");
-                    WinpeBuilder.EnsureFileWritable(wimPath);
-                    // Fallback: DISM mount para adicionar CAB + script
-                    string mountDir = Path.Combine(klWinpe, "mount_valos");
-                    try
-                    {
-                        if (Directory.Exists(mountDir))
-                        {
-                            try { Directory.Delete(mountDir, true); } catch { }
-                            await RunProcessCaptured("dism.exe", "/Cleanup-Mountpoints", 30000);
-                        }
-                        Directory.CreateDirectory(mountDir);
-
-                        var (mntCode, mntOut) = await RunProcessCaptured("dism.exe",
-                            $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
-                        if (mntCode == 0 || mntOut.Contains("already mounted"))
-                        {
-                            Log($"Adicionando pacote WPF: {wpfCab}");
-                            var (pkgCode, _) = await RunProcessCaptured("dism.exe",
-                                $"/Add-Package /Image:\"{mountDir}\" /PackagePath:\"{wpfCab}\"", 180000);
-                            if (pkgCode == 0)
-                                Log("Suporte WPF adicionado com sucesso.");
-                            else
-                                Log($"Aviso: Add-Package retornou código {pkgCode}.");
-
-                            // Também injeta o script via DISM já que montamos
-                            string system32 = Path.Combine(mountDir, "Windows", "System32");
-                            string valosCmd = Path.Combine(system32, "startnet.valos.cmd");
-                            await File.WriteAllTextAsync(valosCmd, valosContent, ct);
-                            Log("startnet.valos.cmd criado (DISM).");
-
-                            var (cmtCode, _) = await RunProcessCaptured("dism.exe",
-                                $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
-                            if (cmtCode == 0)
-                                Log("WIM salvo com sucesso via DISM.");
-                            else
-                            {
-                                Log($"Falha ao commitar WIM ({cmtCode}). Descartando...");
-                                try { await RunProcessCaptured("dism.exe",
-                                    $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 60000); }
-                                catch { }
-                            }
-                        }
-                    }
-                    catch (Exception dismEx)
-                    {
-                        Log($"Aviso durante customização DISM: {dismEx.Message}");
-                        try { await RunProcessCaptured("dism.exe",
-                            $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 60000); }
-                        catch { }
-                    }
-                    finally
-                    {
-                        try { if (Directory.Exists(mountDir)) Directory.Delete(mountDir, true); }
-                        catch { }
-                    }
-                }
-                else if (wpfCab != null)
-                {
-                    Log($"Pacote WPF encontrado: {wpfCab}. Adicionando via DISM (wimlib não suporta Add-Package)...");
-                    WinpeBuilder.EnsureFileWritable(wimPath);
-                    // DISM mount apenas para Add-Package (script já foi via wimlib)
-                    string mountDir = Path.Combine(klWinpe, "mount_valos");
-                    try
-                    {
-                        if (Directory.Exists(mountDir))
-                        {
-                            try { Directory.Delete(mountDir, true); } catch { }
-                            await RunProcessCaptured("dism.exe", "/Cleanup-Mountpoints", 30000);
-                        }
-                        Directory.CreateDirectory(mountDir);
-
-                        var (mntCode, mntOutStr) = await RunProcessCaptured("dism.exe",
-                            $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
-                        if (mntCode == 0 || mntOutStr.Contains("already mounted"))
-                        {
-                            var (pkgCode, _) = await RunProcessCaptured("dism.exe",
-                                $"/Add-Package /Image:\"{mountDir}\" /PackagePath:\"{wpfCab}\"", 180000);
-                            if (pkgCode == 0)
-                                Log("Suporte WPF adicionado com sucesso.");
-                            else
-                                Log($"Aviso: Add-Package retornou código {pkgCode}.");
-
-                            var (cmtCode, _) = await RunProcessCaptured("dism.exe",
-                                $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
-                            if (cmtCode == 0)
-                                Log("WIM salvo com sucesso via DISM.");
-                            else
-                            {
-                                try { await RunProcessCaptured("dism.exe",
-                                    $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 60000); }
-                                catch { }
-                            }
-                        }
-                    }
-                    catch (Exception dismEx)
-                    {
-                        Log($"Aviso durante Add-Package DISM: {dismEx.Message}");
-                        try { await RunProcessCaptured("dism.exe",
-                            $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 60000); }
-                        catch { }
-                    }
-                    finally
-                    {
-                        try { if (Directory.Exists(mountDir)) Directory.Delete(mountDir, true); }
-                        catch { }
-                    }
-                }
-                else
-                {
-                    Log("Pacote WPF não encontrado. O Validation OS vai bootar sem interface WPF.");
-                }
-
-                // 3d. Configurar Winlogon Shell registry no VALOS (sem isso startnet.valos.cmd nunca executa)
-                Log("[3d/5] Configurando Winlogon Shell para startnet.valos.cmd...");
-                ct.ThrowIfCancellationRequested();
-                await WinpeBuilder.ConfigureValosShellAsync(wimPath);
-
-                // 4. Resolver boot.sdi
-                Log("[4/5] Resolvendo boot.sdi...");
-                ct.ThrowIfCancellationRequested();
-                string sdiPath = Path.Combine(klWinpe, "boot.sdi");
-                if (!File.Exists(sdiPath))
-                {
-                    string? resolvedSdi = WinpeBuilder.ResolveBootSdi();
-                    if (!string.IsNullOrEmpty(resolvedSdi))
-                        File.Copy(resolvedSdi, sdiPath, true);
-                    else
-                        return (false,
-                            "boot.sdi não encontrado. Copie de C:\\Windows\\Boot\\DVD\\PCAT\\boot.sdi");
-                }
-
-                // 5. Criar entrada BCD ramdisk + bootsequence one-time
-                Log("[5/5] Criando entrada BCD ramdisk e configurando bootsequence...");
-                ct.ThrowIfCancellationRequested();
-
-                string? guid = await CreateRamdiskEntry(
-                    "KitLugia Validation OS (WPF Test)", "C",
-                    "\\KL_WINPE\\validation_boot.wim",
-                    "\\KL_WINPE\\boot.sdi");
-
-                if (guid == null)
-                    return (false, "Falha ao criar entrada BCD ramdisk para Validation OS.");
-
-                // Configura bootsequence one-time (10s timeout)
-                await RunProcessCaptured("bcdedit.exe", "/timeout 10");
-                var (bsCode, _) = await RunProcessCaptured("bcdedit.exe", $"/bootsequence {guid}");
-                Log($"Bootsequence configurado (código {bsCode}).");
-
-                Log("\n✅ Validation OS preparado com sucesso!");
-                Log($"   WIM: {wimPath}");
-                Log($"   GUID: {guid}");
-                Log("   Na próxima reinicialização, o menu de boot aparecerá com a opção.");
-                Log("   Para boot único agora, reinicie o PC.");
-
-                return (true,
-                    $"Validation OS pronto!\n\n" +
-                    $"WIM: {wimPath}\n" +
-                    $"GUID: {guid}\n\n" +
-                    $"O bootsequence foi configurado. Ao reiniciar, o menu de boot\n" +
-                    $"aparecerá (10s timeout) com a opção 'KitLugia Validation OS'.\n\n" +
-                    $"Se o app KitLugia estiver embutido no WIM (self-contained +\n" +
-                    $"WPF support), ele será lançado automaticamente.");
-            }
-            catch (OperationCanceledException)
-            {
-                return (false, "Operação cancelada.");
-            }
-            catch (Exception ex)
-            {
-                return (false, $"Erro ao preparar Validation OS: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Remove entrada BCD do Validation OS e deleta validation_boot.wim.
-        /// </summary>
-        public static async Task<bool> RemoveValidationOs()
-        {
-            Log("=== Removendo Validation OS ===");
-            int removed = 0;
-
-            try
-            {
-                var guids = await FindBcdGuidsByText("KitLugia", "Validation OS");
-                foreach (var guid in guids)
-                {
-                    Log($"Removendo entrada BCD: {guid}");
-                    var (delCode, _) = await RunProcessCaptured("bcdedit.exe", $"/delete {guid} /f");
-                    if (delCode == 0) removed++;
-                }
-                Log($"Removidas {removed} entradas BCD Validation OS.");
-            }
-            catch (Exception ex)
-            {
-                Log($"Aviso ao limpar BCD: {ex.Message}");
-            }
-
-            try
-            {
-                if (File.Exists(VALIDATION_WIM_PATH))
-                {
-                    File.Delete(VALIDATION_WIM_PATH);
-                    Log("validation_boot.wim deletado.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"Aviso ao deletar validation_boot.wim: {ex.Message}");
-            }
-
-            return removed > 0;
-        }
-
-        /// <summary>
-        /// Gera o conteúdo do startnet.valos.cmd que será executado ao iniciar
-        /// o Validation OS. Tenta lançar o app KitLugia se estiver presente no
-        /// WIM, ou abre o prompt com ajuda.
-        /// </summary>
-        private static string ValidationOsStartnetCmd()
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("@echo off");
-            sb.AppendLine("setlocal enabledelayedexpansion");
-            sb.AppendLine("wpeinit");
-            sb.AppendLine();
-            sb.AppendLine("rem --- Shrink mode: if shrink_config.ini exists, run shrink ---");
-            sb.AppendLine("if exist X:\\shrink_config.ini (");
-            sb.AppendLine("  for /f \"tokens=1,2 delims==\" %%a in (X:\\shrink_config.ini) do (");
-            sb.AppendLine("    if /i \"%%a\"==\"DISK_N\" set DISK_N=%%b");
-            sb.AppendLine("    if /i \"%%a\"==\"PART_N\" set PART_N=%%b");
-            sb.AppendLine("    if /i \"%%a\"==\"SHRINK_MB\" set SHRINK_MB=%%b");
-            sb.AppendLine("  )");
-            sb.AppendLine("  if not \"!PART_N!\"==\"0\" (");
-            sb.AppendLine("    echo ============================================");
-            sb.AppendLine("    echo  KitLugia Validation OS - Shrink Mode");
-            sb.AppendLine("    echo ============================================");
-            sb.AppendLine("    echo select disk !DISK_N! > X:\\shrink.txt");
-            sb.AppendLine("    echo select partition !PART_N! >> X:\\shrink.txt");
-            sb.AppendLine("    echo shrink desired=!SHRINK_MB! >> X:\\shrink.txt");
-            sb.AppendLine("    diskpart /s X:\\shrink.txt");
-            sb.AppendLine("    echo Shrink done. Rebooting...");
-            sb.AppendLine("    echo [KitLugia Validation OS Shrink] > X:\\result.log");
-            sb.AppendLine("    echo Status: OK >> X:\\result.log");
-            sb.AppendLine("    wpeutil reboot");
-            sb.AppendLine("  )");
-            sb.AppendLine(")");
-            sb.AppendLine("if exist C:\\shrink_config.ini (");
-            sb.AppendLine("  for /f \"tokens=1,2 delims==\" %%a in (C:\\shrink_config.ini) do (");
-            sb.AppendLine("    if /i \"%%a\"==\"DISK_N\" set DISK_N=%%b");
-            sb.AppendLine("    if /i \"%%a\"==\"PART_N\" set PART_N=%%b");
-            sb.AppendLine("    if /i \"%%a\"==\"SHRINK_MB\" set SHRINK_MB=%%b");
-            sb.AppendLine("  )");
-            sb.AppendLine("  if not \"!PART_N!\"==\"0\" (");
-            sb.AppendLine("    echo ============================================");
-            sb.AppendLine("    echo  KitLugia Validation OS - Shrink Mode");
-            sb.AppendLine("    echo ============================================");
-            sb.AppendLine("    echo select disk !DISK_N! > C:\\shrink.txt");
-            sb.AppendLine("    echo select partition !PART_N! >> C:\\shrink.txt");
-            sb.AppendLine("    echo shrink desired=!SHRINK_MB! >> C:\\shrink.txt");
-            sb.AppendLine("    diskpart /s C:\\shrink.txt");
-            sb.AppendLine("    echo Shrink done. Rebooting...");
-            sb.AppendLine("    echo [KitLugia Validation OS Shrink] > C:\\result.log");
-            sb.AppendLine("    echo Status: OK >> C:\\result.log");
-            sb.AppendLine("    wpeutil reboot");
-            sb.AppendLine("  )");
-            sb.AppendLine(")");
-            sb.AppendLine();
-            sb.AppendLine("rem --- Normal boot (no shrink) ---");
-            sb.AppendLine("echo ============================================");
-            sb.AppendLine("echo  KitLugia - Validation OS");
-            sb.AppendLine("echo ============================================");
-            sb.AppendLine("echo.");
-            sb.AppendLine();
-            sb.AppendLine("rem --- Se WinXShell.exe estiver presente, lanca como GUI ---");
-            sb.AppendLine("if exist C:\\Windows\\System32\\WinXShell.exe (");
-            sb.AppendLine("    start \"\" C:\\Windows\\System32\\WinXShell.exe");
-            sb.AppendLine("    goto :done");
-            sb.AppendLine(")");
-            sb.AppendLine("if exist X:\\Windows\\System32\\WinXShell.exe (");
-            sb.AppendLine("    start \"\" X:\\Windows\\System32\\WinXShell.exe");
-            sb.AppendLine("    goto :done");
-            sb.AppendLine(")");
-            sb.AppendLine();
-            sb.AppendLine("rem --- Tenta iniciar o app KitLugia (WPF) ---");
-            sb.AppendLine("set APP_PATH=X:\\KitLugia\\KitLugia.exe");
-            sb.AppendLine("if exist \"!APP_PATH!\" (");
-            sb.AppendLine("    echo Iniciando KitLugia...");
-            sb.AppendLine("    start \"\" \"!APP_PATH!\"");
-            sb.AppendLine("    goto :done");
-            sb.AppendLine(")");
-            sb.AppendLine();
-            sb.AppendLine("rem --- Fallback: procura em outras pastas ---");
-            sb.AppendLine("for %%d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do (");
-            sb.AppendLine("    if exist \"%%d:\\KitLugia\\KitLugia.exe\" (");
-            sb.AppendLine("        echo Encontrado KitLugia em %%d:");
-            sb.AppendLine("        start \"\" \"%%d:\\KitLugia\\KitLugia.exe\"");
-            sb.AppendLine("        goto :done");
-            sb.AppendLine("    )");
-            sb.AppendLine(")");
-            sb.AppendLine();
-            sb.AppendLine("echo.");
-            sb.AppendLine("echo  AVISO: KitLugia.exe nao encontrado.");
-            sb.AppendLine("echo  Coloque o app em X:\\KitLugia\\KitLugia.exe dentro do WIM");
-            sb.AppendLine("echo  ou em qualquer unidade \\KitLugia\\KitLugia.exe.");
-            sb.AppendLine("echo.");
-            sb.AppendLine("echo  Comandos disponiveis:");
-            sb.AppendLine("echo    - shutdown /r /t 0   (reiniciar)");
-            sb.AppendLine("echo    - wpeutil reboot     (reiniciar WinPE)");
-            sb.AppendLine("echo    - notepad            (bloco de notas)");
-            sb.AppendLine("echo    - diskpart           (particoes)");
-            sb.AppendLine("echo    - X:\\KitLugia\\KitLugia.exe  (iniciar app manualmente)");
-            sb.AppendLine("echo.");
-            sb.AppendLine();
-            sb.AppendLine(":done");
-            sb.AppendLine("echo.");
-            sb.AppendLine("echo Boot concluido. Digite 'exit' para fechar.");
-            sb.AppendLine("cmd /k");
-            sb.AppendLine("exit");
-            return sb.ToString();
-        }
-
         /// <summary>
         /// startnet.cmd para RAMDISK: tenta X:\shrink_config.ini (injetado no WIM);
         /// fallback: unroll de volumes 1-10 com assign letter=Z.
@@ -5797,12 +5197,6 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
         public static bool IsWinpeReady()
         {
             try { return File.Exists(@"C:\KL_WINPE\boot.wim"); }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-        public static bool IsValidationOsReady()
-        {
-            try { return File.Exists(VALIDATION_WIM_PATH); }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
@@ -6068,16 +5462,15 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
             }
         }
 
-        public static async Task<(bool ok, string msg)> ScheduleWinpeShrink(string targetDrive, long shrinkMB, string osType = "winpe")
+        public static async Task<(bool ok, string msg)> ScheduleWinpeShrink(string targetDrive, long shrinkMB)
         {
             try
             {
                 string klWinpe = @"C:\KL_WINPE";
                 string configIni = Path.Combine(klWinpe, "shrink_config.ini");
-                bool useValOs = osType.Equals("validationos", StringComparison.OrdinalIgnoreCase);
-                string wimFile = useValOs ? "validation_boot.wim" : "boot.wim";
+                string wimFile = "boot.wim";
                 string wimPath = Path.Combine(klWinpe, wimFile);
-                string bcdDesc = useValOs ? "KitLugia Validation OS (WPF Test)" : "KitLugia WinPE - Shrink";
+                string bcdDesc = "KitLugia WinPE - Shrink";
 
                 // 1. Verifica se o WIM existe (com fallback recursivo) — auto-prepara se ausente
                 if (!File.Exists(wimPath))
@@ -6122,20 +5515,20 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
                 }
 
                 // 3b. Escreve shrink_config.ini no HD (backup)
-                string configContent = $"DISK_N={disk}\nPART_N={part}\nPART_OFFSET={offset}\nPART_SIZE={size}\nOS_TYPE={(useValOs ? "validationos" : "winpe")}\n";
+                string configContent = $"DISK_N={disk}\nPART_N={part}\nPART_OFFSET={offset}\nPART_SIZE={size}\nOS_TYPE=winpe\n";
                 if (!string.IsNullOrEmpty(serial))
                     configContent += $"VOL_SERIAL={serial}\n";
                 if (!string.IsNullOrEmpty(label))
                     configContent += $"VOL_LABEL={label}\n";
                 configContent += $"SHRINK_MB={shrinkMB64}\n";
                 await File.WriteAllTextAsync(configIni, configContent);
-                Log($"Config escrito: DISK_N={disk} PART_N={part} OFFSET={offset} SIZE={size} SHRINK={shrinkMB}MB OS={osType}");
+                Log($"Config escrito: DISK_N={disk} PART_N={part} OFFSET={offset} SIZE={size} SHRINK={shrinkMB}MB OS=winpe");
 
                 Log("Config + marcador escritos. Injetando script de shrink no WIM...");
 
                 // 3c. Injetar script + config no WIM via wimlib (rápido, sem montar)
                 string shrinkScript = RamdiskStartnetCmd(disk, part, (int)shrinkMB64);
-                string scriptName = useValOs ? "startnet.valos.cmd" : "startnet.cmd";
+                string scriptName = "startnet.cmd";
                 bool scriptOk = await WinpeBuilder.UpdateWimWithScriptAsync(wimPath, shrinkScript, scriptName);
                 bool configOk = await WinpeBuilder.InjectConfigIntoWimAsync(wimPath, configContent);
                 if (scriptOk && configOk)
@@ -6165,7 +5558,7 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
                     if (guid != null)
                     {
                         var (bsCode, _) = await RunProcessCaptured("bcdedit.exe", $"/bootsequence {guid}");
-                        Log($"Bootsequence configurado para {(useValOs ? "Validation OS" : "WinPE")} (código {bsCode}).");
+                        Log($"Bootsequence configurado para WinPE (código {bsCode}).");
                         if (bsCode != 0)
                         {
                             // Fallback: bootsequence falhou → adiciona ao menu com timeout para seleção manual
@@ -6200,11 +5593,208 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
 
-                return (true, $"{(useValOs ? "Validation OS" : "WinPE")} configurado. DISK_N={disk} PART_N={part} OFFSET={offset} SHRINK={shrinkMB}MB. O sistema será reiniciado em 10s para executar o shrink.");
+                return (true, $"WinPE configurado. DISK_N={disk} PART_N={part} OFFSET={offset} SHRINK={shrinkMB}MB. O sistema será reiniciado em 10s para executar o shrink.");
             }
             catch (Exception ex)
             {
                 return (false, $"Erro ao agendar shrink: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// GUID fixo da entrada BCD de boot do modo TESTE do shell (WinXShell).
+        /// Reusado a cada execucao - nunca acumula entradas no boot manager.
+        /// </summary>
+        public const string TestShellBcdGuid = "{9f7c8d2e-4a5b-4c6d-8e9f-0123456789ab}";
+
+        /// <summary>
+        /// startnet.cmd para o modo TESTE: se existir KL_SHRINK_TARGET.dat o shrink
+        /// agendado roda primeiro (goto :run); sem marcador, lanca WinXShell -winpe
+        /// como shell grafico do WinPE (modo GUI de inspecao manual).
+        /// Regras cmd.exe: sem parenteses dentro de echo de blocos, ASCII puro.
+        /// </summary>
+        private static string TestShellStartnetCmd()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("@echo off");
+            sb.AppendLine("setlocal enabledelayedexpansion");
+            sb.AppendLine("wpeinit");
+            sb.AppendLine("echo KitLugia WinPE - Test Mode WinXShell");
+            sb.AppendLine("ping -n 5 127.0.0.1 > nul");
+            sb.AppendLine();
+            sb.AppendLine("set SHRINK_MB=10000");
+            sb.AppendLine("set DISK_N=0");
+            sb.AppendLine("set PART_N=0");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Scan por KL_SHRINK_TARGET.dat (shrink agendado anteriormente roda primeiro) ---");
+            sb.AppendLine("echo Scanning for KL_SHRINK_TARGET.dat marker...");
+            sb.AppendLine("for /l %%d in (0,1,3) do (");
+            sb.AppendLine("  for /l %%p in (1,1,8) do (");
+            sb.AppendLine("    echo select disk %%d > X:\\mk.txt");
+            sb.AppendLine("    echo select partition %%p >> X:\\mk.txt");
+            sb.AppendLine("    echo assign letter=Z >> X:\\mk.txt");
+            sb.AppendLine("    diskpart /s X:\\mk.txt >nul 2>&1");
+            sb.AppendLine("    if exist Z:\\KL_SHRINK_TARGET.dat (");
+            sb.AppendLine("      for /f \"tokens=1,2 delims==\" %%a in (Z:\\KL_SHRINK_TARGET.dat) do (");
+            sb.AppendLine("        if /i \"%%a\"==\"SHRINK_MB\" set SHRINK_MB=%%b");
+            sb.AppendLine("      )");
+            sb.AppendLine("      set DISK_N=%%d & set PART_N=%%p");
+            sb.AppendLine("      echo select volume Z > X:\\mr.txt");
+            sb.AppendLine("      echo remove letter=Z >> X:\\mr.txt");
+            sb.AppendLine("      diskpart /s X:\\mr.txt >nul 2>&1");
+            sb.AppendLine("      echo Found marker: DISK=%%d PART=%%p SHRINK=!SHRINK_MB!");
+            sb.AppendLine("      goto :run");
+            sb.AppendLine("    )");
+            sb.AppendLine("    echo select volume Z > X:\\mr.txt 2>nul");
+            sb.AppendLine("    echo remove letter=Z >> X:\\mr.txt");
+            sb.AppendLine("    diskpart /s X:\\mr.txt >nul 2>&1");
+            sb.AppendLine("  )");
+            sb.AppendLine(")");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Sem marcador: modo TESTE - lanca o shell WinXShell ---");
+            sb.AppendLine("echo No shrink scheduled. Launching WinXShell shell...");
+            sb.AppendLine("if exist C:\\Windows\\System32\\WinXShell.exe (");
+            sb.AppendLine("  cd /d C:\\Windows\\System32");
+            sb.AppendLine("  start \"\" \"C:\\Windows\\System32\\WinXShell.exe\" -winpe");
+            sb.AppendLine("  echo WinXShell launched with -winpe flag (WinPE shell mode).");
+            sb.AppendLine("  echo Close the VM or reboot manually when done testing.");
+            sb.AppendLine(") else (");
+            sb.AppendLine("  echo ERROR: WinXShell.exe nao encontrado no WIM.");
+            sb.AppendLine("  wpeutil reboot");
+            sb.AppendLine(")");
+            sb.AppendLine("exit /b 0");
+            sb.AppendLine();
+            sb.AppendLine(":run");
+            sb.AppendLine("if \"!PART_N!\"==\"0\" ( echo ERROR: Target partition not found. Rebooting... & wpeutil reboot )");
+            sb.AppendLine("echo select disk !DISK_N! > X:\\s.txt");
+            sb.AppendLine("echo select partition !PART_N! >> X:\\s.txt");
+            sb.AppendLine("echo assign letter=Z >> X:\\s.txt");
+            sb.AppendLine("echo shrink desired=!SHRINK_MB! >> X:\\s.txt");
+            sb.AppendLine("echo remove letter=Z >> X:\\s.txt");
+            sb.AppendLine("diskpart /s X:\\s.txt");
+            sb.AppendLine("echo Shrink done. Writing persistent log...");
+            sb.AppendLine("echo [KitLugia WinPE Shrink] > X:\\result.log");
+            sb.AppendLine("echo Status: OK >> X:\\result.log");
+            sb.AppendLine("echo Disk: !DISK_N! Part: !PART_N! Size: !SHRINK_MB!MB >> X:\\result.log");
+            sb.AppendLine("echo select disk !DISK_N! > X:\\l.txt");
+            sb.AppendLine("echo select partition !PART_N! >> X:\\l.txt");
+            sb.AppendLine("echo assign letter=Z >> X:\\l.txt");
+            sb.AppendLine("diskpart /s X:\\l.txt >nul 2>&1");
+            sb.AppendLine("if exist Z:\\ (");
+            sb.AppendLine("  copy /y X:\\result.log Z:\\KitLugia_WinPE_Log.txt >nul");
+            sb.AppendLine("  if exist Z:\\KL_SHRINK_TARGET.dat del /f /q Z:\\KL_SHRINK_TARGET.dat >nul 2>&1");
+            sb.AppendLine("  echo select volume Z > X:\\lr.txt");
+            sb.AppendLine("  echo remove letter=Z >> X:\\lr.txt");
+            sb.AppendLine("  diskpart /s X:\\lr.txt >nul 2>&1");
+            sb.AppendLine("  echo Log saved to Z:\\KitLugia_WinPE_Log.txt");
+            sb.AppendLine(") else (");
+            sb.AppendLine("  echo WARNING: Could not reassign Z: for persistent log");
+            sb.AppendLine(")");
+            sb.AppendLine("echo Rebooting...");
+            sb.AppendLine("wpeutil reboot");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Modo TESTE (botao TESTAR): injeta WinXShell.exe no boot.wim e agenda o
+        /// reboot via bootsequence one-time (GUID fixo, sem poluir o menu do boot).
+        /// O WinPE boota e o startnet.cmd lanca WinXShell -winpe como shell grafico.
+        /// Se um shrink agendado existir (marcador), o shrink roda primeiro.
+        /// </summary>
+        public static async Task<(bool ok, string msg)> ScheduleTestWinpeShell()
+        {
+            try
+            {
+                Log("========== AGENDANDO TESTE DO SHELL (WINXSHELL) VIA WINPE ==========");
+                string klWinpe = @"C:\KL_WINPE";
+                string wimPath = Path.Combine(klWinpe, "boot.wim");
+
+                // 1. WIM com fallback recursivo + auto-prepare (mesmo padrao do shrink)
+                if (!File.Exists(wimPath))
+                {
+                    string? found = FindWimRecursive(klWinpe);
+                    if (found != null)
+                    {
+                        Log($"WIM esperado nao encontrado em {wimPath}, mas encontrado em: {found}");
+                        wimPath = found;
+                    }
+                    else
+                    {
+                        Log("WinPE nao preparado. Preparando automaticamente (baixar/criar boot.wim)...");
+                        var (prepOk, prepMsg) = await PrepareWinpeBoot();
+                        if (!prepOk)
+                            return (false, $"WinPE ausente e falha ao preparar automaticamente: {prepMsg}");
+                        if (!File.Exists(wimPath))
+                            return (false, "WinPE preparado, mas boot.wim nao encontrado em C:\\KL_WINPE.");
+                        Log("WinPE preparado automaticamente com sucesso.");
+                    }
+                }
+                WinpeBuilder.EnsureFileWritable(wimPath);
+
+                // 2. WinXShell: resolve localmente (KitLugia.WinPE\WinXShell\ ou cache) e injeta no WIM
+                string? wx = await WinpeBuilder.ResolveWinXShellAsync();
+                if (wx == null)
+                    return (false, "WinXShell.exe nao encontrado. Coloque o exe em KitLugia.WinPE\\WinXShell\\WinXShell.exe e tente novamente.");
+                Log($"WinXShell local: {wx}");
+                bool injOk = await WinpeBuilder.InjectWinXShellIntoWimAsync(wimPath);
+                if (!injOk)
+                    return (false, "Falha ao injetar WinXShell.exe no WIM (wimlib indisponivel?).");
+
+                // 3. Script de teste no WIM (marcador de shrink primeiro; senao shell)
+                bool scriptOk = await WinpeBuilder.UpdateWimWithScriptAsync(wimPath, TestShellStartnetCmd(), "startnet.cmd");
+                if (!scriptOk)
+                    Log("Aviso: nao foi possivel injetar startnet.cmd de teste via wimlib.");
+
+                // 4. Bootsequence one-time via BCD ramdisk (GUID fixo, nao acumula no menu)
+                await CleanupOldWinpeEntries();
+                try
+                {
+                    string? guid = await CreateRamdiskEntry(
+                        "KitLugia WinPE - Shell Test (WinXShell)", "C",
+                        $"\\KL_WINPE\\{Path.GetFileName(wimPath)}",
+                        "\\KL_WINPE\\boot.sdi",
+                        fixedGuid: TestShellBcdGuid);
+                    if (guid != null)
+                    {
+                        var (bsCode, _) = await RunProcessCaptured("bcdedit.exe", $"/bootsequence {guid}");
+                        Log($"Bootsequence configurado (codigo {bsCode}).");
+                        if (bsCode != 0)
+                        {
+                            Log("Bootsequence falhou; adicionando entrada ao menu de boot como fallback.");
+                            await SaveOriginalBcdTimeout();
+                            await RunProcessCaptured("bcdedit.exe", "/timeout 10");
+                            await RunProcessCaptured("bcdedit.exe", $"/displayorder {guid} /addlast");
+                        }
+                    }
+                }
+                catch (Exception bcdEx)
+                {
+                    Log($"Aviso: nao foi possivel configurar bootsequence: {bcdEx.Message}");
+                }
+
+                // 5. Reboot
+                Log("Reiniciando em 10 segundos...");
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    try
+                    {
+                        var psi = new System.Diagnostics.ProcessStartInfo("shutdown", "/r /t 10 /c \"KitLugia Shell Test\"")
+                        {
+                            CreateNoWindow = true,
+                            UseShellExecute = true,
+                            Verb = "runas"
+                        };
+                        System.Diagnostics.Process.Start(psi);
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                });
+
+                return (true, "Modo TESTE configurado: WinXShell sera o shell do WinPE. O sistema sera reiniciado em 10s.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao agendar teste do shell: {ex.Message}");
             }
         }
 
@@ -6223,7 +5813,7 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
         public const string ShrinkMarkerFile = "KL_SHRINK_TARGET.dat";
 
         /// <summary>
-        /// GUID fixo da entrada BCD de boot do WinPE/Validation OS Shrink.
+        /// GUID fixo da entrada BCD de boot do WinPE Shrink.
         /// Entrada ÚNICA reutilizada a cada agendamento (não acumula entradas no boot manager).
         /// Boot via /bootsequence one-time; sem displayorder, então não fica no menu do Windows.
         /// </summary>
@@ -6413,7 +6003,7 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
                     char letter = driveLetter[0];
                     string installWim = $@"{letter}:\sources\install.wim";
                     string installEsd = $@"{letter}:\sources\install.esd";
-                    string wimFile = File.Exists(installWim) ? installWim : File.Exists(installEsd) ? installEsd : null;
+                    string? wimFile = File.Exists(installWim) ? installWim : File.Exists(installEsd) ? installEsd : null;
 
                     if (wimFile == null)
                     {

@@ -19,9 +19,6 @@ namespace KitLugia.WinPE.Pages
             EnvValue.Text = env;
             BootMode.Text = Environment.Is64BitOperatingSystem ? "x64" : "x86";
 
-            bool isValOs = WinPEDetector.IsValOS();
-            ValOsBanner.Visibility = isValOs ? Visibility.Visible : Visibility.Collapsed;
-
             var drives = DriveInfo.GetDrives()
                 .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
                 .ToList();

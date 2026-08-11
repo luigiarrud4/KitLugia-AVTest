@@ -114,37 +114,6 @@ namespace KitLugia.WinPE.Pages
             }
         }
 
-        private async void BtnPrepareValos_Click(object _, RoutedEventArgs e)
-        {
-            AppendLog("Preparando Validation OS...");
-            var (ok, msg) = await KitLugia.Core.WinbootManager.PrepareValidationOs();
-            AppendLog(msg);
-        }
-
-        private async void BtnBootValos_Click(object _, RoutedEventArgs e)
-        {
-            AppendLog("Verificando status do Validation OS...");
-            bool ready = KitLugia.Core.WinbootManager.IsValidationOsReady();
-            if (!ready)
-            {
-                AppendLog("❌ Validation OS não está preparado. Use 'Preparar ValOS' primeiro.");
-                return;
-            }
-
-            var (code, _) = await RunCmdCapture("bcdedit.exe", "/timeout 10");
-            var (bsCode, _) = await RunCmdCapture("bcdedit.exe", "/bootsequence {current}");
-            AppendLog(bsCode == 0
-                ? "✅ Bootsequence configurado com o último GUID. Reinicie o PC."
-                : $"⚠️ Código {bsCode}");
-        }
-
-        private async void BtnRemoveValos_Click(object _, RoutedEventArgs e)
-        {
-            AppendLog("Removendo Validation OS...");
-            bool removed = await KitLugia.Core.WinbootManager.RemoveValidationOs();
-            AppendLog(removed ? "✅ Validation OS removido." : "⚠️ Nada para remover.");
-        }
-
         private async void BtnSystemInfo_Click(object _, RoutedEventArgs e)
         {
             AppendLog($"Sistema: {Environment.OSVersion}");
@@ -189,24 +158,6 @@ namespace KitLugia.WinPE.Pages
             {
                 AppendLog($"  Erro: {ex.Message}");
             }
-        }
-
-        private async Task<(int code, string output)> RunCmdCapture(string cmd, string args)
-        {
-            try
-            {
-                var psi = new ProcessStartInfo(cmd, args)
-                {
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                var proc = Process.Start(psi)!;
-                string output = await proc.StandardOutput.ReadToEndAsync();
-                await proc.WaitForExitAsync();
-                return (proc.ExitCode, output);
-            }
-            catch { return (-1, ""); }
         }
 
         private void AppendLog(string text)

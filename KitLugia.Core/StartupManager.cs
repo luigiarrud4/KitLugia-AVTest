@@ -2052,7 +2052,7 @@ namespace KitLugia.Core
                 else if (startupApp.Location.Contains("\\Startup") || startupApp.Location.Contains("\\Start Menu"))
                 {
                     string shortcutPath = System.IO.Path.Combine(startupApp.Location, appName + ".lnk");
-                    bool ok = CreateShortcut(shortcutPath, exePath ?? newFullCommand, args, appName, System.IO.Path.GetDirectoryName(exePath ?? newFullCommand) ?? "");
+                    bool ok = CreateShortcut(shortcutPath, exePath ?? newFullCommand, args ?? "", appName, System.IO.Path.GetDirectoryName(exePath ?? newFullCommand) ?? "");
                     return (ok, ok ? $"Atalho '{appName}' atualizado com novos argumentos." : $"Erro ao atualizar atalho '{appName}'.");
                 }
                 else if (startupApp.Location.Contains("KitLugia") || startupApp.Location.Contains("Turbo Boot"))
@@ -2148,7 +2148,7 @@ namespace KitLugia.Core
                 {
                     string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
                     string shortcutPath = Path.Combine(startupFolder, appName + ".lnk");
-                    CreateShortcut(shortcutPath, exePath, args, appName, Path.GetDirectoryName(exePath) ?? "");
+                    CreateShortcut(shortcutPath, exePath, args ?? "", appName, Path.GetDirectoryName(exePath) ?? "");
                 }
                 else if (location.StartsWith("HK"))
                 {
@@ -2187,7 +2187,8 @@ namespace KitLugia.Core
             {
                 var shellType = Type.GetTypeFromProgID("WScript.Shell");
                 if (shellType == null) return false;
-                dynamic shell = Activator.CreateInstance(shellType);
+                dynamic? shell = Activator.CreateInstance(shellType);
+                if (shell == null) return false;
                 dynamic shortcut = shell.CreateShortcut(shortcutPath);
                 shortcut.TargetPath = targetPath;
                 shortcut.Arguments = arguments ?? "";

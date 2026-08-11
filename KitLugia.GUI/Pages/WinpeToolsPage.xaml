@@ -95,6 +95,9 @@
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button x:Name="BtnPrepareWinpe" Content="PREPARAR" Click="BtnPrepareWinpe_Click"
                                         Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="120" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnTestWinxshell" Content="TESTAR SHELL" Click="BtnTestWinxshell_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#88CCFF" BorderBrush="#225588" Width="110" Margin="0,0,8,0"
+                                        ToolTip="Injeta WinXShell.exe no WinPE e agenda reboot via bootsequence one-time: o WinPE boota com o WinXShell como shell grafico (modo GUI de inspecao manual)"/>
                                 <Button x:Name="BtnRemoveWinpe" Content="REMOVER" Click="BtnRemoveWinpe_Click"
                                         Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="90" Margin="0,0,8,0"/>
                                 <Button x:Name="BtnCleanBcd" Content="LIMPAR BCD" Click="BtnCleanBcd_Click"

@@ -348,6 +348,47 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private async void BtnTestWinxshell_Click(object sender, RoutedEventArgs e)
+        {
+            ShowBusy("AGENDANDO TESTE DO SHELL (WINXSHELL)",
+                "Injetando WinXShell.exe no WinPE e agendando reboot...\n\n" +
+                "1. Resolver WinXShell.exe (KitLugia.WinPE\\WinXShell\\ ou cache)\n" +
+                "2. Injetar no WIM via wimlib\n" +
+                "3. Injetar startnet.cmd de teste (shrink pendente roda primeiro)\n" +
+                "4. Bootsequence one-time via BCD ramdisk\n\n" +
+                "O PC sera reiniciado em 10 segundos.\n" +
+                "O WinPE bootara com o WinXShell como shell grafico.\n\n" +
+                "Se o WinPE nao estiver preparado, sera preparado automaticamente agora.");
+
+            try
+            {
+                UpdateStatus("Resolvendo WinXShell e preparando WIM...");
+
+                var token = _cts?.Token ?? CancellationToken.None;
+                var (ok, msg) = await Task.Run(() =>
+                    WinbootManager.ScheduleTestWinpeShell(), token);
+
+                if (ok)
+                {
+                    ShowBusyResult($"{msg}\n\n" +
+                        "Apos o reboot, o WinPE boota com o WinXShell como interface.\n" +
+                        "Ao voltar ao Windows, clique em VER LOGS.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha: {msg}");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                ShowBusyResult("Operacao cancelada pelo usuario.");
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
         private async void BtnRemoveWinpe_Click(object sender, RoutedEventArgs e)
         {
             var result = System.Windows.MessageBox.Show(
@@ -463,7 +504,7 @@ namespace KitLugia.GUI.Pages
 
                 var token = _cts?.Token ?? CancellationToken.None;
                 var (ok, msg) = await Task.Run(() =>
-                    WinbootManager.ScheduleWinpeShrink(drive, shrinkMb, "winpe"), token);
+                    WinbootManager.ScheduleWinpeShrink(drive, shrinkMb), token);
 
                 if (ok)
                 {

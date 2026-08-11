@@ -1613,15 +1613,518 @@ separada (TraySettings\ForegroundBoost). Usuario validou: funciona.
 habilitada (a task substitui Registry/Startup); SeDebugPrivilege OK; 5/5 RAM limits
 carregados; SmartAlerts com 2048MB/80% (load correto apos fix do cast).
 
+### Sessao 09/08 (cont.) - Scan de registro: falsos positivos "Display" (DDU) + duplicatas HKEY_USERS
+
+**Sintoma**: scan de residuos de "Display Driver Uninstaller" retornava 4 falsos positivos
+(Realtek Audio `Uninstall\{F132AF7F...}` via DisplayIcon=Display.ico, CLSID Windows
+`{101193C0...}` com default "Display", Node.js/npm `Components\7829B5D2...` via display.js,
+Intel ME `Components\3C4787A3...` via `...\ME\Display`).
+
+**Causa raiz**: fallback `KeyHasValueReferencing` (DeepUninstaller.cs) casava QUALQUER valor
+cujo filename tivesse Confidence >= 85 com o displayName — "Display" em "Display Driver
+Uninstaller" (StartsWith -> 90) pegava tudo. O guard anterior (leaf = 1a palavra exigia 2
+tokens no data) ainda deixava passar `Display.ico` porque "Drivers" contem "Driver" (substring).
+
+**Correcoes (DeepUninstaller.cs)**:
+1. Guard em KeyHasValueReferencing (x3182): (a) valor sem separador de path ("Display")
+   nunca casa (descricao de classe); (b) leaf = 1a palavra do nome exige token adicional
+   no DATA; (c) leaf = 1a palavra exige EXTENSAO EXECUTAVEL (.exe/.dll/.com/.bat/.cmd/
+   .scr/.ps1) — mata Display.ico e display.js.
+2. Batch 10 HKEY_USERS: pulava o SID do usuario atual (HKCU ja cobre o mesmo perfil) —
+   eliminadas duplicatas `HKEY_USERS\S-1-5-...-1001\Software\...` do ZCode (WindowsIdentity.
+   GetCurrent().User).
+
+**TESTADO (host, apps instalados)**: DDU = 4 legiveis (Tracing RASAPI32/RASMANCS, App
+Paths, Uninstall); ZCode = 8 legiveis (4 do Revo + chave de instalacao GUID + Uninstall +
+Audio PolicyConfig BCU + RADAR HeapLeak). Zero falsos positivos. Build: 0 erros.
+
 ### Pendencias abertas (revisadas 09/08)
 - [ ] Shrink marker-only: re-testar na VM (SCHEDULE -> reboot -> "Found marker" no log)
 - [ ] Fresh Install completo na VM (backup -> deleta Windows antigo -> apply -> bootloader)
 - [ ] PartitionsPage com Storage UI: validar flags IsSystem/IsBoot/IsSystemFlag + mover letra
 - [ ] CleanDisk via IOCTL (IOCTL_DISK_DELETE_DRIVE_LAYOUT) em disco de teste (VM)
 - [ ] RAM estavel 1h+ (fix do Dispose do Process.GetProcesses aguardando validacao)
-- [ ] Review desinstalador (estilo Revo): testar remover app com lixo + "Ignorar Sempre"
+- [x] ~~Review desinstalador (estilo Revo)~~ (validado 09/08: host, DDU + ZCode desinstalados de verdade)
+- [ ] Testar no app: batch de remocao multi-app (sequencial, a prova de falhas)
 - [ ] Console virtualizado: rodar scan verboso com milhares de linhas sem freeze
 - [x] ~~Downgrade de build~~ (ABANDONADO - Microsoft travou; ferramenta mantida)
 - [x] ~~Toggle Boost do App Ativo~~ (validado no host)
 - [x] ~~Auto-start universal~~ (validado: Registry Run + task existente)
 - [x] ~~GameBarPresenceWriter~~ (validado: renomeia .bak no boot)
+
+### Sessao 09/08 (cont.) - Batch multi-app: sequencial + a prova de falhas + guard de scan
+
+Pedido do usuario: "garanta que o fluxo de desinstalar varios apps seguidos esteja correto".
+
+**Auditoria do batch (`BtnRemoveProgramsSelected_Click`, AppsPage.xaml.cs:995)**:
+1. **BUG: excecao de UM app derrubava o batch inteiro** - `Task.WhenAll(removeTasks)` com
+   `Task.Run(() => DeepUninstallProgram(...))`: se UM app lancasse excecao nao capturada,
+   o WhenAll propagava AggregateException -> catch global -> apps ja desinstalados NAO saiam
+   da lista, residuos NAO iam para a aba Residuos, resultado parcial perdido.
+2. **SemaphoreSlim(2) = 2 UAC/uninstallers GUI simultaneos** - desinstaladores interativos
+   (DDU/MsiExec) abriam 2 janelas + 2 prompts UAC ao mesmo tempo.
+
+**REESCRITO (AppsPage.xaml.cs, BtnRemoveProgramsSelected_Click)**:
+1. **SEQUENCIAL**: `foreach` com try/catch POR APP - falha de um nunca aborta os outros;
+   `result` default (`new UninstallResult()`) no catch para o app continuar sendo anotado.
+2. **Residuos SEMPRE registrados** no LeftoverJunkManager (mesmo com UninstallSuccess=false,
+   residuos podem existir) - dentro do try, com o result valido; no catch com o default vazio
+   (nao adiciona lixo, so nao perde o fluxo).
+3. **Lista de falhas detalhada**: mensagem final lista NOME + motivo de cada app que falhou
+   (erro da excecao OU result.Errors unidos OU "exit code nao indica sucesso"); apps OK saem
+   da lista; apps falhos permanecem para nova tentativa.
+4. **finally robusto**: `ProgramsLoadingPanel` colapsado + `_isAppOperation = false` (antes o
+   catch global nao colapsava o painel).
+5. **Novo guard de scan em background**: apps com `_scanningPrograms.Contains(DisplayName)`
+   (desinstalacao individual anterior ainda escaneando) sao REMOVIDOS da selecao com aviso
+   ("o review abrira automaticamente quando o scan terminar") - evita desinstalacao duplicada
+   + review duplicado do mesmo app.
+6. Progresso `[{i}/{total}]` agora monotono (sequencial - antes Interlocked com concorrencia).
+
+**Verificacoes confirmadas na auditoria**:
+- `DeepUninstaller` e STATELESS (sem campos estaticos mutaveis) - Paralelismo real so existe
+  dentro do Core via `Parallel.Invoke` (L2134) com capturas por batch + lock no AddLocal, e
+  pos-filtro (L2136+) remove chaves de outros apps de nome similar - seguro.
+- `UninstallResult` tem construtor padrao implicito (propriedades com `= new()`) - valido no catch.
+- `LeftoverJunkManager.Add` (L64) thread-safe (lock) com dedup por AppName + janela <1min,
+  cap 100 - batch e BtnReviewBack nao colidem.
+- Fluxo individual INTOCADO: phase 1 (RunUninstallPhaseAsync) + scan background
+  (`_scanningPrograms`/BackgroundTaskTracker) + `EnqueueOrShowReview` (L937) com FIFO
+  `_pendingReviews` (L2108: ao fechar o review, abre o proximo pendente).
+
+Build (09/08): 0 erros / 104 warnings (baseline). App reaberto com --tray.
+
+**A TESTAR (VM/host)**: selecionar N apps (um com uninstaller GUI) -> REMOVER -> batch
+sequencial, um por vez, residuos na aba Residuos, falha de um app nao aborta os outros,
+mensagem final lista os falhos.
+
+### Sessao 09/08 (cont.) - Rodela de loading estilo Windows 11 (spinner de pontos)
+
+Pedido do usuario: a animacao de loading do AppsPage deveria ser a "rodela" que roda
+quando o PC liga/desliga no Windows 11 - um CIRCULO DE PONTOS girando (nao elipse
+tracejada, nao toast de progresso).
+
+**Tentativas intermediarias (descartadas pelo usuario)**:
+1. Overlay com slide-in/slide-out estilo LugiaToast (CubicEase, gradiente, glow) -
+   "consegue melhorar a animacao de loading" -> nao era isso.
+2. Migracao para ShowProgressToast/UpdateProgressToast/CompleteProgressToast (toast
+   pequeno com spinner no LugiaToast, IsProgress=true, transicao amarelo->verde/vermelho
+   na Complete) - "use a notificacao em tempo real" -> nao era isso. O usuario queria o
+   OVERLAY GRANDE de sempre, so com a rodela diferente.
+
+**O que ficou (validado pelo usuario: "perfeito adorei")**:
+- `AppsPage.xaml` (`ProgramsLoadingPanel`, aba Programas, Grid.Row=1, Panel.ZIndex=99,
+  Background #CC000000, CornerRadius 8, Visibility=Visible no load):
+  - Grid 44x44 com `RotateTransform` (x:Name SpinnerRotatePrograms) + Grid.Triggers
+    Loaded -> Storyboard RepeatBehavior=Forever: DoubleAnimation Angle 0->360,
+    Duration 0:0:1.4 (rotacao suave estilo boot/shutdown Win11).
+  - 5 Ellipses 7x7, Fill #FFD700, RenderTransformOrigin 0.5,0.5, empilhados no centro
+    do Grid com `TranslateTransform` (raio 16, angulo 72 entre pontos):
+    (0,-16) / (15.2,-4.9) / (9.4,12.9) / (-9.4,12.9) / (-15.2,-4.9).
+  - Abaixo: TextBlock "Carregando programas..." + TxtProgramsProgress (#FFD700).
+- `AppsPage.xaml.cs`: helpers RESTAURADOS ao formato simples original
+  `ShowProgramsLoading()`/`HideProgramsLoading()` (so Visibility.Visible/Collapsed);
+  `TxtProgramsProgress` atualizado nos 3 fluxos (LoadPrograms, BtnProgramRemove_Click
+  fase 1, batch com progresso sequencial [i/total]).
+
+**Como a rodela funciona (replicar em outras paginas)**:
+1. Grid com RenderTransformOrigin 0.5,0.5 + RotateTransform nomeado.
+2. Grid.Triggers Loaded -> BeginStoryboard Forever girando Angle 0->360 (1.4s).
+3. N pontos (Ellipse) centralizados com TranslateTransform em raio R, angulos
+   equidistantes: x = R*sin(a), y = -R*cos(a). 5 pontos a 72 = exatamente o Win11.
+4. Opcional: pontos com Fill AccentColor/FFD700; tamanho 7x7 em Grid 44x44 (raio 16).
+
+**Manutencao (LugiaToast)**: o spinner IsProgress/ProgressSpinner adicionado ao
+LugiaToast foi MANTIDO (usa ShowProgressToast - inofensivo sem chamadores; nenhum
+fluxo do AppsPage usa mais toasts de progresso).
+
+Build (09/08): 0 erros / 122 warnings (baseline). App reaberto com --tray.
+
+### Sessao 09/08 (cont.) - Falsos positivos "Components" do DDU: native scan (Rust) sem guards
+
+**Sintoma (host, review real do DDU)**: scan de residuos apos desinstalar o Display
+Driver Uninstaller listava como [DELETAR] 2 chaves MSI que NAO eram do app:
+`Components\3C4787A3917DB895087B8C8AC674191D` (Intel ME, valor
+"22:\Software\...\Intel\ME\Display") e `Components\7829B5D21745E6247A7108F3E2BE4BC0`
+(npm do Node.js, valor "...\node_modules\npm\lib\utils\display.js") - confirmado via
+reg query no host.
+
+**Causa raiz**: os guards anti-nome-unico da sessao anterior (KeyHasValueReferencing C#:
+separador de path, token adicional, extensao executavel) existiam SO no walker C#. O
+NATIVE scan reg_scan_ffi (Rust) roda PRIMEIRO em ScanHiveForNames/ScanSoftwareRecursive/
+ScanHiveByValues (modes 0/1/2) e casa por VALOR com confidence SEM nenhum guard -
+"Display" em "Display Driver Uninstaller" casava "...\ME\Display" e "display.js".
+PROVADO via harness: `NativeRegistry.Scan(...Components, mode 0)` retorna os 2 GUIDs,
+o filtro novo os elimina (RAW=2 -> VALIDATED=0).
+
+**Correcoes (DeepUninstaller.cs)**:
+1. `ScanMsiUserData`: "Components" NAO vai mais para ScanHiveForNames (GUIDs hex nunca
+   casam por nome e o match por valor so gera falso positivo). Components fica
+   exclusivamente com ScanInstallerComponentsByValues (match por path do install).
+2. `AddValidatedNative` (novo): revalida os resultados do native scan com o MESMO
+   predicado do walker C# (name >= 70 OU KeyHasValueReferencing guardado) - o native
+   retorna so os paths, entao a chave e reaberta e re-checada. Aplicado nos 3 call
+   sites (mode 0 em ScanHiveForNames, mode 1 em ScanSoftwareRecursive depth 0, mode 2
+   em ScanHiveByValues).
+
+Build: 0 erros / 122 warnings (baseline).
+
+### Sessao 09/08 (cont.) - Desinstalador "nivel Revo": central de config + undo persistente + modo caca
+
+Pedido do usuario: "melhore tudo da lista" (comparativo Revo x Kit). Implementado:
+
+1. **Central de config** (`DeepUninstallSettings.cs`, Core, novo) + janela
+   `DeepUninstallSettingsWindow.xaml(.cs)` (botao "Config" na toolbar da aba
+   Programas, antes de "Atualizar Lista"):
+   - Persistencia: `HKCU\Software\KitLugia\DeepUninstall` (DWORDs), cache com
+     lazy load, setter grava imediato. Defaults: SendToRecycleBin=true,
+     KillProcesses=true, DisableScan=false, SelectLeftovers=true, IgnoreRecent24H=false.
+
+2. **DelToBin** (Revo `DelToBin`, deletar p/ Lixeira): PerformCleanup agora gated
+   por `SendToRecycleBin` - delecao de arquivos/pastas via RecycleManager quando
+   ON (log `[to Recycle Bin]`), permanente quando OFF (`[permanent]`). O fluxo do
+   review (BtnReviewDeleteFiles/Reg) passa por PerformCleanup -> respeita o toggle.
+
+3. **StopRunExe** (Revo): KillProcessesWithTree no RunUninstallPhaseAsync agora
+   gated por `KillProcessesBeforeUninstall`.
+
+4. **Filtro "ignorar < 24h"** (Revo): ScanLeftoverFiles - itens com
+   LastAccessTimeUtc > now-24h sao pulados quando `IgnoreRecent24H` (apos as
+   exclusoes do usuario).
+
+5. **Sel. residuos por padrao** (Revo "Select leftovers by default"): BuildFileItems/
+   BuildRegistryItems desmarcam TUDO quando `SelectLeftoversByDefault=false`.
+
+6. **Nao escanear apos desinstalar** (Revo "Disable scan after uninstall"):
+   StartBackgroundScan pula o scan -> RemoveProgramAfterSuccessfulScan + toast.
+
+7. **Undo persistente pos-reboot** (backups agora em `%LOCALAPPDATA%\KitLugia` =
+   `DeepUninstallSettings.PersistentRoot`, antes %TEMP% - arquivos, .reg, logs e
+   historico sobrevivem ao reboot):
+   - `UninstallHistory.cs` (Core, novo): `UninstallHistoryEntry` (Id, Timestamp,
+     AppName, FilesDeleted, RegistryDeleted, FilesBackedUp "orig|backup",
+     RegistryBackups, DeletionLogFile) + `UninstallHistory` (Load/Save com
+     WriteIndented, Record cap 50, Find, Remove - Remove apaga backups em disco).
+   - `PerformCleanup` grava `UninstallHistory.Record` no fim.
+   - Janela `UninstallHistoryWindow.xaml(.cs)` (botao "Historico"): lista com
+     `HistoryItemViewModel.Summary`; Restaurar (RestoreFileBackup + RestoreRegistryBackup),
+     Excluir (UninstallHistory.Remove), Atualizar. WPF Owner = Window.GetWindow(this).
+
+8. **Modo caca estilo Revo** (`HunterOverlayWindow.xaml(.cs)`, novo; botao
+   "Hunter" abre o overlay em vez do HunterWindow):
+   - Janela transparente (AllowsTransparency, Topmost, Cursor=None) cobrindo a
+     tela virtual (VirtualScreen*) ; contorno tracejado dourado da janela sob o
+     cursor (WindowBorder) + placa de nome (NamePlate, mede com UpdateLayout antes
+     de posicionar).
+   - Mira circular dourada: anel 72px (RingShadow) + circulo 64px (TargetCircle)
+     + ponto central + pontas N/E/S/W + hastes (HairN/S/E/W) - matematica simples:
+     pontas sobre o circulo (raio 32), hastes para fora.
+   - Timer 30ms: WindowFromPoint -> GetAncestor(GA_ROOT) -> GetWindowRect;
+     exclusao do proprio HWND/pid; `Activate()` no Loaded para Esc funcionar de
+     cara (modo caca e modal).
+   - Click: ContextMenu no cursor com: Desinstalar (Deep Uninstall via
+     FindUninstallerEntry - HKLM Uninstall + WOW6432Node, createRestorePoint:false,
+     DeepCleanupDialog + PerformCleanup), Matar processo, Matar + Deletar pasta,
+     Abrir pasta (explorer /select), Propriedades (abre o HunterWindow legado),
+     Copiar caminho, Fechar mira (Esc).
+
+**Quirks aprendidos (KitLugia.GUI tem usings globais com System.Windows.Forms)**:
+- MessageBox (ambig. WinForms) -> alias; MenuItem/Clipboard/ContextMenu -> aliases
+  System.Windows.Controls.*; MouseEventArgs totalmente qualificado ao mesclar.
+- `RestoreFileBackup(string backupPath, string originalPath)` e void - contagem
+  de sucesso via try/catch no chamador.
+- Backups de arquivo "orig|backup" (pipa) e .reg - UninstallHistory.Remove apaga ambos.
+
+Build (09/08): Core 0 erros / 18 warnings; GUI 0 erros / 104 warnings (baseline).
+App reaberto com --tray. A testar: janela Config (toggles salvam), Historico
+(restaurar/excluir), overlay caca (Esc fecha, menu de acoes), review com
+SelectLeftovers=false desmarcado.
+
+### Pendencias abertas (revisadas 09/08, desinstalador)
+- [ ] Testar no app: Config (5 toggles), Historico (restore pos-reboot), overlay caca
+- [ ] (opcional) Scan incremental/SQLite e wizard forçado guiado (itens restantes da lista Revo)
+- [ ] (opcional) Permitir "Desinstalar" (nao so "Deep") no menu do overlay quando for app do Windows
+
+### Sessao 09/08 (cont.) - Hunter overlay: mecanismo de busca refeito (sem timer, segurar + arrastar)
+
+**Sintoma (host)**: a mira ficou linda, mas o mecanismo de busca PISCAVA a tela
+loucamente. Causa raiz: o overlay usava DispatcherTimer de 30ms + WindowFromPoint -
+WindowFromPoint respeita o alpha por pixel de janelas LAYERED (AllowsTransparency):
+com o cursor sobre os pixels OPACOS da mira dourada retornava o PROPRIO overlay
+(hide), um pixel depois retornava a janela real (show) -> contorno alternava a cada
+tick = piscada. NamePlate.UpdateLayout() por tick forçava layout da janela de tela
+cheia inteira. O metodo antigo (HunterWindow) caçava segurando o botao e usava
+WindowFromPhysicalPoint como fallback - funcionava.
+
+**Correcao (HunterOverlayWindow.xaml.cs reescrito, mecanismo novo)**:
+1. SEM TIMER: rastreamento so em eventos de mouse. Idle: MouseMove so reposiciona a
+   mira (PlaceCrosshairAtCursor). Cacar = SEGURAR botao esquerdo e arrastar:
+   MouseLeftButtonDown captura o mouse (CaptureMouse) e atualiza; MouseMove durante
+   o drag atualiza o alvo; MouseLeftButtonUp solta -> abre o menu de acoes se ha alvo.
+   Botao direito ou Esc fecha (cancela).
+2. Hit-test por Z-ORDER via EnumWindows (primeira janela visivel cujo rect contem o
+   ponto, excluindo o pid do kit) + EnumChildWindows para o menor filho sob o ponto
+   (contorno preciso em janelas compostas) - independente de alpha, sem flicker.
+3. Placa de nome: texto + medida (Measure, sem UpdateLayout) SO quando o alvo muda
+   (_infoDirty); NamePlate MaxWidth=380 no XAML. Contorno so muda quando o alvo muda
+   (SetLeft/Width por movimento e barato).
+4. XAML: Canvas com MouseMove/MouseLeftButtonDown/MouseLeftButtonUp/
+   MouseRightButtonDown (antes MouseLeftButtonDown+Right chamavam Canvas_Click).
+
+Build (09/08): 0 erros / 104 warnings (baseline). App reaberto com --tray.
+A testar (host): abrir Hunter -> segurar LMB + arrastar sobre janelas (sem piscar),
+soltar = menu; Esc/right fecha.
+
+### Sessao 09/08 (cont.) - "KitLugia Spy" ORIGEM ENCONTRADA: WinSpy++ (C puro) + overlay alinhado ao port
+
+Pedido do usuario: achar o codigo antigo do hunter ("KitLugia Spy") que era feito em
+outra linguagem e virou um port para C#.
+
+**ORIGEM**: `C:\Users\Lugia\Downloads\winspy-1.8.4\winspy-1.8.4\` = **WinSpy++ 1.8.4**
+(J Brown, 2002, C puro com Win32 API, projeto VS2010) + binario em
+`C:\Users\Lugia\Downloads\WinSpy_Release_x64\winspy.exe`. A peca-chave e
+`src\WindowFromPointEx.c` (154 linhas) - um WindowFromPoint MELHORADO:
+1. `WindowFromPoint(pt)` acha a janela bruta.
+2. Sobe um nivel (`GetParent`; se top-level/popup usa a propria).
+3. `EnumChildWindows` + `FindBestChildProc`: escolhe o MENOR retangulo visivel que
+   contem o ponto (resolve group-box/checkbox - o API nativo nao pega controles
+   aninhados no mesmo nivel).
+4. Fallback: se nada, usa o parent; com fShowHidden=false sobe GetParent ate visivel.
+
+**PORT C# no Kit** (`KitLugia.GUI\Windows\HunterWindow.xaml.cs:697 WindowFromPointEx`)
+e fiel ao C com melhorias: exclui _selfPid (`GetWindowThreadProcessId`), fallback
+`WindowFromPhysicalPoint`, `GetAncestor(GA_ROOT)`, walk `GW_HWNDPREV` para o melhor
+top-level visivel, e restringe o best-child a filhos DIRETOS do parent
+(`GetParent(hwnd) != parent` -> skip) - os NETOS nunca viram alvo.
+
+**ALINHAMENTO (HunterOverlayWindow.xaml.cs)**: o overlay novo (EnumWindows z-order)
+estava divergente - o `HitTestChildProc` aceitava QUALQUER descendente (netos).
+Alinhado ao port:
+1. Novo `[DllImport] GetParent` + campo estatico `_hitParent`.
+2. `HitTestChildProc`: `if (GetParent(hwnd) != _hitParent) return true;` - so filhos
+   diretos do top-level concorrem (contorno estavel, spy e overlay agora concordam
+   na MESMA coordenada - antes "Propriedades" abria o HunterWindow mostrando outro HWND).
+3. `_hitParent = _hitTop` setado antes do `EnumChildWindows` em HitTestAt.
+
+Diff dos 3 mecanismos (C original x port x overlay):
+- Janela base: WindowFromPoint -> WindowFromPoint(Physical) -> WindowFromPointEx
+  (ATUALIZADO 09/08: overlay chamou o MESMO WindowFromPointEx do port em vez de
+  EnumWindows z-order - spy e overlay concordam por construcao, mesma funcao).
+- Walk p/ janela mais alta: - -> GW_HWNDPREV -> GW_HWNDPREV (UpdateTargetAt).
+- Best-fit filho: todos descendentes -> SO filhos diretos -> SO filhos diretos (ALINHADO).
+- Exclusao do pid do kit: - -> sim (top+filho) -> sim (top; filho redundante - filhos
+  pertencem ao mesmo processo do top).
+- Fallback p/ parent: sim -> sim -> sim.
+
+Build (09/08): 0 erros / 122 warnings (baseline). A testar (host): Hunter overlay ->
+segurar LMB + arrastar sobre janelas compositas (ex: Painel de Controle/regedit) ->
+contorno deve ficar no controle direto (igual do spy window, sem netos).
+
+### Sessao 09/08 (cont.) - Hunter overlay: deteccao fiel ao C original + menu antigo de volta
+
+Pedido do usuario: "a deteccao continua meio frouxa veja novamente os kits antigos"
+e depois "segure a mira e solte com o mouse (clique unico esta ruim) pode trazer o
+menu antigo do kit de volta mas mantendo essa mira aparecendo".
+
+1. **Analise do original**: comparado com `WindowFromPointEx.c` (WinSpy++ 1.8.4),
+   o port C# tinha 2 divergencias que deixavam o alvo "frouxo":
+   - Walk `GW_HWNDPREV` + `GetAncestor(GA_ROOT)`: subia para janelas ACIMA na ordem
+     Z (ex: tooltip/popup) e trocava o alvo pela janela que COBRE o controle. O C
+     original NAO faz esse walk - usa exatamente o que WindowFromPoint retornou.
+   - Filtro "so filhos diretos" (`GetParent(hwnd) != parent`): o original enumera
+     TODOS os descendentes (EnumChildWindows e recursivo) e escolhe o MENOR visivel
+     sob o ponto - inclusive netos (checkbox dentro de group-box). O filtro
+     reintroduzia exatamente o bug do group-box que o WinSpy++ foi criado para
+     resolver (mencionado no proprio comentario do C, L60-67).
+   - **Correcao**: `WindowFromPointEx` reescrito nos 2 arquivos (overlay +
+     HunterWindow.xaml.cs:697) fiel ao C: WindowFromPoint -> fallback
+     WindowFromPhysicalPoint -> GetParent sobe 1 nivel -> EnumChildWindows recursivo
+     escolhendo menor area visivel. Mantidas so as adaptacoes necessarias: exclusao
+     do proprio PID + fallback fisico. P/Invokes orfaos (EnumWindows, GetWindow,
+     GetAncestor, SetWindowLong, GetAsyncKeyState, IsWindow) removidos dos 2.
+   - Tambem corrigido bug de placa: `plateY` usava `rc.Top - Left` (misturava X com Y).
+
+2. **Mecanica "segurar + soltar"** (substitui o clique unico/timer):
+   - REMOVIDOS: DispatcherTimer 30ms, GetAsyncKeyState, WS_EX_TRANSPARENT (nao e
+     mais preciso - o rastreamento e por eventos de mouse direto no overlay).
+   - NOVO fluxo: MouseLeftButtonDown grava pressX/pressY/pressTick + UpdateTargetAt.
+     MouseMove durante _hunting: PlaceCrosshair + UpdateTargetAt (mira e alvo seguem
+     o cursor). MouseLeftButtonUp: se mover < 8px E segurou < 300ms -> CLIQUE SIMPLES,
+     NAO abre menu (so reposiciona a mira - o usuario reclamou que clique unico abre
+     o menu na hora sem chance de mirar); caso contrario abre o menu no cursor.
+   - Botao direito: fecha o menu se aberto, senao fecha a mira. Esc: mesma logica.
+
+3. **Menu antigo de volta** (sem destruir a mira - o antigo DestroyOverlay ao abrir):
+   - Removido o ContextMenu WPF; novo painel `ActionMenuPanel` no XAML do overlay
+     (estilo do menu legado do kit: fundo #1E1E1E, titulo dourado #FFD700,
+     subtitulo cinza, botoes: Desinstalar (vermelho #C42B1C), Matar, Matar+Deletar,
+     Abrir Pasta, Propriedades, Copiar caminho, Cancelar).
+   - Botao centralizado perto do cursor com clamp na tela virtual (como o antigo).
+   - `MnuAction_Click` roteia por Tag (uninstall/kill/killdel/openfolder/props/copy/
+     cancel) para os mesmos handlers existentes (DeepUninstallAsync, KillProcess...).
+   - A mira + contorno + placa de nome continuam visiveis APOS abrir o menu (o pedido
+     "mantendo essa mira aparecendo").
+
+Build (09/08): 0 erros / 104 warnings (baseline). A testar (host): segurar LMB +
+arrastar sobre janelas compositas -> contorno no controle menor sob o cursor (netos
+incluidos); clique simples NORMAL (sem arrastar) nao abre o menu; soltar apos
+arrastar abre o menu antigo com a mira ainda visivel.
+
+### Sessao 09/08 (cont.) - Hunter overlay: menu WinForms COPIADO do Hunter antigo (fiel)
+
+Pedido do usuario: "continua ruim faça o seguinte VÁ REALMENTE ATÉ O KIT ANTIGO
+COPIE O MENU INTEIRO DO HUNTER ANTIGO E REAPLIQUE A UI ai depois pensamos em mudar".
+
+**Substituicao total do painel XAML pelo ShowContextMenu WinForms do HunterWindow**:
+1. `HunterOverlayWindow.xaml` (agora SO mira/contorno/placa - ZERO menu XAML):
+   - REMOVIDOS: recurso `DarkButtonStyle`, `ActionMenuPanel`, `MnuTitle`, `MnuSub`,
+     `MnuBtn*` (7 botoes), handlers `MnuAction_Click`. XAML voltou ao estado
+     enxuto (Canvas + ellipses da mira + WindowBorder + NamePlate).
+2. `HunterOverlayWindow.xaml.cs` (linhas ~321-470): `ShowContextMenu(int x, int y)`
+   portado LINHA A LINHA do `HunterWindow.ShowContextMenu` (L536-673):
+   - Form WinForms SEM borda, TopMost, Opacity 0.85, BackColor #1E1E1E; borda
+     desenhada no Paint (#444); titulo dourado #FFD700 bold + subtitulo #AAA
+     (nome do processo ou TruncatePath); separador; botoes [Desinstalar #C42B1C,
+     Matar, Matar + Deletar, Abrir Pasta] (Flat, 30px, 36px de stride) + Cancelar
+     #222/gray (24px). Clamp no WorkingArea da tela do ponto (bw=220, centraliza
+     no clique). `Deactivate` e clique DIREITO no form fecham o menu.
+   - Adaptacoes: acoes agora chamam os handlers DO OVERLAY (DeepUninstallAsync,
+     KillProcess(false/true), OpenFolder) em vez dos Btn*_Click do HunterWindow;
+     `DestroyContextMenu()` SO fecha/dispose o form (nao destroi overlay/mira);
+     botao acao -> DestroyContextMenu + acao (mira continua viva - pedido do
+     usuario "mantendo essa mira aparecendo").
+   - Esc/direito no overlay agora checam `_contextForm != null` (antes
+     ActionMenuPanel.Visibility); `OpenMenu`/`HideMenu`/`MnuAction_Click`
+     DELETADOS; `OpenSpy`/`CopyPath` deletados (dead code - props/copy nao
+     existem no menu antigo).
+   - Helper `TruncatePath(path)` copiado (25 chars + "..." + 30 chars).
+
+Build (09/08): 0 erros / 122 warnings (baseline). A testar (host): soltar a mira
+-> menu WinForms EXATO do hunter antigo (titulo dourado, subtitulo, 4 botoes +
+cancelar) com a mira ainda visivel; Deactivate/direito/Esc fecham; botoes
+Desinstalar/Matar/Matar+Deletar/Abrir Pasta executam sobre a janela alvo.
+
+### Sessao 09/08 (fim) - REVERTIDO: botao verde abre o "KitLugia Spy" (HunterWindow), overlay deletado
+
+Pedido do usuario: "quando clica no botao verde e para abrir o mini menu do kit
+que e uma janela com o nome kitlugia spy... eu ainda estou vendo a mira amarela
+problematica e zero menus" - referencia: copia antiga funcional em
+"KitLugia-master - Copia - Copia - Copia (16)".
+
+**Diagnostico**: a copia antiga NAO tem HunterOverlayWindow. O botao verde
+(AppsPage, `#2E7D32` "Hunter") abria `new HunterOverlayWindow()` (mira amarela)
+em vez de `new HunterWindow()` (janela "KitLugia Spy" com menus). Os XAMLs do
+HunterWindow sao identicos entre as copias (0 diffs) - a UI do Spy nunca foi o
+problema.
+
+**Correcoes**:
+1. `AppsPage.xaml.cs` BtnHunterMode_Click -> `new HunterWindow()` (era
+   HunterOverlayWindow) - identico ao kit antigo (16).
+2. `HunterOverlayWindow.xaml` + `.xaml.cs` DELETADOS (o overlay inteiro era
+   desnecessario; o kit antigo nao tem).
+
+Build: 0 erros / 122 warnings (baseline). A testar: botao verde caça (Hunter)
+-> janela "KitLugia Spy" abre com menus funcionais (Detectar janela, Deep
+Uninstall, Matar, Abrir pasta, contexto WinForms ao segurar LMB).
+
+### Sessao 10/08 - Core 0 warnings + auditoria manual (agents) + 3 bugs reais corrigidos
+
+1. **18 warnings do KitLugia.Core -> 0** (limpeza completa):
+   - SYSLIB0057 DeepUninstaller.cs:1721: X509Certificate.CreateFromSignedFile ->
+     X509CertificateLoader.LoadCertificateFromFile (Authenticode do ProbeFolderBinaries)
+   - CS8600 EmergencyBcdBootManager.cs:95: espDrive -> string? (MountEspAsync ja era nullable)
+   - CS8604 Guardian.cs:2884 + LocalInstallManager.cs:60,132:
+     Path.GetPathRoot(...) ?? "C:\" (Path.Combine com null)
+   - CS8603 (5x) NativeBlake3.cs: HashFile/HashBytes -> string? (caller NativeSha256 ja nullable)
+   - CS8604 StartupManager.cs:2055,2151: args ?? "" no CreateShortcut
+   - CS8600/8602 StartupManager.cs:2190-91: dynamic? + null-check antes do
+     shell.CreateShortcut (Activator.CreateInstance pode retornar null)
+   - SYSLIB0014 WinbootManager.cs:2039: WebClient -> HttpClient streaming async
+     (download do .NET Runtime offline, progress % removido - cosmético)
+   - CS8600 WinbootManager.cs:6416: wimFile -> string?
+   - CA2022 WinpeBuilder.cs:268: fs.ReadAsync -> fs.ReadExactlyAsync (sig WIM)
+   - CS0414 WinpeBuilder.cs:921: WINXSHELL_CACHE agora usado no candidates list
+     (substituiu o literal "C:\KL_WINPE\WinXShell.exe")
+   Builds: Core = 0 avisos / 0 erros; GUI = 0 erros / 104 avisos (baseline proprio).
+
+2. **Auditoria manual com agentes** (104 avisos GUI = so ruido nullable: CS8600x42,
+   CS8618x24, CS8602x20, CS8625x14, CS0414x2, CS0067x2). Achei 3 bugs REAIS, todos corrigidos:
+
+   **BUG A (ALTO)**: NativeSha256.ComputeHash retornava BLAKE3 quando rust_native.dll
+   estava presente (delegava para NativeBlake3.HashFile) -> GitHubUpdater.cs:245 comparava
+   com o SHA256 do zip -> auto-update SEMPRE falhava "Hash mismatch" com a DLL.
+   Correcao: branch NativeBlake3 removido (fica so sha256_file_ffi + managed SHA256).
+   NativeSha256.cs:29-34.
+
+   **BUG B (MEDIO)**: GetProcessTreeSnapshot (DeepUninstaller.cs:5061) fazia
+   using var p = proc e DEPOIS list.Add((proc,...)) - o mesmo objeto disposed ->
+   IsProcessTreeActive (5032) engolia ObjectDisposedException -> stall detection do
+   uninstaller NUNCA disparava. Correcao: snapshot agora captura tuplas de dados
+   (pid, cpu, sample, startTime, sessionId) com dispose correto; leitor reabre por
+   Process.GetProcessById(pid) com catch (processo pode ter saido).
+
+   **BUG C (BAIXO)**: StutterDetector.SampleTopProcess (327) vazava handles: o LINQ
+   Process.GetProcesses().Where().OrderBy().Take(3) criava centenas de Process e so os
+   3 do top3 eram disposed. Correcao: foreach + dispose dos nao-keep + dispose dos
+   escolhidos fora do top3 antes de reassignar.
+
+3. **WinXShell: URL de download MORTA removida** (pesquisa): o asset
+   https://github.com/luigiarrud4/KitLugia-WinPE/releases/download/v1.0/WinXShell.exe
+   NAO existe (404 verificado; releases so tem WinPE-base.7z e VALOS-base.7z).
+   WinpeBuilder.ResolveWinXShellAsync: bloco de download removido (const WINXSHELL_URL
+   deletada) - agora loga orientacao de colocar o exe em KitLugia.WinPE\WinXShell\
+   (as copias locais 3,5 MB continuam e sao encontradas pelos candidates).
+
+4. **WinXShell SOURCE: o binario atual e FECHADO** (pesquisa web): o WinXShell.exe
+   que o kit injeta e o RC5.x do slore (DuiLib + Lua embutido, nunca publicado).
+   Open-source so o shell Win32 classico: github.com/slorelee/PExplorer branch
+   WinXShell_shellpart (LGPL-2.1, C/C++ puro, MSVC VS2012/2015 - VS Community 2026
+   instalado no host). Arquitetura: jcfg JSON + WinXShell.lua + wxsUI components.
+   Decisao do usuario: AINDA NAO DECIDIDO (opcoes: shell C# proprio no WinPE - VALOS
+   ja tem .NET/WPF; fork PExplorer LGPL; ou so configurar jcfg/lua do binario).
+
+5. Integracao mapeada: ResolveWinXShellAsync (WinpeBuilder.cs:926, candidates locais
+   + cache), InjectWinXShellIntoWimAsync (winpeBuilder.cs:986, wimlib add para
+   /Windows/System32/WinXShell.exe), launch no bridge startnet.cmd
+   (WinbootManager.cs:5620-5625: if exist C:\Windows\System32\WinXShell.exe).
+
+### Proxima sessao
+- [ ] Testar o binario atual do WinXShell na VM (TESTAR mode do WinpeToolsPage)
+- [ ] Decidir abordagem do "modificar o codigo fonte": shell C# proprio vs fork PExplorer vs config
+- [ ] (se C#) esquematizar o shell: taskbar, icones, temas, integracao com o shrink/fresh install
+### Sessao 10/08 (cont.) - VALOS EXCLUIDO + botao TESTAR SHELL (WinXShell) no WinpeToolsPage
+
+Pedido do usuario: "exclua o validation OS e coloque o WinXShell no kit no botao testar".
+Validado em docs: WinPE em modo RAMDISK roda winpeshl.exe -> winpeshl.ini ausente -->
+startnet.cmd; explorer.exe NAO existe no WinPE por padrao; o correto e
+`WinXShell.exe -winpe` (flag que cria o Desktop e corrige USERPROFILE).
+
+**1. VALOS REMOVIDO por completo (Core + WinPE) - era "horrivel e nao funciona"**:
+- WinbootManager.cs: 603 linhas deletadas (regiao VALIDATION OS: PrepareValidationOs,
+  RemoveValidationOs, ValidationOsStartnetCmd + IsValidationOsReady). Removidos
+  tambem useValOs branches do ScheduleWinpeShrink (assinatura agora
+  ScheduleWinpeShrink(drive, shrinkMB) - caller do ShrinkPage da WinPE ja passava
+  2 args; GUI WinpeToolsPage atualizado para 2 args; config sempre OS_TYPE=winpe;
+  scriptName sempre startnet.cmd).
+- WinpeBuilder.cs: ConfigureValosShellAsync (registro Winlogon Shell + Setup\CmdLine)
+  e InjectDiskpartIntoWimAsync (so o VALOS usava) deletados.
+- KitLugia.WinPE: ToolsPage (card Validation OS + 3 handlers), DashboardPage
+  (ValOsBanner + isValOs), WinPEDetector.IsValOS deletados; textos "WinPE/ValOS"
+  corrigidos. Builds: Core 0 erros/0 avisos, WinPE 0/0, GUI 0/104 (baseline).
+
+**2. Botao TESTAR SHELL na WinpeToolsPage (card 1, entre PREPARAR e REMOVER)**:
+- `ScheduleTestWinpeShell()` (WinbootManager.cs:5704): resolve WIM
+  (fallback recursivo + auto-prepare, padrao do shrink) -> ResolveWinXShellAsync
+  (local: KitLugia.WinPE\WinXShell\WinXShell.exe, cache C:\KL_WINPE, ao lado do
+  exe; download removido - URL 404) -> InjectWinXShellIntoWimAsync (wimlib add em
+  /Windows/System32/WinXShell.exe) -> UpdateWimWithScriptAsync(TestShellStartnetCmd)
+  -> CreateRamdiskEntry(fixedGuid: TestShellBcdGuid {9f7c8d2e-...}) + /bootsequence
+  (one-time, nao polui o menu; fallback displayorder+timeout) -> reboot 10s.
+- `TestShellStartnetCmd()`: scan por KL_SHRINK_TARGET.dat primeiro (shrink agendado
+  roda antes, copia exata do RamdiskStartnetCmd); sem marcador -> `start "" ...WinXShell.exe -winpe`
+  (cd /d C:\Windows\System32) - shell grafico do WinPE; erro+reboot se exe ausente.
+- Regras cmd.exe mantidas: sem parenteses em echo de blocos, ASCII puro.
+
+**A TESTAR (VM)**: WinpeToolsPage -> TESTAR SHELL -> reboot -> WinPE com Desktop
+WinXShell; depois SEM marcador (shell direto); depois com SCHEDULE pendente (shrink
+primeiro). WinXShell.exe local confirmado: KitLugia.WinPE\WinXShell\ (3,5 MB).

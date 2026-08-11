@@ -160,3 +160,4 @@
 {"timestamp":"2026-08-07T21:53:27.933Z","type":"mcp","status":"unregistered","instanceId":"12424a42-1d8c-4167-a444-dd9587320c94","message":"MCP unregistered — opencode","aiClientName":"opencode"}
 {"timestamp":"2026-08-09T04:04:22.600Z","type":"mcp","status":"registered","instanceId":"20bd8cd0-0efa-48ee-b39c-98e5351e19b9","message":"MCP registered — 20bd8cd0-0efa-48ee-b39c-98e5351e19b9"}
 {"timestamp":"2026-08-09T16:05:33.168Z","type":"mcp","status":"registered","instanceId":"d88c6c29-3118-4453-8ca4-6d156053c866","message":"MCP registered — d88c6c29-3118-4453-8ca4-6d156053c866"}
+{"timestamp":"2026-08-09T17:05:33.682Z","type":"mcp","status":"unregistered","instanceId":"d88c6c29-3118-4453-8ca4-6d156053c866","message":"MCP unregistered — opencode","aiClientName":"opencode"}

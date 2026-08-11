@@ -9,6 +9,7 @@ using System.Management;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -67,8 +68,8 @@ namespace KitLugia.Core
             internal HashSet<string>? BaselineFileSet { get; set; }
             internal HashSet<string>? BaselineRegSet { get; set; }
         }
-        private static readonly string FileBackupDir = Path.Combine(Path.GetTempPath(), "KitLugia", "FileBackup");
-        private static readonly string DeletionLogDir = Path.Combine(Path.GetTempPath(), "KitLugia", "Logs");
+        private static readonly string FileBackupDir = Path.Combine(DeepUninstallSettings.PersistentRoot, "FileBackup");
+        private static readonly string DeletionLogDir = Path.Combine(DeepUninstallSettings.PersistentRoot, "Logs");
 
         public static void KillProcessesForApp(string displayName, string installLocation = "", List<string>? extraExeNames = null)
         {
@@ -155,8 +156,11 @@ namespace KitLugia.Core
             if (createRestorePoint)
                 TryCreateRestorePoint($"KitLugia: Uninstall {displayName}");
 
-            progress?.Report("Encerrando processos do aplicativo...");
-            KillProcessesWithTree(displayName, installLocation);
+            if (DeepUninstallSettings.KillProcessesBeforeUninstall)
+            {
+                progress?.Report("Encerrando processos do aplicativo...");
+                KillProcessesWithTree(displayName, installLocation);
+            }
 
             HashSet<string>? baselineFiles = null;
             HashSet<string>? baselineReg = null;
@@ -857,6 +861,12 @@ namespace KitLugia.Core
             "CRT", "MFC", "ATL",
         };
 
+        // Shared vendor runtime folders under ProgramData that are never app leftovers
+        private static readonly HashSet<string> SharedVendorRuntimeFolders = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "NGX", "RTXDI", "Streamline"
+        };
+
         public static List<string> FindProgramFilesOrphans()
         {
             var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1038,6 +1048,24 @@ namespace KitLugia.Core
                 var toRemove = results.Where(IsExcludedPath).ToList();
                 foreach (var r in toRemove)
                     results.Remove(r);
+            }
+
+            // Revo-style "ignore items accessed < 24h ago" filter (optional, off by default)
+            if (DeepUninstallSettings.IgnoreRecent24H && results.Count > 0)
+            {
+                var cut = DateTime.UtcNow.AddHours(-24);
+                foreach (var p in results.ToList())
+                {
+                    try
+                    {
+                        bool recent;
+                        if (Directory.Exists(p)) recent = Directory.GetLastAccessTimeUtc(p) > cut;
+                        else if (File.Exists(p)) recent = File.GetLastAccessTimeUtc(p) > cut;
+                        else recent = false;
+                        if (recent) results.Remove(p);
+                    }
+                    catch { }
+                }
             }
 
             LogScanStage("  TestForSimilarNames/Exclusions", stage);
@@ -1356,6 +1384,29 @@ namespace KitLugia.Core
                 string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 if (string.IsNullOrEmpty(userProfile)) return false;
 
+                // Public shell roots: never delete the shared Public folder or its shell roots
+                // (individual items inside are OK - per-app shortcuts are legitimately removable)
+                string commonDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
+                if (string.IsNullOrEmpty(commonDesktop))
+                    commonDesktop = Path.Combine(Path.GetPathRoot(userProfile) ?? "C:\\", "Users", "Public", "Desktop");
+                string publicRoot = Directory.GetParent(commonDesktop)?.FullName ?? commonDesktop;
+                string[] publicShellRoots =
+                {
+                    publicRoot,
+                    commonDesktop,
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonDocuments),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonMusic),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonPictures),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonVideos),
+                    Path.Combine(publicRoot, "Downloads"),
+                };
+                foreach (var root in publicShellRoots)
+                {
+                    if (string.IsNullOrEmpty(root)) continue;
+                    if (normalized.Equals(root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
                 if (!normalized.StartsWith(userProfile, StringComparison.OrdinalIgnoreCase))
                     return false;
 
@@ -1417,18 +1468,23 @@ namespace KitLugia.Core
                 return true;
 
             string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            // Skip well-known system subfolders of ProgramData
-            if (fullPath.StartsWith(programData, StringComparison.OrdinalIgnoreCase))
-            {
-                string relative = fullPath[programData.Length..].TrimStart('\\');
-                var parts = relative.Split('\\');
-                if (parts.Length > 0 && (parts[0].Equals("Microsoft", StringComparison.OrdinalIgnoreCase) ||
-                                          parts[0].Equals("Windows", StringComparison.OrdinalIgnoreCase) ||
-                                          parts[0].Equals("Package Cache", StringComparison.OrdinalIgnoreCase) ||
-                                          parts[0].Equals("USOShared", StringComparison.OrdinalIgnoreCase) ||
-                                          parts[0].Equals("USOPrivate", StringComparison.OrdinalIgnoreCase)))
-                    return true;
-            }
+// Skip well-known system subfolders of ProgramData
+                    if (fullPath.StartsWith(programData, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string relative = fullPath[programData.Length..].TrimStart('\\');
+                        var parts = relative.Split('\\');
+                        if (parts.Length > 0 && (parts[0].Equals("Microsoft", StringComparison.OrdinalIgnoreCase) ||
+                                                  parts[0].Equals("Windows", StringComparison.OrdinalIgnoreCase) ||
+                                                  parts[0].Equals("Package Cache", StringComparison.OrdinalIgnoreCase) ||
+                                                  parts[0].Equals("USOShared", StringComparison.OrdinalIgnoreCase) ||
+                                                  parts[0].Equals("USOPrivate", StringComparison.OrdinalIgnoreCase)))
+                            return true;
+                        // Shared vendor runtimes under ProgramData are never app leftovers
+                        // (Uninstall Tool #185: ProgramData\NVIDIA\NGX flagged for deletion)
+                        if (parts.Length >= 2 && parts[0].Equals("NVIDIA", StringComparison.OrdinalIgnoreCase) &&
+                            SharedVendorRuntimeFolders.Contains(parts[1]))
+                            return true;
+                    }
 
             return false;
         }
@@ -1662,7 +1718,7 @@ namespace KitLugia.Core
                     {
                         try
                         {
-                            var cert = X509Certificate.CreateFromSignedFile(file);
+                            var cert = X509CertificateLoader.LoadCertificateFromFile(file);
                             if (cert != null && cert.Subject.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0)
                             {
                                 verifiedMatch = true;
@@ -2093,10 +2149,16 @@ namespace KitLugia.Core
                         using var usersHive = Registry.Users.OpenSubKey("");
                         if (usersHive == null) return;
                         string[] systemSids = { ".DEFAULT", "S-1-5-18", "S-1-5-19", "S-1-5-20" };
+                        // O SID do usuario atual ja e coberto pelo HKCU (mesmo perfil);
+                        // escanea-lo de novo so produz duplicatas.
+                        string currentSid = "";
+                        try { currentSid = WindowsIdentity.GetCurrent().User?.Value ?? ""; }
+                        catch { }
                         foreach (var sid in usersHive.GetSubKeyNames())
                         {
                             if (string.IsNullOrEmpty(sid)) continue;
                             if (systemSids.Contains(sid, StringComparer.OrdinalIgnoreCase)) continue;
+                            if (sid.Equals(currentSid, StringComparison.OrdinalIgnoreCase)) continue;
                             string uh = $@"HKEY_USERS\{sid}";
                             ScanSoftwareRecursive($@"{uh}\Software", displayName, r, ["Microsoft", "Classes", "Wow6432Node"], 0, installLocation);
                             ScanHiveForNames($@"{uh}\Software\Classes\CLSID", displayName, r, installLocation);
@@ -2192,7 +2254,7 @@ namespace KitLugia.Core
                 var native = NativeRegistry.Scan(hiveKey, displayName, installLocation, null, 0);
                 if (native != null)
                 {
-                    foreach (var n in native) results.Add(n);
+                    AddValidatedNative(native, displayName, installLocation, results);
                     return;
                 }
 
@@ -2223,6 +2285,45 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
+        /// <summary>
+        /// Revalida os resultados do native scan (reg_scan_ffi Rust) com a MESMA logica
+        /// guardada do C#. O scan Rust casa por valor com confidence mas NAO tem os guards
+        /// do KeyHasValueReferencing (separador de path, token adicional no data, extensao
+        /// executavel) - casaria falsos positivos de nome-unico: Intel ME "...\ME\Display",
+        /// npm "display.js", CLSID "Display" para displayName "Display Driver Uninstaller".
+        /// O native retorna so os caminhos (sem mostras do match), entao reabrimos a chave e
+        /// aplicamos o mesmo predicado do walker C#: nome >= 70 OU valor referenciando.
+        /// </summary>
+        private static void AddValidatedNative(List<string> native, string displayName, string installLocation, HashSet<string> results)
+        {
+            foreach (var path in native)
+            {
+                try
+                {
+                    string leaf = path.Split('\\').LastOrDefault() ?? "";
+                    if (leaf.Length < 2) continue;
+                    if (leaf.StartsWith('.') || leaf.StartsWith('_')) continue;
+                    if (SystemFolderNames.Contains(leaf)) continue;
+
+                    bool nameMatch = Confidence.Generate(displayName, leaf) >= 70;
+                    bool valueMatch = false;
+                    if (!nameMatch && !string.IsNullOrEmpty(installLocation))
+                    {
+                        var hive = ResolveHive(path, out string subKey);
+                        if (hive != null)
+                        {
+                            using var key = hive.OpenSubKey(subKey, false);
+                            if (key != null)
+                                valueMatch = KeyHasValueReferencing(key, installLocation, displayName);
+                        }
+                    }
+                    if (nameMatch || valueMatch)
+                        results.Add(path);
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+        }
+
         private static void ScanSoftwareRecursive(string hiveKey, string displayName, HashSet<string> results, string[]? exclusions = null, int depth = 0, string installLocation = "")
         {
             if (depth > 2) return;
@@ -2233,7 +2334,7 @@ namespace KitLugia.Core
                     var native = NativeRegistry.Scan(hiveKey, displayName, installLocation, exclusions?.ToList(), 1);
                     if (native != null)
                     {
-                        foreach (var n in native) results.Add(n);
+                        AddValidatedNative(native, displayName, installLocation, results);
                         return;
                     }
                 }
@@ -2278,7 +2379,13 @@ namespace KitLugia.Core
                 if (userData == null) return;
                 foreach (var sid in userData.GetSubKeyNames())
                 {
-                    foreach (var sub in new[] { "Products", "Patches", "Components" })
+                    // "Components" NAO entra no scan por nome/valor: GUIDs hex nunca casam por
+                    // nome, e o match por valor casa falsos positivos de nome-unico no native
+                    // scan (Rust) - ele nao tem os guards do KeyHasValueReferencing C# (Intel ME
+                    // "...\ME\Display", npm "display.js" casavam "Display" em
+                    // "Display Driver Uninstaller"). Components fica exclusivamente com
+                    // ScanInstallerComponentsByValues (match por path do install, seguro).
+                    foreach (var sub in new[] { "Products", "Patches" })
                         ScanHiveForNames($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\{sid}\{sub}", displayName, results, installLocation);
                 }
             }
@@ -3000,18 +3107,27 @@ namespace KitLugia.Core
 
                     if (Directory.Exists(file))
                     {
-                        // Recycle bin first approach (BCUninstaller pattern)
-                        try
+                        // Recycle bin first approach (BCUninstaller pattern), configurable (DelToBin)
+                        if (DeepUninstallSettings.SendToRecycleBin)
                         {
-                            FileSystem.DeleteDirectory(file,
-                                UIOption.OnlyErrorDialogs,
-                                RecycleOption.SendToRecycleBin);
-                            result.FilesDeleted++;
-                            logEntries.Add($"REMOVED  {file} [to Recycle Bin]");
+                            try
+                            {
+                                FileSystem.DeleteDirectory(file,
+                                    UIOption.OnlyErrorDialogs,
+                                    RecycleOption.SendToRecycleBin);
+                                result.FilesDeleted++;
+                                logEntries.Add($"REMOVED  {file} [to Recycle Bin]");
+                            }
+                            catch
+                            {
+                                // Fallback to permanent delete if recycle bin fails
+                                Directory.Delete(file, true);
+                                result.FilesDeleted++;
+                                logEntries.Add($"REMOVED  {file} [permanent]");
+                            }
                         }
-                        catch
+                        else
                         {
-                            // Fallback to permanent delete if recycle bin fails
                             Directory.Delete(file, true);
                             result.FilesDeleted++;
                             logEntries.Add($"REMOVED  {file} [permanent]");
@@ -3019,15 +3135,24 @@ namespace KitLugia.Core
                     }
                     else if (File.Exists(file))
                     {
-                        try
+                        if (DeepUninstallSettings.SendToRecycleBin)
                         {
-                            FileSystem.DeleteFile(file,
-                                UIOption.OnlyErrorDialogs,
-                                RecycleOption.SendToRecycleBin);
-                            result.FilesDeleted++;
-                            logEntries.Add($"REMOVED  {file} [to Recycle Bin]");
+                            try
+                            {
+                                FileSystem.DeleteFile(file,
+                                    UIOption.OnlyErrorDialogs,
+                                    RecycleOption.SendToRecycleBin);
+                                result.FilesDeleted++;
+                                logEntries.Add($"REMOVED  {file} [to Recycle Bin]");
+                            }
+                            catch
+                            {
+                                File.Delete(file);
+                                result.FilesDeleted++;
+                                logEntries.Add($"REMOVED  {file} [permanent]");
+                            }
                         }
-                        catch
+                        else
                         {
                             File.Delete(file);
                             result.FilesDeleted++;
@@ -3058,6 +3183,21 @@ namespace KitLugia.Core
                 result.DeletionLogFile = logFile;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            // Persistent undo history (Revo-style): survives reboot
+            try
+            {
+                UninstallHistory.Record(new UninstallHistoryEntry
+                {
+                    AppName = displayName,
+                    FilesDeleted = result.FilesDeleted,
+                    RegistryDeleted = result.RegistryDeleted,
+                    FilesBackedUp = result.BackupFiles,
+                    RegistryBackups = result.BackupRegistryFiles,
+                    DeletionLogFile = result.DeletionLogFile
+                });
+            }
+            catch { }
         }
 
         private static string? BackupFileItem(string fullPath)
@@ -3263,7 +3403,7 @@ namespace KitLugia.Core
                 var native = NativeRegistry.Scan(hiveKey, displayName, installLocation, null, 2);
                 if (native != null)
                 {
-                    foreach (var n in native) results.Add(n);
+                    AddValidatedNative(native, displayName, installLocation, results);
                     return;
                 }
 
@@ -3605,9 +3745,9 @@ namespace KitLugia.Core
 
         // -- Registry .reg Backup ---------------------------------
 
-        private static readonly string PathBackupDir = Path.Combine(Path.GetTempPath(), "KitLugia", "PathBackup");
+        private static readonly string PathBackupDir = Path.Combine(DeepUninstallSettings.PersistentRoot, "PathBackup");
         private static readonly string RegistryBackupDir = Path.Combine(
-            Path.GetTempPath(), "KitLugia", "RegBackup");
+            DeepUninstallSettings.PersistentRoot, "RegBackup");
 
         /// <summary>
         /// Exports a registry key to a .reg file before deletion.
@@ -4898,10 +5038,11 @@ namespace KitLugia.Core
                 var now = DateTime.UtcNow;
                 var snapshot = GetProcessTreeSnapshot(parent);
 
-                foreach (var (proc, lastCpu, lastSample) in snapshot)
+                foreach (var (pid, lastCpu, lastSample, _, _) in snapshot)
                 {
                     try
                     {
+                        using var proc = Process.GetProcessById(pid);
                         if (proc.HasExited) continue;
                         TimeSpan cpu = proc.TotalProcessorTime;
                         if ((now - lastSample).TotalMilliseconds >= thresholdMs &&
@@ -4918,16 +5059,18 @@ namespace KitLugia.Core
             return true;
         }
 
-        private static List<(Process proc, TimeSpan cpu, DateTime sample)> GetProcessTreeSnapshot(Process parent)
+        private static List<(int pid, TimeSpan cpu, DateTime sample, DateTime startTime, int sessionId)> GetProcessTreeSnapshot(Process parent)
         {
-            var list = new List<(Process, TimeSpan, DateTime)>();
+            var list = new List<(int, TimeSpan, DateTime, DateTime, int)>();
             try
             {
                 var now = DateTime.UtcNow;
-                list.Add((parent, parent.TotalProcessorTime, now));
+                list.Add((parent.Id, parent.TotalProcessorTime, now, parent.StartTime, parent.SessionId));
 
                 // Get children by checking processes with a PPID matching our parent
                 int parentId = parent.Id;
+                DateTime parentStart = parent.StartTime;
+                int parentSession = parent.SessionId;
                 foreach (var proc in Process.GetProcesses())
                 {
                     try
@@ -4938,10 +5081,10 @@ namespace KitLugia.Core
                         // We do this by checking process name similarity or
                         // by examining if they share the same process tree
                         // Simple heuristic: check start time proximity & same session
-                        if (Math.Abs((p.StartTime - parent.StartTime).TotalSeconds) < 120 &&
-                            p.SessionId == parent.SessionId)
+                        if (Math.Abs((p.StartTime - parentStart).TotalSeconds) < 120 &&
+                            p.SessionId == parentSession)
                         {
-                            list.Add((proc, proc.TotalProcessorTime, now));
+                            list.Add((p.Id, p.TotalProcessorTime, now, p.StartTime, p.SessionId));
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }

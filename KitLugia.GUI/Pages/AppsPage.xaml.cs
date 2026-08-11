@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Data;
 using System.ComponentModel;
@@ -473,6 +474,20 @@ namespace KitLugia.GUI.Pages
             hunter.Show();
         }
 
+        private void BtnDeepUninstallSettings_Click(object sender, RoutedEventArgs e)
+        {
+            var wnd = new KitLugia.GUI.Windows.DeepUninstallSettingsWindow();
+            wnd.Owner = Window.GetWindow(this);
+            wnd.ShowDialog();
+        }
+
+        private void BtnUninstallHistory_Click(object sender, RoutedEventArgs e)
+        {
+            var wnd = new KitLugia.GUI.Windows.UninstallHistoryWindow();
+            wnd.Owner = Window.GetWindow(this);
+            wnd.ShowDialog();
+        }
+
         private async void BtnRefreshBloatware_Click(object sender, RoutedEventArgs e)
         {
             if (_isAppOperation) return;
@@ -636,9 +651,20 @@ namespace KitLugia.GUI.Pages
 
         #region PROGRAMS (REGISTRY)
 
-        private async void LoadPrograms()
+        // ─── Overlay de loading (painel escuro com rodela girando estilo Windows 11) ───
+        private void ShowProgramsLoading()
         {
             if (ProgramsLoadingPanel != null) ProgramsLoadingPanel.Visibility = Visibility.Visible;
+        }
+
+        private void HideProgramsLoading()
+        {
+            if (ProgramsLoadingPanel != null) ProgramsLoadingPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private async void LoadPrograms()
+        {
+            ShowProgramsLoading();
             if (ProgramsList != null) ProgramsList.ItemsSource = null;
 
             try
@@ -668,7 +694,7 @@ namespace KitLugia.GUI.Pages
             }
             finally
             {
-                if (ProgramsLoadingPanel != null) ProgramsLoadingPanel.Visibility = Visibility.Collapsed;
+                HideProgramsLoading();
             }
         }
 
@@ -829,7 +855,7 @@ namespace KitLugia.GUI.Pages
                     return;
                 }
 
-                ProgramsLoadingPanel.Visibility = Visibility.Visible;
+                ShowProgramsLoading();
 
                 IProgress<string> progress = new Progress<string>(msg =>
                 {
@@ -849,7 +875,7 @@ namespace KitLugia.GUI.Pages
                 });
 
                 if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
-                ProgramsLoadingPanel.Visibility = Visibility.Collapsed;
+                HideProgramsLoading();
 
                 // Libera a UI IMEDIATAMENTE (desinstalação concluída, scan em background):
                 // o usuário pode continuar desinstalando outros apps sem esperar.
@@ -877,6 +903,15 @@ namespace KitLugia.GUI.Pages
         /// </summary>
         private void StartBackgroundScan(ProgramViewModel program, DeepUninstaller.UninstallResult uninstallResult)
         {
+            if (DeepUninstallSettings.DisableScanAfterUninstall)
+            {
+                // Config "não escanear resíduos": pula o scan e encerra como sucesso.
+                _scanningPrograms.Remove(program.DisplayName);
+                RemoveProgramAfterSuccessfulScan(program, uninstallResult);
+                ShowBackgroundTaskToast($"Desinstalação de {program.DisplayName} concluída (scan desativado).");
+                return;
+            }
+
             if (!_scanningPrograms.Add(program.DisplayName)) return;
 
             string taskId = BackgroundTaskTracker.Instance.RegisterTask($"Escaneando resíduos: {program.DisplayName}", "Apps");
@@ -1008,6 +1043,22 @@ namespace KitLugia.GUI.Pages
                     return;
                 }
 
+                // Apps com scan de resíduos ainda em andamento (desinstalação individual
+                // anterior) NÃO podem ser re-desinstalados: o scan em background já vai
+                // abrir o review quando terminar. Remove da seleção com aviso.
+                var busy = selectedPrograms.Where(p => _scanningPrograms.Contains(p.DisplayName)).ToList();
+                if (busy.Count > 0)
+                {
+                    foreach (var p in busy) p.IsSelected = false;
+                    selectedPrograms = selectedPrograms.Where(p => !_scanningPrograms.Contains(p.DisplayName)).ToList();
+                    MessageBox.Show($"{(busy.Count == 1 ? "O programa" : "Os programas")} a seguir está(ao) com scan de resíduos em andamento e foi(foram) ignorado(s):\n\n" +
+                        string.Join("\n", busy.Select(p => $"  • {p.DisplayName}")) +
+                        "\n\nO review abrirá automaticamente quando o scan terminar.",
+                        "Aviso", MessageBoxButton.OK, MessageBoxImage.Information);
+                    if (selectedPrograms.Count == 0)
+                        return;
+                }
+
                 string programNames = string.Join("\n", selectedPrograms.Select(p => p.DisplayName));
                 if (!await ShowConfirmAsync(
                     $"Remover {selectedPrograms.Count} programa(s) selecionado(s)?\n\n{programNames}\n\nOs resíduos ficarão na aba \"Resíduos\" para limpeza posterior.",
@@ -1017,10 +1068,10 @@ namespace KitLugia.GUI.Pages
                 }
                 {
                     int total = selectedPrograms.Count;
-                    int successCount = 0;
-                    int failCount = 0;
+                    var succeeded = new List<ProgramViewModel>();
+                    var failed = new List<(ProgramViewModel Program, string Error)>();
 
-                    ProgramsLoadingPanel.Visibility = Visibility.Visible;
+                    ShowProgramsLoading();
 
                     IProgress<string> batchProgress = new Progress<string>(msg =>
                     {
@@ -1028,31 +1079,30 @@ namespace KitLugia.GUI.Pages
                             TxtProgramsProgress.Text = msg;
                     });
 
-                    batchProgress.Report($"Processando 0/{total}...");
-
-                    int maxConcurrent = Math.Min(2, Environment.ProcessorCount);
-                    var semaphore = new SemaphoreSlim(maxConcurrent);
-                    int progressIdx = 0;
-
-                    var removeTasks = selectedPrograms.Select(async program =>
+                    // SEQUENCIAL: desinstaladores GUI/UAC nunca devem rodar em paralelo
+                    // (2 janelas + 2 prompts UAC sobrepostos confundem e podem ser
+                    // cancelados um de cada vez). Falha de UM app nunca aborta os outros:
+                    // try/catch por app, resultado anotado e fluxo continua.
+                    int idx = 0;
+                    foreach (var program in selectedPrograms)
                     {
-                        int idx = Interlocked.Increment(ref progressIdx);
+                        idx++;
                         batchProgress.Report($"[{idx}/{total}] {program.DisplayName} — Removendo...");
 
-                        await semaphore.WaitAsync();
                         DeepUninstaller.UninstallResult result;
+                        string? error = null;
                         try
                         {
                             result = await Task.Run(() => DeepUninstaller.DeepUninstallProgram(
                                 program.DisplayName, program.UninstallString,
                                 program.InstallLocation, program.Publisher, program.DisplayIcon, false, batchProgress, captureBaseline: false));
                         }
-                        finally
+                        catch (Exception ex)
                         {
-                            semaphore.Release();
+                            Logger.LogError($"RemovePrograms:{program.DisplayName}", ex.ToString());
+                            error = ex.Message;
+                            result = new DeepUninstaller.UninstallResult();
                         }
-
-                        bool ok = result.UninstallSuccess;
 
                         if (result.LeftoverFiles.Count > 0 || result.LeftoverRegistry.Count > 0 || result.HeuristicFiles.Count > 0 || result.HeuristicRegistry.Count > 0)
                         {
@@ -1069,23 +1119,32 @@ namespace KitLugia.GUI.Pages
                             });
                         }
 
-                        return (program, ok);
-                    }).ToArray();
+                        if (result.UninstallSuccess)
+                        {
+                            succeeded.Add(program);
+                        }
+                        else
+                        {
+                            failed.Add((program, error ?? (result.Errors.Count > 0 ? string.Join(" | ", result.Errors) : "exit code não indica sucesso")));
+                        }
+                    }
 
-                    var progResults = await Task.WhenAll(removeTasks);
-                    successCount = progResults.Count(r => r.ok);
-                    failCount = progResults.Count(r => !r.ok);
-                    foreach (var (program, ok) in progResults.Where(r => r.ok))
+                    foreach (var program in succeeded)
                     {
                         FilteredProgramsCollection?.Remove(program);
                         ProgramsCollection?.Remove(program);
                     }
 
-                    if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
-                    ProgramsLoadingPanel.Visibility = Visibility.Collapsed;
+                    int successCount = succeeded.Count;
+                    int failCount = failed.Count;
+
                     string message = $"Remoção concluída:\n\n✅ {successCount} programa(s) removidos";
                     if (failCount > 0)
-                        message += $"\n⚠️ {failCount} falharam";
+                    {
+                        message += $"\n⚠️ {failCount} falharam:\n" +
+                                   string.Join("\n", failed.Select(f => $"  • {f.Program.DisplayName} — {f.Error}"));
+                        message += "\n\nOs que falharam permanecem na lista para nova tentativa.";
+                    }
                     message += "\n\nOs resíduos podem ser limpos na aba \"Resíduos\".";
 
                     MessageBox.Show(message, "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1097,6 +1156,7 @@ namespace KitLugia.GUI.Pages
             }
             finally
             {
+                HideProgramsLoading();
                 _isAppOperation = false;
             }
         }
@@ -1627,7 +1687,8 @@ namespace KitLugia.GUI.Pages
                 }
             }
             foreach (var item in items)
-                if (item.IsNavigational || item.SafetyLevel == CleanupSafety.Uncertain)
+                if (item.IsNavigational || item.SafetyLevel == CleanupSafety.Uncertain
+                    || !KitLugia.Core.DeepUninstallSettings.SelectLeftoversByDefault)
                     item.IsSelected = false;
             return items;
         }
@@ -1676,7 +1737,8 @@ namespace KitLugia.GUI.Pages
                 }
             }
             foreach (var item in items)
-                if (item.IsNavigational || item.SafetyLevel == CleanupSafety.Uncertain)
+                if (item.IsNavigational || item.SafetyLevel == CleanupSafety.Uncertain
+                    || !KitLugia.Core.DeepUninstallSettings.SelectLeftoversByDefault)
                     item.IsSelected = false;
             return items;
         }

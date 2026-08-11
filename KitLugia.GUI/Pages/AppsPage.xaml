@@ -44,6 +44,72 @@
             </Setter>
         </Style>
 
+        <!-- Rodela estilo Windows 11 (circulo de pontos girando, como no boot/shutdown) - grande -->
+        <ControlTemplate x:Key="Win11SpinnerTemplate" TargetType="ContentControl">
+            <Grid Width="44" Height="44" RenderTransformOrigin="0.5,0.5">
+                <Grid.RenderTransform>
+                    <RotateTransform x:Name="SpinnerRotate"/>
+                </Grid.RenderTransform>
+                <Grid.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                        <BeginStoryboard>
+                            <Storyboard RepeatBehavior="Forever">
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1.4"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Grid.Triggers>
+                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="0" Y="-16"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="15.2" Y="-4.9"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="9.4" Y="12.9"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="-9.4" Y="12.9"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="-15.2" Y="-4.9"/></Ellipse.RenderTransform>
+                </Ellipse>
+            </Grid>
+        </ControlTemplate>
+
+        <!-- Rodela estilo Windows 11 - versao mini (placeholder de icone) -->
+        <ControlTemplate x:Key="Win11MiniSpinnerTemplate" TargetType="ContentControl">
+            <Grid Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
+                <Grid.RenderTransform>
+                    <RotateTransform x:Name="MiniSpinnerRotate"/>
+                </Grid.RenderTransform>
+                <Grid.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                        <BeginStoryboard>
+                            <Storyboard RepeatBehavior="Forever">
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1.4"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Grid.Triggers>
+                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="0" Y="-9"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="8.6" Y="-2.8"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="5.3" Y="7.3"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="-5.3" Y="7.3"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform><TranslateTransform X="-8.6" Y="-2.8"/></Ellipse.RenderTransform>
+                </Ellipse>
+            </Grid>
+        </ControlTemplate>
+
         <!-- Estilo TabItem similar ao ServicesPage -->
         <Style TargetType="TabItem">
             <Setter Property="FontSize" Value="14"/>
@@ -68,7 +134,7 @@
             </Setter>
         </Style>
 
-    </Page.Resources>
+        </Page.Resources>
 
     <Grid Margin="30">
         <!-- NORMAL CONTENT -->
@@ -103,20 +169,7 @@
 
                         <Border x:Name="BloatwareLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <Ellipse Width="40" Height="40" Stroke="#FFD700" StrokeThickness="3" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="70 30">
-                                    <Ellipse.RenderTransform>
-                                        <RotateTransform x:Name="SpinnerRotateBloatware"/>
-                                    </Ellipse.RenderTransform>
-                                    <Ellipse.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever">
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Ellipse.Triggers>
-                                </Ellipse>
+                                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Analisando..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
                                 <TextBlock x:Name="TxtBloatwareProgress" Foreground="#FFD700" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
                             </StackPanel>
@@ -163,17 +216,16 @@
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" Margin="8,0" VerticalAlignment="Center">
                                                 <Image Source="{Binding Icon}" Width="32" Height="32" Stretch="Uniform"/>
-                                                <Ellipse Width="24" Height="24" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Ellipse.Style>
-                                                        <Style TargetType="Ellipse">
+                                                <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <ContentControl.Style>
+                                                        <Style TargetType="ContentControl">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Setter Property="Opacity" Value="1"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </Ellipse.Style>
-                                                </Ellipse>
+                                                    </ContentControl.Style>
+                                                </ContentControl>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" Foreground="White" TextTrimming="CharacterEllipsis"/>
@@ -249,20 +301,7 @@
 
                         <Border x:Name="ProgramsLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <Ellipse Width="40" Height="40" Stroke="#FFD700" StrokeThickness="3" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="70 30">
-                                    <Ellipse.RenderTransform>
-                                        <RotateTransform x:Name="SpinnerRotatePrograms"/>
-                                    </Ellipse.RenderTransform>
-                                    <Ellipse.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever">
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Ellipse.Triggers>
-                                </Ellipse>
+                                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Carregando programas..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
                                 <TextBlock x:Name="TxtProgramsProgress" Foreground="#FFD700" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
                             </StackPanel>
@@ -306,16 +345,16 @@
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" VerticalAlignment="Center">
                                                 <Image Width="32" Height="32" Source="{Binding Icon}" Stretch="Uniform"/>
-                                                <Ellipse Width="24" Height="24" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Ellipse.Style>
-                                                        <Style TargetType="Ellipse">
+                                                <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <ContentControl.Style>
+                                                        <Style TargetType="ContentControl">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </Ellipse.Style>
-                                                </Ellipse>
+                                                    </ContentControl.Style>
+                                                </ContentControl>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
@@ -362,6 +401,12 @@
                                     Background="#C42B1C" Foreground="White" BorderBrush="#C42B1C" BorderThickness="1" Margin="0,0,10,0" Cursor="Hand"/>
                             <Button Content="&#x1F6E1; Ponto de Restauração" Click="BtnCreateRestorePoint_Click" Height="35" Width="150" 
                                     Background="#2C3E50" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"/>
+                            <Button Content="&#x2699;&#xFE0F; Config" Click="BtnDeepUninstallSettings_Click" Height="35" Width="80"
+                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"
+                                    ToolTip="Configurações do desinstalador (Lixeira, matar processos, scan, seleção padrão, ignorar 24h)"/>
+                            <Button Content="&#x1F558; Histórico" Click="BtnUninstallHistory_Click" Height="35" Width="95"
+                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"
+                                    ToolTip="Undo persistente: restaurar arquivos e chaves de registro de desinstalações anteriores (sobrevive ao reboot)"/>
                             <Button Content="Atualizar Lista" Click="BtnRefreshPrograms_Click" Height="35" Width="120" 
                                     Background="#333" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand"/>
                         </StackPanel>
@@ -389,20 +434,7 @@
 
                         <Border x:Name="PortableLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <Ellipse Width="40" Height="40" Stroke="#FFD700" StrokeThickness="3" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="70 30">
-                                    <Ellipse.RenderTransform>
-                                        <RotateTransform x:Name="SpinnerRotatePortable"/>
-                                    </Ellipse.RenderTransform>
-                                    <Ellipse.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever">
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Ellipse.Triggers>
-                                </Ellipse>
+                                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Vasculhando pastas..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
                                 <TextBlock x:Name="TxtPortableProgress" Foreground="#FFD700" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
                             </StackPanel>
@@ -446,7 +478,7 @@
                                                 </CheckBox.LayoutTransform>
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" VerticalAlignment="Center">
-                                                <Ellipse Width="24" Height="24" Stroke="#FFD700" StrokeThickness="2" Fill="Transparent" StrokeDashArray="4 2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>

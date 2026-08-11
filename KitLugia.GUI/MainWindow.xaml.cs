@@ -2175,6 +2175,7 @@ namespace KitLugia.GUI
                 var toast = new LugiaToast();
                 toast.SetContent(title, initialMessage, NotificationType.Info);
                 toast.NotificationId = $"PROGRESS|{taskId}";
+                toast.IsProgress = true;
 
                 _progressToasts[taskId] = toast;
 

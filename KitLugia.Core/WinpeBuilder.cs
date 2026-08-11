@@ -265,7 +265,7 @@ namespace KitLugia.Core
                 {
                     using var fs = new FileStream(finalWim, FileMode.Open, FileAccess.Read);
                     byte[] sig = new byte[4];
-                    await fs.ReadAsync(sig);
+                    await fs.ReadExactlyAsync(sig);
                     string sigStr = System.Text.Encoding.ASCII.GetString(sig);
                     if (sigStr != "MSWI" && sigStr != "wimMS")
                         Log($"Aviso: boot.wim sem assinatura WIM válida (found: {sigStr}). Pode estar corrompido.");
@@ -730,38 +730,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Injetar diskpart.exe do host no WIM via wimlib (VALOS não inclui nativamente).
-        /// </summary>
-        public static async Task<bool> InjectDiskpartIntoWimAsync(string wimPath)
-        {
-            string hostDp = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "diskpart.exe");
-            if (!File.Exists(hostDp))
-            {
-                Log($"diskpart.exe não encontrado em {hostDp}");
-                return false;
-            }
-
-            string? wimlibExe = FindBundledWimlib();
-            if (wimlibExe == null)
-            {
-                Log("wimlib não disponível para injetar diskpart.exe");
-                return false;
-            }
-
-            Log($"Injetando diskpart.exe ({new FileInfo(hostDp).Length / 1024} KB) via wimlib...");
-            string args = $"update \"{wimPath}\" 1"
-                + $" --command=\"add {hostDp} /Windows/System32/diskpart.exe\"";
-
-            var (code, output) = await RunProcess(wimlibExe, args, 60000);
-            if (code == 0)
-                Log("diskpart.exe injetado no WIM com sucesso.");
-            else
-                Log($"Falha ao injetar diskpart.exe (código {code}): {output}");
-
-            return code == 0;
-        }
-
-        /// <summary>
         /// Injeta 7z.exe (+7z.dll se existir) no WIM em C:\Windows\System32\
         /// para o startnet.cmd do Fresh Install extrair o ISO no proprio WinPE
         /// (apos deletar o Windows antigo, quando o host nao conseguiu extrair por falta de espaco).
@@ -818,106 +786,6 @@ namespace KitLugia.Core
             return null;
         }
 
-        /// <summary>
-        /// Configura o registro offline do VALOS para executar startnet.valos.cmd.
-        /// Aciona tanto Winlogon Shell quanto SYSTEM\Setup\CmdLine para garantir
-        /// que o script rode independente do mecanismo de boot do VALOS.
-        /// </summary>
-        public static async Task<bool> ConfigureValosShellAsync(string wimPath)
-        {
-            string mountDir = Path.Combine(WinpeCacheDir, "mount_valos_shell");
-            try
-            {
-                if (Directory.Exists(mountDir))
-                {
-                    try { Directory.Delete(mountDir, true); } catch { }
-                    await RunDism("dism.exe", "/Cleanup-Mountpoints", 30000);
-                }
-                Directory.CreateDirectory(mountDir);
-
-                var (mntCode, mntOut) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
-                if (mntCode != 0 && !mntOut.Contains("already mounted"))
-                {
-                    Log($"Falha ao montar WIM para configurar shell VALOS: {mntOut}");
-                    return false;
-                }
-
-                string cmd = "cmd /k C:\\Windows\\System32\\startnet.valos.cmd";
-                string systemPath = Path.Combine(mountDir, "Windows", "System32", "config");
-
-                // ── SOFTWARE hive: Winlogon Shell ──
-                string swHive = Path.Combine(systemPath, "SOFTWARE");
-                if (File.Exists(swHive))
-                {
-                    Log("Carregando hive SOFTWARE para Winlogon Shell...");
-                    var (loadCode, loadOut) = await RunProcess("reg.exe",
-                        $"load HKLM\\VALOS_SW \"{swHive}\"", 30000);
-                    if (loadCode == 0)
-                    {
-                        var (addCode, addOut) = await RunProcess("reg.exe",
-                            "add \"HKLM\\VALOS_SW\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" "
-                            + $"/v Shell /t REG_SZ /d \"{cmd}\" /f", 30000);
-                        if (addCode == 0)
-                            Log("Winlogon Shell configurado.");
-                        else
-                            Log($"Aviso: Shell key falhou: {addOut}");
-
-                        await RunProcess("reg.exe", "unload HKLM\\VALOS_SW", 30000);
-                    }
-                    else
-                        Log($"Aviso: não foi possível carregar SOFTWARE hive: {loadOut}");
-                }
-
-                // ── SYSTEM hive: Setup\CmdLine (usado por winpeshl/winlogon no WinPE) ──
-                string sysHive = Path.Combine(systemPath, "SYSTEM");
-                if (File.Exists(sysHive))
-                {
-                    Log("Carregando hive SYSTEM para Setup\\CmdLine...");
-                    var (loadCode2, loadOut2) = await RunProcess("reg.exe",
-                        $"load HKLM\\VALOS_SYS \"{sysHive}\"", 30000);
-                    if (loadCode2 == 0)
-                    {
-                        // Diagnostico: valor atual
-                        var (qCode, qOut) = await RunProcess("reg.exe",
-                            "query \"HKLM\\VALOS_SYS\\Setup\" /v CmdLine", 15000);
-                        Log($"Setup\\CmdLine atual: {(qCode == 0 ? qOut.Trim() : "(não configurado)")}");
-
-                        // Define nosso script como CmdLine
-                        var (setCode, setOut) = await RunProcess("reg.exe",
-                            "add \"HKLM\\VALOS_SYS\\Setup\" "
-                            + $"/v CmdLine /t REG_SZ /d \"{cmd}\" /f", 30000);
-                        if (setCode == 0)
-                            Log("SYSTEM\\Setup\\CmdLine configurado como fallback.");
-                        else
-                            Log($"Aviso: Setup\\CmdLine falhou: {setOut}");
-
-                        await RunProcess("reg.exe", "unload HKLM\\VALOS_SYS", 30000);
-                    }
-                    else
-                        Log($"Aviso: não foi possível carregar SYSTEM hive: {loadOut2}");
-                }
-
-                var (cmtCode, cmtOut) = await RunDism("dism.exe",
-                    $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
-                if (cmtCode != 0)
-                {
-                    Log($"Falha ao commitar WIM: {cmtOut}");
-                    return false;
-                }
-
-                Log("Registro VALOS configurado (Winlogon Shell + SYSTEM\\Setup\\CmdLine).");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Log($"Erro ao configurar registro VALOS: {ex.Message}");
-                try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); } catch { }
-                return false;
-            }
-        }
-
-        private const string WINXSHELL_URL = "https://github.com/luigiarrud4/KitLugia-WinPE/releases/download/v1.0/WinXShell.exe";
         private static readonly string WINXSHELL_CACHE = @"C:\KL_WINPE\WinXShell.exe";
 
         /// <summary>
@@ -930,7 +798,7 @@ namespace KitLugia.Core
                 // Junto do executável (copiado pelo csproj)
                 Path.Combine(baseDir, "WinXShell.exe"),
                 // Caminho absoluto já conhecido
-                @"C:\KL_WINPE\WinXShell.exe",
+                WINXSHELL_CACHE,
                 // Projeto (debug): KitLugia.Core\bin\Debug\net10.0\ -> ..\..\..\..\KitLugia.WinPE\WinXShell\
                 Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "KitLugia.WinPE", "WinXShell", "WinXShell.exe")),
                 // Publicado: BaseDirectory\KitLugia.WinPE\WinXShell\
@@ -949,35 +817,10 @@ namespace KitLugia.Core
                 }
             }
 
-            Log("WinXShell não encontrado localmente. Tentando download...");
-            try
-            {
-                using var http = new HttpClient();
-                http.Timeout = TimeSpan.FromMinutes(5);
-                http.DefaultRequestHeaders.UserAgent.ParseAdd("KitLugia/1.0");
-                using var resp = await http.GetAsync(WINXSHELL_URL,
-                    HttpCompletionOption.ResponseHeadersRead);
-                if (!resp.IsSuccessStatusCode)
-                {
-                    Log($"Falha no download WinXShell (HTTP {resp.StatusCode})");
-                    return null;
-                }
-
-                string dest = Path.Combine(WinpeCacheDir, "WinXShell.exe");
-                var dir = Path.GetDirectoryName(dest);
-                if (dir != null) Directory.CreateDirectory(dir);
-
-                await using var fs = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
-                await using var stream = await resp.Content.ReadAsStreamAsync();
-                await stream.CopyToAsync(fs);
-                Log($"WinXShell baixado: {dest} ({new FileInfo(dest).Length / 1024} KB)");
-                return dest;
-            }
-            catch (Exception ex)
-            {
-                Log($"Erro ao baixar WinXShell: {ex.Message}");
-                return null;
-            }
+            Log("WinXShell não encontrado localmente.");
+            Log("Coloque WinXShell.exe em KitLugia.WinPE\\WinXShell\\ ou ao lado do executável do KitLugia.");
+            Log("Download automático removido: a URL antiga (luigiarrud4/KitLugia-WinPE v1.0) retorna 404.");
+            return null;
         }
 
         /// <summary>
@@ -1831,7 +1674,7 @@ namespace KitLugia.Core
 
         /// <summary>
         /// Adiciona um script personalizado em Windows\System32\ no WIM via wimlib (sem montar).
-        /// Usado pelo Validation OS e outros cenários que precisam injetar startnet*.cmd.
+        /// Usado pelos cenários que precisam injetar startnet*.cmd.
         /// Retorna true se wimlib executou com sucesso; false se não disponível ou falhou.
         /// </summary>
         public static async Task<bool> UpdateWimWithScriptAsync(string wimPath, string scriptContent, string scriptName = "startnet.cmd")

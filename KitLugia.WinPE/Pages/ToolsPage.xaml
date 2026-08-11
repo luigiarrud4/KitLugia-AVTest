@@ -6,7 +6,7 @@
     <ScrollViewer Padding="24">
         <StackPanel>
             <TextBlock Text="Ferramentas do Sistema" Style="{StaticResource PageTitle}"/>
-            <TextBlock Text="Utilitários para WinPE e ValOS" 
+            <TextBlock Text="Utilitários para WinPE" 
                        Foreground="{StaticResource TextSecondaryBrush}" Margin="0 4 0 24"/>
 
             <Grid>
@@ -63,18 +63,6 @@
                                     Click="BtnListInterfaces_Click" Margin="0 0 0 6"/>
                             <Button Content="🔑  Configurar IP" Style="{StaticResource AccentButton}"
                                     Click="BtnSetIp_Click"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Style="{StaticResource CardBorder}" Margin="0 0 0 12">
-                        <StackPanel>
-                            <TextBlock Text="🔄  Validation OS" Style="{StaticResource SectionTitle}" Margin="0 0 0 8"/>
-                            <Button Content="📥  Preparar ValOS" Style="{StaticResource AccentButton}" 
-                                    Click="BtnPrepareValos_Click" Margin="0 0 0 6"/>
-                            <Button Content="🚀  Boot ValOS (one-time)" Style="{StaticResource AccentButton}"
-                                    Click="BtnBootValos_Click" Margin="0 0 0 6"/>
-                            <Button Content="🗑️  Remover ValOS" Style="{StaticResource DangerButton}"
-                                    Click="BtnRemoveValos_Click"/>
                         </StackPanel>
                     </Border>
 

@@ -2881,7 +2881,7 @@ new() {
                     case TweakType.PageFile:
                         const string pfKey = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
                         if (applySafeValue)
-                                Registry.SetValue(pfKey, "PagingFiles", new string[] { Path.Combine(Path.GetPathRoot(Environment.SystemDirectory), "pagefile.sys") }, RegistryValueKind.MultiString);
+                                Registry.SetValue(pfKey, "PagingFiles", new string[] { Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "pagefile.sys") }, RegistryValueKind.MultiString);
                         else
                             Registry.SetValue(pfKey, "PagingFiles", Array.Empty<string>(), RegistryValueKind.MultiString);
                         break;

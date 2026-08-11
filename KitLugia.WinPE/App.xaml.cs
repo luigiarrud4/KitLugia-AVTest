@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using Application = System.Windows.Application;
 
 namespace KitLugia.WinPE
@@ -10,7 +10,7 @@ namespace KitLugia.WinPE
             base.OnStartup(e);
 
             if (WinPEDetector.IsWinPE())
-                KitLugia.Core.Logger.Log("KitLugia.WinPE iniciado em ambiente WinPE/ValOS");
+                KitLugia.Core.Logger.Log("KitLugia.WinPE iniciado em ambiente WinPE/Windows");
             else
                 KitLugia.Core.Logger.Log("KitLugia.WinPE iniciado em Windows normal (modo compatibilidade)");
         }

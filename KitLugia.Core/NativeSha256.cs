@@ -28,11 +28,6 @@ namespace KitLugia.Core
 
         public static string? ComputeHash(string filePath)
         {
-            if (NativeBlake3.UseNative)
-            {
-                return NativeBlake3.HashFile(filePath);
-            }
-
             if (UseNative)
             {
                 byte[] buf = new byte[65];

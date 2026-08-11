@@ -92,7 +92,7 @@ namespace KitLugia.Core
                 progressCallback?.Invoke(75, "Instalando rEFInd no ESP...");
                 Logger.Log("[BCDBOOT] Instalando rEFInd no ESP...");
 
-                string espDrive = await RefindManager.MountEspAsync();
+                string? espDrive = await RefindManager.MountEspAsync();
                 if (espDrive == null)
                 {
                     Logger.Log("[BCDBOOT] Falha ao montar ESP.");

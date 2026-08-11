@@ -21,22 +21,8 @@ namespace KitLugia.WinPE
             return false;
         }
 
-        public static bool IsValOS()
-        {
-            try
-            {
-                if (File.Exists(@"C:\Windows\System32\startnet.valos.cmd"))
-                    return true;
-                if (Directory.Exists(@"C:\KL_WINPE"))
-                    return true;
-            }
-            catch { }
-            return false;
-        }
-
         public static string GetEnvironment()
         {
-            if (IsValOS()) return "Validation OS";
             if (IsWinPE()) return "WinPE";
             return "Windows";
         }
