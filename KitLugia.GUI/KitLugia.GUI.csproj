@@ -75,11 +75,6 @@
 	  <Content Include="Tools\GoodbyeDPI\**\*">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
-	  <!-- WinXShell GUI para VALOS -->
-	  <Content Include="..\KitLugia.WinPE\WinXShell\WinXShell.exe">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		  <Link>WinXShell.exe</Link>
-	  </Content>
 	</ItemGroup>
 
 	<ItemGroup>

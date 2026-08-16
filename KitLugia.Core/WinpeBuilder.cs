@@ -786,72 +786,57 @@ namespace KitLugia.Core
             return null;
         }
 
-        private static readonly string WINXSHELL_CACHE = @"C:\KL_WINPE\WinXShell.exe";
-
         /// <summary>
-        /// Obtém WinXShell.exe: tenta local (vários paths), cache, depois download.
+        /// Injeta Explorer++.exe (file manager do WinPE) no WIM via wimlib.
+        /// O WinXShell foi removido: Explorer++ e o unico shell de teste.
         /// </summary>
-        public static async Task<string?> ResolveWinXShellAsync()
+        public static async Task<bool> InjectExplorerPlusPlusIntoWimAsync(string wimPath)
         {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string[] candidates = [
-                // Junto do executável (copiado pelo csproj)
-                Path.Combine(baseDir, "WinXShell.exe"),
-                // Caminho absoluto já conhecido
-                WINXSHELL_CACHE,
-                // Projeto (debug): KitLugia.Core\bin\Debug\net10.0\ -> ..\..\..\..\KitLugia.WinPE\WinXShell\
-                Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "KitLugia.WinPE", "WinXShell", "WinXShell.exe")),
-                // Publicado: BaseDirectory\KitLugia.WinPE\WinXShell\
-                Path.Combine(baseDir, "KitLugia.WinPE", "WinXShell", "WinXShell.exe"),
-                // Alternate: BaseDirectory\Resources\WinXShell\
-                Path.Combine(baseDir, "Resources", "WinXShell", "WinXShell.exe"),
-            ];
-
-            foreach (var c in candidates)
-            {
-                var fi = new FileInfo(c);
-                if (fi.Exists && fi.Length > 100000)
-                {
-                    Log($"WinXShell encontrado: {fi.FullName} ({fi.Length / 1024} KB)");
-                    return fi.FullName;
-                }
-            }
-
-            Log("WinXShell não encontrado localmente.");
-            Log("Coloque WinXShell.exe em KitLugia.WinPE\\WinXShell\\ ou ao lado do executável do KitLugia.");
-            Log("Download automático removido: a URL antiga (luigiarrud4/KitLugia-WinPE v1.0) retorna 404.");
-            return null;
-        }
-
-        /// <summary>
-        /// Injeta WinXShell.exe no WIM via wimlib.
-        /// </summary>
-        public static async Task<bool> InjectWinXShellIntoWimAsync(string wimPath)
-        {
-            string? src = await ResolveWinXShellAsync();
-            if (src == null)
-            {
-                Log("WinXShell não disponível. Pulando injeção.");
-                return false;
-            }
-
             string? wimlibExe = FindBundledWimlib();
             if (wimlibExe == null)
             {
-                Log("wimlib não disponível para injetar WinXShell.");
+                Log("wimlib não disponível para injetar Explorer++.");
                 return false;
             }
 
-            Log($"Injetando WinXShell.exe no WIM...");
-            string args = $"update \"{wimPath}\" 1"
-                + $" --command=\"add {src} /Windows/System32/WinXShell.exe\"";
+            string? explorerpp = FindExplorerPlusPlus();
+            if (explorerpp == null)
+            {
+                Log("Explorer++ NAO encontrado. Procure em: Resources\\App\\Explorer++\\Explorer++.exe (publicado na pasta Resources\\App do kit).");
+                return false;
+            }
+
+            Log($"Explorer++ encontrado: {explorerpp}");
+            string commands = $"add \"{explorerpp}\" /Windows/System32/Explorer++.exe";
+            Log("Injetando Explorer++.exe no WIM...");
+            string args = $"update \"{wimPath}\" 1 --command=\"{commands}\"";
             var (code, output) = await RunProcess(wimlibExe, args, 60000);
             if (code == 0)
-                Log("WinXShell.exe injetado no WIM com sucesso.");
+                Log("Explorer++.exe injetado no WIM com sucesso.");
             else
-                Log($"Falha ao injetar WinXShell (código {code}): {output}");
+                Log($"Falha ao injetar Explorer++ (código {code}): {output}");
 
             return code == 0;
+        }
+
+        private static string? FindExplorerPlusPlus()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string[] candidates = [
+                // Kit publicado: raiz (copiado pelo csproj ao lado do executavel)
+                Path.Combine(baseDir, "Explorer++.exe"),
+                Path.Combine(baseDir, "Explorer++", "Explorer++.exe"),
+                // Resources\App (kit publicado)
+                Path.Combine(baseDir, "Resources", "App", "Explorer++", "Explorer++.exe"),
+                // Projeto (dev): KitLugia.GUI\Resources\App\Explorer++
+                Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "KitLugia.GUI", "Resources", "App", "Explorer++", "Explorer++.exe")),
+            ];
+            foreach (var c in candidates)
+            {
+                if (!string.IsNullOrWhiteSpace(c) && File.Exists(c) && new FileInfo(c).Length > 100000)
+                    return c;
+            }
+            return null;
         }
 
         /// <summary>

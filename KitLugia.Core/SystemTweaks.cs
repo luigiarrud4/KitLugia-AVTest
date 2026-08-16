@@ -9150,5 +9150,168 @@ namespace KitLugia.Core
         }
 
         #endregion
+
+        #region Telemetria e Relatorios (servicos + tarefas agendadas)
+
+        /// <summary>
+        /// Servicos de telemetria/reportes seguros de desativar. DefaultStart: 2=demand, 3=auto.
+        /// </summary>
+        public static readonly (string Service, string Display, int DefaultStart)[] TelemetryServices =
+        {
+            ("DiagTrack", "Telemetria (Connected User Experiences)", 3),
+            ("dmwappushservice", "WAP Push Message Routing", 2),
+            ("WerSvc", "Relatorio de Erros do Windows", 2),
+            ("PcaSvc", "Assistente de Compatibilidade de Programas", 3),
+        };
+
+        /// <summary>
+        /// Pastas do Task Scheduler cujas tarefas sao telemetria/reportes (seguro desativar todas).
+        /// </summary>
+        public static readonly string[] TelemetryTaskFolders =
+        {
+            @"\Microsoft\Windows\Application Experience\",
+            @"\Microsoft\Windows\Customer Experience Improvement Program\",
+        };
+
+        private static void RunSc(string args)
+        {
+            try
+            {
+                using var p = Process.Start(new ProcessStartInfo("sc.exe", args)
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                });
+                p?.WaitForExit(15000);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"sc.exe falhou ({args}): {ex.Message}");
+            }
+        }
+
+        public static bool IsServiceDisabled(string service)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{service}");
+                return key?.GetValue("Start") is int s && s == 4;
+            }
+            catch { return false; }
+        }
+
+        public static string GetServiceStartMode(string service)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{service}");
+                return key?.GetValue("Start") is int s
+                    ? s switch { 0 => "boot", 1 => "system", 2 => "demand", 3 => "auto", 4 => "disabled", _ => "demand" }
+                    : "demand";
+            }
+            catch { return "demand"; }
+        }
+
+        /// <summary>
+        /// Desativa/restaura um servico. Ao desativar, guarda o Start original em
+        /// HKCU\Software\KitLugia\Tweaks\ServiceOriginals para restaurar depois.
+        /// </summary>
+        public static void SetServiceStartup(string service, bool disable)
+        {
+            try
+            {
+                string start;
+                if (disable)
+                {
+                    using var save = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\KitLugia\Tweaks\ServiceOriginals");
+                    save?.SetValue(service, GetServiceStartMode(service), RegistryValueKind.String);
+                    start = "disabled";
+                    RunSc($"config {service} start= disabled");
+                    RunSc($"stop {service}");
+                    Logger.Log($"Servico desativado: {service} (start= disabled)");
+                }
+                else
+                {
+                    string original = "demand";
+                    using var save = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\KitLugia\Tweaks\ServiceOriginals");
+                    string? stored = save?.GetValue(service) as string;
+                    if (!string.IsNullOrEmpty(stored)) original = stored;
+                    else
+                    {
+                        var def = TelemetryServices.FirstOrDefault(t => t.Service == service);
+                        original = def.DefaultStart == 3 ? "auto" : "demand";
+                    }
+                    start = original;
+                    RunSc($"config {service} start= {original}");
+                    Logger.Log($"Servico restaurado: {service} (start= {original})");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao alterar servico {service}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Desativa/reativa TODAS as tarefas das pastas de telemetria. Retorna o numero de tarefas alteradas.
+        /// </summary>
+        public static int ApplyTelemetryScheduledTasks(bool disable)
+        {
+            int changed = 0;
+            try
+            {
+                using (var ts = new Microsoft.Win32.TaskScheduler.TaskService())
+                {
+                    foreach (var folderPath in TelemetryTaskFolders)
+                    {
+                        var folder = ts.GetFolder(folderPath);
+                        if (folder == null) continue;
+                        foreach (var task in folder.Tasks)
+                        {
+                            try
+                            {
+                                if (task.Enabled == disable) continue;
+                                task.Enabled = disable;
+                                changed++;
+                                Logger.Log($"Tarefa {(disable ? "desativada" : "ativada")}: {task.Path}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"Tarefa inacessivel: {task.Path} - {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao alterar tarefas de telemetria: {ex.Message}");
+            }
+            return changed;
+        }
+
+        /// <summary>
+        /// True se TODAS as tarefas monitoradas estao desativadas (ou a pasta nao existe).
+        /// </summary>
+        public static bool AreTelemetryTasksDisabled()
+        {
+            try
+            {
+                using (var ts = new Microsoft.Win32.TaskScheduler.TaskService())
+                {
+                    foreach (var folderPath in TelemetryTaskFolders)
+                    {
+                        var folder = ts.GetFolder(folderPath);
+                        if (folder == null) continue;
+                        foreach (var task in folder.Tasks)
+                            if (task.Enabled) return false;
+                    }
+                }
+                return true;
+            }
+            catch { return true; }
+        }
+
+        #endregion
     }
 }

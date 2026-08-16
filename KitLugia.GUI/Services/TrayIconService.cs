@@ -534,6 +534,13 @@ namespace KitLugia.GUI.Services
         public bool SearchIndexerDisabled { get; set; } = false;
         public bool TextInputHostDisabled { get; set; } = false;
 
+        // Telemetria e relatórios - serviços + tarefas agendadas (aplicadas no startup conforme preferência)
+        public bool DiagTrackSvcDisabled { get; set; } = false;
+        public bool DmwappushSvcDisabled { get; set; } = false;
+        public bool WerSvcDisabled { get; set; } = false;
+        public bool PcaSvcDisabled { get; set; } = false;
+        public bool TelemetryTasksDisabled { get; set; } = false;
+
         public bool IsInitialized { get; private set; } = false;
 
         // RAM Limiter - Variáveis e configurações
@@ -1443,6 +1450,11 @@ namespace KitLugia.GUI.Services
                 key.SetValue("CompatTelRunnerDisabled", CompatTelRunnerDisabled ? 1 : 0);
                 key.SetValue("SearchIndexerDisabled", SearchIndexerDisabled ? 1 : 0);
                 key.SetValue("TextInputHostDisabled", TextInputHostDisabled ? 1 : 0);
+                key.SetValue("DiagTrackSvcDisabled", DiagTrackSvcDisabled ? 1 : 0);
+                key.SetValue("DmwappushSvcDisabled", DmwappushSvcDisabled ? 1 : 0);
+                key.SetValue("WerSvcDisabled", WerSvcDisabled ? 1 : 0);
+                key.SetValue("PcaSvcDisabled", PcaSvcDisabled ? 1 : 0);
+                key.SetValue("TelemetryTasksDisabled", TelemetryTasksDisabled ? 1 : 0);
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
@@ -1654,6 +1666,12 @@ namespace KitLugia.GUI.Services
             if (CompatTelRunnerDisabled) ApplyCommunityProcessToggle("CompatTelRunner", true);
             if (SearchIndexerDisabled) ApplyCommunityProcessToggle("SearchIndexer", true);
             if (TextInputHostDisabled) ApplyCommunityProcessToggle("TextInputHost", true);
+
+            if (DiagTrackSvcDisabled) SystemTweaks.SetServiceStartup("DiagTrack", true);
+            if (DmwappushSvcDisabled) SystemTweaks.SetServiceStartup("dmwappushservice", true);
+            if (WerSvcDisabled) SystemTweaks.SetServiceStartup("WerSvc", true);
+            if (PcaSvcDisabled) SystemTweaks.SetServiceStartup("PcaSvc", true);
+            if (TelemetryTasksDisabled) SystemTweaks.ApplyTelemetryScheduledTasks(true);
         }
 
         public void LoadSettings()
@@ -1700,6 +1718,11 @@ namespace KitLugia.GUI.Services
                 CompatTelRunnerDisabled = (int)key.GetValue("CompatTelRunnerDisabled", 0) == 1;
                 SearchIndexerDisabled = (int)key.GetValue("SearchIndexerDisabled", 0) == 1;
                 TextInputHostDisabled = (int)key.GetValue("TextInputHostDisabled", 0) == 1;
+                DiagTrackSvcDisabled = (int)key.GetValue("DiagTrackSvcDisabled", 0) == 1;
+                DmwappushSvcDisabled = (int)key.GetValue("DmwappushSvcDisabled", 0) == 1;
+                WerSvcDisabled = (int)key.GetValue("WerSvcDisabled", 0) == 1;
+                PcaSvcDisabled = (int)key.GetValue("PcaSvcDisabled", 0) == 1;
+                TelemetryTasksDisabled = (int)key.GetValue("TelemetryTasksDisabled", 0) == 1;
 
                 _monitorTimer.Interval = TimeSpan.FromSeconds(MonitorIntervalSeconds);
             }

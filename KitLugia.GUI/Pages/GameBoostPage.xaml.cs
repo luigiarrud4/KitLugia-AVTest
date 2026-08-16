@@ -588,7 +588,7 @@ namespace KitLugia.GUI.Pages
                         var result = KitLugia.Core.SystemTweaks.UnparkCpuPowerConfig();
                         if (result.Success)
                         {
-                            KitLugia.Core.Logger.Log($"s Unpark CPU: {result.Message}");
+                            KitLugia.Core.Logger.Log($"✔️ Unpark CPU: {result.Message}");
                             Dispatcher.Invoke(() => SaveGameBoostSettings());
                         }
                         else
@@ -604,7 +604,7 @@ namespace KitLugia.GUI.Pages
                         var result = KitLugia.Core.SystemTweaks.RevertUnparkCpuPowerConfig();
                         if (result.Success)
                         {
-                            KitLugia.Core.Logger.Log($"s Unpark CPU revertido: {result.Message}");
+                            KitLugia.Core.Logger.Log($"✔️ Unpark CPU revertido: {result.Message}");
                             Dispatcher.Invoke(() => SaveGameBoostSettings());
                         }
                         else

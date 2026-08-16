@@ -83,28 +83,25 @@
 
                     <!-- STEP 1: PREPARAR WINPE -->
                     <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel>
+                            <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                            <WrapPanel Orientation="Horizontal">
                                 <Button x:Name="BtnPrepareWinpe" Content="PREPARAR" Click="BtnPrepareWinpe_Click"
-                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="120" Margin="0,0,8,0"/>
-                                <Button x:Name="BtnTestWinxshell" Content="TESTAR SHELL" Click="BtnTestWinxshell_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#88CCFF" BorderBrush="#225588" Width="110" Margin="0,0,8,0"
-                                        ToolTip="Injeta WinXShell.exe no WinPE e agenda reboot via bootsequence one-time: o WinPE boota com o WinXShell como shell grafico (modo GUI de inspecao manual)"/>
+                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="112" Margin="0,0,8,4"/>
+                                <Button x:Name="BtnTestShell" Content="TESTAR SHELL" Click="BtnTestShell_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#88CCFF" BorderBrush="#225588" Width="104" Margin="0,0,8,4"
+                                        ToolTip="Injeta Explorer++.exe no WinPE e agenda reboot via bootsequence one-time: o WinPE boota com o Explorer++ como file manager (modo GUI de inspecao manual)"/>
+                                <Button x:Name="BtnBootInstaller" Content="BOOT INSTALADOR" Click="BtnBootInstaller_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#88FFAA" BorderBrush="#225522" Width="112" Margin="0,0,8,4"
+                                        ToolTip="Seleciona uma ISO do Windows e agenda reboot direto no Windows Setup (instalador grafico), sem criar particoes nem abrir o WinPE comum - util para testar ISOs"/>
                                 <Button x:Name="BtnRemoveWinpe" Content="REMOVER" Click="BtnRemoveWinpe_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="90" Margin="0,0,8,0"/>
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="88" Margin="0,0,8,4"/>
                                 <Button x:Name="BtnCleanBcd" Content="LIMPAR BCD" Click="BtnCleanBcd_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FFAA44" BorderBrush="#554422" Width="90"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FFAA44" BorderBrush="#554422" Width="88" Margin="0,0,0,4"
                                         ToolTip="Remove todas as entradas do Boot Manager criadas pelo KitLugia (WinPE, shrink)"/>
-                            </StackPanel>
-                        </Grid>
+                            </WrapPanel>
+                        </StackPanel>
                     </Border>
 
                     <!-- PARTITION LIST + SHRINK ACTION -->

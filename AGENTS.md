@@ -1,4 +1,18 @@
-# KitLugia — AGENTS.md
+﻿# KitLugia — AGENTS.md
+
+## REGRAS DO PROJETO
+
+1. **NUNCA usar hardcoded paths** (ex: `C:\Users\...`, `C:\KL_WINPE\arquivo.exe`).
+   Todo caminho de recurso do app (WinXShell, Explorer++, drivers, tools) deve ser
+   relativo a `AppDomain.CurrentDomain.BaseDirectory` (kit publicado) ou resolvido
+   por candidatos relativos. O kit e publicado (VS/Deploy) e movido para outras
+   maquinas/VM — um path absoluto quebra la. Excecao legitima: `C:\KL_WINPE` como
+   DIRETORIO de staging do WinPE (BCD ramdisk referencia), nunca para achar recursos.
+
+2. **Deploy.ps1 NAO tocar** — o usuario publica pelo Visual Studio; o Deploy.ps1 e
+   fluxo alternativo, qualquer alteracao precisa de ordem explicita.
+
+3. Arquivos novos do projeto nascem com encoding correto (ver .editorconfig: UTF-8+BOM).
 
 ## Estado atual do projeto (29/07/2026)
 
@@ -2128,3 +2142,1018 @@ startnet.cmd; explorer.exe NAO existe no WinPE por padrao; o correto e
 **A TESTAR (VM)**: WinpeToolsPage -> TESTAR SHELL -> reboot -> WinPE com Desktop
 WinXShell; depois SEM marcador (shell direto); depois com SCHEDULE pendente (shrink
 primeiro). WinXShell.exe local confirmado: KitLugia.WinPE\WinXShell\ (3,5 MB).
+
+### Sessao 10/08 (cont.) - TESTAR SHELL: 2 bugs corrigidos (X: RAMDISK + card esticado)
+
+Teste real (VM) do TESTAR SHELL: WinXShell NAO iniciou (script ficou no scan do
+marcador e depois morreu) e o card 1 da WinpeToolsPage ficou com o fundo esticado.
+
+**BUG 1 (script, WinbootManager.cs TestShellStartnetCmd)**: o launcher checava
+`if exist C:\Windows\System32\WinXShell.exe` - SEMPRE FALSO: o WinPE RAMDISK monta
+o sistema em X:\ (C: so existe no VALOS legado). Alem disso, o echo com
+"(WinPE shell mode)" dentro de bloco if...else violava a regra de parse do cmd
+(bloco so e parseado quando a condicao e TRUE; parens balanceados ainda quebram).
+Corrigido: resolver o drive do sistema em tempo de execucao e SEM blocos:
+- `set OSDRV=X` + `if exist C:\Windows\System32\WinXShell.exe set OSDRV=C`
+- `if exist !OSDRV!:\Windows\System32\WinXShell.exe goto :launch` + label
+  `:launch` com `cd /d` + `start "" !OSDRV!:...WinXShell.exe -winpe` (labels
+  depois de exit/b nunca executam por fallthrough; wpeutil reboot ganhou
+  `exit /b 1` de seguranca apos si).
+- Scan do marcador ganhou progresso: `echo   Probing disk %%d - partitions 1-8...`
+  + aviso "This scans up to 4 disks x 8 partitions and can take a minute..."
+  (antes o scan de 32 diskpart ficava MUDO ~30-60s e parecia travado).
+
+**BUG 2 (card, WinpeToolsPage.xaml)**: StackPanel horizontal com 4 botoes
+(PREPARAR/TESTAR/REMOVER/LIMPAR BCD) estourava a largura minima do card ->
+o Border StepCardStyle esticava (fundo preto grande). Corrigido: WrapPanel
+Horizontal com MaxWidth=440 + Margin inferior 4 nos botoes - quebram linha
+quando falta espaco, o card nunca estica.
+
+**LICAO**: no WinPE RAMDISK os arquivos injetados no WIM (wimlib add
+/Windows/System32/X.exe) ficam em X:\Windows\System32 - nunca C:\. O VALOS
+usava C: porque bootava com um Windows real instalado. O bridge startnet.cmd
+antigo (X: e C:) estava certo.
+
+Script validado localmente (host, versao sanitizada diskpart->echo, subst X:):
+scan 4x8 roda sem crash, "No shrink scheduled. Launching WinXShell shell...",
+OSDRV=X, goto :launch, `start "" ... -winpe`, exit 0. Builds: Core 0/0,
+GUI 0/104 (baseline).
+
+**A TESTAR (VM)**: TESTAR SHELL de novo -> WinPE mostra progresso do scan ->
+~1min -> "Launching WinXShell shell..." -> Desktop WinXShell aparece
+(se o Windows Boot Manager reclamar, escolher a entrada "Shell Test" no menu).
+
+### Sessao 11/08 - WinXShell REMOVIDO: Explorer++ e o unico shell do WinPE
+
+Pedido do usuario: "o winxshell ele não funciona ta pode jogar ele fora".
+
+**Removido por completo (Core + GUI + WinPE + docs)**:
+1. KitLugia.Core\WinpeBuilder.cs: ResolveWinXShellAsync deletado; InjectWinXShellIntoWimAsync
+   → InjectExplorerPlusPlusIntoWimAsync (so Explorer++.exe → /Windows/System32/Explorer++.exe,
+   um comando wimlib, log se ausente); FindExplorerPlusPlus sem parametro (raiz do kit,
+   Explorer++\, Resources\App\Explorer++\, path dev KitLugia.WinPE\Explorer++\).
+2. KitLugia.Core\WinbootManager.cs: TestShellStartnetCmd sem fallback WinXShell — so
+   Explorer++ (OSDRV detect, assign D-K, launch); removed :assign_drives_wx/:launch_wx;
+   ScheduleTestWinpeShell usa o metodo novo, BCD entry "Shell Test (Explorer++)".
+3. KitLugia.GUI: csproj sem Content do WinXShell.exe; tooltip + dialogs atualizados.
+4. KitLugia.WinPE: csproj Content agora Explorer++\*; MainWindow botao "Iniciar Explorer++"
+   (search System32 + Explorer++\ subpasta); DashboardPage card Explorer++; mojibake dos
+   emojis/acentos corrigidos (foram 2x-encoded).
+5. Arquivos apagados: WinXShell\WinXShell.exe (3,4 MB), WinXShell_x86.exe (3 MB),
+   WinXShell.jcfg, download_winxshell.ps1. Pasta WinXShell\ renomeada → KitLugia.WinPE\Explorer++\
+   (Explorer++.exe 6,2 MB + History/License/Readme).
+6. docs/REVIEW-PENDING.md: itens 1/10/linha resolvidos atualizados.
+
+**Bom saber**: Environment.SystemDirectory no WinPE RAMDISK = X:\Windows\System32 (o
+arquivo injetado vive la). Preciso disso no MainWindow do KitLugia.WinPE (checagem + launch).
+
+**A TESTAR (VM)**: publicar VS → copiar pasta para a VM → TESTAR SHELL → WinPE boota e
+abre Explorer++ direto (com letras D-K atribuidas, sem scan 4x8).
+
+### Sessao 11/08 (cont.) - KitLugia toolkit DENTRO do WinPE (substitui o cmd.exe do Test Mode)
+
+Pedido do usuario: "criar algo legal que rode bem dentro do winpe" + "o kit extraido
+(publicado) abro na VM... injeta". Fluxo real: WinPE com Explorer++ ja funciona; o que
+faltava era o CMD do WinPE nao ser um shell grafico - abria um cmd.exe cru.
+
+1. **InjectWinpeToolkitIntoWimAsync (WinpeBuilder.cs, novo)**: injeta o publish
+   self-contained do KitLugia.WinPE (app WPF + runtime .NET 10 ~203MB) no boot.wim em
+   /Windows/System32/KitLugia/ via wimlib. Candidatos para o publish (todos relativos):
+   (a) BaseDir\KitLugia\KitLugia.WinPE.exe (pasta publicada do GUI), (b) Resources\App\
+   WinpeToolkit\, (c) caminho dev ..\..\..\KitLugia.WinPE\bin\Release\net10.0-windows10.0.26100.0\
+   win-x64\publish\. Filtra BootGoodies\ e LinuxPreOS\ (nao cabem no WinPE; ~50MB a menos).
+   Staging em %TEMP% (reclamado OK - nao e hardcoded de recurso). Durante o wimlib add,
+   o WinPE RAMDISK ganha scratch X: ampliado (DISM /ScratchDir em X: + set 1024MB via
+   DISM /Set-ScratchSpace) para aquecer o imagex com 200MB+ e o add nao estourar o X:.
+
+2. **KitLugia.GUI.csproj**: Content glob do publish com Link KitLugia\ (copia o toolkit
+   self-contained para a pasta publicada do GUI) + target EnsureWinpeToolkitPublish que
+   roda `dotnet publish KitLugia.WinPE -c Release -r win-x64 --self-contained true` se
+   o publish nao existir (build nao falha sem ele - so copia o que houver).
+
+3. **TestShellStartnetCmd reescrito (WinbootManager.cs)**: agora o fluxo real:
+   - Scan do marcador KL_SHRINK_TARGET.dat igual ao RamdiskStartnetCmd (marker-only,
+     DISK/PART do proprio diskpart) - se achou, vai :run e roda o shrink COMPLETO
+     (mesmo fluxo do SCHEDULE, log persistente + remove marcador) e depois vai :shell.
+   - Sem marcador: direto :shell -> assign_drives (letras D-K nos discos 0-1, manda
+     diskpart real) -> :launch:
+     `start "" !OSDRV!:\Windows\System32\Explorer++.exe`
+     + `if exist !OSDRV!:\Windows\System32\KitLugia\KitLugia.WinPE.exe` -> tambem lanca
+     o kit WPF (a GUI do WinPE com Dashboard/Tools/etc). OSDRV resolve X: vs C: em runtime.
+   - Regras cmd.exe preservadas: echos de bloco SEM parenteses, ASCII puro, exit /b no fim.
+
+4. **Validacao local** (host, sem VM): harness reflection dump_shell (dump TestShellStartnetCmd)
+   + simulacao com subst X: e Explorers fakes: scan 4x8 intacto, "Assigning drive letters...",
+   launch do Explorer++ e do kit dispararam, "Shell ready" + exit 0, ZERO "was unexpected
+   at this time". AST do script: 119 linhas, ASCII puro, echos de bloco limpos.
+   Staging real: 203MB / 268 arquivos (sem BootGoodies/LinuxPreOS). Output do GUI ja tem
+   a pasta KitLugia\ (250MB publish completo). Builds: Core 0/0, GUI 0 erros.
+
+**A TESTAR (VM)**: publicar VS (pasta publicada agora tem KitLugia\ com o toolkit) >
+copiar para a VM > TESTAR SHELL > WinPE boota > shoot scan 4x8 (~1 min, com progresso) >
+:launch > Explorer++ abre + KitLugia.WinPE.exe (WPF) abre como GUI do WinPE. Com marcador
+pendente: shrink roda primeiro (Status: OK no log) e o shell abre depois.
+
+### Sessao 11/08 (cont.) - BUG: toolkit WPF abria INVISIVEL (janela nunca criada) + crash-log
+
+**Sintoma (VM, 17:35)**: TESTAR SHELL funcionou de ponta a ponta - WinPE bootou, scan
+4x8, letras D-K, Explorer++ ABRIU, "Starting KitLugia toolkit..." - mas nenhuma janela
+do KitLugia.WinPE.exe apareceu ("so o explorer++ ligo").
+
+**CAUSA RAIZ (App.xaml.cs/App.xaml)**: o App.xaml NAO tem `StartupUri` e NAO existe
+Program.cs - o Main gerado pelo WPF roda `app.Run()` SEM POSSIBILIDADE DE ABRIR JANELA
+(o WPF so cria a janela a partir de StartupUri). O processo subia e ficava vivo em
+background, invisivel, exatamente como observado. Nenhum c�digo criava `new MainWindow()`.
+
+**CORRECOES (KitLugia.WinPE)**:
+1. `App.xaml.cs` OnStartup: agora cria e mostra `new MainWindow()` explicitamente
+   (try/catch com log de falha).
+2. `CrashLog.cs` (novo): grava qualquer excecao (AppDomain/Dispatcher/Task +
+   "info" de inicializacao) em `%TEMP%\KitLugiaWinPE_crash.log` (diagnostico no proprio
+   WinPE via Explorer++) E na raiz de TODOS os volumes C..Z (`C:\KitLugiaWinPE_crash.log`
+   etc) - o RAMDISK X: some no reboot, mas a raiz do disco do Windows sobrevive: o
+   usuario ve o log depois de voltar ao Windows. Sobrecarga Write(stage, string).
+3. Build Release OK + `dotnet publish -r win-x64 --self-contained` FORCADO (o target
+   EnsureWinpeToolkitPublish so roda se o exe nao existir no publish - publicacao
+   manual atualizou o publish de 250MB).
+
+**FLUXO DE TESTE (VM)**: republicar pelo VS (o glob Content copia KitLugia\ nova p/
+publicado) > copiar > TESTAR SHELL > o kit WPF deve abrir como GUI do WinPE (Dashboard
++ FileExplorer + Partitions + Shrink + InstallWindows + Tools = COMPLEMENTO do shell
+Explorer++). Se ainda nao abrir: ler C:\KitLugiaWinPE_crash.log (raiz do disco) - o
+crash-log diz exatamente onde morreu.
+
+### Sessao 11/08 (fim) - CANCELADO: kit DENTRO do WinPE NAO existe mais (framework-dependent de volta)
+
+Pedido do usuario: "cancele a ideia de colocar o kit dentro do winpe faca o programa
+a voltar a ser dependente de instalar o .net nao quero autocontained".
+
+**Reverso completo da ideia (nem o KitLugia.WinPE toolkit nem o KitLugia.GUI common
+entram no WIM)**:
+
+1. `KitLugia.Core\WinpeBuilder.cs`: `FindWinpeToolkitPublish` + `InjectWinpeToolkitIntoWimAsync`
+   (DISM mount/scratch FBWF 1024MB/wimlib fallback) + `CopyDirectoryFiltered` DELETADOS
+   (dead code). `FindExplorerPlusPlus`/`InjectExplorerPlusPlusIntoWimAsync` intocados
+   (Explorer++ continua sendo o shell do WinPE no TESTAR SHELL).
+2. `KitLugia.Core\WinbootManager.cs`: `TestShellStartnetCmd` de volta a Explorer++ ONLY
+   (bloco `if exist ...\KitLugia\KitLugia.GUI.exe` removido; o script nao lança mais nada
+   alem do Explorer++.exe); `ScheduleTestWinpeShell` sem a chamada `InjectWinpeToolkitIntoWimAsync`;
+   texto final "WinPE bootara com Explorer++ como file manager".
+3. `KitLugia.GUI\Pages\WinpeToolsPage.xaml.cs`: overlay de confirmacao do TESTAR SHELL
+   com 4 passos (Explorer++ + startnet + bootsequence) e aviso "sem kit interno".
+4. `KitLugia.GUI\KitLugia.GUI.csproj`: SEM glob de publish self-contained e SEM target
+   `EnsureWinpeToolkitPublish` (ficou so o Content do Explorer++.exe na raiz do kit).
+5. Perfis de publish do VS conferidos: FolderProfile (default) e FolderProfile3 (win-x64)
+   = `SelfContained=false` (framework-dependent); FolderProfile1 self-contained win-x86 e
+   perfil antigo nao usado. O kit publica dependente do .NET instalado, como sempre foi.
+
+**O que fica** (validado pelo usuario antes do cancelamento): Explorer++ (6MB) como file
+manager do WinPE no TESTAR SHELL, com shrink marker-only pendente rodando antes do shell.
+KitLugia.WinPE projeto (App fix + CrashLog) continua no repo sem uso/injecao - pode ser
+deletado se desejado.
+
+Build: Core 0 erros / 0 avisos; GUI 0 erros. Sem self-contained em lugar nenhum.
+
+### Sessao 11/08 (fim 2) - KitLugia.WinPE DELETADO do repo (projeto era lixo de IA antiga)
+
+Pedido do usuario: o projeto KitLugia.WinPE foi criado por uma IA antiga ("delirio"),
+ele nunca mexeu nele. Delecao completa:
+
+1. **Pasta `KitLugia.WinPE\` removida do repo** (projeto WPF inteiro: App/MainWindow/
+   Pages/Dashboard/Tools + CrashLog.cs + WinXShell ja deletados antes).
+2. **Explorer++ PRESERVADO**: movido para `KitLugia.GUI\Resources\App\Explorer++\`
+   (Explorer++.exe 6,2MB + History/License/Readme) - o glob `<Content Include="Resources\**\*">`
+   do GUI copia para `output\Resources\App\Explorer++\` na publicacao.
+3. `WinpeBuilder.FindExplorerPlusPlus`: candidatos KitLugia.WinPE\ removidos; dev path
+   agora `..\..\..\..\KitLugia.GUI\Resources\App\Explorer++\`; mensagem de log atualizada.
+4. `KitLugia.GUI.csproj`: Content Include explicito do Explorer++.exe (Link na raiz)
+   REMOVIDO - o glob Resources\**\* cobre (arquivo em Resources\App\Explorer++\ no output).
+5. `KitLugia.sln`: projeto KitLugia.WinPE removido (linha Project + 12 linhas de
+   ProjectConfigurationPlatforms do GUID {4CA25971-...}).
+
+Build solucao (Debug): 0 erros. Output do GUI validado: Resources\App\Explorer++\Explorer++.exe presente.
+
+### Sessao 12/08 - ISO Editor "so nativas": DISM 100% removido (wimlib + pnputil + $WinPEDriver$)
+
+Pedido do usuario: "aproveite uso somente coisas nativas para evitar usar as ferramentas
+ruins da microsoft que sao lentas" (pesquisa web incluida). O ISO Editor NAO usa mais DISM
+em nenhum fluxo:
+
+1. **AppX bloat sem DISM** (IsoEditorManager.RemoveProvisionedAppsNoMountAsync):
+   - wimlib ls "wim" idx "Program Files/WindowsApps/" lista as pastas de pacote
+     (parse: `<num>\t<path>`, nome = ultimo segmento; filtra nomes com '.')
+   - wimlib update --command-file deleta as pastas que casam prefixo_ (StartsWith)
+   - Hive SOFTWARE offline: extract via wimlib -> reg load -> delete AppxAllUserStore\
+     Applications\<fullname> + Application\<fullname> -> dd Deprovisioned\<fullname>
+     (marcador MS Learn que impede re-provisionamento em feature updates) -> unload ->
+     re-inject via wimlib update. Espelha 1:1 o Remove-AppxProvisionedPackage
+     (CleanupPackageFromPerMachineStore do AppxAllUserStore).
+2. **Drivers sem DISM**: export com pnputil /export-driver * "dir" (nativo, instantaneo)
+   + copia para $WinPEDriver$ na raiz da midia - o Setup.exe do WinPE varre recursivamente
+   os .inf e injeta no driverstore do OS instalado (metodo documentado MS Learn). SEM
+   tocar no boot.wim.
+3. **WinSxS**: wimlib optimize (reconstroi o WIM e remove espaco desperdicado dos updates)
+   - DISM /StartComponentCleanup /ResetBase era inutil em midia nova (nao ha WinSxS\Backup).
+4. **Scheduled tasks**: wimlib update delete de Windows/System32/Tasks/... (no-mount).
+5. **Modo profundo DISM DELETADO** (IsoEditorPage): sem MountWim/UnmountWim/
+   ApplyRegistryTweaks/InjectBootWimDrivers/DeleteScheduledTaskFiles (versoes de montagem);
+   fluxo UNICO no-mount com todas as opcoes (bloat, drivers, WinSxS, tasks, registry,
+   SetupComplete, ConX fix); UpdateModeHint = "Modo: NATIVO (wimlib + registro offline,
+   sem montar)".
+6. **Core limpo**: IsoEditorManager perdeu ~700 linhas de dead code DISM (MountWim/
+   UnmountWim/InjectDrivers/GetProvisionedApps/RemoveProvisionedApps/GetWindowsFeatures/
+   EnableFeature/DisableFeature/CleanupWinSxS/GetCapabilities/RemoveCapabilities/
+   GetPackages/RemovePackages/GetLanguages/RemoveLanguages/ExportToESD + parsers +
+   data models ProvisionedAppInfo/WindowsFeatureInfo). CleanupIsoEdit sem mountDir.
+
+Build: 0 erros / 108 avisos (baseline nullable GUI). docs/ISO_EDITOR_WIMLIB_PLAN.md
+atualizado com a secao "Sessao 12/08".
+
+**A TESTAR (VM/host)**: fluxo completo com bloat+drivers+WinSxS marcados (antes exigia
+montagem) - conferir no log: "wimlib update delete" das pastas, "Deprovisioned",
+"pnputil", "copiados para $WinPEDriver$", "WIM otimizado"; ISO final bootavel.
+### Sessao 12/08 (cont.) - BUGS do fluxo nativo CORRIGIDOS (teste real 13/08): 4 bugs de sintaxe wimlib
+
+Teste real (host, ISO 25H2): ISO criada com sucesso (7 GB, bootavel), mas registry/appx/tasks
+FALHARAM em silencio. Causa: a versao do wimlib embutida NAO suporta --command-file nem aceita
+destdir no extract (e o comando de listagem e dir, nao ls). Todos reproduzidos num WIM de
+teste descartavel e corrigidos (IsoEditorManager.cs):
+
+1. **--command-file= NAO existe** (usage: [--command=STRING] [< CMDFILE]): os 3 metodos
+   (InjectFilesIntoWimAsync, RemoveProvisionedAppsNoMountAsync, DeleteScheduledTaskFilesNoMountAsync)
+   passaram a usar **stdin redirect** via novo RunProcessCapturedWithStdin(filename, args, stdinContent)
+   (RedirectStandardInput; leitura assincrona de stdout/stderr para evitar deadlock de pipe).
+2. **extract WIM IMAGE PATH DEST NAO aceita destdir** (usage: extract WIMFILE IMAGE [(PATH | @LISTFILE)...]
+   com --dest-dir=CMD_DIR): destdir inexistente vira PATH PATTERN -> erro 49 "No matches".
+   Corrigido nos 2 metodos (ApplyRegistryEditsNoMountAsync + RemoveProvisionedAppsNoMountAsync):
+   extract "wim" idx "Windows/System32/config/software" --dest-dir="tmpDir". Nome do arquivo
+   local = ULTIMO SEGMENTO do path interno (ex: "system", "ntuser.dat") - antes era
+   hive.ToLowerInvariant() ("ntuser" vs arquivo "ntuser.dat").
+3. **ls NAO existe -> dir**: ListWindowsAppsFoldersAsync usava wimlib ls (exit != 0 ->
+   lista SEMPRE vazia -> bloat nunca removia). Agora dir "wim" idx --path="Program Files/WindowsApps/"
+   e o filtro mantem SO filhos DIRETOS (1 nivel abaixo do prefixo, sem backslash extra) -
+   elimina o bug 
+ame.Contains('.') que descartava todas as pastas de pacote (ex:
+   Clipchamp.Clipchamp_4.4.10720.0_neutral_split... tem '.').
+4. **Delete de PASTAS exige --recursive** no update (erro 32 "directory but a recursive delete
+   was not requested"): todos os updates de delete ganharam --recursive (pastas de pacote e
+   pastas de tasks tipo WindowsUpdate).
+5. Formato do command file: **aspas SAO delimitadores** (paths com espaco SEM aspas quebram o
+   parse: "Unexpected argument Files/WindowsApps/..."); paths internos do WIM podem usar / ou \.
+
+VALIDADO no WIM real (25H2, 6 GB, somente leitura): dir lista pacotes corretamente; extract do
+hive SOFTWARE -> 76,8 MB, exit 0. Build: 0 erros / 108 avisos (baseline).
+
+Sobre o Grok (13/08): acertou que --command-file nao existe (item 3 do checklist dele); o resto
+do argumento dele ("nao da para remover AppX sem DISM") NAO se aplica ao metodo usado: o
+Remove-AppxProvisionedPackage faz por baixo exatamente o que o kit faz (CleanupPackageFromPerMachineStore
+= deletar pasta WindowsApps + remover entrada Applications + criar marcador Deprovisioned, MS Learn).
+DISM so adiciona o registro em CBS/componentes, irrelevante para instalacao limpa. Drivers via
+$WinPEDriver$ e metodo MS oficial (o proprio Grok cita). O "Titus camada 3" (registro offline +
+delete de pastas + scripts FirstLogon) e exatamente a arquitetura do editor.
+
+**A TESTAR (host)**: rodar o fluxo completo de novo (bloat + tasks + registry marcados) e conferir
+no log: "Removendo N pasta(s)", "Deprovisioned", "Registry tweaks aplicados sem montar",
+"Deletando 10 scheduled task(s)", SetupComplete/ConX "injetado", "WIM otimizado".
+### Sessao 12/08 (cont.) - BUG: "edicao 4 invalida" ao re-rodar o fluxo (pasta persistente)
+
+Sintoma (host, 15:13): 2a execucao do fluxo nativo falhava com
+"wimlib export falhou (codigo 18): ERROR: '4' is not a valid image in
+...\iso_contents\sources\install.wim". O install.wim do iso_contents ja tinha
+SIDO exportado na rodada anterior (1 imagem), mas o codigo tentava exportar a
+edicao escolhida de novo.
+
+Causa raiz (IsoEditorPage.xaml.cs L349): lreadySingle usava _editions.Count
+(a analise da ISO ORIGINAL, sempre N edicoes) em vez de contar as imagens do
+ARQUIVO REAL em iso_contents (pasta persistente, pode estar processado).
+
+Correcao: apos localizar wimPath, o fluxo re-analisa o arquivo real com
+AnalyzeWimAsync(wimPath) (rapido, ~1-2s):
+1. ileImageCount = imagens do arquivo em iso_contents (nao do _editions).
+2. lreadySingle = !origIsEsd && fileImageCount == 1 (skip do export).
+3. Se fileImageCount == 1 e editionIndex > 1 -> loga "Usando edicao 1" e corrige.
+4. Se a re-analise falhar -> erro claro + CleanupIsoEdit (antes: export erro 18).
+
+Build: 0 erros. A re-analise roda em todo fluxo (ISO nova: N imagens -> export normal;
+reuso de pasta persistente: 1 imagem -> skip + tweaks na imagem 1).
+
+**A TESTAR (host)**: rodar o fluxo 2x seguidas na MESMA pasta de trabalho (2o run
+sem export, tweaks direto na imagem unica) e com ISO nova (export normal).
+### Sessao 12/08 (cont.) - Estilo Titus: ISO MONTADA + copia nativa (sem extrair com 7z)
+
+Pedido do usuario: "no chris titus o modo que ele faz ele nem extrai a iso ele so
+monta e ja vai direto" - o winutil ISO Creator usa Mount-DiskImage + Copy-Item do
+drive virtual (ISO UDF e cru, 7z so adiciona overhead de parsing).
+
+Correcoes (IsoEditorPage.xaml.cs):
+1. **CopyDirectoryAsync** (conteudo da ISO): agora MONTA a ISO via
+   IsoManager.MountIso(_isoPath) e copia o conteudo do drive com **robocopy
+   nativo** (/E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /MT:8, exit 0-7 = sucesso;
+   robocopy ja era o fallback do WinbootManager L1719), Dismount no finally.
+   7z so como FALLBACK se o mount falhar. Log: "Montando ISO e copiando conteudo
+   (estilo Titus, nativo)..."
+2. **ExtractInstallFileOnlyAsync** (analise): mesmo padrao - monta, copia
+   sources\install.wim/esd com File.Copy nativo, dismount; 7z seletivo so como
+   fallback.
+
+Build: 0 erros. Ganho: copia de ~10GB via robocopy do drive montado e muito
+mais rapida que a extracao 7z.
+
+**A TESTAR (host)**: rodar fluxo com pasta de trabalho VAZIA - conferir no log
+"ISO montada em X:\ e conteudo copiado (robocopy, codigo N)" e a ISO final OK;
+rodar de novo (reuso) - so "Conteudo da ISO ja extraido (reuso)."
+### Sessao 13/08 - PERFORMANCE do fluxo nativo: benchmark real + LZX default + optimize sem recompressao
+
+Pedido do usuario: "pesquise a fundo, estamos no .net10-windows deve ter ferramentas
+melhores" (no WinPE e rapido, no host o fluxo estava lento).
+
+**Pesquisa concluida**:
+- Nao existe WIM API nativa no .NET BCL nem via WinRT; WIMGAPI/DISM e o que o usuario
+  quer evitar (lento). wimlib (C nativo) e a ferramenta certa - o overhead de
+  Process.Start e ~10ms, irrelevante. ProcessStartInfo.ArgumentList seria cosmetico.
+- Benchmark REAL no WIM do usuario (6,04 GB, edicao 1, 13 GiB de file data):
+  - export --compress=lzms (default antigo): **153s** (2min33, log do usuario)
+  - export --compress=lzx: **86s** (1.8x mais rapido; +560 MB = 6605 vs 6040 MB)
+  - wimlib docs confirmam: optimize SEM --compress REUSA dados comprimidos (so remove
+    holes de appends/deletes); --compress=TYPE implica --recompress (WIM inteiro do
+    zero = minutos). --threads default = autodetect (processadores).
+
+**Correcoes (3)**:
+1. **ComboCompression default = LZX** (IsoEditorPage.xaml: SelectedIndex="1", texto
+   "LZX (balanceado, rapido - recomendado)"). LZMS fica como opcao (maxima reducao).
+2. **OptimizeWimAsync SEM --compress=lzms** (IsoEditorManager.cs): reconstrucao
+   estrutural (segundos) em vez de recompressao completa (~2.5min). A compressao ja
+   foi escolhida no export - recompressao e redundante. Comentario no metodo explica.
+3. **Timing por etapa** (IsoEditorPage.xaml.cs): Stopwatch do fluxo nativo
+   (flowSw) - mensagens do export/optimize anexam "(Ns de fluxo nativo)" e o fim
+   loga "Tempo total do fluxo nativo: Ns." - feedback real de onde o tempo vai.
+
+**Fluxo total estimado**: ~5min -> ~2min (robocopy + export LZX 86s + tweaks
+rapidos + optimize segundos + oscdimg 11s).
+
+**A TESTAR (host)**: fluxo completo com ChkCleanupWinSxS + strip marcados - log deve
+mostrar "WIM otimizado ... (Ns)" com N pequeno, "Tempo total do fluxo nativo" e a
+ISO final bootavel.
+### Sessao 13/08 (cont.) - Tasks: 25H2 NAO inclui mais as tasks de telemetria no WIM (fix delete)
+
+Sintoma (host, 15:44): fluxo rapido (LZX + optimize sem recompressao), mas aviso amarelo:
+"wimlib update delete de tasks falhou (codigo 49): Path
+\Windows\System32\Tasks\Microsoft\Windows\Application Experience\Microsoft Compatibility
+Appraiser does not exist in WIM image 1".
+
+Causa raiz (PROVADO via dir no WIM real 25H2): Tasks\Microsoft\Windows so tem 6 pastas
+(DeviceLicensingService, PLA, RemoteApp and Desktop Connections Update, SyncCenter,
+TaskScheduler, WCM) - a Microsoft REMOVEU do WIM as tasks de telemetria (Application
+Experience/Compatibility Appraiser, CEIP, Chkdsk Proxy, WER, InstallService,
+UpdateOrchestrator, UpdateAssistant, WaaSMedic, WindowsUpdate). O wimlib update ABORTA
+no 1o path ausente (codigo 49) e NADA era deletado -> aviso.
+
+Correcao (IsoEditorManager.DeleteScheduledTaskFilesNoMountAsync): mesmo padrao do bloat -
+lista antes com dir "wim" idx --path="/Windows/System32/Tasks" (1 chamada barata),
+filtra os targets que EXISTEM (igual ou prefixo com /), deleta so os existentes; se
+nenhum existe retorna sucesso "esta versao ja nao as inclui". Log: "Deletando N
+scheduled task(s) existente(s) (M ja ausentes nesta versao)...".
+
+Build: 0 erros. Na pratica: 25H2 = nada a deletar (mensagem informativa, sem aviso).
+
+**A TESTAR (host)**: re-rodar o fluxo - o bloco de tasks deve logar "Deletando 0..." ou
+"Nenhuma das 10 task(s) alvo existe no WIM" SEM aviso amarelo; ISO final ok.
+
+### Sessao 13/08 (cont.) - ISO Editor: UI no estilo kit novo + bloat 42 (Titus) + PID.txt + cancelamento
+
+Pedido do usuario: "pode melhorar tudo que for possivel ai apos você terminar quero que
+ajeite a escala da ui e os botões para ficarem no mesmo estilo do kit mais novo e tambem
+pegar a tela de loading nova que mostra informações em tempo real da pagina do winpepage
+shrinkpage... no winboot a tela de seleção esta um pouco melhor que a nossa de agora no
+kit iso editor".
+
+**UI (IsoEditorPage.xaml)**:
+1. **OverlayBusy reescrito no padrao WinpeToolsPage/UpdatePage** (antes: barra
+   indeterminada + 1 texto): Border #1A1A1A CornerRadius 12 Width 540 borda #FFD700 +
+   DropShadowEffect; titulo dourado (TxtOpTitle); **barra de progresso REAL** (ProgressFill
+   #FFD700 + TxtProgressPercent); TxtProgressStep (passo, dourado) + TxtProgressStatus
+   (status curto, wrap); **log detalhado scrollavel** (TxtOpDesc Consolas, inlines coloridos
+   erro/ok/info) com "Copiar log" (TxtCopyOpLog_MouseDown -> Clipboard); warning de acao
+   critica; botao CANCELAR (cancela entre etapas).
+2. **OverlayConfig no estilo kit novo** (referencia WinbootPage): Background
+   CardBackground + BorderBrush AccentColor + CornerRadius 15 + DropShadowEffect
+   (antes #1E1E1E borda dourada 2px); botao CANCELAR -> SecondaryButtonStyle; botao
+   INICIAR AGORA -> GoldButtonStyle (Height 38); botoes Selecionar/Desmarcar Todas ->
+   SecondaryButtonStyle (antes Background inline).
+3. **Footer**: BtnCleanup/BtnBack/BtnCreate todos com Height 38 + estilos padrao
+   (Secondary/Gold).
+4. **Textos desatualizados corrigidos**: "CUSTOMIZACAO PROFUNDA (DISM MOUNT - LENTO
+   20-40min)" -> "CUSTOMIZACAO (wimlib + pnputil - SEM MONTAR)" (verde); ChkCleanupWinSxS
+   "Limpar WinSxS com /ResetBase" -> "Otimizar WIM (wimlib optimize)"; ChkDebloatPreset
+   "Remove 20+" -> "Remove 40+"; descricao dos drivers ($WinPEDriver$).
+
+**Core (IsoEditorPage.xaml.cs)**:
+5. **Bloat expandido para 42 prefixos** (estilo Chris Titus/winutil 2026): adicionados
+   Microsoft.Copilot, Microsoft.549981C3F5F10 (Cortana), Microsoft.MicrosoftTeams,
+   Microsoft.People, Microsoft.WindowsCommunicationsApps, Microsoft.Getstarted,
+   Microsoft.WindowsAlarms, Microsoft.WindowsCalculator, Microsoft.WindowsCamera,
+   Microsoft.WindowsClock, Microsoft.WindowsMaps, Microsoft.WindowsPhotos,
+   Microsoft.WindowsScan, Microsoft.ScreenSketch, Microsoft.MixedReality.Portal,
+   Microsoft.Wallet, Microsoft.PPIProjection, Microsoft.Windows.Phone (Phone Link),
+   Microsoft.YourPhone, Microsoft.XboxApp, Microsoft.XboxGamingOverlay,
+   Microsoft.XboxIdentityProvider, Microsoft.XboxSpeechToTextOverlay. (Fora: Edge,
+   Notepad, Terminal, OneDriveSync - uso comum.)
+6. **PID.txt stale removido** (com ChkDisableSponsoredApps): midia modificada + PID.txt
+   original pode dar erro de PID no setup (Titus deleta).
+7. **Progresso por etapa mapeado** (SetBusyStatus(status, pct, label)): analise 3-6,
+   copiar conteudo 8, export 18, registry 35, bloat 45, tasks 50, drivers 55,
+   SetupComplete 60, ConX 63, optimize 70, KitLugia 75, ISO final 85, sucesso 100
+   (overlay fica aberto atras do MessageBox de sucesso mostrando a barra cheia).
+8. **Cancelamento entre etapas** (_cts + CheckCancelled em 6 pontos: apos copiar,
+   registry, bloat, tasks, drivers): CANCELAR para o proximo checkpoint, loga
+   "Operacao cancelada pelo usuario" e fecha o overlay.
+9. **AddLog alimenta o overlay** (AddOpLog com cores erro/ok/info + scroll automatico).
+10. Helpers novos: ShowBusy(title) (zera overlay), SetBusyStatus, CheckCancelled,
+    AddOpLog, ScrollOverlayToBottom, IsErrorText, BtnCancelOp_Click,
+    TxtCopyOpLog_MouseDown (System.Windows.Clipboard qualificado - ambig. WinForms).
+    Usings: + System.Windows.Documents, System.Threading.
+11. **Análise SEM extração** (feedback do usuário: "por que extrair primeiro o
+    install.wim?"): novo AnalyzeIsoMountedAsync - monta a ISO e roda wimlib info
+    direto no sources\install.wim/esd do drive virtual (estilo Titus de verdade,
+    sem copiar 7GB); usado no BtnAnalyzeIso_Click e na análise automática do
+    BtnConfirmStart_Click; 7z seletivo fica só como fallback (mount falhou).
+    Antes: ~17s de extração 7z; agora: mount + wimlib info + dismount (~2-3s).
+
+Build: 0 erros / 108 avisos (baseline nullable GUI).
+
+**A TESTAR (host)**: rodar fluxo completo - overlay com barra real + passos + log em
+tempo real; CANCELAR no meio -> para apos a etapa; "Removendo 42 AppX provisionados";
+"PID.txt removido"; OverlayConfig no novo estilo; ISO final bootavel.
+
+### Sessao 13/08 (cont.) - CAUSA RAIZ do fallback 7z: drive com barra dupla (E\:\)
+
+Sintoma (host, 19:33): "Análise rápida - montando ISO e lendo sources\install.* direto
+do drive (estilo Titus, sem extrair)..." e logo "Fallback: extraindo apenas sources\
+install.* da ISO com 7z..." - o mount SEMPRE caia no fallback, mas o robocopy/fluxo
+completo funcionava (ou o reuso de pasta mascara o mount).
+
+Causa raiz: IsoManager.MountIso retorna DriveLetter como \"E:\\\" (letra + dois pontos +
+barra). Os 3 consumidores faziam drive.TrimEnd(':') -> \"E\\\" -> montavam
+$"E\:\" (barra INVERTIDA antes dos dois pontos = caminho invalido): File.Exists
+sempre falso, robocopy com source invalido (caia no fallback 7z silenciosamente).
+O mount em si SEMPRE funcionou - o path derivado e que era lixo.
+
+Correcao (IsoEditorPage.xaml.cs, 3 pontos): drive.TrimEnd('\\', ':') + ":\\" -
+remove barra e dois pontos e garante \"E:\" (aceita \"E\", \"E:\" ou \"E:\\\").
+Locais: AnalyzeIsoMountedAsync (~L154), ExtractInstallFileOnlyAsync (~L200),
+CopyDirectoryAsync (~L910).
+
+Build: 0 erros / 108 avisos (baseline).
+
+**A TESTAR (host)**: rodar fluxo com pasta de trabalho VAZIA - log deve mostrar
+\"Lendo E:\sources\install.wim direto do drive montado...\" (analise em ~2-3s sem 7z)
+e \"ISO montada em E:\ e conteúdo copiado (robocopy...)\" (copia nativa, sem 7z);
+fluxo completo ~2min.
+
+### Sessao 13/08 (cont.) - Otimizacoes finais: hives em paralelo + skip optimize em reuso + rodela Win11
+
+**TESTADO pelo usuario (19:42)**: log real \"Lendo E:\sources\install.wim direto do
+drive montado...\" - analise em ~2-3s SEM 7z; fluxo completo 12s; ISO criada.
+Usuario: \"velocidade esta otima\". Log 19:16 mostrou 324 arquivos na ISO (vs 1048
+antes) - nao investigado.
+
+1. **Rodela Win11 no OverlayBusy** (IsoEditorPage.xaml): 5 ellipses #FFD700 7x7 com
+   TranslateTransform (circulo raio 16), Grid 44x44 com RotateTransform + Storyboard
+   Loaded 0->360 1.4s Forever (template do AppsPage). Posicao final apos 3 ajustes:
+   **linha propria do Grid** (RowDefinitions Auto/Auto; conteudo na Row 0, rodela na
+   Row 1 com HorizontalAlignment Right + VerticalAlignment Center, Margin 0,10,14,0) -
+   nunca sobrepoe o texto vermelho nem o botao CANCELAR.
+
+2. **Registry hives EM PARALELO** (IsoEditorManager.ApplyRegistryEditsNoMountAsync):
+   foreach sequencial substituido por funcao local ProcessHiveAsync + Task.WhenAll
+   (1 Task por hive: SOFTWARE/SYSTEM/DEFAULT/NTUSER). Seguro: hives diferentes usam
+   chaves HKLM\z{...} e arquivos locais diferentes; listas reInject/applied protegidas
+   com reInjectLock/appliedLock; re-injecao unica no final (InjectFilesIntoWimAsync).
+   CUIDADO CS0136: listas declaradas 2x (fora e dentro do try) quebraram o build -
+   so declarar dentro do try. Ganho ~7s -> ~2-3s.
+
+3. **Skip do optimize em reuso** (IsoEditorPage.xaml.cs): wimSizeBeforeTweaks capturado
+   apos o export (baseline do WIM cru); no bloco do ChkCleanupWinSxS, se o tamanho
+   atual == baseline (reuso puro: tweaks sem re-inject/bloat inexistente/tasks ja
+   ausentes), pula com log \"WIM inalterado nesta rodada (reuso) - optimize desnecessario,
+   pulando.\" - evita reconstrucao estrutural inutil em rodadas repetidas.
+
+Build: 0 erros / 108 avisos (baseline).
+
+**A TESTAR (host)**: rodar fluxo 2x seguidas - 2a rodada com log do skip do optimize
+(e \"Registry tweaks aplicados sem montar (SOFTWARE, SYSTEM...)\" mais rapido, hives
+paralelos); rodada 1 completa inalterada.
+
+
+### Sessao 13/08 (fim) - BOOT DIRETO NO INSTALADOR: botao na WinpeToolsPage (testar ISOs sem particoes)
+
+Pedido do usuario: "se da para dar boot no winpe da para dar boot direto no arquivo de install
+do windows?" -> resposta: install.wim NAO e bootavel; boot.wim index 2 (Setup) e. Implementado
+botao BOOT INSTALADOR no card 1 da WinpeToolsPage (verde, entre TESTAR SHELL e REMOVER):
+o PC reinicia direto no Windows Setup da ISO selecionada - sem criar particoes nem abrir o
+WinPE comum (util para testar ISOs).
+
+**Pesquisa confirmada**: boot.wim sozinho nao basta ("A required CD/DVD drive device is missing" -
+os arquivos do instalador NAO estao dentro do boot.wim); o setup.exe varre TODOS os volumes
+procurando `\Sources\install.wim` na RAIZ de cada drive (winsetup.dll GetLogicalDriveStringsW);
+metodo emacsos/winutil: copiar Sources p/ disco + ei.cfg. Solucao usada: /installfrom (doc MS).
+
+**Core (WinbootManager.cs)**:
+1. Const nova `InstallerBcdGuid = "{5b7d9f1e-3c4a-4e6b-8d2f-9a1c2b3d4e5f}"` (ao lado de
+   TestShellBcdGuid L5608) - GUID fixo, entrada unica, nao acumula no menu.
+2. `ScheduleBootInstallerAsync(string isoPath)` (novo, depois de ScheduleTestWinpeShell):
+   1. Monta a ISO (IsoEditorManager.MountIso - estilo Titus) e copia `Sources\` INTEIRO para
+      C:\KL_WINPE\InstallISO\Sources\ via robocopy /E /MT:8 (o WinPE e outro ambiente: a
+      montagem do host nao persiste no boot). boot.sdi: o da ISO; fallback C:\KL_WINPE\boot.sdi.
+      Dismount no finally.
+   2. `AnalyzeWimAsync(sources\boot.wim)` exige >= 2 imagens; `ExportSingleEditionAsync(idx 2,
+      compress=lzx)` -> C:\KL_WINPE\installer_boot.wim UNICO (elimina ambiguidade de indice
+      no boot ramdisk: o bootmgr nao tem indice no BCD; com 1 imagem, qualquer escolha = Setup).
+   3. install.wim: se a ISO so tem install.esd, renomeia para install.wim (ESD = WIM solid,
+      formato detectado pelo conteudo - /installfrom aceita).
+   4. winpeshl.ini custom injetado na imagem (InjectFilesIntoWimAsync idx 1, ASCII):
+      `[LaunchApps]` + `%SystemDrive%\sources\setup.exe, /installfrom:C:\KL_WINPE\InstallISO\Sources\install.wim`
+      (formato de args com virgula = mesmo do fix ConX /legacy do IsoEditor - comprovado).
+   5. CreateRamdiskEntry(fixedGuid: InstallerBcdGuid) + bootsequence one-time + fallback
+      displayorder + reboot 10s (mesmo padrao do ScheduleTestWinpeShell).
+
+**GUI (WinpeToolsPage)**: botao `BtnBootInstaller` (SecondaryButtonStyle verde #88FFAA/#225522,
+Width 112, WrapPanel do card 1) + `BtnBootInstaller_Click` (OpenFileDialog .iso -> ShowBusy com
+5 passos + aviso "Requer ~10 GB livres em C:" -> Task.Run ScheduleBootInstallerAsync -> ShowBusyResult).
+
+Build: 0 erros / 0 avisos (incremental Core+GUI).
+
+**A TESTAR (VM)**: WinpeToolsPage -> BOOT INSTALADOR -> selecionar ISO -> log: monta, robocopy
+Sources, export idx 2 lzx, winpeshl.ini /installfrom injetado, bootsequence -> reboot 10s ->
+Windows Setup abre direto em modo grafico (sem pedir midia). Se pedir midia: verificar
+install.wim em C:\KL_WINPE\InstallISO\Sources\ e o winpeshl.ini injetado no installer_boot.wim.
+
+### Sessao 14/08 - BUG 0xc0000487 no BOOT INSTALADOR: causa raiz = WIM exportado sem flag bootable
+
+**Sintoma (teste real, ISO 25H2)**: fluxo inteiro OK no log (robocopy code 1, export 2s,
+injeção 1s, BCD {5b7d9f1e-...} + bootsequence code 0) mas o boot falhava rápido com:
+`Arquivo: \windows\system32\boot\winload.efi / Status: 0xc0000487` ("arquivo necessário
+ausente ou com erros").
+
+**Causa raiz (confirmada por pesquisa web)**: o mesmo erro EXATO aparece no issue
+microsoft/Windows-Containers#494 quando se boota um WinPE recapturado/exportado SEM o
+flag bootable. A doc WDS confirma: "A RAMDISK boot image must be... explicitly marked as
+being able to boot from RAMDISK (/boot option in ImageX)". O `ExportSingleEditionAsync`
+rodava `wimlib export` SEM `--boot` -> o WIM destino ficava com BootIndex=0 no header
+(offset 0x34) -> bootmgr não descobre a imagem ao montar o ramdisk -> winload.efi "ausente".
+
+**CORRECAO (2 arquivos)**:
+1. `IsoEditorManager.ExportSingleEditionAsync` ganhou param `bool markBootable = false`:
+   quando true, o comando vira `export "src" N "dst" --compress=X --boot` (o wimlib
+   bundled suporta --boot: "Mark the exported image as the bootable image of the WIM").
+   Chamadores existentes (ISO Editor) não mudam (default false).
+2. `WinbootManager.ScheduleBootInstallerAsync` passa `markBootable: true` + verificação
+   de header pós-export: lê 4 bytes em 0x34 do installer_boot.wim e loga
+   "Verificacao WIM exportado: N imagem(ens), BootIndex=X (com --boot deve ser 1)" -
+   evidência direta no log do próximo teste (sem precisar inspecionar o arquivo).
+
+Build: 0 erros / 108 avisos (baseline). Obs: C:\KL_WINPE\installer_boot.wim e
+C:\KL_WINPE\InstallISO\ não existiam mais no host na hora do diagnóstico (limpos) -
+a verificação de header embutida resolve isso nas próximas rodadas.
+
+**A TESTAR (VM)**: BOOT INSTALADOR de novo -> log deve mostrar "BootIndex=1" na
+verificação -> reboot -> Setup da ISO abre direto (sem 0xc0000487 e sem pedir midia).
+
+### Sessao 14/08 (cont.) - BUG 2 do BOOT INSTALADOR: setup.exe nao achava install.wim (letra de drive)
+
+**Sintoma (teste real do usuario)**: com o 0xc0000487 resolvido, o WinPE bootava e o
+Setup da ISO ABRIA, mas com erro: "O Windows não pôde coletar informações de [OSImage]
+já que o arquivo de imagem especificado [C:\KL_WINPE\InstallISO\Sources\install.wim]
+não existe" (splash "A instalação está sendo iniciada" visível).
+
+**Causa raiz**: o winpeshl.ini injetado hardcodava `C:\KL_WINPE\InstallISO\Sources\install.wim`,
+mas as letras de drive do WinPE NAO sao as mesmas do host (lição antiga do kit: shrink e
+fresh install usam scan de drives justamente por isso) - o drive com o KL_WINPE pode ser
+D:, E:, etc. no ambiente do Setup.
+
+**CORRECAO (2 arquivos, winpeshl.ini -> startnet.cmd com scan de drives)**:
+1. `IsoEditorManager.InstallSetupStartnetAsync` (novo): instala um startnet.cmd na imagem
+   (index) via wimlib update com stdin e REMOVE o winpeshl.ini existente se a imagem tiver
+   (dir check por substring "winpeshl.ini" antes) - o winpeshl.exe so executa o startnet.cmd
+   quando NAO ha winpeshl.ini, e a imagem de Setup da midia tem um proprio.
+2. `WinbootManager.ScheduleBootInstallerAsync` (passo 4): gera startnet.cmd ASCII que
+   varre as letras `for %%d in (Z Y W V U T R Q P O N M L K J I H G F E D C)` procurando
+   `%%d:\KL_WINPE\InstallISO\Sources\install.wim` (fallback install.esd -> ISOFILE) e
+   lanca `start "" "%SystemDrive%\sources\setup.exe" /installfrom:%ISODRV%:\KL_WINPE\InstallISO\Sources\%ISOFILE%`
+   com log persistente `%ISODRV%:\KL_WINPE\installer_boot_log.txt`; sem encontrar -> log
+   em %SystemDrive% e setup sem /installfrom.
+
+**QUIRK cmd.exe descoberto na validacao (falso alarme)**: `if exist "%%d:\..."` dentro de
+bloco for NAO falha com lista grande - o teste inicial usava lista C..S e subst em Z:, a
+lista simplesmente nao continha Z (o script estava certo). SEM delayed expansion necessario:
+o bloco `if defined ISODRV` e parseado DEPOIS do for, entao `%ISODRV%` ja tem o valor final
+(parse-time expansion ok). Nao usar `setlocal EnableDelayedExpansion` em scripts com
+`if exist "%%d:\..."` - testado quebra o match (T1/T2/T3/diag5).
+
+**VALIDADO localmente (host, subst Z: + fakes)**: scan acha Z:, log
+"install.wim encontrado em Z: - iniciando Setup" em Z:\KL_WINPE\installer_boot_log.txt,
+setup chamado com /installfrom:Z:\...\install.wim (marcador TESTE_OK), else branch correto
+com lista sem o drive. Build: 0 erros / 108 avisos (baseline). Lixo do teste removido.
+
+**A TESTAR (VM)**: BOOT INSTALADOR -> log do host com "BootIndex=1" -> reboot -> o
+startnet.cmd varre as letras, escreve installer_boot_log.txt na raiz do drive com o
+KL_WINPE e o Setup abre com o install.wim localizado (sem erro de OSImage). Se o drive
+ganhar outra letra, o scan cobre (Z..C).
+
+### Sessao 14/08 (cont. 2) - BUG 3 do BOOT INSTALADOR: Setup sem discos = faltava wpeinit
+
+Sintoma (teste real do usuario): com o 0xc0000487 e o OSImage resolvidos, o Setup ABRIA
+(startnet.cmd rodou, /installfrom funcionou) mas mostrava "Instalar driver para mostrar o
+hardware" / "Um driver de midia necessario para o computador esta ausente" com tabela vazia
+- ZERO discos (VMware: Virtual SAS 64GB + Virtual NVMe 130GB).
+
+Causa raiz (PROVADA com o boot.wim real da ISO 25H2 no host):
+1. O startnet.cmd ORIGINAL da midia 25H2 (extraido de sources\boot.wim idx 2) e
+   literalmente `wpeinit` (1 linha). O InstallSetupStartnetAsync o SOBRESCREVEU com o
+   script de scan - removendo a inicializacao do PnP.
+2. Sem wpeinit: o PnP/DeviceInstaller nunca roda, stornvme/lsi_sas nao carregam -> o
+   Setup (um exe normal) abre mas nao enxerga NENHUM disco.
+3. Os outros 3 geradores JA chamavam wpeinit (RamdiskStartnetCmd L5080, TestShellStartnetCmd
+   L5627, RamdiskReinstallPreserveStartnetCmd L6578) - o startnet.cmd do boot instalador
+   era o UNICO sem.
+
+Verificacoes no host (ISO Win11_25H2_BrazilianPortuguese_x64_v2 (2).iso, 7,61 GB):
+- wimlib info: imagem 2 = "Microsoft Windows Setup (amd64)", Boot Index 2.
+- Export --compress=lzx --boot (args identicos ao fluxo): EXIT 0, Boot Index 1, 1 imagem,
+  610 MB, 21248 arquivos / 5470 dirs.
+- wimlib dir idx 2 original vs idx 1 exportado: winpeshl/startnet IDENTICOS (a midia NAO
+  tem winpeshl.ini - so winpeshl.exe + startnet.cmd); DriverStore 1293 linhas nos DOIS
+  (conteudo preservado - teoria de driverstore descartada).
+- startnet.cmd original extraido = "wpeinit" (prova definitiva).
+- Script do scan (com delayed expansion) re-testado no host com subst Z:: acha o
+  install.wim, ISODRV=Z, log correto - o scan estava OK (nao mexido).
+
+Correcoes (WinbootManager.cs):
+1. startnet.cmd do boot instalador: `wpeinit` adicionado no topo (apos os rems, antes do
+   setlocal) com comentario - sem ele o Setup nao ve nenhum disco.
+2. Verificacao de header pos-export CORRIGIDA (era bogus): lia 4 bytes em 0x30/0x34 do
+   header (lixo - 0x30-0x37 e o QWORD de lookup table offset; BootIndex NAO existe no
+   header fixo) e logou "692500 imagem(ens), BootIndex=33554432" sem significado. Agora
+   le o XML data (offset QWORD em 0x38, tamanho em 0x40) e Regex `<BOOTINDEX>N</BOOTINDEX>`:
+   loga "BootIndex=N (via XML; com --boot deve ser 1)" ou aviso de BOOTINDEX ausente.
+3. Doc comment do passo 4 atualizado (midia usa startnet.cmd=wpeinit, nao winpeshl.ini).
+
+Build: 0 erros / 108 avisos (baseline).
+
+**A TESTAR (VM)**: BOOT INSTALADOR de novo -> log "BootIndex=1 (via XML...)" -> reboot ->
+wpeinit roda (~5-10s) -> Setup abre com os DOIS discos (SAS + NVMe) na tela de selecao.
+
+### Sessao 14/08 (cont. 4) - Zero discos no Setup: BOOTINDEX era falso alarme + startnet auto-diagnostico
+
+Sintoma (VM, 17:08): apos o fix do wpeinit, o Setup ABRE mas mostra "Instalar driver para
+mostrar o hardware" / "Erro: nenhum driver foi encontrado" com ZERO discos (VMware: Virtual
+SAS 64GB + Virtual NVMe 130GB). Causa raiz ainda NAO encontrada - evidencias coletadas no host:
+
+1. **BOOTINDEX "ausente" = FALSO ALARME (provado)**: o wimlib 1.14.5 NAO grava `<BOOTINDEX>`
+   no XML mesmo com `--boot` (verificado: export com --boot -> XML 692.500 bytes, sem a
+   substring; `wimlib info` ainda reporta "Boot Index: 1"). O boot funciona independente.
+   CORRECAO: verificacao pos-export agora usa `wimlib info` (regex "Boot Index: N") em vez
+   de ler o XML (WinbootManager.cs L~5924). Core 0 erros / 0 avisos.
+
+2. **idx 1 vs idx 2 IDENTICOS no que importa**: wpeinit.exe, winpeshl.exe e startnet.cmd
+   com SHA256 identicos entre o idx 1 (WinPE generico) e o idx 2 (Setup) da midia; hive
+   SYSTEM Setup identico nos 2 (CmdLine=winpeshl.exe, SetupType=0x1, SystemSetupInProgress=0x1,
+   AllowStart com PlugPlay/Power/RPCSS/EventLog). Zerar SetupType NAO diferencia nada.
+
+3. **DriverStore idx 2 preservado** no export (1293 entradas) contem stornvme/nvmedisk/
+   c_nvmedisk/pvscsii/lsi_sas/arcsas/itsas35i - os drivers de storage ESTAO la.
+
+4. **boot.sdi da midia = \boot\boot.sdi (3.170.304 B), NAO sources\** - e o codigo JA usa
+   o correto (ScheduleBootInstallerAsync L~5890: isoDrive + "boot\\boot.sdi" -> installer_boot.sdi;
+   fallback C:\KL_WINPE\boot.sdi). O X: monta com o boot.sdi da propria midia. NAO e o problema.
+
+5. **startnet.cmd original da midia idx 2 = literalmente 'wpeinit'** (9 bytes); sem winpeshl.ini
+   no WIM inteiro (so winpeshl.exe + .mui). Web (osdeploy): o winpeshl.exe faz "Beginning PNP
+   initialization" e o startnet.cmd roda depois - o nosso startnet chama wpeinit de novo (OK).
+
+**NOVO: startnet.cmd auto-diagnostico** (o proximo teste responde sozinho):
+- `set WPEINIT_RC=%errorlevel%` logo apos o wpeinit (captura o exit code do PnP).
+- Dentro do bloco `if defined ISODRV`: roda `diskpart /s` com "list disk" e grava a saida
+  NO installer_boot_log.txt (responde a pergunta decisiva: o WinPE VE os discos?).
+- Copia `wpeinit.log` e `winpeshl.log` para `!ISODRV!:\KL_WINPE\` (o PnP do WinPE loga
+  X:\Windows\System32\wpeinit.log - se o DeviceInstaller falhou, esta la).
+- Regras cmd.exe respeitadas: sem parenteses em echo de blocos, ASCII puro.
+
+**VALIDADO localmente (host, com subst Z: + fakes)**: parse sem "inesperado"; ISODRV=Z
+encontrado; WPEINIT_RC=9009 capturado (wpeinit nao existe no host - valida a captura);
+diskpart list disk real logado (Disco 0 465GB / Disco 1 3726GB); setup fake lancado com
+`/installfrom:Z:\KL_WINPE\InstallISO\Sources\install.wim` (TESTE_OK). Lixo do teste limpo.
+
+Build: Core 0 erros / 0 avisos. GUI: MSB3021 (app aberto) - compilar/publicar com app fechado.
+
+**A TESTAR (VM)**: BOOT INSTALADOR -> reboot -> Setup abre (com ou sem discos) -> reboot de
+volta -> mandar os 3 artefatos do drive do KL_WINPE: installer_boot_log.txt (diskpart list
+disk dentro!), wpeinit.log e winpeshl.log. Se diskpart listar os 2 discos -> problema e do
+SETUP (nao do WinPE); se listar 0 -> PnP do WinPE falhou (wpeinit.log diz o motivo).
+
+
+### Sessao 14/08 (cont. 5) - CAUSA RAIZ do "zero discos": shim setup.exe da raiz do WIM (analise binaria)
+
+**Sintoma (VM 17:37)**: apos o fix do wpeinit, o Setup ABRE mas a tela de selecao de disco mostra ZERO discos. Novas evidencias do usuario: (a) BootIndex=1 confirmado via wimlib info (verificacao nova funcionou); (b) o dialogo "Procurar" do proprio Setup lista TODOS os discos com letras/arquivos -> o WinPE VE os discos; o problema e o Setup NAO enumera-los na tela; (c) Setup "pula direto pra ultima parte" (sem telas de idioma) - /installfrom provavelmente passou.
+
+**Analise binaria da midia 25H2 (ISO montada, winpeshl.exe + wpeinit.exe + setup.exe da raiz extraidos do idx 2 via wimlib)**:
+
+1. **winpeshl.exe** (61.440 B, strings ASCII + UTF-16): importa `WpeInitializeDriversOfClass` (WpeUtil.dll) e `CreateProcessW`; SEM winpeshl.ini ele: (a) "Beginning PNP initialization" numa thread; (b) tenta `%SystemDrive%\$Windows.~BT\sources\setup.exe`; (c) tenta **`%SystemDrive%\setup.exe`**; (d) fallback `cmd.exe /k startnet.cmd`. Tambem: `Global\EVENT_WINPE_REMSTOR`, `DisableRemovableStorageInit`, `%windir%\Setup\Scripts\disablecmdrequest.tag`, WallpaperHost.
+
+2. **wpeinit.exe** (61.440 B): NAO lanca setup - so unattend/SMI (windowsPE pass, smiengine.dll). Descartado como launcher.
+
+3. **idx 2 TEM `\setup.exe` NA RAIZ (333.256 B - o SHIM)** alem de `sources\setup.exe` (wimlib dir confirmou: raiz = Program Files(x86)/ProgramData/setup.exe/sources/Users/Windows). O winpeshl lanca o shim da raiz - e o shim prepara o ambiente do Setup:
+   - `PrepareVolumeAccessPath`/`CreateVolumeAccessPath`/`ReleaseVolumeAccessPath` com `DefineDosDevice` (da LETRAS TEMPORARIAS a volumes sem letra; "No free drive letters to use!")
+   - `\\?\PHYSICALDRIVE%d`, `GetSystemDiskNumber`, `\Device\Harddisk%d`, `Partition` (enumera discos fisicos e acha o disco do sistema)
+   - `ORIGINAL_SETUP_WORKINGDIR_ENV_VAR`, mutex `Global\Microsoft.Windows.Setup` + `Microsoft.Windows.Setup.Local`, `FirstUX` (UI "Primeira UX"), `WinSetup.dll`
+   - `/%s /%s:%s /%s:"%s" %s` + `durestart` + `$WINDOWS.~BT`/`BTFolderPath`/`OSImagePath`/`boot.wim`: o shim RELANCA o sources\setup.exe repassando args (formato par:valor; /installfrom e arg WDS aceito - a ajuda lista "see the Windows Deployment Services documentation")
+   - Ajuda propria: /auto /quiet /installdrivers /noreboot /installlangpacks /showoobe /unattend /postoobe /copylogs /pkey /addbootmgrlast /Compact /imageindex + debug (1394debug/debug/emsport/usbdebug/netdebug/busparams)
+
+**CONCLUSAO (causa raiz)**: na midia real o fluxo e winpeshl -> X:\setup.exe (shim) -> shim prepara ambiente (volume access paths, disco do sistema, env vars, mutex) -> relanca sources\setup.exe. O nosso startnet.cmd lancava `%SystemDrive%\sources\setup.exe` DIRETO, pulando o shim -> Setup abria CRU, sem o ambiente de enumeracao de discos -> "zero discos" na tela (apesar do WinPE ver os discos).
+
+**CORRECAO (WinbootManager.cs, ScheduleBootInstallerAsync)**: o launch agora e o SHIM da raiz:
+- `start "" "%SystemDrive%\setup.exe" /installfrom:!ISODRV!:\KL_WINPE\InstallISO\Sources\!ISOFILE!` (e no else: `start "" "%SystemDrive%\setup.exe"` sem /installfrom).
+- Doc comment e Log atualizados (explicam o shim e a cadeia winpeshl->shim->sources). winpeshl.ini NUNCA existiu no idx 2 (so winpeshl.exe + .mui; startnet.cmd = 'wpeinit' 9 B confirmado de novo byte a byte 77 70 65 69 6E 69 74 0D 0A).
+- Fix CS8604: verificacao do BootIndex (wimlib info) envolta em null-check do FindBundledWimlib.
+
+**Overlay da GUI (WinpeToolsPage)**: passo 4 atualizado ("Injetar startnet.cmd que lanca o shim setup.exe da raiz (fluxo nativo da midia) com /installfrom"; passo 3 com --boot).
+
+**VALIDADO (host)**: script regenerado com subst Z: + fakes - parse sem "inesperado", ISODRV=Z encontrado, WPEINIT_RC=9009 (wpeinit nao existe no host), comando gerado exato: `start "" "%SystemDrive%\setup.exe" /installfrom:Z:\KL_WINPE\InstallISO\Sources\install.wim` (no WinPE %SystemDrive% = X:). ISO desmontada e lixo do teste limpo. Builds: Core 0 erros / 0 avisos; GUI 0 erros (incremental Core+GUI; MSB3021 se app aberto).
+
+**A TESTAR (VM)**: BOOT INSTALADOR de novo -> Setup deve abrir COM a tela de selecao de disco listando os 2 discos (SAS + NVMe) - o shim prepara a enumeracao. Se o shim reclamar do /installfrom: alternativa ja mapeada - copiar install.wim para !ISODRV!:\sources\install.wim (raiz de volume, padrao winutil: o setup varre a raiz de todos os volumes) e lancar o shim sem args.
+
+
+### Sessao 14/08 (cont. 6) - CAUSA RAIZ REAL: winpeshl lancava o SHIM X:\setup.exe ANTES do nosso startnet.cmd
+
+**Sintoma (VM 18:07)**: mesmo com o launch do shim corrigido, o Setup abriu de novo SEM discos e "nao gravou nada" (sem installer_boot_log.txt em C:\KL_WINPE).
+
+**CAUSA RAIZ (deduzida do fato "nao gravou nada" + strings do winpeshl)**: o nosso startnet.cmd NUNCA rodou em NENHUM teste. O winpeshl.exe SEM winpeshl.ini tenta, nesta ordem: (1) %SystemDrive%\$Windows.~BT\sources\setup.exe (nao existe) -> (2) %SystemDrive%\setup.exe -> **EXISTE no nosso installer_boot.wim (o shim de 333 KB que exportamos junto do idx 2!)** -> lanca o shim -> (3) so se AMBOS falharem: cmd /k startnet.cmd. Ou seja: o winpeshl lancava o shim direto (Setup cru, sem /installfrom e sem o ambiente) e o nosso startnet.cmd (scan + wpeinit + diag) JAMAIS era executado - por isso nenhum log era gravado e o comportamento era identico ao teste anterior.
+
+**CORRECAO (IsoEditorManager.InstallSetupStartnetAsync reescrito)**: em vez de REMOVER o winpeshl.ini, agora INJETA um proprio:
+- `[LaunchApps]` + `%SystemRoot%\system32\cmd.exe, /k startnet.cmd` (ASCII; formato AppPath, args do winpeshl).
+- Com winpeshl.ini presente, o winpeshl lanca SO o que o [LaunchApps] mandar (ignora os paths de setup) -> o nosso startnet.cmd roda -> scan -> shim com /installfrom -> ambiente completo -> discos.
+- Command file via stdin: add startnet.cmd + add winpeshl.ini (o add sobrescreve se existir; a midia original NAO tem winpeshl.ini).
+
+**VALIDADO (host)**: WIM de teste descartavel - `add winpeshl.ini /Windows/System32/winpeshl.ini` via stdin exit 0; dir confirma startnet.cmd + winpeshl.ini; extract confirma conteudo exato. Build Core: 0 erros / 0 avisos.
+
+**A TESTAR (VM)**: BOOT INSTALADOR -> o winpeshl.ini faz o winpeshl lancar cmd /k startnet.cmd -> o startnet roda (AGORA sim): wpeinit -> scan -> "install.wim encontrado em X:" -> log em C:\KL_WINPE\installer_boot_log.txt -> lanca o shim %SystemDrive%\setup.exe com /installfrom -> Setup com a tela de disco listando SAS + NVMe. Ponto de verificacao imediato apos reboot: C:\KL_WINPE\installer_boot_log.txt DEVE existir no Windows (se nao existir, o winpeshl ainda nao esta rodando o nosso startnet).
+
+
+### Sessao 15/08 - BOOT INSTALADOR VALIDADO (instalacao completa com sucesso!) + limite 0x80300001
+
+**TESTADO NA VM com SUCESSO TOTAL (15/08 18:27-19:00)**: o winpeshl.ini resolveu de vez:
+1. Log do host: fluxo completo OK (robocopy 1, export lzx --boot, BootIndex=1, startnet+winpeshl.ini injetados, BCD GUID fixo {5b7d9f1e-...}, bootsequence 0).
+2. **O nosso startnet.cmd RODOU** (prova: installer_boot_log.txt gravado): "install.wim encontrado em D:", "wpeinit exit code: 0", diagnostico diskpart list disk = Disco 0 (64GB) + Disco 1 (130GB).
+3. wpeinit.log: PNP completo (rede, componentes WinPE-Setup/WMI/WSH, firewall) STATUS: SUCCESS.
+4. Setup ABRIU com as telas CORRETAS: idioma -> selecao de particao (todas listadas, Novo habilitado) -> instalou o Windows 11 completo no disco ao lado (64GB) -> dual boot (Windows 11 vol 5 / vol 3) -> OOBE -> desktop.
+
+**LIMITE DESCOBERTO (nao e bug - fisica da fonte)**: no 2o teste o usuario deletou a particao de 64GB onde o KL_WINPE/install.wim vivia e o setup falhou com 0x80300001 ("Verifique a unidade de midia"). O install.wim esta NUMA PARTICAO DO DISCO; deletando-a, a fonte do /installfrom some. Na midia real (DVD/USB) isso nao acontece (o install.wim esta no CD, nao deletavel). Solucoes: (a) instalar POR CIMA (selecionar a particao com Windows antigo e Avancar - o setup limpa) SEMPRE que a particao-alvo != particao do KL_WINPE; (b) copiar o KL_WINPE p/ pendrive/USB antes (midia nao deletavel) e deletar a particao; (c) aviso adicionado no overlay do BOOT INSTALADOR (WinpeToolsPage.xaml.cs): "NAO excluir/formatar a particao que contem C:\KL_WINPE".
+
+**PENDENCIA FECHADA**: "Testar BOOT INSTALADOR na VM" - CONCLUIDO (instalacao real com sucesso). O fluxo BOOT INSTALADOR e o mais testado da pagina: winpeshl.ini -> startnet.cmd -> wpeinit -> scan de drives -> shim X:\setup.exe + /installfrom -> ambiente de discos completo.
+
+### Sessao 15/08 (fim) - Fonte em RAM (RAMDISK X:): excluir a particao primaria + instalacao limpa
+
+Pedido do usuario: "quanto fica o tamanho final nao tem como jogar o instalador na RAM
+para ele rodar ali mesmo para poder excluir a particao primaria e fazer uma instalacao limpa".
+
+**MEDICOES REAIS (ISO 25H2 montada no host)**: Sources total = **7,45 GB**; install.wim
+sozinho = **6,77 GB**; boot.wim = 0,58 GB. Tamanho final em C: ≈ **8,1 GB** (InstallISO\
+Sources 7,45 GB + installer_boot.wim ~0,61 GB + installer_boot.sdi 3 MB). RAM necessaria
+p/ fonte em RAM ≈ **11 GB livres** (install.wim 6,77 GB + WIM de Setup descomprimido
+~2,5 GB + overhead Setup ~1 GB) - VM com 16 GB cabe; 8 GB nao (fallback automatico).
+
+**BLCOO RAMSRC no startnet.cmd (WinbootManager.ScheduleBootInstallerAsync, apos o scan,
+antes do launch)**:
+1. `set RAMSRC=` + `if not exist "X:\sources\!ISOFILE!"` -> mkdir X:\sources (o WIM de
+   Setup ja tem sources\, e no-op seguro) -> `copy /y "!ISODRV!:...\!ISOFILE!" "X:\sources\!ISOFILE!"`:
+   se o copy funcionar, `set RAMSRC=X:\sources\!ISOFILE!` + log "Fonte em RAM X: - a
+   particao do disco pode ser excluida na tela do Setup."; se falhar (RAM cheia), log
+   "RAM insuficiente - usando a fonte do disco, nao excluir a particao de origem."
+2. Se X:\sources\!ISOFILE! ja existe (rodada anterior): RAMSRC direto + log "Fonte ja
+   presente em RAM X:".
+3. Launch: `if defined RAMSRC` -> `start "" "%SystemDrive%\setup.exe" /installfrom:!RAMSRC!`
+   (RAM); senao fallback `!ISODRV!:\KL_WINPE\InstallISO\Sources\!ISOFILE!` (disco).
+4. Tudo logado em installer_boot_log.txt (o usuario ve qual fonte foi usada).
+
+**QUIRK cmd.exe (regra 03/08 VIOLADA e CORRIGIDA por mim)**: os echos do bloco RAM tinham
+parenteses `(X:)` e `(nao excluir...)` DENTRO do bloco `if defined ISODRV ( ... )` - o parse
+quebrou ("- foi inesperado") e o trace (echo on) PROVOU: o echo `(X:)` executou como
+TOP-LEVEL, fora do bloco. E a regra de sempre: **qualquer ( ou ) em echo/rem dentro de
+bloco if/for quebra o parse, mesmo balanceado** - removidos todos (rems tambem). O parse
+do bloco RAM de 3 niveis aninhados (if defined ISODRV -> if not exist -> if exist/else)
+funciona perfeitamente sem eles.
+
+**VALIDADO localmente (host, subst X: + Z: com fakes)**: parse limpo (zero "inesperado"),
+scan achou Z:, diskpart list disk real no log, "Copiando install.wim para o RAMDISK X:",
+"Fonte em RAM X:" + X:\sources\install.wim = True (branch RAMSRC OK); 2o run com
+X:\sources preenchido -> "Fonte ja presente em RAM X:" (branch reuso OK); branch RAM
+insuficiente validado no teste minimo (log4/log7 = fallback do disco). Lixos limpos
+(substs removidos).
+
+**Overlay da GUI (WinpeToolsPage.xaml.cs)**: passo 4 atualizado (startnet + winpeshl.ini),
+"Requer ~10 GB livres em C: (install.wim de 6.8 GB + boot.wim de Setup)" e novo bloco
+"FONTE EM RAM: se o PC tiver RAM suficiente (>= 11 GB livres), o install.wim e copiado
+para o RAMDISK X: do WinPE - ai a particao de origem pode ser EXCLUIDA na tela do Setup
+(instalacao limpa). Sem RAM, o fallback usa a fonte do disco e a particao com C:\KL_WINPE
+deve permanecer intacta (0x80300001)."
+
+Doc comments atualizados (passo 3 do ScheduleBootInstallerAsync + comentario inline do
+script: winpeshl.ini agora e INJETADO, nao removido - explicita o RAMSRC).
+
+Build Core: 0 erros / 0 avisos.
+
+**A TESTAR (VM)**: BOOT INSTALADOR -> log do host mostra "Fonte em RAM X:" (16 GB de RAM)
+-> na tela de particoes EXCLUIR a particao primaria (a do Windows antigo) e instalar limpo
+na particao recriada; variante com RAM baixa (VM de 8 GB): log "RAM insuficiente" e o
+fluxo usa a fonte do disco (nao excluir a particao do KL_WINPE).
+
+### Sessao 15/08 (cont.) - Otimizacao ESD (solid LZMS): rodar o BOOT INSTALADOR com 8 GB de RAM
+
+Pedido do usuario: "pesquise na web o objetivo é rodar em pelo menos 8gb ram" - o
+install.wim de 6,8 GB nao cabia no RAMDISK X: com 8 GB de RAM.
+
+**PESQUISA (wimlib man)**: `wimlib optimize install.wim --solid` converte para ESD
+(solid LZMS), "decrease the archive size significantly" (exemplos reais: 9->5,6 GB;
+4,4->3,1 GB). ESD e o formato oficial das ISOs UUP - o Setup instala normal. Solid
+nao pode ser dividido (irrelevante aqui). `--compress=LZX:100` e alternativa lenta.
+
+**MEDICOES REAIS (25H2 pt-BR, host)**:
+- install.wim LZX original: 6,77 GB (4 edicoes, 13 GiB de dados descomprimidos).
+- `wimlib optimize install.wim --solid`: **5,01 GB** (economia 1,76 GB / 26%) em
+  **8,3 min**. RC=0. COMPRESSION: LZMS, Boot Index 0 (install nao e bootable - ok).
+- boot.wim idx 2 (Setup): Total Bytes 2,58 GB descomprimido, mas Hard Link Bytes
+  1,16 GB -> RAMDISK X: ocupa ~1,4-2,4 GB efetivos.
+- **Conta de RAM com ESD**: X: ~1,4-2,4 GB + install.wim solid 5,01 GB + overhead
+  ~0,5-1 GB = **~7-8 GB -> cabe em 8 GB**. Sem ESD: 6,77 + 2,4 + 0,5 = ~9,7 GB (nao cabe).
+- Bloat do ISO Editor (42 AppX) = ~50 MB apenas - irrelevante para caber (AppX de
+  midia moderna sao stubs; o grosso e WinSxS + base). winre.wim NAO existe na 25H2.
+
+**IMPLEMENTADO (Core + GUI)**:
+1. `WinbootManager.ScheduleBootInstallerAsync(string isoPath, bool optimizeEsd = false)`:
+   bloco 3.5 apos o check do installWim, antes do startnet.cmd:
+   - `WinpeBuilder.EnsureFileWritable(installWim)` PRIMEIRO (o robocopy herda o
+     atributo ReadOnly do CD -> wimlib falhava com erro 71 "Permission denied" - bug
+     real reproduzido no teste; o Set-ItemProperty manual resolveu).
+   - Check de espaco: `AvailableFreeSpace < 6 GB` -> pula com log claro (o optimize
+     reescreve no proprio arquivo: precisa de ~5 GB extras no volume).
+   - `RunProcessCaptured(wimlib, "optimize \"...\" --solid")` (timeout 0 = infinito,
+     ~8-10 min) + log antes/depois em GB + tempo.
+   - Falha nao aborta o fluxo: loga aviso e usa o install.wim original.
+2. GUI (`BtnBootInstaller_Click`): pergunta `mw.ShowConfirmationDialog` antes do
+   ShowBusy ("Otimizar para RAM baixa (ESD solid)? 6,8 -> ~5 GB, ~8-10 min, ~6 GB
+   extras em C:"); overlay mostra passo 3.5 e os requisitos (16 GB livres com otimizacao).
+
+**A TESTAR (VM de 8 GB)**: BOOT INSTALADOR -> SIM na otimizacao -> log
+"Convertendo install.wim para ESD (solid LZMS)...", "ESD otimizado: 6,77 GB -> 5,01 GB
+(economia 1,76 GB) em 8,3 min" -> reboot -> startnet copia ~5 GB para X:\sources
+(antes 6,77) -> "Fonte em RAM X:" -> excluir a particao primaria e instalar limpo.
+
+### Sessao 16/08 - Integrity OTIMIZADO (scan ~15-30s -> ~1-2s) + mojibake + whitelist de servicos intencionais
+
+Pedido do usuario (log de runtime 21:44-21:54): Integrity demorava demais para carregar
+resultados/gerar o valor final; erros no log: (a) "Corrigir Vulnerabilidades" REATIVAVA
+DPS/DiagTrack que o usuario tinha desligado nos toggles; (b) mojibake do sc.exe
+("[SC] ChangeServiceConfig �XITO"); (c) "bcdedit /set timeout 30" codigo 1 com mensagem
+vazia; (d) typo "s Unpark CPU"; (e) "start" de WdiServiceHost/WdiSystemHost falhava 5
+(Acesso negado) tratado como falha. "use o rust native se puder e busque na web".
+
+**Rust reg_scan_ffi NAO se aplica (decisao)**: ele varre subarvores por nome/valor (uso:
+residuos do DeepUninstaller). O Integrity le valores PONTUAIS (KeyPath+ValueName fixos) -
+RegistryBatch (cache de chaves) ja e o caminho mais rapido. Gargalos reais eram PROCESSOS
+e objetos COM, nao registro - ambos eliminados abaixo. Web (bcdedit): "The parameter is
+incorrect" acontece quando falta GUID/objeto; com encoding OEM + log de saida o motivo
+real aparece agora.
+
+**Guardian.cs (KitLugia.Core)**:
+1. **BCD: 28 processos -> 1**: GetHarmfulTweaksWithStatus roda cdedit /enum UMA vez
+   (se ha tweaks Bcd) em _bcdEnumOutput/_bcdEnumError/_bcdEnumAttempted (ThreadStatic,
+   limpo no finally). CheckTweak Bcd usa o cache; fora de scan roda pontual. Parse de
+   valor: string.Join(" ", parts, 1, ...) (suporta valores com espaco).
+2. **Services: 94 ServiceController -> leitura de registro**: CheckTweak Service lê
+   DWORD Start de HKLM\SYSTEM\CurrentControlSet\Services\<nome> via RegistryBatch
+   (fast path, 10-50x), helper StartDwordToMode (0=Boot/1=System/2=Auto/3=Manual/4=Disabled),
+   fallback ServiceHelper.
+3. **Whitelist de servicos intencionais** (KitIntentionalServiceStart): DPS, WdiServiceHost,
+   WdiSystemHost, DiagTrack, dmwappushservice, WerSvc, PcaSvc, NDU = Disabled. CheckTweak
+   -> Status OK (nao conta como vulnerabilidade); ToggleTweak com applySafeValue -> NAO
+   reativa (retorna mensagem "permanece desativado (intencional do KitLugia - reative pelo
+   toggle do Kit)"). Resolve o conflito do log (Integrity desfazia os toggles).
+4. **ToggleTweak Service**: usa SystemUtils.RunExternalProcessWithCode (exit code real);
+   falha do config -> (false, codigo); start falho com 5 (Acesso negado - Wdi*) ou 1056
+   (ja rodando) = aviso, nao falha. BCD toggle loga saida+erro na falha.
+
+**SystemUtils.cs**: GetOemEncoding() novo (CultureInfo.CurrentCulture.TextInfo.OEMCodePage
+= cp850 pt-BR/437 en-US, fallback 850, final UTF8); aplicado em RunExternalProcessAsync;
+RunExternalProcessWithCode(Async) novo (int ExitCode, string Output). **ProcessRunner.cs**:
+Run() usa GetOemEncoding() - fim do mojibake do sc.exe/bcdedit.
+
+**IntegrityPage.xaml.cs**: BtnToggleItem SEM Task.Delay(2000) + re-scan completo (ToggleTweak
+ja re-verifica via CheckTweak; usa o status do proprio tweak, caixa "INFO" quando status nao
+mudou). BtnFixAll: delay por item 150ms -> 25ms, removido Task.Delay(800). Score ("valor
+final") agora e gerado com o scan ~10x mais rapido.
+
+**Fixes**: GameBoostPage.xaml.cs:591/607 typo "s Unpark CPU" -> "✔️ Unpark CPU". Fix CS0104
+latente WinpeToolsPage.xaml.cs:403 (Application -> System.Windows.Application - o arquivo
+nao tem using Forms; erro so aparecia no build completo). Build solucao: 0 erros / 0 avisos
+(app fechado - MSB3021 pelo processo rodando).
+
+**A TESTAR (host)**: abrir Integrity -> scan deve carregar em ~1-2s (antes 15-30s); toggles
+individuais sem espera de 2s; DPS/WdiServiceHost/WdiSystemHost/DiagTrack com o toggle do Kit
+desligado aparecem OK (nao vermelho) e "Restaurar Todos" NAO os reativa; log do sc.exe sem
+mojibake; start do Wdi* sem "falha".
+
+### Sessao 16/08 (fim) - CAUSA RAIZ FINAL do scan lento: RecoverFromExecutableScan 29s -> 9ms
+
+**Sintoma**: mesmo com bcdedit/Service/Registry otimizados (sessao anterior), o scan
+Integrity ainda levava 92s no app (01:14:52 -> 01:16:24). Profiler (harness
+`%TEMP%\opencode\guardian_prof`, elevado) mediu: scan total 58,7s; `PathRepair.
+GetInstalledProgramPaths` = 28,9s (sessao anterior: bcdedit 53ms, Registry 11ms,
+Service 0ms). Causa: `RecoverFromExecutableScan` fazia 32 `Directory.GetFiles(root,
+pattern, AllDirectories)` (8 alvos x 4 raizes) - cada chamada ~29s; o PATH "INCOMPLETO"
+dispara isso a cada scan.
+
+**REESCRITA (PathRepair.cs, 5 etapas medidas no harness)**:
+1. DFS de passada unica por raiz (`EnumerateFilesSkippingHeavy`, stack + visited):
+   91,8s -> 31s. Quirks: (a) **junctions ciclam** (UserProfile\AppData\Local\Application
+   Data -> Local) - visited por path NAO pega (path lexical difere) - resolvido com cap
+   de profundidade 4 + skip por nome das junctions classicas ("Application Data",
+   "Local Settings", "My Documents", "NetHood", "PrintHood", "Recent", "SendTo",
+   "Templates", "Start Menu"); (b) listar TODOS os nomes de arquivo e caro - filtrar no
+   kernel com `EnumerateFiles(dir, "*.exe")` + "*.cmd".
+2. Skip de arvores gigantes (nenhum alvo vive la): node_modules, .git, .svn, temp,
+   cache, caches, logs, $recycle.bin, downloads, onedrive, winsxs, installer, webcache,
+   history, cookies, codelldb, explorercache, "Microsoft Visual Studio", "Windows Kits",
+   "WindowsApps", dotnet, Git, nodejs, PowerShell, "Microsoft Edge", "Common Files",
+   "Microsoft", AppData, Roaming, Packages, ProgramData. 31s -> 5,4s.
+3. **onlyTargets**: o DFS roda SO para os alvos AUSENTES (GetInstalledProgramPaths
+   computa `missing = allTargets - paths.Keys` e so escaneia esses) - com tudo coberto
+   o custo e ~0. CUIDADO com o sentido do filtro (bug real: passei os PRESENTES e o
+   filtro mantinha exatamente eles - o DFS continuava varrendo tudo).
+4. **pwsh fora do wanted**: instalacao MSIX do PowerShell 7 e so um stub reparse
+   inacessivel (nunca encontrariavel) - removeu-se pwsh.exe do mapa; pwsh classico
+   (ProgramFiles\PowerShell\7) ja tem check proprio. Sem isso, o DFS procurava pwsh.exe
+   (que nao existe fora do WindowsApps) e varria as 4 raizes ATE O FIM (~5,4s).
+5. Checks rapidos do 7-Zip (ProgramFiles\7-Zip, ProgramFilesX86\7-Zip,
+   LocalAppData\Programs\7-Zip) + preferencia no DFS: dir chamado "7-Zip"/"7zip" ganha
+   de 7z.exe interno de outros apps (ex: NVIDIA App tem um 7z.exe - era achado como
+   "7z"); entre genericos, o mais raso.
+
+**RESULTADO (harness, host)**: `GetInstalledProgramPaths` cache frio: **9 ms** (era
+28.987 ms); scan completo com bcdedit cacheado: **160 ms** (477 tweaks). Cache TTL
+5 min mantido (2a chamada ~70 ms). 7z correto = C:\Program Files\7-Zip (antes apontava
+pro NVIDIA App). pwsh sai da lista quando so existe o stub MSIX (correto - o dir real
+e inacessivel).
+
+Build solucao: 0 erros / 108 avisos (baseline nullable GUI).
+
+**A TESTAR (host)**: abrir Integrity -> scan carrega em ~1-2s mesmo na 1a vez apos
+iniciar o app; "Restaurar Todos" rapido (25ms/item); nenhum 7z do NVIDIA App no PATH.
+
+### Sessao 16/08 (fim 2) - HarmfulTweaks: duplicatas removidas + 10 checks novos de desktop
+
+Pedido do usuario: "julgue as coisas que tem ai dentro e adicione mais ou menos na mesma proporcao".
+Auditoria dos 477 itens de `HarmfulTweaks` (Guardian.cs) contra duplicatas exatas (mesmo ServiceName ou
+mesma KeyPath+ValueName) e itens exclusivos de servidor.
+
+**Removidos nesta sessao (duplicatas exatas)**:
+- Memory Compression (Memoria) + Compressao de Memoria RAM Desativada (Desempenho) - ambos
+  `DisableMemoryCompression` (nenhuma entrada permanece)
+- Reset do Cache de RAM (Memoria, SysMain Start=4)
+- NTFS - Last Access Time Update (Desempenho, `NtfsDisableLastAccessUpdate`) - fica a de Saude do Disco
+- Program Compatibility Assistant PCA (fica PcaSvc em Servicos Essenciais)
+- Windows Image Acquisition WIA (fica stisvc)
+- Windows Location Service LFS (fica lfsvc)
+- Windows Search Indexing em Discos (fica WSearch)
+- Gerenciador de Filas de Impressao Print Spooler (fica Spooler)
+- Prefetch / Superfetch Desativado (SysMain, Desempenho) - fica a de Saude do Disco
+- SSD TRIM Agendado (defragsvc, Desempenho) - fica a de Saude do Disco
+- PnP Device Enumeration (PlugPlay, Driver e Hardware) - fica a de Servicos Essenciais
+- Restricoes de Armazenamento de Senhas (VaultSvc, Perfil de Usuario) - fica a de Servicos Essenciais
+- LLMNR (Seguranca de Rede, `EnableMulticast`=1, nome com typo) - fica a 648 (Rede e Conectividade, `EnableLLMNR`=0)
+
+**Mantidos deliberadamente** (nao sao duplicatas): SessionEnv (RDP), SSTP/VPN (SstpSvc/RasMan),
+LanmanServer/LanmanWorkstation (SMB domestico), W32Time, iphlpsvc, DPS, LargeSystemCache,
+DisablePagingExecutive, Fast Startup (3x), NTFS 8.3 (4x).
+
+**10 checks novos adicionados ao fim da lista** (desktop Win10/11):
+1. AllowInsecureGuestAuth=1 (LanmanWorkstation\Parameters, Seguranca de Rede)
+2. RequireSecuritySignature=0 (LanmanWorkstation\Parameters, Seguranca de Rede)
+3. LmCompatibilityLevel=1 (Lsa, Seguranca Critica; default 3 = NTLMv2)
+4. EnableControlledFolderAccess=0 (Defender Exploit Guard, Defesa e Antivirus - ransomware)
+5. VerifiedAndReputablePolicyState=0 (CI\Policy, Defesa e Antivirus - Smart App Control W11)
+6. RestrictDriverInstallationToAdministrators=0 (PointAndPrint, Seguranca Critica - PrintNightmare)
+7. AdvertisingInfo\Enabled=1 (Privacidade Global)
+8. TailoredExperiencesWithDiagnosticDataEnabled=1 (Privacidade Global)
+9. EnableActivityFeed=1 (Privacidade Global)
+10. BingSearchEnabled=1 (Privacidade Global)
+
+**Correcoes de corrupcao** (edits anteriores tinham deixado fragmentos): item hibrido
+renomeado para "Working Set Trim (Poda de Working Set Desativada)" (`DisablePagedSystemCaching`),
+fragmento pendurado "Reset do Cache de RAM" removido, corpo orfao do NTFS Last Access removido.
+
+**LICAO**: ao remover um bloco, o oldString deve incluir o bloco inteiro `new() { ... },` + o
+cabecalho do proximo item; conferir com leitura antes do build. Build Core: 0 erros / 0 avisos.
+Solucao completa so com app fechado (MSB3021 DLL bloqueada pelo processo rodando).
+
+**A TESTAR (host)**: abrir Integrity -> scan lista ~467 checks (era 477), sem entradas duplicadas;
+"Restaurar Todos" nao reativa DPS/DiagTrack (whitelist da sessao anterior continua valida).

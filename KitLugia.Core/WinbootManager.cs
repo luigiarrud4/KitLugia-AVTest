@@ -5602,15 +5602,21 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
         }
 
         /// <summary>
-        /// GUID fixo da entrada BCD de boot do modo TESTE do shell (WinXShell).
+        /// GUID fixo da entrada BCD de boot do modo TESTE do shell (Explorer++).
         /// Reusado a cada execucao - nunca acumula entradas no boot manager.
         /// </summary>
         public const string TestShellBcdGuid = "{9f7c8d2e-4a5b-4c6d-8e9f-0123456789ab}";
 
         /// <summary>
+        /// GUID fixo da entrada BCD de boot DIRETO no instalador (Windows Setup da ISO).
+        /// Reusado a cada execucao - nunca acumula entradas no boot manager.
+        /// </summary>
+        public const string InstallerBcdGuid = "{5b7d9f1e-3c4a-4e6b-8d2f-9a1c2b3d4e5f}";
+
+        /// <summary>
         /// startnet.cmd para o modo TESTE: se existir KL_SHRINK_TARGET.dat o shrink
-        /// agendado roda primeiro (goto :run); sem marcador, lanca WinXShell -winpe
-        /// como shell grafico do WinPE (modo GUI de inspecao manual).
+        /// agendado roda primeiro (marcador); sem marcador, lanca Explorer++ como
+        /// shell grafico do WinPE (modo GUI de inspecao manual).
         /// Regras cmd.exe: sem parenteses dentro de echo de blocos, ASCII puro.
         /// </summary>
         private static string TestShellStartnetCmd()
@@ -5619,14 +5625,14 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
             sb.AppendLine("@echo off");
             sb.AppendLine("setlocal enabledelayedexpansion");
             sb.AppendLine("wpeinit");
-            sb.AppendLine("echo KitLugia WinPE - Test Mode WinXShell");
-            sb.AppendLine("ping -n 5 127.0.0.1 > nul");
+            sb.AppendLine("echo KitLugia WinPE - Test Mode");
+            sb.AppendLine("ping -n 3 127.0.0.1 > nul");
             sb.AppendLine();
-            sb.AppendLine("set SHRINK_MB=10000");
+            sb.AppendLine("set SHRINK_MB=0");
             sb.AppendLine("set DISK_N=0");
             sb.AppendLine("set PART_N=0");
             sb.AppendLine();
-            sb.AppendLine("rem --- Scan por KL_SHRINK_TARGET.dat (shrink agendado anteriormente roda primeiro) ---");
+            sb.AppendLine("rem --- Scan por KL_SHRINK_TARGET.dat (shrink agendado roda primeiro) ---");
             sb.AppendLine("echo Scanning for KL_SHRINK_TARGET.dat marker...");
             sb.AppendLine("for /l %%d in (0,1,3) do (");
             sb.AppendLine("  for /l %%p in (1,1,8) do (");
@@ -5642,7 +5648,7 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
             sb.AppendLine("      echo select volume Z > X:\\mr.txt");
             sb.AppendLine("      echo remove letter=Z >> X:\\mr.txt");
             sb.AppendLine("      diskpart /s X:\\mr.txt >nul 2>&1");
-            sb.AppendLine("      echo Found marker: DISK=%%d PART=%%p SHRINK=!SHRINK_MB!");
+            sb.AppendLine("      echo Found marker: DISK=%%d PART=%%p SHRINK=!SHRINK_MB! - running shrink first.");
             sb.AppendLine("      goto :run");
             sb.AppendLine("    )");
             sb.AppendLine("    echo select volume Z > X:\\mr.txt 2>nul");
@@ -5651,21 +5657,12 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
             sb.AppendLine("  )");
             sb.AppendLine(")");
             sb.AppendLine();
-            sb.AppendLine("rem --- Sem marcador: modo TESTE - lanca o shell WinXShell ---");
-            sb.AppendLine("echo No shrink scheduled. Launching WinXShell shell...");
-            sb.AppendLine("if exist C:\\Windows\\System32\\WinXShell.exe (");
-            sb.AppendLine("  cd /d C:\\Windows\\System32");
-            sb.AppendLine("  start \"\" \"C:\\Windows\\System32\\WinXShell.exe\" -winpe");
-            sb.AppendLine("  echo WinXShell launched with -winpe flag (WinPE shell mode).");
-            sb.AppendLine("  echo Close the VM or reboot manually when done testing.");
-            sb.AppendLine(") else (");
-            sb.AppendLine("  echo ERROR: WinXShell.exe nao encontrado no WIM.");
-            sb.AppendLine("  wpeutil reboot");
-            sb.AppendLine(")");
-            sb.AppendLine("exit /b 0");
+            sb.AppendLine("rem --- Sem marcador: shell direto ---");
+            sb.AppendLine("goto :shell");
             sb.AppendLine();
             sb.AppendLine(":run");
-            sb.AppendLine("if \"!PART_N!\"==\"0\" ( echo ERROR: Target partition not found. Rebooting... & wpeutil reboot )");
+            sb.AppendLine("rem --- Shrink agendado (mesmo fluxo do SCHEDULE, marker-only) ---");
+            sb.AppendLine("echo Running scheduled shrink...");
             sb.AppendLine("echo select disk !DISK_N! > X:\\s.txt");
             sb.AppendLine("echo select partition !PART_N! >> X:\\s.txt");
             sb.AppendLine("echo assign letter=Z >> X:\\s.txt");
@@ -5675,7 +5672,6 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
             sb.AppendLine("echo Shrink done. Writing persistent log...");
             sb.AppendLine("echo [KitLugia WinPE Shrink] > X:\\result.log");
             sb.AppendLine("echo Status: OK >> X:\\result.log");
-            sb.AppendLine("echo Disk: !DISK_N! Part: !PART_N! Size: !SHRINK_MB!MB >> X:\\result.log");
             sb.AppendLine("echo select disk !DISK_N! > X:\\l.txt");
             sb.AppendLine("echo select partition !PART_N! >> X:\\l.txt");
             sb.AppendLine("echo assign letter=Z >> X:\\l.txt");
@@ -5690,22 +5686,67 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
             sb.AppendLine(") else (");
             sb.AppendLine("  echo WARNING: Could not reassign Z: for persistent log");
             sb.AppendLine(")");
-            sb.AppendLine("echo Rebooting...");
+            sb.AppendLine("goto :shell");
+            sb.AppendLine();
+            sb.AppendLine(":shell");
+            sb.AppendLine("rem --- Lanca o Explorer++ (file manager do WinPE) ---");
+            sb.AppendLine("set OSDRV=X");
+            sb.AppendLine("if exist C:\\Windows\\System32\\Explorer++.exe set OSDRV=C");
+            sb.AppendLine("if exist !OSDRV!:\\Windows\\System32\\Explorer++.exe goto :assign_drives");
+            sb.AppendLine("echo ERROR: Explorer++.exe not found in WIM.");
+            sb.AppendLine("echo Expected in Windows\\System32. Rebooting...");
             sb.AppendLine("wpeutil reboot");
+            sb.AppendLine("exit /b 1");
+            sb.AppendLine();
+            sb.AppendLine(":assign_drives");
+            sb.AppendLine("rem --- Atribui letras D-K a particoes dos discos 0-1 ---");
+            sb.AppendLine("echo Assigning drive letters...");
+            sb.AppendLine("echo select disk 0 > X:\\dp.txt");
+            sb.AppendLine("echo select partition 1 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=D >> X:\\dp.txt");
+            sb.AppendLine("echo select disk 0 >> X:\\dp.txt");
+            sb.AppendLine("echo select partition 2 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=E >> X:\\dp.txt");
+            sb.AppendLine("echo select disk 0 >> X:\\dp.txt");
+            sb.AppendLine("echo select partition 3 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=F >> X:\\dp.txt");
+            sb.AppendLine("echo select disk 0 >> X:\\dp.txt");
+            sb.AppendLine("echo select partition 4 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=G >> X:\\dp.txt");
+            sb.AppendLine("echo select disk 0 >> X:\\dp.txt");
+            sb.AppendLine("echo select partition 5 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=H >> X:\\dp.txt");
+            sb.AppendLine("echo select disk 1 >> X:\\dp.txt");
+            sb.AppendLine("echo select partition 1 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=I >> X:\\dp.txt");
+            sb.AppendLine("echo select disk 1 >> X:\\dp.txt");
+            sb.AppendLine("echo select partition 2 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=J >> X:\\dp.txt");
+            sb.AppendLine("echo select disk 1 >> X:\\dp.txt");
+            sb.AppendLine("echo select partition 3 >> X:\\dp.txt");
+            sb.AppendLine("echo assign letter=K >> X:\\dp.txt");
+            sb.AppendLine("diskpart /s X:\\dp.txt >nul 2>&1");
+            sb.AppendLine("echo Drive letters assigned.");
+            sb.AppendLine();
+            sb.AppendLine(":launch");
+            sb.AppendLine("echo Starting Explorer++ file manager...");
+            sb.AppendLine("start \"\" !OSDRV!:\\Windows\\System32\\Explorer++.exe");
+            sb.AppendLine("echo Explorer++ launched. Use cmd to run tools.");
+            sb.AppendLine("exit /b 0");
             return sb.ToString();
         }
 
         /// <summary>
-        /// Modo TESTE (botao TESTAR): injeta WinXShell.exe no boot.wim e agenda o
+        /// Modo TESTE (botao TESTAR): injeta Explorer++.exe no boot.wim e agenda o
         /// reboot via bootsequence one-time (GUID fixo, sem poluir o menu do boot).
-        /// O WinPE boota e o startnet.cmd lanca WinXShell -winpe como shell grafico.
+        /// O WinPE boota e o startnet.cmd lanca Explorer++ como shell grafico.
         /// Se um shrink agendado existir (marcador), o shrink roda primeiro.
         /// </summary>
         public static async Task<(bool ok, string msg)> ScheduleTestWinpeShell()
         {
             try
             {
-                Log("========== AGENDANDO TESTE DO SHELL (WINXSHELL) VIA WINPE ==========");
+                Log("========== AGENDANDO TESTE DO SHELL (EXPLORER++ + KIT) VIA WINPE ==========");
                 string klWinpe = @"C:\KL_WINPE";
                 string wimPath = Path.Combine(klWinpe, "boot.wim");
 
@@ -5731,14 +5772,10 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
                 }
                 WinpeBuilder.EnsureFileWritable(wimPath);
 
-                // 2. WinXShell: resolve localmente (KitLugia.WinPE\WinXShell\ ou cache) e injeta no WIM
-                string? wx = await WinpeBuilder.ResolveWinXShellAsync();
-                if (wx == null)
-                    return (false, "WinXShell.exe nao encontrado. Coloque o exe em KitLugia.WinPE\\WinXShell\\WinXShell.exe e tente novamente.");
-                Log($"WinXShell local: {wx}");
-                bool injOk = await WinpeBuilder.InjectWinXShellIntoWimAsync(wimPath);
+                // 2. Explorer++: resolve localmente e injeta no WIM
+                bool injOk = await WinpeBuilder.InjectExplorerPlusPlusIntoWimAsync(wimPath);
                 if (!injOk)
-                    return (false, "Falha ao injetar WinXShell.exe no WIM (wimlib indisponivel?).");
+                    return (false, "Falha ao injetar Explorer++.exe no WIM (wimlib indisponivel ou arquivo ausente).");
 
                 // 3. Script de teste no WIM (marcador de shrink primeiro; senao shell)
                 bool scriptOk = await WinpeBuilder.UpdateWimWithScriptAsync(wimPath, TestShellStartnetCmd(), "startnet.cmd");
@@ -5750,7 +5787,7 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
                 try
                 {
                     string? guid = await CreateRamdiskEntry(
-                        "KitLugia WinPE - Shell Test (WinXShell)", "C",
+                        "KitLugia WinPE - Shell Test (Explorer++)", "C",
                         $"\\KL_WINPE\\{Path.GetFileName(wimPath)}",
                         "\\KL_WINPE\\boot.sdi",
                         fixedGuid: TestShellBcdGuid);
@@ -5790,11 +5827,333 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
 
-                return (true, "Modo TESTE configurado: WinXShell sera o shell do WinPE. O sistema sera reiniciado em 10s.");
+                return (true, "Modo TESTE configurado: WinPE bootara com Explorer++ como file manager. O sistema sera reiniciado em 10s.");
             }
             catch (Exception ex)
             {
                 return (false, $"Erro ao agendar teste do shell: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Agenda boot DIRETO no instalador do Windows (Setup) a partir de uma ISO:
+        /// sem criar particoes nem abrir o WinPE comum - util para testar ISOs.
+        /// 1. Monta a ISO (estilo Titus, sem extrair com 7z) e copia Sources\ para
+        ///    C:\KL_WINPE\InstallISO\ (robocopy nativo; o WinPE nao herda a montagem do host).
+        /// 2. Exporta a imagem de Setup (index 2) do boot.wim para um WIM UNICO
+        ///    (elimina ambiguidade de indice no boot ramdisk) via wimlib, marcado
+        ///    bootable (--boot) - sem o flag o bootmgr falha com 0xc0000487.
+        /// 3. Instala startnet.cmd + winpeshl.ini na imagem ([LaunchApps] -> cmd /k startnet.cmd;
+        ///    sem o ini o winpeshl lanca o shim X:\setup.exe direto e o nosso script nunca roda):
+        ///    o script roda wpeinit (PnP - sem ele o Setup nao ve discos), varre as letras de
+        ///    drive do WinPE (NAO sao as do host!) procurando o install.wim copiado e lanca o
+        ///    shim setup.exe da raiz com /installfrom dinamico. Se houver RAM suficiente, o
+        ///    install.wim e copiado para X:\sources (RAMDISK) e o /installfrom aponta para la -
+        ///    a particao de origem do disco pode ser excluida na tela do Setup (instalacao limpa);
+        ///    sem RAM, fallback automatico para a fonte do disco.
+        /// 4. Bootsequence one-time via BCD ramdisk (GUID fixo, nao acumula) + reboot 10s.
+        /// </summary>
+        public static async Task<(bool ok, string msg)> ScheduleBootInstallerAsync(string isoPath, bool optimizeEsd = false)
+        {
+            try
+            {
+                Log("========== AGENDANDO BOOT DIRETO NO INSTALADOR (ISO) ==========");
+                if (string.IsNullOrEmpty(isoPath) || !File.Exists(isoPath))
+                    return (false, $"ISO nao encontrada: {isoPath}");
+
+                string klWinpe = @"C:\KL_WINPE";
+                string installRoot = Path.Combine(klWinpe, "InstallISO");
+                string sourcesDir = Path.Combine(installRoot, "Sources");
+                string installerBootWim = Path.Combine(klWinpe, "installer_boot.wim");
+                string installerBootSdi = Path.Combine(klWinpe, "installer_boot.sdi");
+
+                // 1. Monta a ISO e copia Sources para o disco (o WinPE e outro ambiente:
+                //    a montagem do host nao persiste no boot, por isso a copia)
+                Log($"Montando ISO {Path.GetFileName(isoPath)}...");
+                var (mOk, mMsg, mDrive) = await IsoEditorManager.MountIso(isoPath);
+                if (!mOk || string.IsNullOrEmpty(mDrive))
+                    return (false, $"Falha ao montar a ISO: {mMsg}");
+                string isoDrive = mDrive.TrimEnd('\\', ':') + ":\\";
+
+                try
+                {
+                    Log("Copiando Sources da ISO para o disco (robocopy)...");
+                    Directory.CreateDirectory(sourcesDir);
+                    var (rcCode, rcOut) = await RunProcessCaptured("robocopy.exe",
+                        $"\"{isoDrive}sources\" \"{sourcesDir}\" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /MT:8");
+                    if (rcCode > 7)
+                        return (false, $"Falha ao copiar Sources da ISO (robocopy codigo {rcCode}): {rcOut}");
+                    Log($"Sources copiados (robocopy codigo {rcCode}).");
+
+                    // boot.sdi: o da propria ISO; fallback: o do WinPE preparado
+                    string isoSdi = isoDrive + "boot\\boot.sdi";
+                    if (File.Exists(isoSdi))
+                    {
+                        try { File.Copy(isoSdi, installerBootSdi, true); } catch { }
+                    }
+                    if (!File.Exists(installerBootSdi) && File.Exists(Path.Combine(klWinpe, "boot.sdi")))
+                    {
+                        try { File.Copy(Path.Combine(klWinpe, "boot.sdi"), installerBootSdi, true); } catch { }
+                    }
+                }
+                finally
+                {
+                    await IsoEditorManager.DismountIso(isoPath);
+                }
+
+                if (!File.Exists(installerBootSdi))
+                    return (false, "boot.sdi nao encontrado na ISO nem em C:\\KL_WINPE\\boot.sdi.");
+
+                // 2. boot.wim: exige a imagem de Setup (index 2) e exporta para WIM unico
+                string srcBootWim = Path.Combine(sourcesDir, "boot.wim");
+                if (!File.Exists(srcBootWim))
+                    return (false, "sources\\boot.wim nao encontrado na ISO copiada.");
+
+                var (anOk, anMsg, editions) = await IsoEditorManager.AnalyzeWimAsync(srcBootWim);
+                if (!anOk || editions.Count < 2)
+                    return (false, $"boot.wim invalido para instalacao: {anMsg} (a imagem de Setup/PE nao foi encontrada).");
+
+                Log($"Exportando imagem 2 (Setup) do boot.wim para WIM unico (lzx, marcada bootable)...");
+                var (exOk, exMsg, _) = await IsoEditorManager.ExportSingleEditionAsync(srcBootWim, 2, installerBootWim, "lzx", markBootable: true);
+                if (!exOk)
+                    return (false, $"Falha ao exportar a imagem de Setup: {exMsg}");
+                WinpeBuilder.EnsureFileWritable(installerBootWim);
+
+                // 2.5 O Sources\boot.wim ORIGINAL so servia para o export - o
+                //     installer_boot.wim ja e o WIM de boot do ramdisk e o Setup
+                //     nao usa o boot.wim da midia. Deletar economiza ~600 MB no
+                //     disco (medicao real na 25H2: 597 MB).
+                try
+                {
+                    if (File.Exists(srcBootWim))
+                    {
+                        long srcBootSize = new FileInfo(srcBootWim).Length;
+                        File.Delete(srcBootWim);
+                        Log($"Sources\\boot.wim original removido apos o export (-{srcBootSize / 1024 / 1024} MB) - o installer_boot.wim e o WIM de boot.");
+                    }
+                }
+                catch (Exception bEx) { Log($"Aviso: nao foi possivel remover Sources\\boot.wim original: {bEx.Message}"); }
+
+                // Verificacao: o WIM precisa estar marcado como bootable
+                // (BootIndex != 0) para o bootmgr achar a imagem no boot ramdisk -
+                // sem --boot o wimlib grava 0 e o boot falha com 0xc0000487.
+                // O BootIndex NAO fica no header fixo nem como <BOOTINDEX> no XML
+                // (verificado no wimlib 1.14.5: o elemento nao e gravado mesmo com
+                // --boot) - o wimlib info reporta "Boot Index: N" e e a fonte confiavel.
+                try
+                {
+                    var wimlibExe = WinpeBuilder.FindBundledWimlib();
+                    if (wimlibExe != null)
+                    {
+                        var (biOk, biOut) = await RunProcessCaptured(wimlibExe, $"info \"{installerBootWim}\"");
+                        var biMatch = System.Text.RegularExpressions.Regex.Match(biOut, @"Boot\s+Index:\s*(\d+)");
+                        if (biMatch.Success)
+                            Log($"Verificacao WIM exportado: BootIndex={biMatch.Groups[1].Value} (via wimlib info; com --boot deve ser 1).");
+                        else
+                            Log("Verificacao WIM exportado: Boot Index nao reportado pelo wimlib info - conferir que o boot usa a imagem unica (Setup).");
+                    }
+                }
+                catch { }
+
+                // 3. install.wim: se a ISO so tem install.esd, renomeia (ESD e WIM com
+                //    compressao solid - o formato e detectado pelo conteudo)
+                string installWim = Path.Combine(sourcesDir, "install.wim");
+                string installEsd = Path.Combine(sourcesDir, "install.esd");
+                if (!File.Exists(installWim) && File.Exists(installEsd))
+                {
+                    Log("ISO contem install.esd - renomeando para install.wim (formato WIM compativel).");
+                    try { File.Move(installEsd, installWim); } catch (Exception mvEx) { Log($"Aviso: nao foi possivel renomear install.esd: {mvEx.Message}"); }
+                }
+                if (!File.Exists(installWim))
+                    return (false, "install.wim/install.esd nao encontrado em Sources.");
+
+                // 3.5 Otimizacao ESD (solid LZMS): converte o install.wim para ESD
+                //     (compressao solid) - medicao real na 25H2: 6,77 GB -> 5,01 GB
+                //     (economia ~1,76 GB / 26%, ~8 min). O Setup aceita via /installfrom
+                //     (formato detectado pelo conteudo, o nome .wim nao importa - o proprio
+                //     fluxo ja renomeia install.esd -> install.wim). Sem isso a fonte em RAM
+                //     precisa de ~11 GB; com ESD, ~7,5-8 GB - roda em VM de 8 GB.
+                if (optimizeEsd)
+                {
+                    try
+                    {
+                        WinpeBuilder.EnsureFileWritable(installWim);
+                        long beforeBytes = new FileInfo(installWim).Length;
+                        var wimlibExe2 = WinpeBuilder.FindBundledWimlib();
+                        if (wimlibExe2 == null)
+                        {
+                            Log("Otimizacao ESD pulada: wimlib-imagex nao encontrado no kit.");
+                        }
+                        else
+                        {
+                            // O optimize reescreve o WIM no proprio arquivo (temp no mesmo
+                            // volume) - precisa de ~6 GB livres extras durante a conversao.
+                            string driveRoot = Path.GetPathRoot(installWim) ?? @"C:\";
+                            long freeBytes = new DriveInfo(driveRoot).AvailableFreeSpace;
+                            if (freeBytes < (6L * 1024 * 1024 * 1024))
+                            {
+                                Log($"Otimizacao ESD pulada: espaco livre insuficiente em {driveRoot} ({freeBytes / 1024 / 1024 / 1024} GB < 6 GB necessarios).");
+                            }
+                            else
+                            {
+                                Log("Convertendo install.wim para ESD (solid LZMS) - pode levar ~8-10 min...");
+                                var sw = System.Diagnostics.Stopwatch.StartNew();
+                                var (eCode, eOut) = await RunProcessCaptured(wimlibExe2, $"optimize \"{installWim}\" --solid");
+                                sw.Stop();
+                                long afterBytes = File.Exists(installWim) ? new FileInfo(installWim).Length : 0;
+                                if (eCode == 0)
+                                    Log($"ESD otimizado: {beforeBytes / 1024.0 / 1024 / 1024:0.00} GB -> {afterBytes / 1024.0 / 1024 / 1024:0.00} GB (economia {Math.Max(0, beforeBytes - afterBytes) / 1024.0 / 1024 / 1024:0.00} GB) em {sw.Elapsed.TotalMinutes:0.0} min.");
+                                else
+                                    Log($"Aviso: otimizacao ESD falhou (codigo {eCode}): {eOut.Trim()} - usando install.wim original.");
+                            }
+                        }
+                    }
+                    catch (Exception esdEx) { Log($"Aviso: otimizacao ESD: {esdEx.Message}"); }
+                }
+
+                // 4. startnet.cmd: o WinPE nao enxerga o C: do host (as letras sao
+                //    atribuidas em outra ordem) - o script varre as letras procurando
+                //    o install.wim copiado e lanca o setup.exe com /installfrom dinamico.
+                //    O startnet.cmd original da midia (que roda wpeinit - confirmado na
+                //    25H2: o arquivo e literalmente 'wpeinit') e SUBSTITUIDO; por isso o
+                //    script novo chama wpeinit explicitamente no topo (sem ele o PnP nao
+                //    roda e o Setup nao ve nenhum disco). O winpeshl.ini INJETADO pelo
+                //    IsoEditorManager.InstallSetupStartnetAsync ([LaunchApps] -> cmd /k
+                //    startnet.cmd) garante que o winpeshl lanca ESTE script (sem ele o
+                //    winpeshl lanca o shim X:\setup.exe direto e o script nunca roda).
+                //    Apos o scan, o script tenta copiar o install.wim para X:\sources
+                //    (RAMDISK): se couber, o /installfrom aponta para a RAM e a particao
+                //    de origem do disco pode ser excluida no Setup (instalacao limpa);
+                //    senao, fallback para a fonte do disco (nao excluir a particao).
+                //    CRUCIAL: o setup a lancar e o SHIM da raiz do WIM (%SystemDrive%\setup.exe,
+                //    333 KB), NAO o sources\setup.exe. Na midia real o winpeshl (sem
+                //    winpeshl.ini) procura %SystemDrive%\$Windows.~BT\sources\setup.exe e
+                //    %SystemDrive%\setup.exe - e o idx 2 TEM setup.exe na raiz (confirmado
+                //    por wimlib dir na 25H2). O shim prepara o ambiente que o Setup exige
+                //    (strings dele: PrepareVolumeAccessPath/CreateVolumeAccessPath com
+                //    DefineDosDevice p/ volumes sem letra, GetSystemDiskNumber, env var
+                //    ORIGINAL_SETUP_WORKINGDIR_ENV_VAR, mutex Global\Microsoft.Windows.Setup,
+                //    FirstUX) e RELANCA o sources\setup.exe repassando os args (formato
+                //    "/%s /%s:%s /%s:\"%s\" %s"). Lancar o sources\setup.exe direto faz o
+                //    Setup abrir CRU, sem a enumeracao de discos preparada pelo shim -
+                //    era a causa raiz de "zero discos" na tela de selecao.
+                string scriptPath = Path.Combine(Path.GetTempPath(), "kitlugia_installer_startnet.cmd");
+                try
+                {
+                    string script =
+                        "@echo off\r\n" +
+                        "rem KitLugia Boot Instalador - localiza o install.wim copiado pelo host.\r\n" +
+                        "rem As letras de drive do WinPE nao sao as mesmas do host: varre todas.\r\n" +
+                        "rem wpeinit e obrigatorio: sem ele o PnP nao roda e o Setup nao ve NENHUM disco\r\n" +
+                        "rem (o startnet.cmd original da midia 25H2 e literalmente 'wpeinit').\r\n" +
+                        "wpeinit\r\n" +
+                        "set WPEINIT_RC=%errorlevel%\r\n" +
+                        "setlocal EnableDelayedExpansion\r\n" +
+                        "set ISODRV=\r\n" +
+                        "set ISOFILE=install.wim\r\n" +
+                        "for %%d in (Z Y W V U T R Q P O N M L K J I H G F E D C) do (\r\n" +
+                        "  if exist \"%%d:\\KL_WINPE\\InstallISO\\Sources\\install.wim\" set ISODRV=%%d\r\n" +
+                        "  if exist \"%%d:\\KL_WINPE\\InstallISO\\Sources\\install.esd\" set ISODRV=%%d\r\n" +
+                        "  if exist \"%%d:\\KL_WINPE\\InstallISO\\Sources\\install.esd\" set ISOFILE=install.esd\r\n" +
+                        ")\r\n" +
+                        "if defined ISODRV (\r\n" +
+                        "  echo [KitLugia] install.wim encontrado em !ISODRV!: - iniciando Setup > !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "  echo [KitLugia] wpeinit exit code: !WPEINIT_RC! >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "  echo [KitLugia] Diagnostico - diskpart list disk: >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "  echo list disk > %SystemDrive%\\diag_diskpart.txt\r\n" +
+                        "  diskpart /s %SystemDrive%\\diag_diskpart.txt >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "  if exist %SystemDrive%\\Windows\\System32\\wpeinit.log copy /y %SystemDrive%\\Windows\\System32\\wpeinit.log !ISODRV!:\\KL_WINPE\\wpeinit.log\r\n" +
+                        "  if exist %SystemDrive%\\Windows\\System32\\winpeshl.log copy /y %SystemDrive%\\Windows\\System32\\winpeshl.log !ISODRV!:\\KL_WINPE\\winpeshl.log\r\n" +
+                        "  rem === FONTE EM RAM X: - permite EXCLUIR a particao do disco na tela do Setup ===\r\n" +
+                        "  rem O RAMDISK do WinPE cresce dinamicamente ate a RAM disponivel; se nao\r\n" +
+                        "  rem comportar o install.wim, o fallback usa a fonte do disco - nao excluir.\r\n" +
+                        "  set RAMSRC=\r\n" +
+                        "  if not exist \"X:\\sources\\!ISOFILE!\" (\r\n" +
+                        "    if not exist X:\\sources mkdir X:\\sources\r\n" +
+                        "    echo [KitLugia] Copiando !ISOFILE! para o RAMDISK X: - pode demorar alguns minutos... >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "    copy /y \"!ISODRV!:\\KL_WINPE\\InstallISO\\Sources\\!ISOFILE!\" \"X:\\sources\\!ISOFILE!\" >nul\r\n" +
+                        "    if exist \"X:\\sources\\!ISOFILE!\" (\r\n" +
+                        "      set RAMSRC=X:\\sources\\!ISOFILE!\r\n" +
+                        "      echo [KitLugia] Fonte em RAM X: - a particao do disco pode ser excluida na tela do Setup. >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "    ) else (\r\n" +
+                        "      echo [KitLugia] RAM insuficiente - usando a fonte do disco, nao excluir a particao de origem. >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "    )\r\n" +
+                        "  ) else (\r\n" +
+                        "    set RAMSRC=X:\\sources\\!ISOFILE!\r\n" +
+                        "    echo [KitLugia] Fonte ja presente em RAM X:. >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
+                        "  )\r\n" +
+                        "  if defined RAMSRC (\r\n" +
+                        "    start \"\" \"%SystemDrive%\\setup.exe\" /installfrom:!RAMSRC!\r\n" +
+                        "  ) else (\r\n" +
+                        "    start \"\" \"%SystemDrive%\\setup.exe\" /installfrom:!ISODRV!:\\KL_WINPE\\InstallISO\\Sources\\!ISOFILE!\r\n" +
+                        "  )\r\n" +
+                        ") else (\r\n" +
+                        "  echo [KitLugia] install.wim/esd NAO encontrado em nenhum volume - Setup sem /installfrom > %SystemDrive%\\installer_boot_log.txt\r\n" +
+                        "  start \"\" \"%SystemDrive%\\setup.exe\"\r\n" +
+                        ")\r\n";
+                    File.WriteAllText(scriptPath, script, System.Text.Encoding.ASCII);
+                }
+                catch (Exception scrEx)
+                {
+                    return (false, $"Falha ao criar startnet.cmd: {scrEx.Message}");
+                }
+
+                Log("Instalando startnet.cmd (scan de drives + shim setup.exe da raiz com /installfrom) na imagem de Setup...");
+                bool injOk = await IsoEditorManager.InstallSetupStartnetAsync(installerBootWim, 1, scriptPath);
+                if (!injOk)
+                    Log("Aviso: nao foi possivel instalar o startnet.cmd (wimlib) - o Setup pode pedir a midia manualmente.");
+                try { File.Delete(scriptPath); } catch { }
+
+                // 5. Bootsequence one-time via BCD ramdisk (GUID fixo, nao acumula no menu)
+                await CleanupOldWinpeEntries();
+                try
+                {
+                    string? guid = await CreateRamdiskEntry(
+                        "KitLugia - Boot Instalador (ISO)", "C",
+                        "\\KL_WINPE\\installer_boot.wim",
+                        "\\KL_WINPE\\installer_boot.sdi",
+                        fixedGuid: InstallerBcdGuid);
+                    if (guid != null)
+                    {
+                        var (bsCode, _) = await RunProcessCaptured("bcdedit.exe", $"/bootsequence {guid}");
+                        Log($"Bootsequence configurado (codigo {bsCode}).");
+                        if (bsCode != 0)
+                        {
+                            Log("Bootsequence falhou; adicionando entrada ao menu de boot como fallback.");
+                            await SaveOriginalBcdTimeout();
+                            await RunProcessCaptured("bcdedit.exe", "/timeout 10");
+                            await RunProcessCaptured("bcdedit.exe", $"/displayorder {guid} /addlast");
+                        }
+                    }
+                }
+                catch (Exception bcdEx)
+                {
+                    Log($"Aviso: nao foi possivel configurar bootsequence: {bcdEx.Message}");
+                }
+
+                // 6. Reboot
+                Log("Reiniciando em 10 segundos...");
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    try
+                    {
+                        var psi = new System.Diagnostics.ProcessStartInfo("shutdown", "/r /t 10 /c \"KitLugia Boot Instalador\"")
+                        {
+                            CreateNoWindow = true,
+                            UseShellExecute = true,
+                            Verb = "runas"
+                        };
+                        System.Diagnostics.Process.Start(psi);
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                });
+
+                return (true, "Boot no instalador configurado: o PC reiniciara em 10s e entrara direto no Windows Setup da ISO (instalador grafico, pronto para testar a imagem).");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao agendar boot do instalador: {ex.Message}");
             }
         }
 

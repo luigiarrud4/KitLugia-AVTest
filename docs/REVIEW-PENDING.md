@@ -4,7 +4,7 @@
 
 ### 1. WPF não funciona em WinPE padrão
 - `PresentationCore.dll` depende de `milcore`/DWM — ausente no WinPE
-- **Solução proposta:** Launcher nativo Win32 (~50KB) que detecta ambiente e desvia para WinXShell + diskpart scripts
+- **Solução proposta:** Launcher nativo Win32 (~50KB) que detecta ambiente e desvia para Explorer++ (file manager portátil) + diskpart scripts
 
 ### 2. Tamanho excessivo (250MB)
 - Scratch space WinPE = 512MB default — app ocupa metade
@@ -44,10 +44,9 @@
 - Em WinPE: `X:\Program Files` — pode não existir
 - **Decisão:** Usar `C:\KL_WINPE` como raiz universal?
 
-### 10. WinXShell fallback vs shell único
-- App tenta ser shell (startnet.cmd) E lançar WinXShell
-- Duas GUIs competindo — confuso
-- **Decisão:** Modo shell único: `startnet.cmd` → check → WinXShell OU app
+### 10. Shell único resolvido: Explorer++ (WinXShell removido)
+- WinXShell não funcionava como file manager no WinPE (partições sem letras) e foi removido
+- **Decisão:** Modo shell único: `startnet.cmd` → check → Explorer++ (injetado em System32)
 
 ## ✅ Já Resolvido nesta Sprint
 - Styles.xaml `Color` → `Background`
@@ -55,6 +54,6 @@
 - `UseWindowsForms` removido + referências ambíguas corrigidas
 - `InputDialog` substitui `Microsoft.VisualBasic.Interaction.InputBox`
 - Build 0 erros, 0 warnings
-- WinXShell baixado + injetado
+- Explorer++ baixado + injetado (WinXShell removido)
 - ISO WinPE criada (478MB, BIOS+UEFI)
 - QEMU lançado com ISO

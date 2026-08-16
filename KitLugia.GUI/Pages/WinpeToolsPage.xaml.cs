@@ -348,21 +348,21 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private async void BtnTestWinxshell_Click(object sender, RoutedEventArgs e)
+        private async void BtnTestShell_Click(object sender, RoutedEventArgs e)
         {
-            ShowBusy("AGENDANDO TESTE DO SHELL (WINXSHELL)",
-                "Injetando WinXShell.exe no WinPE e agendando reboot...\n\n" +
-                "1. Resolver WinXShell.exe (KitLugia.WinPE\\WinXShell\\ ou cache)\n" +
+            ShowBusy("AGENDANDO TESTE DO SHELL (EXPLORER++)",
+                "Injetando Explorer++.exe (file manager) no WinPE...\n\n" +
+                "1. Resolver Explorer++.exe (raiz do kit ou KitLugia.WinPE\\Explorer++)\n" +
                 "2. Injetar no WIM via wimlib\n" +
                 "3. Injetar startnet.cmd de teste (shrink pendente roda primeiro)\n" +
                 "4. Bootsequence one-time via BCD ramdisk\n\n" +
                 "O PC sera reiniciado em 10 segundos.\n" +
-                "O WinPE bootara com o WinXShell como shell grafico.\n\n" +
+                "O WinPE bootara com Explorer++ como file manager (sem kit interno).\n\n" +
                 "Se o WinPE nao estiver preparado, sera preparado automaticamente agora.");
 
             try
             {
-                UpdateStatus("Resolvendo WinXShell e preparando WIM...");
+                UpdateStatus("Resolvendo Explorer++ e preparando WIM...");
 
                 var token = _cts?.Token ?? CancellationToken.None;
                 var (ok, msg) = await Task.Run(() =>
@@ -371,8 +371,76 @@ namespace KitLugia.GUI.Pages
                 if (ok)
                 {
                     ShowBusyResult($"{msg}\n\n" +
-                        "Apos o reboot, o WinPE boota com o WinXShell como interface.\n" +
+                        "Apos o reboot, o WinPE boota com o Explorer++ como interface.\n" +
                         "Ao voltar ao Windows, clique em VER LOGS.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha: {msg}");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                ShowBusyResult("Operacao cancelada pelo usuario.");
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        private async void BtnBootInstaller_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Selecionar ISO do Windows (boot direto no instalador)",
+                Filter = "Imagem ISO (*.iso)|*.iso|Todos os arquivos|*.*"
+            };
+            if (dlg.ShowDialog() != true) return;
+            string isoPath = dlg.FileName;
+
+            bool optimizeEsd = false;
+            if (System.Windows.Application.Current.MainWindow is MainWindow mw)
+                optimizeEsd = await mw.ShowConfirmationDialog(
+                    "Otimizar para RAM baixa (ESD solid)?\n\n" +
+                    "Converte o install.wim (6,8 GB) para ESD solid (~5 GB, economia de 1,8 GB).\n" +
+                    "Necessario para a fonte em RAM rodar com 8 GB de RAM.\n" +
+                    "Leva ~8-10 min e precisa de ~6 GB livres extras em C: durante a conversao.\n\n" +
+                    "Nao otimizar = fonte em RAM exige ~11 GB de RAM.");
+
+            ShowBusy("AGENDANDO BOOT DIRETO NO INSTALADOR",
+                $"ISO: {System.IO.Path.GetFileName(isoPath)}\n\n" +
+                "1. Montar a ISO (estilo Titus, sem extrair com 7z)\n" +
+                "2. Copiar Sources para C:\\KL_WINPE\\InstallISO (robocopy)\n" +
+                "3. Exportar imagem de Setup (index 2) do boot.wim para WIM unico (--boot)\n" +
+                (optimizeEsd ? "3.5. Otimizar install.wim para ESD solid (~5 GB, RAM baixa)\n" : "") +
+                "4. Injetar startnet.cmd + winpeshl.ini que lanca o shim setup.exe da raiz (fluxo nativo da midia) com /installfrom\n" +
+                "5. Bootsequence one-time via BCD ramdisk\n\n" +
+                "O PC sera reiniciado em 10 segundos.\n" +
+                "O Windows Setup (instalador) abre direto em modo grafico - sem criar particoes.\n\n" +
+                (optimizeEsd
+                    ? "Requer ~16 GB livres em C: (Sources 7.4 GB + otimizacao ESD ~6 GB temporarios).\n\n" +
+                      "FONTE EM RAM: com ESD (~5 GB), o install.wim cabe em 8 GB de RAM - a particao\n" +
+                      "de origem pode ser EXCLUIDA na tela do Setup (instalacao limpa)."
+                    : "Requer ~10 GB livres em C: (install.wim de 6.8 GB + boot.wim de Setup).\n\n" +
+                      "FONTE EM RAM: se o PC tiver RAM suficiente (>= 11 GB livres), o install.wim\n" +
+                      "e copiado para o RAMDISK X: do WinPE - ai a particao de origem pode ser\n" +
+                      "EXCLUIDA na tela do Setup (instalacao limpa). Sem RAM, o fallback usa a fonte\n" +
+                      "do disco e a particao com C:\\KL_WINPE deve permanecer intacta (0x80300001)."));
+
+            try
+            {
+                UpdateStatus("Montando ISO e preparando instalador...");
+
+                var token = _cts?.Token ?? CancellationToken.None;
+                var (ok, msg) = await Task.Run(() =>
+                    WinbootManager.ScheduleBootInstallerAsync(isoPath, optimizeEsd), token);
+
+                if (ok)
+                {
+                    ShowBusyResult($"{msg}\n\n" +
+                        "Apos o reboot, o Windows Setup abre direto.\n" +
+                        "Ao voltar ao Windows, os arquivos ficam em C:\\KL_WINPE\\InstallISO.");
                 }
                 else
                 {

@@ -57,6 +57,31 @@ namespace KitLugia.Core
     [ThreadStatic]
     private static RegistryBatch? _currentBatch;
 
+    // Cache do bcdedit /enum por scan (executado 1x em vez de 1 processo por tweak BCD)
+    [ThreadStatic]
+    private static string? _bcdEnumOutput;
+    [ThreadStatic]
+    private static string? _bcdEnumError;
+    [ThreadStatic]
+    private static bool _bcdEnumAttempted;
+
+    /// <summary>
+    /// Serviços que o KitLugia desativa DE PROPÓSITO (toggles de telemetria, diagnóstico,
+    /// fix de memory leak). O Integrity não deve marcá-los como vulnerabilidade nem
+    /// reativá-los no "Restaurar Todos" - reativar desfazeria os toggles do usuário.
+    /// </summary>
+    private static readonly Dictionary<string, string> KitIntentionalServiceStart = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["DPS"] = "Disabled",
+        ["WdiServiceHost"] = "Disabled",
+        ["WdiSystemHost"] = "Disabled",
+        ["DiagTrack"] = "Disabled",
+        ["dmwappushservice"] = "Disabled",
+        ["WerSvc"] = "Disabled",
+        ["PcaSvc"] = "Disabled",
+        ["NDU"] = "Disabled",
+    };
+
     private static readonly List<ScannableTweak> HarmfulTweaks = new()
     {
 
@@ -499,11 +524,6 @@ new() {
             Category = "Serviços Essenciais", Type = TweakType.Service, ServiceName = "wbiosrvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
         },
         new() {
-            Name = "Serviço de Configuração Automática de WLAN",
-            Description = "Gerencia conexões Wi-Fi automaticamente. Desativar impede que o Windows se conecte a redes sem fio automaticamente.",
-            Category = "Serviços Essenciais", Type = TweakType.Service, ServiceName = "Wlansvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
-        },
-        new() {
             Name = "Serviço de Geolocalização",
             Description = "Fornece dados de localização para aplicativos. Desativar afeta Mapas, Clima e outros apps que dependem de localização.",
             Category = "Serviços Essenciais", Type = TweakType.Service, ServiceName = "lfsvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
@@ -642,11 +662,6 @@ new() {
             Name = "Serviço de Instalação da Loja",
             Description = "Necessário para baixar e atualizar aplicativos da Microsoft Store (incluindo apps como Calculadora e Fotos).",
             Category = "Atualizações e Loja", Type = TweakType.Service, ServiceName = "InstallService", HarmfulStartMode = "Disabled", DefaultStartMode = "Demand"
-        },
-        new() {
-            Name = "Transferência Inteligente (BITS)",
-            Description = "Gerencia downloads em segundo plano. Se desativado, Windows Update e outros apps podem falhar ao baixar conteúdo.",
-            Category = "Atualizações e Loja", Type = TweakType.Service, ServiceName = "BITS", HarmfulStartMode = "Disabled", DefaultStartMode = "Delayed-Auto"
         },
         new() {
             Name = "Otimização de Entrega (DoSvc)",
@@ -1328,12 +1343,6 @@ new() {
             Description = "Arquivo LMHosts corrompido. Causa falhas na resolução de nomes NetBIOS em redes locais e problemas para acessar compartilhamentos de rede.",
             Category = "Rede (Problemas)", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NetBT\Parameters", ValueName = "EnableLMHOSTS", HarmfulValue = 1, DefaultValue = 0
         },
-        new() {
-            Name = "BranchCache (Serviço em Estado Inválido)",
-            Description = "BranchCache em estado incorreto em redes corporativas. Causa lentidão no acesso a arquivos compartilhados em filiais e tráfego WAN desnecessário.",
-            Category = "Rede (Problemas)", Type = TweakType.Service, ServiceName = "PeerDistSvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
-        },
-
         // ==================================================================================
         // 14. DRIVER E HARDWARE (PROBLEMAS)
         // ==================================================================================
@@ -1361,11 +1370,6 @@ new() {
             Name = "Code Integrity (Integridade de Código Desativada)",
             Description = "Verificação de integridade de código do kernel desativada. Permite que código malicioso não verificado seja executado no kernel, causando instabilidade.",
             Category = "Driver e Hardware", Type = TweakType.Bcd, ValueName = "nointegritychecks", HarmfulValue = "Yes", DefaultValue = "No"
-        },
-        new() {
-            Name = "PnP Device Enumeration (Enumeração de Hardware Desativada)",
-            Description = "Enumeração de dispositivos Plug and Play desativada. Impede que o Windows detecte novo hardware conectado (USB, PCIe, etc).",
-            Category = "Driver e Hardware", Type = TweakType.Service, ServiceName = "PlugPlay", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
         },
         new() {
             Name = "Serviço de Informações de Aplicativos (Aplicativos Elevados)",
@@ -1492,11 +1496,6 @@ new() {
             Category = "Perfil de Usuário", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment", ValueName = "Path", HarmfulValue = "CORRUPTED", DefaultValue = @"%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\"
         },
         new() {
-            Name = "TEMP/TMP (Variável de Ambiente Inválida)",
-            Description = "Variável TEMP/TMP apontando para diretório inválido ou inexistente. Causa falhas ao instalar programas e erros 'Cannot create temporary file'.",
-            Category = "Perfil de Usuário", KeyPath = @"HKEY_CURRENT_USER\Environment", ValueName = "TEMP", HarmfulValue = "", DefaultValue = @"%USERPROFILE%\AppData\Local\Temp"
-        },
-        new() {
             Name = "Aliases do PowerShell Quebrados (Comandos Essenciais)",
             Description = "Aliases no perfil do PowerShell apontando para executáveis inexistentes (ex: winget, dotnet). Causa erro 'X is not recognized' mesmo com programas instalados.",
             Category = "Variáveis de Ambiente", Type = TweakType.Registry, IsOptional = false,
@@ -1511,11 +1510,6 @@ new() {
             Name = "AppData Roaming (Caminho Corrompido)",
             Description = "Caminho AppData Roaming corrompido. Aplicativos perdem configurações de usuário, temas, favoritos e senhas salvas.",
             Category = "Perfil de Usuário", KeyPath = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", ValueName = "AppData", HarmfulValue = "", DefaultValue = @"%USERPROFILE%\AppData\Roaming"
-        },
-        new() {
-            Name = "Restrições de Armazenamento de Senhas (Credential Manager Corrompido)",
-            Description = "Gerenciador de Credenciais corrompido. Causa perda de senhas salvas, pedidos constantes de login e falhas em conexões de rede mapeadas.",
-            Category = "Perfil de Usuário", Type = TweakType.Service, ServiceName = "VaultSvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
         },
         new() {
             Name = "Perfil Temporário (Temp Profile) Carregado",
@@ -1644,11 +1638,6 @@ new() {
             Name = "Windows Performance Recorder (WPR) Corrompido",
             Description = "Gravador de performance do Windows corrompido. Causa falhas ao tentar gravar traces de performance para diagnóstico de lentidão.",
             Category = "Eventos e Diagnóstico", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Performance Recorder", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
-            Name = "Serviço de Relatório de Erros do Windows (WER) Desativado",
-            Description = "Windows Error Reporting desativado. Impede que relatórios de erro sejam enviados para análise, dificultando a correção de problemas recorrentes.",
-            Category = "Eventos e Diagnóstico", Type = TweakType.Service, ServiceName = "WerSvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
         },
         new() {
             Name = "Windows Error Reporting (Loop de Crash)",
@@ -1800,11 +1789,6 @@ new() {
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers", ValueName = "TdrLevel", HarmfulValue = 0, DefaultValue = 3
         },
         new() {
-            Name = "Validação de Requisições ASP.NET",
-            Description = "Validação de requisições ASP.NET desativada. Expõe aplicações web a ataques de injeção e smuggling de requisições HTTP maliciosas.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\ASP.NET", ValueName = "RequestValidation", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
             Name = "Gerenciamento de Energia com NPU (Sleep/Bateria)",
             Description = "Configuração de timeout de sleep inadequada em laptops com NPU. Causa consumo excessivo de bateria e lentidão do sistema devido a throttling térmico.",
             Category = "Estabilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power", ValueName = "SleepInactivityTimeout", HarmfulValue = 0, DefaultValue = 1800
@@ -1847,16 +1831,6 @@ new() {
             Name = "Serviço de Estação de Trabalho (LanmanWorkstation Desativado)",
             Description = "Serviço de estação de trabalho desativado. Impede acesso a pastas compartilhadas e recursos de rede como impressoras.",
             Category = "Rede (Problemas)", Type = TweakType.Service, ServiceName = "LanmanWorkstation", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
-        },
-        new() {
-            Name = "Net Logon (Serviço de Logon de Rede Desativado)",
-            Description = "Serviço de logon de rede desativado. Causa falhas em logon em domínios, problemas de autenticação em redes corporativas.",
-            Category = "Rede (Problemas)", Type = TweakType.Service, ServiceName = "Netlogon", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
-        },
-        new() {
-            Name = "Computer Browser (Serviço de Navegação Desativado)",
-            Description = "Serviço de navegação de computadores na rede desativado. Computador não aparece na lista de dispositivos da rede no Explorer.",
-            Category = "Rede (Problemas)", Type = TweakType.Service, ServiceName = "Browser", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
         },
         new() {
             Name = "Remote Access Connection Manager",
@@ -1971,17 +1945,7 @@ new() {
         // ==================================================================================
         // 21. PROBLEMAS DE MEMÓRIA E CACHE
         // ==================================================================================
-        new() {
-            Name = "Standby List (Lista de Espera de Memória Não Limpa)",
-            Description = "Lista de páginas de memória em espera não é limpa adequadamente. Causa lentidão progressiva após horas de uso, mesmo com RAM livre disponível.",
-            Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "ClearStandbyListAtShutdown", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
-            Name = "Memory Compression (Compressão de Memória Desativada)",
-            Description = "Compressão de memória do Windows desativada. Causa maior uso de páginação em disco quando a RAM está cheia, resultando em lentidão severa.",
-            Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "DisableMemoryCompression", HarmfulValue = 1, DefaultValue = 0
-        },
-        new() {
+new() {
             Name = "Working Set Trim (Poda de Working Set Desativada)",
             Description = "Poda automática de working set desativada. Processos acumulam páginas de memória que não usam mais, causando inchaço de memória RAM.",
             Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "DisablePagedSystemCaching", HarmfulValue = 1, DefaultValue = 0
@@ -2041,12 +2005,6 @@ new() {
             Description = "ASLR (Address Space Layout Randomization) forçado para máxima randomização. Causa consumo excessivo de memória em aplicativos sem benefício de segurança adicional.",
             Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "MoveImages", HarmfulValue = 1, DefaultValue = 0
         },
-        new() {
-            Name = "Reset do Cache de RAM (SysMain/SuperFetch Desativado)",
-            Description = "SysMain (SuperFetch) gerencia o cache inteligente de RAM no Windows. Quando desativado por game boosters, o cache de aplicativos deixa de ser otimizado, causando acúmulo progressivo de RAM em standby que nunca é liberada. Reativá-lo restaura o gerenciamento de cache aos padrões do Windows.",
-            Category = "Memória", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SysMain", ValueName = "Start", HarmfulValue = 4, DefaultValue = 3
-        },
-
         // ==================================================================================
         // 22. SEGURANÇA AVANÇADA DE REDE E FIREWALL
         // ==================================================================================
@@ -2074,11 +2032,6 @@ new() {
             Name = "NetBIOS sobre TCP/IP (Configuração Insegura)",
             Description = "NetBIOS sobre TCP/IP ativado em redes inseguras. Expõe informações do computador (nome, usuários, compartilhamentos) para qualquer um na rede.",
             Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NetBT\Parameters", ValueName = "TransportBindName", HarmfulValue = "", DefaultValue = @"\Device\"
-        },
-        new() {
-            Name = "LLMNR (Link-Local Multicast Name Resolution) Ativado)",
-            Description = "LLMNR é um protocolo de resolução de nomes inseguro. Permite ataques de envenenamento de resposta onde um atacante na rede pode interceptar tráfego.",
-            Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\LLMNR", ValueName = "EnableMulticast", HarmfulValue = 1, DefaultValue = 0
         },
         new() {
             Name = "mDNS (Multicast DNS) Ativado em Rede Corporativa",
@@ -2324,11 +2277,6 @@ new() {
             Category = "Compatibilidade", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatibility", ValueName = "AppCompatCache", HarmfulValue = 1, DefaultValue = 0
         },
         new() {
-            Name = "Program Compatibility Assistant (PCA) Desativado",
-            Description = "Assistente de compatibilidade de programas desativado. Aplicativos com problemas de compatibilidade não são detectados e corrigidos automaticamente.",
-            Category = "Compatibilidade", Type = TweakType.Service, ServiceName = "PcaSvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
-        },
-        new() {
             Name = "Application Identity Service (AppIDSvc) Desativado",
             Description = "Serviço de identidade de aplicativo desativado. AppLocker e políticas de controle de aplicativo não funcionam corretamente.",
             Category = "Compatibilidade", Type = TweakType.Service, ServiceName = "AppIDSvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
@@ -2337,11 +2285,6 @@ new() {
             Name = "Virtual Disk Service (VDS) Desativado",
             Description = "Serviço de disco virtual desativado. Gerenciamento de discos (mount, unmount, RAID) via software falha, impedindo montagem de ISOs e VHDs.",
             Category = "Compatibilidade", Type = TweakType.Service, ServiceName = "vds", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
-        },
-        new() {
-            Name = "Windows Image Acquisition (WIA) Desativado",
-            Description = "Serviço de aquisição de imagem desativado. Scanners e câmeras não são detectados pelo Windows, causando erro 'Scanner not found'.",
-            Category = "Compatibilidade", Type = TweakType.Service, ServiceName = "stisvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
         },
         new() {
             Name = "Windows Media Player Network Sharing (Desativado)",
@@ -2362,11 +2305,6 @@ new() {
             Name = "Windows Sensor Service (SensorService) Desativado",
             Description = "Serviço de sensores desativado. Sensores de luz ambiente, proximidade, acelerômetro e outros não funcionam, afetando ajuste automático de brilho e rotação.",
             Category = "Compatibilidade", Type = TweakType.Service, ServiceName = "SensorService", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
-        },
-        new() {
-            Name = "Windows Location Service (LFS) Desativado",
-            Description = "Serviço de localização desativado. Aplicativos de mapa, clima e serviços baseados em localização não conseguem determinar sua posição.",
-            Category = "Compatibilidade", Type = TweakType.Service, ServiceName = "lfsvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
         },
         new() {
             Name = "Windows Push Notifications (WPN) Desativado",
@@ -2433,11 +2371,6 @@ new() {
             Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", ValueName = "EncryptData", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "LDAP Signing (Assinatura LDAP Desativada)",
-            Description = "Assinatura de consultas LDAP desativada em domínios. Permite que atacantes modifiquem consultas LDAP em trânsito em redes corporativas.",
-            Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\NTDS\Parameters", ValueName = "LDAPServerIntegrity", HarmfulValue = 0, DefaultValue = 2
-        },
-        new() {
             Name = "SMB Guest Fallback (Fallback para Convidado Habilitado)",
             Description = "Fallback para acesso SMB como convidado quando credenciais falham. Permite que atacantes acessem compartilhamentos sem autenticação válida.",
             Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", ValueName = "AllowGuestAccess", HarmfulValue = 1, DefaultValue = 0
@@ -2456,11 +2389,6 @@ new() {
             Name = "Remote Desktop (RDP) Desativado no Firewall",
             Description = "RDP sem proteção de firewall. Atacantes podem escanear e tentar força bruta na porta RDP. O firewall deve bloquear RDP em perfis públicos.",
             Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\PublicProfile\GloballyOpenPorts", ValueName = "3389:TCP", HarmfulValue = "3389:TCP:*:Enabled", DefaultValue = ""
-        },
-        new() {
-            Name = "Serviço de Compartilhamento de Porta Net.Tcp",
-            Description = "Gerencia compartilhamento de portas TCP. Desativar impede que aplicativos .NET compartilhem portas via WCF. O padrão do Windows é Manual (iniciado sob demanda).",
-            Category = "Serviços Essenciais", Type = TweakType.Service, ServiceName = "NetTcpPortSharing", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
         },
         new() {
             Name = "Remote Desktop (RDP) Drive Redirection",
@@ -2490,21 +2418,6 @@ new() {
             Name = "Plano de Energia de Alto Desempenho",
             Description = "O Windows pode estar configurado com plano de energia 'Economia de Energia' ou 'Balanceado', reduzindo frequência de CPU e causando lentidão geral. O plano 'Alto Desempenho' garante que o processador opere na frequência máxima constantemente.",
             Category = "Desempenho", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\bc5038f7-23e0-4960-96da-33abaf5935ec", ValueName = "Attributes", HarmfulValue = 2, DefaultValue = 0, IsOptional = true
-        },
-        new() {
-            Name = "Prefetch / Superfetch Desativado",
-            Description = "O Prefetch e Superfetch (SysMain) aceleram a abertura de aplicativos carregando-os previamente na memória RAM. Desativá-los causa abertura mais lenta de programas e boot mais demorado, especialmente em HDDs.",
-            Category = "Desempenho", Type = TweakType.Service, ServiceName = "SysMain", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
-        },
-        new() {
-            Name = "Compressão de Memória RAM Desativada",
-            Description = "A compressão de memória do Windows 10/11 compacta páginas inativas na RAM, permitindo que mais programas caibam em memória física. Desativá-la aumenta o uso do arquivo de paginação e lentifica o sistema em PCs com pouca RAM.",
-            Category = "Desempenho", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "DisableMemoryCompression", HarmfulValue = 1, DefaultValue = 0
-        },
-        new() {
-            Name = "NTFS - Last Access Time Update (Atualização de Data de Acesso)",
-            Description = "Por padrão, o Windows registra a data/hora de cada acesso a arquivo no NTFS. Em discos com muita leitura, isso gera escritas desnecessárias, aumentando a latência. Desativar melhora a performance de I/O, especialmente em HDDs.",
-            Category = "Desempenho", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem", ValueName = "NtfsDisableLastAccessUpdate", HarmfulValue = 0, DefaultValue = 1, IsOptional = true
         },
         new() {
             Name = "NTFS - 8.3 Short Name Generation",
@@ -2557,11 +2470,6 @@ new() {
             Category = "Desempenho", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000", ValueName = "EnableUlps", HarmfulValue = 1, DefaultValue = 0, IsOptional = true
         },
         new() {
-            Name = "Windows Search Indexing em Discos (Impacto de I/O)",
-            Description = "O serviço de indexação do Windows Search pode gerar alta carga de I/O em discos mecânicos (HDDs), causando lentidão durante a indexação. Em SSDs, o impacto é menor, mas o serviço pode ser configurado para menor prioridade.",
-            Category = "Desempenho", Type = TweakType.Service, ServiceName = "WSearch", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
-        },
-        new() {
             Name = "Serviço de Mapeamento de Porta (RPC/DCOM) Lento",
             Description = "O serviço de mapeamento de porta RPC pode apresentar lentidão na resolução de chamadas COM/DCOM, afetando aplicativos que dependem dessas tecnologias. Deve permanecer em execução automática.",
             Category = "Desempenho", Type = TweakType.Service, ServiceName = "RpcEptMapper", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
@@ -2607,16 +2515,6 @@ new() {
             Category = "Desempenho", Type = TweakType.Service, ServiceName = "MMCSS", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
         },
         new() {
-            Name = "Gerenciador de Filas de Impressão (Print Spooler) Impactando Desempenho",
-            Description = "O serviço Print Spooler causa lentidão de inicialização e pode consumir CPU periodicamente mesmo sem impressoras. Se não usa impressoras, é seguro configurá-lo como Manual.",
-            Category = "Desempenho", Type = TweakType.Service, ServiceName = "Spooler", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto", IsOptional = true
-        },
-        new() {
-            Name = "SSD TRIM Agendado (Manutenção de SSD)",
-            Description = "O serviço de desfragmentação e otimização de unidades inclui TRIM agendado para SSDs. Desativá-lo impede a manutenção automática de SSDs, causando degradação de performance com o tempo.",
-            Category = "Desempenho", Type = TweakType.Service, ServiceName = "defragsvc", HarmfulStartMode = "Disabled", DefaultStartMode = "Manual"
-        },
-        new() {
             Name = "Atualizações em Segundo Plano (Banda Larga para Windows Update)",
             Description = "O Windows Update pode usar parte da banda larga em segundo plano para baixar atualizações, causando lentidão de rede e picos de uso de disco e CPU inesperados durante o uso normal do PC.",
             Category = "Desempenho", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config", ValueName = "DODownloadMode", HarmfulValue = 3, DefaultValue = 1, IsOptional = true
@@ -2625,6 +2523,56 @@ new() {
             Name = "Feedback de Diagnóstico (Telemetria de Alto Impacto)",
             Description = "O nível máximo de telemetria ('Full') causa alto I/O de disco e uso de CPU para coleta e envio de dados diagnósticos. Reduzir para 'Basic' ou 'Security' diminui o impacto no desempenho.",
             Category = "Desempenho", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection", ValueName = "AllowTelemetry", HarmfulValue = 3, DefaultValue = 1, IsOptional = true
+        },
+        new() {
+            Name = "Autenticação de Convidado Insegura (AllowInsecureGuestAuth Ativado)",
+            Description = "O SMB permite autenticação de convidado insegura quando AllowInsecureGuestAuth=1, expondo compartilhamentos de rede a conexões sem autenticação real (risco em redes não confiáveis).",
+            Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters", ValueName = "AllowInsecureGuestAuth", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
+            Name = "Assinatura SMB Desativada (RequireSecuritySignature=0)",
+            Description = "A assinatura de pacotes SMB desativada permite ataques de man-in-the-middle em compartilhamentos de rede (CVE-2018-8440 e variantes). Manter habilitada protege a integridade do tráfego SMB.",
+            Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters", ValueName = "RequireSecuritySignature", HarmfulValue = 0, DefaultValue = 1
+        },
+        new() {
+            Name = "Nível de Compatibilidade LM/NTLM Baixo (LmCompatibilityLevel=1)",
+            Description = "LmCompatibilityLevel baixo permite autenticação LAN Manager/NTLMv1, protocolos obsoletos e vulneráveis a ataques de retransmissão (relay). O nível 3 (NTLMv2) é o padrão seguro do Windows.",
+            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa", ValueName = "LmCompatibilityLevel", HarmfulValue = 1, DefaultValue = 3
+        },
+        new() {
+            Name = "Acesso Controlado a Pastas Desativado (Ransomware)",
+            Description = "O Acesso Controlado a Pastas (Controlled Folder Access) do Defender protege documentos e pastas contra ransomware. Desativá-lo deixa os arquivos vulneráveis a criptografia por malware.",
+            Category = "Defesa e Antivírus", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Windows Defender Exploit Guard\Controlled Folder Access", ValueName = "EnableControlledFolderAccess", HarmfulValue = 0, DefaultValue = 1
+        },
+        new() {
+            Name = "Smart App Control Desativado (VerifiedAndReputablePolicyState=0)",
+            Description = "O Smart App Control (Windows 11) bloqueia apps não assinados/não confiáveis. Desativá-lo deixa o PC vulnerável a malware disfarçado de programa legítimo.",
+            Category = "Defesa e Antivírus", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CI\Policy", ValueName = "VerifiedAndReputablePolicyState", HarmfulValue = 0, DefaultValue = 1
+        },
+        new() {
+            Name = "Instalação de Drivers Restrita Desativada (PrintNightmare)",
+            Description = "RestrictDriverInstallationToAdministrators=0 permite que usuários comuns instalem drivers de impressora via ponto e imprimir (Point and Print), vetor do exploit PrintNightmare (CVE-2021-34527).",
+            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint", ValueName = "RestrictDriverInstallationToAdministrators", HarmfulValue = 0, DefaultValue = 1
+        },
+        new() {
+            Name = "Anúncios Personalizados Ativados (AdvertisingInfo=1)",
+            Description = "A ID de publicidade do dispositivo permite que apps rastreiem e personalizem anúncios. Desativá-la (AdvertisingInfo=0) protege a privacidade sem quebrar funcionalidade.",
+            Category = "Privacidade Global", KeyPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo", ValueName = "Enabled", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
+            Name = "Experiências Sob Medida Ativadas (TailoredExperiences=1)",
+            Description = "As experiências sob medida usam dados de diagnóstico para mostrar dicas e anúncios personalizados. Desativá-las reduz o rastreamento sem impacto em funcionalidade.",
+            Category = "Privacidade Global", KeyPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy", ValueName = "TailoredExperiencesWithDiagnosticDataEnabled", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
+            Name = "Atividade do Feed Ativada (EnableActivityFeed=1)",
+            Description = "O feed de atividades (linha do tempo) coleta e exibe histórico de atividades do usuário, armazenando dados localmente e enviando parte para a Microsoft. Desativá-lo preserva a privacidade.",
+            Category = "Privacidade Global", KeyPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy", ValueName = "EnableActivityFeed", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
+            Name = "Busca na Web com Bing Ativada (BingSearchEnabled=1)",
+            Description = "A busca na web integrada ao menu Iniciar envia consultas de pesquisa para a Microsoft. Desativá-la faz a busca funcionar localmente, sem enviar dados de consulta.",
+            Category = "Privacidade Global", KeyPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Search", ValueName = "BingSearchEnabled", HarmfulValue = 1, DefaultValue = 0
         }
     };
 
@@ -2643,8 +2591,22 @@ new() {
 
             using var batch = new RegistryBatch();
             _currentBatch = batch;
+            _bcdEnumOutput = null;
+            _bcdEnumError = null;
+            _bcdEnumAttempted = false;
             try
             {
+                // BCD: UM único bcdedit /enum para todo o scan (antes: 1 processo por tweak BCD).
+                if (HarmfulTweaks.Any(t => t.Type == TweakType.Bcd))
+                {
+                    var bcd = ProcessRunner.Run("bcdedit", "/enum", 10000);
+                    _bcdEnumAttempted = true;
+                    _bcdEnumOutput = bcd.Output;
+                    _bcdEnumError = bcd.Error;
+                    if (bcd.ExitCode != 0)
+                        Logger.Log($"[CHECK] Erro ao obter BCD (cache): {bcd.Error}");
+                }
+
                 foreach (var tweak in HarmfulTweaks)
                 {
                     CheckTweak(tweak);
@@ -2654,6 +2616,9 @@ new() {
             finally
             {
                 _currentBatch = null;
+                _bcdEnumOutput = null;
+                _bcdEnumError = null;
+                _bcdEnumAttempted = false;
             }
 
             return tweaksCopy;
@@ -2815,6 +2780,17 @@ new() {
                         if (string.IsNullOrEmpty(tweak.ServiceName) || string.IsNullOrEmpty(tweak.DefaultStartMode))
                             return (false, "Configuração de serviço inválida.");
 
+                        // Serviço desativado de propósito pelo KitLugia (telemetria/diagnóstico):
+                        // restaurar via Integrity reativaria o que o usuário desligou nos toggles.
+                        if (applySafeValue &&
+                            KitIntentionalServiceStart.TryGetValue(tweak.ServiceName, out var intentionalMode) &&
+                            intentionalMode.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
+                        {
+                            Logger.Log($"[TOGGLE] {tweak.ServiceName} está desativado de propósito pelo KitLugia - não reativado. Use o toggle do Kit (Tweaks) para reativar.");
+                            tweak.Status = TweakStatus.OK;
+                            return (true, $"{tweak.Name} permanece desativado (intencional do KitLugia - reative pelo toggle do Kit).");
+                        }
+
                         string mode = applySafeValue ? tweak.DefaultStartMode : tweak.HarmfulStartMode ?? "Disabled";
                         string scMode = mode.ToLower();
 
@@ -2838,14 +2814,26 @@ new() {
                         string scCmd = $"config {tweak.ServiceName} start= {scMode}";
 
                         Logger.Log($"[TOGGLE] Executando: sc.exe {scCmd}");
-                        var configResult = SystemUtils.RunExternalProcess("sc.exe", scCmd, true);
-                        Logger.Log($"[TOGGLE] SC Config Result: {configResult}");
+                        var (scExitCode, scResult) = SystemUtils.RunExternalProcessWithCode("sc.exe", scCmd, true);
+                        Logger.Log($"[TOGGLE] SC Config Result: {scResult.Trim()}");
+
+                        if (scExitCode != 0)
+                        {
+                            Logger.Log($"[TOGGLE] SC Config falhou com código {scExitCode}");
+                            return (false, $"Falha ao configurar o serviço '{tweak.ServiceName}' (código {scExitCode}).");
+                        }
 
                         if (applySafeValue && mode != "Disabled")
                         {
                             Logger.Log($"[TOGGLE] Iniciando serviço: {tweak.ServiceName}");
-                            var startResult = SystemUtils.RunExternalProcess("sc.exe", $"start {tweak.ServiceName}", true);
-                            Logger.Log($"[TOGGLE] SC Start Result: {startResult}");
+                            var (startExitCode, startResult) = SystemUtils.RunExternalProcessWithCode("sc.exe", $"start {tweak.ServiceName}", true);
+                            Logger.Log($"[TOGGLE] SC Start Result: {startResult.Trim()}");
+                            // 5 = Acesso negado (serviços protegidos como Wdi*), 1056 = já em execução:
+                            // não são falhas do toggle, só avisos.
+                            if (startExitCode != 0 && startExitCode != 5 && startExitCode != 1056)
+                            {
+                                Logger.Log($"[TOGGLE] Aviso: start do serviço retornou código {startExitCode} (serviços protegidos podem negar o start).");
+                            }
                         }
                         break;
 
@@ -2871,7 +2859,7 @@ new() {
 
                         if (exitCode != 0)
                         {
-                            Logger.Log($"[TOGGLE] BCD falhou com código {exitCode}: {error}");
+                            Logger.Log($"[TOGGLE] BCD falhou com código {exitCode} - Saída: '{output.Trim()}' - Erro: '{error.Trim()}'");
                             return (false, $"Falha ao modificar BCD: {error}");
                         }
 
@@ -3547,13 +3535,33 @@ new() {
 
                     try
                     {
-                        string? startMode = ServiceHelper.GetServiceStartMode(tweak.ServiceName);
+                        // Fast path: lê o DWORD Start de HKLM\SYSTEM\CurrentControlSet\Services\<nome>
+                        // via RegistryBatch (cache de chaves) - 10-50x mais rápido que ServiceController.
+                        string? startMode = null;
+                        if (_currentBatch != null)
+                        {
+                            var (val, err) = _currentBatch.GetValue(
+                                $@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\{tweak.ServiceName}", "Start");
+                            if (err == null && val != null)
+                                startMode = StartDwordToMode(Convert.ToInt32(val));
+                        }
+                        if (startMode == null)
+                            startMode = ServiceHelper.GetServiceStartMode(tweak.ServiceName);
 
                         if (startMode == null)
                         {
                             if (Logger.VerboseCheckLogs)
                                 Logger.Log($"[CHECK] Serviço {tweak.ServiceName} não encontrado");
                             tweak.Status = TweakStatus.NOT_FOUND;
+                            return;
+                        }
+
+                        // Serviço desativado de propósito pelo KitLugia (telemetria/diagnóstico/
+                        // memory leak) - não é vulnerabilidade e não deve ser "restaurado".
+                        if (KitIntentionalServiceStart.TryGetValue(tweak.ServiceName, out var intentionalMode) &&
+                            startMode.Equals(intentionalMode, StringComparison.OrdinalIgnoreCase))
+                        {
+                            tweak.Status = TweakStatus.OK;
                             return;
                         }
 
@@ -3604,12 +3612,29 @@ new() {
                 {
                     if (string.IsNullOrEmpty(tweak.ValueName) || tweak.HarmfulValue == null) return;
 
-                    var (exitCode, output, error) = ProcessRunner.Run("bcdedit", "/enum", 10000);
-                    if (exitCode != 0)
+                    // Usa o cache do scan (1 único bcdedit /enum) ou roda pontualmente
+                    // quando chamado fora de um scan (toggle individual / uso isolado).
+                    string output;
+                    if (_bcdEnumAttempted)
                     {
-                        Logger.Log($"[CHECK] Erro ao obter BCD: {error}");
-                        tweak.Status = TweakStatus.ERROR;
-                        return;
+                        if (!string.IsNullOrEmpty(_bcdEnumError))
+                        {
+                            Logger.Log($"[CHECK] Erro ao obter BCD (cache): {_bcdEnumError}");
+                            tweak.Status = TweakStatus.ERROR;
+                            return;
+                        }
+                        output = _bcdEnumOutput ?? "";
+                    }
+                    else
+                    {
+                        var (exitCode, outp, error) = ProcessRunner.Run("bcdedit", "/enum", 10000);
+                        if (exitCode != 0)
+                        {
+                            Logger.Log($"[CHECK] Erro ao obter BCD: {error}");
+                            tweak.Status = TweakStatus.ERROR;
+                            return;
+                        }
+                        output = outp;
                     }
 
                     var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -3623,11 +3648,11 @@ new() {
                             var trimmed = line.Trim();
                             if (trimmed.StartsWith(tweak.ValueName, StringComparison.OrdinalIgnoreCase))
                             {
-                                // Extrai o valor após o nome do parâmetro
+                                // Extrai o valor após o nome do parâmetro (suporta valores com espaços)
                                 var parts = trimmed.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
                                 if (parts.Length >= 2)
                                 {
-                                    string actualValue = parts[1];
+                                    string actualValue = string.Join(" ", parts, 1, parts.Length - 1);
                                     if (actualValue.Equals(harmfulStr, StringComparison.OrdinalIgnoreCase))
                                     {
                                         isHarmful = true;
@@ -3650,6 +3675,23 @@ new() {
                 tweak.Status = TweakStatus.ERROR;
                 Logger.Log($"Erro ao verificar tweak '{tweak.Name}': {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Mapeia o DWORD Start de HKLM\SYSTEM\CurrentControlSet\Services\&lt;nome&gt; para o
+        /// modo textual usado nos checks (Boot/System/Auto/Manual/Disabled).
+        /// </summary>
+        private static string? StartDwordToMode(int start)
+        {
+            return start switch
+            {
+                0 => "Boot",
+                1 => "System",
+                2 => "Auto",
+                3 => "Manual",
+                4 => "Disabled",
+                _ => null,
+            };
         }
 
         private static string[] GetAllPowerShellProfiles()

@@ -82,6 +82,24 @@ namespace KitLugia.Core
 
         #region Execução de Processos
 
+        /// <summary>
+        /// Encoding OEM do sistema (cp850 pt-BR / cp437 en-US / cp65001 UTF-8).
+        /// Ferramentas nativas (sc.exe, bcdedit, powercfg) emitem texto OEM; ler como
+        /// UTF-8 fixo gerava mojibake no log (ex: "[SC] ChangeServiceConfig �XITO").
+        /// </summary>
+        public static Encoding GetOemEncoding()
+        {
+            try
+            {
+                int cp = System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage;
+                if (cp > 0) return Encoding.GetEncoding(cp);
+            }
+            catch { /* code page não instalada - usa fallback */ }
+
+            try { return Encoding.GetEncoding(850); } catch { /* fallback final */ }
+            return Encoding.UTF8;
+        }
+
         public static async Task<string> RunExternalProcessAsync(string fileName, string arguments, bool hidden = false, bool waitForExit = true, bool runAs = false)
         {
             var psi = new ProcessStartInfo(fileName, arguments)
@@ -101,8 +119,9 @@ namespace KitLugia.Core
                 psi.RedirectStandardOutput = true;
                 psi.RedirectStandardError = true;
                 psi.UseShellExecute = false;
-                psi.StandardOutputEncoding = Encoding.UTF8;
-                psi.StandardErrorEncoding = Encoding.UTF8;
+                var oem = GetOemEncoding();
+                psi.StandardOutputEncoding = oem;
+                psi.StandardErrorEncoding = oem;
             }
             else
             {
@@ -152,6 +171,58 @@ namespace KitLugia.Core
         public static string RunExternalProcess(string fileName, string arguments, bool hidden = false, bool waitForExit = true, bool runAs = false)
         {
             return RunExternalProcessAsync(fileName, arguments, hidden, waitForExit, runAs).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Executa um processo e retorna (ExitCode, Saída) - útil para sc.exe/bcdedit onde
+        /// o exit code é a fonte de verdade e o texto é OEM (encoding correto aplicado).
+        /// </summary>
+        public static async Task<(int ExitCode, string Output)> RunExternalProcessWithCodeAsync(string fileName, string arguments, bool hidden = false)
+        {
+            var psi = new ProcessStartInfo(fileName, arguments)
+            {
+                CreateNoWindow = hidden,
+                WindowStyle = hidden ? ProcessWindowStyle.Hidden : ProcessWindowStyle.Normal,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            var oem = GetOemEncoding();
+            psi.StandardOutputEncoding = oem;
+            psi.StandardErrorEncoding = oem;
+
+            try
+            {
+                using var process = Process.Start(psi);
+                if (process == null) return (1, "Falha ao iniciar o processo.");
+
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+
+                var exitTask = process.WaitForExitAsync();
+                if (await Task.WhenAny(exitTask, Task.Delay(120000)).ConfigureAwait(false) != exitTask)
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    return (1, "[TIMEOUT] Processo excedeu 120 segundos.");
+                }
+
+                string output = await outputTask.ConfigureAwait(false);
+                string error = await errorTask.ConfigureAwait(false);
+                return (process.ExitCode, string.IsNullOrEmpty(error) ? output : $"{output}\n{error}");
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return (1, "Processo cancelado pelo usuário.");
+            }
+            catch (Exception ex)
+            {
+                return (1, $"Erro ao executar processo: {ex.Message}");
+            }
+        }
+
+        public static (int ExitCode, string Output) RunExternalProcessWithCode(string fileName, string arguments, bool hidden = false)
+        {
+            return RunExternalProcessWithCodeAsync(fileName, arguments, hidden).GetAwaiter().GetResult();
         }
 
         public static string? FindWingetPath()

@@ -20,24 +20,611 @@ namespace KitLugia.Core
 
         private static async Task<(int ExitCode, string Output)> RunProcessCaptured(string filename, string args)
         {
+            return await RunProcessCapturedWithStdin(filename, args, null);
+        }
+
+        /// <summary>
+        /// Executa um processo capturando stdout+stderr e, opcionalmente, escrevendo
+        /// stdinContent no stdin do processo (usado pelo wimlib update < CMDFILE).
+        /// </summary>
+        private static async Task<(int ExitCode, string Output)> RunProcessCapturedWithStdin(string filename, string args, string? stdinContent)
+        {
             return await Task.Run(() =>
             {
                 var psi = new ProcessStartInfo(filename, args)
                 {
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
+                    RedirectStandardInput = stdinContent != null,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
 
                 using var process = Process.Start(psi)!;
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
+                string output, error;
+                if (stdinContent != null)
+                {
+                    // Leitura assíncrona para evitar deadlock de pipe (stdout cheio + stdin bloqueado)
+                    var tout = process.StandardOutput.ReadToEndAsync();
+                    var terr = process.StandardError.ReadToEndAsync();
+                    process.StandardInput.Write(stdinContent);
+                    process.StandardInput.Close();
+                    output = tout.GetAwaiter().GetResult();
+                    error = terr.GetAwaiter().GetResult();
+                    process.WaitForExit();
+                }
+                else
+                {
+                    output = process.StandardOutput.ReadToEnd();
+                    error = process.StandardError.ReadToEnd();
+                    process.WaitForExit();
+                }
 
                 return (process.ExitCode, output + (string.IsNullOrEmpty(error) ? "" : $"\n[ERROR]: {error}"));
             });
         }
+        // ==========================================
+        // WIMLIB (SEM MONTAR) - motor rápido
+        // wimlib-imagex embutido modifica o WIM em 1-2s, sem DISM mount/commit.
+        // ==========================================
+
+        private static string? WimlibExe => WinpeBuilder.FindBundledWimlib();
+
+        /// <summary>
+        /// Lista as edições (indices + nomes) de um install.wim/esd via wimlib-imagex info
+        /// (rápido, sem montar). Detecta se a imagem é ESD (solid) pela extensão.
+        /// </summary>
+        public static async Task<(bool Success, string Message, List<WimEdition> Editions)> AnalyzeWimAsync(string wimPath)
+        {
+            return await Task.Run(async () =>
+            {
+                try
+                {
+                    if (!File.Exists(wimPath)) return (false, "Arquivo WIM/ESD não encontrado.", new List<WimEdition>());
+                    string? wimlib = WimlibExe;
+                    if (wimlib == null) return (false, "wimlib-imagex.exe não encontrado no kit.", new List<WimEdition>());
+
+                    var (code, output) = await RunProcessCaptured(wimlib, $"info \"{wimPath}\"");
+                    if (code != 0) return (false, $"wimlib info falhou (código {code}): {output.Trim()}", new List<WimEdition>());
+
+                    var editions = new List<WimEdition>();
+                    int currentIndex = 0;
+                    foreach (var rawLine in output.Replace("\r\n", "\n").Split('\n'))
+                    {
+                        var line = rawLine.Trim();
+                        // wimlib imprime "Index: N" (sem "Image"); DISM/outros podem usar "Image Index: N".
+                        var idxMatch = Regex.Match(line, @"^(?:Image\s+)?Index\s*:\s*(\d+)\s*$", RegexOptions.IgnoreCase);
+                        if (idxMatch.Success)
+                        {
+                            currentIndex = int.Parse(idxMatch.Groups[1].Value);
+                            editions.Add(new WimEdition { Index = currentIndex });
+                            continue;
+                        }
+                        if (currentIndex == 0 || editions.Count == 0) continue;
+                        var cur = editions[^1];
+                        var nameMatch = Regex.Match(line, @"^(?:Name|Nome|Nazwa)\s*:\s*(.+)$", RegexOptions.IgnoreCase);
+                        if (nameMatch.Success) cur.Name = nameMatch.Groups[1].Value.Trim();
+                        var descMatch = Regex.Match(line, @"^Description\s*:\s*(.+)$", RegexOptions.IgnoreCase);
+                        if (descMatch.Success) cur.Description = descMatch.Groups[1].Value.Trim();
+                    }
+
+                    bool isEsd = wimPath.EndsWith(".esd", StringComparison.OrdinalIgnoreCase)
+                                 || output.Contains("Solid compression", StringComparison.OrdinalIgnoreCase)
+                                 || output.Contains("Compression: LZMS", StringComparison.OrdinalIgnoreCase);
+                    foreach (var e in editions) e.IsEsd = isEsd;
+
+                    if (editions.Count == 0) return (false, "Nenhuma edição encontrada no WIM/ESD.", editions);
+                    return (true, $"Analisada: {FormatBytes(new FileInfo(wimPath).Length)}, {editions.Count} edição(ões)" + (isEsd ? " (ESD comprimida)" : ""), editions);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Erro ao analisar WIM: {ex.Message}");
+                    return (false, $"Erro ao analisar: {ex.Message}", new List<WimEdition>());
+                }
+            });
+        }
+
+        /// <summary>
+        /// Exporta UMA edição do WIM/ESD para um novo install.wim, recomprimindo.
+        /// - ESD (solid) -> WIM normal (permite tweaks depois, sem runtime DISM)
+        /// - strip de ISO multi-edição (deixa só a escolhida), reduz tamanho
+        /// - compress: "lzms" (máx) ou "lzx" (padrão/balanceado)
+        /// - markBootable: adiciona --boot ao export (marca a imagem exportada como bootable
+        ///   no header do WIM, BootIndex=1) - necessario para boot ramdisk (bootmgr so
+        ///   carrega imagens marcadas; sem o flag o WIM exportado falha com 0xc0000487)
+        /// </summary>
+        public static async Task<(bool Success, string Message, string OutputPath)> ExportSingleEditionAsync(
+            string wimPath, int index, string destWim, string compress = "lzms", bool markBootable = false)
+        {
+            return await Task.Run(async () =>
+            {
+                try
+                {
+                    string? wimlib = WimlibExe;
+                    if (wimlib == null) return (false, "wimlib-imagex.exe não encontrado no kit.", wimPath);
+                    if (!File.Exists(wimPath)) return (false, "Arquivo WIM/ESD não encontrado.", wimPath);
+
+                    long sizeBefore = new FileInfo(wimPath).Length;
+                    bool sameFile = Path.GetFullPath(destWim).Equals(Path.GetFullPath(wimPath), StringComparison.OrdinalIgnoreCase);
+
+                    // Destino igual à origem (ex: exportar edição N do próprio install.wim): exporta
+                    // para um .tmp e substitui o original no fim. Destino existente (rodada anterior):
+                    // apaga primeiro, senão o wimlib aborta com "already an image named ...".
+                    string targetWim = destWim;
+                    if (sameFile)
+                    {
+                        targetWim = destWim + ".kitltmp";
+                        try { if (File.Exists(targetWim)) { File.SetAttributes(targetWim, FileAttributes.Normal); File.Delete(targetWim); } } catch { }
+                    }
+                    else if (File.Exists(destWim))
+                    {
+                        try { File.SetAttributes(destWim, FileAttributes.Normal); File.Delete(destWim); } catch { }
+                    }
+
+                    if (compress != "lzms" && compress != "lzx") compress = "lzms";
+                    string bootFlag = markBootable ? " --boot" : "";
+                    var (code, output) = await RunProcessCaptured(wimlib, $"export \"{wimPath}\" {index} \"{targetWim}\" --compress={compress}{bootFlag}");
+                    if (code != 0)
+                    {
+                        try { File.Delete(targetWim); } catch { }
+                        return (false, $"wimlib export falhou (código {code}): {output.Trim()}", wimPath);
+                    }
+
+                    if (sameFile)
+                    {
+                        try { File.SetAttributes(wimPath, FileAttributes.Normal); File.Delete(wimPath); } catch { }
+                        File.Move(targetWim, destWim);
+                    }
+
+                    long sizeAfter = new FileInfo(destWim).Length;
+                    long saved = sizeBefore - sizeAfter;
+                    string msg = $"Exportada edição {index} como install.wim (compressão {compress}). " +
+                                 $"Economia: {FormatBytes(saved)} (antes {FormatBytes(sizeBefore)} -> depois {FormatBytes(sizeAfter)})";
+                    return (true, msg, destWim);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Erro ao exportar edição: {ex.Message}");
+                    return (false, $"Erro ao exportar: {ex.Message}", wimPath);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Injeta arquivos no WIM (index específico) via wimlib update --command-file,
+        /// sem montar. Mesmo padrão do WinpeBuilder.InjectWimlibIntoWimAsync.
+        /// </summary>
+        public static async Task<bool> InjectFilesIntoWimAsync(string wimPath, int index, IEnumerable<(string LocalPath, string WimTarget)> files)
+        {
+            try
+            {
+                string? wimlib = WimlibExe;
+                if (wimlib == null) return false;
+                if (!File.Exists(wimPath)) return false;
+
+                var list = files.Where(f => File.Exists(f.LocalPath)).ToList();
+                if (list.Count == 0) return false;
+                File.SetAttributes(wimPath, FileAttributes.Normal);
+
+                string tmpDir = Path.Combine(Path.GetTempPath(), "KitLugia_IsoWimlib");
+                Directory.CreateDirectory(tmpDir);
+                var sb = new List<string>();
+                foreach (var (local, target) in list)
+                {
+                    string targetNorm = target.Replace('\\', '/');
+                    if (!targetNorm.StartsWith("/")) targetNorm = "/" + targetNorm;
+                    sb.Add($"add \"{local}\" {targetNorm}");
+                }
+                string commands = string.Join("\n", sb);
+
+                string args = $"update \"{wimPath}\" {index}";
+                var (code, output) = await RunProcessCapturedWithStdin(wimlib, args, commands);
+                try { Directory.Delete(tmpDir, true); } catch { }
+
+                if (code != 0)
+                {
+                    Logger.Log($"wimlib update falhou (código {code}): {output.Trim()}");
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao injetar arquivos no WIM: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Instala um startnet.cmd + winpeshl.ini na imagem (index) do WIM de Setup:
+        /// SEM winpeshl.ini o winpeshl.exe tenta lancar %SystemDrive%\$Windows.~BT\sources\setup.exe
+        /// e %SystemDrive%\setup.exe ANTES do fallback cmd /k startnet.cmd - e a imagem de Setup
+        /// da midia TEM setup.exe na raiz (o shim, 333 KB), entao o nosso startnet.cmd NUNCA
+        /// rodava (o winpeshl lancava o shim, que abre o Setup cru, sem /installfrom e sem o
+        /// ambiente de enumeracao de discos). Com winpeshl.ini presente, o winpeshl lanca SO o
+        /// que o [LaunchApps] mandar - cmd.exe /k startnet.cmd - e o fluxo fica sob nosso controle.
+        /// </summary>
+        public static async Task<bool> InstallSetupStartnetAsync(string wimPath, int index, string startnetLocalPath)
+        {
+            try
+            {
+                string? wimlib = WimlibExe;
+                if (wimlib == null) return false;
+                if (!File.Exists(wimPath) || !File.Exists(startnetLocalPath)) return false;
+                File.SetAttributes(wimPath, FileAttributes.Normal);
+
+                // 1. winpeshl.ini local: [LaunchApps] -> cmd /k startnet.cmd (ASCII; o
+                //    winpeshl le AppPath + args separados por virgula - formato da midia)
+                string iniLocal = Path.Combine(Path.GetTempPath(), "kitlugia_winpeshl.ini");
+                File.WriteAllText(iniLocal,
+                    "[LaunchApps]\r\n" +
+                    "%SystemRoot%\\system32\\cmd.exe, /k startnet.cmd\r\n",
+                    System.Text.Encoding.ASCII);
+
+                // 2. Command file via stdin: add startnet.cmd + add/substituir winpeshl.ini
+                var cmds = new List<string>
+                {
+                    $"add \"{startnetLocalPath}\" /Windows/System32/startnet.cmd",
+                    $"add \"{iniLocal}\" /Windows/System32/winpeshl.ini"
+                };
+
+                var (uCode, uOut) = await RunProcessCapturedWithStdin(wimlib, $"update \"{wimPath}\" {index}", string.Join("\n", cmds));
+                try { File.Delete(iniLocal); } catch { }
+                if (uCode != 0)
+                {
+                    Logger.Log($"wimlib update do startnet/winpeshl.ini falhou (codigo {uCode}): {uOut.Trim()}");
+                    return false;
+                }
+                Logger.Log($"startnet.cmd + winpeshl.ini instalados na imagem {index} (winpeshl.ini controla o launch do startnet.cmd).");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao instalar startnet.cmd/winpeshl.ini no WIM: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Lista as pastas de nível superior de Program Files\WindowsApps de um WIM via wimlib dir
+        /// (nome completo do pacote = o nome da pasta; só filhos DIRETOS da raiz de WindowsApps).
+        /// </summary>
+        public static async Task<List<string>> ListWindowsAppsFoldersAsync(string wimPath, int index)
+        {
+            var result = new List<string>();
+            try
+            {
+                string? wimlib = WimlibExe;
+                if (wimlib == null || !File.Exists(wimPath)) return result;
+
+                // dir lista a subárvore inteira (o próprio dir + pacotes + arquivos); o filtro abaixo
+                // mantém só os filhos diretos (pacotes) - 1 nível abaixo do prefixo.
+                var (code, output) = await RunProcessCaptured(wimlib, $"dir \"{wimPath}\" {index} --path=\"Program Files/WindowsApps/\"");
+                if (code != 0) return result;
+
+                const string prefix = @"\Program Files\WindowsApps\";
+                foreach (var rawLine in output.Replace("\r\n", "\n").Split('\n'))
+                {
+                    string p = rawLine.Trim();
+                    if (!p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                    string name = p.Substring(prefix.Length);
+                    if (string.IsNullOrEmpty(name) || name.Contains('\\')) continue; // só filhos diretos
+                    if (!result.Contains(name, StringComparer.OrdinalIgnoreCase)) result.Add(name);
+                }
+            }
+            catch (Exception ex) { Logger.Log($"Erro ao listar WindowsApps: {ex.Message}"); }
+            return result;
+        }
+
+        /// <summary>
+        /// Remove AppX provisionados SEM DISM e SEM montar (método nativo, espelha o que o
+        /// Remove-AppxProvisionedPackage faz por baixo - ver AppxAllUserStore::CleanupPackageFromPerMachineStore):
+        /// 1. wimlib ls lista as pastas de Program Files\WindowsApps
+        /// 2. wimlib update DELETE remove as pastas cujo nome começa com algum prefixo
+        /// 3. Hive SOFTWARE (extract -> reg load -> delete Applications + add Deprovisioned -> unload -> re-inject)
+        ///    Deprovisioned é o marcador documentado (MS Learn) que impede o re-provisionamento em updates.
+        /// </summary>
+        public static async Task<(bool Success, string Message)> RemoveProvisionedAppsNoMountAsync(
+            string wimPath, int index, IEnumerable<string> namePrefixes, Action<string>? log = null)
+        {
+            try
+            {
+                string? wimlib = WimlibExe;
+                if (wimlib == null) return (false, "wimlib-imagex.exe não encontrado no kit.");
+                if (!File.Exists(wimPath)) return (false, "Arquivo WIM/ESD não encontrado.");
+
+                var prefixes = namePrefixes.Select(p => p.Trim()).Where(p => p.Length > 0).ToList();
+                if (prefixes.Count == 0) return (false, "Nenhum app informado para remover.");
+
+                log?.Invoke("Listando pastas de WindowsApps no WIM (wimlib ls)...");
+                var folders = await ListWindowsAppsFoldersAsync(wimPath, index);
+                var toRemove = folders
+                    .Where(f => prefixes.Any(p => f.StartsWith(p + "_", StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (toRemove.Count == 0)
+                {
+                    log?.Invoke("Nenhum app provisionado correspondente encontrado no WIM (já removidos?).");
+                    return (true, "Nenhum AppX provisionado encontrado para os prefixos informados.");
+                }
+
+                string tmpDir = Path.Combine(Path.GetTempPath(), $"KitLugia_IsoAppx_{DateTime.Now:yyyyMMdd_HHmmss}");
+                Directory.CreateDirectory(tmpDir);
+                try
+                {
+                    // 1) wimlib update: delete das pastas (--recursive p/ pastas; comandos via stdin)
+                    var cmds = toRemove.Select(f => $"delete \"Program Files/WindowsApps/{f}\"").ToList();
+                    log?.Invoke($"Removendo {toRemove.Count} pasta(s) de WindowsApps via wimlib update...");
+                    var (uCode, uOut) = await RunProcessCapturedWithStdin(wimlib, $"update \"{wimPath}\" {index} --recursive", string.Join("\n", cmds));
+                    if (uCode != 0)
+                    {
+                        log?.Invoke($"Aviso: wimlib update delete falhou (código {uCode}): {uOut.Trim()} - continua com o registro.");
+                    }
+
+                    // 2) hive SOFTWARE: delete Applications/<fullname> + add Deprovisioned/<fullname>
+                    string softwareLocal = Path.Combine(tmpDir, "software");
+                    log?.Invoke("Extraindo hive SOFTWARE do WIM...");
+                    var (xCode, xOut) = await RunProcessCaptured(wimlib, $"extract \"{wimPath}\" {index} \"Windows/System32/config/software\" --dest-dir=\"{tmpDir}\"");
+                    if (xCode != 0 || !File.Exists(softwareLocal))
+                    {
+                        log?.Invoke($"Aviso: não foi possível extrair SOFTWARE (código {xCode}): {xOut.Trim()} - registro não editado.");
+                        return (true, $"{toRemove.Count} AppX removidos (pastas), registro SOFTWARE não editado.");
+                    }
+
+                    var unloadPsi = new ProcessStartInfo("reg.exe", "unload HKLM\\zSOFTWARE")
+                    { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+                    using (var pu = Process.Start(unloadPsi)) pu?.WaitForExit(10000);
+
+                    var (lCode, lOut) = await RunProcessCaptured("reg.exe", $"load HKLM\\zSOFTWARE \"{softwareLocal}\"");
+                    if (lCode != 0)
+                    {
+                        log?.Invoke($"Aviso: reg load de SOFTWARE falhou (código {lCode}): {lOut.Trim()} - registro não editado.");
+                        return (true, $"{toRemove.Count} AppX removidos (pastas), registro SOFTWARE não editado.");
+                    }
+
+                    const string appxRoot = @"HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore";
+                    foreach (var fullName in toRemove)
+                    {
+                        // Remove a entrada de provisionamento (a pasta já foi deletada)
+                        await RunProcessCaptured("reg.exe", $"delete \"{appxRoot}\\Applications\\{fullName}\" /f");
+                        await RunProcessCaptured("reg.exe", $"delete \"{appxRoot}\\Application\\{fullName}\" /f");
+                        // Marcador Deprovisioned: impede o re-provisionamento em feature updates (MS Learn)
+                        var (dCode, dOut) = await RunProcessCaptured("reg.exe", $"add \"{appxRoot}\\Deprovisioned\\{fullName}\" /f");
+                        if (dCode != 0) log?.Invoke($"Deprovisioned {fullName} -> ({dCode}) {dOut.Trim()}");
+                    }
+
+                    var (uCode2, uOut2) = await RunProcessCaptured("reg.exe", "unload HKLM\\zSOFTWARE");
+                    if (uCode2 != 0) log?.Invoke($"reg unload SOFTWARE -> ({uCode2}) {uOut2.Trim()}");
+
+                    log?.Invoke("Reinjetando hive SOFTWARE no WIM via wimlib...");
+                    bool ok = await InjectFilesIntoWimAsync(wimPath, index, new[] { (softwareLocal, "/Windows/System32/config/software") });
+                    if (!ok) return (false, "Falha ao re-injetar SOFTWARE (wimlib update).");
+
+                    return (true, $"{toRemove.Count} AppX provisionados removidos sem montar: {string.Join(", ", toRemove.Take(8))}" +
+                                 (toRemove.Count > 8 ? $" (+{toRemove.Count - 8})" : ""));
+                }
+                finally
+                {
+                    try { Directory.Delete(tmpDir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro no RemoveProvisionedAppsNoMountAsync: {ex.Message}");
+                return (false, $"Erro ao remover AppX sem montar: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Deleta arquivos de scheduled tasks de dentro do WIM via wimlib update delete (sem montar).
+        /// tasks: caminhos relativos a Windows\System32\Tasks (ex: "Microsoft\Windows\UpdateOrchestrator").
+        /// Versões novas (24H2/25H2) NÃO incluem mais a maioria das tasks de telemetria no WIM:
+        /// lista antes com dir e só deleta o que EXISTE (o update aborta no 1º path ausente com
+        /// código 49 e nada é deletado).
+        /// </summary>
+        public static async Task<(bool Success, string Message)> DeleteScheduledTaskFilesNoMountAsync(
+            string wimPath, int index, IEnumerable<string> tasks, Action<string>? log = null)
+        {
+            try
+            {
+                string? wimlib = WimlibExe;
+                if (wimlib == null) return (false, "wimlib-imagex.exe não encontrado no kit.");
+                if (!File.Exists(wimPath)) return (false, "Arquivo WIM/ESD não encontrado.");
+
+                var list = tasks.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+                if (list.Count == 0) return (false, "Nenhuma task informada.");
+
+                // Lista o que existe de verdade em Tasks (1 chamada dir, barata - 25H2 tem ~10 linhas)
+                var (lsCode, lsOutput) = await RunProcessCaptured(wimlib, $"dir \"{wimPath}\" {index} --path=\"/Windows/System32/Tasks\"");
+                var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (lsCode == 0)
+                {
+                    foreach (var rawLine in lsOutput.Replace("\r\n", "\n").Split('\n'))
+                    {
+                        var line = rawLine.Trim().Replace('\\', '/');
+                        if (!line.StartsWith("/Windows/System32/Tasks/", StringComparison.OrdinalIgnoreCase)) continue;
+                        existing.Add(line);
+                    }
+                }
+
+                var toDelete = list
+                    .Select(t => "Windows/System32/Tasks/" + t.TrimStart('/').Replace('\\', '/'))
+                    .Where(p => existing.Any(e => e.Equals("/" + p, StringComparison.OrdinalIgnoreCase)
+                                               || e.StartsWith("/" + p + "/", StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (toDelete.Count == 0)
+                    return (true, $"Nenhuma das {list.Count} scheduled task(s) alvo existe no WIM (esta versão já não as inclui). Nada a deletar.");
+
+                string tmpDir = Path.Combine(Path.GetTempPath(), $"KitLugia_IsoTasks_{DateTime.Now:yyyyMMdd_HHmmss}");
+                Directory.CreateDirectory(tmpDir);
+                try
+                {
+                    var cmds = toDelete.Select(p => $"delete \"{p}\"").ToList();
+                    log?.Invoke($"Deletando {toDelete.Count} scheduled task(s) existente(s) via wimlib update ({list.Count - toDelete.Count} já ausentes nesta versão)...");
+                    var (code, output) = await RunProcessCapturedWithStdin(wimlib, $"update \"{wimPath}\" {index} --recursive", string.Join("\n", cmds));
+                    if (code != 0) return (false, $"wimlib update delete de tasks falhou (código {code}): {output.Trim()}");
+                    return (true, $"{toDelete.Count} scheduled task(s) deletadas sem montar.");
+                }
+                finally
+                {
+                    try { Directory.Delete(tmpDir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro no DeleteScheduledTaskFilesNoMountAsync: {ex.Message}");
+                return (false, $"Erro ao deletar tasks sem montar: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Otimiza o WIM via wimlib optimize SEM recompressão: remove os "holes" deixados
+        /// pelos updates (appends/deletes) reutilizando os dados comprimidos existentes.
+        /// Equivalente no-mount ao DISM /StartComponentCleanup /ResetBase em mídia nova.
+        /// NUNCA passar --compress= aqui: ele implica --recompress (wimlib docs) e recomprime
+        /// o WIM INTEIRO do zero (minutos em 6GB). A compressão já foi escolhida no export.
+        /// </summary>
+        public static async Task<(bool Success, string Message)> OptimizeWimAsync(string wimPath)
+        {
+            try
+            {
+                string? wimlib = WimlibExe;
+                if (wimlib == null) return (false, "wimlib-imagex.exe não encontrado no kit.");
+                if (!File.Exists(wimPath)) return (false, "Arquivo WIM/ESD não encontrado.");
+
+                long before = new FileInfo(wimPath).Length;
+                var (code, output) = await RunProcessCaptured(wimlib, $"optimize \"{wimPath}\"");
+                if (code != 0) return (false, $"wimlib optimize falhou (código {code}): {output.Trim()}");
+                long after = new FileInfo(wimPath).Length;
+                return (true, $"WIM otimizado: {FormatBytes(before)} -> {FormatBytes(after)} (economia {FormatBytes(before - after)})");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro no OptimizeWimAsync: {ex.Message}");
+                return (false, $"Erro ao otimizar: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Aplica registry tweaks SEM montar o WIM:
+        /// extrai as hives (SOFTWARE/SYSTEM/NTUSER/DEFAULT) via wimlib, reg load,
+        /// reg add, reg unload, e re-injeta as hives via wimlib update.
+        /// edits: (Hive, SubKeyCompleto, ValorName, Tipo, Valor) - Hive sem o prefixo HKLM\z.
+        /// </summary>
+        public static async Task<(bool Success, string Message)> ApplyRegistryEditsNoMountAsync(
+            string wimPath, int index,
+            IEnumerable<(string Hive, string Key, string Name, string Type, string Value)> edits,
+            Action<string>? log = null)
+        {
+            try
+            {
+                string? wimlib = WimlibExe;
+                if (wimlib == null) return (false, "wimlib-imagex.exe não encontrado no kit.");
+                if (!File.Exists(wimPath)) return (false, "Arquivo WIM/ESD não encontrado.");
+
+                var hiveWimPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["SOFTWARE"] = "/Windows/System32/config/software",
+                    ["SYSTEM"] = "/Windows/System32/config/system",
+                    ["DEFAULT"] = "/Windows/System32/config/default",
+                    ["NTUSER"] = "/Users/Default/ntuser.dat",
+                };
+
+                var groups = edits
+                    .Where(e => !string.IsNullOrWhiteSpace(e.Key))
+                    .GroupBy(e => e.Hive, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (groups.Count == 0) return (false, "Nenhum tweak de registro para aplicar.");
+
+                string tmpDir = Path.Combine(Path.GetTempPath(), $"KitLugia_IsoHives_{DateTime.Now:yyyyMMdd_HHmmss}");
+                Directory.CreateDirectory(tmpDir);
+
+                try
+                {
+                    var reInject = new List<(string Local, string Wim)>();
+                    var applied = new List<string>();
+                    var reInjectLock = new object();
+                    var appliedLock = new object();
+
+                    // Processa cada hive EM PARALELO (extract + reg load + tweaks + unload):
+                    // hives diferentes = chaves HKLM\z{...} diferentes + arquivos locais diferentes
+                    // (software/system/default/ntuser.dat) - sem colisao entre si.
+                    async Task ProcessHiveAsync(IGrouping<string, (string Hive, string Key, string Name, string Type, string Value)> g)
+                    {
+                        string hive = g.Key.ToUpperInvariant();
+                        if (!hiveWimPath.ContainsKey(hive))
+                        {
+                            log?.Invoke($"Aviso: hive desconhecido '{g.Key}' ignorado.");
+                            return;
+                        }
+
+                        string wimInternal = hiveWimPath[hive];
+                        string hiveLocal = Path.Combine(tmpDir, wimInternal.Substring(wimInternal.LastIndexOf('/') + 1));
+
+                        log?.Invoke($"Extraindo hive {hive} do WIM (edição {index})...");
+                        var (xCode, xOut) = await RunProcessCaptured(wimlib, $"extract \"{wimPath}\" {index} \"{wimInternal.TrimStart('/')}\" --dest-dir=\"{tmpDir}\"");
+                        if (xCode != 0 || !File.Exists(hiveLocal))
+                        {
+                            log?.Invoke($"Aviso: não foi possível extrair {hive} (código {xCode}): {xOut.Trim()}");
+                            return;
+                        }
+
+                        // Liberar hive caso já esteja carregado (reg load exige key inexistente)
+                        var unloadPsi = new ProcessStartInfo("reg.exe", $"unload HKLM\\z{hive}")
+                        {
+                            UseShellExecute = false, CreateNoWindow = true,
+                            RedirectStandardOutput = true, RedirectStandardError = true
+                        };
+                        using (var pu = Process.Start(unloadPsi)) pu?.WaitForExit(10000);
+
+                        log?.Invoke($"Carregando hive {hive} (reg load)...");
+                        var (lCode, lOut) = await RunProcessCaptured("reg.exe", $"load HKLM\\z{hive} \"{hiveLocal}\"");
+                        if (lCode != 0)
+                        {
+                            log?.Invoke($"Aviso: reg load de {hive} falhou (código {lCode}): {lOut.Trim()} - tweaks deste hive pulados.");
+                            return;
+                        }
+
+                        foreach (var e in g)
+                        {
+                            var (aCode, aOut) = await RunProcessCaptured("reg.exe",
+                                $"add \"HKLM\\z{hive}\\{e.Key.TrimStart('\\')}\" /v {e.Name} /t {e.Type} /d \"{e.Value}\" /f");
+                            if (aCode == 0) { lock (appliedLock) applied.Add(hive); }
+                            else log?.Invoke($"reg add {e.Key}\\{e.Name} -> ({aCode}) {aOut.Trim()}");
+                        }
+
+                        var (uCode, uOut) = await RunProcessCaptured("reg.exe", $"unload HKLM\\z{hive}");
+                        if (uCode != 0) log?.Invoke($"reg unload {hive} -> ({uCode}) {uOut.Trim()}");
+
+                        lock (reInjectLock) reInject.Add((hiveLocal, wimInternal.TrimStart('/')));
+                    }
+
+                    await Task.WhenAll(groups.Select(g => Task.Run(() => ProcessHiveAsync(g))));
+
+                    if (reInject.Count > 0)
+                    {
+                        log?.Invoke($"Reinjeta {reInject.Count} hive(s) no WIM via wimlib...");
+                        bool ok = await InjectFilesIntoWimAsync(wimPath, index, reInject.Select(r => (r.Local, r.Wim)));
+                        if (!ok) return (false, "Falha ao re-injetar hives no WIM (wimlib update).");
+                    }
+
+                    return (applied.Count > 0
+                        ? (true, $"Registry tweaks aplicados sem montar ({string.Join(", ", applied.Distinct())}).")
+                        : (false, "Nenhum tweak de registro foi aplicado (veja o log)."));
+                }
+                finally
+                {
+                    try { Directory.Delete(tmpDir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro no ApplyRegistryEditsNoMountAsync: {ex.Message}");
+                return (false, $"Erro ao aplicar tweaks sem montar: {ex.Message}");
+            }
+        }
+
         // ==========================================
         // ISO MANAGEMENT (Usando IsoManager existente)
         // ==========================================
@@ -67,729 +654,8 @@ namespace KitLugia.Core
         }
 
         // ==========================================
-        // DISM MANAGEMENT (via PowerShell - usando IsoManager)
-        // ==========================================
-
-        /// <summary>
-        /// Monta uma imagem WIM usando DISM
-        /// </summary>
-        public static async Task<(bool Success, string Message)> MountWim(string wimPath, string mountPath)
-        {
-            return await IsoManager.MountWim(wimPath, mountPath);
-        }
-
-        /// <summary>
-        /// Desmonta uma imagem WIM usando DISM e salva as alterações
-        /// </summary>
-        public static async Task<(bool Success, string Message)> UnmountWim(string mountPath, bool commit = true)
-        {
-            return await IsoManager.UnmountWim(mountPath, commit);
-        }
-
-        /// <summary>
-        /// Injeta drivers em uma imagem WIM usando DISM
-        /// </summary>
-        public static async Task<(bool Success, string Message)> InjectDrivers(string mountPath, string driverPath)
-        {
-            return await IsoManager.InjectDrivers(mountPath, driverPath);
-        }
-
-        // ==========================================
-        // ADVANCED ISO CUSTOMIZATION (Debloat, Features, etc.)
-        // ==========================================
-
-        /// <summary>
-        /// Lista todos os provisioned apps (UWP) na imagem montada
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<ProvisionedAppInfo> Apps)> GetProvisionedApps(string mountPath)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<ProvisionedAppInfo>());
-
-                    // Usar dism.exe diretamente (igual ao Chris Titus WinUtil)
-                    // PowerShell adiciona overhead desnecessário
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/English /Image:\"{mountPath}\" /Get-ProvisionedAppxPackages /Format:Table",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    // Se o comando falhar, pode ser que não há apps provisioned (isso é normal)
-                    if (process.ExitCode != 0)
-                    {
-                        Logger.Log($"Aviso: Não foi possível listar provisioned apps (pode não haver apps): {error}");
-                        // Retornar sucesso com lista vazia em vez de falha
-                        return (true, "Nenhum app provisioned encontrado na imagem.", new List<ProvisionedAppInfo>());
-                    }
-
-                    // Parse do output do DISM
-                    var apps = ParseProvisionedApps(output);
-                    return (true, $"Apps listados com sucesso. Total: {apps.Count}", apps);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao listar provisioned apps: {ex.Message}");
-                    // Retornar sucesso com lista vazia em vez de falha
-                    return (true, $"Não foi possível listar apps (erro ignorado): {ex.Message}", new List<ProvisionedAppInfo>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Remove provisioned apps da imagem montada
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<string> RemovedApps)> RemoveProvisionedApps(string mountPath, List<string> packageNames)
-        {
-            return await Task.Run(async () =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<string>());
-
-                    var removedApps = new List<string>();
-                    var failedApps = new List<string>();
-                    var notFoundApps = new List<string>();
-
-                    // Primeiro, listar todos os provisioned apps disponíveis
-                    var (listSuccess, _, availableApps) = await GetProvisionedApps(mountPath);
-                    if (!listSuccess || availableApps.Count == 0)
-                    {
-                        return (false, "Não foi possível listar apps disponíveis na imagem.", new List<string>());
-                    }
-
-                    var availablePackageNames = availableApps.Select(a => a.PackageName).ToList();
-
-                    foreach (var packageName in packageNames)
-                    {
-                        // Verificar se o pacote existe antes de tentar remover
-                        var exactMatch = availablePackageNames.FirstOrDefault(p => p.Equals(packageName, StringComparison.OrdinalIgnoreCase));
-                        var partialMatch = availablePackageNames.FirstOrDefault(p => p.Contains(packageName, StringComparison.OrdinalIgnoreCase) || packageName.Contains(p, StringComparison.OrdinalIgnoreCase));
-
-                        var targetPackage = exactMatch ?? partialMatch;
-
-                        if (targetPackage == null)
-                        {
-                            notFoundApps.Add(packageName);
-                            Logger.Log($"Pacote não encontrado na imagem: {packageName}");
-                            continue;
-                        }
-
-                        // Usar PowerShell para remover (igual ao Chris Titus mas com melhor tratamento)
-                        var psi = new ProcessStartInfo
-                        {
-                            FileName = "powershell.exe",
-                            Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"dism /English /Image:'{mountPath}' /Remove-ProvisionedAppxPackage /PackageName:'{targetPackage}'\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        };
-
-                        using var process = Process.Start(psi)!;
-                        string output = process.StandardOutput.ReadToEnd();
-                        string error = process.StandardError.ReadToEnd();
-                        process.WaitForExit();
-
-                        if (process.ExitCode == 0)
-                        {
-                            removedApps.Add(packageName);
-                        }
-                        else
-                        {
-                            failedApps.Add(packageName);
-                            Logger.Log($"Falha ao remover {packageName}: {error}");
-                        }
-                    }
-
-                    string message = $"Removidos: {removedApps.Count}/{packageNames.Count}";
-                    if (notFoundApps.Count > 0)
-                        message += $"\nNão encontrados: {notFoundApps.Count}";
-                    if (failedApps.Count > 0)
-                        message += $"\nFalharam: {failedApps.Count}";
-
-                    return (true, message, removedApps);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao remover provisioned apps: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<string>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Lista todas as features do Windows na imagem montada
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<WindowsFeatureInfo> Features)> GetWindowsFeatures(string mountPath)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<WindowsFeatureInfo>());
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/Image:\"{mountPath}\" /Get-Features /Format:Table",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                        return (false, $"Erro ao listar features: {error}", new List<WindowsFeatureInfo>());
-
-                    // Parse do output do DISM
-                    var features = ParseWindowsFeatures(output);
-                    return (true, $"Features listadas com sucesso. Total: {features.Count}", features);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao listar features: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<WindowsFeatureInfo>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Habilita uma feature do Windows
-        /// </summary>
-        public static async Task<(bool Success, string Message)> EnableFeature(string mountPath, string featureName, bool all = false)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.");
-
-                    var allParam = all ? "/All" : "";
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/Image:\"{mountPath}\" /Enable-Feature /FeatureName:\"{featureName}\" {allParam} /NoRestart",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode == 0)
-                        return (true, $"Feature {featureName} habilitada com sucesso.");
-                    else
-                        return (false, $"Erro ao habilitar feature: {error}");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao habilitar feature: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}");
-                }
-            });
-        }
-
-        /// <summary>
-        /// Desabilita uma feature do Windows
-        /// </summary>
-        public static async Task<(bool Success, string Message)> DisableFeature(string mountPath, string featureName)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.");
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/Image:\"{mountPath}\" /Disable-Feature /FeatureName:\"{featureName}\" /NoRestart",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode == 0)
-                        return (true, $"Feature {featureName} desabilitada com sucesso.");
-                    else
-                        return (false, $"Erro ao desabilitar feature: {error}");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao desabilitar feature: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}");
-                }
-            });
-        }
-
-        // ==========================================
-        // ISO SIZE REDUCTION (WinSxS, Compression, etc.)
-        // ==========================================
-
-        /// <summary>
-        /// Limpa o WinSxS (Component Store) da imagem montada
-        /// /ResetBase remove versões superadas (não pode desinstalar updates)
-        /// </summary>
-        public static async Task<(bool Success, string Message, long SpaceSaved)> CleanupWinSxS(string mountPath, bool resetBase = false)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", 0);
-
-                    var sizeBefore = GetDirectorySize(new DirectoryInfo($"{mountPath}\\Windows\\WinSxS"));
-
-                    var resetBaseParam = resetBase ? "/ResetBase" : "";
-                    // Usar dism.exe diretamente (igual ao Chris Titus WinUtil)
-                    // PowerShell adiciona overhead desnecessário
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/English /Image:\"{mountPath}\" /Cleanup-Image /StartComponentCleanup {resetBaseParam}",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                        return (false, $"Erro ao limpar WinSxS: {error}", 0);
-
-                    var sizeAfter = GetDirectorySize(new DirectoryInfo($"{mountPath}\\Windows\\WinSxS"));
-                    var spaceSaved = sizeBefore - sizeAfter;
-
-                    var message = $"WinSxS limpo com sucesso. Economia: {FormatBytes(spaceSaved)}";
-                    if (resetBase)
-                        message += "\n⚠️ /ResetBase usado: Updates antigos não podem ser desinstalados.";
-
-                    return (true, message, spaceSaved);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao limpar WinSxS: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", 0);
-                }
-            });
-        }
-
-        /// <summary>
-        /// Lista todas as capabilities disponíveis
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<string> Capabilities)> GetCapabilities(string mountPath)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<string>());
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/Image:\"{mountPath}\" /Get-Capabilities",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                        return (false, $"Erro ao listar capabilities: {error}", new List<string>());
-
-                    // Parse do output do DISM
-                    var capabilities = new List<string>();
-                    var lines = output.Split('\n');
-                    foreach (var line in lines)
-                    {
-                        var match = Regex.Match(line, @"Capability Identity\s*:\s*(.+)");
-                        if (match.Success)
-                        {
-                            capabilities.Add(match.Groups[1].Value.Trim());
-                        }
-                    }
-
-                    return (true, $"Capabilities listadas com sucesso. Total: {capabilities.Count}", capabilities);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao listar capabilities: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<string>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Remove capabilities da imagem montada
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<string> Removed)> RemoveCapabilities(string mountPath, List<string> capabilities)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<string>());
-
-                    var removed = new List<string>();
-                    var failed = new List<string>();
-
-                    foreach (var capability in capabilities)
-                    {
-                        var psi = new ProcessStartInfo
-                        {
-                            FileName = "dism.exe",
-                            Arguments = $"/Image:\"{mountPath}\" /Remove-Capability /CapabilityName:\"{capability}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        };
-
-                        using var process = Process.Start(psi)!;
-                        string output = process.StandardOutput.ReadToEnd();
-                        string error = process.StandardError.ReadToEnd();
-                        process.WaitForExit();
-
-                        if (process.ExitCode == 0)
-                            removed.Add(capability);
-                        else
-                            failed.Add(capability);
-                    }
-
-                    string message = $"Removidas: {removed.Count}/{capabilities.Count}";
-                    if (failed.Count > 0)
-                        message += $"\nFalharam: {string.Join(", ", failed)}";
-
-                    return (true, message, removed);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao remover capabilities: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<string>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Lista todos os pacotes do sistema
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<string> Packages)> GetPackages(string mountPath)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<string>());
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/Image:\"{mountPath}\" /Get-Packages",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                        return (false, $"Erro ao listar pacotes: {error}", new List<string>());
-
-                    // Parse do output do DISM
-                    var packages = new List<string>();
-                    var lines = output.Split('\n');
-                    foreach (var line in lines)
-                    {
-                        var match = Regex.Match(line, @"Package Identity\s*:\s*(.+)");
-                        if (match.Success)
-                        {
-                            packages.Add(match.Groups[1].Value.Trim());
-                        }
-                    }
-
-                    return (true, $"Pacotes listados com sucesso. Total: {packages.Count}", packages);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao listar pacotes: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<string>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Remove pacotes do sistema (OneDrive, Edge, etc.)
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<string> Removed)> RemovePackages(string mountPath, List<string> packages)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<string>());
-
-                    var removed = new List<string>();
-                    var failed = new List<string>();
-
-                    foreach (var package in packages)
-                    {
-                        var psi = new ProcessStartInfo
-                        {
-                            FileName = "dism.exe",
-                            Arguments = $"/Image:\"{mountPath}\" /Remove-Package /PackageName:\"{package}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        };
-
-                        using var process = Process.Start(psi)!;
-                        string output = process.StandardOutput.ReadToEnd();
-                        string error = process.StandardError.ReadToEnd();
-                        process.WaitForExit();
-
-                        if (process.ExitCode == 0)
-                            removed.Add(package);
-                        else
-                            failed.Add(package);
-                    }
-
-                    string message = $"Removidos: {removed.Count}/{packages.Count}";
-                    if (failed.Count > 0)
-                        message += $"\nFalharam: {string.Join(", ", failed)}";
-
-                    return (true, message, removed);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao remover pacotes: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<string>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Lista idiomas instalados
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<string> Languages)> GetLanguages(string mountPath)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<string>());
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/Image:\"{mountPath}\" /Get-Intl",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                        return (false, $"Erro ao listar idiomas: {error}", new List<string>());
-
-                    // Parse do output do DISM
-                    var languages = new List<string>();
-                    var lines = output.Split('\n');
-                    foreach (var line in lines)
-                    {
-                        var match = Regex.Match(line, @"Default system UI language\s*:\s*(.+)");
-                        if (match.Success)
-                        {
-                            languages.Add(match.Groups[1].Value.Trim());
-                        }
-                    }
-
-                    return (true, $"Idiomas listados com sucesso. Total: {languages.Count}", languages);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao listar idiomas: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<string>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Remove idiomas não usados
-        /// </summary>
-        public static async Task<(bool Success, string Message, List<string> Removed)> RemoveLanguages(string mountPath, List<string> languages)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(mountPath))
-                        return (false, "Diretório de montagem não existe.", new List<string>());
-
-                    var removed = new List<string>();
-                    var failed = new List<string>();
-
-                    foreach (var language in languages)
-                    {
-                        var psi = new ProcessStartInfo
-                        {
-                            FileName = "dism.exe",
-                            Arguments = $"/Image:\"{mountPath}\" /Remove-Language /Language:\"{language}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        };
-
-                        using var process = Process.Start(psi)!;
-                        string output = process.StandardOutput.ReadToEnd();
-                        string error = process.StandardError.ReadToEnd();
-                        process.WaitForExit();
-
-                        if (process.ExitCode == 0)
-                            removed.Add(language);
-                        else
-                            failed.Add(language);
-                    }
-
-                    string message = $"Removidos: {removed.Count}/{languages.Count}";
-                    if (failed.Count > 0)
-                        message += $"\nFalharam: {string.Join(", ", failed)}";
-
-                    return (true, message, removed);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao remover idiomas: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", new List<string>());
-                }
-            });
-        }
-
-        /// <summary>
-        /// Exporta WIM para ESD com compressão LZMS (recovery)
-        /// Economia significativa de espaço (~1-2GB)
-        /// </summary>
-        public static async Task<(bool Success, string Message, long SizeReduction)> ExportToESD(string wimPath, string esdPath, int index = 1)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    if (!File.Exists(wimPath))
-                        return (false, "Arquivo WIM não existe.", 0);
-
-                    var sizeBefore = new FileInfo(wimPath).Length;
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dism.exe",
-                        Arguments = $"/Export-Image /SourceImageFile:\"{wimPath}\" /SourceIndex:{index} /DestinationImageFile:\"{esdPath}\" /Compress:recovery",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                        return (false, $"Erro ao exportar para ESD: {error}", 0);
-
-                    var sizeAfter = new FileInfo(esdPath).Length;
-                    var reduction = sizeBefore - sizeAfter;
-
-                    return (true, $"ESD criado com sucesso. Economia: {FormatBytes(reduction)}\n⚠️ ESD não pode ser montado/modificado.", reduction);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Erro ao exportar para ESD: {ex.Message}");
-                    return (false, $"Erro: {ex.Message}", 0);
-                }
-            });
-        }
-
-        // ==========================================
         // HELPER METHODS (Parsing & Utilities)
         // ==========================================
-
-        private static long GetDirectorySize(DirectoryInfo dir)
-        {
-            if (!dir.Exists)
-                return 0;
-
-            long size = 0;
-            try
-            {
-                size = dir.EnumerateFiles().Sum(fi => fi.Length);
-                size += dir.EnumerateDirectories().Sum(di => GetDirectorySize(di));
-            }
-            catch
-            {
-                // Ignora erros de acesso
-            }
-            return size;
-        }
 
         private static string FormatBytes(long bytes)
         {
@@ -803,103 +669,21 @@ namespace KitLugia.Core
             }
             return $"{len:0.##} {sizes[order]}";
         }
-
-        private static List<ProvisionedAppInfo> ParseProvisionedApps(string dismOutput)
-        {
-            var apps = new List<ProvisionedAppInfo>();
-            var lines = dismOutput.Split('\n');
-
-            foreach (var line in lines)
-            {
-                // Exemplo de linha: Package Identity : Microsoft.BingWeather_4.52.3522.0_neutral__~_8wekyb3d8bbwe
-                var match = Regex.Match(line, @"Package Identity\s*:\s*(.+)");
-                if (match.Success)
-                {
-                    var packageName = match.Groups[1].Value.Trim();
-                    apps.Add(new ProvisionedAppInfo
-                    {
-                        PackageName = packageName,
-                        DisplayName = GetDisplayName(packageName)
-                    });
-                }
-            }
-
-            return apps;
-        }
-
-        private static List<WindowsFeatureInfo> ParseWindowsFeatures(string dismOutput)
-        {
-            var features = new List<WindowsFeatureInfo>();
-            var lines = dismOutput.Split('\n');
-
-            foreach (var line in lines)
-            {
-                // Exemplo de linha: Feature Name : TelnetClient
-                var match = Regex.Match(line, @"Feature Name\s*:\s*(.+)");
-                if (match.Success)
-                {
-                    var featureName = match.Groups[1].Value.Trim();
-                    features.Add(new WindowsFeatureInfo
-                    {
-                        FeatureName = featureName,
-                        DisplayName = GetFeatureDisplayName(featureName)
-                    });
-                }
-            }
-
-            return features;
-        }
-
-        private static string GetDisplayName(string packageName)
-        {
-            // Extrai nome legível do package name
-            // Ex: Microsoft.BingWeather_4.52.3522.0_neutral__~_8wekyb3d8bbwe -> Bing Weather
-            var parts = packageName.Split('_');
-            if (parts.Length > 0)
-            {
-                var name = parts[0].Replace("Microsoft.", "").Replace("MicrosoftCorporationII.", "");
-                // Converte CamelCase para espaços
-                return Regex.Replace(name, "(?<!^)(?=[A-Z])", " ");
-            }
-            return packageName;
-        }
-
-        private static string GetFeatureDisplayName(string featureName)
-        {
-            // Mapeamento de features para nomes legíveis
-            var featureMap = new Dictionary<string, string>
-            {
-                { "TelnetClient", "Telnet Client" },
-                { "TFTP", "TFTP Client" },
-                { "NetFx3", ".NET Framework 3.5" },
-                { "Microsoft-Windows-NetFX3-OC-Package", ".NET Framework 3.5 (includes .NET 2.0 and 3.0)" },
-                { "Internet-Explorer-Optional-amd64", "Internet Explorer 11" },
-                { "MediaPlayback", "Windows Media Player" },
-                { "WindowsMediaPlayer", "Windows Media Player" },
-                { "MicrosoftWindowsPowerShellV2", "PowerShell 2.0" },
-                { "Microsoft-Windows-NetFx4-US-OC-Package", ".NET Framework 4.5" }
-            };
-
-            return featureMap.TryGetValue(featureName, out var displayName) ? displayName : featureName;
-        }
     }
 
     // ==========================================
     // DATA MODELS
     // ==========================================
 
-    public class ProvisionedAppInfo
+    /// <summary>
+    /// Uma edição (imagem) dentro de um install.wim/esd, listada pelo wimlib info.
+    /// </summary>
+    public class WimEdition
     {
-        public string PackageName { get; set; } = "";
-        public string DisplayName { get; set; } = "";
-        public bool IsSelected { get; set; } = false;
-    }
-
-    public class WindowsFeatureInfo
-    {
-        public string FeatureName { get; set; } = "";
-        public string DisplayName { get; set; } = "";
-        public string State { get; set; } = "Unknown";
-        public bool IsSelected { get; set; } = false;
+        public int Index { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public bool IsEsd { get; set; } = false;
+        public override string ToString() => $"{Index}. {(string.IsNullOrEmpty(Name) ? "Edição" : Name)}".TrimEnd();
     }
 }

@@ -342,7 +342,7 @@
                 <TextBlock Text="Sistema e Reparos" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4C0;" 
-                    Content="ISO Editor (Winhance)"
+                    Content="Kit ISO Editor"
                     ToolTip="Editor de ISO Profissional - Montagem, Debloat, Features e Redu&#xE7;&#xE3;o de Tamanho"
                     Click="BtnGoToIsoEditor_Click"/>
 

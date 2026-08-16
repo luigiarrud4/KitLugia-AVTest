@@ -15,7 +15,7 @@
                         <DropShadowEffect Color="#FFD700" BlurRadius="15" ShadowDepth="0" Opacity="0.5"/>
                     </TextBlock.Effect>
                 </TextBlock>
-                <TextBlock Text="Winhance + Winboot: Suite Completa de Instala&#xE7;&#xE3;o e Customiza&#xE7;&#xE3;o" 
+                <TextBlock Text="Kit ISO Editor + Winboot: Suite Completa de Instala&#xE7;&#xE3;o e Customiza&#xE7;&#xE3;o" 
                           Foreground="{StaticResource TextMuted}" FontSize="16" HorizontalAlignment="Center" Margin="0,10,0,0"/>
             </StackPanel>
 
@@ -27,12 +27,12 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- M&#xF3;dulo 1: ISO Editor (Winhance) -->
+                <!-- M&#xF3;dulo 1: ISO Editor (Kit) -->
                 <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="12" Padding="25" Style="{StaticResource CardStyle}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                             <TextBlock Text="&#x1F4BF;" FontSize="28" VerticalAlignment="Center"/>
-                            <TextBlock Text="WINHANCE" FontSize="22" FontWeight="Bold" 
+                            <TextBlock Text="KIT ISO EDITOR" FontSize="22" FontWeight="Bold" 
                                       Foreground="{StaticResource AccentColor}" Margin="10,0,0,0"/>
                         </StackPanel>
                         <TextBlock Text="Editor de ISO Profissional" FontSize="16" FontWeight="SemiBold" 
