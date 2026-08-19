@@ -1,203 +1,274 @@
 # KitLugia
 
-> Suíte de manutenção, diagnóstico, otimização e recuperação para Windows, construída com .NET, WPF e uma biblioteca nativa em Rust.
+> Ferramentas para manutenção, diagnóstico, otimização e recuperação do Windows — com interface WPF, núcleo em .NET e rotinas nativas em Rust.
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![Rust](https://img.shields.io/badge/Rust-native%20module-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f.svg)](LICENSE)
 
-O **KitLugia** reúne em uma única interface ferramentas para cuidar do sistema, investigar problemas, preparar mídias de boot, ajustar desempenho e executar reparos do Windows. O projeto combina uma interface desktop em WPF, um núcleo de serviços e uma biblioteca nativa em Rust para tarefas específicas de desempenho e análise.
+O KitLugia é uma aplicação desktop que reúne, em uma única interface, operações que normalmente ficam espalhadas pelo Registro, PowerShell, ferramentas administrativas e utilitários de recuperação do Windows.
 
-> **Status:** projeto em desenvolvimento ativo. Algumas funções alteram configurações sensíveis do Windows e podem exigir privilégios de administrador.
+Ele não é apenas um painel de botões: dependendo da função escolhida, pode ler e alterar configurações do sistema, remover arquivos e pacotes, executar ferramentas nativas, reconfigurar a rede, preparar discos ou criar mídia de boot.
 
-## Aviso importante
+> **Status:** projeto em desenvolvimento ativo. Algumas áreas são experimentais e podem exigir privilégios de administrador.
 
-O KitLugia pode alterar o Registro, serviços, plano de energia, configurações de rede, componentes de boot, arquivos do sistema e aplicativos instalados. Use as ferramentas somente se você souber o efeito da operação:
+## Aviso de segurança
 
-- crie um ponto de restauração e mantenha um backup antes de aplicar mudanças;
-- revise cada ação antes de confirmá-la;
-- não execute o programa em máquinas de produção sem validar o comportamento;
-- algumas operações podem exigir reinicialização ou mídia de recuperação;
-- o projeto não substitui uma solução corporativa de backup, segurança ou gerenciamento de endpoints.
+O KitLugia pode alterar o Registro, serviços, plano de energia, configurações de rede, componentes de boot, arquivos do sistema, partições e aplicativos instalados.
 
-## O que o KitLugia oferece
+Antes de usar funções de alteração:
 
-### Otimização do sistema
+- crie um ponto de restauração e mantenha um backup;
+- confirme o disco, partição, adaptador ou pacote selecionado;
+- teste em uma máquina de desenvolvimento antes de usar em produção;
+- esteja preparado para reiniciar o Windows ou usar uma mídia de recuperação;
+- leia o resultado da operação: algumas mudanças não são totalmente reversíveis.
 
-- Ajustes de Registro voltados para desempenho e responsividade;
-- gerenciamento de planos de energia, incluindo perfis de alto desempenho;
-- configuração de efeitos visuais e opções de inicialização/desligamento;
-- ajustes relacionados a GPU e agendamento acelerado por hardware;
-- gerenciamento de prioridade de processos para CPU, I/O e memória;
-- otimizações de memória e de rede usando APIs nativas do Windows.
+As classificações abaixo são uma orientação de risco, não uma garantia de segurança:
 
-### Diagnóstico e segurança
+| Classificação | Significado |
+| --- | --- |
+| **Baixo** | Leituras, diagnósticos e operações geralmente reversíveis. |
+| **Médio** | Altera configurações do sistema, rede, serviços ou arquivos de cache. Pode exigir reinicialização ou ajuste manual. |
+| **Alto** | Remove pacotes, altera segurança/boot, reconfigura componentes ou escreve em mídia física. Faça backup antes. |
 
-O módulo **Guardian** reúne verificações de configuração e integridade, incluindo:
+## O que ele realmente faz
 
-- mitigações de CPU, CFG, DEP e UAC;
-- SMBv1, AutoRun e proteções do kernel;
-- análise das variáveis de ambiente e integridade do shell do Explorer;
-- diagnósticos de configurações de segurança potencialmente frágeis;
-- referências de vulnerabilidades para apoiar a investigação e a atualização do sistema.
+### 1. Otimização do sistema — risco médio
 
-Os resultados são indicações para investigação, não um certificado de segurança nem um substituto para um scanner profissional.
+A área de otimização não apenas “melhora o PC” de forma genérica. Ela aplica conjuntos de ajustes escolhidos pelo usuário e pode:
 
-### Limpeza e manutenção
+- escrever valores no Registro em escopos de usuário e máquina;
+- alterar plano de energia e configurações de desempenho com APIs do Windows;
+- configurar opções relacionadas a CPU, GPU, VRAM, agendamento e efeitos visuais;
+- ajustar prioridade de processos e tarefas agendadas;
+- controlar serviços do Windows e opções de inicialização;
+- desativar economias de energia USB ou aplicar ajustes voltados para jogos e latência;
+- reverter o conjunto de otimizações quando existe uma ação de restauração correspondente.
 
-- remoção de aplicativos pré-instalados e bloatware;
-- limpeza de arquivos temporários;
-- análise de espaço em disco;
-- busca por arquivos duplicados;
-- ferramentas de limpeza e manutenção do Registro.
+O código usa, entre outros mecanismos, Registro, WMI, PowerShell, powercfg, sc.exe e schtasks.exe. O resultado depende do hardware, da versão do Windows e dos drivers: um ajuste que ajuda em um computador pode não ajudar em outro.
 
-### Boot, recuperação e WinPE
+Arquivos centrais: SystemTweaks.cs, OptimizationOrchestrator.cs, PowerPlanManager.cs e AdvancedTweaksManager.cs.
 
-- criação de mídias inicializáveis;
-- preparação de USB bootável;
-- edição de imagens ISO;
-- integração com ferramentas como Rufus e Easy2Boot;
-- otimização e recuperação do processo de boot.
+### 2. Guardian: diagnóstico de segurança e integridade — leitura e reparos de risco médio/alto
 
-### Rede
+O Guardian é um verificador de configurações do Windows, não um antivírus. Ele procura sinais de configuração frágil ou inconsistente, como:
 
-- gerenciamento de DNS com perfis conhecidos e DHCP;
-- ajustes de TCP/IP e controle de congestionamento;
-- diagnóstico de conectividade;
-- análise de latência e testes de conexão;
-- ferramentas para investigar problemas de rede.
+- estado de mitigações de CPU, CFG, DEP e UAC;
+- SMBv1, AutoRun e proteções relacionadas ao kernel;
+- configurações de serviços e do BCD, o banco de dados de boot;
+- problemas na variável PATH e na integridade do shell do Explorer;
+- chaves de Registro e opções que podem reduzir a proteção do sistema.
 
-### Reparos do Windows
+Além de diagnosticar, algumas rotinas podem reparar configurações, alterar serviços com sc.exe, atualizar opções de boot com bcdedit e assumir propriedade de chaves protegidas quando necessário.
 
+As referências de CVE exibidas pelo projeto ajudam a contextualizar achados; elas não significam que o programa faça uma validação completa de vulnerabilidade nem substituem Windows Update, EDR ou um scanner de segurança.
+
+Arquivo central: Guardian.cs.
+
+### 3. Limpeza e manutenção — risco médio
+
+A limpeza remove resíduos específicos para liberar espaço ou resolver problemas comuns. Entre os alvos implementados estão:
+
+- pastas temporárias do usuário e do Windows;
+- cache do Windows Update;
+- caches de shaders da GPU;
+- logs e arquivos de diagnóstico;
+- cache DNS;
+- Prefetch;
+- Lixeira;
+- arquivos antigos encontrados dentro de diretórios selecionados;
+- limpeza de pacotes e sobras de aplicativos em operações específicas;
+- CompactOS, para compactação de arquivos do sistema.
+
+O código tenta ignorar arquivos bloqueados ou sem permissão e registra o que não conseguiu remover. Ainda assim, apagar caches e pastas de sistema pode aumentar temporariamente o tempo de inicialização de alguns aplicativos ou exigir privilégios elevados.
+
+Arquivo central: CleanupManager.cs.
+
+### 4. Aplicativos pré-instalados e bloatware — risco alto
+
+O gerenciador de bloatware lista pacotes instalados, permite selecionar pacotes para remoção e pode encaminhar o usuário à Microsoft Store para reinstalação de aplicativos compatíveis.
+
+A remoção opera sobre os nomes dos pacotes e pode usar padrões. Por isso, uma seleção ampla demais pode remover componentes que o usuário pretendia manter ou afetar outros perfis do Windows.
+
+Arquivos centrais: BloatwareManager.cs e SystemTweaks.cs.
+
+### 5. Ferramentas de rede — risco médio
+
+A área de rede faz mudanças concretas na configuração do Windows, não apenas um teste de velocidade. Ela pode:
+
+- trocar o DNS para perfis como Cloudflare, Google ou DHCP;
+- ajustar TCP/IP, CTCP, RSS e opções de offload;
+- desativar ou alterar componentes de otimização de rede;
+- executar diagnósticos de adaptador e conectividade;
+- limpar ou redefinir Winsock, TCP/IP e ARP;
+- consultar chaves e configurações dos adaptadores de rede;
+- medir latência e auxiliar na investigação de conexões instáveis.
+
+As rotinas utilizam netsh, ipconfig, cmdkey, certutil e APIs do Windows. Um reset de rede pode apagar configurações personalizadas, desconectar o computador e exigir reinicialização. Ajustes voltados para latência também podem reduzir estabilidade ou throughput em determinados equipamentos.
+
+Arquivos centrais: NetworkManager.cs, AdapterManager.cs, DnsBenchmark.cs e LatencyAnalyzer.cs.
+
+### 6. Reparos do Windows — risco médio/alto
+
+A área de reparo funciona como uma interface assistida para ferramentas nativas do Windows. Ela pode executar:
+
+- SFC, para verificar e restaurar arquivos protegidos do sistema;
+- DISM, para reparar o armazenamento de componentes e a imagem do Windows;
 - correções relacionadas ao Windows Update;
-- execução assistida de SFC e DISM;
-- reparos de componentes;
-- recuperação do boot;
-- configuração e diagnóstico de serviços.
+- reparos gerais de componentes, serviços e boot.
 
-## Stack tecnológica
+SFC e DISM podem consumir bastante CPU, disco e tempo. O resultado depende do estado da imagem do Windows e das fontes de reparo disponíveis. O KitLugia executa e apresenta essas operações; ele não consegue garantir que todo dano do sistema será corrigido.
+
+Arquivos centrais: SystemRepair.cs, GeneralRepairManager.cs e WindowsUpdateManager.cs.
+
+### 7. Boot, partições e mídia inicializável — risco alto
+
+Esta é uma das áreas mais sensíveis do projeto. As ferramentas podem:
+
+- enumerar unidades USB e discos disponíveis;
+- preparar uma unidade com FAT32 ou NTFS;
+- escolher esquema MBR ou GPT;
+- criar mídia para instalação do Windows, WinPE, Linux ou configurações dual boot;
+- escrever imagem em modo raw/DD;
+- editar ou montar imagens ISO;
+- atualizar arquivos e configurações de boot;
+- trabalhar com BCD, bcdboot, bootsect e diskpart.
+
+O código acessa dispositivos físicos com APIs como CreateFile e DeviceIoControl e executa diskpart para operações de disco. Uma seleção incorreta pode limpar partições e causar perda permanente de dados. Confirme sempre a unidade antes de formatar ou gravar uma imagem.
+
+Arquivos centrais: BootableMediaManager.cs, BootloaderPackager.cs, BootOptimizerManager.cs, PartitionManager.cs, IsoManager.cs e IsoEditorManager.cs.
+
+### 8. WinPE personalizado — risco alto e dependências externas
+
+O construtor de WinPE prepara uma imagem de recuperação personalizada. O fluxo pode:
+
+- baixar ou receber uma base de WinPE;
+- criar diretórios temporários de trabalho;
+- montar e modificar imagens WIM;
+- injetar drivers;
+- alterar o startnet.cmd e outros arquivos de inicialização;
+- empacotar a imagem em uma ISO final;
+- limpar e desmontar os pontos de montagem.
+
+Dependendo do fluxo, ele procura ferramentas como dism.exe, 7z.exe, oscdimg.exe e wimlib-imagex.exe. Se uma montagem não for desmontada corretamente, arquivos e recursos podem permanecer bloqueados até uma limpeza manual ou reinicialização.
+
+Arquivo central: WinpeBuilder.cs.
+
+### 9. Biblioteca nativa em Rust — aceleração de tarefas específicas
+
+O módulo Rust não é uma segunda aplicação completa. Ele fornece rotinas nativas para tarefas específicas, como:
+
+- comparação de strings usando uma implementação de Sift4;
+- hashing SHA-256 e BLAKE3;
+- análise de caminhos e padrões de arquivos;
+- leitura e enumeração de valores do Registro por APIs Win32;
+- buscas e verificações com menos sobrecarga que uma implementação puramente gerenciada em alguns cenários.
+
+A biblioteca é compilada como DLL cdylib e integrada ao build .NET quando o artefato nativo está disponível. Ela usa FFI e blocos unsafe para conversar com APIs do Windows, então deve ser compilada e testada para a arquitetura alvo.
+
+Arquivo central: rust_native/src/lib.rs.
+
+## Outras áreas disponíveis na interface
+
+Além dos módulos descritos acima, a solução contém páginas e serviços para drivers, processos, inicialização, tela, privacidade, serviços, programas, atualizações, configurações do Windows, memória, túneis, adaptadores virtuais, WinRE e ferramentas avançadas.
+
+A disponibilidade de cada ação pode variar conforme a versão do Windows, permissões, hardware, drivers e ferramentas externas instaladas.
+
+## O que o KitLugia não é
+
+- não é antivírus nem EDR;
+- não é uma garantia automática de aumento de FPS ou redução de latência;
+- não substitui backup, ponto de restauração ou mídia de recuperação;
+- não torna seguros todos os ajustes só porque eles aparecem na interface;
+- não corrige qualquer corrupção do Windows sem depender da imagem e das ferramentas do próprio sistema;
+- não é totalmente portátil entre versões e edições do Windows.
+
+## Tecnologia
 
 | Camada | Tecnologia |
 | --- | --- |
 | Interface | C# + WPF |
-| Runtime | .NET 10 |
-| Núcleo | Projeto compartilhado KitLugia.Core |
-| Sistema | APIs nativas do Windows, Registro e WMI |
-| Integração nativa | Rust como DLL cdylib |
+| Runtime | .NET 10, SDK definido em global.json |
+| Núcleo | KitLugia.Core |
+| Sistema | Registro, WMI, APIs Win32 e ferramentas administrativas do Windows |
+| Integração nativa | Rust compilado como DLL cdylib |
 | Solução | KitLugia.sln |
 | Licença | MIT |
 
-O módulo Rust fica em rust_native e é configurado para gerar uma biblioteca dinâmica otimizada para release. Quando a DLL está disponível, os projetos .NET a copiam para a saída e para a publicação da aplicação.
-
 ## Requisitos
 
-### Obrigatórios
-
 - Windows 10 versão 1903 ou superior, ou Windows 11;
-- [.NET SDK 10.0.301](https://dotnet.microsoft.com/download/dotnet/10.0) ou compatível com o global.json;
+- [.NET SDK 10.0.301](https://dotnet.microsoft.com/download/dotnet/10.0) ou versão compatível com o global.json;
 - Git;
-- permissões de administrador para as funções que alteram o sistema.
+- privilégios de administrador para funções que alteram o sistema;
+- Rustup e toolchain MSVC para compilar o módulo nativo;
+- Visual Studio 2022 ou Build Tools com ferramentas C++ para cenários que dependam da toolchain nativa;
+- ferramentas externas como 7-Zip, oscdimg ou wimlib quando o fluxo de WinPE exigir.
 
-### Para compilar o módulo Rust
-
-- [Rustup](https://rustup.rs/);
-- toolchain MSVC do Rust;
-- Visual Studio 2022 com as ferramentas de desenvolvimento para C++ ou o Build Tools equivalente.
-
-### Opcional
-
-- Visual Studio 2022 para desenvolvimento WPF;
-- GitHub CLI (gh) para publicar assets de release usando o fluxo em DEPLOY.md.
-
-## Começando
-
-Clone o repositório correto e entre na pasta do projeto:
+## Instalação e execução
 
 ~~~powershell
 git clone https://github.com/luigiarrud4/KitLugia-AVTest.git
 Set-Location KitLugia-AVTest
-~~~
 
-### Compilar a solução
-
-~~~powershell
 dotnet restore KitLugia.sln
 dotnet build KitLugia.sln --configuration Release
-~~~
-
-### Executar em desenvolvimento
-
-~~~powershell
 dotnet run --project .\\KitLugia.GUI\\KitLugia.GUI.csproj --configuration Release
 ~~~
 
-Algumas operações só ficam disponíveis ou produzem resultados completos quando o processo é executado como administrador.
+Execute como administrador somente quando a operação escolhida exigir. Evite executar diretamente em um sistema sem backup.
 
-### Compilar a biblioteca Rust
-
-Para gerar a DLL nativa antes do build .NET:
+### Compilar o módulo Rust
 
 ~~~powershell
 cargo build --manifest-path .\\rust_native\\Cargo.toml --release
 ~~~
 
-Depois, compile a solução novamente para que a DLL seja copiada para a saída quando o arquivo existir em rust_native\\target\\release\\.
+Depois, compile a solução .NET novamente para que a DLL nativa seja copiada para a saída quando estiver disponível.
 
-### Publicar uma versão self-contained
-
-Para uma publicação independente para Windows x64:
+### Publicar para Windows x64
 
 ~~~powershell
 dotnet publish .\\KitLugia.GUI\\KitLugia.GUI.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true
 ~~~
 
-O script [Deploy.ps1](Deploy.ps1) automatiza o fluxo de build, empacotamento e geração do hash SHA-256 descrito em [DEPLOY.md](DEPLOY.md).
+O fluxo automatizado de empacotamento está documentado em [DEPLOY.md](DEPLOY.md) e no script [Deploy.ps1](Deploy.ps1).
 
 ## Estrutura do repositório
 
 ~~~text
 KitLugia-AVTest/
-├── KitLugia.Core/        # Serviços, regras de negócio e operações do Windows
-├── KitLugia.GUI/         # Aplicação WPF, páginas, controles e temas
+├── KitLugia.Core/        # Núcleo: operações, diagnósticos e integrações do Windows
+├── KitLugia.GUI/         # Interface WPF, páginas, controles e temas
 ├── KitLugia.Updater/     # Aplicação de atualização
-├── rust_native/          # Biblioteca nativa Rust compilada como DLL
-├── WinPE_ISO/            # Recursos e ferramentas relacionadas a WinPE/ISO
+├── rust_native/          # Biblioteca nativa Rust
+├── WinPE_ISO/            # Recursos relacionados a WinPE e ISO
 ├── docs/                 # Documentação complementar
 ├── scripts/              # Scripts e artefatos auxiliares
-├── Deploy.ps1            # Automação de build e empacotamento
-├── deploy.bat            # Atalho de deploy para Windows
-├── DEPLOY.md             # Fluxo de publicação e upload de releases
+├── Deploy.ps1            # Build, empacotamento e hash SHA-256
+├── deploy.bat            # Atalho de deploy no Windows
+├── DEPLOY.md             # Publicação e assets de release
 ├── KitLugia.sln          # Solução principal .NET
-└── global.json           # Versão do SDK .NET utilizada
+└── global.json           # Versão do SDK .NET
 ~~~
-
-## Organização do código
-
-- **KitLugia.Core:** concentra as operações de sistema, diagnósticos, rede, limpeza, boot e reparos;
-- **KitLugia.GUI:** apresenta as funções em páginas e controles WPF reutilizáveis;
-- **KitLugia.Updater:** mantém o fluxo de atualização separado da aplicação principal;
-- **rust_native:** fornece rotinas nativas compiladas como rust_native.dll;
-- **Deploy.ps1 / deploy.bat:** apoiam o empacotamento e a preparação de releases.
 
 ## Contribuindo
 
-Contribuições, correções e sugestões são bem-vindas. Antes de abrir um pull request:
+Antes de abrir um pull request:
 
-1. leia a documentação existente em [docs](docs/), quando aplicável;
-2. descreva claramente o problema ou a melhoria;
-3. teste as alterações em uma instalação de desenvolvimento do Windows;
-4. informe se a mudança exige privilégios de administrador, reinicialização ou ferramentas externas;
-5. evite incluir binários gerados, pastas bin, obj ou artefatos locais no commit;
-6. mantenha o escopo da alteração pequeno e explique impactos no sistema.
-
-Para mudanças que mexem com Registro, boot, segurança ou rede, inclua no pull request o comportamento esperado e uma forma segura de reverter a alteração.
+1. teste as alterações em uma instalação de desenvolvimento do Windows;
+2. explique quais arquivos, chaves, serviços ou ferramentas externas são envolvidos;
+3. informe se a mudança exige administrador, reinicialização ou mídia de recuperação;
+4. descreva como reverter a alteração quando ela tocar Registro, boot, rede ou segurança;
+5. não inclua binários gerados, pastas bin, obj ou artefatos locais.
 
 ## Documentação relacionada
 
-- [DEPLOY.md](DEPLOY.md) — build, empacotamento e publicação de releases;
-- [AGENTS.md](AGENTS.md) — orientações e contexto para agentes de desenvolvimento;
-- [ROADMAP_REVO.md](ROADMAP_REVO.md) — direção e próximos passos do projeto;
+- [DEPLOY.md](DEPLOY.md) — build, empacotamento e publicação;
+- [AGENTS.md](AGENTS.md) — contexto e orientações de desenvolvimento;
+- [ROADMAP_REVO.md](ROADMAP_REVO.md) — direção do projeto;
 - [EXM_TWEAKS_REFERENCE.md](EXM_TWEAKS_REFERENCE.md) — referência de ajustes;
 - [LICENSE](LICENSE) — licença MIT.
 
@@ -208,5 +279,3 @@ Distribuído sob a licença MIT. Consulte [LICENSE](LICENSE) para o texto comple
 ## Autor
 
 Desenvolvido por [Luigi Arruda](https://github.com/luigiarrud4).
-
-Se este projeto for útil para você, considere deixar uma estrela no repositório e compartilhar feedback por meio das issues.
