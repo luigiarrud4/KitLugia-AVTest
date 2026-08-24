@@ -1822,6 +1822,531 @@ namespace KitLugia.Core
         }
         #endregion
 
+        #region Hardware-Aware Tweaks (L3 Cache, NVIDIA PowerMizer, NVMe, GPU Interrupt Priority)
+
+        // ============================================================
+        // THIRD LEVEL DATA CACHE (L3) — Auto-detect from CPU
+        // ============================================================
+        private const string MemMgmtPath2 = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
+
+        public static bool IsThirdLevelCacheSet()
+        {
+            try
+            {
+                var val = Registry.GetValue(MemMgmtPath2, "ThirdLevelDataCache", 0);
+                return val != null && Convert.ToInt32(val) > 0;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static void ApplyThirdLevelCacheTweak()
+        {
+            try
+            {
+                // Read actual L3 cache from CPU via WMI
+                int l3CacheKb = 0;
+                using var searcher = new ManagementObjectSearcher("SELECT L3CacheSize FROM Win32_Processor");
+                foreach (ManagementObject obj in searcher.Get().Cast<ManagementObject>())
+                {
+                    using (obj)
+                    {
+                        if (obj["L3CacheSize"] != null)
+                        {
+                            l3CacheKb = Convert.ToInt32(obj["L3CacheSize"]);
+                            break;
+                        }
+                    }
+                }
+
+                if (l3CacheKb > 0)
+                {
+                    Registry.SetValue(MemMgmtPath2, "ThirdLevelDataCache", l3CacheKb, RegistryValueKind.DWord);
+                    Logger.Log($"L3 Cache Tweak aplicado: {l3CacheKb} KB (auto-detectado do CPU)");
+                }
+                else
+                {
+                    Logger.Log("L3 Cache: não detectado via WMI, pulando.");
+                }
+            }
+            catch (Exception ex) { Logger.LogError("ApplyThirdLevelCacheTweak", ex.Message); }
+        }
+
+        public static void RevertThirdLevelCacheTweak()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(MemMgmtPath2.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("ThirdLevelDataCache", false);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        public static (bool Success, string Message) ToggleThirdLevelCache()
+        {
+            if (IsThirdLevelCacheSet())
+            {
+                RevertThirdLevelCacheTweak();
+                return (true, "L3 Cache restaurado para padrão.");
+            }
+            ApplyThirdLevelCacheTweak();
+            var val = Registry.GetValue(MemMgmtPath2, "ThirdLevelDataCache", 0);
+            int kb = val != null ? Convert.ToInt32(val) : 0;
+            return (kb > 0, kb > 0 ? $"L3 Cache configurado: {kb} KB" : "L3 Cache não detectado no CPU.");
+        }
+
+        // ============================================================
+        // NVIDIA PowerMizer — Force Maximum Performance
+        // ============================================================
+        private static readonly string[] NvidiaPowerMizerPaths = new[]
+        {
+            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000",
+            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0001",
+            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0002",
+            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0003"
+        };
+
+        public static bool IsNvidiaPowerMizerMaxPerformance()
+        {
+            try
+            {
+                foreach (var path in NvidiaPowerMizerPaths)
+                {
+                    var val = Registry.GetValue($@"HKEY_LOCAL_MACHINE\{path.Substring(5)}", "PerfLevelSrc", -1);
+                    if (val != null && Convert.ToInt32(val) == 0x2222) return true;
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            return false;
+        }
+
+        public static void ApplyNvidiaPowerMizerMaxPerformance()
+        {
+            try
+            {
+                int applied = 0;
+                foreach (var path in NvidiaPowerMizerPaths)
+                {
+                    string subPath = path.Replace("HKLM\\", "");
+                    using var key = Registry.LocalMachine.OpenSubKey(subPath, true);
+                    if (key == null) continue;
+
+                    // Only apply to NVIDIA adapters (check ProviderName)
+                    var provider = key.GetValue("ProviderName")?.ToString() ?? "";
+                    if (!provider.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    // PerfLevelSrc=0x2222: Force performance level from registry
+                    key.SetValue("PerfLevelSrc", 0x2222, RegistryValueKind.DWord);
+                    // PowerMizerEnable=1: Enable PowerMizer control
+                    key.SetValue("PowerMizerEnable", 1, RegistryValueKind.DWord);
+                    // PowerMizerLevel=1: Maximum performance
+                    key.SetValue("PowerMizerLevel", 1, RegistryValueKind.DWord);
+                    // PowerMizerDefault=1: Maximum performance on battery
+                    key.SetValue("PowerMizerDefault", 1, RegistryValueKind.DWord);
+                    // PowerMizerDefaultAC=1: Maximum performance on AC
+                    key.SetValue("PowerMizerDefaultAC", 1, RegistryValueKind.DWord);
+                    applied++;
+                }
+                Logger.Log($"NVIDIA PowerMizer Max Performance aplicado em {applied} GPU(s). Reinício necessário.");
+            }
+            catch (Exception ex) { Logger.LogError("ApplyNvidiaPowerMizerMaxPerformance", ex.Message); }
+        }
+
+        public static void RevertNvidiaPowerMizer()
+        {
+            try
+            {
+                foreach (var path in NvidiaPowerMizerPaths)
+                {
+                    string subPath = path.Replace("HKLM\\", "");
+                    using var key = Registry.LocalMachine.OpenSubKey(subPath, true);
+                    if (key == null) continue;
+                    key?.DeleteValue("PerfLevelSrc", false);
+                    key?.DeleteValue("PowerMizerEnable", false);
+                    key?.DeleteValue("PowerMizerLevel", false);
+                    key?.DeleteValue("PowerMizerDefault", false);
+                    key?.DeleteValue("PowerMizerDefaultAC", false);
+                }
+                Logger.Log("NVIDIA PowerMizer restaurado para padrão.");
+            }
+            catch (Exception ex) { Logger.LogError("RevertNvidiaPowerMizer", ex.Message); }
+        }
+
+        public static (bool Success, string Message) ToggleNvidiaPowerMizer()
+        {
+            if (IsNvidiaPowerMizerMaxPerformance())
+            {
+                RevertNvidiaPowerMizer();
+                return (true, "NVIDIA PowerMizer restaurado para padrão.");
+            }
+            ApplyNvidiaPowerMizerMaxPerformance();
+            return (IsNvidiaPowerMizerMaxPerformance(), "NVIDIA PowerMizer configurado para máximo desempenho. Reinício necessário.");
+        }
+
+        // ============================================================
+        // NVMe Latency & Handoff Tweaks
+        // ============================================================
+        private static readonly string[] NvMeServicePaths = new[]
+        {
+            @"HKLM\SYSTEM\CurrentControlSet\Services\stornvme\Parameters",
+            @"HKLM\SYSTEM\CurrentControlSet\Services\nvme\Parameters"
+        };
+
+        public static bool IsNvMeLatencyOptimized()
+        {
+            try
+            {
+                // Check D3Handoff for NVMe (enables fast resume from D3 power state)
+                foreach (var path in NvMeServicePaths)
+                {
+                    var val = Registry.GetValue($"{path}", "D3Handoff", -1);
+                    if (val != null && Convert.ToInt32(val) == 1) return true;
+                }
+                return false;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static void ApplyNvMeLatencyTweaks()
+        {
+            try
+            {
+                // D3Handoff=1: Enable fast D3 power state transitions for NVMe drives
+                foreach (var path in NvMeServicePaths)
+                {
+                    try
+                    {
+                        string subPath = path.Replace("HKLM\\", "");
+                        using var key = Registry.LocalMachine.CreateSubKey(subPath, true);
+                        key?.SetValue("D3Handoff", 1, RegistryValueKind.DWord);
+                    }
+                    catch { }
+                }
+
+                // Also set device-specific NVMe power management via power settings
+                // NVMe devices use the StorNVMe power management
+                try
+                {
+                    string nvmePowerPath = @"HKLM\SYSTEM\CurrentControlSet\Enum\PCI";
+                    // Set AllowIdle1InD3 for NVMe devices (prevents deep sleep latency)
+                    var pciKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum", true);
+                    if (pciKey != null)
+                    {
+                        foreach (var enumSub in pciKey.GetSubKeyNames())
+                        {
+                            if (!enumSub.StartsWith("PCI", StringComparison.OrdinalIgnoreCase)) continue;
+                            try
+                            {
+                                using var devKey = pciKey.OpenSubKey($@"{enumSub}\Device Parameters", true);
+                                if (devKey?.GetValue("AllowIdle1InD3") != null)
+                                {
+                                    devKey.SetValue("AllowIdle1InD3", 0, RegistryValueKind.DWord);
+                                    Logger.Log($"NVMe: AllowIdle1InD3=0 em {enumSub}");
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                catch { }
+
+                Logger.Log("NVMe Latency Tweaks aplicados (D3Handoff=1, AllowIdle1InD3=0)");
+            }
+            catch (Exception ex) { Logger.LogError("ApplyNvMeLatencyTweaks", ex.Message); }
+        }
+
+        public static void RevertNvMeLatencyTweaks()
+        {
+            try
+            {
+                foreach (var path in NvMeServicePaths)
+                {
+                    string subPath = path.Replace("HKLM\\", "");
+                    using var key = Registry.LocalMachine.OpenSubKey(subPath, true);
+                    key?.DeleteValue("D3Handoff", false);
+                }
+                Logger.Log("NVMe Latency Tweaks restaurados.");
+            }
+            catch (Exception ex) { Logger.LogError("RevertNvMeLatencyTweaks", ex.Message); }
+        }
+
+        public static (bool Success, string Message) ToggleNvMeLatency()
+        {
+            if (IsNvMeLatencyOptimized())
+            {
+                RevertNvMeLatencyTweaks();
+                return (true, "NVMe Latency restaurado para padrão.");
+            }
+            ApplyNvMeLatencyTweaks();
+            return (true, "NVMe Latency otimizado (D3Handoff=1). Reinício pode ser necessário.");
+        }
+
+        // ============================================================
+        // GPU DPC & Interrupt Priority
+        // ============================================================
+        public static bool IsGpuDpcLatencyLow()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl", "IRQ8Priority", 0);
+                return val != null && Convert.ToInt32(val) == 1;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static void ApplyGpuDpcLatencyTweaks()
+        {
+            try
+            {
+                // IRQ8Priority=1: Real-time priority for system clock interrupt
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\PriorityControl", "IRQ8Priority", 1, RegistryValueKind.DWord);
+                Logger.Log("GPU DPC Latency: IRQ8Priority=1 aplicado.");
+            }
+            catch (Exception ex) { Logger.LogError("ApplyGpuDpcLatencyTweaks", ex.Message); }
+        }
+
+        public static void RevertGpuDpcLatencyTweaks()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\PriorityControl", true);
+                key?.DeleteValue("IRQ8Priority", false);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        public static (bool Success, string Message) ToggleGpuDpcLatency()
+        {
+            if (IsGpuDpcLatencyLow())
+            {
+                RevertGpuDpcLatencyTweaks();
+                return (true, "GPU DPC Latency restaurado.");
+            }
+            ApplyGpuDpcLatencyTweaks();
+            return (true, "GPU DPC Latency otimizado (IRQ8Priority=1).");
+        }
+
+        // ============================================================
+        // Memory Prioritization & Large System Cache
+        // ============================================================
+        public static bool IsMemoryPrioritizationDse()
+        {
+            try
+            {
+                var val = Registry.GetValue(MemMgmtPath2, "LargeSystemCache", 0);
+                return val != null && Convert.ToInt32(val) == 1;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static void ApplyMemoryPrioritizationDse()
+        {
+            try
+            {
+                // LargeSystemCache=1: Prioritize system file cache (improves server/heavy I/O)
+                Registry.SetValue(MemMgmtPath2, "LargeSystemCache", 1, RegistryValueKind.DWord);
+                // DisablePagingExecutive=1: Keep kernel in RAM (requires reboot, uses more RAM but faster)
+                Registry.SetValue(MemMgmtPath2, "DisablePagingExecutive", 1, RegistryValueKind.DWord);
+                Logger.Log("Memory Prioritization aplicado: LargeSystemCache=1, DisablePagingExecutive=1");
+            }
+            catch (Exception ex) { Logger.LogError("ApplyMemoryPrioritizationDse", ex.Message); }
+        }
+
+        public static void RevertMemoryPrioritizationDse()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(MemMgmtPath2.Replace(@"HKEY_LOCAL_MACHINE\", ""), true);
+                key?.DeleteValue("LargeSystemCache", false);
+                key?.DeleteValue("DisablePagingExecutive", false);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        public static (bool Success, string Message) ToggleMemoryPrioritizationDse()
+        {
+            if (IsMemoryPrioritizationDse())
+            {
+                RevertMemoryPrioritizationDse();
+                return (true, "Memory Prioritization restaurado.");
+            }
+            ApplyMemoryPrioritizationDse();
+            return (true, "Memory Prioritization aplicado. Reinício necessário.");
+        }
+
+        // ============================================================
+        // Boot Configuration (bcdedit) — Fast Boot Optimization
+        // ============================================================
+        public static bool IsBootLogEnabled()
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "bcdedit",
+                    Arguments = "/enum {current}",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc == null) return false;
+                string output = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit();
+                return output.Contains("bootlog", StringComparison.OrdinalIgnoreCase) && output.Contains("Yes", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static (bool Success, string Message) ToggleBootLog(bool enable)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "bcdedit",
+                    Arguments = enable ? "/set {current} bootlog Yes" : "/set {current} bootlog No",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                proc?.WaitForExit();
+                return (true, enable ? "Boot log ativado." : "Boot log desativado.");
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        public static bool IsNoGuiBootEnabled()
+            {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "bcdedit",
+                    Arguments = "/enum {current}",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc == null) return false;
+                string output = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit();
+                return output.Contains("noguirolstatus Yes", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static (bool Success, string Message) ToggleNoGuiBoot(bool enable)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "bcdedit",
+                    Arguments = enable ? "/set {current} nointegritychecks Yes" : "/set {current} nointegritychecks No",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                proc?.WaitForExit();
+                return (true, enable ? "No-integrity-checks boot ativado (cuidado!)." : "No-integrity-checks boot desativado.");
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        // ============================================================
+        // Detect NVMe Drives for Information
+        // ============================================================
+        public static List<string> DetectNvMeDrives()
+        {
+            var drives = new List<string>();
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive WHERE InterfaceType = 'NVMe'");
+                foreach (ManagementObject obj in searcher.Get().Cast<ManagementObject>())
+                {
+                    using (obj)
+                    {
+                        string model = obj["Model"]?.ToString() ?? "Unknown NVMe";
+                        drives.Add(model);
+                    }
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            return drives;
+        }
+
+        public static bool HasNvMeDrive()
+        {
+            return DetectNvMeDrives().Count > 0;
+        }
+
+        // ============================================================
+        // Detect GPU Vendor for Conditional Tweaks
+        // ============================================================
+        public enum GpuVendor { Unknown, NVIDIA, AMD, Intel }
+
+        public static GpuVendor DetectPrimaryGpuVendor()
+        {
+            var names = GetAllGpuNames();
+            var primary = names.FirstOrDefault(n => !n.Contains("Microsoft Basic") && !n.Contains("Parsec"));
+            if (string.IsNullOrEmpty(primary)) return GpuVendor.Unknown;
+            if (primary.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)) return GpuVendor.NVIDIA;
+            if (primary.Contains("AMD", StringComparison.OrdinalIgnoreCase) || primary.Contains("Radeon", StringComparison.OrdinalIgnoreCase)) return GpuVendor.AMD;
+            if (primary.Contains("Intel", StringComparison.OrdinalIgnoreCase)) return GpuVendor.Intel;
+            return GpuVendor.Unknown;
+        }
+
+        // ============================================================
+        // AMD-Specific GPU Tweaks
+        // ============================================================
+        public static bool IsAmdAntiLagEnabled()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKLM\SOFTWARE\AMD\CN\GameFilters", "AntiLag", -1);
+                return val != null && Convert.ToInt32(val) == 1;
+            }
+            catch { return false; }
+        }
+
+        public static (bool Success, string Message) ToggleAmdAntiLag()
+        {
+            try
+            {
+                bool current = IsAmdAntiLagEnabled();
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\AMD\CN\GameFilters", "AntiLag", current ? 0 : 1, RegistryValueKind.DWord);
+                return (true, current ? "AMD Anti-Lag desativado." : "AMD Anti-Lag ativado.");
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        // ============================================================
+        // Intel-Specific GPU Tweaks (Xe/Integrated)
+        // ============================================================
+        public static bool IsIntelDynamicTuningEnabled()
+        {
+            try
+            {
+                var val = Registry.GetValue(@"HKLM\SOFTWARE\Intel\Display\igfxcui\profiles\video\Global", "EnableDynamicTuning", -1);
+                return val != null && Convert.ToInt32(val) == 1;
+            }
+            catch { return false; }
+        }
+
+        public static (bool Success, string Message) ToggleIntelDynamicTuning()
+        {
+            try
+            {
+                bool current = IsIntelDynamicTuningEnabled();
+                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Intel\Display\igfxcui\profiles\video\Global", "EnableDynamicTuning", current ? 0 : 1, RegistryValueKind.DWord);
+                return (true, current ? "Intel Dynamic Tuning desativado." : "Intel Dynamic Tuning ativado.");
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        #endregion
+
         #region Network & Driver
         /// <summary>
         /// Obtém lista de adaptadores de rede ativos. IMPORTANTE: Caller deve descartar os ManagementObject.
@@ -7613,8 +8138,13 @@ namespace KitLugia.Core
                     return false;
 
 
-                Process[] processes = Process.GetProcessesByName("OneDrive");
-                if (processes.Length > 0)
+                bool anyOneDrive = false;
+                foreach (var p in Process.GetProcessesByName("OneDrive"))
+                {
+                    if (!p.HasExited) anyOneDrive = true;
+                    p.Dispose();
+                }
+                if (anyOneDrive)
                     return false;
 
 
@@ -8684,39 +9214,65 @@ namespace KitLugia.Core
         {
             try
             {
-                string scriptPath = GetForceStopUnlockScriptPath();
-                string cmd = $"powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File \"{scriptPath}\" \"%1\"";
+                // Always remove old entries first (prevents duplicates from PowerShell era)
+                RemoveForceStopUnlock();
 
-                using var k1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\forcestopunlock");
-                k1?.SetValue("", "Force Stop Unlock");
-                k1?.SetValue("Icon", "%SystemRoot%\\System32\\shell32.dll,276");
-                using var c1 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\forcestopunlock\command");
-                c1?.SetValue("", cmd);
+                // Use the KitLugia executable path for context menu command
+                string exePath = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+                exePath = System.IO.Path.Combine(exePath, "KitLugia.GUI.exe");
+                if (!System.IO.File.Exists(exePath))
+                    exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(exePath)) return;
 
-                using var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\forcestopunlock");
-                k2?.SetValue("", "Force Stop Unlock");
-                k2?.SetValue("Icon", "%SystemRoot%\\System32\\shell32.dll,276");
-                using var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\forcestopunlock\command");
-                c2?.SetValue("", cmd);
+                string cmd = $"\"{exePath}\" --unlock \"%1\"";
+                string icon = "%SystemRoot%\\System32\\shell32.dll,276";
 
-                using var k3 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\forcestopunlock");
-                k3?.SetValue("", "Force Stop Unlock");
-                k3?.SetValue("Icon", "%SystemRoot%\\System32\\shell32.dll,276");
-                using var c3 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Drive\shell\forcestopunlock\command");
-                c3?.SetValue("", cmd);
+                // Register for: *, Directory, Drive (3 shell locations)
+                string[] shellPaths = {
+                    @"Software\Classes\*\shell",
+                    @"Software\Classes\Directory\shell",
+                    @"Software\Classes\Drive\shell"
+                };
+
+                foreach (string shellPath in shellPaths)
+                {
+                    using var k = Registry.CurrentUser.CreateSubKey(shellPath + @"\forcestopunlock");
+                    k?.SetValue("", "Force Stop Unlock (KitLugia)");
+                    k?.SetValue("Icon", icon);
+                    using var c = Registry.CurrentUser.CreateSubKey(shellPath + @"\forcestopunlock\command");
+                    c?.SetValue("", cmd);
+                }
+
+
+                Logger.Log($"[FORCE STOP] Menu de contexto registrado: {cmd}");
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch (Exception ex) { Logger.Log($"[FORCE STOP] Erro ao registrar menu de contexto: {ex.Message}"); }
         }
         public static void RemoveForceStopUnlock()
         {
             try
             {
-                using var s1 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\*\shell", true);
-                s1?.DeleteSubKeyTree("forcestopunlock", false);
-                using var s2 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Directory\shell", true);
-                s2?.DeleteSubKeyTree("forcestopunlock", false);
-                using var s3 = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Drive\shell", true);
-                s3?.DeleteSubKeyTree("forcestopunlock", false);
+                // Remove ALL variants: old PowerShell name and new C# name
+                string[] shellPaths = {
+                    @"Software\Classes\*\shell",
+                    @"Software\Classes\Directory\shell",
+                    @"Software\Classes\Drive\shell"
+                };
+                string[] keyNames = { "forcestopunlock", "ForceStopUnlock", "force_stop_unlock" };
+
+                foreach (string shellPath in shellPaths)
+                {
+                    foreach (string keyName in keyNames)
+                    {
+                        try
+                        {
+                            using var s = Registry.CurrentUser.OpenSubKey(shellPath, true);
+                            s?.DeleteSubKeyTree(keyName, false);
+                        }
+                        catch { }
+                    }
+                }
+
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }

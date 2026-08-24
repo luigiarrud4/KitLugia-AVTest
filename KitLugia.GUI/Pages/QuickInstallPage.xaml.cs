@@ -54,7 +54,7 @@ namespace KitLugia.GUI.Pages
                     StandardOutputEncoding = System.Text.Encoding.UTF8,
                     StandardErrorEncoding = System.Text.Encoding.UTF8
                 };
-                var proc = Process.Start(psi);
+                using var proc = Process.Start(psi);
                 if (proc == null) return (-1, "", "Process.Start returned null");
 
                 var outTask = proc.StandardOutput.ReadToEndAsync();

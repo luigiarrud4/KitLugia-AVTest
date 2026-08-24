@@ -29,6 +29,9 @@ namespace KitLugia.Core
         [DllImport("advapi32.dll", SetLastError = true)]
         private static extern int RegCloseKey(IntPtr hKey);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
         private const uint TOKEN_QUERY = 0x0008;
         private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
         private const int SE_PRIVILEGE_ENABLED = 0x2;
@@ -112,12 +115,24 @@ namespace KitLugia.Core
                 int or long or uint => RegistryValueKind.DWord,
                 string[] => RegistryValueKind.MultiString,
                 byte[] => RegistryValueKind.Binary,
-                string s when s.Contains('%') && (s.Contains("%SystemRoot%") || s.Contains("%USERPROFILE%") || s.Contains("%PATH%"))
+                string s when s.Contains('%') && HasExpandableVariables(s)
                     => RegistryValueKind.ExpandString,
                 string => RegistryValueKind.String,
                 bool => RegistryValueKind.DWord,
                 _ => RegistryValueKind.String
             };
+        }
+
+        /// <summary>
+        /// True se a string contem pelo menos uma variavel %NOME% bem formada
+        /// (ex: %SystemRoot%, %USERPROFILE%, %ProgramFiles%). Regra generica:
+        /// qualquer %VAR% deve ser gravado como REG_EXPAND_SZ, senao o Windows
+        /// trata o literal e o caminho nunca expande.
+        /// </summary>
+        private static bool HasExpandableVariables(string s)
+        {
+            try { return System.Text.RegularExpressions.Regex.IsMatch(s, "%[^%]+%"); }
+            catch { return false; }
         }
 
         /// <summary>
@@ -258,8 +273,11 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
             finally
             {
+                // OpenProcessToken devolve um HANDLE DE TOKEN (kernel32) -
+                // fechar com RegCloseKey (advapi32 de registro) vazava 1 handle
+                // a cada escrita com ownership (caminho mais quente do app).
                 if (tokenHandle != IntPtr.Zero)
-                    RegCloseKey(tokenHandle);
+                    CloseHandle(tokenHandle);
             }
         }
     }

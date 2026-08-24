@@ -146,6 +146,7 @@
         <Border Grid.Row="3" Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="8">
             <Grid>
                 <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto" Padding="0"
+                              CanContentScroll="True"
                               VirtualizingPanel.ScrollUnit="Item"
                               VirtualizingPanel.VirtualizationMode="Recycling">
                     <ItemsControl x:Name="ItemsList"
@@ -166,7 +167,7 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="40"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="70"/>
                                             <ColumnDefinition Width="140"/>
                                             <ColumnDefinition Width="140"/>
                                         </Grid.ColumnDefinitions>
@@ -180,29 +181,50 @@
                                             <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="11"/>
                                         </StackPanel>
 
-                                        <!-- BOTÃO DE INFORMAÇÃO -->
-                                        <Button Grid.Column="2" Click="BtnInfo_Click" Tag="{Binding Description}"
-                                                Background="Transparent" BorderThickness="0" 
-                                                HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                Width="30" Height="30" Cursor="Help"
-                                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
-                                            <Button.ToolTip>
-                                                <ToolTip Content="{Binding Description}"/>
-                                            </Button.ToolTip>
-                                            <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="Transparent">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter Property="Opacity" Value="1"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
+                                        <!-- BOTÃO DE INFORMAÇÃO + EXPLORADOR DE PATH -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Button Click="BtnInfo_Click" Tag="{Binding Description}"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    Width="30" Height="30" Cursor="Help"
+                                                    ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                                                <Button.ToolTip>
+                                                    <ToolTip Content="{Binding Description}"/>
+                                                </Button.ToolTip>
+                                                <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="Transparent">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Opacity" Value="1"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+
+                                            <Button x:Name="BtnPathExplore" Click="BtnPathExplore_Click" Tag="{Binding}"
+                                                    Background="Transparent" BorderThickness="0" Visibility="Collapsed"
+                                                    Width="30" Height="30" Cursor="Hand"
+                                                    ToolTip="Ver o PATH atual, o que falta e adicionar caminhos ausentes">
+                                                <TextBlock Text="➕" FontSize="15" Foreground="#FFD700" Opacity="0.75"/>
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="Transparent">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Opacity" Value="1"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </StackPanel>
 
                                         <!-- Badge de Status -->
                                         <Border Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,15,0"
@@ -235,6 +257,11 @@
                                 </Border>
 
                                 <DataTemplate.Triggers>
+                                    <!-- ITENS DE PATH: mostra o botão + (Explorador de PATH) -->
+                                    <DataTrigger Binding="{Binding IsPathItem}" Value="True">
+                                        <Setter TargetName="BtnPathExplore" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+
                                     <!-- ESTADO: MODIFICADO -->
                                     <DataTrigger Binding="{Binding Status}" Value="MODIFIED">
                                         <Setter TargetName="StatusBadge" Property="Background" Value="#25C42B1C"/>

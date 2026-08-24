@@ -478,7 +478,17 @@
                                                 </CheckBox.LayoutTransform>
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" VerticalAlignment="Center">
-                                                <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <Image Source="{Binding Icon}" Width="32" Height="32" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <ContentControl.Style>
+                                                        <Style TargetType="ContentControl">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ContentControl.Style>
+                                                </ContentControl>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>

@@ -13,6 +13,7 @@ namespace KitLugia.GUI.Helpers
     public static class AppIconHelper
     {
         private static readonly Dictionary<string, BitmapSource?> IconCache = new Dictionary<string, BitmapSource?>(500, StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, DateTime> IconCacheAccess = new Dictionary<string, DateTime>(500, StringComparer.OrdinalIgnoreCase);
         private static readonly object CacheLock = new object();
 
         public static BitmapSource? GetAppIcon(string packageName, int size = 32, string? aumid = null)
@@ -21,7 +22,10 @@ namespace KitLugia.GUI.Helpers
             lock (CacheLock)
             {
                 if (IconCache.ContainsKey(cacheKey))
+                {
+                    IconCacheAccess[cacheKey] = DateTime.UtcNow;
                     return IconCache[cacheKey];
+                }
             }
 
             BitmapSource? icon = null;
@@ -46,7 +50,23 @@ namespace KitLugia.GUI.Helpers
             lock (CacheLock)
             {
                 if (!IconCache.ContainsKey(cacheKey))
+                {
+                    // Cap LRU: remove o menos acessado quando o cache lota (evita crescimento sem limite)
+                    if (IconCache.Count >= 500)
+                    {
+                        DateTime oldest = DateTime.MaxValue;
+                        string? evictKey = null;
+                        foreach (var kv in IconCacheAccess)
+                            if (kv.Value < oldest) { oldest = kv.Value; evictKey = kv.Key; }
+                        if (evictKey != null)
+                        {
+                            IconCache.Remove(evictKey);
+                            IconCacheAccess.Remove(evictKey);
+                        }
+                    }
                     IconCache[cacheKey] = icon;
+                    IconCacheAccess[cacheKey] = DateTime.UtcNow;
+                }
             }
             return icon;
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -384,15 +384,19 @@ namespace KitLugia.Core
         private static DateTime _scanCacheTime;
         private static readonly TimeSpan ScanCacheTtl = TimeSpan.FromMinutes(5);
 
-        public static Dictionary<string, string> RecoverFromExecutableScan(IEnumerable<string>? onlyTargets = null)
+        public static Dictionary<string, string> RecoverFromExecutableScan(IEnumerable<string>? onlyTargets = null, Action<string>? progress = null)
         {
+            // SINGLE-FLIGHT: o cache era checado sob lock mas o scan rodava FORA -
+            // scans concorrentes (Integridade + busca global + toggles) disparavam
+            // varreduras DFS em PARALELO, saturando o disco e congelando o app.
+            // Agora o lock cobre a varredura inteira: o 2o chamador espera o 1o
+            // terminar (chamadores sao background threads) e reusa o cache.
             lock (_scanCacheLock)
             {
                 // Cache com TTL: a varredura de disco custa ~30s e o PATH de programas
                 // instalados nao muda entre scans (Integrity chama isto ate 2x por scan).
                 if (_scanCache != null && DateTime.UtcNow - _scanCacheTime < ScanCacheTtl)
                     return new Dictionary<string, string>(_scanCache, StringComparer.OrdinalIgnoreCase);
-            }
 
             // Recuperacao baseada no disco: procura .exe conhecidos e retorna dir pai
             var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -425,15 +429,73 @@ namespace KitLugia.Core
                 "node_modules", "\\.git\\", "\\.svn\\", "\\sdk\\", "\\examples\\",
                 "\\test\\", "\\tests\\", "\\cache\\", "\\scratch\\", "\\resources\\app\\"
             };
+            // Se o filtro onlyTargets excluiu tudo, nada foi escaneado - nao tocar no cache
+            // (um scan vazio aqueceria o cache com um dicionario vazio por 5 min).
+            bool didScan = wanted.Count > 0;
+            // Indexador nativo USN/MFT embutido (requer elevacao): resolve os
+            // alvos lendo a Master File Table em ~1-3s; o DFS cobre apenas o
+            // que sobrar. Sem elevacao, FindFileDirectories retorna vazio e o
+            // comportamento e exatamente o antigo (DFS completo).
+            if (wanted.Count > 0)
+            {
+                try
+                {
+                    var viaIndex = NativeUsn.FindFileDirectories(wanted.Keys.ToList(), maxPerName: 8);
+                    foreach (var kvp in viaIndex)
+                    {
+                        if (kvp.Value == null || kvp.Value.Count == 0) continue;
+                        string candidate = kvp.Value[0]; // ja ordenado: 7-Zip primeiro, depois mais raso
+                        string lower = candidate.ToLowerInvariant();
+                        // Preferencia do 7z: dir chamado 7-Zip/7zip ganha de 7z.exe
+                        // interno de outros apps (ex: NVIDIA App). So remove do wanted
+                        // quando o candidato e bom - senao o 1o 7z.exe encontrado (e.g.
+                        // NVIDIA) impediria o DFS de achar o 7-Zip real depois.
+                        if (kvp.Key == "7z")
+                        {
+                            bool curGood = lower.Contains("7-zip") || lower.Contains("7zip");
+                            if (found.TryGetValue("7z", out string? prev7z))
+                            {
+                                string prevLower = prev7z.ToLowerInvariant();
+                                bool prevGood = prevLower.Contains("7-zip") || prevLower.Contains("7zip");
+                                if (prevGood && !curGood) continue;
+                                if (!curGood && !prevGood &&
+                                    lower.Count(c => c == '\\') > prevLower.Count(c => c == '\\'))
+                                    continue;
+                            }
+                            found["7z"] = candidate;
+                            if (curGood) wanted.Remove(kvp.Key);
+                        }
+                        else
+                        {
+                            found[kvp.Key] = candidate;
+                            wanted.Remove(kvp.Key);
+                        }
+                    }
+                    if (viaIndex.Count > 0)
+                        Logger.Log($"PathRepair: {viaIndex.Count} alvo(s) resolvido(s) pelo indexador nativo USN (MFT).");
+                }
+                catch { }
+            }
+            var dfsSw = System.Diagnostics.Stopwatch.StartNew();
+            const int DfsTimeoutMs = 15000; // 15s max for DFS scan (prevents 30s+ hangs)
+            int rootIdx = 0;
+            string[] rootNames = { "Program Files", "Program Files (x86)", "AppData\\Local", "UserProfile" };
             foreach (var root in searchRoots)
             {
                 if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
                 if (wanted.Count == 0) break;
+                if (dfsSw.ElapsedMilliseconds > DfsTimeoutMs)
+                {
+                    Logger.Log($"PathRepair: DFS scan timeout after {dfsSw.ElapsedMilliseconds}ms ({found.Count} targets found so far)");
+                    break;
+                }
+                progress?.Invoke($"Escaneando {rootNames[Math.Min(rootIdx, rootNames.Length - 1)]}...");
+                rootIdx++;
                 try
                 {
                     // Uma unica passada DFS por raiz (pulando subpastas pesadas), filtrando
                     // por nome de arquivo - corta ~32 varreduras completas para 4.
-                    foreach (var file in EnumerateFilesSkippingHeavy(root))
+                    foreach (var file in EnumerateFilesSkippingHeavy(root, dfsSw, DfsTimeoutMs))
                     {
                         string fileName = Path.GetFileName(file);
                         if (wanted.TryGetValue(fileName, out string? targetName))
@@ -444,18 +506,28 @@ namespace KitLugia.Core
                             if (avoidSubstrings.Any(s => lower.Contains(s))) continue;
                             // Preferencia do 7z: dir chamado 7-Zip/7zip ganha de 7z.exe interno
                             // de outros apps (ex: NVIDIA App); entre genericos, o mais raso.
-                            if (targetName == "7z" && found.TryGetValue("7z", out string? prev7z))
+                            // So remove do wanted quando o candidato e bom - senao o 1o 7z.exe
+                            // encontrado (e.g. NVIDIA App) impediria o DFS de achar o 7-Zip real.
+                            if (targetName == "7z")
                             {
                                 bool curGood = lower.Contains("7-zip") || lower.Contains("7zip");
-                                string prevLower = prev7z.ToLowerInvariant();
-                                bool prevGood = prevLower.Contains("7-zip") || prevLower.Contains("7zip");
-                                if (prevGood && !curGood) continue;
-                                if (!curGood && !prevGood &&
-                                    lower.Count(c => c == '\\') > prevLower.Count(c => c == '\\'))
-                                    continue;
+                                if (found.TryGetValue("7z", out string? prev7z))
+                                {
+                                    string prevLower = prev7z.ToLowerInvariant();
+                                    bool prevGood = prevLower.Contains("7-zip") || prevLower.Contains("7zip");
+                                    if (prevGood && !curGood) continue;
+                                    if (!curGood && !prevGood &&
+                                        lower.Count(c => c == '\\') > prevLower.Count(c => c == '\\'))
+                                        continue;
+                                }
+                                found["7z"] = dir;
+                                if (curGood) wanted.Remove(fileName);
                             }
-                            found[targetName] = dir;
-                            wanted.Remove(fileName);
+                            else
+                            {
+                                found[targetName] = dir;
+                                wanted.Remove(fileName);
+                            }
                             if (wanted.Count == 0) break;
                         }
                     }
@@ -465,15 +537,21 @@ namespace KitLugia.Core
                     // Sem acesso (ou erro transiente): continua para as outras raizes
                 }
             }
-            lock (_scanCacheLock)
+            if (didScan)
             {
-                _scanCache = found;
+                // Merge no cache compartilhado: um scan de fallback nao descarta o que
+                // outro scan ja encontrou antes (TTL 5 min cobre a vida util do PATH).
+                if (_scanCache == null)
+                    _scanCache = new Dictionary<string, string>(found, StringComparer.OrdinalIgnoreCase);
+                else
+                    foreach (var kvp in found) _scanCache[kvp.Key] = kvp.Value;
                 _scanCacheTime = DateTime.UtcNow;
             }
             return found;
+            }
         }
 
-        public static Dictionary<string, string> GetInstalledProgramPaths()
+        public static Dictionary<string, string> GetInstalledProgramPaths(Action<string>? progress = null)
         {
             var paths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -553,7 +631,7 @@ namespace KitLugia.Core
             string[] allTargets = { "winget", "node", "npm", "git", "7z", "pwsh", "dotnet", "cargo" };
             var missing = allTargets.Where(t => !paths.ContainsKey(t)).ToList();
             var recovered = missing.Count > 0
-                ? RecoverFromExecutableScan(missing)
+                ? RecoverFromExecutableScan(missing, progress)
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in recovered)
             {
@@ -579,13 +657,17 @@ namespace KitLugia.Core
             "Microsoft", "AppData", "Roaming", "Packages", "ProgramData"
         };
 
-        private static IEnumerable<string> EnumerateFilesSkippingHeavy(string root)
+        private static IEnumerable<string> EnumerateFilesSkippingHeavy(string root, System.Diagnostics.Stopwatch? dfsWatch = null, int timeoutMs = 0)
         {
             var stack = new Stack<(string Dir, int Depth)>();
             var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             stack.Push((root, 0));
             while (stack.Count > 0)
             {
+                // Enforce timeout per-directory (not just per-root) to prevent
+                // a single huge tree (e.g. LocalAppData) from blocking for minutes.
+                if (dfsWatch != null && timeoutMs > 0 && dfsWatch.ElapsedMilliseconds > timeoutMs)
+                    yield break;
                 var (dir, depth) = stack.Pop();
                 if (!visited.Add(dir)) continue;
                 // Programas instalados ficam em profundidade <= 4 (ex: LocalAppData\Programs\App\bin);
@@ -643,6 +725,212 @@ namespace KitLugia.Core
 
             var entries = DiagnosePath(pathValue, "User");
             return entries.All(e => e.Problem == PathEntryProblem.None);
+        }
+
+        // --- API de leitura/escrita do PATH (usada pelo Explorador de PATH) ----
+
+        public const string SystemPathRegistryKey = @"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
+        public const string UserPathRegistryKey = @"Environment";
+
+        public static string GetSystemPathValue()
+        {
+            try
+            {
+                return Microsoft.Win32.Registry.LocalMachine
+                    .OpenSubKey(SystemPathRegistryKey)?.GetValue("Path")?.ToString() ?? "";
+            }
+            catch { return ""; }
+        }
+
+        public static string GetUserPathValue()
+        {
+            try
+            {
+                return Microsoft.Win32.Registry.CurrentUser
+                    .OpenSubKey(UserPathRegistryKey)?.GetValue("Path")?.ToString() ?? "";
+            }
+            catch { return ""; }
+        }
+
+        public static bool SetSystemPathValue(string newPath)
+            => SetPathValue(Microsoft.Win32.Registry.LocalMachine, SystemPathRegistryKey, newPath);
+
+        public static bool SetUserPathValue(string newPath)
+            => SetPathValue(Microsoft.Win32.Registry.CurrentUser, UserPathRegistryKey, newPath);
+
+        private static bool SetPathValue(Microsoft.Win32.RegistryKey baseKey, string subKeyPath, string newPath)
+        {
+            try
+            {
+                // hint Unknown: o tipo e decidido por auto-deteccao (%VAR% -> REG_EXPAND_SZ)
+                bool ok = RegistryOwnership.TrySetValueWithOwnershipFallback(baseKey, subKeyPath, "Path", newPath, Microsoft.Win32.RegistryValueKind.Unknown);
+                if (ok) BroadcastEnvironmentChange();
+                return ok;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Adiciona UMA entrada ao PATH (System ou User) com dedup por caminho
+        /// expandido, preservando REG_EXPAND_SZ. Retorna true se adicionou (ou
+        /// se ja existia - idempotente).
+        /// </summary>
+        public static bool AddSinglePathEntry(string pathType, string entry)
+        {
+            if (string.IsNullOrWhiteSpace(entry)) return false;
+            string target = Environment.ExpandEnvironmentVariables(entry).TrimEnd('\\');
+
+            string current = pathType.Equals("User", StringComparison.OrdinalIgnoreCase)
+                ? GetUserPathValue() : GetSystemPathValue();
+
+            var entries = new List<string>();
+            foreach (var raw in current.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                entries.Add(raw);
+                try
+                {
+                    if (Environment.ExpandEnvironmentVariables(raw).TrimEnd('\\')
+                        .Equals(target, StringComparison.OrdinalIgnoreCase))
+                        return true; // ja presente (idempotente)
+                }
+                catch { }
+            }
+
+            entries.Add(entry);
+            string newPath = string.Join(";", entries);
+
+            return pathType.Equals("User", StringComparison.OrdinalIgnoreCase)
+                ? SetUserPathValue(newPath) : SetSystemPathValue(newPath);
+        }
+
+        /// <summary>
+        /// Avisa o Explorer (e todos os processos) que as variaveis de ambiente mudaram.
+        /// Roda em background (fire-and-forget): o broadcast para HWND_BROADCAST pode
+        /// bloquear ate o timeout por janela travada - na UI thread isso congelaria o app.
+        /// </summary>
+        private static void BroadcastEnvironmentChange()
+        {
+            try
+            {
+                _ = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        _ = NativeEnv.SendMessageTimeout(
+                            new IntPtr(0xffff), 0x001a, IntPtr.Zero, "Environment", 0x0002, 2000, out _);
+                    }
+                    catch { }
+                });
+            }
+            catch { }
+        }
+
+        private static class NativeEnv
+        {
+            [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+            public static extern IntPtr SendMessageTimeout(
+                IntPtr hWnd, int Msg, IntPtr wParam, string lParam, int fuFlags, int uTimeout, out IntPtr lpdwResult);
+        }
+
+        /// <summary>
+        /// Candidato a entrada ausente do PATH (essencial de sistema ou programa instalado).
+        /// </summary>
+        public class PathEntryCandidate
+        {
+            public string Label { get; set; } = "";
+            public string Path { get; set; } = "";
+            public string Detail { get; set; } = "";
+            public bool CanAdd { get; set; }
+        }
+
+        /// <summary>
+        /// Entradas minimas do System PATH que ainda nao estao presentes (comparadas
+        /// por caminho expandido). CanAdd=true sempre - o usuario pode querer adicionar
+        /// mesmo sem a pasta existir (ex: %ProgramFiles%\PowerShell\7 com PS7 via MSIX);
+        /// a UI confirma quando a pasta nao existe.
+        /// </summary>
+        public static List<PathEntryCandidate> GetMissingSystemEntries(string currentSystemPath)
+        {
+            var result = new List<PathEntryCandidate>();
+            string[] minimal = {
+                "%SystemRoot%\\system32",
+                "%SystemRoot%",
+                "%SystemRoot%\\System32\\Wbem",
+                "%SYSTEMROOT%\\System32\\WindowsPowerShell\\v1.0\\",
+                "%SYSTEMROOT%\\System32\\OpenSSH\\",
+                "%ProgramFiles%\\dotnet",
+                "%ProgramFiles%\\PowerShell\\7\\"
+            };
+
+            var currentEntries = currentSystemPath.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var m in minimal)
+            {
+                bool present = false;
+                string expanded = Environment.ExpandEnvironmentVariables(m).TrimEnd('\\');
+                foreach (var c in currentEntries)
+                {
+                    try
+                    {
+                        if (Environment.ExpandEnvironmentVariables(c).TrimEnd('\\')
+                            .Equals(expanded, StringComparison.OrdinalIgnoreCase)) { present = true; break; }
+                    }
+                    catch { }
+                }
+                if (present) continue;
+
+                bool exists;
+                try { exists = Directory.Exists(expanded); }
+                catch { exists = false; }
+
+                result.Add(new PathEntryCandidate
+                {
+                    Label = m,
+                    Path = m,
+                    Detail = exists
+                        ? "Essencial do sistema (pasta existe - recomendado adicionar)"
+                        : "Essencial do sistema (pasta nao existe no PC - confirmar para adicionar)",
+                    CanAdd = true
+                });
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Programas instalados detectados (winget/dotnet/pwsh/git/node/npm/cargo/7z)
+        /// cujo diretorio NAO esta no User PATH - o que o kit ve que falta.
+        /// </summary>
+        public static List<PathEntryCandidate> GetMissingInstalledEntries(string currentUserPath, Action<string>? progress = null)
+        {
+            var result = new List<PathEntryCandidate>();
+            var installed = GetInstalledProgramPaths(progress);
+            if (installed.Count == 0) return result;
+
+            var currentEntries = currentUserPath.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var kvp in installed)
+            {
+                if (string.IsNullOrWhiteSpace(kvp.Value)) continue;
+                string target = kvp.Value.TrimEnd('\\');
+                bool present = false;
+                foreach (var c in currentEntries)
+                {
+                    try
+                    {
+                        if (Environment.ExpandEnvironmentVariables(c).TrimEnd('\\')
+                            .Equals(target, StringComparison.OrdinalIgnoreCase)) { present = true; break; }
+                    }
+                    catch { }
+                }
+                if (present) continue;
+
+                result.Add(new PathEntryCandidate
+                {
+                    Label = kvp.Key,
+                    Path = kvp.Value,
+                    Detail = "Programa instalado detectado pelo kit",
+                    CanAdd = true
+                });
+            }
+            return result;
         }
     }
 }

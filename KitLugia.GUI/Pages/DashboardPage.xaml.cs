@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -49,6 +49,9 @@ namespace KitLugia.GUI.Pages
 
         public void Cleanup()
         {
+            _latencyScanCts?.Cancel();
+            _latencyScanCts?.Dispose();
+            _latencyScanCts = null;
 
             this.Loaded -= DashboardPage_Loaded;
             this.Unloaded -= DashboardPage_Unloaded;

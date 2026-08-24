@@ -19,8 +19,8 @@ namespace KitLugia.GUI
         {
             try
             {
-                IntPtr handle = Process.GetCurrentProcess().Handle;
-                EmptyWorkingSet(handle);
+                using var proc = Process.GetCurrentProcess();
+                EmptyWorkingSet(proc.Handle);
             }
             catch
             {

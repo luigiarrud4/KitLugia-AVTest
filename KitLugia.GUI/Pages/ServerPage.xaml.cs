@@ -90,7 +90,8 @@ namespace KitLugia.GUI.Pages
 
                             try
                             {
-                                string procName = Process.GetProcessById(pid).ProcessName;
+                                using var p = Process.GetProcessById(pid);
+                                string procName = p.ProcessName;
                                 result.Add((port, procName));
                             }
                             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }

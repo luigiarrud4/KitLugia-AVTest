@@ -20,19 +20,28 @@ namespace KitLugia.GUI
 
         private static Mutex? _mutex;
 
+        public static string? UnlockPath { get; private set; }
+
         [STAThread]
         public static void Main(string[] args)
         {
             bool startMinimized = false;
-            foreach (var arg in args)
+            string? unlockPath = null;
+
+            for (int i = 0; i < args.Length; i++)
             {
-                string lower = arg.ToLower();
+                string lower = args[i].ToLower();
                 if (lower == "--tray" || lower == "-tray" || lower == "--minimized")
                 {
                     startMinimized = true;
-                    break;
+                }
+                else if (lower == "--unlock" && i + 1 < args.Length)
+                {
+                    unlockPath = args[++i];
                 }
             }
+
+            UnlockPath = unlockPath;
 
             // ★ OTIMIZAÇÃO: boost self priority to High so the tray icon + watchdog load faster.
             // Padrão é Normal — fica atrás de outros apps de boot na disputa por CPU.
@@ -56,7 +65,12 @@ namespace KitLugia.GUI
             }
             if (!acquired)
             {
-                // Já existe uma instância rodando — traz para frente
+                // Já existe uma instância rodando
+                // Se --unlock foi passado, envia o caminho via IPC para a instância existente
+                if (!string.IsNullOrEmpty(unlockPath))
+                {
+                    Services.UnlockIpcServer.SendUnlockCommand(unlockPath);
+                }
                 BringExistingToFront();
                 return;
             }
@@ -87,16 +101,23 @@ namespace KitLugia.GUI
             try
             {
                 var current = Process.GetCurrentProcess();
-                var existing = Process.GetProcessesByName(current.ProcessName)
-                    .FirstOrDefault(p => p.Id != current.Id);
+                Process? existing = null;
+                foreach (var p in Process.GetProcessesByName(current.ProcessName))
+                {
+                    if (p.Id == current.Id) { p.Dispose(); continue; }
+                    if (existing == null && !p.HasExited) existing = p;
+                    else p.Dispose();
+                }
 
                 if (existing is not null && !existing.HasExited && existing.MainWindowHandle != IntPtr.Zero)
                 {
                     if (IsIconic(existing.MainWindowHandle)) ShowWindow(existing.MainWindowHandle, SW_RESTORE);
                     else ShowWindow(existing.MainWindowHandle, SW_SHOW);
                     SetForegroundWindow(existing.MainWindowHandle);
+                    existing.Dispose();
                     return;
                 }
+                existing?.Dispose();
 
                 // Janela oculta (tray mode) ou processo inexistente — envia sinal via named event
                 try

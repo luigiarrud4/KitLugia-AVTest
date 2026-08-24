@@ -57,13 +57,19 @@ namespace KitLugia.Core
     [ThreadStatic]
     private static RegistryBatch? _currentBatch;
 
-    // Cache do bcdedit /enum por scan (executado 1x em vez de 1 processo por tweak BCD)
-    [ThreadStatic]
+    // GATE GLOBAL do scan: abrir a Integridade + digitar na busca + toggles
+    // disparavam scans CONCORRENTES (cada um com bcdedit + varredura de PATH
+    // propria) e o disco/CPU saturam - o app parecia travado. Com o lock, o
+    // 2o scan espera o 1o terminar (chamadores sao background threads).
+    private static readonly object _scanGate = new();
+
+    // Cache do bcdedit /enum COMPARTILHADO entre scans/toggles (TTL 15s):
+    // o antigo ThreadStatic forçava um bcdedit /enum por thread/scan.
     private static string? _bcdEnumOutput;
-    [ThreadStatic]
     private static string? _bcdEnumError;
-    [ThreadStatic]
     private static bool _bcdEnumAttempted;
+    private static DateTime _bcdEnumTimeUtc;
+    private const double BcdEnumCacheTtlSeconds = 15;
 
     /// <summary>
     /// Serviços que o KitLugia desativa DE PROPÓSITO (toggles de telemetria, diagnóstico,
@@ -2587,41 +2593,58 @@ new() {
 
         public static List<ScannableTweak> GetHarmfulTweaksWithStatus()
         {
-            var tweaksCopy = new List<ScannableTweak>(HarmfulTweaks.Count);
-
-            using var batch = new RegistryBatch();
-            _currentBatch = batch;
-            _bcdEnumOutput = null;
-            _bcdEnumError = null;
-            _bcdEnumAttempted = false;
-            try
+            // Single-flight: scans concorrentes (Integridade + busca global +
+            // FixAll + toggles) agora SERIALIZAM - um unico bcdedit e uma unica
+            // varredura de PATH por janela de cache em vez de N em paralelo.
+            lock (_scanGate)
             {
-                // BCD: UM único bcdedit /enum para todo o scan (antes: 1 processo por tweak BCD).
-                if (HarmfulTweaks.Any(t => t.Type == TweakType.Bcd))
+                var tweaksCopy = new List<ScannableTweak>(HarmfulTweaks.Count);
+
+                using var batch = new RegistryBatch();
+                _currentBatch = batch;
+                // Cache BCD compartilhado: invalida SO quando expira (TTL 15s),
+                // nao a cada scan - o 1o scan de uma janela roda o bcdedit e os
+                // scans/toggles seguintes reusam o output sem spawnar processo.
+                if (!_bcdEnumAttempted || (DateTime.UtcNow - _bcdEnumTimeUtc).TotalSeconds >= BcdEnumCacheTtlSeconds)
                 {
-                    var bcd = ProcessRunner.Run("bcdedit", "/enum", 10000);
-                    _bcdEnumAttempted = true;
-                    _bcdEnumOutput = bcd.Output;
-                    _bcdEnumError = bcd.Error;
-                    if (bcd.ExitCode != 0)
-                        Logger.Log($"[CHECK] Erro ao obter BCD (cache): {bcd.Error}");
+                    _bcdEnumOutput = null;
+                    _bcdEnumError = null;
+                    _bcdEnumAttempted = false;
+                }
+                try
+                {
+                    // BCD: UM único bcdedit /enum para todo o scan (antes: 1 processo por tweak BCD).
+                    if (HarmfulTweaks.Any(t => t.Type == TweakType.Bcd))
+                    {
+                        if (!_bcdEnumAttempted)
+                        {
+                            var bcd = ProcessRunner.Run("bcdedit", "/enum", 10000);
+                            // Ordem: escrever dados ANTES do flag (leitor nunca ve
+                            // flag=true com output pela metade).
+                            _bcdEnumOutput = bcd.Output;
+                            _bcdEnumError = bcd.Error;
+                            _bcdEnumTimeUtc = DateTime.UtcNow;
+                            _bcdEnumAttempted = true;
+                            if (bcd.ExitCode != 0)
+                                Logger.Log($"[CHECK] Erro ao obter BCD (cache): {bcd.Error}");
+                        }
+                    }
+
+                    foreach (var tweak in HarmfulTweaks)
+                    {
+                        CheckTweak(tweak);
+                        tweaksCopy.Add(tweak);
+                    }
+                }
+                finally
+                {
+                    _currentBatch = null;
+                    // Cache BCD MANTIDO entre scans (TTL cuida da validade) -
+                    // o reset no finally destruiria o ganho entre scans/toggles.
                 }
 
-                foreach (var tweak in HarmfulTweaks)
-                {
-                    CheckTweak(tweak);
-                    tweaksCopy.Add(tweak);
-                }
+                return tweaksCopy;
             }
-            finally
-            {
-                _currentBatch = null;
-                _bcdEnumOutput = null;
-                _bcdEnumError = null;
-                _bcdEnumAttempted = false;
-            }
-
-            return tweaksCopy;
         }
 
         public static (bool Success, string Message) ToggleTweak(ScannableTweak tweak)
@@ -3612,10 +3635,11 @@ new() {
                 {
                     if (string.IsNullOrEmpty(tweak.ValueName) || tweak.HarmfulValue == null) return;
 
-                    // Usa o cache do scan (1 único bcdedit /enum) ou roda pontualmente
-                    // quando chamado fora de um scan (toggle individual / uso isolado).
+                    // Usa o cache compartilhado do scan (1 único bcdedit /enum,
+                    // TTL 15s) ou roda pontualmente quando o cache expirou
+                    // (toggle individual / uso isolado).
                     string output;
-                    if (_bcdEnumAttempted)
+                    if (_bcdEnumAttempted && (DateTime.UtcNow - _bcdEnumTimeUtc).TotalSeconds < BcdEnumCacheTtlSeconds)
                     {
                         if (!string.IsNullOrEmpty(_bcdEnumError))
                         {
@@ -3634,6 +3658,11 @@ new() {
                             tweak.Status = TweakStatus.ERROR;
                             return;
                         }
+                        // Alimenta o cache compartilhado (dados antes do flag).
+                        _bcdEnumOutput = outp;
+                        _bcdEnumError = error;
+                        _bcdEnumTimeUtc = DateTime.UtcNow;
+                        _bcdEnumAttempted = true;
                         output = outp;
                     }
 

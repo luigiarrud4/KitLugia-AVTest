@@ -197,9 +197,13 @@ namespace KitLugia.Core
             {
                 foreach (var p in Process.GetProcessesByName(procName))
                 {
-                    p.CloseMainWindow();
-                    if (!p.WaitForExit(3000))
-                        p.Kill();
+                    try
+                    {
+                        p.CloseMainWindow();
+                        if (!p.WaitForExit(3000))
+                            p.Kill();
+                    }
+                    finally { p.Dispose(); }
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }

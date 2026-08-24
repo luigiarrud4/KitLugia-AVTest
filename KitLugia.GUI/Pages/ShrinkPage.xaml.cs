@@ -21,6 +21,9 @@ namespace KitLugia.GUI.Pages
 
         public void Cleanup()
         {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
             this.Loaded -= ShrinkPage_Loaded;
             this.DataContext = null;
         }

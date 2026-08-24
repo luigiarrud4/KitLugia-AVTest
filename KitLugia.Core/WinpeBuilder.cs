@@ -1600,7 +1600,7 @@ namespace KitLugia.Core
                 StandardErrorEncoding = Encoding.UTF8,
             };
 
-            var proc = Process.Start(psi);
+            using var proc = Process.Start(psi);
             if (proc == null) return (-1, "Falha ao iniciar processo");
 
             var outputTask = proc.StandardOutput.ReadToEndAsync();
@@ -1635,7 +1635,7 @@ namespace KitLugia.Core
                 WorkingDirectory = workingDirectory ?? Path.GetDirectoryName(filename) ?? "",
             };
 
-            var proc = Process.Start(psi);
+            using var proc = Process.Start(psi);
             if (proc == null) return (-1, "Falha ao iniciar processo");
 
             var outputTask = proc.StandardOutput.ReadToEndAsync();

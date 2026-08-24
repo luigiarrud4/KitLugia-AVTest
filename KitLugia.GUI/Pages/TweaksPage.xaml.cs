@@ -1,8 +1,9 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Threading.Tasks;
 using KitLugia.Core;
+using KitLugia.GUI.Services;
 using Microsoft.Win32;
 
 // Resolve ambiguidade da Cor
@@ -119,6 +120,8 @@ namespace KitLugia.GUI.Pages
                 {
                     if (!_isPageLoaded) return;
                     _isLoading = true;
+
+                    ChkMaintainTweaks.IsChecked = TweakRegistry.IsMaintained();
 
                     ChkGameMode.IsChecked = gamesOptimized;
                     UpdateLabel(StatusGame, gamesOptimized, "Prioridade Alta", "Padrão");
@@ -264,6 +267,29 @@ namespace KitLugia.GUI.Pages
                     ChkInputQueue.IsChecked = inputQueue;
                     UpdateLabel(StatusInputQueue, inputQueue, "200", "Padrão (100)");
 
+                    // Novos hardware-aware tweaks
+                    bool powerMizer = SystemTweaks.IsNvidiaPowerMizerMaxPerformance();
+                    ChkPowerMizer.IsChecked = powerMizer;
+                    UpdateLabel(StatusPowerMizer, powerMizer, "Max Perf", "Padrão");
+
+                    bool nvmeLatency = SystemTweaks.IsNvMeLatencyOptimized();
+                    ChkNvMe.IsChecked = nvmeLatency;
+                    UpdateLabel(StatusNvMe, nvmeLatency, "Otimizado", "Padrão");
+                    var nvmeDrives = SystemTweaks.DetectNvMeDrives();
+                    InfoNvMe.Text = nvmeDrives.Count > 0
+                        ? $"NVMe: {string.Join(", ", nvmeDrives.Take(2))} ({nvmeDrives.Count} detectado(s))"
+                        : "Nenhum drive NVMe detectado";
+                    ChkNvMe.IsEnabled = nvmeDrives.Count > 0;
+                    StatusNvMe.Text = nvmeDrives.Count > 0 ? (nvmeLatency ? "Otimizado" : "Padrão") : "Sem NVMe";
+
+                    bool dpcLatency = SystemTweaks.IsGpuDpcLatencyLow();
+                    ChkDpcLatency.IsChecked = dpcLatency;
+                    UpdateLabel(StatusDpcLatency, dpcLatency, "IRQ8=1", "Padrão");
+
+                    bool memPriority = SystemTweaks.IsMemoryPrioritizationDse();
+                    ChkMemPriority.IsChecked = memPriority;
+                    UpdateLabel(StatusMemPriority, memPriority, "Em RAM", "Padrão");
+
                     // Startup
                     ChkStartupDelay.IsChecked = startupDelay;
                     UpdateLabel(StatusStartupDelay, startupDelay, "Removido", "Padrão");
@@ -351,6 +377,8 @@ namespace KitLugia.GUI.Pages
                 });
 
                 UpdateSlideLabel(StatusSlideInput, targetActive, "Nível Máximo", "Padrão");
+
+                RecordTweak("SlideInput", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("REINÍCIO NECESSÁRIO", "As mudanças na latência de input exigem reiniciar o computador.");
             }
@@ -380,6 +408,8 @@ namespace KitLugia.GUI.Pages
                 });
 
                 UpdateSlideLabel(StatusSlideUsb, targetActive, "Desativado", "Padrão");
+
+                RecordTweak("SlideUsb", targetActive);
             }
             catch (Exception ex)
             {
@@ -407,6 +437,8 @@ namespace KitLugia.GUI.Pages
                 });
 
                 UpdateSlideLabel(StatusSlideGaming, targetActive, "Extremo (DWM/GameDVR OFF)", "Padrão");
+
+                RecordTweak("SlideGaming", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("REINÍCIO NECESSÁRIO", "As alterações estruturais do Thread e GameDVR exigem reiniciar o computador.");
             }
@@ -436,6 +468,8 @@ namespace KitLugia.GUI.Pages
                 });
 
                 UpdateSlideLabel(StatusPciePower, targetActive, "Desativado (Off)", "Padrão");
+
+                RecordTweak("PciePower", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("PCIe POWER", "Link State Power Management alterado. Ganho de FPS varia entre sistemas.");
             }
@@ -465,6 +499,8 @@ namespace KitLugia.GUI.Pages
                 });
 
                 UpdateSlideLabel(StatusTimeout, targetActive, "Desativado (0)", "Padrão");
+
+                RecordTweak("Timeout", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("TIMEOUT", "Timeout de disco e tela alterado. Não desligarão durante uso.");
             }
@@ -486,6 +522,8 @@ namespace KitLugia.GUI.Pages
             {
                 SystemTweaks.ApplyGamingOptimizations();
                 UpdateLabel(StatusGame, true, "Prioridade Alta", "Padrão");
+
+                RecordTweak("GameMode", true);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowSuccess("MODO JOGO", "Prioridade de jogo definida para Alta.");
             }
@@ -493,6 +531,8 @@ namespace KitLugia.GUI.Pages
             {
                 SystemTweaks.RevertGamingOptimizations();
                 UpdateLabel(StatusGame, false, "Prioridade Alta", "Padrão");
+
+                RecordTweak("GameMode", false);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("MODO JOGO", "Prioridade de jogo restaurada para padrão.");
             }
@@ -506,6 +546,7 @@ namespace KitLugia.GUI.Pages
             bool nowActive = ChkMPO.IsChecked == true;
             UpdateLabel(StatusMPO, nowActive, "Corrigido (OFF)", "Padrão (ON)");
 
+                RecordTweak("MPO", nowActive);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("REINÍCIO NECESSÁRIO", $"{result.Message}\nO Windows precisa ser reiniciado para aplicar.");
         }
@@ -525,6 +566,9 @@ namespace KitLugia.GUI.Pages
             {
                 StatusVBS.Text = "Padrão (Seguro)";
                 StatusVBS.Foreground = _colorDefault;
+
+
+            RecordTweak("VBS", isOptimizationActive);
             }
 
             if (Application.Current.MainWindow is MainWindow mw)
@@ -558,6 +602,7 @@ namespace KitLugia.GUI.Pages
             bool nowActive = ChkMemoryUsage.IsChecked == true;
             UpdateLabel(StatusMemoryUsage, nowActive, "Otimizado", "Padrão");
 
+                RecordTweak("MemoryUsage", nowActive);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("REINÍCIO NECESSÁRIO", $"{result.Message}\nO Windows precisa ser reiniciado para aplicar.");
         }
@@ -570,6 +615,7 @@ namespace KitLugia.GUI.Pages
             bool nowActive = ChkTimer.IsChecked == true;
             UpdateLabel(StatusTimer, nowActive, "Latência Mínima", "Padrão");
 
+                RecordTweak("TimerResolution", nowActive);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("REINÍCIO NECESSÁRIO", $"{result.Message}\nO Windows precisa ser reiniciado para aplicar as mudanças de Timer.");
         }
@@ -582,6 +628,7 @@ namespace KitLugia.GUI.Pages
             bool nowActive = ChkShutdown.IsChecked == true;
             UpdateLabel(StatusShutdown, nowActive, "⚡ Turbo Boot", "Padrão");
 
+                RecordTweak("FastShutdown", nowActive);
             // Update Tray if exists
             var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
             if (tray != null) { tray.TurboShutdownEnabled = nowActive; tray.SaveSettings(); }
@@ -603,6 +650,7 @@ namespace KitLugia.GUI.Pages
 
             UpdateLabel(StatusBackgroundApps, targetActive, "Desativado", "Padrão");
 
+            RecordTweak("BackgroundApps", targetActive);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowSuccess("APPS EM SEGUNDO PLANO", targetActive ? "Apps em segundo plano desabilitados via GPEDIT." : "Apps em segundo plano habilitados.");
         }
@@ -623,6 +671,7 @@ namespace KitLugia.GUI.Pages
 
             UpdateLabel(StatusNDU, targetActive, "Desativado", "Padrão");
 
+            RecordTweak("NDU", targetActive);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowSuccess("SERVIÇO NDU", targetActive ? "Serviço NDU desabilitado (fix memory leak)." : "Serviço NDU habilitado.");
         }
@@ -643,6 +692,7 @@ namespace KitLugia.GUI.Pages
 
             UpdateLabel(StatusServiceStartup, targetActive, "Otimizado", "Padrão");
 
+            RecordTweak("ServiceStartup", targetActive);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowSuccess("STARTUP DE SERVIÇOS", targetActive ? "Serviços não essenciais definidos para Manual (reduz processos de inicialização)." : "Serviços revertidos para Automatic.");
         }
@@ -663,6 +713,7 @@ namespace KitLugia.GUI.Pages
 
             UpdateLabel(StatusNoAutoReboot, targetActive, "Ativado", "Padrão");
 
+            RecordTweak("NoAutoReboot", targetActive);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowSuccess("REINÍCIO AUTOMÁTICO", targetActive ? "Reinício automático impedido quando usuário está logado." : "Reinício automático habilitado.");
         }
@@ -685,6 +736,8 @@ namespace KitLugia.GUI.Pages
             if (success)
             {
                 UpdateLabel(StatusDiagnosticServices, targetActive, "Desativado", "Padrão");
+
+                RecordTweak("DiagnosticServices", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowSuccess("SERVIÇOS DE DIAGNÓSTICO", targetActive
                         ? "Diagnósticos desabilitados (DPS, WdiServiceHost, WdiSystemHost)."
@@ -712,6 +765,8 @@ namespace KitLugia.GUI.Pages
                 if (result.Success)
                 {
                     UpdateLabel(StatusPowerThrottling, true, "Desativado", "Padrão");
+
+                    RecordTweak("PowerThrottling", true);
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowSuccess("POWER THROTTLING", "Power Throttling desativado. CPU rodará em performance máxima.");
                 }
@@ -728,6 +783,8 @@ namespace KitLugia.GUI.Pages
                 if (result.Success)
                 {
                     UpdateLabel(StatusPowerThrottling, false, "Desativado", "Padrão");
+
+                    RecordTweak("PowerThrottling", false);
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowInfo("POWER THROTTLING", "Power Throttling restaurado para padrão Windows.");
                 }
@@ -751,6 +808,8 @@ namespace KitLugia.GUI.Pages
                 if (result.Success)
                 {
                     UpdateLabel(StatusGdiScaling, true, "Desativado", "Padrão");
+
+                    RecordTweak("GdiScaling", true);
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowSuccess("GDI SCALING", "GDI Scaling desativado. Aplicativos legados sem scaling automático.");
                 }
@@ -767,6 +826,8 @@ namespace KitLugia.GUI.Pages
                 if (result.Success)
                 {
                     UpdateLabel(StatusGdiScaling, false, "Desativado", "Padrão");
+
+                    RecordTweak("GdiScaling", false);
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowInfo("GDI SCALING", "GDI Scaling restaurado para o padrão Windows.");
                 }
@@ -831,7 +892,7 @@ namespace KitLugia.GUI.Pages
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
-        private static bool IsSmartScreenSystemDisabled()
+        internal static bool IsSmartScreenSystemDisabled()
         {
             int votes = 0, total = 0;
 
@@ -873,7 +934,7 @@ namespace KitLugia.GUI.Pages
             return votes > total / 2;
         }
 
-        private static bool IsSmartScreenExplorerDisabled()
+        internal static bool IsSmartScreenExplorerDisabled()
         {
             int votes = 0, total = 0;
 
@@ -946,6 +1007,8 @@ namespace KitLugia.GUI.Pages
             });
             ChkSmartScreenSystem.IsEnabled = true;
             UpdateLabel(StatusSmartScreenSystem, disable, "Desativado", "Ativo");
+
+            RecordTweak("SmartScreenSystem", disable);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("SmartScreen", disable
                     ? "Filtro SmartScreen desativado em todas as camadas. Recomenda-se manter um antivírus ativo."
@@ -986,6 +1049,8 @@ namespace KitLugia.GUI.Pages
             });
             ChkSmartScreenExplorer.IsEnabled = true;
             UpdateLabel(StatusSmartScreenExplorer, disable, "Desativado", "Ativo");
+
+            RecordTweak("SmartScreenExplorer", disable);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("SmartScreen Explorer", disable
                     ? "Bloqueio de arquivos do Explorer desativado em múltiplas camadas. Você poderá abrir qualquer arquivo sem restrições."
@@ -1021,6 +1086,8 @@ namespace KitLugia.GUI.Pages
             await Task.Run(() => SystemTweaks.SetServiceStartup("DiagTrack", disable));
             ChkDiagTrackSvc.IsEnabled = true;
             UpdateLabel(StatusDiagTrackSvc, disable, "Desativado", "Ativo");
+
+            RecordTweak("DiagTrack", disable);
             SaveTelemetryPreference("DiagTrack", disable);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("Telemetria (DiagTrack)", disable
@@ -1036,6 +1103,8 @@ namespace KitLugia.GUI.Pages
             await Task.Run(() => SystemTweaks.SetServiceStartup("dmwappushservice", disable));
             ChkDmwappushSvc.IsEnabled = true;
             UpdateLabel(StatusDmwappushSvc, disable, "Desativado", "Ativo");
+
+            RecordTweak("Dmwappush", disable);
             SaveTelemetryPreference("Dmwappush", disable);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("WAP Push (dmwappushservice)", disable
@@ -1051,6 +1120,8 @@ namespace KitLugia.GUI.Pages
             await Task.Run(() => SystemTweaks.SetServiceStartup("WerSvc", disable));
             ChkWerSvc.IsEnabled = true;
             UpdateLabel(StatusWerSvc, disable, "Desativado", "Ativo");
+
+            RecordTweak("WerSvc", disable);
             SaveTelemetryPreference("WerSvc", disable);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("Relatório de Erros (WerSvc)", disable
@@ -1066,6 +1137,8 @@ namespace KitLugia.GUI.Pages
             await Task.Run(() => SystemTweaks.SetServiceStartup("PcaSvc", disable));
             ChkPcaSvc.IsEnabled = true;
             UpdateLabel(StatusPcaSvc, disable, "Desativado", "Ativo");
+
+            RecordTweak("PcaSvc", disable);
             SaveTelemetryPreference("PcaSvc", disable);
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("Compatibilidade (PcaSvc)", disable
@@ -1082,6 +1155,8 @@ namespace KitLugia.GUI.Pages
             ChkTelemetryTasks.IsEnabled = true;
             bool nowOff = SystemTweaks.AreTelemetryTasksDisabled();
             UpdateLabel(StatusTelemetryTasks, nowOff, "Desativadas", "Ativas");
+
+            RecordTweak("TelemetryTasks", nowOff);
             SaveTelemetryPreference("TelemetryTasks", nowOff);
             if (nowOff != disable)
             {
@@ -1160,7 +1235,7 @@ namespace KitLugia.GUI.Pages
                 {
                     Content = hasRegPath
                         ? $"Aumenta a VRAM dedicada (DedicatedSegmentSize) no registro para esta GPU.{Environment.NewLine}Caminho: {gpu.RegPath}{Environment.NewLine}Recomendado: {recommended} MB baseado em {totalRam:F1} GB de RAM.{Environment.NewLine}Útil para GPUs integradas e jogos que reportam pouca VRAM."
-                        : $"Não foi possível encontrar o caminho do registro para esta GPU.{Environment.NewLine}Os tweaks de VRAM não estarão disponíveis para ela."
+                        : $"Caminho não encontrado — será criado ao ativar (força criação igual ao Dashboard).{Environment.NewLine}GPU: {gpu.Name}{Environment.NewLine}Recomendado: {recommended} MB."
                 };
                 Grid.SetColumn(infoBtn, 0);
                 grid.Children.Add(infoBtn);
@@ -1176,16 +1251,16 @@ namespace KitLugia.GUI.Pages
                 };
                 stack.Children.Add(nameBlock);
 
-                // VRAM info line
+                // VRAM info line - sempre visível, laranja vira aviso mas não bloqueia
                 string statusPart = isApplied ? $"{vramMb} MB" : "Padr\u00E3o";
-                string regPart = hasRegPath ? "" : "  (caminho do registro n\u00E3o encontrado)";
+                string regPart = hasRegPath ? "" : " (será criado ao ativar)";
                 var vramLine = new TextBlock
                 {
                     Text = $"VRAM: {statusPart}  |  RAM: {totalRam:F1} GB  |  Recomendado: {recommended} MB{regPart}",
                     FontSize = 11,
                     Foreground = hasRegPath
                         ? (System.Windows.Media.Brush)new BrushConverter().ConvertFromString("#A0A0A0")
-                        : System.Windows.Media.Brushes.Orange,
+                        : new SolidColorBrush(Color.FromRgb(255, 193, 7)),
                     Margin = new Thickness(0, 2, 0, 0)
                 };
                 stack.Children.Add(vramLine);
@@ -1214,15 +1289,15 @@ namespace KitLugia.GUI.Pages
                 Grid.SetColumn(border, 2);
                 grid.Children.Add(border);
 
-                // Toggle (só habilitado se achou o caminho do registro)
+                // Toggle sempre habilitado - força criação do caminho se não existir (igual Dashboard)
                 var toggle = new System.Windows.Controls.CheckBox
                 {
                     Style = (System.Windows.Style)FindResource("ToggleSwitchStyle"),
                     IsChecked = isApplied,
-                    Tag = gpu.RegPath ?? "",
-                    IsEnabled = hasRegPath,
+                    Tag = hasRegPath ? gpu.RegPath! : $"CREATE:{gpu.Name}",
+                    IsEnabled = true,
                     Margin = new Thickness(0, 20, 20, 20),
-                    Opacity = hasRegPath ? 1.0 : 0.3
+                    Opacity = 1.0
                 };
                 toggle.Click += VramToggle_Click;
                 Grid.SetColumn(toggle, 3);
@@ -1265,19 +1340,53 @@ namespace KitLugia.GUI.Pages
 
                     await Task.Run(() =>
                     {
+                        string effectivePath = regPath;
+                        // Força criação se caminho não existia (CREATE:GPU Name)
+                        if (effectivePath.StartsWith("CREATE:", StringComparison.Ordinal))
+                        {
+                            string gpuDesc = effectivePath.Substring(7);
+                            effectivePath = SystemTweaks.FindGpuRegistryPathByDescription(gpuDesc) ?? "";
+                            if (string.IsNullOrEmpty(effectivePath))
+                            {
+                                // Cria subchave nova em 0000-0009 livre (força criação igual Dashboard)
+                                string baseGuid = "{4d36e968-e325-11ce-bfc1-08002be10318}";
+                                string basePath = $@"SYSTEM\CurrentControlSet\Control\Class\{baseGuid}";
+                                using var baseKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(basePath);
+                                string? freeSlot = null;
+                                if (baseKey != null)
+                                {
+                                    for (int i = 0; i < 16; i++)
+                                    {
+                                        string slot = i.ToString("D4");
+                                        if (baseKey.OpenSubKey(slot) == null) { freeSlot = slot; break; }
+                                    }
+                                }
+                                freeSlot ??= "0000";
+                                effectivePath = $@"HKEY_LOCAL_MACHINE\{basePath}\{freeSlot}";
+                                try
+                                {
+                                    using var k = Microsoft.Win32.Registry.LocalMachine.CreateSubKey($@"{basePath}\{freeSlot}", true);
+                                    k?.SetValue("DriverDesc", gpuDesc, Microsoft.Win32.RegistryValueKind.String);
+                                }
+                                catch { }
+                            }
+                            // Atualiza tag para próximos toggles
+                            toggle.Dispatcher.Invoke(() => toggle.Tag = effectivePath);
+                        }
+
                         if (targetActive)
                         {
-                            if (!string.IsNullOrEmpty(regPath))
+                            if (!string.IsNullOrEmpty(effectivePath))
                             {
                                 double totalRam = SystemUtils.GetTotalSystemRamGB();
                                 int sizeToSet = SystemTweaks.GetRecommendedVramMb(totalRam);
-                                SystemTweaks.ApplyGpuVramTweak(regPath, sizeToSet);
+                                SystemTweaks.ApplyGpuVramTweak(effectivePath, sizeToSet);
                             }
                         }
                         else
                         {
-                            if (!string.IsNullOrEmpty(regPath))
-                                SystemTweaks.RevertRegistryValue(regPath, "DedicatedSegmentSize");
+                            if (!string.IsNullOrEmpty(effectivePath) && !effectivePath.StartsWith("CREATE:"))
+                                SystemTweaks.RevertRegistryValue(effectivePath, "DedicatedSegmentSize");
                         }
                     });
 
@@ -1321,6 +1430,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertFrameQueue();
                 });
                 UpdateLabel(StatusFrameQueue, targetActive, "Low Latency (0)", "Padrão (1)");
+
+                RecordTweak("FrameQueue", targetActive);
                 InfoFrameQueue.Text = targetActive ? "FrameQueueMode=0 (Low Latency)" : "FrameQueueMode=1 (Padrão Windows)";
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "FrameQueueMode: Low Latency" : "FrameQueueMode: Padrão");
@@ -1342,6 +1453,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertGpuPreemption();
                 });
                 UpdateLabel(StatusPreemption, targetActive, "Ativado", "Padrão");
+
+                RecordTweak("Preemption", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "Preempção de GPU ativada" : "Preempção de GPU: Padrão");
             }
@@ -1362,6 +1475,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertGpuIdleSchedule();
                 });
                 UpdateLabel(StatusGpuIdle, targetActive, "Desativado", "Ativo");
+
+                RecordTweak("GpuIdle", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "GPU Idle desativado" : "GPU Idle: Padrão");
             }
@@ -1382,6 +1497,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertGpuPowerLatency();
                 });
                 UpdateLabel(StatusPowerLatency, targetActive, "Latência (1)", "Padrão (0)");
+
+                RecordTweak("PowerLatency", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "GPU Power Latency: Priorizar Latência" : "GPU Power Latency: Padrão");
             }
@@ -1413,6 +1530,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertRegistryValue(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "SecondLevelDataCache");
                 });
                 UpdateLabel(StatusL2Cache, targetActive, "Aplicado", "Padrão");
+
+                RecordTweak("L2Cache", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("CACHE CPU", targetActive ? "Cache L2/L3 configurado conforme sua CPU." : "Cache L2/L3 restaurado para padrão.");
             }
@@ -1437,6 +1556,8 @@ namespace KitLugia.GUI.Pages
                 else
                 {
                     UpdateLabel(StatusRmCacheLoc, targetActive, "Aplicado", "Padrão");
+
+                RecordTweak("RmCacheLoc", targetActive);
                     InfoRmCacheLoc.Text = targetActive
                         ? $"Aplicado: {Environment.ProcessorCount} núcleos lógicos (NVIDIA)."
                         : "Configurado com o numero de nucleos logicos.";
@@ -1467,6 +1588,8 @@ namespace KitLugia.GUI.Pages
                 else
                 {
                     UpdateLabel(StatusNagle, targetActive, "Aplicado", "Padrão");
+
+                    RecordTweak("Nagle", targetActive);
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowInfo("NAGLE", result.Message);
                 }
@@ -1499,6 +1622,8 @@ namespace KitLugia.GUI.Pages
                     }
                 });
                 UpdateLabel(StatusCoreParking, targetActive, "Aplicado", "Padrão");
+
+                RecordTweak("CoreParking", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("CORE PARKING", targetActive ? "Core Parking desativado. Todos os núcleos permanecem ativos." : "Core Parking restaurado para padrão.");
             }
@@ -1519,6 +1644,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertHags();
                 });
                 UpdateLabel(StatusHags, targetActive, "Ativado (2)", "Padrão");
+
+                RecordTweak("Hags", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "HAGS ativado (HwSchMode=2)" : "HAGS: Padrão");
             }
@@ -1539,6 +1666,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertTdrDelay();
                 });
                 UpdateLabel(StatusTdr, targetActive, "10s", "Padrão (2s)");
+
+                RecordTweak("Tdr", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "TDR Delay aumentado para 10s" : "TDR Delay: Padrão (2s)");
             }
@@ -1559,6 +1688,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertIoPageLockLimit();
                 });
                 UpdateLabel(StatusIoLock, targetActive, "8192 KB", "Padrão");
+
+                RecordTweak("IoLock", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("MEMÓRIA", targetActive ? "IoPageLockLimit=8192 KB" : "IoPageLockLimit: Padrão");
             }
@@ -1579,8 +1710,106 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertInputQueueSize();
                 });
                 UpdateLabel(StatusInputQueue, targetActive, "200", "Padrão (100)");
+
+                RecordTweak("InputQueue", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("INPUT", targetActive ? "Fila de input aumentada para 200" : "Fila de input: Padrão");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        // --- NVIDIA PowerMizer ---
+        private async void ChkPowerMizer_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkPowerMizer.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.ApplyNvidiaPowerMizerMaxPerformance();
+                    else SystemTweaks.RevertNvidiaPowerMizer();
+                });
+                bool newState = await Task.Run(() => SystemTweaks.IsNvidiaPowerMizerMaxPerformance());
+                UpdateLabel(StatusPowerMizer, newState, "Max Perf", "Padrão");
+                ChkPowerMizer.IsChecked = newState;
+                RecordTweak("PowerMizer", newState);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("NVIDIA", newState ? "PowerMizer: Máximo desempenho (reinício necessário)" : "PowerMizer restaurado");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        // --- NVMe Latency ---
+        private async void ChkNvMe_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkNvMe.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.ApplyNvMeLatencyTweaks();
+                    else SystemTweaks.RevertNvMeLatencyTweaks();
+                });
+                bool newState = await Task.Run(() => SystemTweaks.IsNvMeLatencyOptimized());
+                UpdateLabel(StatusNvMe, newState, "Otimizado", "Padrão");
+                ChkNvMe.IsChecked = newState;
+                RecordTweak("NvMe", newState);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("NVME", newState ? "NVMe latency otimizado (D3Handoff=1)" : "NVMe restaurado");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        // --- GPU DPC Latency ---
+        private async void ChkDpcLatency_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkDpcLatency.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.ApplyGpuDpcLatencyTweaks();
+                    else SystemTweaks.RevertGpuDpcLatencyTweaks();
+                });
+                bool newState = await Task.Run(() => SystemTweaks.IsGpuDpcLatencyLow());
+                UpdateLabel(StatusDpcLatency, newState, "IRQ8=1", "Padrão");
+                ChkDpcLatency.IsChecked = newState;
+                RecordTweak("DpcLatency", newState);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("DPC LATENCY", newState ? "IRQ8 Priority=1 aplicado" : "DPC Latency restaurado");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        // --- Memory Prioritization ---
+        private async void ChkMemPriority_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkMemPriority.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.ApplyMemoryPrioritizationDse();
+                    else SystemTweaks.RevertMemoryPrioritizationDse();
+                });
+                bool newState = await Task.Run(() => SystemTweaks.IsMemoryPrioritizationDse());
+                UpdateLabel(StatusMemPriority, newState, "Em RAM", "Padrão");
+                ChkMemPriority.IsChecked = newState;
+                RecordTweak("MemPriority", newState);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("MEMORIA", newState ? "Kernel mantido em RAM (reinício necessário)" : "Memory Prioritization restaurado");
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
@@ -1599,6 +1828,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertStartupDelay();
                 });
                 UpdateLabel(StatusStartupDelay, targetActive, "Removido", "Padrão");
+
+                RecordTweak("StartupDelay", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "Startup delay removido (0ms)" : "Startup delay: Padrão");
             }
@@ -1619,6 +1850,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.EnableFastStartup();
                 });
                 UpdateLabel(StatusFastStartup, targetActive, "Desativado", "Ativo");
+
+                RecordTweak("FastStartup", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "Fast Startup desativado (desligamento completo)" : "Fast Startup: Padrão");
             }
@@ -1639,6 +1872,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertBootMenuTimeout();
                 });
                 UpdateLabel(StatusBootMenu, targetActive, "0s", "Padrão (30s)");
+
+                RecordTweak("BootMenu", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "Boot menu timeout: 0s" : "Boot menu timeout: 30s");
             }
@@ -1659,6 +1894,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.DisableNumLockOnStartup();
                 });
                 UpdateLabel(StatusNumLock, targetActive, "Ativado", "Desativado");
+
+                RecordTweak("NumLock", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("STARTUP", targetActive ? "NumLock ativado na inicialização" : "NumLock desativado na inicialização");
             }
@@ -1679,6 +1916,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertWaitToKillService();
                 });
                 UpdateLabel(StatusWaitToKillService, targetActive, "2s", "Padrão (5s)");
+
+                RecordTweak("WaitToKillService", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "WaitToKillService: 2s" : "WaitToKillService: Padrão (5s)");
             }
@@ -1699,6 +1938,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertQuickAppKill();
                 });
                 UpdateLabel(StatusQuickAppKill, targetActive, "Ativado", "Padrão");
+
+                RecordTweak("QuickAppKill", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "Quick App Kill: Ativado" : "Quick App Kill: Padrão");
             }
@@ -1719,6 +1960,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.EnableClearPageFile();
                 });
                 UpdateLabel(StatusClearPageFile, targetActive, "Desativado", "Padrão");
+
+                RecordTweak("ClearPageFile", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "Limpeza de PageFile: Desativada" : "Limpeza de PageFile: Padrão");
             }
@@ -1739,6 +1982,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.DisableVerboseStatus();
                 });
                 UpdateLabel(StatusVerboseStatus, targetActive, "Detalhado", "Oculto");
+
+                RecordTweak("VerboseStatus", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SHUTDOWN", targetActive ? "VerboseStatus: Ativado (mensagens detalhadas)" : "VerboseStatus: Oculto");
             }
@@ -1759,6 +2004,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertMenuShowDelay();
                 });
                 UpdateLabel(StatusMenuDelay, targetActive, "0ms", "Padrão (400ms)");
+
+                RecordTweak("MenuDelay", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("INTERFACE", targetActive ? "MenuShowDelay: 0ms (instantâneo)" : "MenuShowDelay: Padrão (400ms)");
             }
@@ -1779,6 +2026,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.RevertVisualFX();
                 });
                 UpdateLabel(StatusVisualFX, targetActive, "Máximo", "Padrão");
+
+                RecordTweak("VisualFX", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("INTERFACE", targetActive ? "Animações visuais: Desativadas" : "Animações visuais: Padrão");
             }
@@ -1815,6 +2064,8 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.ResetIconCache();
                 });
                 UpdateLabel(StatusIconCache, targetActive, "8192 KB", "Padrão");
+
+                RecordTweak("IconCache", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("EXPLORER", targetActive ? "Cache de ícones: 8192 KB" : "Cache de ícones: Padrão");
             }
@@ -1835,11 +2086,43 @@ namespace KitLugia.GUI.Pages
                     else SystemTweaks.EnablePCA();
                 });
                 UpdateLabel(StatusPCA, targetActive, "Desativado", "Ativo");
+
+                RecordTweak("PCA", targetActive);
+                RecordTweak("PCA", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SISTEMA", targetActive ? "PCA: Desativado" : "PCA: Ativo (padrão)");
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }
+        }
+
+        // ── Manter Tweaks Apos Reboot ──────────────────────────────────
+
+        private void ChkMaintainTweaks_Click(object sender, RoutedEventArgs e)
+        {
+            bool enabled = ChkMaintainTweaks.IsChecked == true;
+            TweakRegistry.SetMaintained(enabled);
+            if (enabled)
+            {
+                TweakRegistry.SaveAllTweakStates();
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowSuccess("TWEAKS", "Estados dos tweaks salvos. Serão verificados e reaplicados a cada inicialização.");
+            }
+            else
+            {
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("TWEAKS", "Manutenção automática desativada. Tweaks não serão reaplicados no boot.");
+            }
+        }
+
+        /// <summary>
+        /// Records the current state of a tweak for persistence.
+        /// Call at the end of each tweak Click handler when maintenance is enabled.
+        /// </summary>
+        private void RecordTweak(string name, bool active)
+        {
+            if (TweakRegistry.IsMaintained())
+                TweakRegistry.SaveTweakState(name, active);
         }
     }
 }

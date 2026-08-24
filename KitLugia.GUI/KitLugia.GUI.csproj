@@ -1,4 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<?xml version='1.0' encoding='utf-8'?>
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
@@ -9,10 +10,10 @@
 		
 		<NoWarn>$(NoWarn);WFAC010;CS1668;XLS0414</NoWarn>
 
-		<!-- Habilita WPF e Windows Forms (para di�logos de pasta) -->
+		
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
-		<!-- For�ar codifica��o UTF-8 para caracteres especiais -->
+		
 		<CodePage>65001</CodePage>
 		<ApplicationIcon>Iconarchive-Realistic-Fruits-Yellow-Apple.ico</ApplicationIcon>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
@@ -20,7 +21,7 @@
 		<PublishReadyToRun>true</PublishReadyToRun>
 		<PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
 		<DebugType>embedded</DebugType>
-		<!-- XAML Hot Reload: desligado em Release, ligado em Debug (necessario p/ XAML Hot Reload funcionar) -->
+		
 		<EnableXamlDiagnostics Condition="'$(Configuration)' == 'Debug'">true</EnableXamlDiagnostics>
 		<EnableXamlDiagnostics Condition="'$(Configuration)' != 'Debug'">false</EnableXamlDiagnostics>
 		<XamlDebuggingInformation Condition="'$(Configuration)' == 'Debug'">True</XamlDebuggingInformation>
@@ -36,7 +37,7 @@
 
 	<ItemGroup>
 	  <Content Include="Iconarchive-Realistic-Fruits-Yellow-Apple.ico" />
-	  <!-- Linux PreOS (GRUB2 boot) -->
+	  
 	  <Content Include="..\KitLugia.Core\Resources\LinuxPreOS\vmlinuz">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		<Link>Resources\LinuxPreOS\vmlinuz</Link>
@@ -49,7 +50,7 @@
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		<Link>Resources\LinuxPreOS\grubx64.efi</Link>
 	  </Content>
-	  <!-- rEFInd (standalone, no antiX dependency) -->
+	  
 	  <Content Include="..\KitLugia.Core\Resources\BootGoodies\refind\refind_x64.efi">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		<Link>Resources\BootGoodies\refind\refind_x64.efi</Link>
@@ -58,7 +59,7 @@
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		<Link>Resources\BootGoodies\refind\shellx64.efi</Link>
 	  </Content>
-	  <!-- Ferramentas Externas -->
+	  
 	  <Content Include="External\MAS\**\*">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
@@ -71,7 +72,14 @@
 	  <Content Include="Resources\**\*">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
-	  <!-- GoodbyeDPI - Contorno de DPI -->
+	  <!-- Removido KitLugia.WinPE.exe e ISOs/WIMs grandes (300MB+ desnecessários no kit) -->
+	  <Content Remove="Resources\**\KitLugia.WinPE.exe" />
+	  <Content Remove="Resources\**\*.iso" />
+	  <Content Remove="Resources\**\*.wim" />
+	  <Content Remove="Resources\**\*.esd" />
+	  <Content Remove="**\WinPE*.iso" />
+	  <Content Remove="**\KitLugia_WinPE.iso" />
+	  
 	  <Content Include="Tools\GoodbyeDPI\**\*">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
@@ -81,7 +89,7 @@
 		<ProjectReference Include="..\KitLugia.Core\KitLugia.Core.csproj" />
 	</ItemGroup>
 
-  <!-- Rust native DLL -->
+  
   <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\rust_native\target\release\rust_native.dll')">
     <Content Include="..\rust_native\target\release\rust_native.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -90,4 +98,12 @@
     </Content>
   </ItemGroup>
 
+<ItemGroup><Page Remove="Pages\_PageTemplate.xaml" Generator="MSBuild:Compile" /><None Include="Pages\_PageTemplate.xaml" CopyToOutputDirectory="Never" /><None Include="Pages\_PageTemplate.xaml.cs" CopyToOutputDirectory="Never" /><None Include="Pages\_CONVENTIONS.md" CopyToOutputDirectory="Never" />  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Pages\_PageTemplate.xaml.cs" />
+    <None Include="Pages\_PageTemplate.xaml" CopyToOutputDirectory="Never" />
+    <None Include="Pages\_PageTemplate.xaml.cs" CopyToOutputDirectory="Never" />
+    <None Include="Pages\_CONVENTIONS.md" CopyToOutputDirectory="Never" />
+  </ItemGroup>
 </Project>

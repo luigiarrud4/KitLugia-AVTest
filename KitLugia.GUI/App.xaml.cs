@@ -33,7 +33,37 @@ namespace KitLugia.GUI
                 return;
             }
 
+            // Modo --unlock: abre a janela Force Stop Unlock diretamente (via context menu)
+            string? unlockPath = KitLugia.GUI.Program.UnlockPath;
+            if (!string.IsNullOrEmpty(unlockPath))
+            {
+                KitLugia.Core.Logger.Log($"[FORCE STOP] Modo unlock ativado: {unlockPath}");
+                base.OnStartup(e);
+                OpenForceStopUnlock(unlockPath);
+                return;
+            }
+
             base.OnStartup(e);
+
+            // Start IPC server to receive --unlock commands from other instances
+            KitLugia.GUI.Services.UnlockIpcServer.Start();
+
+            // Sempre verifica .NET Desktop Runtime e oferece instalação direta (sem abrir site) — prompt inline
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (!KitLugia.GUI.Services.DotNetDirectInstaller.IsDesktopRuntimeInstalled("10") &&
+                        !KitLugia.GUI.Services.DotNetDirectInstaller.IsDesktopRuntimeInstalled("8"))
+                    {
+                        await Dispatcher.InvokeAsync(async () =>
+                        {
+                            await KitLugia.GUI.Services.DotNetDirectInstaller.PromptAndInstallDirectAsync(Current.MainWindow);
+                        });
+                    }
+                }
+                catch { }
+            });
 
             // Always run startup method check in background so the window appears first
             _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
@@ -44,6 +74,18 @@ namespace KitLugia.GUI
             if (!StartMinimized)
             {
                 mainWindow.Show();
+            }
+        }
+
+        private async void OpenForceStopUnlock(string path)
+        {
+            // Wait for MainWindow to initialize
+            await Task.Delay(500);
+
+            // Navigate within the Kit to ForceStopUnlock page with path
+            if (Current.MainWindow is KitLugia.GUI.MainWindow mw)
+            {
+                mw.NavigateToUnlock(path);
             }
         }
 

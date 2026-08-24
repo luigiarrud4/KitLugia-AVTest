@@ -35,6 +35,16 @@ namespace KitLugia.Core
         public string Location { get; set; }
         public StartupStatus Status { get; set; }
 
+        /// <summary>Hex color for status pill (green for enabled, red for disabled)</summary>
+        public string StatusColor => Status switch
+        {
+            StartupStatus.Enabled => "#4CAF50",
+            StartupStatus.Elevated => "#FF9800",
+            StartupStatus.TurboBoot => "#E91E63",
+            StartupStatus.TurboBootNormal => "#9C27B0",
+            _ => "#555555",
+        };
+
         public StartupAppDetails(string name, string fullCommand, string location, StartupStatus status)
         {
             Name = name;
@@ -70,6 +80,15 @@ namespace KitLugia.Core
     public record ServiceInfo(string Name, string DisplayName, string Description, string Status, string StartMode, ServiceSafetyLevel Safety)
     {
         public string Manufacturer { get; init; } = "Desconhecido";
+
+        /// <summary>Hex color for status pill (green=running, gray=stopped, orange=other)</summary>
+        public string StatusColor => Status?.ToLowerInvariant() switch
+        {
+            "executando" or "running" => "#4CAF50",
+            "parado" or "stopped" => "#555555",
+            "pausado" or "paused" => "#FF9800",
+            _ => "#607D8B",
+        };
     }
 
     // --- DRIVER ITEM ---
@@ -190,6 +209,12 @@ namespace KitLugia.Core
         public string? ServiceName { get; set; }
         public string? HarmfulStartMode { get; set; }
         public string? DefaultStartMode { get; set; }
+
+        /// <summary>
+        /// True para os itens que manipulam a variável PATH (System/User).
+        /// Habilita o botão "+" (Explorador de PATH) na UI.
+        /// </summary>
+        public bool IsPathItem => Name.Contains("PATH", StringComparison.OrdinalIgnoreCase) && ValueName == "Path";
     }
     // --- WINBOOT MODELS ---
     public class DiskInfo

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Page x:Class="KitLugia.GUI.Pages.TweaksPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -11,6 +11,23 @@
 
             <TextBlock Text="Desempenho e Tweaks" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
             <TextBlock Text="Altera&#xE7;&#xF5;es avan&#xE7;adas no registro. Mudan&#xE7;as exigem reinicializa&#xE7;&#xE3;o." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- Manter Tweaks Apos Reboot -->
+            <Border Background="#1A1A1A" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <controls:InfoButton Grid.Column="0" ToolTipText="Quando ativado, o KitLugia verifica todos os tweaks desta pagina a cada inicializacao e reaplica automaticamente qualquer um que o Windows Update ou outro processo tenha revertido. A verificacao e executada em background e nao atrasa a inicializacao do app."/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock Text="&#x1F6E1;&#xFE0F; Manter Tweaks Ativos Ap&#xF3;s Reboot" FontSize="15" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="Verifica e reaplica tweaks revertidos pelo Windows a cada inicializa&#xE7;&#xE3;o." FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <CheckBox x:Name="ChkMaintainTweaks" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMaintainTweaks_Click" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
 
             <!-- GRUPO 1: JOGOS -->
             <TextBlock Text="Jogos e Gr&#xE1;ficos" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
@@ -1812,6 +1829,88 @@
                             <TextBlock x:Name="StatusTdr" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
                         </Border>
                         <CheckBox x:Name="ChkTdr" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTdr_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <!-- NVIDIA PowerMizer Max Performance -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Força a GPU NVIDIA a operar em máximo desempenho permanente (PerfLevelSrc=0x2222, PowerMizerLevel=1). Impede que a GPU reduza clocks ou entre em estados de economia de energia. Resultado: latência menor e FPS mais consistente em jogos. Requer reinício. Apenas para GPUs NVIDIA."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="NVIDIA PowerMizer (Max Performance)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Força GPU NVIDIA a operar em clocks máximos permanentemente." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusPowerMizer" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkPowerMizer" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPowerMizer_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- NVMe Latency -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Otimiza latência de drives NVMe configurando D3Handoff=1 (transições rápidas de energia D3) e AllowIdle1InD3=0 (impede idle profundo). Resultado: tempos de acesso ao disco 15-30% mais rápidos em drives NVMe. Apenas para drives NVMe (é detectado automaticamente). Requer reinício."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="NVMe Latência (D3 Handoff)" FontSize="15" Foreground="White"/>
+                            <TextBlock x:Name="InfoNvMe" Text="Detectando drives NVMe..." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusNvMe" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkNvMe" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNvMe_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- GPU DPC Latency -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Configura IRQ8Priority=1 para dar prioridade de tempo real ao interrupção do relógio do sistema. Reduz DPC latency e micro-stutters, especialmente em jogos com driver NVIDIA/AMD. Efeito combinado com “Desativar Core Parking” e “Low Latency”."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="GPU DPC Latency (IRQ Priority)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Prioridade de interrupção do relógio para reduzir DPC latency." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusDpcLatency" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkDpcLatency" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDpcLatency_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Memory Prioritization -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Ativa LargeSystemCache=1 e DisablePagingExecutive=1. Mantém o kernel do Windows e arquivos do sistema em RAM ao invés de pagefile. Resultado: I/O de disco mais rápido, menos page faults, apps abrem mais rápido. Usa mais RAM (~200-500MB). Recomendado para 16GB+ RAM. Requer reinício."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Memory Prioritization (Kernel em RAM)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Mantém kernel e sistema em RAM para I/O mais rápido." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusMemPriority" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkMemPriority" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMemPriority_Click" Margin="0,20,20,20"/>
                     </Grid>
 
                     <Separator Background="#1A5568" Opacity="0.4" Margin="20,0"/>

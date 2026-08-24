@@ -1,4 +1,4 @@
-﻿using KitLugia.Core;
+using KitLugia.Core;
 using KitLugia.GUI.Helpers;
 using System;
 using System.Collections.Generic;
@@ -74,12 +74,7 @@ namespace KitLugia.GUI.Pages
             };
             _logTimer.Tick += FlushLogQueue;
             Loaded += OnLoaded;
-            Unloaded += (_, _) =>
-            {
-                _logTimer.Stop();
-                try { WinbootManager.OnLogUpdate -= QueueLogUpdate; } catch { }
-                try { WinbootManager.OnLogReplace -= HandleLogReplace; } catch { }
-            };
+            Unloaded += WinpeToolsPage_Unloaded;
         }
 
         private async void OnLoaded(object s, RoutedEventArgs e)
@@ -978,6 +973,24 @@ namespace KitLugia.GUI.Pages
         }
 
         #endregion
+        public void Cleanup()
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
+            _logTimer?.Stop();
+            _logTimer = null;
+            try { WinbootManager.OnLogUpdate -= QueueLogUpdate; } catch { }
+            try { WinbootManager.OnLogReplace -= HandleLogReplace; } catch { }
+            Loaded -= OnLoaded;
+            this.Unloaded -= WinpeToolsPage_Unloaded;
+            this.DataContext = null;
+        }
+
+        private void WinpeToolsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
     }
 
     public class PartitionListItem

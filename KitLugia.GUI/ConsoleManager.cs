@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using KitLugia.GUI.Logging;
@@ -28,6 +29,8 @@ namespace KitLugia.GUI
         // Teto do espelho em memória. O arquivo guarda tudo (LogStore) — "copiar tudo"
         // não depende deste teto. 20k linhas na memória = ~3 MB, sem estourar RAM.
         private const int MaxMirrorLines = LogStore.MaxInMemoryLines;
+        // Cauda de gravação em disco: continuations encadeadas preservam a ordem entre lotes
+        private static Task _logWriteTail = Task.CompletedTask;
 
         private static void ScheduleFlush()
         {
@@ -53,10 +56,18 @@ namespace KitLugia.GUI
 
             foreach (var line in batch)
             {
-                // Sempre persiste tudo no disco (completo, sem limite artificial de 500).
-                LogStore.AppendLine(line);
+                // Espelho da UI no thread do dispatcher (barato: só adiciona a string)
                 Logs.Add(line);
             }
+
+            // Persistência em disco FORA da UI thread; continuations encadeadas
+            // garantem que lotes de threads diferentes nunca saiam de ordem.
+            var snapshot = new List<string>(batch);
+            _logWriteTail = _logWriteTail.ContinueWith(_ =>
+            {
+                foreach (var line in snapshot)
+                    LogStore.AppendLine(line);
+            }, TaskScheduler.Default);
 
             // Trim do espelho da UI: remove do INÍCIO mantendo as mais recentes.
             if (Logs.Count > MaxMirrorLines)

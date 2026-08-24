@@ -71,6 +71,13 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
+        // Cache para evitar montar a mesma ISO duas vezes (BtnBrowseIso + BtnCreate = 2 mounts de 2.5s cada)
+        private static readonly Dictionary<string, string> _isoLangCache = new();
+        private static readonly object _isoLangLock = new();
+        private static List<DiskInfo>? _diskCache;
+        private static DateTime _diskCacheTime;
+        private static readonly TimeSpan DiskCacheTtl = TimeSpan.FromSeconds(3);
+
         /// <summary>
         /// Detecta o idioma da ISO usando DISM /Get-WimInfo
         /// Retorna o código de idioma (ex: pt-BR, en-US, es-ES)
@@ -84,6 +91,19 @@ namespace KitLugia.Core
                     return DetectLanguageFromDrive(extractedDrive);
                 }
 
+                // Cache: evita segundo mount (2.5s) quando usuário já selecionou ISO e depois clica INICIAR
+                string cacheKey = "";
+                try
+                {
+                    var fi = new FileInfo(isoPath);
+                    cacheKey = $"{isoPath}|{fi.Length}|{fi.LastWriteTimeUtc.Ticks}";
+                    lock (_isoLangLock)
+                    {
+                        if (_isoLangCache.TryGetValue(cacheKey, out var cached)) { Log($"Idioma do cache: {cached} (sem montar)"); return cached; }
+                    }
+                }
+                catch { }
+
                 Log("Detectando idioma da ISO...");
 
                 string driveLetter = await MountIso(isoPath);
@@ -95,6 +115,10 @@ namespace KitLugia.Core
 
                 string lang = DetectLanguageFromDrive(driveLetter);
                 await DismountIso(isoPath);
+                if (!string.IsNullOrEmpty(cacheKey))
+                {
+                    lock (_isoLangLock) _isoLangCache[cacheKey] = lang;
+                }
                 return lang;
             }
             catch (Exception ex)
@@ -118,7 +142,42 @@ namespace KitLugia.Core
                 return "pt-BR";
             }
 
-            var psi = new ProcessStartInfo
+            // Usa wimlib-imagex (mais rápido que DISM, sem montagem)
+            string? wimlibPath = WinpeBuilder.FindBundledWimlib();
+            if (wimlibPath != null && File.Exists(wimlibPath))
+            {                    var psi = new ProcessStartInfo
+                    {
+                        FileName = wimlibPath,
+                        Arguments = $"info \"{wimPath}\" 1",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true,
+                        StandardOutputEncoding = System.Text.Encoding.UTF8
+                    };
+
+                using var process = Process.Start(psi);
+                if (process != null)
+                {
+                    string output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    if (process.ExitCode == 0)
+                    {
+                        // wimlib output: "Default Language: pt-BR"
+                        var match = Regex.Match(output, @"Default Language:\s*([a-z]{2}-[A-Z]{2})");
+                        if (match.Success)
+                        {
+                            string detectedLanguage = match.Groups[1].Value;
+                            Log($"Idioma detectado via wimlib: {detectedLanguage}");
+                            return detectedLanguage;
+                        }
+                    }
+                }
+            }
+
+            // Fallback: DISM (se wimlib não disponível)
+            var psiDism = new ProcessStartInfo
             {
                 FileName = "dism.exe",
                 Arguments = $"/Get-WimInfo /WimFile:\"{wimPath}\" /Index:1",
@@ -129,41 +188,41 @@ namespace KitLugia.Core
                 StandardOutputEncoding = System.Text.Encoding.UTF8
             };
 
-            using var process = Process.Start(psi);
-            if (process == null)
+            using var processDism = Process.Start(psiDism);
+            if (processDism == null)
             {
                 Log("Falha ao iniciar DISM.");
                 return "pt-BR";
             }
 
-            string output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
+            string outputDism = processDism.StandardOutput.ReadToEnd();
+            processDism.WaitForExit();
 
-            if (process.ExitCode != 0)
+            if (processDism.ExitCode != 0)
             {
-                Log($"DISM retornou erro: {process.ExitCode}");
+                Log($"DISM retornou erro: {processDism.ExitCode}");
                 return "pt-BR";
             }
 
-            var match = Regex.Match(output, @"Default\s*:\s*([a-z]{2}-[A-Z]{2})");
-            if (match.Success)
+            var matchDism = Regex.Match(outputDism, @"Default\s*:\s*([a-z]{2}-[A-Z]{2})");
+            if (matchDism.Success)
             {
-                string detectedLanguage = match.Groups[1].Value;
-                Log($"Idioma detectado: {detectedLanguage}");
+                string detectedLanguage = matchDism.Groups[1].Value;
+                Log($"Idioma detectado via DISM: {detectedLanguage}");
                 return detectedLanguage;
             }
 
-            if (output.Contains("pt-BR") || output.Contains("ptbr"))
+            if (outputDism.Contains("pt-BR") || outputDism.Contains("ptbr"))
             {
                 Log("Idioma detectado: pt-BR (fallback)");
                 return "pt-BR";
             }
-            if (output.Contains("en-US") || output.Contains("enus"))
+            if (outputDism.Contains("en-US") || outputDism.Contains("enus"))
             {
                 Log("Idioma detectado: en-US (fallback)");
                 return "en-US";
             }
-            if (output.Contains("es-ES") || output.Contains("eses"))
+            if (outputDism.Contains("es-ES") || outputDism.Contains("eses"))
             {
                 Log("Idioma detectado: es-ES (fallback)");
                 return "es-ES";
@@ -671,6 +730,23 @@ namespace KitLugia.Core
         // --- DISK ENGINE ---
         public static List<DiskInfo> GetDisks(bool filterWinboot = false, bool safeMode = false)
         {
+            // Fast path: cache de 3s + IOCTL nativo via PartitionManager (18ms vs 340ms WMI)
+            if (_diskCache != null && (DateTime.UtcNow - _diskCacheTime) < DiskCacheTtl)
+            {
+                // Retorna cópia filtrada do cache
+                return FilterDisks(_diskCache, filterWinboot, safeMode);
+            }
+            try
+            {
+                var fast = TryGetDisksFast();
+                if (fast != null && fast.Count > 0)
+                {
+                    _diskCache = fast;
+                    _diskCacheTime = DateTime.UtcNow;
+                    return FilterDisks(fast, filterWinboot, safeMode);
+                }
+            }
+            catch { }
 
             // Típico: 1-4 discos em sistemas comuns
             var disks = new List<DiskInfo>(4);
@@ -716,40 +792,6 @@ namespace KitLugia.Core
                                         partInfo.FreeSpace = (ulong)logicalDisk["FreeSpace"];
                                     }
                                 }
-                                if (filterWinboot)
-                                {
-                                    // 20GB mínimo (Garante ocultação total de MSR, EFI, Recovery e do Winboot de 8GB)
-                                    if (partInfo.Size < 20000000000) continue;
-
-                                    if (safeMode)
-                                    {
-
-                                        // MSR, EFI, Recovery são geralmente < 20GB ou têm tipos específicos
-                                        // Winboot é identificado pelo label WINBOOT_LABEL
-                                        if (partInfo.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase)) continue;
-                                        if (partInfo.Label.Equals("Winboot", StringComparison.OrdinalIgnoreCase)) continue;
-                                    }
-                                    else
-                                    {
-
-                                        // System partitions (English, Portuguese, Spanish, French, German, Italian, Russian, Chinese, Japanese, Korean)
-                                        string[] systemLabels = { "System", "Sistema", "Système", "Systemlaufwerk", "Sistema operativo", "Система", "系统", "システム", "시스템" };
-                                        if (systemLabels.Any(l => partInfo.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
-
-                                        // Recovery partitions (English, Portuguese, Spanish, French, German, Italian, Russian, Chinese, Japanese, Korean)
-                                        string[] recoveryLabels = { "Recovery", "Recuperação", "Recuperación", "Récupération", "Wiederherstellung", "Ripristino", "Восстановление", "恢复", "復旧", "복구" };
-                                        if (recoveryLabels.Any(l => partInfo.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
-
-                                        // Reserved partitions (English, Portuguese, Spanish, French, German, Italian, Russian, Chinese, Japanese, Korean)
-                                        string[] reservedLabels = { "Reserved", "Reservado", "Reservado", "Réservé", "Reserviert", "Riservato", "Зарезервировано", "保留", "予約", "예약" };
-                                        if (reservedLabels.Any(l => partInfo.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
-
-                                        // Winboot partitions (para não selecionar a própria partição Winboot)
-                                        if (partInfo.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase)) continue;
-                                        if (partInfo.Label.Equals("Winboot", StringComparison.OrdinalIgnoreCase)) continue;
-                                    }
-                                }
-
                                 disk.Partitions.Add(partInfo);
                             }
                         }
@@ -758,7 +800,82 @@ namespace KitLugia.Core
                 }
             }
             catch (Exception ex) { Logger.Log($"Erro WinbootManager.GetDisks: {ex.Message}"); }
-            return disks;
+            // Cacheia resultado WMI também
+            _diskCache = disks;
+            _diskCacheTime = DateTime.UtcNow;
+            return FilterDisks(disks, filterWinboot, safeMode);
+        }
+
+        private static List<DiskInfo>? TryGetDisksFast()
+        {
+            try
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var fast = PartitionManager.GetAllDisks();
+                if (fast == null || fast.Count == 0) return null;
+                var result = new List<DiskInfo>(fast.Count);
+                foreach (var d in fast)
+                {
+                    var disk = new DiskInfo
+                    {
+                        Index = d.Index,
+                        Model = d.Model,
+                        Interface = d.MediaType ?? d.Interface,
+                        Size = d.Size
+                    };
+                    foreach (var p in d.Partitions)
+                    {
+                        // Mapeia PartitionInfoEx -> PartitionInfo (compatível com Winboot)
+                        disk.Partitions.Add(new PartitionInfo
+                        {
+                            Index = p.Index,
+                            DiskIndex = p.DiskIndex != 0 ? p.DiskIndex : d.Index,
+                            Name = p.IsUnallocated ? "Não Alocado" : $"Partição {p.Index}",
+                            DriveLetter = p.DriveLetter,
+                            Label = p.Label,
+                            FileSystem = p.FileSystem,
+                            Size = p.Size,
+                            FreeSpace = p.FreeSpace
+                        });
+                    }
+                    result.Add(disk);
+                }
+                sw.Stop();
+                Logger.Log($"[WINBOOT] GetDisks FAST (IOCTL) em {sw.ElapsedMilliseconds}ms — {result.Count} discos");
+                return result;
+            }
+            catch { return null; }
+        }
+
+        private static List<DiskInfo> FilterDisks(List<DiskInfo> source, bool filterWinboot, bool safeMode)
+        {
+            if (!filterWinboot) return new List<DiskInfo>(source);
+            var filtered = new List<DiskInfo>(source.Count);
+            foreach (var disk in source)
+            {
+                var copy = new DiskInfo { Index = disk.Index, Model = disk.Model, Interface = disk.Interface, Size = disk.Size };
+                foreach (var p in disk.Partitions)
+                {
+                    if (p.Size < 20000000000) continue;
+                    if (safeMode)
+                    {
+                        if (p.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase) || p.Label.Equals("Winboot", StringComparison.OrdinalIgnoreCase)) continue;
+                    }
+                    else
+                    {
+                        string[] systemLabels = { "System", "Sistema", "Système", "Systemlaufwerk", "Sistema operativo", "Система", "系统", "システム", "시스템" };
+                        if (systemLabels.Any(l => p.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
+                        string[] recoveryLabels = { "Recovery", "Recuperação", "Recuperación", "Récupération", "Wiederherstellung", "Ripristino", "Восстановление", "恢复", "復旧", "복구" };
+                        if (recoveryLabels.Any(l => p.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
+                        string[] reservedLabels = { "Reserved", "Reservado", "Réservé", "Reserviert", "Riservato", "Зарезервировано", "保留", "予約", "예약" };
+                        if (reservedLabels.Any(l => p.Label.Contains(l, StringComparison.OrdinalIgnoreCase))) continue;
+                        if (p.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase) || p.Label.Equals("Winboot", StringComparison.OrdinalIgnoreCase)) continue;
+                    }
+                    copy.Partitions.Add(p);
+                }
+                filtered.Add(copy);
+            }
+            return filtered;
         }
 
         public static List<PartitionInfo> GetRemovablePartitions()
@@ -1400,7 +1517,7 @@ namespace KitLugia.Core
                 CreateNoWindow = true
             };
 
-            var proc = Process.Start(psi);
+            using var proc = Process.Start(psi);
             if (proc == null) return (-1, "");
 
             var outputTask = proc.StandardOutput.ReadToEndAsync();
@@ -1564,12 +1681,32 @@ namespace KitLugia.Core
             {
                 try
                 {
-                    // 1. Tentar montar com PowerShell (mais preciso: DetectBootFile varre o sistema de arquivos real)
+                    // 1. RÁPIDO: 7zip listing (sem montar ISO, ~1-2s)
+                    string sevenZipPath = FindSevenZipPath();
+                    if (!string.IsNullOrEmpty(sevenZipPath))
+                    {
+                        Log("Tentando detecção via 7zip (rápido)...");
+                        var (listCode, listOutput) = await RunProcessCaptured(sevenZipPath, $"l \"{isoPath}\"");
+
+                        if (listCode == 0 || listCode == 1)
+                        {
+                            BootFileInfo? info = AnalyzeSevenZipOutput(listOutput);
+                            if (info != null)
+                            {
+                                Log($"✅ Detecção via 7zip: {info.Value.Description}");
+                                return info;
+                            }
+                        }
+                    }
+
+                    // 2. FALLBACK: Montar ISO via PowerShell (mais lento, ~5-10s)
+                    Log("7zip não identificou. Tentando montagem da ISO...");
                     var (mountCode, _) = await RunProcessCaptured("powershell.exe", $"-Command \"Mount-DiskImage -ImagePath '{isoPath}' -StorageType ISO -Access ReadOnly\"");
 
                     if (mountCode == 0)
                     {
-                        await Task.Delay(1500);
+                        // Reduzido de 1500ms para 800ms — o delay serve só para o mount estabilizar
+                        await Task.Delay(800);
 
                         var (_, getLetterOutput) = await RunProcessCaptured("powershell.exe", $"-Command \"(Get-DiskImage -ImagePath '{isoPath}' | Get-Volume).DriveLetter\"");
                         string isoDrive = getLetterOutput.Trim().Replace("\r", "").Replace("\n", "");
@@ -1587,26 +1724,6 @@ namespace KitLugia.Core
                     else
                     {
                         Log($"⚠️ Mount-DiskImage falhou (exit code {mountCode})");
-                    }
-
-                    // 2. FALLBACK: 7zip listing (rápido, sem montar, usado quando mount falha)
-                    Log("Tentando detecção via 7zip...");
-                    string sevenZipPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "App", "7Zip", "7z.exe");
-                    if (!File.Exists(sevenZipPath))
-                    {
-                        sevenZipPath = @"C:\Program Files\7-Zip\7z.exe";
-                    }
-
-                    if (File.Exists(sevenZipPath))
-                    {
-                        var (listCode, listOutput) = await RunProcessCaptured(sevenZipPath, $"l \"{isoPath}\"");
-
-                        if (listCode == 0 || listCode == 1)
-                        {
-                            BootFileInfo? info = AnalyzeSevenZipOutput(listOutput);
-                            Log($"Detecção via 7zip: {info?.Description ?? "Tipo Desconhecido"}");
-                            if (info != null) return info;
-                        }
                     }
 
                     Log($"❌ Não foi possível identificar a ISO");
@@ -1851,36 +1968,19 @@ namespace KitLugia.Core
                     
                     if (isKitLugiaIso && File.Exists(targetXml))
                     {
-                        Log("ISO do KitLugia detectada. Preservando autounattend.xml existente.");
-                        
-                        // Apenas modificar nome de usuário se fornecido
-                        if (!string.IsNullOrEmpty(userName))
-                        {
-                            Log($"Modificando usuário no autounattend.xml existente: {userName}");
-                            string xmlContent = File.ReadAllText(targetXml);
-                            string patchedXml = PatchUnattendXml(xmlContent, userName, password);
-                            File.WriteAllText(targetXml, patchedXml, Encoding.UTF8);
-                        }
-                        else
-                        {
-                            Log("Autounattend.xml preservado sem modificações.");
-                        }
+                        Log("ISO do KitLugia detectada. Preservando autounattend.xml existente mas patchando idioma/usuário.");
+                        string xmlContent = File.ReadAllText(targetXml);
+                        string patchedXml = PatchUnattendXml(xmlContent, userName, password, detectedLanguage);
+                        File.WriteAllText(targetXml, patchedXml, Encoding.UTF8);
+                        Log($"Autounattend.xml patchado: idioma={detectedLanguage} usuário={userName}");
                     }
                     else if (!string.IsNullOrEmpty(customXmlPath) && File.Exists(customXmlPath))
                     {
-                        // Se for um perfil customizado (E2B), tentamos injetar o nome de usuário/senha se fornecido
-                        if (!string.IsNullOrEmpty(userName))
-                        {
-                            Log($"Customizando Perfil E2B com usuário: {userName}");
-                            string xmlContent = File.ReadAllText(customXmlPath);
-                            string patchedXml = PatchUnattendXml(xmlContent, userName, password);
-                            File.WriteAllText(targetXml, patchedXml, Encoding.UTF8);
-                        }
-                        else
-                        {
-                            File.Copy(customXmlPath, targetXml, true);
-                        }
-                        Log($"Arquivo Unattend customizado importado/patchado de: {customXmlPath}");
+                        Log($"Custom XML detectado: {customXmlPath} — patchando idioma/usuário.");
+                        string xmlContent = File.ReadAllText(customXmlPath);
+                        string patchedXml = PatchUnattendXml(xmlContent, userName, password, detectedLanguage);
+                        File.WriteAllText(targetXml, patchedXml, Encoding.UTF8);
+                        Log($"Arquivo Unattend customizado importado/patchado: idioma={detectedLanguage} usuário={userName}");
                     }
                     else
                     {
@@ -3076,13 +3176,16 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                     return false;
                 }
                 
-                // 0. VDS (Safe Mode Fix)
-                try 
+                // 0. VDS (Safe Mode Fix) — somente iniciar se VDS não estiver rodando (evita overhead)
+                if (safeMode)
                 {
-                    await RunProcessCaptured("sc", "config vds start= demand");
-                    await RunProcessCaptured("net", "start vds");
+                    try 
+                    {
+                        await RunProcessCaptured("sc", "config vds start= demand");
+                        await RunProcessCaptured("net", "start vds");
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 // 1. AUTO-CLEANUP: Detectar e remover Winboot existente (evita boot duplicado)
                 Log("Verificando se já existe uma partição Winboot anterior...");
@@ -3313,35 +3416,28 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
                 Log("Diskpart concluído com sucesso (ExitCode 0).");
 
-                // Aguardar WMI estabilizar após alterações do diskpart
-                await System.Threading.Tasks.Task.Delay(2000);
+                // Aguardar WMI estabilizar (reduzido de 2000ms para 1000ms)
+                await System.Threading.Tasks.Task.Delay(1000);
 
                 // 4. VERIFICAÇÃO E CORREÇÃO DE LETRA (Crítico)
+                // Cache de disks — evita chamar GetDisks() múltiplas vezes
+                var cachedDisks = GetDisks(false, safeMode);
 
-                // Isso funciona em qualquer idioma do Windows/ISO
                 bool hasLetter = false;
-                try
-                {
-                    var disksCheck = GetDisks(false, safeMode);
-                    var targetPartition = disksCheck.SelectMany(d => d.Partitions)
-                                                  .FirstOrDefault(p => p.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase));
-                    hasLetter = targetPartition != null && !string.IsNullOrEmpty(targetPartition.DriveLetter);
-                }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                var targetPartition = cachedDisks.SelectMany(d => d.Partitions)
+                                              .FirstOrDefault(p => p.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase));
+                hasLetter = targetPartition != null && !string.IsNullOrEmpty(targetPartition.DriveLetter);
 
                 if (!hasLetter)
                 {
                     Log("Aviso: Diskpart não confirmou atribuição de letra. Tentando atribuição forçada...");
-                    // Procura a partição sem letra com o label KITLUGIA
                     StringBuilder fixScript = new StringBuilder();
                     fixScript.AppendLine("rescan");
                     fixScript.AppendLine("list volume");
                     fixScript.AppendLine("exit");
                     
-                    var (listCode, listOut) = await RunProcessCaptured("diskpart.exe", "/s " + scriptPath); // Reusa o path mas com novo conteúdo
                     File.WriteAllText(scriptPath, fixScript.ToString());
-                    (listCode, listOut) = await RunProcessCaptured("diskpart.exe", $"/s \"{scriptPath}\"");
-
+                    var (listCode, listOut) = await RunProcessCaptured("diskpart.exe", $"/s \"{scriptPath}\"");
 
                     if (listCode != 0)
                     {
@@ -3349,7 +3445,6 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                     }
                     else
                     {
-                        // Tenta achar o volume pelo label no output do list volume
                         var match = Regex.Match(listOut, @"Volume\s+(\d+)\s+\w\s+" + WINBOOT_LABEL, RegexOptions.IgnoreCase);
                         if (match.Success)
                         {
@@ -3357,7 +3452,6 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                             Log($"Volume {WINBOOT_LABEL} encontrado como {volNum}. Forçando atribuição...");
                             File.WriteAllText(scriptPath, $"select volume {volNum}\nassign\nexit");
                             var (assignCode, assignOut) = await RunProcessCaptured("diskpart.exe", $"/s \"{scriptPath}\"");
-                            
 
                             if (assignCode != 0)
                             {
@@ -3366,13 +3460,15 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                         }
                     }
                     File.Delete(scriptPath);
+                    // Re-escaneia apenas se a atribuição forçada foi necessária
+                    cachedDisks = GetDisks(false, safeMode);
                 }
 
-                await System.Threading.Tasks.Task.Delay(1000);
+                // Aguardar estabilização reduzido (reduzido de 1000ms para 500ms)
+                await System.Threading.Tasks.Task.Delay(500);
 
-                // Verificamos se agora temos uma partição com a letra
-                var disksAfter = GetDisks(false, safeMode);
-                var createdPart = disksAfter.SelectMany(d => d.Partitions)
+                // Reutiliza cache de disks
+                var createdPart = cachedDisks.SelectMany(d => d.Partitions)
                                             .FirstOrDefault(p => p.Label.Equals(WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase));
 
                 if (createdPart == null || string.IsNullOrEmpty(createdPart.DriveLetter))
@@ -3398,10 +3494,24 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
         /// Injeta o comando de instalação do KitLugia em um XML Unattend existente.
         /// Procura pela seção FirstLogonCommands e adiciona se necessário.
         /// </summary>
-        private static string PatchUnattendXml(string xml, string userName, string? password)
+        private static string PatchUnattendXml(string xml, string userName, string? password, string? language = null)
         {
             try
             {
+                // 0. PATCH DE IDIOMA (garante que autounattend pré-pronto mude automaticamente - 100%)
+                if (!string.IsNullOrEmpty(language))
+                {
+                    string inputLocale = GetInputLocaleFromLanguage(language);
+                    // SystemLocale, UILanguage, UserLocale são simples
+                    xml = Regex.Replace(xml, @"<SystemLocale>.*?</SystemLocale>", $"<SystemLocale>{language}</SystemLocale>", RegexOptions.Singleline);
+                    xml = Regex.Replace(xml, @"<UserLocale>.*?</UserLocale>", $"<UserLocale>{language}</UserLocale>", RegexOptions.Singleline);
+                    // UILanguage tem 2 ocorrências (International-Core e SetupUILanguage) — patcha todas
+                    xml = Regex.Replace(xml, @"<UILanguage>.*?</UILanguage>", $"<UILanguage>{language}</UILanguage>", RegexOptions.Singleline);
+                    xml = Regex.Replace(xml, @"<InputLocale>.*?</InputLocale>", $"<InputLocale>{inputLocale}</InputLocale>", RegexOptions.Singleline);
+                    // TimeZone também se já houver no XML
+                    try { string tz = GetTimeZoneFromLanguage(language); xml = Regex.Replace(xml, @"<TimeZone>.*?</TimeZone>", $"<TimeZone>{tz}</TimeZone>", RegexOptions.Singleline); } catch { }
+                }
+
                 // 1. PATCH DE USUÁRIO (Súrgico - Apenas dentro de LocalAccounts)
                 if (!string.IsNullOrEmpty(userName))
                 {
@@ -3626,8 +3736,8 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
                 // Buscar a partição pela letra do drive
                 string query = $"SELECT * FROM MSFT_Partition WHERE DriveLetter = '{driveLetter}:'";
                 ObjectQuery objectQuery = new ObjectQuery(query);
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, objectQuery);
-                ManagementObjectCollection partitions = searcher.Get();
+                using var searcher = new ManagementObjectSearcher(scope, objectQuery);
+                using var partitions = searcher.Get();
 
                 if (partitions.Count == 0)
                 {
@@ -4345,6 +4455,25 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             return values;
         }
 
+        // Parse wimlib info output: extracts values from key-value pairs (key: value format)
+        private static List<string> ParseWimlibInfoValues(string output)
+        {
+            var values = new List<string>();
+            foreach (var line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                // wimlib uses "key: value" format (colon, not equals)
+                var m = Regex.Match(line.Trim(), @"^(.+?):\s+(.+)$");
+                if (!m.Success) continue;
+                string key = m.Groups[1].Value.Trim();
+                string val = m.Groups[2].Value.Trim();
+                // Skip section headers and metadata
+                if (key.Contains("for image") || key.Contains("information", StringComparison.OrdinalIgnoreCase) ||
+                    key.Contains("Image Count") || key.Contains("Version") || string.IsNullOrEmpty(val)) continue;
+                values.Add(val);
+            }
+            return values;
+        }
+
         public static async Task<List<WimEditionInfo>> GetIsoEditions(string isoPath)
         {
             var editions = new List<WimEditionInfo>();
@@ -4359,36 +4488,64 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
 
                 if (File.Exists(wimPath))
                 {
-                    var (_, output) = await RunProcessCaptured("dism.exe", $"/Get-ImageInfo /ImageFile:\"{wimPath}\"");
-                    
-                    // Parse DISM output: blocks separated by blank lines
-                    var blocks = output.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var block in blocks)
+                    // Usa wimlib-imagex (mais rápido que DISM, sem montagem)
+                    string? wimlibPath = WinpeBuilder.FindBundledWimlib();
+                    if (wimlibPath != null && File.Exists(wimlibPath))
                     {
-                        var vals = ParseDismColonValues(block);
-                        if (vals.Count < 2) continue;
-                        // First colon-value pair is Index (numeric), second is Name
-                        if (!int.TryParse(vals[0], out int idx)) continue;
-                        var info = new WimEditionInfo { Index = idx, Name = vals[1] };
-                        
-                        // Detailed info per index
-                        var (_, detail) = await RunProcessCaptured("dism.exe", $"/Get-ImageInfo /ImageFile:\"{wimPath}\" /Index:{info.Index}");
-                        var detailVals = ParseDismColonValues(detail);
-                        // Order: Index(0), Name(1), Description(2), Size(3), Edition(4), Architecture(5), Version(6)
-                        int detailIdx = 0;
-                        foreach (var dv in detailVals)
+                        var (_, output) = await RunProcessCaptured(wimlibPath, $"info \"{wimPath}\"");
+                        if (string.IsNullOrEmpty(output))
                         {
-                            if (detailIdx == 0) { detailIdx++; continue; } // Index
-                            else if (detailIdx == 1) { detailIdx++; continue; } // Name
-                            else if (detailIdx == 2) { detailIdx++; continue; } // Description
-                            else if (detailIdx == 3) { detailIdx++; continue; } // Size
-                            else if (detailIdx == 4) info.EditionId = dv;
-                            else if (detailIdx == 5) info.Architecture = dv;
-                            else if (detailIdx == 6) { info.Version = dv; break; }
-                            detailIdx++;
+                            Log("wimlib info retornou vazio.");
+                            return editions;
                         }
 
-                        editions.Add(info);
+                        // Parse wimlib output: each image starts with "Index: N"
+                        var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        int currentIdx = 0;
+                        string currentName = "";
+                        foreach (var line in lines)
+                        {
+                            var idxMatch = Regex.Match(line.Trim(), @"^Index:\s+(\d+)$");
+                            if (idxMatch.Success)
+                            {
+                                // Save previous entry if exists
+                                if (currentIdx > 0 && !string.IsNullOrEmpty(currentName))
+                                {
+                                    editions.Add(new WimEditionInfo { Index = currentIdx, Name = currentName });
+                                }
+                                currentIdx = int.Parse(idxMatch.Groups[1].Value);
+                                currentName = "";
+                                continue;
+                            }
+                            if (currentIdx > 0 && string.IsNullOrEmpty(currentName))
+                            {
+                                var nameMatch = Regex.Match(line.Trim(), @"^Name:\s+(.+)$");
+                                if (nameMatch.Success)
+                                {
+                                    currentName = nameMatch.Groups[1].Value.Trim();
+                                }
+                            }
+                        }
+                        // Save last entry
+                        if (currentIdx > 0 && !string.IsNullOrEmpty(currentName))
+                        {
+                            editions.Add(new WimEditionInfo { Index = currentIdx, Name = currentName });
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: DISM (se wimlib não disponível)
+                        Log("wimlib não encontrado, usando DISM como fallback...");
+                        var (_, output) = await RunProcessCaptured("dism.exe", $"/Get-ImageInfo /ImageFile:\"{wimPath}\"");
+                        var blocks = output.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var block in blocks)
+                        {
+                            var vals = ParseDismColonValues(block);
+                            if (vals.Count < 2) continue;
+                            if (!int.TryParse(vals[0], out int idx)) continue;
+                            var info = new WimEditionInfo { Index = idx, Name = vals[1] };
+                            editions.Add(info);
+                        }
                     }
                 }
             }

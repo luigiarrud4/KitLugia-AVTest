@@ -89,6 +89,169 @@ namespace KitLugia.GUI.Pages
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
+        private bool _syncingLanguage = false;
+
+        private void SelectWinbootLanguage(string langCode)
+        {
+            if (_syncingLanguage) return;
+            _syncingLanguage = true;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(langCode))
+                {
+                    if (CmbWinbootLanguage != null)
+                    {
+                        foreach (var item in CmbWinbootLanguage.Items)
+                            if (item is ComboBoxItem cbi && string.Equals(cbi.Tag?.ToString(), langCode, StringComparison.OrdinalIgnoreCase))
+                            { CmbWinbootLanguage.SelectedItem = cbi; break; }
+                    }
+                    if (CmbQuickLanguage != null)
+                    {
+                        foreach (var item in CmbQuickLanguage.Items)
+                            if (item is ComboBoxItem cbi && string.Equals(cbi.Tag?.ToString(), langCode, StringComparison.OrdinalIgnoreCase))
+                            { CmbQuickLanguage.SelectedItem = cbi; break; }
+                    }
+                }
+            }
+            catch { }
+            finally { _syncingLanguage = false; }
+        }
+
+        private string GetSelectedWinbootLanguage()
+        {
+            try
+            {
+                // Prioridade: quick (visível no início) > overlay
+                if (CmbQuickLanguage?.SelectedItem is ComboBoxItem q && q.Tag != null)
+                    return q.Tag.ToString() ?? "pt-BR";
+                if (CmbWinbootLanguage?.SelectedItem is ComboBoxItem cbi && cbi.Tag != null)
+                    return cbi.Tag.ToString() ?? "pt-BR";
+            }
+            catch { }
+            return "pt-BR";
+        }
+
+        private void CmbQuickLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_syncingLanguage) return;
+            if (e.AddedItems.Count == 0) return;
+            if (sender is not System.Windows.Controls.ComboBox cb || cb.SelectedItem is not ComboBoxItem cbi || cbi.Tag == null) return;
+            try
+            {
+                SelectWinbootLanguage(cbi.Tag.ToString() ?? "pt-BR");
+                // Sincroniza também os geradores Au (pode ser null durante InitializeComponent)
+                if (CmbAuLanguage != null)
+                {
+                    string code = cbi.Tag.ToString() ?? "pt-BR";
+                    foreach (var it in CmbAuLanguage.Items)
+                        if (it is ComboBoxItem a && string.Equals(a.Tag?.ToString(), code, StringComparison.OrdinalIgnoreCase))
+                        { CmbAuLanguage.SelectedItem = a; break; }
+                }
+                if (TxtQuickHint != null) TxtQuickHint.Text = $"Idioma rápido: {cbi.Tag} — já vale no INICIAR CRIAÇÃO e no EDITAR.";
+            }
+            catch { }
+        }
+
+        private void SyncQuickToMain()
+        {
+            try
+            {
+                if (TxtQuickUser != null && TxtUserName != null) TxtUserName.Text = TxtQuickUser.Text ?? "Usuario";
+                if (TxtQuickUser != null && TxtAuUserName != null) TxtAuUserName.Text = TxtQuickUser.Text ?? "Usuario";
+                if (ChkQuickBypass != null && ChkBypassTpm != null) ChkBypassTpm.IsChecked = ChkQuickBypass.IsChecked;
+                if (ChkQuickBypass != null && ChkAuBypassTpm != null) ChkAuBypassTpm.IsChecked = ChkQuickBypass.IsChecked;
+                if (ChkQuickLocal != null && ChkLocalAccount != null) ChkLocalAccount.IsChecked = ChkQuickLocal.IsChecked;
+                if (ChkQuickLocal != null && ChkAuLocalAccount != null) ChkAuLocalAccount.IsChecked = ChkQuickLocal.IsChecked;
+                if (ChkQuickAuto != null && ChkFullAuto != null) ChkFullAuto.IsChecked = ChkQuickAuto.IsChecked;
+                if (ChkQuickAuto != null && ChkAuFullAuto != null) ChkAuFullAuto.IsChecked = ChkQuickAuto.IsChecked;
+                if (ChkQuickPrivacy != null && ChkDisablePrivacy != null) ChkDisablePrivacy.IsChecked = ChkQuickPrivacy.IsChecked;
+                if (ChkQuickPrivacy != null && ChkAuDisablePrivacy != null) ChkAuDisablePrivacy.IsChecked = ChkQuickPrivacy.IsChecked;
+                if (ChkQuickDefender != null && ChkAuDisableDefender != null) ChkAuDisableDefender.IsChecked = ChkQuickDefender.IsChecked;
+                if (ChkQuickCopilot != null && ChkAuDisableCopilot != null) ChkAuDisableCopilot.IsChecked = ChkQuickCopilot.IsChecked;
+                if (ChkQuickOneDrive != null && ChkAuRemoveOneDrive != null) ChkAuRemoveOneDrive.IsChecked = ChkQuickOneDrive.IsChecked;
+                if (ChkQuickBitlocker != null && ChkAuDisableBitlocker != null) ChkAuDisableBitlocker.IsChecked = ChkQuickBitlocker.IsChecked;
+                if (ChkQuickSpotlight != null && ChkAuDisableSpotlight != null) ChkAuDisableSpotlight.IsChecked = ChkQuickSpotlight.IsChecked;
+            }
+            catch { }
+        }
+
+        private void ShowIsoQuickActions()
+        {
+            try
+            {
+                if (PanelIsoQuickActions != null) PanelIsoQuickActions.Visibility = Visibility.Visible;
+                if (BtnDirectEdit != null) { BtnDirectEdit.IsEnabled = true; BtnDirectEdit.Opacity = 1.0; }
+                if (BtnDirectQuick != null) { BtnDirectQuick.IsEnabled = true; BtnDirectQuick.Opacity = 1.0; }
+                SyncQuickToMain();
+            }
+            catch { }
+        }
+
+        private void BtnDirectQuick_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (PanelIsoQuickActions != null)
+                {
+                    PanelIsoQuickActions.Visibility = PanelIsoQuickActions.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+                    // Não chama ShowIsoQuickActions aqui pra não forçar Visible de novo
+                    if (BtnDirectEdit != null) { BtnDirectEdit.IsEnabled = true; BtnDirectEdit.Opacity = 1.0; }
+                    if (BtnDirectQuick != null) { BtnDirectQuick.IsEnabled = true; BtnDirectQuick.Opacity = 1.0; }
+                }
+            }
+            catch { }
+        }
+
+        private void BtnQuickEdit_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                SyncQuickToMain();
+                string lang = GetSelectedWinbootLanguage();
+                SelectWinbootLanguage(lang);
+                // Preenche editor com XML atual usando idioma/usuário rápidos
+                string user = TxtQuickUser?.Text ?? TxtUserName?.Text ?? "Usuario";
+                string pass = TxtPassword?.Password ?? TxtAuPassword?.Password ?? "";
+                var tempPath = Path.Combine(Path.GetTempPath(), $"kitlugia_quick_{Guid.NewGuid()}.xml");
+                WinbootManager.GenerateAutounattendXml(tempPath, bypassRequirements: ChkQuickBypass?.IsChecked ?? true, localAccount: ChkQuickLocal?.IsChecked ?? true, disablePrivacy: ChkQuickPrivacy?.IsChecked ?? true, userName: user, password: pass, fullAuto: ChkQuickAuto?.IsChecked ?? true, language: lang, timeZone: WinbootManager.GetTimeZoneFromLanguage(lang),
+                    disableDefender: ChkQuickDefender?.IsChecked ?? false, disableCopilot: ChkQuickCopilot?.IsChecked ?? true, removeOneDrive: ChkQuickOneDrive?.IsChecked ?? false, disableBitlocker: ChkQuickBitlocker?.IsChecked ?? true, disableSpotlight: ChkQuickSpotlight?.IsChecked ?? true);
+                if (File.Exists(tempPath))
+                {
+                    TxtAutounattendXml.Text = File.ReadAllText(tempPath);
+                    try { File.Delete(tempPath); } catch { }
+                }
+                OverlayAutounattendEditor.Visibility = Visibility.Visible;
+                WinbootManager.Log($"Editor rápido aberto (idioma {lang}, usuário {user}).");
+            }
+            catch (Exception ex) { System.Windows.MessageBox.Show($"Erro ao abrir editor: {ex.Message}"); }
+        }
+
+        private void BtnQuickViewXml_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                SyncQuickToMain();
+                string lang = GetSelectedWinbootLanguage();
+                string user = TxtQuickUser?.Text ?? "Usuario";
+                var tempPath = Path.Combine(Path.GetTempPath(), $"kitlugia_view_{Guid.NewGuid()}.xml");
+                WinbootManager.GenerateAutounattendXml(tempPath, bypassRequirements: ChkQuickBypass?.IsChecked ?? true, localAccount: ChkQuickLocal?.IsChecked ?? true, disablePrivacy: true, userName: user, password: "", fullAuto: ChkQuickAuto?.IsChecked ?? true, language: lang, timeZone: WinbootManager.GetTimeZoneFromLanguage(lang));
+                if (File.Exists(tempPath))
+                {
+                    TxtAutounattendXml.Text = File.ReadAllText(tempPath);
+                    try { File.Delete(tempPath); } catch { }
+                    OverlayAutounattendEditor.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex) { System.Windows.MessageBox.Show($"Erro: {ex.Message}"); }
+        }
+
+        private void BtnQuickAdvanced_Click(object sender, RoutedEventArgs e)
+        {
+            SyncQuickToMain();
+            // Reusa o fluxo de INICIAR CRIAÇÃO mas sem re-validar disco
+            BtnCreate_Click(sender, e);
+        }
+
         private void ComboAutomationProfiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ComboAutomationProfiles.SelectedItem is WinbootManager.AutomationProfile profile)
@@ -230,6 +393,25 @@ namespace KitLugia.GUI.Pages
             if (dlg.ShowDialog() == true)
             {
                 TxtIsoPath.Text = dlg.FileName;
+                ShowIsoQuickActions();
+                if (TxtDetectedIsoType != null) TxtDetectedIsoType.Text = "Analisando ISO... (detecção rápida 7z)";
+                if (TxtQuickHint != null) TxtQuickHint.Text = "Detectando idioma da ISO em segundo plano...";
+                // Fire-and-forget: não bloqueia UI (mount de 2.5s roda em background)
+                var isoPath = dlg.FileName;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        string autoLang = await WinbootManager.DetectIsoLanguage(isoPath);
+                        Dispatcher.Invoke(() =>
+                        {
+                            SelectWinbootLanguage(autoLang);
+                            if (TxtDetectedIsoType != null) TxtDetectedIsoType.Text = $"Detectado: {autoLang} (pode alterar em Opções Rápidas)";
+                            if (TxtQuickHint != null) TxtQuickHint.Text = $"ISO: {autoLang} — altere acima se quiser. Padrão pt-BR garante que não inicie em inglês.";
+                        });
+                    }
+                    catch { }
+                });
             }
         }
 
@@ -519,10 +701,16 @@ namespace KitLugia.GUI.Pages
 
         private void TxtIsoPath_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (string.IsNullOrEmpty(TxtIsoPath.Text)) return;
-            
+            if (string.IsNullOrEmpty(TxtIsoPath.Text))
+            {
+                if (PanelIsoQuickActions != null) PanelIsoQuickActions.Visibility = Visibility.Collapsed;
+                if (BtnDirectEdit != null) { BtnDirectEdit.IsEnabled = false; BtnDirectEdit.Opacity = 0.5; }
+                if (BtnDirectQuick != null) { BtnDirectQuick.IsEnabled = false; BtnDirectQuick.Opacity = 0.5; }
+                return;
+            }
             // Limpa tipo detectado anterior
             TxtDetectedIsoType.Text = "";
+            ShowIsoQuickActions();
         }
 
         private void BtnBrowseInjected_Click(object sender, RoutedEventArgs e)
@@ -665,7 +853,26 @@ namespace KitLugia.GUI.Pages
                             TxtCustomXmlInfo.Text = "Perfil E2B selecionado.";
                     }
 
+                    // Mostra overlay imediatamente - detecção de idioma roda em background (performance: não bloqueia 2.5s)
+                    PanelLanguageSelection.Visibility = isWindows ? Visibility.Visible : Visibility.Collapsed;
                     OverlayConfig.Visibility = Visibility.Visible;
+                    // Pré-seleciona idioma em background (cache evita segundo mount)
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            string autoLang = await WinbootManager.DetectIsoLanguage(TxtIsoPath.Text);
+                            Dispatcher.Invoke(() =>
+                            {
+                                bool hasLang = false;
+                                foreach (var it in CmbWinbootLanguage.Items)
+                                    if (it is ComboBoxItem c && string.Equals(c.Tag?.ToString(), autoLang, StringComparison.OrdinalIgnoreCase)) { hasLang = true; break; }
+                                if (hasLang) { SelectWinbootLanguage(autoLang); TxtWinbootLanguageHint.Text = $"Detectado da ISO: {autoLang} — você pode alterar acima. Teclado e fuso ajustados automaticamente."; }
+                                else { SelectWinbootLanguage("pt-BR"); TxtWinbootLanguageHint.Text = $"ISO detectada: {autoLang} (sem opção direta) — padrão mantido em pt-BR. Você pode alterar acima."; }
+                            });
+                        }
+                        catch { }
+                    });
                 }
                 else
                 {
@@ -763,6 +970,7 @@ namespace KitLugia.GUI.Pages
             }
 
             OverlayConfig.Visibility = Visibility.Collapsed;
+            SyncQuickToMain();
 
             // Log informativo se estiver usando arquivo customizado
             if (_isUsingCustomXml && !string.IsNullOrEmpty(_customXmlPath))
@@ -911,7 +1119,9 @@ namespace KitLugia.GUI.Pages
             bool removePaint3D = ChkAuRemovePaint3D.IsChecked == true;
             bool safeMode = ChkSafeMode.IsChecked ?? false;
             bool isMultiIso = ChkMultiIso.IsChecked ?? false;
-            string user = TxtUserName.Text;
+            string user = !string.IsNullOrWhiteSpace(TxtQuickUser?.Text) ? TxtQuickUser.Text : TxtUserName.Text;
+            // Sincroniza usuário rápido para o gerador Au também
+            try { if (TxtAuUserName != null) TxtAuUserName.Text = user; } catch { }
             string pass = TxtPassword.Password;
 
             if (_isBusy) return;
@@ -939,8 +1149,14 @@ namespace KitLugia.GUI.Pages
                     }));
                 if (!partOk) throw new Exception("Falha ao criar partição. O disco pode não ter espaço não alocado suficiente.");
 
-                // 2. Aguardar WMI estabilizar antes de enumerar discos
-                await Task.Delay(2000);
+                // 2. Aguardar estabilizar (polling rápido, cache IOCTL evita WMI lento)
+                for (int i = 0; i < 5; i++)
+                {
+                    await Task.Delay(400);
+                    var poll = WinbootManager.GetDisks();
+                    var found = poll.SelectMany(d => d.Partitions).Any(p => p.Label.Equals(WinbootManager.WINBOOT_LABEL, StringComparison.OrdinalIgnoreCase) || p.Label.StartsWith("KITLUGIA", StringComparison.OrdinalIgnoreCase));
+                    if (found) break;
+                }
 
                 // 2. Localizar a nova partição
                 var disks = WinbootManager.GetDisks();
@@ -963,10 +1179,16 @@ namespace KitLugia.GUI.Pages
                 }
                 
 
-                UpdateStatus("Detectando idioma da ISO...");
-                string detectedLanguage = await WinbootManager.DetectIsoLanguage(selectedIsoPath, winbootDrive);
+                // Idioma: escolha do usuário tem prioridade (fix grave: sistema iniciava em inglês por padrão)
+                string isoDetectedLanguage = await WinbootManager.DetectIsoLanguage(selectedIsoPath, winbootDrive);
+                string uiSelectedLanguage = GetSelectedWinbootLanguage();
+                string detectedLanguage = !string.IsNullOrWhiteSpace(uiSelectedLanguage) ? uiSelectedLanguage : isoDetectedLanguage;
                 string detectedTimeZone = WinbootManager.GetTimeZoneFromLanguage(detectedLanguage);
-                WinbootManager.Log($"Idioma detectado: {detectedLanguage} → Fuso: {detectedTimeZone}");
+                if (!string.Equals(detectedLanguage, isoDetectedLanguage, StringComparison.OrdinalIgnoreCase))
+                    WinbootManager.Log($"Idioma personalizado escolhido: {detectedLanguage} (ISO era {isoDetectedLanguage}) → Fuso: {detectedTimeZone}");
+                else
+                    WinbootManager.Log($"Idioma: {detectedLanguage} → Fuso: {detectedTimeZone}");
+                WinbootManager.Log($"InputLocale: {WinbootManager.GetInputLocaleFromLanguage(detectedLanguage)} | GeoID: {WinbootManager.GetGeoIdFromLanguage(detectedLanguage)}");
                 
                 // 3.5 Aplicar Customizações (Rufus-style + Automação)
                 if (!isMultiIso)

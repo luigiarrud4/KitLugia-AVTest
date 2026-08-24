@@ -23,7 +23,6 @@ namespace KitLugia.GUI.Pages
     public partial class NetworkPage : Page
     {
         private bool _isLoading = true;
-        private bool _isFirstLoadComplete = false;
         private readonly SolidColorBrush _colorActive = new SolidColorBrush(Color.FromRgb(108, 203, 95));
         private readonly SolidColorBrush _colorDefault = new SolidColorBrush(Color.FromRgb(150, 150, 150));
         private readonly SolidColorBrush _colorWarning = new SolidColorBrush(Color.FromRgb(244, 129, 32));
@@ -55,7 +54,6 @@ namespace KitLugia.GUI.Pages
             var dnsTask = LoadStatus();
             var settingsTask = LoadNetworkSettingsAsync();
             await Task.WhenAll(adapterTask, dnsTask, settingsTask);
-            _isFirstLoadComplete = true;
             SetRefreshIndicator("OK");
         }
 

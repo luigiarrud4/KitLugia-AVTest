@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -202,6 +202,10 @@ namespace KitLugia.GUI
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KitLugia",
             "goodbyedpi_config.json");
+        // Cache do scan externo: o timer de status roda a cada 2s, mas o GetProcessesByName
+        // só precisa rodar a cada 10s quando inativo (elimina o pico periódico de CPU no tray)
+        private DateTime _goodbyeDpiExternalScanTime = DateTime.MinValue;
+        private bool _goodbyeDpiExternalScanResult = false;
         public bool GoodbyeDPIActive
         {
             get
@@ -209,6 +213,10 @@ namespace KitLugia.GUI
                 // Verifica se o processo está rodando
                 if (_goodbyeDpiProcess != null && !_goodbyeDpiProcess.HasExited)
                     return true;
+
+                // Cache: re-scan externo no máximo a cada 10s
+                if ((DateTime.Now - _goodbyeDpiExternalScanTime).TotalSeconds < 10)
+                    return _goodbyeDpiExternalScanResult;
 
                 // Verifica se há processo goodbyedpi.exe rodando (caso tenha sido iniciado externamente)
                 try
@@ -224,6 +232,8 @@ namespace KitLugia.GUI
                             // Descarta os demais (se houver mais de um)
                             for (int i = 1; i < processes.Length; i++)
                                 processes[i].Dispose();
+                            _goodbyeDpiExternalScanTime = DateTime.Now;
+                            _goodbyeDpiExternalScanResult = true;
                             return true;
                         }
                     }
@@ -241,6 +251,8 @@ namespace KitLugia.GUI
                     // Ignora erros ao verificar processos
                 }
 
+                _goodbyeDpiExternalScanTime = DateTime.Now;
+                _goodbyeDpiExternalScanResult = false;
                 return false;
             }
         }
@@ -255,7 +267,14 @@ namespace KitLugia.GUI
                     return "Não está rodando";
 
                 var process = processes[0];
-                return $"Rodando (PID: {process.Id}, RAM: {process.WorkingSet64 / 1024 / 1024}MB, Tempo: {process.StartTime:HH:mm:ss})";
+                try
+                {
+                    return $"Rodando (PID: {process.Id}, RAM: {process.WorkingSet64 / 1024 / 1024}MB, Tempo: {process.StartTime:HH:mm:ss})";
+                }
+                finally
+                {
+                    foreach (var p in processes) p.Dispose();
+                }
             }
             catch (Exception ex)
             {
@@ -596,6 +615,7 @@ namespace KitLugia.GUI
             {
                 Dispatcher.Invoke(() =>
                 {
+                    _trayService?.ResumeMonitoring(); // Retomar timers ao mostrar janela
                     EnsureUIInitialized();
                     // Garante MainFrame visível antes de Show() - mesmo que Window_Loaded
                     // ainda não tenha sido chamado (MainFrame começa Opacity=0 no XAML)
@@ -1208,6 +1228,58 @@ namespace KitLugia.GUI
         }
 
         /// <summary>
+        /// Navigate to Force Stop Unlock page and auto-fill path for analysis.
+        /// Called from IPC when user right-clicks a file/folder in Explorer.
+        /// </summary>
+        public void NavigateToUnlock(string path)
+        {
+            try
+            {
+                var page = new Pages.WindowsSettings.ForceStopUnlockPage();
+                CleanupAndNavigate(page);
+
+                // Highlight the ForceStopUnlock nav button
+                HighlightNavItem("ForceStopUnlock");
+
+                // Pre-fill path and trigger analysis after page loads
+                _ = Dispatcher.BeginInvoke(async () =>
+                {
+                    await Task.Delay(300);
+                    page.PreFillAndAnalyze(path);
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NAV] Erro ao navegar para unlock: {ex.Message}");
+                NavigateToPage(PageType.ForceStopUnlock);
+            }
+        }
+
+        private void HighlightNavItem(string tag)
+        {
+            try
+            {
+                // Find and highlight the sidebar button for this page
+                if (FindName("SidebarPanel") is StackPanel sidebar)
+                {
+                    foreach (var child in sidebar.Children)
+                    {
+                        if (child is Button btn && btn.Tag?.ToString() == tag)
+                        {
+                            btn.Background = new System.Windows.Media.SolidColorBrush(
+                                System.Windows.Media.Color.FromRgb(0x33, 0x55, 0xAA));
+                        }
+                        else if (child is Button otherBtn)
+                        {
+                            otherBtn.Background = System.Windows.Media.Brushes.Transparent;
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
         /// Navegação simples - apenas navega para a nova página.
         /// </summary>
         private void CleanupAndNavigate(Page newPage)
@@ -1243,6 +1315,25 @@ namespace KitLugia.GUI
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }), System.Windows.Threading.DispatcherPriority.Background);
+
+                // Sem cache de páginas: devolve ao SO em background a RAM da página anterior.
+                // GC.Collect é pontual (só ao navegar, quando o WorkingSet está alto) - o usuário
+                // aprovou a coleta; o que não pode é CPU constante, resolvido pelos 3 fixes de idle.
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        if (Environment.WorkingSet < 90L * 1024 * 1024) return;
+                        long before = Environment.WorkingSet;
+                        GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, true);
+                        GC.WaitForPendingFinalizers();
+                        MemoryHelper.TrimWorkingSet();
+                        long freedMb = (before - Environment.WorkingSet) / (1024L * 1024L);
+                        if (freedMb >= 10)
+                            Logger.Log($"RAM devolvida apos navegacao: {freedMb} MB (pagina anterior liberada)");
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                });
             }
             catch (Exception ex)
             {
@@ -1266,7 +1357,73 @@ namespace KitLugia.GUI
             if (NotifPanel != null) NotifPanel.Toggle();
         }
 
-        
+        // =========================================================
+        // HAMBURGER MENU — Toggle Sidebar
+        // =========================================================
+        private bool _sidebarOpen = true;
+        private bool _sidebarAnimating = false;
+
+        private void BtnHamburger_Click(object sender, RoutedEventArgs e)
+        {
+            if (_sidebarAnimating) return;
+            _sidebarOpen = !_sidebarOpen;
+            _sidebarAnimating = true;
+
+            if (_sidebarOpen)
+            {
+                // Open sidebar: make visible, fade in
+                if (SidebarPanel != null)
+                {
+                    SidebarPanel.Visibility = Visibility.Visible;
+                    SidebarPanel.IsHitTestVisible = true;
+                    var anim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200))
+                    {
+                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                    };
+                    anim.Completed += (s, ev) => { _sidebarAnimating = false; };
+                    SidebarPanel.BeginAnimation(OpacityProperty, anim);
+                }
+                else
+                {
+                    _sidebarAnimating = false;
+                }
+            }
+            else
+            {
+                // Close sidebar: fade out, then collapse
+                if (SidebarPanel != null)
+                {
+                    SidebarPanel.IsHitTestVisible = false;
+                    var anim = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200))
+                    {
+                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                    };
+                    anim.Completed += (s, ev) =>
+                    {
+                        if (!_sidebarOpen)
+                            SidebarPanel.Visibility = Visibility.Collapsed;
+                        _sidebarAnimating = false;
+                    };
+                    SidebarPanel.BeginAnimation(OpacityProperty, anim);
+                }
+                else
+                {
+                    _sidebarAnimating = false;
+                }
+            }
+        }
+
+        private void BtnKitTaskManager_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var w = new Windows.TaskManager.KitTaskManagerWindow { Owner = this };
+                w.Show();
+                KitLugia.Core.Logger.Log("[KIT TASK MANAGER] Janela aberta via topbar (quadrado vermelho).");
+            }
+            catch (Exception ex) { KitLugia.Core.Logger.Log($"[KIT TASK MANAGER] Erro: {ex.Message}"); }
+        }
+
         private void BtnConsole_Click(object sender, RoutedEventArgs e)
         {
             // Alterna a visibilidade do console
@@ -1433,6 +1590,7 @@ namespace KitLugia.GUI
                                     proc.WaitForExit(5000);
                                 }
                                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                                finally { proc.Dispose(); }
                             }
                             _goodbyeDpiProcess = null;
                             Logger.Log("GOODBYEDPI: Processos externos encerrados");
@@ -2601,6 +2759,9 @@ namespace KitLugia.GUI
 
             if (SplashScreen != null)
             {
+                SplashScreen.BeginAnimation(FrameworkElement.OpacityProperty, null);
+                SplashScreen.Opacity = 0;
+                SplashScreen.IsHitTestVisible = false;
                 SplashScreen.Visibility = Visibility.Collapsed;
             }
 
@@ -2643,9 +2804,16 @@ namespace KitLugia.GUI
             {
                 SidebarPanel.BeginAnimation(FrameworkElement.OpacityProperty, null);
                 SidebarPanel.Opacity = 1;
+                SidebarPanel.Visibility = Visibility.Visible;
             }
 
-            if (SplashScreen != null) SplashScreen.Visibility = Visibility.Collapsed;
+            if (SplashScreen != null)
+            {
+                SplashScreen.BeginAnimation(FrameworkElement.OpacityProperty, null);
+                SplashScreen.Opacity = 0;
+                SplashScreen.IsHitTestVisible = false;
+                SplashScreen.Visibility = Visibility.Collapsed;
+            }
 
             // GoodbyeDPI timer só inicia agora (não compete com a intro)
             _goodbyeDpiStatusTimer?.Start();

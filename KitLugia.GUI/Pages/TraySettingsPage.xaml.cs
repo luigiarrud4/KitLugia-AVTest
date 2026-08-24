@@ -440,7 +440,13 @@ namespace KitLugia.GUI.Pages
             if (string.IsNullOrWhiteSpace(processName)) return false;
             try
             {
-                return System.Diagnostics.Process.GetProcessesByName(processName).Length > 0;
+                bool found = false;
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName(processName))
+                {
+                    if (!p.HasExited) found = true;
+                    p.Dispose();
+                }
+                return found;
             }
             catch { return false; }
         }

@@ -37,6 +37,7 @@ namespace KitLugia.GUI.Helpers
 
         // Cache temporário para evitar reprocessar caminhos
         private static readonly Dictionary<string, BitmapSource?> PathCache = new(200, StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, DateTime> PathCacheAccess = new(200, StringComparer.OrdinalIgnoreCase);
         private static readonly object CacheLock = new();
 
         /// <summary>
@@ -123,7 +124,10 @@ namespace KitLugia.GUI.Helpers
             lock (CacheLock)
             {
                 if (PathCache.TryGetValue(cacheKey, out var cached))
+                {
+                    PathCacheAccess[cacheKey] = DateTime.UtcNow;
                     return cached;
+                }
             }
 
             BitmapSource? result = null;
@@ -151,9 +155,11 @@ namespace KitLugia.GUI.Helpers
                 {
                     try
                     {
+                        bool exists2 = File.Exists(cleanPath);
+                        uint flags2 = SHGFI_ICON | SHGFI_SMALLICON;
+                        if (!exists2) flags2 |= SHGFI_USEFILEATTRIBUTES;
                         var shfi = new SHFILEINFO();
-                        IntPtr hr = SHGetFileInfo(cleanPath, 0, ref shfi, (uint)Marshal.SizeOf(shfi),
-                            SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES);
+                        IntPtr hr = SHGetFileInfo(cleanPath, 0, ref shfi, (uint)Marshal.SizeOf(shfi), flags2);
                         if (hr != IntPtr.Zero && shfi.hIcon != IntPtr.Zero)
                         {
                             using (var icon = System.Drawing.Icon.FromHandle(shfi.hIcon))
@@ -166,6 +172,9 @@ namespace KitLugia.GUI.Helpers
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
+
+                if (result == null && File.Exists(cleanPath))
+                    result = TryExtractIconEx(cleanPath, iconIndex);
 
                 // ExtractAssociatedIcon com índice específico
                 if (result == null && File.Exists(cleanPath))
@@ -198,7 +207,23 @@ namespace KitLugia.GUI.Helpers
             lock (CacheLock)
             {
                 if (!PathCache.ContainsKey(cacheKey))
+                {
+                    // Cap LRU: remove o menos acessado quando o cache lota (evita crescimento sem limite)
+                    if (PathCache.Count >= 200)
+                    {
+                        DateTime oldest = DateTime.MaxValue;
+                        string? evictKey = null;
+                        foreach (var kv in PathCacheAccess)
+                            if (kv.Value < oldest) { oldest = kv.Value; evictKey = kv.Key; }
+                        if (evictKey != null)
+                        {
+                            PathCache.Remove(evictKey);
+                            PathCacheAccess.Remove(evictKey);
+                        }
+                    }
                     PathCache[cacheKey] = result;
+                    PathCacheAccess[cacheKey] = DateTime.UtcNow;
+                }
             }
             return result;
         }
@@ -227,27 +252,41 @@ namespace KitLugia.GUI.Helpers
                 candidate = Path.Combine(winDir, fileName);
                 if (File.Exists(candidate)) return candidate;
 
-                // Procura no ProgramFiles
-                string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                foreach (var dir in Directory.GetDirectories(pf))
-                {
-                    candidate = Path.Combine(dir, fileName);
-                    if (File.Exists(candidate)) return candidate;
-                }
+                // Nota: busca em ProgramFiles removida (lenta, 30-50 IOs por falha) — só System32/Windows relevantes para processos
+                // Se precisar de ProgramFiles, use cache de disco ou busca lazy sob demanda
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-                // Procura no ProgramFiles (x86)
-                string pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-                if (!string.IsNullOrEmpty(pf86) && pf86 != pf)
+            return null;
+        }
+
+        [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+        private static extern uint ExtractIconEx(string szFileName, int nIconIndex, IntPtr[] phiconLarge, IntPtr[] phiconSmall, uint nIcons);
+
+        private static BitmapSource? TryExtractIconEx(string path, int index)
+        {
+            try
+            {
+                IntPtr[] large = new IntPtr[1];
+                IntPtr[] small = new IntPtr[1];
+                uint cnt = ExtractIconEx(path, index, large, small, 1);
+                IntPtr hIcon = small[0] != IntPtr.Zero ? small[0] : large[0];
+                if (hIcon != IntPtr.Zero)
                 {
-                    foreach (var dir in Directory.GetDirectories(pf86))
+                    try
                     {
-                        candidate = Path.Combine(dir, fileName);
-                        if (File.Exists(candidate)) return candidate;
+                        using (var icon = System.Drawing.Icon.FromHandle(hIcon))
+                            return IconToBitmapSource(icon);
+                    }
+                    finally
+                    {
+                        if (hIcon != IntPtr.Zero) DestroyIcon(hIcon);
+                        if (large[0] != IntPtr.Zero && large[0] != hIcon) DestroyIcon(large[0]);
+                        if (small[0] != IntPtr.Zero && small[0] != hIcon) DestroyIcon(small[0]);
                     }
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-
             return null;
         }
 

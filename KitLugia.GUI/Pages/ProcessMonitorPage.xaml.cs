@@ -1,28 +1,57 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Management;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using System.Management;
-using System.Net.NetworkInformation;
-using Microsoft.Win32;
-using System.IO;
-using System.Text.RegularExpressions;
 using KitLugia.Core;
+using KitLugia.GUI.Helpers;
 
 namespace KitLugia.GUI.Pages
 {
     public partial class ProcessMonitorPage : Page
     {
         private ObservableCollection<ProcessMonitorInfo> _processes = null!;
-        private PerformanceCounter _cpuCounter = null!;
-        private PerformanceCounter _ramCounter = null!;
         private DispatcherTimer _updateTimer = null!;
         private ProcessOptimizationManager _optimizationManager = null!;
+        private bool _isLoaded = false;
+
+        // Nomes de processos do Windows / sistema que ficam embaixo
+        private static readonly HashSet<string> _windowsProcessNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "csrss", "smss", "lsass", "services", "wininit", "svchost", "sihost", "taskhostw",
+            "dwm", "SearchIndexer", "SearchUI", "ShellExperienceHost", "StartMenuExperienceHost",
+            "RuntimeBroker", "WmiPrvSE", "dps", "spoolsv", "TrustedInstaller", "TiWorker",
+            "audiodg", "conhost", "ctfmon", "fontdrvhost", "MsMpEng", "NisSrv",
+            "System", "Idle", "Registry", "Memory Compression", "vmmem",
+            "SecurityHealthService", "SecurityHealthSystray", "dllhost",
+            "Microsoft.Photos", "YourPhone", "Widgets", "GameBarPresenceWriter",
+            "TextInputHost", "CompPkgSurrogate", "SearchProtocolHost",
+            "SearchFilterHost", "SearchProtocolHost", "backgroundTaskHost",
+            "MicrosoftEdge", "MicrosoftEdgeCP", "msedge", "msedgewebview2",
+            "OneDrive", "OneDriveStandaloneUpdater", "WAASMedicSvc",
+            "WUDFHost", "unsecapp", "WmiApSrv", "MoUsoWorker",
+            "UsoClient", "MusNotification", "MusNotifyIcon",
+            "WerFault", "WerMgr", "WerInject",
+            "TabletInputService", "WpnService", "cbdhsvc",
+            "PrintWorkflow", "LicenseManager", "ClipSVC",
+            "WSearch", "SysMain", "Dnscache", "EventLog",
+            "CryptSvc", "BFE", "WinDefend", "SenseIR",
+            "SenseCncProxy", "SenseNdl", "mpcmdrun",
+            "MsAudit", "CumulativeUpdate", "DISMHost",
+            "WaaSMedicSvc", "MoUsoWorker", "HxTsiRouter",
+            "SystemSettings", "F5OSTune", "GameBar",
+        };
 
         public ProcessMonitorPage()
         {
@@ -30,34 +59,31 @@ namespace KitLugia.GUI.Pages
             InitializeProcessMonitor();
             InitializeOptimizationManager();
             LoadDefaultProfiles();
+            this.Loaded += ProcessMonitorPage_Loaded;
         }
 
         #region Initialization
+
+        private void ProcessMonitorPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (!_isLoaded)
+            {
+                _isLoaded = true;
+                _ = RefreshProcessesAsync();
+            }
+        }
 
         private void InitializeProcessMonitor()
         {
             _processes = new ObservableCollection<ProcessMonitorInfo>();
             ProcessListView.ItemsSource = _processes;
 
-            try
-            {
-                _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-                _ramCounter = new PerformanceCounter("Memory", "Available MBytes");
-            }
-            catch (Exception ex)
-            {
-                UpdateStatus($"⚠️ Erro ao inicializar contadores: {ex.Message}", "#FF6B00");
-            }
-
             _updateTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(2)
+                Interval = TimeSpan.FromSeconds(3)
             };
             _updateTimer.Tick += UpdateTimer_Tick;
             _updateTimer.Start();
-
-            // Carregar processos em background
-            _ = RefreshProcessesAsync();
 
             this.Unloaded += ProcessMonitorPage_Unloaded;
         }
@@ -66,9 +92,9 @@ namespace KitLugia.GUI.Pages
         {
             _updateTimer?.Stop();
             _updateTimer = null;
-            _cpuCounter?.Dispose();
-            _ramCounter?.Dispose();
             _processes?.Clear();
+            _isLoaded = false;
+            this.Loaded -= ProcessMonitorPage_Loaded;
             this.Unloaded -= ProcessMonitorPage_Unloaded;
             this.DataContext = null;
         }
@@ -81,13 +107,12 @@ namespace KitLugia.GUI.Pages
         private void InitializeOptimizationManager()
         {
             _optimizationManager = new ProcessOptimizationManager();
-            _optimizationManager.StatusChanged += (message, color) => 
+            _optimizationManager.StatusChanged += (message, color) =>
                 Dispatcher.Invoke(() => UpdateStatus(message, color));
         }
 
         private void LoadDefaultProfiles()
         {
-            // Carregar perfis padrão
             SteamProfile.IsChecked = true;
             EpicProfile.IsChecked = true;
             BalancedMode.IsChecked = true;
@@ -99,59 +124,175 @@ namespace KitLugia.GUI.Pages
 
         #endregion
 
+        #region Process Enumeration (Safe - no Win32Exception spam)
+
+        /// <summary>
+        /// Safely enumerates processes without throwing Win32Exception.
+        /// Each property is accessed individually with its own try-catch.
+        /// </summary>
+        private static ProcessMonitorInfo? SafeEnumerateProcess(Process proc)
+        {
+            if (proc == null) return null;
+
+            string name = string.Empty;
+            int id = 0;
+
+            try
+            {
+                id = proc.Id;
+                name = proc.ProcessName;
+            }
+            catch { return null; }
+
+            if (string.IsNullOrEmpty(name)) return null;
+
+            var info = new ProcessMonitorInfo
+            {
+                Id = id,
+                Name = name
+            };
+
+            // CPU usage - can throw Win32Exception for system processes
+            try
+            {
+                info.CpuUsage = Math.Round(proc.TotalProcessorTime.TotalMilliseconds / 1000.0, 2);
+            }
+            catch { info.CpuUsage = 0; }
+
+            // RAM usage - can throw Win32Exception
+            try
+            {
+                info.RamUsageBytes = proc.WorkingSet64;
+                info.RamUsage = FormatBytes(proc.WorkingSet64);
+            }
+            catch { info.RamUsage = "N/A"; info.RamUsageBytes = 0; }
+
+            // Priority - can throw Win32Exception
+            try
+            {
+                info.Priority = proc.PriorityClass.ToString();
+            }
+            catch { info.Priority = "N/A"; }
+
+            // Responding - can throw InvalidOperationException if process exited
+            try
+            {
+                info.Status = proc.Responding ? "Ativo" : "Sem resposta";
+            }
+            catch { info.Status = "N/A"; }
+
+            // Session ID - can throw Win32Exception
+            try
+            {
+                info.SessionId = proc.SessionId;
+            }
+            catch { info.SessionId = -1; }
+
+            // Categorize: System/Windows processes go to bottom, background above, user apps at top
+            info.Category = CategorizeProcess(name, id, info.SessionId);
+
+            // Try to get main module path for icon
+            try
+            {
+                var mainModule = proc.MainModule;
+                if (mainModule != null)
+                    info.ExecutablePath = mainModule.FileName;
+            }
+            catch { /* Access denied for many system processes - expected */ }
+
+            return info;
+        }
+
+        private static ProcessCategory CategorizeProcess(string name, int pid, int sessionId)
+        {
+            // PID 0 = Idle, PID 4 = System
+            if (pid == 0 || pid == 4) return ProcessCategory.WindowsSystem;
+
+            // Named Windows system processes
+            if (_windowsProcessNames.Contains(name)) return ProcessCategory.WindowsSystem;
+
+            // Check session: session 0 is typically services/system
+            if (sessionId == 0 && pid > 4) return ProcessCategory.Background;
+
+            // Session 1+ = user processes
+            return ProcessCategory.UserApp;
+        }
+
+        #endregion
+
         #region Timer and Updates
 
         private async void UpdateTimer_Tick(object? sender, EventArgs e)
         {
+            if (!_isLoaded) return;
+
             UpdateSystemInfo();
 
-            // Process.GetProcesses + WMI queries off UI thread
+            int filterIndex = CmbFilter?.SelectedIndex ?? 0;
+
             var currentProcesses = await Task.Run(() =>
             {
                 var result = new List<ProcessMonitorInfo>();
                 try
                 {
-                    foreach (var proc in Process.GetProcesses())
+                    var allProcs = Process.GetProcesses();
+                    foreach (var proc in allProcs)
                     {
                         try
                         {
-                            if (string.IsNullOrEmpty(proc.ProcessName)) continue;
-                            result.Add(new ProcessMonitorInfo
-                            {
-                                Id = proc.Id,
-                                Name = proc.ProcessName,
-                                CpuUsage = Math.Round(proc.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
-                                RamUsage = FormatBytes(proc.WorkingSet64),
-                                Priority = proc.PriorityClass.ToString(),
-                                Status = proc.Responding ? "Responding" : "Not Responding",
-                                NetworkUsage = "Detecting..."
-                            });
+                            var info = SafeEnumerateProcess(proc);
+                            if (info != null)
+                                result.Add(info);
                         }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                        finally { proc.Dispose(); }
+                        catch { /* Already handled in SafeEnumerateProcess */ }
+                        finally
+                        {
+                            try { proc.Dispose(); } catch { }
+                        }
                     }
-                    return result.OrderByDescending(p => p.CpuUsage).Take(50).ToList();
+
+                    // Apply filter
+                    if (filterIndex == 1)
+                        result = result.Where(p => p.Category == ProcessCategory.UserApp).ToList();
+                    else if (filterIndex == 2)
+                        result = result.Where(p => p.Category == ProcessCategory.Background).ToList();
+                    else if (filterIndex == 3)
+                        result = result.Where(p => p.Category == ProcessCategory.WindowsSystem).ToList();
+
+                    // Sort: User apps first (by CPU desc), then Background, then Windows System
+                    return result
+                        .OrderBy(p => p.Category)
+                        .ThenByDescending(p => p.CpuUsage)
+                        .ThenBy(p => p.Name)
+                        .Take(80)
+                        .ToList();
                 }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<ProcessMonitorInfo>(); }
+                catch { return new List<ProcessMonitorInfo>(); }
             });
 
             try
             {
-                foreach (var process in currentProcesses)
+                // Efficient update: update existing, add new, remove gone
+                var toRemove = new List<ProcessMonitorInfo>();
+                foreach (var existing in _processes)
                 {
-                    var existingProcess = _processes.FirstOrDefault(p => p.Id == process.Id);
-                    if (existingProcess != null)
-                        existingProcess.UpdateFrom(process);
+                    var updated = currentProcesses.FirstOrDefault(p => p.Id == existing.Id);
+                    if (updated != null)
+                        existing.UpdateFrom(updated);
                     else
-                        _processes.Add(process);
+                        toRemove.Add(existing);
                 }
 
-                var processesToRemove = _processes
-                    .Where(p => !currentProcesses.Any(cp => cp.Id == p.Id))
-                    .ToList();
+                foreach (var proc in toRemove)
+                    _processes.Remove(proc);
 
-                foreach (var process in processesToRemove)
-                    _processes.Remove(process);
+                foreach (var proc in currentProcesses)
+                {
+                    if (!_processes.Any(p => p.Id == proc.Id))
+                        _processes.Add(proc);
+                }
+
+                ProcessCountText.Text = $"{_processes.Count} processos";
             }
             catch (Exception ex)
             {
@@ -165,16 +306,9 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                // Atualizar uso de RAM
-                var totalMemory = GC.GetTotalMemory(false);
-                var availableMemory = _ramCounter?.NextValue() ?? 0;
-                var usedMemory = (16 * 1024) - availableMemory; // Assumindo 16GB
-                var memoryUsage = (usedMemory / (16 * 1024)) * 100;
-
-                RamUsageText.Text = $"{usedMemory:F1} GB / 16 GB ({memoryUsage:F1}%)";
-
-                // Atualizar contador de processos
-                ProcessCountText.Text = _processes.Count.ToString();
+                var stats = MemoryOptimizer.GetMemoryStats();
+                var usedMemory = stats.TotalGB - stats.FreeGB;
+                RamUsageText.Text = $"{usedMemory:F1} GB / {stats.TotalGB:F1} GB ({stats.Percent}%)";
             }
             catch (Exception ex)
             {
@@ -182,64 +316,16 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void UpdateProcessList()
-        {
-            try
-            {
-                var currentProcesses = new List<ProcessMonitorInfo>();
-                foreach (var proc in Process.GetProcesses())
-                {
-                    try
-                    {
-                        if (string.IsNullOrEmpty(proc.ProcessName)) continue;
-                        currentProcesses.Add(new ProcessMonitorInfo
-                        {
-                            Id = proc.Id,
-                            Name = proc.ProcessName,
-                            CpuUsage = Math.Round(proc.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
-                            RamUsage = FormatBytes(proc.WorkingSet64),
-                            Priority = proc.PriorityClass.ToString(),
-                            Status = proc.Responding ? "Responding" : "Not Responding",
-                            NetworkUsage = GetProcessNetworkUsage(proc.Id)
-                        });
-                    }
-                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                    finally { proc.Dispose(); }
-                }
-
-                currentProcesses = currentProcesses.OrderByDescending(p => p.CpuUsage).Take(50).ToList();
-
-                // Atualizar ObservableCollection de forma eficiente
-                foreach (var process in currentProcesses)
-                {
-                    var existingProcess = _processes.FirstOrDefault(p => p.Id == process.Id);
-                    if (existingProcess != null)
-                    {
-                        existingProcess.UpdateFrom(process);
-                    }
-                    else
-                    {
-                        _processes.Add(process);
-                    }
-                }
-
-                // Remover processos que não existem mais
-                var processesToRemove = _processes
-                    .Where(p => !currentProcesses.Any(cp => cp.Id == p.Id))
-                    .ToList();
-
-                foreach (var process in processesToRemove)
-                {
-                    _processes.Remove(process);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Erro ao atualizar lista de processos: {ex.Message}");
-            }
-        }
-
         #endregion
+
+        private static string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB" };
+            double len = bytes;
+            int order = 0;
+            while (len >= 1024 && order < sizes.Length - 1) { order++; len /= 1024; }
+            return $"{len:F1} {sizes[order]}";
+        }
 
         #region Auto-Detection and Optimization
 
@@ -248,12 +334,11 @@ namespace KitLugia.GUI.Pages
             if (!AutoDetectSteam.IsChecked.HasValue || !AutoDetectEpic.IsChecked.HasValue)
                 return;
 
-            // Detectar processos de gaming (acessa _processes na UI thread)
-            var steamProcesses = _processes.Where(p => 
+            var steamProcesses = _processes.Where(p =>
                 p.Name.Contains("steam", StringComparison.OrdinalIgnoreCase) ||
                 p.Name.Contains("steamwebhelper", StringComparison.OrdinalIgnoreCase)).ToList();
 
-            var epicProcesses = _processes.Where(p => 
+            var epicProcesses = _processes.Where(p =>
                 p.Name.Contains("epic", StringComparison.OrdinalIgnoreCase) ||
                 p.Name.Contains("eos", StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -261,17 +346,13 @@ namespace KitLugia.GUI.Pages
             bool autoSteam = AutoDetectSteam.IsChecked == true;
             bool autoEpic = AutoDetectEpic.IsChecked == true;
 
-            // Operações pesadas (rede, registro, processos) em background
             Task.Run(() =>
             {
-                // Detectar alta atividade de rede
                 var networkActivity = GetNetworkActivity();
 
-                // Ativar Ultra Desempenho automaticamente
                 if (autoNetwork && networkActivity > 10)
                     ActivateUltraPerformanceMode();
 
-                // Otimizar processos de gaming
                 if (autoSteam && steamProcesses.Any())
                     OptimizeGamingProcesses(steamProcesses, "Steam");
 
@@ -295,17 +376,16 @@ namespace KitLugia.GUI.Pages
                     totalActivity += stats.BytesReceived + stats.BytesSent;
                 }
 
-                return totalActivity / (1024 * 1024); // Converter para MB
+                return totalActivity / (1024 * 1024);
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
+            catch { return 0; }
         }
 
         private void ActivateUltraPerformanceMode()
         {
             UpdateStatus("🚀 Ativando Ultra Desempenho (alta atividade de rede)", "#00FF88");
-            
-            // Aumentar prioridade de processos de rede
-            var networkProcesses = _processes.Where(p => 
+
+            var networkProcesses = _processes.Where(p =>
                 p.Name.Contains("steam", StringComparison.OrdinalIgnoreCase) ||
                 p.Name.Contains("epic", StringComparison.OrdinalIgnoreCase) ||
                 p.Name.Contains("download", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -315,7 +395,6 @@ namespace KitLugia.GUI.Pages
                 _optimizationManager.SetProcessPriority(process.Id, ProcessPriorityClass.High);
             }
 
-            // Otimizar configurações de rede
             _optimizationManager.OptimizeNetworkForHighSpeed();
         }
 
@@ -327,14 +406,9 @@ namespace KitLugia.GUI.Pages
             {
                 try
                 {
-                    // Definir prioridade alta para processos de gaming
                     _optimizationManager.SetProcessPriority(process.Id, ProcessPriorityClass.High);
-                    
-                    // Otimizar uso de memória
                     _optimizationManager.OptimizeProcessMemory(process.Id);
-                    
-                    // Definir afinidade de CPU para cores de performance
-                    _optimizationManager.SetProcessAffinity(process.Id, 0xF); // Primeiros 4 cores
+                    _optimizationManager.SetProcessAffinity(process.Id, (IntPtr)0xF);
                 }
                 catch (Exception ex)
                 {
@@ -365,7 +439,7 @@ namespace KitLugia.GUI.Pages
             {
                 try
                 {
-                    var process = Process.GetProcessById(selectedProcess.Id);
+                    using var process = Process.GetProcessById(selectedProcess.Id);
                     process.Kill();
                     UpdateStatus($"❌ Processo {selectedProcess.Name} finalizado", "#FF6B00");
                 }
@@ -374,31 +448,22 @@ namespace KitLugia.GUI.Pages
                     UpdateStatus($"⚠️ Erro ao finalizar processo: {ex.Message}", "#FF6B00");
                 }
             }
+            else
+            {
+                UpdateStatus("⚠️ Selecione um processo na lista", "#FFD700");
+            }
         }
 
-        private void Profile_Checked(object sender, RoutedEventArgs e)
-        {
-            // Perfil atualizado - será aplicado no botão Apply
-        }
+        private void Profile_Checked(object sender, RoutedEventArgs e) { }
+        private void PerformanceMode_Checked(object sender, RoutedEventArgs e) { }
+        private void NetworkOptimization_Checked(object sender, RoutedEventArgs e) { }
+        private void MemoryOptimization_Checked(object sender, RoutedEventArgs e) { }
+        private void AutoDetection_Checked(object sender, RoutedEventArgs e) { }
 
-        private void PerformanceMode_Checked(object sender, RoutedEventArgs e)
+        private void CmbFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Modo de desempenho atualizado - será aplicado no botão Apply
-        }
-
-        private void NetworkOptimization_Checked(object sender, RoutedEventArgs e)
-        {
-            // Otimização de rede atualizada - será aplicada no botão Apply
-        }
-
-        private void MemoryOptimization_Checked(object sender, RoutedEventArgs e)
-        {
-            // Otimização de memória atualizada - será aplicada no botão Apply
-        }
-
-        private void AutoDetection_Checked(object sender, RoutedEventArgs e)
-        {
-            // Detecção automática atualizada
+            // Re-filter the process list based on selected category
+            _ = RefreshProcessesAsync();
         }
 
         private async void ApplyCustomizationButton_Click(object sender, RoutedEventArgs e)
@@ -418,108 +483,87 @@ namespace KitLugia.GUI.Pages
 
             var optimizations = new OptimizationSettings
             {
-                // Perfis de Gaming
                 SteamEnabled = SteamProfile.IsChecked == true,
                 EpicEnabled = EpicProfile.IsChecked == true,
                 XboxEnabled = XboxProfile.IsChecked == true,
                 DiscordEnabled = DiscordProfile.IsChecked == true,
-
-                // Modos de Desempenho
                 UltraPerformanceMode = UltraPerfMode.IsChecked == true,
                 GamingMode = GamingMode.IsChecked == true,
                 BalancedMode = BalancedMode.IsChecked == true,
-
-                // Otimização de Rede
                 HighBandwidthMode = HighBandwidthMode.IsChecked == true,
                 LowLatencyMode = LowLatencyMode.IsChecked == true,
                 DownloadBoost = DownloadBoost.IsChecked == true,
-
-                // Otimização de RAM
                 MemoryCompression = MemoryCompression.IsChecked == true,
                 IntelligentCleanup = IntelligentCleanup.IsChecked == true,
                 StandbyListOptimization = StandbyListOptimization.IsChecked == true,
-
-                // Detecção Automática
                 AutoDetectSteam = AutoDetectSteam.IsChecked == true,
                 AutoDetectEpic = AutoDetectEpic.IsChecked == true,
                 AutoDetectHighNetwork = AutoDetectHighNetwork.IsChecked == true
             };
 
             _optimizationManager.ApplyOptimizations(optimizations);
-            
+
             UpdateStatus("✅ Customizações aplicadas com sucesso!", "#00FF88");
         }
 
         private Task RefreshProcessesAsync()
         {
+            // Capture current filter on UI thread
+            int filterIndex = 0;
+            Dispatcher.Invoke(() => { filterIndex = CmbFilter?.SelectedIndex ?? 0; });
+
             return Task.Run(() =>
             {
                 var processes = new List<ProcessMonitorInfo>();
-                foreach (var proc in Process.GetProcesses())
+                var allProcs = Process.GetProcesses();
+                foreach (var proc in allProcs)
                 {
                     try
                     {
-                        if (string.IsNullOrEmpty(proc.ProcessName)) continue;
-                        processes.Add(new ProcessMonitorInfo
-                        {
-                            Id = proc.Id,
-                            Name = proc.ProcessName,
-                            CpuUsage = Math.Round(proc.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
-                            RamUsage = FormatBytes(proc.WorkingSet64),
-                            Priority = proc.PriorityClass.ToString(),
-                            Status = proc.Responding ? "Responding" : "Not Responding",
-                            NetworkUsage = "Detecting..."
-                        });
+                        var info = SafeEnumerateProcess(proc);
+                        if (info != null)
+                            processes.Add(info);
                     }
-                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                    finally { proc.Dispose(); }
+                    catch { }
+                    finally
+                    {
+                        try { proc.Dispose(); } catch { }
+                    }
                 }
 
-                processes = processes.OrderByDescending(p => p.CpuUsage).Take(50).ToList();
+                // Apply filter
+                if (filterIndex == 1)
+                    processes = processes.Where(p => p.Category == ProcessCategory.UserApp).ToList();
+                else if (filterIndex == 2)
+                    processes = processes.Where(p => p.Category == ProcessCategory.Background).ToList();
+                else if (filterIndex == 3)
+                    processes = processes.Where(p => p.Category == ProcessCategory.WindowsSystem).ToList();
+
+                processes = processes
+                    .OrderBy(p => p.Category)
+                    .ThenByDescending(p => p.CpuUsage)
+                    .ThenBy(p => p.Name)
+                    .Take(80)
+                    .ToList();
 
                 Dispatcher.Invoke(() =>
                 {
                     _processes.Clear();
                     foreach (var p in processes) _processes.Add(p);
+                    ProcessCountText.Text = $"{_processes.Count} processos";
                 });
             });
         }
 
         private void UpdateStatus(string message, string color)
         {
-            StatusText.Text = message;
-            StatusText.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
-        }
-
-        private string FormatBytes(long bytes)
-        {
-            string[] sizes = { "B", "KB", "MB", "GB" };
-            double len = bytes;
-            int order = 0;
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-            return $"{len:F1} {sizes[order]}";
-        }
-
-        private string GetProcessNetworkUsage(int processId)
-        {
             try
             {
-                using (var searcher = new ManagementObjectSearcher(
-                    $"SELECT * FROM Win32_Process WHERE ProcessId = {processId}"))
-                {
-                    foreach (ManagementObject obj in searcher.Get())
-                    {
-                        // Simplificado - implementação real exigiria APIs mais complexas
-                        return "Detecting...";
-                    }
-                }
+                StatusText.Text = message;
+                StatusText.Foreground = new System.Windows.Media.SolidColorBrush(
+                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return "N/A"; }
-            return "N/A";
+            catch { }
         }
 
         #endregion
@@ -527,23 +571,141 @@ namespace KitLugia.GUI.Pages
 
     #region Data Models
 
-    public class ProcessMonitorInfo
+    public enum ProcessCategory
     {
+        UserApp = 0,      // Aplicativos do usuário (topo)
+        Background = 1,   // Processos em segundo plano (meio)
+        WindowsSystem = 2 // Processos do Windows/Sistema (baixo)
+    }
+
+    public class ProcessMonitorInfo : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public double CpuUsage { get; set; }
-        public string RamUsage { get; set; } = string.Empty;
-        public string Priority { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public string NetworkUsage { get; set; } = string.Empty;
+        public string ExecutablePath { get; set; } = string.Empty;
+        public int SessionId { get; set; }
+        public ProcessCategory Category { get; set; } = ProcessCategory.UserApp;
+        public long RamUsageBytes { get; set; }
+
+        private BitmapSource? _icon;
+        public BitmapSource? Icon
+        {
+            get => _icon;
+            set { _icon = value; OnPropertyChanged(nameof(Icon)); }
+        }
+
+        private double _cpuUsage;
+        public double CpuUsage
+        {
+            get => _cpuUsage;
+            set
+            {
+                _cpuUsage = value;
+                OnPropertyChanged(nameof(CpuUsage));
+                OnPropertyChanged(nameof(CpuUsageFormatted));
+                OnPropertyChanged(nameof(CpuColor));
+            }
+        }
+
+        public string CpuUsageFormatted => CpuUsage > 0 ? $"{CpuUsage:F1}%" : "0%";
+
+        public System.Windows.Media.Brush CpuColor
+        {
+            get
+            {
+                if (CpuUsage > 50) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 107, 107));
+                if (CpuUsage > 20) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 215, 0));
+                if (CpuUsage > 5) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(78, 205, 196));
+                return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(150, 150, 150));
+            }
+        }
+
+        private string _ramUsage = string.Empty;
+        public string RamUsage
+        {
+            get => _ramUsage;
+            set { _ramUsage = value; OnPropertyChanged(nameof(RamUsage)); }
+        }
+
+        private string _priority = string.Empty;
+        public string Priority
+        {
+            get => _priority;
+            set { _priority = value; OnPropertyChanged(nameof(Priority)); }
+        }
+
+        private string _status = string.Empty;
+        public string Status
+        {
+            get => _status;
+            set { _status = value; OnPropertyChanged(nameof(Status)); }
+        }
+
+        private string _networkUsage = string.Empty;
+        public string NetworkUsage
+        {
+            get => _networkUsage;
+            set { _networkUsage = value; OnPropertyChanged(nameof(NetworkUsage)); }
+        }
+
+        public string CategoryLabel => Category switch
+        {
+            ProcessCategory.UserApp => "👤 App",
+            ProcessCategory.Background => "⚙️ Background",
+            ProcessCategory.WindowsSystem => "🪟 Windows",
+            _ => "?"
+        };
+
+        public System.Windows.Media.Brush CategoryColor => Category switch
+        {
+            ProcessCategory.UserApp => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(78, 205, 196)),
+            ProcessCategory.Background => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 215, 0)),
+            ProcessCategory.WindowsSystem => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(130, 130, 130)),
+            _ => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(150, 150, 150))
+        };
 
         public void UpdateFrom(ProcessMonitorInfo other)
         {
             CpuUsage = other.CpuUsage;
             RamUsage = other.RamUsage;
+            RamUsageBytes = other.RamUsageBytes;
             Status = other.Status;
             NetworkUsage = other.NetworkUsage;
+            Priority = other.Priority;
+            Category = other.Category;
+            OnPropertyChanged(nameof(CategoryLabel));
+            OnPropertyChanged(nameof(CategoryColor));
         }
+
+        /// <summary>
+        /// Loads the process icon asynchronously. Safe to call from any thread.
+        /// </summary>
+        public async Task LoadIconAsync()
+        {
+            if (Icon != null) return; // Already loaded
+            if (string.IsNullOrEmpty(ExecutablePath)) return;
+
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var icon = ProgramIconHelper.GetIconFromFile(ExecutablePath);
+                    if (icon != null)
+                    {
+                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                        {
+                            Icon = icon;
+                        });
+                    }
+                }
+                catch { /* Icon loading is best-effort */ }
+            });
+        }
+
+        private void OnPropertyChanged(string propertyName) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     public class OptimizationSettings
@@ -576,7 +738,7 @@ namespace KitLugia.GUI.Pages
 
     public class ProcessOptimizationManager
     {
-        public event Action<string, string> StatusChanged = null!;
+        public event Action<string, string>? StatusChanged;
 
         public void ApplyOptimizations(OptimizationSettings settings)
         {
@@ -584,27 +746,13 @@ namespace KitLugia.GUI.Pages
             {
                 StatusChanged?.Invoke("⚙️ Aplicando otimizações de sistema...", "#FFA500");
 
-                // Otimizações de memória
-                if (settings.MemoryCompression)
-                    EnableMemoryCompression();
+                if (settings.MemoryCompression) EnableMemoryCompression();
+                if (settings.IntelligentCleanup) EnableIntelligentCleanup();
+                if (settings.StandbyListOptimization) OptimizeStandbyList();
+                if (settings.HighBandwidthMode) OptimizeNetworkBandwidth();
+                if (settings.LowLatencyMode) OptimizeNetworkLatency();
+                if (settings.DownloadBoost) EnableDownloadBoost();
 
-                if (settings.IntelligentCleanup)
-                    EnableIntelligentCleanup();
-
-                if (settings.StandbyListOptimization)
-                    OptimizeStandbyList();
-
-                // Otimizações de rede
-                if (settings.HighBandwidthMode)
-                    OptimizeNetworkBandwidth();
-
-                if (settings.LowLatencyMode)
-                    OptimizeNetworkLatency();
-
-                if (settings.DownloadBoost)
-                    EnableDownloadBoost();
-
-                // Otimizações de desempenho
                 ApplyPerformanceMode(settings);
 
                 StatusChanged?.Invoke("✅ Todas as otimizações aplicadas!", "#00FF88");
@@ -619,7 +767,7 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                var process = Process.GetProcessById(processId);
+                using var process = Process.GetProcessById(processId);
                 process.PriorityClass = priority;
             }
             catch (Exception ex)
@@ -632,8 +780,7 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                var process = Process.GetProcessById(processId);
-                // Forçar garbage collection para o processo
+                using var process = Process.GetProcessById(processId);
                 process.MinWorkingSet = (nint)process.WorkingSet64;
             }
             catch (Exception ex)
@@ -646,7 +793,7 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                var process = Process.GetProcessById(processId);
+                using var process = Process.GetProcessById(processId);
                 process.ProcessorAffinity = affinity;
             }
             catch (Exception ex)
@@ -659,14 +806,10 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                // Otimizações de registro para rede
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", true))
-                {
-                    key?.SetValue("TcpWindowSize", 65536, Microsoft.Win32.RegistryValueKind.DWord);
-                    key?.SetValue("Tcp1323Opts", 3, Microsoft.Win32.RegistryValueKind.DWord);
-                }
-
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", true);
+                key?.SetValue("TcpWindowSize", 65536, Microsoft.Win32.RegistryValueKind.DWord);
+                key?.SetValue("Tcp1323Opts", 3, Microsoft.Win32.RegistryValueKind.DWord);
                 StatusChanged?.Invoke("🌐 Rede otimizada para alta velocidade", "#00FF88");
             }
             catch (Exception ex)
@@ -675,57 +818,50 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        #region Private Optimization Methods
+        private static string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB" };
+            double len = bytes;
+            int order = 0;
+            while (len >= 1024 && order < sizes.Length - 1) { order++; len /= 1024; }
+            return $"{len:F1} {sizes[order]}";
+        }
 
         private void EnableMemoryCompression()
         {
             try
             {
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", true))
-                {
-                    key?.SetValue("CompressionKey", 1, Microsoft.Win32.RegistryValueKind.DWord);
-                }
-
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", true);
+                key?.SetValue("CompressionKey", 1, Microsoft.Win32.RegistryValueKind.DWord);
                 StatusChanged?.Invoke("🗜️ Compressão de RAM ativada", "#00FF88");
             }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"⚠️ Erro ao ativar compressão: {ex.Message}", "#FF6B00");
-            }
+            catch (Exception ex) { StatusChanged?.Invoke($"⚠️ Erro: {ex.Message}", "#FF6B00"); }
         }
 
         private void EnableIntelligentCleanup()
         {
             try
             {
-                // Limpar arquivos temporários antigos
                 var tempPath = Path.GetTempPath();
                 var tempFiles = Directory.GetFiles(tempPath, "*", SearchOption.AllDirectories)
-                    .Where(f => File.GetLastWriteTime(f) < DateTime.Now.AddDays(1));
+                    .Where(f => { try { return File.GetLastWriteTime(f) < DateTime.Now.AddDays(1); } catch { return false; } });
 
-                foreach (var file in tempFiles.Take(100)) // Limitar para não sobrecarregar
+                int deleted = 0;
+                foreach (var file in tempFiles.Take(100))
                 {
-                    try
-                    {
-                        File.Delete(file);
-                    }
-                    catch { /* Ignorar arquivos em uso */ }
+                    try { File.Delete(file); deleted++; } catch { }
                 }
 
-                StatusChanged?.Invoke("🧹 Limpeza inteligente concluída", "#00FF88");
+                StatusChanged?.Invoke($"🧹 Limpeza inteligente: {deleted} arquivos removidos", "#00FF88");
             }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"⚠️ Erro na limpeza: {ex.Message}", "#FF6B00");
-            }
+            catch (Exception ex) { StatusChanged?.Invoke($"⚠️ Erro: {ex.Message}", "#FF6B00"); }
         }
 
         private void OptimizeStandbyList()
         {
             try
             {
-                // Otimizar lista de standby para melhor performance
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
@@ -733,117 +869,66 @@ namespace KitLugia.GUI.Pages
                     UseShellExecute = false,
                     CreateNoWindow = true
                 });
-
                 StatusChanged?.Invoke("💤 Lista de standby otimizada", "#00FF88");
             }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"⚠️ Erro ao otimizar standby: {ex.Message}", "#FF6B00");
-            }
+            catch (Exception ex) { StatusChanged?.Invoke($"⚠️ Erro: {ex.Message}", "#FF6B00"); }
         }
 
         private void OptimizeNetworkBandwidth()
         {
             try
             {
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", true))
-                {
-                    key?.SetValue("NetworkThrottlingIndex", 0xFFFFFFFF, Microsoft.Win32.RegistryValueKind.DWord);
-                }
-
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", true);
+                key?.SetValue("NetworkThrottlingIndex", 0xFFFFFFFF, Microsoft.Win32.RegistryValueKind.DWord);
                 StatusChanged?.Invoke("📡 Largura de banda otimizada", "#00FF88");
             }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"⚠️ Erro ao otimizar banda: {ex.Message}", "#FF6B00");
-            }
+            catch (Exception ex) { StatusChanged?.Invoke($"⚠️ Erro: {ex.Message}", "#FF6B00"); }
         }
 
         private void OptimizeNetworkLatency()
         {
             try
             {
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", true))
-                {
-                    key?.SetValue("SystemResponsiveness", 0, Microsoft.Win32.RegistryValueKind.DWord);
-                }
-
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", true);
+                key?.SetValue("SystemResponsiveness", 0, Microsoft.Win32.RegistryValueKind.DWord);
                 StatusChanged?.Invoke("⚡ Latência otimizada", "#00FF88");
             }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"⚠️ Erro ao otimizar latência: {ex.Message}", "#FF6B00");
-            }
+            catch (Exception ex) { StatusChanged?.Invoke($"⚠️ Erro: {ex.Message}", "#FF6B00"); }
         }
 
         private void EnableDownloadBoost()
         {
             try
             {
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", true))
-                {
-                    key?.SetValue("MaxUserPort", 65534, Microsoft.Win32.RegistryValueKind.DWord);
-                    key?.SetValue("TCPTimedWaitDelay", 30, Microsoft.Win32.RegistryValueKind.DWord);
-                }
-
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", true);
+                key?.SetValue("MaxUserPort", 65534, Microsoft.Win32.RegistryValueKind.DWord);
+                key?.SetValue("TCPTimedWaitDelay", 30, Microsoft.Win32.RegistryValueKind.DWord);
                 StatusChanged?.Invoke("⬇️ Download boost ativado", "#00FF88");
             }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"⚠️ Erro ao ativar boost: {ex.Message}", "#FF6B00");
-            }
+            catch (Exception ex) { StatusChanged?.Invoke($"⚠️ Erro: {ex.Message}", "#FF6B00"); }
         }
 
         private void ApplyPerformanceMode(OptimizationSettings settings)
         {
             try
             {
-                if (settings.UltraPerformanceMode)
-                {
-                    // Modo Ultra Performance
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "powercfg.exe",
-                        Arguments = "/setactive SCHEME_MIN",
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    });
-                }
-                else if (settings.GamingMode)
-                {
-                    // Modo Gaming
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "powercfg.exe",
-                        Arguments = "/setactive SCHEME_PERFORMANCE",
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    });
-                }
-                else if (settings.BalancedMode)
-                {
-                    // Modo Balanced
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "powercfg.exe",
-                        Arguments = "/setactive SCHEME_BALANCED",
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    });
-                }
+                string scheme = settings.UltraPerformanceMode ? "SCHEME_MIN" :
+                                settings.GamingMode ? "SCHEME_PERFORMANCE" : "SCHEME_BALANCED";
 
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "powercfg.exe",
+                    Arguments = $"/setactive {scheme}",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
                 StatusChanged?.Invoke("⚡ Modo de desempenho aplicado", "#00FF88");
             }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"⚠️ Erro ao aplicar modo: {ex.Message}", "#FF6B00");
-            }
+            catch (Exception ex) { StatusChanged?.Invoke($"⚠️ Erro: {ex.Message}", "#FF6B00"); }
         }
-
-        #endregion
     }
 
     #endregion

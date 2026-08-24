@@ -260,6 +260,23 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private void BtnPathExplore_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var win = new KitLugia.GUI.Windows.PathExplorerWindow
+                {
+                    Owner = System.Windows.Window.GetWindow(this)
+                };
+                win.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Não foi possível abrir o Explorador de PATH: {ex.Message}",
+                    "Explorador de PATH", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         private async void BtnToggleItem_Click(object sender, RoutedEventArgs e)
         {
             if (_isBusy) return;

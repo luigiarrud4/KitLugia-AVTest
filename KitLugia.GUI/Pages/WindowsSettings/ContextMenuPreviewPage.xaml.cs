@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,6 +33,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         public ContextMenuPreviewPage()
         {
             InitializeComponent();
+            this.Unloaded += ContextMenuPreviewPage_Unloaded;
             this.Loaded += async (s, e) =>
             {
                 await Task.Run(() =>
@@ -233,6 +234,17 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 finally { _isLoading = false; }
             }
+        }
+        public void Cleanup()
+        {
+            this.Unloaded -= ContextMenuPreviewPage_Unloaded;
+            _entries.Clear();
+            this.DataContext = null;
+        }
+
+        private void ContextMenuPreviewPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
     }
 }

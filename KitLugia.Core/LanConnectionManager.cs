@@ -234,7 +234,7 @@ public sealed class LanConnectionManager : IDisposable
                 {
                     if (int.TryParse(parts[4], out int pid) && pid > 0)
                     {
-                        var process = Process.GetProcessById(pid);
+                        using var process = Process.GetProcessById(pid);
                         return (process.ProcessName, pid);
                     }
                 }

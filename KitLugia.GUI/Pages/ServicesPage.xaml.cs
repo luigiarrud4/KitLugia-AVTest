@@ -80,6 +80,7 @@ namespace KitLugia.GUI.Pages
             this.DataContext = null;
 
 
+            MemoryHelper.TrimWorkingSet();
 
         }
 

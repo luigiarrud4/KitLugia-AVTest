@@ -334,9 +334,9 @@ namespace KitLugia.Core
 
         public static async Task StartAutoUpdateCheck()
         {
-            try
+            while (true)
             {
-                while (true)
+                try
                 {
                     await Task.Delay(TimeSpan.FromHours(24));
                     if (await CheckForUpdatesAsync())
@@ -344,10 +344,11 @@ namespace KitLugia.Core
                         Logger.Log("🔄 Atualização disponível! Use a opção 'Atualizar' no menu.");
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"❌ Erro no auto-update check: {ex.Message}");
+                catch (Exception ex)
+                {
+                    // Exceção pontual (rede/API) NAO pode matar o loop - loga e continua
+                    Logger.Log($"❌ Erro no auto-update check (tentativa continuará em 24h): {ex.Message}");
+                }
             }
         }
 

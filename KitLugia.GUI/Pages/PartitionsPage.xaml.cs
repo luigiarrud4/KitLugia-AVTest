@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -69,6 +69,9 @@ namespace KitLugia.GUI.Pages
         {
             _realTimeMonitorTimer?.Stop();
             _realTimeMonitorTimer = null;
+            _usageMonitorCts?.Cancel();
+            _usageMonitorCts?.Dispose();
+            _usageMonitorCts = null;
 
 
             _usageMonitorCts?.Cancel();
