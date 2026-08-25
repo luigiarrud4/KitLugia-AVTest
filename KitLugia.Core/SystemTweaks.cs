@@ -8676,7 +8676,21 @@ namespace KitLugia.Core
         {
             try
             {
-                return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock", "", null) is string s && !string.IsNullOrEmpty(s);
+                // FIX: checava só o valor padrão da chave "*", que pode existir vazia.
+                string[] paths =
+                {
+                    @"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock",
+                    @"HKEY_CURRENT_USER\Software\Classes\Directory\shell\forcestopunlock",
+                    @"HKEY_CURRENT_USER\Software\Classes\Drive\shell\forcestopunlock",
+                };
+                foreach (var path in paths)
+                {
+                    if (Registry.GetValue(path + @"\command", "", null) is string s && !string.IsNullOrEmpty(s))
+                        return true;
+                    if (Registry.GetValue(path, "", null) is string s2 && !string.IsNullOrEmpty(s2))
+                        return true;
+                }
+                return false;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -74,6 +74,18 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         {
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.NavigateToPage(PageType.ForceStopUnlock);
+        }
+
+        private void BtnContextMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.NavigateToPage(PageType.ContextMenuManagerPage);
+        }
+
+        private void BtnContextMenuAdd_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.NavigateToPage(PageType.ContextMenuAddPage);
         }
 
         private void BtnPowerPlan_Click(object sender, RoutedEventArgs e)
