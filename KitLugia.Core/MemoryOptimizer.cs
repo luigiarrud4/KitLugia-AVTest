@@ -45,6 +45,9 @@ namespace KitLugia.Core
         [DllImport("advapi32.dll", SetLastError = true)]
         private static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, bool DisableAllPrivileges, ref TOKEN_PRIVILEGES NewState, uint BufferLength, IntPtr PreviousState, IntPtr ReturnLength);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         private struct TOKEN_PRIVILEGES
         {
@@ -221,7 +224,9 @@ namespace KitLugia.Core
             }
             finally
             {
-                // Simple handle close not strictly needed for pseudo handle but good practice if real handle
+                // OpenProcessToken NAO e pseudo-handle: fechar sempre (vazava 1
+                // token por chamada - rodava 2x por limpeza de RAM no tray).
+                CloseHandle(hToken);
             }
         }
 

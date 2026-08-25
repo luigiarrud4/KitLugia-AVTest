@@ -21,6 +21,7 @@ namespace KitLugia.GUI.Pages
         public ReinstallPreservePage()
         {
             InitializeComponent();
+            this.Unloaded += ReinstallPreservePage_Unloaded;
             Loaded += OnLoaded;
         }
 
@@ -430,5 +431,15 @@ namespace KitLugia.GUI.Pages
             => TxtStatusBar.Text = message;
 
         #endregion
+        public void Cleanup()
+        {
+            this.Unloaded -= ReinstallPreservePage_Unloaded;
+            this.DataContext = null;
+        }
+
+        private void ReinstallPreservePage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
     }
 }

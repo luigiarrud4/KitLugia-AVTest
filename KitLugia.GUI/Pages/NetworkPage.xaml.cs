@@ -23,7 +23,6 @@ namespace KitLugia.GUI.Pages
     public partial class NetworkPage : Page
     {
         private bool _isLoading = true;
-        private bool _isFirstLoadComplete = false;
         private readonly SolidColorBrush _colorActive = new SolidColorBrush(Color.FromRgb(108, 203, 95));
         private readonly SolidColorBrush _colorDefault = new SolidColorBrush(Color.FromRgb(150, 150, 150));
         private readonly SolidColorBrush _colorWarning = new SolidColorBrush(Color.FromRgb(244, 129, 32));
@@ -55,7 +54,6 @@ namespace KitLugia.GUI.Pages
             var dnsTask = LoadStatus();
             var settingsTask = LoadNetworkSettingsAsync();
             await Task.WhenAll(adapterTask, dnsTask, settingsTask);
-            _isFirstLoadComplete = true;
             SetRefreshIndicator("OK");
         }
 
@@ -366,121 +364,181 @@ namespace KitLugia.GUI.Pages
 
         private async void BtnBenchmarkDns_Click(object sender, RoutedEventArgs e)
         {
-            BtnBenchmarkDns.IsEnabled = false;
-            PgbBenchmark.Visibility = Visibility.Visible;
-            TxtBenchmarkStatus.Text = "Testando provedores DNS...";
-            var providers = DnsBenchmark.GetDefaultProviders();
-            DnsProviderList.ItemsSource = providers;
+            try
+            {
+                BtnBenchmarkDns.IsEnabled = false;
+                PgbBenchmark.Visibility = Visibility.Visible;
+                TxtBenchmarkStatus.Text = "Testando provedores DNS...";
+                var providers = DnsBenchmark.GetDefaultProviders();
+                DnsProviderList.ItemsSource = providers;
 
-            var results = await Task.Run(() => DnsBenchmark.BenchmarkAsync(providers));
-            DnsProviderList.ItemsSource = results;
+                var results = await Task.Run(() => DnsBenchmark.BenchmarkAsync(providers));
+                DnsProviderList.ItemsSource = results;
 
-            PgbBenchmark.Visibility = Visibility.Collapsed;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
 
-            var fastest = results.FirstOrDefault(p => p.LatencyMs >= 0);
-            if (fastest != null)
-                TxtBenchmarkStatus.Text = $"Teste conclu\u00eddo! Mais r\u00e1pido: {fastest.Name} ({fastest.LatencyMs:F0} ms)";
-            else
-                TxtBenchmarkStatus.Text = "Nenhum DNS respondeu ao teste.";
-            BtnBenchmarkDns.IsEnabled = true;
+                var fastest = results.FirstOrDefault(p => p.LatencyMs >= 0);
+                if (fastest != null)
+                    TxtBenchmarkStatus.Text = $"Teste conclu\u00eddo! Mais r\u00e1pido: {fastest.Name} ({fastest.LatencyMs:F0} ms)";
+                else
+                    TxtBenchmarkStatus.Text = "Nenhum DNS respondeu ao teste.";
+                BtnBenchmarkDns.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em BtnBenchmarkDns_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
+            }
         }
 
         private async void BtnApplyDnsProvider_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is System.Windows.Controls.Button btn && btn.Tag is DnsProvider provider)
+            try
             {
-                if (!(Application.Current.MainWindow is MainWindow mainWin)) return;
-                string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"DNS: {provider.Name}", "Network");
-                mainWin.ShowInfo("DNS", $"Aplicando {provider.Name} ({provider.Primary})...");
-                var result = await Task.Run(() => Toolbox.SetCustomDns(provider.Primary, provider.Secondary));
-                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
-                if (result.Success) mainWin.ShowSuccess("SUCESSO", result.Message);
-                else mainWin.ShowError("ERRO", result.Message);
-                LoadStatus();
+                if (sender is System.Windows.Controls.Button btn && btn.Tag is DnsProvider provider)
+                {
+                    if (!(Application.Current.MainWindow is MainWindow mainWin)) return;
+                    string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"DNS: {provider.Name}", "Network");
+                    mainWin.ShowInfo("DNS", $"Aplicando {provider.Name} ({provider.Primary})...");
+                    var result = await Task.Run(() => Toolbox.SetCustomDns(provider.Primary, provider.Secondary));
+                    Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
+                    if (result.Success) mainWin.ShowSuccess("SUCESSO", result.Message);
+                    else mainWin.ShowError("ERRO", result.Message);
+                    LoadStatus();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em BtnApplyDnsProvider_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
         private async void BtnApplyCustomDns_Click(object sender, RoutedEventArgs e)
         {
-            var primary = TxtCustomDnsPrimary.Text?.Trim();
-            if (string.IsNullOrEmpty(primary))
+            try
             {
-                if (Application.Current.MainWindow is MainWindow m)
-                    m.ShowError("DNS", "Digite o IP do DNS primário.");
-                return;
+                var primary = TxtCustomDnsPrimary.Text?.Trim();
+                if (string.IsNullOrEmpty(primary))
+                {
+                    if (Application.Current.MainWindow is MainWindow m)
+                        m.ShowError("DNS", "Digite o IP do DNS primário.");
+                    return;
+                }
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
+                string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("DNS Customizado", "Network");
+                mw.ShowInfo("DNS", $"Aplicando DNS customizado ({primary})...");
+                var result = await Task.Run(() => Toolbox.SetCustomDns(primary, TxtCustomDnsSecondary.Text?.Trim()));
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
+                if (result.Success) mw.ShowSuccess("SUCESSO", result.Message);
+                else mw.ShowError("ERRO", result.Message);
+                LoadStatus();
             }
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-            string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("DNS Customizado", "Network");
-            mw.ShowInfo("DNS", $"Aplicando DNS customizado ({primary})...");
-            var result = await Task.Run(() => Toolbox.SetCustomDns(primary, TxtCustomDnsSecondary.Text?.Trim()));
-            Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
-            if (result.Success) mw.ShowSuccess("SUCESSO", result.Message);
-            else mw.ShowError("ERRO", result.Message);
-            LoadStatus();
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em BtnApplyCustomDns_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
+            }
         }
 
         private async void BtnFlushDns_Click(object sender, RoutedEventArgs e)
         {
-            if (Application.Current.MainWindow is MainWindow mw)
+            try
             {
-                string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Limpando Cache DNS", "Network");
-                var result = await Task.Run(() => Toolbox.FlushDnsCache());
-                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
-                mw.ShowSuccess("CACHE", result.Message);
+                if (Application.Current.MainWindow is MainWindow mw)
+                {
+                    string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Limpando Cache DNS", "Network");
+                    var result = await Task.Run(() => Toolbox.FlushDnsCache());
+                    Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
+                    mw.ShowSuccess("CACHE", result.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em BtnFlushDns_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
         private async void BtnCleanNetworkSafe_Click(object sender, RoutedEventArgs e)
         {
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
+            try
+            {
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
 
-            if (!await mw.ShowConfirmationDialog(
-                "Limpeza Segura de Rede\n\n" +
-                "Isso ir\u00e1 executar:\n" +
-                "\u2022 ipconfig /flushdns (limpar cache DNS)\n" +
-                "\u2022 netsh winsock reset (resetar Winsock)\n" +
-                "\u2022 netsh int ip reset (resetar TCP/IP)\n" +
-                "\u2022 arp -d * (esvaziar tabela ARP)\n" +
-                "\u2022 netsh winhttp reset proxy (remover proxy)\n" +
-                "\u2022 cmdkey /delete:* (limpar credenciais salvas)\n" +
-                "\u2022 certutil -urlcache * delete (limpar cache SSL)\n\n" +
-                "N\u00c3O altera configura\u00e7\u00f5es permanentes do PC.\n" +
-                "Deseja continuar?"))
-                return;
+                if (!await mw.ShowConfirmationDialog(
+                    "Limpeza Segura de Rede\n\n" +
+                    "Isso ir\u00e1 executar:\n" +
+                    "\u2022 ipconfig /flushdns (limpar cache DNS)\n" +
+                    "\u2022 netsh winsock reset (resetar Winsock)\n" +
+                    "\u2022 netsh int ip reset (resetar TCP/IP)\n" +
+                    "\u2022 arp -d * (esvaziar tabela ARP)\n" +
+                    "\u2022 netsh winhttp reset proxy (remover proxy)\n" +
+                    "\u2022 cmdkey /delete:* (limpar credenciais salvas)\n" +
+                    "\u2022 certutil -urlcache * delete (limpar cache SSL)\n\n" +
+                    "N\u00c3O altera configura\u00e7\u00f5es permanentes do PC.\n" +
+                    "Deseja continuar?"))
+                    return;
 
-            mw.ShowInfo("LIMPEZA", "Executando limpeza segura de rede...");
-            var result = await Task.Run(() => Toolbox.CleanNetworkSafe());
-            mw.ShowSuccess("LIMPEZA", result);
+                mw.ShowInfo("LIMPEZA", "Executando limpeza segura de rede...");
+                var result = await Task.Run(() => Toolbox.CleanNetworkSafe());
+                mw.ShowSuccess("LIMPEZA", result);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em BtnCleanNetworkSafe_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
+            }
         }
 
         private async void BtnCleanNetworkFull_Click(object sender, RoutedEventArgs e)
         {
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
+            try
+            {
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
 
-            if (!await mw.ShowConfirmationDialog(
-                "\u26A0\uFE0F LIMPEZA COMPLETA DE REDE \u26A0\uFE0F\n\n" +
-                "Isso ir\u00e1 executar TUDO da limpeza segura, MAIS:\n\n" +
-                "\u2022 netsh advfirewall reset\n" +
-                "   \u2192 RESTAURA O FIREWALL DO ZERO\n" +
-                "   \u2192 Remove TODAS as regras personalizadas\n" +
-                "   \u2192 Regras de apps, jogos, antiv\u00edrus, VPNs ser\u00e3o PERDIDAS\n" +
-                "   \u2192 Firewall volta ao estado original de f\u00e1brica\n\n" +
-                "Recomendado apenas para casos extremos (ex: captcha infinito,\n" +
-                "rede muito suja, problemas persistentes ap\u00f3s limpeza segura).\n\n" +
-                "Tem certeza que deseja continuar?"))
-                return;
+                if (!await mw.ShowConfirmationDialog(
+                    "\u26A0\uFE0F LIMPEZA COMPLETA DE REDE \u26A0\uFE0F\n\n" +
+                    "Isso ir\u00e1 executar TUDO da limpeza segura, MAIS:\n\n" +
+                    "\u2022 netsh advfirewall reset\n" +
+                    "   \u2192 RESTAURA O FIREWALL DO ZERO\n" +
+                    "   \u2192 Remove TODAS as regras personalizadas\n" +
+                    "   \u2192 Regras de apps, jogos, antiv\u00edrus, VPNs ser\u00e3o PERDIDAS\n" +
+                    "   \u2192 Firewall volta ao estado original de f\u00e1brica\n\n" +
+                    "Recomendado apenas para casos extremos (ex: captcha infinito,\n" +
+                    "rede muito suja, problemas persistentes ap\u00f3s limpeza segura).\n\n" +
+                    "Tem certeza que deseja continuar?"))
+                    return;
 
-            if (!await mw.ShowConfirmationDialog(
-                "\u26A0\uFE0F CONFIRMA\u00c7\u00c3O FINAL \u26A0\uFE0F\n\n" +
-                "VOC\u00ca EST\u00c1 PRESTES A RESETAR COMPLETAMENTE O FIREWALL.\n\n" +
-                "Isso pode afetar programas que dependem de regras de firewall\n" +
-                "personalizadas (jogos, servidores, VPNs, emuladores).\n\n" +
-                "Deseja realmente prosseguir?"))
-                return;
+                if (!await mw.ShowConfirmationDialog(
+                    "\u26A0\uFE0F CONFIRMA\u00c7\u00c3O FINAL \u26A0\uFE0F\n\n" +
+                    "VOC\u00ca EST\u00c1 PRESTES A RESETAR COMPLETAMENTE O FIREWALL.\n\n" +
+                    "Isso pode afetar programas que dependem de regras de firewall\n" +
+                    "personalizadas (jogos, servidores, VPNs, emuladores).\n\n" +
+                    "Deseja realmente prosseguir?"))
+                    return;
 
-            mw.ShowInfo("LIMPEZA TOTAL", "Executando limpeza completa de rede...");
-            var result = await Task.Run(() => Toolbox.CleanNetworkFull());
-            mw.ShowSuccess("LIMPEZA TOTAL", result);
+                mw.ShowInfo("LIMPEZA TOTAL", "Executando limpeza completa de rede...");
+                var result = await Task.Run(() => Toolbox.CleanNetworkFull());
+                mw.ShowSuccess("LIMPEZA TOTAL", result);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em BtnCleanNetworkFull_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
+            }
         }
 
         // =========================================================
@@ -488,79 +546,109 @@ namespace KitLugia.GUI.Pages
         // =========================================================
         private async void BtnEnableAdapter_Click(object sender, RoutedEventArgs e)
         {
-            var (name, success) = GetSelectedAdapterConnectionName();
-            if (!success) return;
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-
-            if (!await mw.ShowConfirmationDialog(
-                $"Tem certeza que deseja ATIVAR o adaptador '{name}'?\n\n" +
-                $"Isso pode restaurar sua conex\u00e3o de rede."))
-                return;
-
-            SetProcessingState("Ativando...");
-            mw.ShowInfo("ATIVANDO", $"Ativando adaptador '{name}'...");
-            var result = await Task.Run(() => AdapterManager.SetAdapterState(name, true));
-            if (result.Success)
+            try
             {
-                mw.ShowSuccess("ATIVO", result.Message);
-                await RefreshAdapterStatus(forceDelay: true);
+                var (name, success) = GetSelectedAdapterConnectionName();
+                if (!success) return;
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
+
+                if (!await mw.ShowConfirmationDialog(
+                    $"Tem certeza que deseja ATIVAR o adaptador '{name}'?\n\n" +
+                    $"Isso pode restaurar sua conex\u00e3o de rede."))
+                    return;
+
+                SetProcessingState("Ativando...");
+                mw.ShowInfo("ATIVANDO", $"Ativando adaptador '{name}'...");
+                var result = await Task.Run(() => AdapterManager.SetAdapterState(name, true));
+                if (result.Success)
+                {
+                    mw.ShowSuccess("ATIVO", result.Message);
+                    await RefreshAdapterStatus(forceDelay: true);
+                }
+                else
+                {
+                    mw.ShowError("ERRO", result.Message);
+                    SetProcessingState("Falha");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                mw.ShowError("ERRO", result.Message);
-                SetProcessingState("Falha");
+                Logger.Log($"[NETWORK] Erro em BtnEnableAdapter_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
         private async void BtnDisableAdapter_Click(object sender, RoutedEventArgs e)
         {
-            var (name, success) = GetSelectedAdapterConnectionName();
-            if (!success) return;
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-
-            if (!await mw.ShowConfirmationDialog(
-                $"Tem certeza que deseja DESLIGAR o adaptador '{name}'?\n\n" +
-                $"Voc\u00ea perder\u00e1 a conex\u00e3o de rede at\u00e9 reativ\u00e1-lo manualmente ou clicar em 'Ligar'."))
-                return;
-
-            SetProcessingState("Desativando...");
-            mw.ShowInfo("DESLIGANDO", $"Desativando adaptador '{name}'...");
-            var result = await Task.Run(() => AdapterManager.SetAdapterState(name, false));
-            if (result.Success)
+            try
             {
-                mw.ShowSuccess("DESATIVADO", result.Message);
-                await RefreshAdapterStatus(forceDelay: true);
+                var (name, success) = GetSelectedAdapterConnectionName();
+                if (!success) return;
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
+
+                if (!await mw.ShowConfirmationDialog(
+                    $"Tem certeza que deseja DESLIGAR o adaptador '{name}'?\n\n" +
+                    $"Voc\u00ea perder\u00e1 a conex\u00e3o de rede at\u00e9 reativ\u00e1-lo manualmente ou clicar em 'Ligar'."))
+                    return;
+
+                SetProcessingState("Desativando...");
+                mw.ShowInfo("DESLIGANDO", $"Desativando adaptador '{name}'...");
+                var result = await Task.Run(() => AdapterManager.SetAdapterState(name, false));
+                if (result.Success)
+                {
+                    mw.ShowSuccess("DESATIVADO", result.Message);
+                    await RefreshAdapterStatus(forceDelay: true);
+                }
+                else
+                {
+                    mw.ShowError("ERRO", result.Message);
+                    SetProcessingState("Falha");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                mw.ShowError("ERRO", result.Message);
-                SetProcessingState("Falha");
+                Logger.Log($"[NETWORK] Erro em BtnDisableAdapter_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
         private async void BtnRestartAdapter_Click(object sender, RoutedEventArgs e)
         {
-            var (name, success) = GetSelectedAdapterConnectionName();
-            if (!success) return;
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-
-            if (!await mw.ShowConfirmationDialog(
-                $"Tem certeza que deseja REINICIAR o adaptador '{name}'?\n\n" +
-                $"A conex\u00e3o ser\u00e1 interrompida por alguns segundos.\n" +
-                $"Aplicativos online podem ser temporariamente afetados."))
-                return;
-
-            SetProcessingState("Reiniciando...");
-            mw.ShowInfo("REINICIANDO", $"Reiniciando adaptador '{name}'...\nA conex\u00e3o ser\u00e1 interrompida por alguns segundos.");
-            var result = await AdapterManager.RestartAdapterAsync(name);
-            if (result.Success)
+            try
             {
-                mw.ShowSuccess("REINICIADO", result.Message);
-                await RefreshAdapterStatus(forceDelay: true);
+                var (name, success) = GetSelectedAdapterConnectionName();
+                if (!success) return;
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
+
+                if (!await mw.ShowConfirmationDialog(
+                    $"Tem certeza que deseja REINICIAR o adaptador '{name}'?\n\n" +
+                    $"A conex\u00e3o ser\u00e1 interrompida por alguns segundos.\n" +
+                    $"Aplicativos online podem ser temporariamente afetados."))
+                    return;
+
+                SetProcessingState("Reiniciando...");
+                mw.ShowInfo("REINICIANDO", $"Reiniciando adaptador '{name}'...\nA conex\u00e3o ser\u00e1 interrompida por alguns segundos.");
+                var result = await AdapterManager.RestartAdapterAsync(name);
+                if (result.Success)
+                {
+                    mw.ShowSuccess("REINICIADO", result.Message);
+                    await RefreshAdapterStatus(forceDelay: true);
+                }
+                else
+                {
+                    mw.ShowError("ERRO", result.Message);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                mw.ShowError("ERRO", result.Message);
+                Logger.Log($"[NETWORK] Erro em BtnRestartAdapter_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -627,162 +715,182 @@ namespace KitLugia.GUI.Pages
 
         private async void BtnApplyMac_Click(object sender, RoutedEventArgs e)
         {
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-
-            if (string.IsNullOrEmpty(_generatedMac))
+            try
             {
-                mw.ShowError("ATEN\u00c7\u00c3O", "Clique em 'Gerar Novo MAC' primeiro.");
-                return;
-            }
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
 
-            if (CmbNetworkAdapter.SelectedIndex < 0 || CmbNetworkAdapter.SelectedIndex >= _physicalAdapters.Count)
-            {
-                mw.ShowError("ATEN\u00c7\u00c3O", "Selecione um adaptador de rede f\u00edsico primeiro.");
-                return;
-            }
-
-            var adp = _physicalAdapters[CmbNetworkAdapter.SelectedIndex];
-            var formattedMac = FormatMacDisplay(_generatedMac);
-            var currentMacBefore = FormatMacDisplay(adp.CurrentMac);
-
-            if (!await mw.ShowConfirmationDialog(
-                $"Voc\u00ea est\u00e1 prestes a alterar o MAC address do adaptador:\n\n" +
-                $"{adp.Description}\n" +
-                $"MAC Atual: {currentMacBefore}\n" +
-                $"Novo MAC:  {formattedMac}\n\n" +
-                $"O adaptador ser\u00e1 reiniciado automaticamente.\n" +
-                $"A conex\u00e3o ser\u00e1 interrompida por alguns segundos.\n\n" +
-                $"Continuar?"))
-                return;
-
-            if (!adp.SupportsSpoofing)
-            {
-                var tryWorkaround = await mw.ShowConfirmationDialog(
-                    $"Este adaptador N\u00c3O possui suporte oficial a NetworkAddress.\n\n" +
-                    $"Driver: {adp.Description}\n\n" +
-                    $"O Kit pode tentar adicionar o suporte manualmente no registro.\n" +
-                    $"Deseja tentar este workaround?");
-
-                if (tryWorkaround)
+                if (string.IsNullOrEmpty(_generatedMac))
                 {
-                    mw.ShowInfo("WORKAROUND", "Adicionando suporte a NetworkAddress no registro...");
-                    await Task.Run(() => AdapterManager.EnsureNetworkAddressSupport(adp.Id));
-                    (adp.SupportsSpoofing, _) = await Task.Run(() => AdapterManager.CheckNetworkAddressSupport(adp.Id));
+                    mw.ShowError("ATEN\u00c7\u00c3O", "Clique em 'Gerar Novo MAC' primeiro.");
+                    return;
                 }
+
+                if (CmbNetworkAdapter.SelectedIndex < 0 || CmbNetworkAdapter.SelectedIndex >= _physicalAdapters.Count)
+                {
+                    mw.ShowError("ATEN\u00c7\u00c3O", "Selecione um adaptador de rede f\u00edsico primeiro.");
+                    return;
+                }
+
+                var adp = _physicalAdapters[CmbNetworkAdapter.SelectedIndex];
+                var formattedMac = FormatMacDisplay(_generatedMac);
+                var currentMacBefore = FormatMacDisplay(adp.CurrentMac);
+
+                if (!await mw.ShowConfirmationDialog(
+                    $"Voc\u00ea est\u00e1 prestes a alterar o MAC address do adaptador:\n\n" +
+                    $"{adp.Description}\n" +
+                    $"MAC Atual: {currentMacBefore}\n" +
+                    $"Novo MAC:  {formattedMac}\n\n" +
+                    $"O adaptador ser\u00e1 reiniciado automaticamente.\n" +
+                    $"A conex\u00e3o ser\u00e1 interrompida por alguns segundos.\n\n" +
+                    $"Continuar?"))
+                    return;
 
                 if (!adp.SupportsSpoofing)
                 {
-                    if (!await mw.ShowConfirmationDialog(
-                        $"O driver pode n\u00e3o aceitar o novo MAC.\n\n" +
-                        $"Mesmo assim, o valor ser\u00e1 escrito no registro — se o driver ignorar,\n" +
-                        $"o MAC n\u00e3o ser\u00e1 alterado.\n\n" +
-                        $"Tentar mesmo assim?"))
-                        return;
+                    var tryWorkaround = await mw.ShowConfirmationDialog(
+                        $"Este adaptador N\u00c3O possui suporte oficial a NetworkAddress.\n\n" +
+                        $"Driver: {adp.Description}\n\n" +
+                        $"O Kit pode tentar adicionar o suporte manualmente no registro.\n" +
+                        $"Deseja tentar este workaround?");
+
+                    if (tryWorkaround)
+                    {
+                        mw.ShowInfo("WORKAROUND", "Adicionando suporte a NetworkAddress no registro...");
+                        await Task.Run(() => AdapterManager.EnsureNetworkAddressSupport(adp.Id));
+                        (adp.SupportsSpoofing, _) = await Task.Run(() => AdapterManager.CheckNetworkAddressSupport(adp.Id));
+                    }
+
+                    if (!adp.SupportsSpoofing)
+                    {
+                        if (!await mw.ShowConfirmationDialog(
+                            $"O driver pode n\u00e3o aceitar o novo MAC.\n\n" +
+                            $"Mesmo assim, o valor ser\u00e1 escrito no registro — se o driver ignorar,\n" +
+                            $"o MAC n\u00e3o ser\u00e1 alterado.\n\n" +
+                            $"Tentar mesmo assim?"))
+                            return;
+                    }
                 }
-            }
 
-            mw.ShowInfo("APLICANDO MAC", $"Aplicando MAC {formattedMac} em '{adp.Description}'...");
+                mw.ShowInfo("APLICANDO MAC", $"Aplicando MAC {formattedMac} em '{adp.Description}'...");
 
-            var setResult = await Task.Run(() => AdapterManager.SetMacAddress(adp.Id, _generatedMac));
-            if (!setResult.Success)
-            {
-                mw.ShowError("ERRO", setResult.Message);
-                return;
-            }
-
-            mw.ShowInfo("REINICIANDO", "MAC aplicado no registro. Reiniciando adaptador...");
-
-            var restartResult = await AdapterManager.RestartAdapterAsync(adp.ConnectionName);
-            await Task.Delay(1000);
-
-            var (changed, liveMac) = await Task.Run(() =>
-                AdapterManager.VerifyMacChange(adp.ConnectionName, _generatedMac));
-
-            if (restartResult.Success)
-            {
-                BtnRestoreMac.IsEnabled = true;
-                await RefreshAdapterStatus(forceDelay: true);
-
-                if (changed)
+                var setResult = await Task.Run(() => AdapterManager.SetMacAddress(adp.Id, _generatedMac));
+                if (!setResult.Success)
                 {
-                    mw.ShowSuccess("SUCESSO", $"MAC alterado para {formattedMac}\n{restartResult.Message}");
+                    mw.ShowError("ERRO", setResult.Message);
+                    return;
+                }
+
+                mw.ShowInfo("REINICIANDO", "MAC aplicado no registro. Reiniciando adaptador...");
+
+                var restartResult = await AdapterManager.RestartAdapterAsync(adp.ConnectionName);
+                await Task.Delay(1000);
+
+                var (changed, liveMac) = await Task.Run(() =>
+                    AdapterManager.VerifyMacChange(adp.ConnectionName, _generatedMac));
+
+                if (restartResult.Success)
+                {
+                    BtnRestoreMac.IsEnabled = true;
+                    await RefreshAdapterStatus(forceDelay: true);
+
+                    if (changed)
+                    {
+                        mw.ShowSuccess("SUCESSO", $"MAC alterado para {formattedMac}\n{restartResult.Message}");
+                    }
+                    else
+                    {
+                        var liveDisplay = !string.IsNullOrEmpty(liveMac) ? FormatMacDisplay(liveMac) : "N/A";
+                        mw.ShowInfo("VERIFICA\u00c7\u00c3O",
+                            $"MAC pode n\u00e3o ter sido alterado.\n" +
+                            $"Esperado: {formattedMac}\n" +
+                            $"Atual:    {liveDisplay}\n\n" +
+                            $"O driver deste adaptador pode n\u00e3o suportar NetworkAddress.\n" +
+                            $"Tente: 1) Reiniciar o PC  2) Verificar no Gerenciador de Dispositivos\n" +
+                            $"(Propriedades > Avan\u00e7ado > Network Address)");
+                    }
+
+                    _generatedMac = "";
+                    BtnApplyMac.IsEnabled = false;
+                    TxtNewMac.Text = "Clique em 'Gerar' para criar um novo";
+                    TxtNewMac.Foreground = _colorWarning;
                 }
                 else
                 {
-                    var liveDisplay = !string.IsNullOrEmpty(liveMac) ? FormatMacDisplay(liveMac) : "N/A";
-                    mw.ShowInfo("VERIFICA\u00c7\u00c3O",
-                        $"MAC pode n\u00e3o ter sido alterado.\n" +
-                        $"Esperado: {formattedMac}\n" +
-                        $"Atual:    {liveDisplay}\n\n" +
-                        $"O driver deste adaptador pode n\u00e3o suportar NetworkAddress.\n" +
-                        $"Tente: 1) Reiniciar o PC  2) Verificar no Gerenciador de Dispositivos\n" +
-                        $"(Propriedades > Avan\u00e7ado > Network Address)");
+                    var msg = $"MAC foi aplicado no registro, mas houve um problema ao reiniciar o adaptador:\n{restartResult.Message}\n\n";
+                    msg += changed
+                        ? "O MAC j\u00e1 est\u00e1 ativo mesmo assim."
+                        : "Reinicie o adaptador manualmente ou reinicie o PC para aplicar.";
+
+                    mw.ShowInfo("ATEN\u00c7\u00c3O", msg);
                 }
-
-                _generatedMac = "";
-                BtnApplyMac.IsEnabled = false;
-                TxtNewMac.Text = "Clique em 'Gerar' para criar um novo";
-                TxtNewMac.Foreground = _colorWarning;
             }
-            else
+            catch (Exception ex)
             {
-                var msg = $"MAC foi aplicado no registro, mas houve um problema ao reiniciar o adaptador:\n{restartResult.Message}\n\n";
-                msg += changed
-                    ? "O MAC j\u00e1 est\u00e1 ativo mesmo assim."
-                    : "Reinicie o adaptador manualmente ou reinicie o PC para aplicar.";
-
-                mw.ShowInfo("ATEN\u00c7\u00c3O", msg);
+                Logger.Log($"[NETWORK] Erro em BtnApplyMac_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
         private async void BtnRestoreMac_Click(object sender, RoutedEventArgs e)
         {
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-
-            if (CmbNetworkAdapter.SelectedIndex < 0 || CmbNetworkAdapter.SelectedIndex >= _physicalAdapters.Count)
+            try
             {
-                mw.ShowError("ATEN\u00c7\u00c3O", "Selecione um adaptador de rede f\u00edsico primeiro.");
-                return;
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
+
+                if (CmbNetworkAdapter.SelectedIndex < 0 || CmbNetworkAdapter.SelectedIndex >= _physicalAdapters.Count)
+                {
+                    mw.ShowError("ATEN\u00c7\u00c3O", "Selecione um adaptador de rede f\u00edsico primeiro.");
+                    return;
+                }
+
+                var adp = _physicalAdapters[CmbNetworkAdapter.SelectedIndex];
+
+                if (!await mw.ShowConfirmationDialog(
+                    $"Restaurar o MAC original de f\u00e1brica do adaptador:\n\n" +
+                    $"{adp.Description}\n" +
+                    $"MAC Atual: {FormatMacDisplay(adp.CurrentMac)}\n\n" +
+                    $"O adaptador ser\u00e1 reiniciado automaticamente.\n" +
+                    $"Continuar?"))
+                    return;
+
+                mw.ShowInfo("RESTAURANDO", $"Removendo MAC personalizado de '{adp.Description}'...");
+
+                var restoreResult = await Task.Run(() => AdapterManager.RestoreOriginalMac(adp.Id, adp.NetCfgInstanceId, adp.ConnectionName));
+                if (!restoreResult.Success)
+                {
+                    mw.ShowError("ERRO", restoreResult.Message);
+                    return;
+                }
+
+                mw.ShowInfo("REINICIANDO", "MAC original restaurado. Reiniciando adaptador...");
+
+                var restartResult = await AdapterManager.RestartAdapterAsync(adp.ConnectionName);
+                await Task.Delay(1000);
+
+                var (changed, _) = await Task.Run(() =>
+                    AdapterManager.VerifyMacChange(adp.ConnectionName, ""));
+
+                if (restartResult.Success)
+                {
+                    BtnRestoreMac.IsEnabled = false;
+                    await RefreshAdapterStatus(forceDelay: true);
+                    mw.ShowSuccess("RESTAURADO", $"MAC original restaurado com sucesso.\n{restartResult.Message}");
+                }
+                else
+                {
+                    mw.ShowSuccess("RESTAURADO",
+                        $"MAC original restaurado no registro.\n{restartResult.Message}\n\n" +
+                        $"Reinicie o adaptador manualmente ou o PC para aplicar.");
+                }
             }
-
-            var adp = _physicalAdapters[CmbNetworkAdapter.SelectedIndex];
-
-            if (!await mw.ShowConfirmationDialog(
-                $"Restaurar o MAC original de f\u00e1brica do adaptador:\n\n" +
-                $"{adp.Description}\n" +
-                $"MAC Atual: {FormatMacDisplay(adp.CurrentMac)}\n\n" +
-                $"O adaptador ser\u00e1 reiniciado automaticamente.\n" +
-                $"Continuar?"))
-                return;
-
-            mw.ShowInfo("RESTAURANDO", $"Removendo MAC personalizado de '{adp.Description}'...");
-
-            var restoreResult = await Task.Run(() => AdapterManager.RestoreOriginalMac(adp.Id, adp.NetCfgInstanceId, adp.ConnectionName));
-            if (!restoreResult.Success)
+            catch (Exception ex)
             {
-                mw.ShowError("ERRO", restoreResult.Message);
-                return;
-            }
-
-            mw.ShowInfo("REINICIANDO", "MAC original restaurado. Reiniciando adaptador...");
-
-            var restartResult = await AdapterManager.RestartAdapterAsync(adp.ConnectionName);
-            await Task.Delay(1000);
-
-            var (changed, _) = await Task.Run(() =>
-                AdapterManager.VerifyMacChange(adp.ConnectionName, ""));
-
-            if (restartResult.Success)
-            {
-                BtnRestoreMac.IsEnabled = false;
-                await RefreshAdapterStatus(forceDelay: true);
-                mw.ShowSuccess("RESTAURADO", $"MAC original restaurado com sucesso.\n{restartResult.Message}");
-            }
-            else
-            {
-                mw.ShowSuccess("RESTAURADO",
-                    $"MAC original restaurado no registro.\n{restartResult.Message}\n\n" +
-                    $"Reinicie o adaptador manualmente ou o PC para aplicar.");
+                Logger.Log($"[NETWORK] Erro em BtnRestoreMac_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -791,48 +899,58 @@ namespace KitLugia.GUI.Pages
         // =========================================================
         private async void BtnAutoDetectMac_Click(object sender, RoutedEventArgs e)
         {
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-
-            if (CmbNetworkAdapter.SelectedIndex < 0 || CmbNetworkAdapter.SelectedIndex >= _physicalAdapters.Count)
+            try
             {
-                mw.ShowError("ATENÇÃO", "Selecione um adaptador de rede físico primeiro.");
-                return;
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
+
+                if (CmbNetworkAdapter.SelectedIndex < 0 || CmbNetworkAdapter.SelectedIndex >= _physicalAdapters.Count)
+                {
+                    mw.ShowError("ATENÇÃO", "Selecione um adaptador de rede físico primeiro.");
+                    return;
+                }
+
+                if (!await mw.ShowConfirmationDialog(
+                    "Auto-detect MAC\n\n" +
+                    "Este processo irá testar até 40 MACs diferentes até encontrar um que funcione " +
+                    "no seu adaptador. O adaptador será reiniciado a cada tentativa.\n\n" +
+                    "Deseja continuar?"))
+                    return;
+
+                var adp = _physicalAdapters[CmbNetworkAdapter.SelectedIndex];
+                BtnAutoDetectMac.IsEnabled = false;
+                TxtAutoDetectProgress.Visibility = Visibility.Visible;
+                TxtAutoDetectProgress.Text = "Iniciando auto-detect...";
+
+                var result = await AdapterManager.AutoDetectMacAsync(
+                    adp.Id, adp.ConnectionName,
+                    progress => Dispatcher.Invoke(() => TxtAutoDetectProgress.Text = progress));
+
+                BtnAutoDetectMac.IsEnabled = true;
+
+                if (result != null)
+                {
+                    TxtNewMac.Text = FormatMacDisplay(result);
+                    BtnApplyMac.IsEnabled = true;
+                    BtnApplyMacText.Text = "✅ MAC detectado! Aplicar?";
+                    await RefreshAdapterStatus(forceDelay: true);
+                    mw.ShowSuccess("AUTO-DETECT",
+                        $"MAC funcional encontrado: {FormatMacDisplay(result)}\n\n" +
+                        $"O MAC já foi aplicado no registro e está ativo no adaptador.");
+                }
+                else
+                {
+                    mw.ShowError("AUTO-DETECT",
+                        "Nenhum MAC funcionou após 40 tentativas.\n\n" +
+                        "Isso pode ocorrer em adaptadores muito restritivos. " +
+                        "Tente um adaptador diferente ou reinicie o PC e tente novamente.");
+                }
             }
-
-            if (!await mw.ShowConfirmationDialog(
-                "Auto-detect MAC\n\n" +
-                "Este processo irá testar até 40 MACs diferentes até encontrar um que funcione " +
-                "no seu adaptador. O adaptador será reiniciado a cada tentativa.\n\n" +
-                "Deseja continuar?"))
-                return;
-
-            var adp = _physicalAdapters[CmbNetworkAdapter.SelectedIndex];
-            BtnAutoDetectMac.IsEnabled = false;
-            TxtAutoDetectProgress.Visibility = Visibility.Visible;
-            TxtAutoDetectProgress.Text = "Iniciando auto-detect...";
-
-            var result = await AdapterManager.AutoDetectMacAsync(
-                adp.Id, adp.ConnectionName,
-                progress => Dispatcher.Invoke(() => TxtAutoDetectProgress.Text = progress));
-
-            BtnAutoDetectMac.IsEnabled = true;
-
-            if (result != null)
+            catch (Exception ex)
             {
-                TxtNewMac.Text = FormatMacDisplay(result);
-                BtnApplyMac.IsEnabled = true;
-                BtnApplyMacText.Text = "✅ MAC detectado! Aplicar?";
-                await RefreshAdapterStatus(forceDelay: true);
-                mw.ShowSuccess("AUTO-DETECT",
-                    $"MAC funcional encontrado: {FormatMacDisplay(result)}\n\n" +
-                    $"O MAC já foi aplicado no registro e está ativo no adaptador.");
-            }
-            else
-            {
-                mw.ShowError("AUTO-DETECT",
-                    "Nenhum MAC funcionou após 40 tentativas.\n\n" +
-                    "Isso pode ocorrer em adaptadores muito restritivos. " +
-                    "Tente um adaptador diferente ou reinicie o PC e tente novamente.");
+                Logger.Log($"[NETWORK] Erro em BtnAutoDetectMac_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -1207,13 +1325,23 @@ namespace KitLugia.GUI.Pages
         // =========================================================
         private async void BtnResetNetwork_Click(object sender, RoutedEventArgs e)
         {
-            if (!(Application.Current.MainWindow is MainWindow mw)) return;
-
-            if (await mw.ShowConfirmationDialog("Deseja resetar TODAS as configura\u00e7\u00f5es de rede para o padr\u00e3o do Windows?\n\nIsso ir\u00e1 reverter todas as otimiza\u00e7\u00f5es aplicadas."))
+            try
             {
-                mw.ShowInfo("RESETANDO", "Resetando pilha de rede...");
-                await Task.Run(() => SystemTweaks.ResetEthernetSettings());
-                mw.ShowSuccess("RESETADO", "Pilha de rede resetada com sucesso!");
+                if (!(Application.Current.MainWindow is MainWindow mw)) return;
+
+                if (await mw.ShowConfirmationDialog("Deseja resetar TODAS as configura\u00e7\u00f5es de rede para o padr\u00e3o do Windows?\n\nIsso ir\u00e1 reverter todas as otimiza\u00e7\u00f5es aplicadas."))
+                {
+                    mw.ShowInfo("RESETANDO", "Resetando pilha de rede...");
+                    await Task.Run(() => SystemTweaks.ResetEthernetSettings());
+                    mw.ShowSuccess("RESETADO", "Pilha de rede resetada com sucesso!");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em BtnResetNetwork_Click: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 

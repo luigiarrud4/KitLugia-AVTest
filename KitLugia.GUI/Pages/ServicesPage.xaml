@@ -92,7 +92,7 @@
                     </StackPanel>
 
                     <Border Grid.Row="1" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
-                        <DataGrid x:Name="GridStartup" SelectionMode="Single" PreviewMouseRightButtonDown="GridStartup_PreviewMouseRightButtonDown">
+                        <DataGrid x:Name="GridStartup" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling" PreviewMouseRightButtonDown="GridStartup_PreviewMouseRightButtonDown">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="250" IsReadOnly="True" SortMemberPath="Name">
                                     <DataGridTextColumn.ElementStyle>
@@ -486,7 +486,7 @@
 
                     <!-- TABELA DE SERVI&#xC7;OS -->
                     <Border Grid.Row="2" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
-                        <DataGrid x:Name="GridServices" SelectionMode="Single">
+                        <DataGrid x:Name="GridServices" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                             <DataGrid.Columns>
                                 <!-- Nome Amig&#xE1;vel -->
                                 <DataGridTextColumn Header="Nome" Binding="{Binding DisplayName}" Width="220" IsReadOnly="True" SortMemberPath="DisplayName">
@@ -633,7 +633,7 @@
                     </StackPanel>
 
                     <Border Grid.Row="1" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
-                        <DataGrid x:Name="GridTasks" SelectionMode="Single">
+                        <DataGrid x:Name="GridTasks" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Nome da Tarefa" Binding="{Binding Name}" Width="220" IsReadOnly="True"/>
                                 <DataGridTextColumn Header="Descri&#xE7;&#xE3;o" Binding="{Binding Description}" Width="*" IsReadOnly="True"/>
@@ -721,7 +721,7 @@
                         <TextBlock Text="Apps e Servi&#xE7;os que atrasaram o in&#xED;cio:" Foreground="{StaticResource AccentColor}" FontWeight="Bold" Margin="0,0,0,10"/>
 
                         <Border Grid.Row="1" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Background="#111">
-                            <DataGrid x:Name="GridBootItems" SelectionMode="Single">
+                            <DataGrid x:Name="GridBootItems" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Nome do Processo" Binding="{Binding ItemName}" Width="250" IsReadOnly="True"/>
                                     <DataGridTextColumn Header="Tipo" Binding="{Binding SubType}" Width="100" IsReadOnly="True"/>

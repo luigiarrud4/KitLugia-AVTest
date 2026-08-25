@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -47,6 +47,12 @@ namespace KitLugia.GUI.Pages
 
         public void Cleanup()
         {
+            _sfcCts?.Cancel();
+            _sfcCts?.Dispose();
+            _sfcCts = null;
+            _dismCts?.Cancel();
+            _dismCts?.Dispose();
+            _dismCts = null;
             this.DataContext = null;
         }
 

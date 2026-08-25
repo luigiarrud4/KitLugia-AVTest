@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Data;
@@ -216,6 +217,9 @@ namespace KitLugia.GUI.Pages
             if (BloatwareLoadingPanel != null) BloatwareLoadingPanel.Visibility = Visibility.Visible;
             if (BloatwareList != null) BloatwareList.ItemsSource = null;
 
+            // Spinner só gira enquanto o painel está visível (Loaded-trigger girava para sempre)
+            SetSpinnerRunning(BloatwareSpinner, BloatwareLoadingPanel?.Visibility == Visibility.Visible);
+
             if (BloatwareIconProgressText != null) BloatwareIconProgressText.Text = "Ícones carregados: 0/0";
 
             string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Carregando Apps Bloatware", "Apps");
@@ -270,7 +274,30 @@ namespace KitLugia.GUI.Pages
             finally
             {
                 if (BloatwareLoadingPanel != null) BloatwareLoadingPanel.Visibility = Visibility.Collapsed;
+                SetSpinnerRunning(BloatwareSpinner, false); // para a rotação do spinner
                 Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, success, message);
+            }
+        }
+
+        /// <summary>
+        /// Liga/desliga a animação de um spinner em runtime. Storyboards com
+        /// RepeatBehavior=Forever disparados no Loaded continuam consumindo CPU
+        /// mesmo invisíveis; aqui a animação só existe enquanto necessário.
+        /// </summary>
+        private static void SetSpinnerRunning(System.Windows.Controls.ContentControl? spinner, bool running)
+        {
+            if (spinner?.RenderTransform is RotateTransform rt)
+            {
+                if (running)
+                {
+                    var spin = new DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(1400)) { RepeatBehavior = RepeatBehavior.Forever };
+                    rt.BeginAnimation(RotateTransform.AngleProperty, spin, HandoffBehavior.SnapshotAndReplace);
+                }
+                else
+                {
+                    rt.BeginAnimation(RotateTransform.AngleProperty, null);
+                    rt.Angle = 0;
+                }
             }
         }
 
@@ -1187,14 +1214,22 @@ namespace KitLugia.GUI.Pages
         {
             if (PortableLoadingPanel != null) PortableLoadingPanel.Visibility = Visibility.Visible;
             if (PortableList != null) PortableList.ItemsSource = null;
-            if (TxtPortableProgress != null) TxtPortableProgress.Text = "";
+            if (TxtPortableProgress != null) TxtPortableProgress.Text = "Lendo índice MFT dos volumes (1ª vez ~15s)...";
 
             try
             {
                 _portableCts?.Cancel();
                 _portableCts = new CancellationTokenSource();
 
-                var apps = await Task.Run(() => PortableAppScanner.Scan());
+                var token = _portableCts.Token;
+                var apps = await Task.Run(() => PortableAppScanner.Scan((done, total) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (TxtPortableProgress != null)
+                            TxtPortableProgress.Text = $"Varrendo pastas... {done}/{total}";
+                    });
+                }, token), token);
 
                 PortableCollection = new ObservableCollection<PortableDetectedViewModel>(
                     apps.Select(a => new PortableDetectedViewModel(a)));
@@ -1204,6 +1239,14 @@ namespace KitLugia.GUI.Pages
 
                 FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(PortableCollection);
                 if (PortableList != null) PortableList.ItemsSource = FilteredPortableCollection;
+
+                // Load icons for portable apps asynchronously
+                if (PortableCollection.Count > 0)
+                    _ = Task.Run(() => LoadPortableIconsAsync(token));
+            }
+            catch (OperationCanceledException)
+            {
+                // Scan cancelado pelo usuario (Refresh clicado) — silencioso
             }
             catch (Exception ex)
             {
@@ -1214,6 +1257,72 @@ namespace KitLugia.GUI.Pages
             {
                 if (PortableLoadingPanel != null) PortableLoadingPanel.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private async Task LoadPortableIconsAsync(CancellationToken token)
+        {
+            if (PortableCollection == null) return;
+
+            int totalIcons = PortableCollection.Count;
+            var items = PortableCollection
+                .Where(p => p.Icon == null && !string.IsNullOrEmpty(p.MainExecutable))
+                .ToList();
+
+            if (items.Count == 0) return;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (PortableIconProgressText != null)
+                    PortableIconProgressText.Text = $"Ícones: 0/{items.Count}";
+            });
+
+            var semaphore = new System.Threading.SemaphoreSlim(5, 5);
+            var tasks = items.Select(async app =>
+            {
+                await semaphore.WaitAsync(token);
+                try
+                {
+                    if (token.IsCancellationRequested) return;
+                    string? iconPath = null;
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(app.MainExecutable) && File.Exists(app.MainExecutable))
+                            iconPath = app.MainExecutable;
+                        else if (!string.IsNullOrEmpty(app.FolderPath))
+                        {
+                            // Try to find .exe in the folder
+                            var exes = Directory.GetFiles(app.FolderPath, "*.exe", SearchOption.TopDirectoryOnly);
+                            if (exes.Length > 0) iconPath = exes[0];
+                        }
+                    }
+                    catch { }
+
+                    var icon = !string.IsNullOrEmpty(iconPath) ? ProgramIconHelper.GetIconFromFile(iconPath) : null;
+
+                    if (icon != null && !token.IsCancellationRequested)
+                    {
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            app.Icon = icon;
+                            if (PortableIconProgressText != null && PortableCollection != null)
+                            {
+                                int loaded = PortableCollection.Count(p => p.Icon != null);
+                                PortableIconProgressText.Text = $"Ícones: {loaded}/{items.Count}";
+                            }
+                        }, System.Windows.Threading.DispatcherPriority.Background);
+                    }
+                }
+                finally { semaphore.Release(); }
+            });
+
+            await Task.WhenAll(tasks);
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (PortableList != null) PortableList.Items.Refresh();
+                if (PortableIconProgressText != null)
+                    PortableIconProgressText.Text = "Ícones carregados!";
+            });
         }
 
         private async void BtnPortableRemove_Click(object sender, RoutedEventArgs e)
@@ -2552,8 +2661,10 @@ namespace KitLugia.GUI.Pages
         public bool IsSelected { get; set; }
     }
 
-    public class PortableDetectedViewModel
+    public class PortableDetectedViewModel : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public PortableDetectedViewModel(PortableAppEntry entry)
         {
             Name = entry.Name;
@@ -2575,5 +2686,15 @@ namespace KitLugia.GUI.Pages
         public int Confidence { get; set; }
         public string ConfidenceLabel { get; set; }
         public bool IsSelected { get; set; }
+
+        private object? _icon;
+        public object? Icon
+        {
+            get => _icon;
+            set { _icon = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon))); }
+        }
+
+        private void OnPropertyChanged(string name) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }

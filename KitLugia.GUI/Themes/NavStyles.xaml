@@ -45,6 +45,14 @@
                             <Setter Property="Foreground" Value="White"/>
                             <Setter TargetName="icon" Property="Foreground" Value="White"/>
                         </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#35FFD700"/>
+                            <Setter TargetName="border" Property="RenderTransform">
+                                <Setter.Value><ScaleTransform ScaleX="0.97" ScaleY="0.97"/></Setter.Value>
+                            </Setter>
+                            <Setter Property="Foreground" Value="#FFFFFF"/>
+                            <Setter TargetName="icon" Property="Foreground" Value="#FFFFFF"/>
+                        </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="border" Property="Background" Value="#25FFD700"/>
                             <Setter TargetName="border" Property="BorderBrush" Value="#44FFD700"/>
@@ -101,6 +109,14 @@
                             <Setter TargetName="border" Property="Background" Value="#15FFFFFF"/>
                             <Setter Property="Foreground" Value="White"/>
                             <Setter TargetName="icon" Property="Foreground" Value="White"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#35FFD700"/>
+                            <Setter TargetName="border" Property="RenderTransform">
+                                <Setter.Value><ScaleTransform ScaleX="0.97" ScaleY="0.97"/></Setter.Value>
+                            </Setter>
+                            <Setter Property="Foreground" Value="#FFFFFF"/>
+                            <Setter TargetName="icon" Property="Foreground" Value="#FFFFFF"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="border" Property="Background" Value="#25FFD700"/>

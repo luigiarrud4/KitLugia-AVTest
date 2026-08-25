@@ -15,6 +15,7 @@
         <ResourceDictionary Source="Toggles.xaml"/>
         <ResourceDictionary Source="NavStyles.xaml"/>
         <ResourceDictionary Source="PageStyles.xaml"/>
+        <ResourceDictionary Source="ListStyles.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
 </ResourceDictionary>

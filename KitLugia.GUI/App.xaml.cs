@@ -18,6 +18,19 @@ namespace KitLugia.GUI
             // Renderização padrão (DirectWrite/hardware) - necessário para suporte a emojis, acentos e Unicode
             RenderOptions.ProcessRenderMode = RenderMode.Default;
 
+            // ANTI-FLASH BRANCO GLOBAL: sobrescreve as cores do SISTEMA que o WPF usa como
+            // fallback em templates default (ListBox/ScrollViewer/ComboBox/ToolTip etc.).
+            // Qualquer controle ainda não estilizado mostra essas cores — nunca branco.
+            var res = Resources;
+            res[System.Windows.SystemColors.WindowBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x11, 0x11, 0x11));
+            res[System.Windows.SystemColors.ControlBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A));
+            res[System.Windows.SystemColors.ControlLightBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x22, 0x22, 0x22));
+            res[System.Windows.SystemColors.ControlLightLightBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2A, 0x2A, 0x2A));
+            res[System.Windows.SystemColors.MenuBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A));
+            res[System.Windows.SystemColors.AppWorkspaceBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x0A, 0x0A, 0x0A));
+            res[System.Windows.SystemColors.HighlightBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00));
+            res[System.Windows.SystemColors.InfoBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x25, 0x25, 0x25));
+
             if (e.Args.Length > 0)
             {
                 KitLugia.Core.Logger.Log($"Argumentos recebidos: {string.Join(", ", e.Args)}");
@@ -33,7 +46,37 @@ namespace KitLugia.GUI
                 return;
             }
 
+            // Modo --unlock: abre a janela Force Stop Unlock diretamente (via context menu)
+            string? unlockPath = KitLugia.GUI.Program.UnlockPath;
+            if (!string.IsNullOrEmpty(unlockPath))
+            {
+                KitLugia.Core.Logger.Log($"[FORCE STOP] Modo unlock ativado: {unlockPath}");
+                base.OnStartup(e);
+                OpenForceStopUnlock(unlockPath);
+                return;
+            }
+
             base.OnStartup(e);
+
+            // Start IPC server to receive --unlock commands from other instances
+            KitLugia.GUI.Services.UnlockIpcServer.Start();
+
+            // Sempre verifica .NET Desktop Runtime e oferece instalação direta (sem abrir site) — prompt inline
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (!KitLugia.GUI.Services.DotNetDirectInstaller.IsDesktopRuntimeInstalled("10") &&
+                        !KitLugia.GUI.Services.DotNetDirectInstaller.IsDesktopRuntimeInstalled("8"))
+                    {
+                        await Dispatcher.InvokeAsync(async () =>
+                        {
+                            await KitLugia.GUI.Services.DotNetDirectInstaller.PromptAndInstallDirectAsync(Current.MainWindow);
+                        });
+                    }
+                }
+                catch { }
+            });
 
             // Always run startup method check in background so the window appears first
             _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
@@ -44,6 +87,18 @@ namespace KitLugia.GUI
             if (!StartMinimized)
             {
                 mainWindow.Show();
+            }
+        }
+
+        private async void OpenForceStopUnlock(string path)
+        {
+            // Wait for MainWindow to initialize
+            await Task.Delay(500);
+
+            // Navigate within the Kit to ForceStopUnlock page with path
+            if (Current.MainWindow is KitLugia.GUI.MainWindow mw)
+            {
+                mw.NavigateToUnlock(path);
             }
         }
 

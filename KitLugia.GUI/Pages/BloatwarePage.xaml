@@ -120,13 +120,10 @@
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
                                                     <Setter Property="Visibility" Value="Visible"/>
-                                                    <DataTrigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard RepeatBehavior="Forever">
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.3" Duration="0:0:0.5" AutoReverse="True"/>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.EnterActions>
+                                                    <!-- FIX PERF: era DoubleAnimation Forever por item
+                                                         (dezenas de timelines simultâneas). Agora é estático
+                                                         com opacidade reduzida — mesmo efeito visual, zero custo. -->
+                                                    <Setter Property="Opacity" Value="0.35"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>

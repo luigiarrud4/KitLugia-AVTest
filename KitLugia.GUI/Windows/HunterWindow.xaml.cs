@@ -187,7 +187,7 @@ namespace KitLugia.GUI.Windows
                         _currentHwnd = hWnd;
                         UpdateInfo(hWnd);
                     }
-                    try { var p = Process.GetProcessById((int)pid); name = p.ProcessName; try { path = p.MainModule?.FileName ?? ""; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    try { using (var p = Process.GetProcessById((int)pid)) { name = p.ProcessName; try { path = p.MainModule?.FileName ?? ""; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
             ShowInfo(pos.X, pos.Y, name, path);
@@ -748,7 +748,7 @@ namespace KitLugia.GUI.Windows
             string procPath = "";
             try
             {
-                var proc = Process.GetProcessById((int)pid);
+                using var proc = Process.GetProcessById((int)pid);
                 procName = proc.ProcessName;
                 try { procPath = proc.MainModule?.FileName ?? ""; } catch { procPath = "(sem acesso)"; }
             }
@@ -865,7 +865,7 @@ namespace KitLugia.GUI.Windows
             _detectedPid = pid;
             try
             {
-                var proc = Process.GetProcessById((int)pid);
+                using var proc = Process.GetProcessById((int)pid);
                 _detectedName = proc.ProcessName;
                 try { _detectedPath = proc.MainModule?.FileName ?? ""; } catch { _detectedPath = ""; }
             }
@@ -966,7 +966,7 @@ namespace KitLugia.GUI.Windows
             if (_detectedPid == 0) return;
             await Task.Run(() =>
             {
-                try { var p = Process.GetProcessById((int)_detectedPid); p.Kill(); p.WaitForExit(3000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { using (var p = Process.GetProcessById((int)_detectedPid)) { p.Kill(); p.WaitForExit(3000); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
         }
 
@@ -974,7 +974,7 @@ namespace KitLugia.GUI.Windows
         {
             await Task.Run(() =>
             {
-                try { var p = Process.GetProcessById((int)_detectedPid); p.Kill(); p.WaitForExit(3000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { using (var p = Process.GetProcessById((int)_detectedPid)) { p.Kill(); p.WaitForExit(3000); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             });
             if (!string.IsNullOrEmpty(_detectedPath))
                 await Task.Run(() =>

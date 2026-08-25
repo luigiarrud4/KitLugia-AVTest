@@ -3157,3 +3157,836 @@ Solucao completa so com app fechado (MSB3021 DLL bloqueada pelo processo rodando
 
 **A TESTAR (host)**: abrir Integrity -> scan lista ~467 checks (era 477), sem entradas duplicadas;
 "Restaurar Todos" nao reativa DPS/DiagTrack (whitelist da sessao anterior continua valida).
+
+### Sessao 16/08 (fim 3) - Explorador de PATH (botao + no Integrity) + integracao Everything (SDK embutido)
+
+Pedido do usuario: botao "mais" ao lado do info nos itens PATH do Integrity -> janela com o
+PATH atual, diagnostico por entrada e adicionar por item ausente; acelerar a resolucao de
+executaveis instalados com o indexador Everything (pesquisa web feita).
+
+1. **Everything (voidtools) integrado** (`KitLugia.Core\EverythingSearcher.cs`, novo):
+   - Load dinamico LoadLibrary/GetProcAddress/Marshal.GetDelegateForFunctionPointer da
+     Everything64.dll (SDK oficial, 91 KB — EMBUTIDO em `KitLugia.GUI\Resources\App\Everything\`,
+     glob Resources\**\* copia p/ output; a DLL sozinha NAO indexa — precisa do processo
+     Everything rodando, IPC via WM_COPYDATA).
+   - Candidatos: BaseDir\Resources\App\Everything\, BaseDir\, %ProgramFiles%\Everything\,
+     %LOCALAPPDATA%\Programs\Everything\ (todos relativos/descobertos — sem hardcode).
+   - Funcoes: SetSearchW, SetMatchPath(false)/SetMatchWholeWord(true)/SetMatchCase(false),
+     SetMax(8), SetSort(3=PATH_ASCENDING), QueryW(true), GetLastError (0=OK, 2=IPC indisponivel
+     = Everything nao rodando OU mismatch de elevacao), GetNumResults, IsFileResult,
+     GetResultFullPathNameW, IsDBLoaded. SDK e estado GLOBAL do processo -> lock `_gate`.
+   - `FindExecutableDirectories(fileNames)`: query por nome exato (whole word), filtra
+     IsFileResult + File.Exists, retorna Dictionary<nome, dir> (~1ms por alvo).
+   - Probe "kitlugia_probe_no_such_file" no 1o acesso -> `IsAvailable`/`LibraryPath` (static,
+     ThreadStatic no) — se IPC falhar, loga orientacao de instalar/rodar a Everything.
+2. **PathRepair.cs (Core)**: `SystemPathRegistryKey`/`UserPathRegistryKey`; `GetSystemPathValue`/
+   `GetUserPathValue`; `SetSystemPathValue`/`SetUserPathValue` (via TrySetValueWithOwnershipFallback
+   hint Unknown + `BroadcastEnvironmentChange` = SendMessageTimeout HWND_BROADCAST WM_SETTINGCHANGE
+   "Environment", P/Invoke proprio NativeEnv); `AddSinglePathEntry(pathType, entry)` (dedup por
+   caminho EXPANDIDO, idempotente); `PathEntryCandidate` {Label, Path, Detail, CanAdd};
+   `GetMissingSystemEntries` (7 minimos: system32, %SystemRoot%, Wbem, WindowsPowerShell\v1.0,
+   OpenSSH, dotnet, PowerShell\7 — CanAdd = pasta existe); `GetMissingInstalledEntries` (via
+   GetInstalledProgramPaths).
+   `RecoverFromExecutableScan`: hook do Everything ANTES do DFS (resolve os wanted restantes,
+   remove do DFS; preferencia 7z: dir 7-Zip/7zip ganha de 7z.exe interno tipo NVIDIA App; log
+   "PathRepair: N alvo(s) resolvido(s) pelo indice da Everything").
+3. **UI (IntegrityPage)**: botao info envolvido em StackPanel + novo botao "mais" `BtnPathExplore`
+   (Visibility Collapsed, DataTrigger em `ScannableTweak.IsPathItem` -> Visible); handler abre
+   `KitLugia.GUI.Windows.PathExplorerWindow` (Owner = Window.GetWindow). `Models.cs`:
+   `IsPathItem` = Name.Contains("PATH", OrdinalIgnoreCase) && ValueName == "Path".
+4. **PathExplorerWindow (GUI\Windows\, novo)**: 2 colunas System|User com raw TextBox + Copiar;
+   ListBox de entradas com icone/cor por PathEntryProblem (DiagnosePath); candidatos ausentes
+   com botao "Adicionar" por item (CanAdd); footer com dica/acelerador da Everything +
+   "Abrir Editor do Windows..." (rundll32 sysdm.cpl,EditEnvironmentVariables); carrega via
+   Task.Run; Refresh*Section apos add. Estilo escuro do kit (UninstallHistoryWindow).
+5. **Bug latente corrigido (RegistryOwnership.DetectValueKind)**: so %SystemRoot%/%USERPROFILE%/
+   %PATH% eram tratados como expandiveis — `%ProgramFiles%` virava REG_SZ quebrado; agora regex
+   generica `%[^%]+%` (`HasExpandableVariables`) -> ExpandString.
+6. **Quirks da sessao**: (a) usings globais da GUI incluem System.Windows.Forms -> `Button`/
+   `MessageBox` AMBIGUOS em arquivos novos: qualificar System.Windows.Controls.Button /
+   System.Windows.MessageBox (quirk ja documentado); (b) PowerShell 5.1 `Set-Content -Encoding
+   UTF8` RE-CORROMPE acentos de arquivo sem BOM (Get-Content rele ANSI, grava UTF8) — editar
+   arquivos com ferramenta que preserva UTF-8 e conferir com Select-String apos; (c) harness
+   csc .NET Framework 4.0 NAO carrega assembly net10 (ReflectionTypeLoadException) — harness
+   de teste do Core precisa ser console app net10.0-windows via `dotnet build`.
+
+**TESTADO (host, Everything 1.4 32-bit rodando + DLL embutida ao lado)**: IsAvailable=True,
+LibraryPath resolvido; winget->WindowsApps e npm->Roaming\npm achados pelo indice (antes DFS);
+missing system = PowerShell\7 (CanAdd=False, pasta nao existe - correto); DiagnosePath User:
+18 problemas legitimos (system paths no User PATH, duplicados case-insensitive, chocolatey\bin
+inexistente); AddSinglePathEntry idempotente (7-Zip ja presente -> True sem escrever). Build
+solucao: 0 erros (Core 0/0; GUI so baseline). SDK: Everything 1.4 x86 instalado no host —
+SDK DLL funciona via IPC com servidor 32-bit de callers 64-bit.
+
+**A TESTAR (app)**: Integrity -> item PATH -> botao "mais" -> janela com entradas/candidatos;
+"Adicionar" em candidato -> dedup + broadcast; sem Everything rodando -> dica no rodape.
+
+### Sessao 16/08 (fim 4) - Travadas do Guardian: gate single-flight + cache bcdedit TTL + 2 bugs reais do PathRepair
+
+Pedido do usuario: "o app congela" em 4 pontos - abrir Integridade, digitar na busca global,
+clicar em item/toggle, abrir Explorador de PATH. Auditoria: NENHUMA chamada Guardian roda na UI
+thread (todas Task.Run). Causa raiz sistemica: scans CONCORRENTES (IntegrityPage ctor + busca
+global por tecla + toggles + PathExplorer) saturavam CPU/disco; cache bcdedit `[ThreadStatic]`
+forcava 1 spawn de bcdedit por thread/scan; DFS (RecoverFromExecutableScan) rodava FORA do
+lock -> DFS em paralelo.
+
+**Guardian.cs**: `_bcdEnumOutput/_bcdEnumError/_bcdEnumAttempted` deixaram de ser ThreadStatic
+(linhas 56-66) - agora campos static compartilhados + `_bcdEnumTimeUtc` + `BcdEnumCacheTtlSeconds
+= 15`. `GetHarmfulTweaksWithStatus` inteiro dentro de `lock (_scanGate)`; invalida o cache BCD
+so por TTL (15s); grava os dados ANTES de setar `_bcdEnumAttempted`; finally nao reseta mais o
+cache BCD (so `_currentBatch = null`). Branch pontual do BCD em `CheckTweak` (~3611) checa TTL
+e alimenta o cache compartilhado quando roda fora do scan.
+
+**PathRepair.RecoverFromExecutableScan**: single-flight - `lock (_scanCacheLock)` cobre a
+varredura inteira (2o chamador espera e reusa o cache).
+
+**2 BUGS REAIS encontrados pelo harness** (`%TEMP%\opencode\guardian_gate`, console net10
+referenciando KitLugia.Core.dll Debug - csc .NET Framework NAO carrega net10, usar dotnet build):
+1. **Cache envenenado por scan vazio**: com onlyTargets filtrado a zero (todos os 8 alvos
+   cobertos pelos checks rapidos), o metodo gravava `_scanCache = {}` (vazio) -> 5 min de cache
+   dizendo "nada encontrado" -> chamadas seguintes retornavam 7z ausente em 0,2ms. Correcao:
+   `didScan = wanted.Count > 0`; so grava cache se houve scan, e faz MERGE no cache existente
+   (scan de fallback nao descarta o que outro scan achou).
+2. **Preferencia do 7z morta (NVIDIA App)**: o 1o `7z.exe` achado removia `7z.exe` do wanted -
+   o ramo de preferencia (`prevGood && !curGood`) so executava quando found ja tinha 7z E o
+   arquivo ainda estava no wanted (impossivel: acontecem no MESMO 1o hit). Resultado sem
+   Everything: DFS achava `C:\Program Files\NVIDIA Corporation\NVIDIA App\7z.exe` como "7z".
+   Correcao (nos 2 loops, Everything e DFS): para o alvo 7z, so `wanted.Remove` quando o
+   candidato e BOM (dir contem 7-Zip/7zip) - a busca continua ate achar o 7-Zip real; entre
+   genericos, o mais raso.
+
+**MEDICOES (harness, host)**: 2 scans Guardian concorrentes = 152 ms total (antes 2 scans
+completos em paralelo + 2 bcdedit); scan imediato = 18 ms (TTL compartilhado); 2 DFS
+concorrentes = 659 ms total (1 scan + reuso); DFS frio = 651 ms com `7z=C:\Program Files\7-Zip`
+(correto); cache quente = 0 ms; GetInstalledProgramPaths = 0 ms (tudo coberto por checks
+rapidos). Build solucao: 0 erros / 108 avisos (baseline GUI). PathExplorerWindow.xaml.cs
+ganhou `using System.IO;` (erro CS0103 Directory no build completo - ImplicitUsings nao cobre
+esse arquivo).
+
+**A TESTAR (host)**: abrir Integridade + digitar na busca global ao mesmo tempo; alternar
+toggles; abrir Explorador de PATH - sem travadas; ~150-200 ms de scan; 7z aponta p/ 7-Zip
+(nao NVIDIA App) mesmo sem Everything rodando.
+
+### Sessao 16/08 (fim 5) - Indexador nativo USN/MFT: cache SO de diretorios + drop de node/git/npm CORRIGIDO
+
+Pedido do usuario: kit funcionando so com o .exe, sem Everything.exe externo - o indexador
+nativo MFT/USN embutido precisava resolver TODOS os alvos do PathRepair (7z/dotnet/winget
+resolviam, mas node/git/npm/cargo caiam na resolucao de caminho).
+
+**CAUSA RAIZ (provada com debug)**: o cache guardava TODOS os registros da MFT com cap de
+4M - o C: tem >4M registros e o cap cortava DIRETORIOS RECENTES (ex: SquirrelTemp\tempk,
+pasta de instalador) da cadeia de pais. A cadeia quebrava no meio -> caminho parcial
+("C:\SquirrelTemp\tempk\...") -> File.Exists falso -> alvo descartado. Os matches EXISTIAM
+(10x node, 16x npm, 16x git, 1x cargo) - o drop era so da resolucao.
+
+**CORRECAO (NativeUsn.cs, ScanVolume)**: o cache agora guarda SO DIRETORIOS
+(dirCache FRN->(Parent,NameIdx) + dirNames), arquivos so casam nome em wanted.
+A cadeia de pais so precisa de diretorios - memoria ~10x menor e o scan roda o volume
+INTEIRO sem cap quebrar caminhos (MaxDirRecords=2_000_000 apenas como guarda de seguranca).
+
+**VALIDADO (host, harness)**: 7 nomes em 7,2s -> TODOS os alvos com caminhos reais:
+- 7z.exe = C:\Program Files\7-Zip (+ Local Disk C_1102025206\... e C:\tmp\kitlugia-gui-build\...)
+- dotnet.exe = C:\Program Files (x86)\dotnet | C:\Program Files\dotnet
+- winget.exe = C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1.29.280.0_x64...
+- node.exe = C:\Program Files\nodejs | C:\Users\Lugia\.lmstudio\.internal\utils | Raycast\backend
+- npm.cmd = C:\Program Files\nodejs | node_modules\npm\bin | VS18\...\NodeJs
+- cargo.exe = C:\Users\Lugia\.cargo\bin | .rustup\toolchains\stable...\bin
+- git.exe = C:\Program Files\Git\bin | Git\cmd | Git\mingw64\bin
+Fallback EverythingSearcher (USN): 5 nomes -> 7z, winget, node, npm, git (7,2s).
+Suite completo do harness: [1] 136ms (462 itens), [2] 14ms, [3b] DFS cold 7,2s com
+7z=C:\Program Files\7-Zip, [5] GetInstalledProgramPaths 0ms com 8 alvos corretos.
+Todo o debug (NativeUsn-DEBUG, debugMatchCount, logs de chain/resolve) REMOVIDO.
+Build solucao: 0 erros / 108 avisos (baseline nullable GUI).
+
+**A TESTAR (app)**: PathRepair/Explorador de PATH sem Everything rodando (o kit nao precisa
+mais do Everything.exe - so da DLL embutida para acelerar quando o processo existe):
+- Sem Everything: node/git/npm/cargo/7z/dotnet/winget todos resolvidos pelo indexador nativo
+  (log "PathRepair: N alvo(s) resolvido(s) pelo indexador nativo USN (MFT).")
+- Com Everything rodando: mesma saida, mais rapido (indice ja montado)
+- Volumes grandes (C: com >4M registros) agora escaneiam COMPLETOS - diretorios recentes
+  em pastas de instalador (SquirrelTemp etc.) nao quebram mais a resolucao de caminho.
+
+### Sessao 17/08 - Fix travada das categorias (CanContentScroll) + Guia do PATH (janela nomeada)
+
+**Travada ao mudar categoria na Integridade - CAUSA RAIZ**: o ScrollViewer da lista
+(IntegrityPage.xaml:148) nao tinha `CanContentScroll="True"` - sem isso o
+VirtualizingStackPanel NAO virtualiza e cada rebind do ItemsSource materializava
+TODOS os ~460 containers (templates pesados) na UI thread. "Todas as Categorias"
+travava mais (460 itens), "Modificado" era rapido (~50). CORRECAO: 1 linha
+(CanContentScroll=True). ToolsPage.xaml:96 (ComboBox popup) nao precisa - so o
+ScrollViewer da lista de integridade.
+
+**PATH verificado no registry** (pedido do usuario): User PATH correto - todas as
+adicoes do PathRepair estao la (.cargo\bin, nodejs, 7-Zip, Git\cmd, dotnet,
+WindowsApps, GitHub CLI, .dotnet\tools, WARP, VS Code, Jan, qemu, Devin, Kiro).
+Aviso laranja no `C:\ProgramData\chocolatey\bin` = pasta NAO EXISTE (Chocolatey nao
+instalado, entrada legada - remover e seguro). Duplicatas no System PATH (system32,
+Wbem, OpenSSH x2, dotnet com/sem barra) = inofensivas.
+
+**Legenda de cores do Explorador de PATH** (PathExplorerWindow.xaml.cs:88 ToRow):
+✅ verde #4CAF50 = pasta existe; ⚠️ laranja #FFA500 = Missing (pasta nao existe);
+🔄 dourado #FFD700 = WrongLocation (sistema no User PATH ou vice-versa);
+🔁 vermelho #FF6F61 = Duplicate; 🧹 cinza #999999 = Junk; 🗑️ cinza = Orphan;
+❌ vermelho = SyntaxError. Ordem dos checks: DiagnosePath (PathRepair.cs:123).
+
+**NOVO PathGuideWindow** (KitLugia.GUI\Windows\, janela nomeada "Guia do PATH"):
+botao "i" (&#x24D8;) no header do PathExplorerWindow abre a janela com legenda de
+cores, o que cada painel mostra, cadeia de resolucao (USN/MFT -> Everything ->
+DFS) e dicas. Overlay por cima do kit (Owner=this, ShowDialog). Sem BOM era
+corrompido - todos os arquivos novos salvos em UTF-8+BOM (.editorconfig).
+
+**docs/PATH_EXPLORER_GUIDE.md** (novo): legenda, arquitetura (PathRepair/
+NativeUsn/EverythingSearcher/Guardian), ideias de expansao (acoes em lote,
+reparar tudo, backup/restore do PATH, snapshot comparativo, edicao inline,
+%VAR% indefinida, ordenacao inteligente) e medicoes de performance.
+
+Build: 0 erros. A testar (host): alternar categorias/buscar sem travada; abrir
+Explorador de PATH e clicar no "i" (guia abre por cima); cores conferem com a
+legenda; chocolatey\bin laranja.
+
+### Sessao 17/08 (cont.) - EVERYTHING REMOVIDA: so indexador nativo USN/MFT, otimizado + cache em disco
+
+Pedido do usuario: "sim pode remover ai da para manter so o nativo e otimizar o nativo
+o maximo possivel" - o kit agora e 100% independente de processo/DLL externa.
+
+1. **Remocao**: `KitLugia.Core\EverythingSearcher.cs` DELETADO; `Everything64.dll` +
+   pasta `Resources\App\Everything\` DELETADAS; nenhuma referencia em csproj (glob
+   Resources\** cobria a DLL). Docs (PATH_EXPLORER_GUIDE.md secao 7) e guia
+   (PathGuideWindow.xaml secao 3: cadeia agora = USN/MFT -> varredura direta DFS)
+   atualizados; XML doc do PathGuideWindow.xaml.cs sem "Everything".
+
+2. **PathRepair.cs**: hook agora chama `NativeUsn.FindFileDirectories(wanted.Keys.ToList(),
+   maxPerName: 8)` direto; log "PathRepair: N alvo(s) resolvido(s) pelo indexador
+   nativo USN (MFT)."; preferencia 7z com `kvp.Value[0]` (candidato = 1o da lista,
+   ja ordenada 7-Zip primeiro).
+
+3. **NativeUsn.cs OTIMIZADO (validado no host, harness usn_opt)**:
+   - **Cache em disco por volume** (estilo Everything DB): `%LOCALAPPDATA%\KitLugia\
+     NativeUsnCache\usn_<serial>.json` (arquivo por serial do volume via
+     GetVolumeInformation). 1a leitura da MFT: ~7,6s (C: ~4M registros, ~4GB);
+     consultas seguintes: **4-31ms**. Validacoes: (a) serial do volume bate
+     (mudou -> deleta arquivo), (b) `Directory.Exists` em cada caminho ao carregar
+     (app desinstalado cai fora), (c) MISS de nome -> so rescaneia se o cache
+     estiver VELHO (**TTL 6h**) - alvo genuinamente ausente (ex: cargo nao instalado)
+     NAO vira scan de 8s por consulta (bug pego no harness: RUN 4 rescaneava).
+   - **ZERO alocacoes de string no scan**: nomes de diretorio copiados como bytes
+     crus num pool unico (byte[] exponencial + List<(Off,Len)>); comparacao de
+     nomes de arquivo via `NameMatches` byte-a-byte case-insensitive (antes:
+     `wanted.Contains(GetString)` = ~2M strings alocadas). Match de arquivo
+     tambem copia o nome para o pool (o buffer do ioctl e REUTILIZADO entre
+     iteracoes - offsets do buf nao valem apos o loop).
+   - Buffer ioctl 8MB + volumes em PARALELO (Parallel.ForEach, por volume);
+     resultados validados com File.Exists/Directory.Exists.
+   - Resultados identicos ao baseline: 7 alvos (7z/dotnet/winget/node/npm/cargo/git),
+     50 caminhos validos, 7z = C:\Program Files\7-Zip (nao NVIDIA App).
+
+Build: Core 0 erros / 0 avisos; harness 0 erros. GUI compilacao completa pendente
+(app aberto bloqueia MSB3021). A testar (host): abrir Integrity -> PathExplorer ->
+"mais" sem travada (cache quente); sem Everything rodando tudo funciona.
+
+**LICAO**: bottleneck do scan USN e a LEITURA da MFT (~4GB em C:), nao o parse -
+alocacoes/buffers nao mudam o tempo de frio (7-8s); a otimizacao real e cache do
+resultado (o que a Everything faz com o .db). Cache em disco + TTL + validacao
+File.Exists = frescor sem rescan storm.
+
+### Sessao 18/08 - Auditoria RAM/CPU: fixes HIGH aplicados (leaks de Process + jank de UI thread)
+
+Pedido do usuario: "veja se o modo como ele foi construido e o mais otimizado e melhor sem memory leaks picos de uso de processador". Auditoria com 4 agentes (estrutura, caches, timers, processos). Veredito: arquitetura solida; principais achados e fixes abaixo.
+
+**Fixes aplicados (Auditoria de Processos - todo #5)**. Todos os pontos de Process sem Dispose: 
+1. Program.cs BringExistingToFront - foreach + dispose de todos exceto o retido (existentes descartados nos 2 caminhos).
+2. TraySettingsPage.IsProcessRunning, ServerPage:93, QuickInstallPage:57 (using var proc).
+3. HunterWindow: L190 (using + try aninhado do MainModule), L751/L868, kill sites L969/977.
+4. ProcessMonitorPage L368/622/635/649 (using var process); L114/190/458/475 ja dispoiam (sem mudanca).
+5. SystemTweaks L7616 (OneDrive: foreach + dispose + HasExited), LanConnectionManager L237, BrowserExtensionManager L198 (try/finally).
+6. MainWindow L253 (GetGoodbyeDPIStatus: finally dispose do array) e L1427 (kill: finally por item).
+7. VERIFICADOS OK: TrayIconService GetProcessesById (11 sites using var), GetCachedProcesses callers (1398/1967/2002/2141/3092-3146 todos com finally dispose), ApplyProcessRamLimits/CpuLimits (4096+), IsoEditorManager:43, IsoManager:675, TunnelManager:253 (intencional).
+
+**Fixes aplicados (todo #7 - monitor avancado fora da UI thread)**: 
+- AdvancedMonitor_Tick (L4225, DispatcherTimer 2s): Task.Run + guard anti-sobreposicao Interlocked _monitorTickBusy (campo novo perto de _advancedMonitorTimer). UpdateProcessCache/AnalyzeProcessBehaviors/CheckSmartAlerts/UpdateTrayIconAdvanced sao thread-safe (dicionarios + Logger + NotifyIcon OK cross-thread).
+- UpdateSystemStats: PerformanceCounter de CPU CACHEADO em _cpuTotalCounter (criar por tick custava ~100ms+; 1o NextValue()=0 aceitavel, leitura vira delta).
+- ProBalanceTimerTick: ApplyProBalance via Task.Run (scan de todos os processos, antes na UI thread).
+
+**Fixes aplicados (todo #6/#8/#9/#10)**: 
+- ConsoleManager: persistencia em disco movida para fora da UI thread com cadeia de continuations (_logWriteTail, TaskScheduler.Default) - ordem entre lotes preservada; espelho da UI adiciona so string no dispatcher.
+- GitHubUpdater.StartAutoUpdateCheck: try/catch AGORA DENTRO do while - excecao pontual (rede/API) nao mata mais o loop de 24h.
+- AppIconHelper (cap 500) + ProgramIconHelper (cap 200): caches ganharam evict LRU real (dict de acesso + remove o mais antigo quando lota) - antes cresciam sem limite.
+- TrayIconService: SessionEnding handler guardado em campo (SessionEndingEventHandler) e REMOVIDO no DisposeCore (antes lambda anonima = leak de assinatura estatica para sempre).
+
+**Build**: Core 0 erros / 0 avisos; GUI 0 erros / 108 avisos (baseline nullable; app aberto - build de verificacao com -o temp). Fechar o app antes do build normal (MSB3021).
+
+**Adiados (auditoria, nao bloqueiam)**: virtualizacao AppsPage.xaml; GlobalSearchPage sem Take(); timers de paginas rodando com janela no tray (Window.Hide nao dispara Unloaded); 21 storyboards infinitos (glow GameBoostPage); sync-over-async (AdapterManager 362, DriverManager 397, SystemTweaks 430, SearchEngine 186, SmartVersionDetector 330, MainWindow 1410-1518); VirtualTerminal Text += O(n2); ProcessMonitorPage merge O(n*m); WinTunePage ~40 reads sync; ExmTweaksPage 4 bcdedit; Program.cs app inteiro High priority; paginas recriadas por navegacao; double-dispose _trayService (MainWindow ForceShutdown x Cleanup - checar idempotencia); dead code GetCpuUsage GameBoostPage L168.
+
+
+### Sessao 18/08 (cont.) - RAM presa em 160MB apos navegacao: sem cache de paginas + devolucao de RAM pos-nav
+
+Pedido do usuario: "o kit não esta conseguindo limpar a ram e se manter em 60mb~ agora saindo da
+pagina do inicio e indo até o services page e voltando ele fica constantemente em 160mb, o kit
+não pode ter cache de paginas".
+
+**Investigacao (conclusao: NAO ha cache de paginas)**: MainFrame (Frame WPF) sem dicionarios de
+paginas (GetPageInstance cria instancia nova a cada F5/Ctrl+R); RemoveBackEntry ja era chamado
+pos-navegacao (background); TODAS as paginas com DispatcherTimer param o timer no Cleanup
+(NetworkPage/PrivacyPage/ProcessMonitorPage/StutterPage/PartitionsPage/TraySettingsPage/
+WinpeToolsPage/DiagnosticPage - verificado via grep); DashboardPage/ServicesPage nao tem timers,
+Load/Unload desinscrevem, CTS cancelado, grids limpos, DataContext=null. Zero assinaturas de
+eventos estaticos nas paginas. O 160MB constante = heap crescido (WMI + DataGrids) com Working
+Set nunca devolvido: DashboardPage.Cleanup chamava MemoryHelper.TrimWorkingSet mas
+ServicesPage.Cleanup NAO - e a rota do usuario (Services -> back) era justamente o hop sem trim.
+
+**Correcoes (2 arquivos)**:
+1. `MainWindow.CleanupAndNavigate`: novo bloco pos-navegacao em Task.Run (sem cache de paginas) -
+   se WorkingSet > 90MB: GC.Collect(MaxGeneration, Optimized) + WaitForPendingFinalizers +
+   MemoryHelper.TrimWorkingSet; loga "RAM devolvida apos navegacao: N MB" so quando liberou >= 10MB.
+   Gate de 90MB evita competir com o GC natural em uso leve (respeita o comentario existente de
+   nao forcar GC em navegacao normal).
+2. `ServicesPage.Cleanup`: adicionado MemoryHelper.TrimWorkingSet() (espelha o DashboardPage -
+   era a unica pagina do roteiro sem o trim).
+
+Build: GUI 0 erros / 108 avisos (baseline, build de verificacao com -o temp).
+
+**A TESTAR (app)**: Dashboard -> Services -> voltar -> RAM deve cair de volta a ~60-80MB em
+alguns segundos (log "RAM devolvida apos navegacao: N MB"); repetir varias vezes e conferir que
+o Working Set nunca acumula (paginas nao ficam retidas).
+
+**CORRECAO 18/08 (2a rodada) - pico de CPU de 14% ao navegar: GC.Collect removido**
+
+Sintoma: apos o fix anterior, o usuario notou pico de 14% de CPU ao mover entre paginas.
+Causa: o bloco pos-navegacao chamava GC.Collect(MaxGeneration, Optimized) +
+WaitForPendingFinalizers a cada navegacao com WorkingSet > 90MB - coleta gen2 bloqueante
+de heap de ~160MB custa ~50-150ms de CPU (o comentario original do codigo ja avisava:
+"GC.Collect() forcado causa micro-freezes e compete com a renderizacao do WPF").
+
+Correcao (MainWindow.CleanupAndNavigate): bloco agora so chama
+MemoryHelper.TrimWorkingSet (EmptyWorkingSet, estilo Firemin) - chamada de sistema
+instantanea, sem GC forcado, sem micro-freeze, sem pico de CPU. O gate de 90MB e o log
+"RAM devolvida apos navegacao: N MB" mantidos. O heap continua sendo gerenciado pelo
+GC natural; o Trim devolve a RAM fisica visivel no Task Manager.
+
+Build: GUI 0 erros / 108 avisos (baseline).
+
+**A TESTAR (app)**: Dashboard -> Services -> voltar - RAM cai de volta a ~60-80MB SEM pico
+de CPU perceptivel (navegacao sem micro-freeze); repetir varias vezes e conferir Working
+Set estavel.
+
+### Sessao 18/08 (cont.) - Otimizacoes WPF aplicadas (pesquisa + 3 mudancas de baixo risco)
+
+Pedido do usuario: "a partir daqui voce vai poder aplicar as otimizacoes que quiser"
+(apos pesquisa web sobre otimizacao WPF, entregue em PT-BR com fontes MS Learn).
+
+**1. Virtualizacao explicita nos 4 DataGrids da ServicesPage.xaml** (GridStartup L95,
+GridServices L489, GridTasks L636, GridBootItems L724):
+`EnableRowVirtualization="True" EnableColumnVirtualization="True"
+VirtualizingStackPanel.VirtualizationMode="Recycling"` - todos ja tinham altura
+limitada (linhas *), entao a virtualizacao ja funcionava por default; a mudanca
+explicita + Recycling (reuso de containers) evita recriacao de row templates.
+
+**2. ProcessMonitorPage.xaml.cs - 2 bugs reais corrigidos**:
+- `_cpuCounter`/`_ramCounter` (PerformanceCounter) removidos: `_cpuCounter` nunca era
+  lido; `_ramCounter` so no UpdateSystemInfo antigo. Removidos fields, bloco try/catch
+  de init e Dispose() do Cleanup.
+- `UpdateSystemInfo` reescrito: RAM real via `MemoryOptimizer.GetMemoryStats()`
+  (KitLugia.Core, GlobalMemoryStatusEx) - antes tinha 16GB HARDCODED. Agora
+  `"{used:F1} GB / {stats.TotalGB:F1} GB ({stats.Percent}%)"`.
+- `ProcessMonitorInfo` agora implementa INotifyPropertyChanged (notifica CpuUsage,
+  RamUsage, Priority, Status, NetworkUsage; Id/Name planos) - sem isso os valores
+  visiveis nunca atualizavam nas linhas ja existentes (o merge in-place da
+  ObservableCollection a cada 2s ja estava correto, so faltava a notificacao).
+- Obs: a otimizacao planejada (reusar a colecao sem reatribuir ItemsSource) JA
+  existia no codigo - nada a fazer nesse ponto.
+
+**3. GameBoostPage: so 1 storyboard infinito (nao 21)** - a nota antiga do AGENTS.md
+("21 storyboards infinitos") estava desatualizada (de outra copia). O unico e o
+StatusGlow (L142-151: DropShadowEffect #00FF00 BlurRadius 15, Opacity+BlurRadius
+DoubleAnimations Forever/AutoReverse) - elemento pequeno, custo desprezivel,
+MANTIDO (visual validado pelo usuario). DropShadowEffects estaticos L104 (#FFD700)
+e L138 (StatusGlow) tambem mantidos.
+
+**Quirk do rg/PowerShell**: padrao com aspas duplas embutidas falha silenciosamente
+(`'RepeatBehavior="Forever"'` retorna vazio mesmo havendo match) - usar alternancia
+(`'Forever|Storyboard'`) ou sem aspas no padrao.
+
+Build: GUI 0 erros / 108 avisos (baseline, verificacao com -o temp - app rodando
+bloqueia MSB3021).
+
+**A TESTAR (app)**: abrir Services (4 grids listando servicos/tasks/boot) e navegar
+sem travada; ProcessMonitorPage mostrando RAM real (nao 16GB) com valores de CPU/RAM
+atualizando a cada 2s nas linhas ja existentes; GameBoostPage com glow normal.
+
+### Sessao 18/08 (cont. 2) - CPU 1-2% no Task Manager: diagnostico + 3 fixes (GoodbyeDPI cache, RAM limiter 2s, tracker so com janela)
+
+Pedido do usuario: "veja o uso de CPU" (1-2% constante no Gerenciador de Tarefas, RAM presa em 160MB estava resolvida). Diagnostico COMPLETO com medicao real das duas versoes (atual vs copia 17):
+
+**MEDICOES (Debug, mesmo host, registry real)**: TRAY atual 57.5MB/0.25% (max 1.87%, p95 0.69%) vs (17) 59.5MB/0.15% (max 0.61%) - atual usa MENOS RAM; JANELA atual 103.9MB/0.18% (max 0.78%) vs (17) 94.1MB/0.14% (max 0.55%) (+10MB nao acumulativo, provavel renderizacao WPF). Diffs concluidos: GetGoodbyeDPIStatus, MonitorTick (identicos entre versoes; atual so adiciona profile.LastSeenTick), DashboardPage_Loaded (leve - LoadSystemInfo com cache de sessao em disco).
+
+**CONCLUSAO**: versao atual NAO vaza e NAO tem cache de paginas. "77MB constante" do usuario = estado pos-navegacao apos TrimWorkingSet (heap WPF ~100MB nao devolve sem GC; GC.Collect foi REMOVIDO por pico de 14% CPU). Picos de CPU identicos nas duas versoes: ~0.3-0.5% a cada 2s (goodbyeDPI status) + ~1.87% a cada 30s (MonitorTick/UpdateProcessProfiles); "1-2%" do Task Manager = media suavizada desses picos.
+
+**3 FIXES APLICADOS (aprovados pelo usuario)**:
+1. **GoodbyeDPI status com cache de 10s** (MainWindow.xaml.cs, getter GoodbyeDPIActive): campos _goodbyeDpiExternalScanTime (DateTime.MinValue) + _goodbyeDpiExternalScanResult; se _goodbyeDpiProcess vivo -> true imediato (sem scan); senao o scan externo so roda se o cache tiver > 10s (cache atualizado nos 2 caminhos). Atraso maximo de 10s no tooltip quando o processo externo morre - aceitavel.
+2. **RAM Limiter minimo de 2000ms** (TrayIconService.cs setter RamLimiterIntervalMs): Math.Max(2000, value) (era 500). Cobre todos os caminhos: load do registry (L1718 passa pelo setter), save (L1450), UI TraySettingsPage (L421/L468/L475). Registry auto-corrige para 2000 (getter retorna o clampado). Efeito colateral: penaltyMs = Math.Min(9000, _ramLimiterIntervalMs * limit.ConsecutiveTrimCount) dobra (trims consecutivos mais espacados - aceitavel).
+3. **Tracker de perfis so com janela visivel** (MonitorTick, secao "// 7. Dynamic Intelligence (V2)"): UpdateProcessProfiles(stats); ApplyFireminOptimizations(); envoltos em if (IsMainWindowVisibleForTracking) - helper Application.Current?.MainWindow is { } w && w.IsVisible && w.WindowState != System.Windows.WindowState.Minimized (WindowState precisa ser QUALIFICADO: System.Windows.WindowState - o arquivo nao tem o using). O pico de 1.87% a cada 30s some com o app no tray. _processProfiles so e usado por UpdateProcessProfiles/PruneDeadProcessProfiles/ApplyFireminOptimizations - gate seguro; GameBoost usa SetWinEventHook, nao o tracker.
+
+**Quirk de ferramenta novo**: 
+g -rn = -r n e REPLACE no ripgrep (nao recursive) - substitui o match por "n" na saida (arquivos intactos). Nunca usar -r com rg.
+
+Build temp verificacao: GUI 0 erros / 108 avisos (baseline; app aberto bloqueia MSB3021 - compilar com app fechado).
+
+**A TESTAR (app)**: com o kit no tray, Task Manager deve ficar ~0.1-0.3% estavel (sem pico de 1.87% a cada 30s; goodbyeDPI tooltip pode atrasar ate 10s); com a janela aberta, os perfis continuam atualizando normalmente (ProcessMonitorPage/GameBoost intactos); RAM Limiter continua trimando (intervalos de 2s em vez de 1s).
+**DECISAO DO USUARIO (18/08, 2a rodada): GC.Collect RESTAURADO na navegacao.** Pedido: "pode manter a coleta de lixo o uso do processador so nao pode ser constante e sem descanso". O pico pontual de 14% ao navegar e aceitavel; o problema era o uso CONSTANTE (idle), ja resolvido pelos 3 fixes acima. MainWindow.CleanupAndNavigate: bloco pos-navegacao voltou a chamar GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, true) + GC.WaitForPendingFinalizers() + MemoryHelper.TrimWorkingSet() (gate 90MB + log "RAM devolvida apos navegacao" mantidos; MaxGeneration precisa ser QUALIFICADO como GC.MaxGeneration - sem using static). Build: 0 erros / 108 avisos (baseline). A testar: navegar Dashboard -> Services -> voltar com RAM caindo a ~60-80MB (agora com GC + trim), pico momentaneo de CPU na navegacao aceitavel.
+
+### Sessao 18/08 (cont. 3) - AppsPage "Portateis / Detectados": scan rapido (1 passada + paralelo + skip + progresso)
+
+Pedido do usuario: a aba que "procura apps/pastas pelo tamanho" estava lenta - dava para usar o indexador USN? **Veredito**: NAO - o `NativeUsn` (USN/MFT) guarda so NOMES de arquivos/pastas (`FindFileDirectories`); registros USN nao tem tamanho de arquivo. O gargalo real era o `PortableAppScanner.AnalyzeFolder`: 5 varreduras recursivas completas POR PASTA (exe top, exe all, tamanho, dll, allFiles).
+
+**Otimizado (KitLugia.Core\PortableAppScanner.cs)**:
+1. **Passada unica DFS** (Stack<(dir, depth)>) acumulando tudo: exeTopCount, nonInstallerExeCount, mainExe (maior nao-instalador por tamanho), totalBytes, dllCount, fileCount, hasUninsExe, hasConfigFiles. Confidence com os MESMOS thresholds do original (dll>=3 +30/>=1 +15; exe>=1 && files>=10 +20; >=10MB +15/>=5MB +10; unins* -30; config +10; exeTop==1 +10; <1MB ou sem exe nao-instalador -> null; clamp 0..100; <30 -> null; installedPaths -> null).
+2. **Skip de subarvores gigantes**: `_subtreeSkipNames` (node_modules, .git, .svn, .vs, packages, Package Cache, cache, Caches, Logs, logs, Temp, IsolatedStorage, $Recycle.Bin, System Volume Information, Config.Msi, Windows, System32, SysWOW64, ProgramData, Program Files (x86), Recovery, MSBuild, Microsoft.NET, Assembly, MicrosoftEdge, Temporary Internet Files, junctions classicas do AppData) + nomes com ponto inicial + `MaxDepth = 10`.
+3. **EnumerationOptions nativo** (sem syscall por item): `IgnoreInaccessible=true` (mata try/catch), `AttributesToSkip = Hidden | System | ReparsePoint` (junctions nem entram na enumeracao - ciclos impossiveis; semantica identica ao GetFiles original que ja pulava hidden/system) + `RecurseSubdirectories=false`.
+4. **Parallel.ForEach** sobre as pastas raiz com `lock(gate)` nos resultados; `OrderByDescending(Confidence).ThenByDescending(TotalSizeBytes)`.
+
+**GUI (AppsPage.xaml.cs LoadPortableApps)**: callback de progresso -> `Dispatcher.Invoke` -> `TxtPortableProgress.Text = "Varrendo pastas... {done}/{total}"` (elemento ja existia).
+
+**TESTADO (harness, host, 18/08)**: antes 71s com EnumOpts preliminar -> **42,7s** com EnumOpts final (233 -> 224 apps; resto do tempo = I/O puro das pastas gigantes de D:\ - 72GB/44GB/28GB - impossivel mais rapido sem MFT que nao tem tamanhos). Resultados corretos: RobloxStudioBeta (Fishstrap), Ollama, Opera GX (browser_assistant), xenia_canary, rclone (SteaMidra) etc. Tamanhos agora EXCLUEM subarvores pesadas (node_modules/cache/...) - menores que antes, aceito (scan muito mais rapido). Build solucao: 0 erros / 108 avisos (baseline).
+
+**A TESTAR (app)**: abrir aba Portateis / Detectados -> progresso "Varrendo pastas... N/total" em tempo real -> lista final ~30-40s (antes varios minutos) com os tamanhos corretos; ordenacao por confianca depois tamanho.
+
+### Sessao 18/08 (cont. 4) - Portateis/Detectados: FindFirstFileExW nativo (tamanho inline) 42,7s -> 30,2s
+
+Pedido do usuario: "procure na web se ah mais coisas que de para olhar para otimizar isso".
+
+**Pesquisa web (achados)**:
+1. **FindFirstFileExW + FindExInfoBasic + FIND_FIRST_EX_LARGE_FETCH**: o WIN32_FIND_DATA ja traz o TAMANHO embutido na enumeracao - o .NET `Directory.EnumerateFiles` descarta isso e o `FileInfo.Length` faz 1 syscall EXTRA por arquivo (~2M+ arquivos em D:). O .NET nao usa LARGE_FETCH (buffer grande, menos round-trips). Blog Sebastian Schoner 2024: 54,7s -> 27,8s (~2x) em HDD com 7 threads; SO post: 661s -> 11s (60x). Fonte: devblogs.microsoft.com/oldnewthing/20111226-00/?p=8813 (metadados de diretorio podem ser stale).
+2. **MFT raw (WizTree/Everything)**: ler $MFT direto da nome+tamanho+parent de tudo numa passada sequencial (segundos por volume) - requer admin + parser NTFS complexo. O kit tem rust_native.dll (reg_scan_ffi) - candidato a Fase 2. docs.rs/disktree/latest/disktree/mft (DEFAULT_READERS/calibrate_readers, FIRST_ORDINARY_RECORD, ROOT_RECORD).
+3. NtQueryDirectoryFileEx com buffer gigante - alternativa mais complexa; FindFirstFileExW cobre o ganho.
+
+**Implementado (KitLugia.Core\PortableAppScanner.cs)**:
+1. **P/Invoke nativo** `FindFirstFileExW` (FindExInfoBasic=1, FindExSearchNameMatch=1, FIND_FIRST_EX_LARGE_FETCH=2) + `FindNextFileW` + `FindClose`; struct `Win32FindData` (LayoutKind.Sequential, CharSet Unicode, **Pack=4** - longs alinhados a 4 p/ bater com o nativo: dwFileAttributes@0, ftCreationTime@4, nFileSizeHigh@0x1C, cFileName@0x2C/260, cAlternateFileName@0x234/14). `EnumerateDirNative(dir)` -> IEnumerable<(Name, Size, IsDir, LastWriteFileTime)> com handle try/finally FindClose.
+2. **Atributos filtrados no nativo**: `SkippedAttributes = Hidden|System|ReparsePoint` (0x2|0x4|0x400) via `(dwFileAttributes & SkippedAttributes) != 0` - preserva a semantica do antigo `AttributesToSkip` (junctions nem entram, ciclos impossiveis). `EnumerationOptions EnumOpts` REMOVIDO (dead code apos a troca).
+3. **AnalyzeFolder reescrito**: 1 passada DFS com EnumerateDirNative; `totalBytes += size` direto do WIN32_FIND_DATA (SEM `new FileInfo` por arquivo - elimina 1 stat/file); `mainExePath = Path.Combine(dir, name)`; `.` e `..` pulados no enumerador.
+
+**TESTADO (harness, host, 18/08)**: mesmo resultado (224 apps identicos), **42,7s -> 30,2s** (~30% mais rapido, 1 syscall/file eliminado + LARGE_FETCH). Build Core: 0 erros / 0 avisos. Resto do tempo = I/O puro das pastas gigantes de D:\. Harness removido.
+
+**A TESTAR (app)**: abrir aba Portateis / Detectados -> lista final ~30s com os mesmos apps; progresso "Varrendo pastas... N/total" em tempo real.
+
+**PROXIMO PASSO (opcional, Fase 2 - MFT raw)**: estender rust_native com scanner MFT estilo WizTree/disktree (nome+tamanho+parent de tudo em segundos, exige admin, parser NTFS complexo) - perguntar ao usuario se quer antes de implementar.
+
+### Sessao 18/08 (cont. 5) - Portateis/Detectados: Fase 2 MFT raw COMPLETA (rust mft_scan_ffi + fallback, paridade 100%)
+
+Pedido do usuario: "use o rust native se puder" (o PROXIMO PASSO da sessao anterior foi aprovado). O scanner agora
+e **MFT-first com fallback por local/volume** - sem o Everything externo, so o kit.
+
+**Rust (rust_native\src\mft.rs, novo, ~890 linhas)**:
+1. Abre `\\.\C:` (CreateFileW admin, GENERIC_READ, share RW) -> FSCTL_GET_NTFS_VOLUME_DATA (MFT LCN/MFT zone) -> `FSCTL_GET_RETRIEVAL_POINTERS` do `$MFT` -> le o arquivo em chunks de 16MB (8MB de buffer duplo) -> parse dos 5.126.240 records reais (C: 6,5GB MFT). Pula records invalid/sem FILE_NAME/indices (0x02/0x04/0x05, base ref != 0 = hard links duplicados; `ReadMftEntry` valida base 0; +2 on dir 0x02, +1 on FILE 0x00, 0x10 e 0x80 contam 1x).
+2. `FILE_NAME` value layout confirmado: parent@0x00, lastmod@0x10, realsize@0x30, flags@0x38, name_len@0x40, name@0x42 (min value 0x42). Nomes em UTF-16LE, pool de bytes com offsets, **zero alocacao de String durante o scan** (identico ao NativeUsn).
+3. **Resolucao de prefixo**: BFS do record raiz (rec 5) acumulando o nome relativo; resolve ate 3 prefixos por volume (`prefixes` = ';'-separated com '/' e NUL-terminated; entrada vazia = volume inteiro, vira rec 5). Falha de resolucao por permission/loop -> rec 0xFFFFFFFF. BFS com max 8M records + max 16MB de nome acumulado.
+4. **Blob de saida**: `[u32 prefix_count][u32 x prefix_recs][entry: u64 rec | u64 parent | u64 size | u64 last_write | u16 flags | u16 name_len | u16 name...]` - so rec >= 16, ja ordenado por (parent, rec). Flags: 0x1 dir | 0x2 reparse | 0x4 hidden/system (normalizado de FILE_ATTR_*).
+5. **FFI**: `mft_scan_ffi(volume_root:*const u16, prefixes:*const u16, out_buf:*mut u8, out_capacity:i32) -> i32`. rc>=0 = bytes escritos; rc<=-1000 -> buffer pequeno, `needed = -rc - 1000`; -1 args, -2 CreateFile (nao-admin), -3 nao-NTFS, -4 geometry, -5 record0/$DATA, -6 read/overflow, -7 zero records.
+6. 3 testes passam (`scan_real_c`, `buffer_too_small`, `nonexistent_volume`), zero debug output. cargo build --release OK (linker MSVC so stdout benigno).
+
+**C# (KitLugia.Core\NativeMft.cs, novo)**: `MftFlags` (Directory 0x1/Reparse 0x2/HiddenSystem 0x4), `MftEntry` (readonly struct), `MftIndex` (CSR: recordCount = max(Rec,Parent)+1; cnt[parent+1]++; `Starts[rc+2]`; `RecToIdx` via Array.Fill(-1); filhos de r = [Starts[r+1], Starts[r+2])), `MftVolumeResult` (VolumeRoot/VolumeFailed/ErrorCode/Entries/PrefixRecs paralelo a Locations/Index), `NativeMft.ScanAllVolumes` (agrupa por Path.GetPathRoot, `Parallel.ForEach` por volume - sem estado global no Rust, chamadas concorrentes seguras), `TryScanVolume` (buffer 1MB, loop de crescimento `rc<=-1000 && tries<8`, `cap = max(needed, cap*2)`, DllNotFound/BadImage/EntryPoint -> null), `ParseBlob` (guard de tamanho no nome). DLL copiada automaticamente pelos csproj (Core L49, GUI L85-89).
+
+**PortableAppScanner.cs integrado (MFT-first com fallback)**:
+1. `Scan()`: GetInstalledProgramPaths + GetScanLocations 1x -> `NativeMft.ScanAllVolumes` -> por local: volume falhou / prefix rec == 0xFFFFFFFF -> `CollectClassicCandidates` (Directory.GetDirectories, fallback); senao candidatos = filhos do rec do prefixo (skip flags reparse|hidden-system, nomes com '.', `_excludedFolderNames`, installedPaths, dedup por pasta). Classic vira `ScanClassic` de fato (corpo antigo movido p/ fallback).
+2. `AnalyzeFolderMft(dirRec, folderPath, index, installedPaths)`: DFS com Stack<(Rec, Depth, RelDir)> - profundidade = nivel do DIR enumerado (start (dirRec, 0)); skip reparse|hidden-system p/ dirs E arquivos (igual EnumerateDirNative SkippedAttributes); skip `_subtreeSkipNames` + nomes com '.' em dirs; depth > MaxDepth(10) pula o dir inteiro; exeTopCount = depth==0; mainExe = maior nao-instalador com relDir acumulado (`Path.Combine(folderPath, relDir, name)`).
+3. `BuildPortableEntry(...)` extraido (helper compartilhado classic/MFT) - confidence IDENTICA (thresholds da sessao anterior, installedPaths -> null, clamp 0..100, <30 null, appName do mainExe).
+4. `LastModified` MFT: `DateTime.FromFileTimeUtc((long)LastWrite).ToLocalTime()` do proprio entry do candidato (RecToIdx) - parity com `DirectoryInfo.LastWriteTime` (local) do classic; fallback Directory.GetLastWriteTime se RecToIdx < 0.
+
+**TESTADO (harness elevado, host, 18/08)**: MFT-first **224 apps em 15,8s** (inclui leitura MFT fria de C: + D: em paralelo, ~8s+); classic de referencia 4,1s (cache quente; frio era 30,2s). **PARIDADE 100%**: 0 missing, 0 extra, 0 mismatch de confidence/size/name (224 = 224). Top: KitLugia.GUI(85), AlterarCMD(85), RobloxStudioBeta(75), browser_assistant(75). Build Core: 0 erros / 0 avisos. Harness removido.
+
+Flags: blob flags 0x1/0x2/0x4 (NAO sao os Win32 0x2/0x4/0x400 - Rust normaliza); entrada vazia no prefixos = volume inteiro (rec 5); rec 5 NAO vai pro blob (so rec>=16 - candidatos sao filhos de recs validos, sempre no blob); MFT precisa de admin (rc=-2 -> fallback classic automatico, por volume); entradas ja ordenadas por (parent, rec) - sem sort no C#.
+
+**A TESTAR (app)**: aba Portateis / Detectados -> lista com os mesmos 224 apps (paridade garantida pelo harness) em ~15s na 1a vez (leitura MFT) e progresso "Varrendo pastas... N/total"; sem admin o fallback classic roda sozinho (lista identica).
+
+### Sessao 18/08 (cont. 6) - Portateis/Detectados: logs de diagnostico + 2 bugs reais (LastModified DNF + RAM do blob)
+
+Relato do usuario (app Debug, 17:29): "adicione mais logs, o kit travou em um momento e o scan foi mais
+rapido mas parece mostrar menos resultados". Log do depurador: `DirectoryNotFoundException` x6 +
+`FileNotFoundException` (WinRT.Runtime) x4. RAM 736MB com limpeza de 8MB (RAM Limiter trima o proprio
+processo). Scan roda em Task.Run (thready verificado em AppsPage.xaml.cs:1186 - UI NAO congela pelo
+scan; `_portableCts` e cancelado mas NUNCA passado ao Scan - token inocuo, sem resultados parciais).
+
+**BUG 1 (menos resultados - DirectoryNotFoundException x6)**: `AnalyzeFolderMft` fazia
+`new DirectoryInfo(folderPath).LastWriteTime` INCONDICIONALMENTE ANTES do fallback MFT
+(RecToIdx) - pasta que sumiu entre o snapshot MFT (~15s) e a analise (instaladores temp,
+mudancas de arquivos) lancava DNF -> catch engolia -> candidato descartado. Classico sofria
+igual (GetDirectories -> LastWriteTime com pasta deletada no meio). CORRECAO: RecToIdx/MFT
+LastWrite PRIMEIRO (sem tocar o filesystem); fallback `Directory.Exists(folderPath)` +
+DirectoryInfo so quando RecToIdx < 0 (classico idem com guard de Exists; senao DateTime.MinValue).
+
+**BUG 2 (freeze + 736MB - blob duplicado em byte[])**: `ParseBlob` copiava o blob FFI inteiro
+via Marshal.Copy para `byte[]` (ate ~250MB por volume; C: = uniao de LocalAppData+Roaming+
+Desktop+Downloads+Documents, D: = volume inteiro) - pico de RAM 736MB + trim do RAM Limiter
+= storm de page faults = travada. CORRECAO: ParseBlob le DIRETO do IntPtr (ReadU32/ReadU64/
+ReadU16 com Marshal.ReadInt* + Marshal.PtrToStringUni) - SEM copia do blob; `using System.Text`
+removido (Encoding.Unicode.GetString nao e mais usado).
+
+**LOGS NOVOS (pedido do usuario)**:
+- NativeMft.TryScanVolume: falha loga `[MFT] Volume X: FALHOU rc=N apos N tentativa(s)` (por que
+  caiu no fallback classic); sucesso loga `[MFT] Volume X: OK rc=N, blob N.N MB, N entradas,
+  prefixos [..]` (rec por local ou ? nao-resolvido).
+- PortableAppScanner.Scan: `[Portatil] Scan iniciado: N local(is)`, `Scan MFT: N volume(s) em Ns`,
+  por local `-> MFT (prefixo rec N)` ou `-> scan classico (motivo)` (sem dados MFT / volume falhou
+  rc=N / prefixo nao resolvido), `N candidato(s) em Ns`, `N app(s) detectado(s) em Ns`.
+- GUI (AppsPage.LoadPortableApps): TxtPortableProgress inicia com "Lendo indice MFT dos volumes
+  (1a vez ~15s)..." - o usuario ve que NAO travou durante a leitura da MFT.
+
+**A TESTAR (app)**: abrir aba Portateis -> progresso "Lendo indice MFT..." ~15s -> logs
+[MFT] nos dois volumes (prefixos resolvidos) -> lista ~224 apps SEM DirectoryNotFoundException
+no depurador; RAM sem pico de 736MB (blob sem copia); "menos resultados" deve sumir (pastas
+que sumiram nao descartam mais os candidatos).
+
+---
+
+### Sessao 20/08 - Force Stop Unlock: REESCRITO COMPLETO (detecao de drivers, delecao robusta, menu de contexto)
+
+**Problema original**: O Force Stop Unlock nao conseguia detectar nem descarregar o driver WinDivert (usado pelo goodbyedpi). O usuario colava a pasta e o Kit dizia "Nenhum bloqueador encontrado" mesmo com o goodbyedpi.exe rodando e o WinDivert64.sys carregado.
+
+**Causa raiz (identificada via logs)**:
+1. WinDivert e registrado como servico Win32 (Type=16), NAO como kernel driver (Type=1)
+2. O SCM enum so encontrava servicos por ImagePath, mas o nome do servico era "WinDivert1.4" (nao "WinDivert64")
+3. Os fallbacks (sc query, registry scan, loaded driver list) so rodavam quando results.Count == 0, mas o SCM enum retornava 0 bytes e parava antes
+4. O Unlock retornava cedo apos Restart Manager success, sem tentar descarregar drivers
+
+**Correcoes aplicadas**:
+
+#### KitLugia.Core/DriverUnlockService.cs
+- `ServiceMatchesSysFiles()`: Matching fuzzy — "WinDivert1.4" casa com "WinDivert64.sys" (com/sem digitos, substring)
+- `GetAllServiceNames()`: Usa `sc query state=all` (sem filtro de tipo) para pegar TODOS os servicos
+- `FindDriversViaScQuery()`: Agora busca todos os servicos, nao so `type=driver`
+- `FindDriversViaRegistry()`: Removeu filtro `startType > 2` e `isDriverLike`, usa matching fuzzy
+- Fallbacks rodam SEMPRE (nao mais condicionados a `results.Count == 0`)
+- SCM enum: Usa `ServiceMatchesSysFiles` alem do match por ImagePath
+
+#### KitLugia.Core/ForceStopUnlockService.cs
+- `FindViaNativeHandles()`: Enumeracao nativa de handles via NtQuerySystemInformation — encontra handles File, Section (memoria mapeada), Key. Sem depender de handle64.exe
+- `GetHandleName()` / `GetHandleType()`: Query nativa do nome e tipo de cada handle via NtQueryObject
+- `FindBlockingProcesses()`: Fluxo 4 etapas — Restart Manager -> Native Handles -> handle64.exe (fallback) -> Driver scan
+- Unlock 7 fases: RM shutdown -> Kill processos da pasta -> Descarregar drivers (SCM/NtUnloadDriver/sc stop+delete) -> Fechar handles -> Delecao robusta -> Kill restantes
+- `RobustDeleteFile()`: 6 metodos de delecao: File.Delete, cmd del, NtSetInformationFile, rename+delete, MoveFileEx, reboot delete
+- `RobustDeleteWithRetry()`: Repete 3x com 1.5s delay entre tentativas
+- `RobustDeleteFolder()`: Deleta todos arquivos recursivamente, depois diretorios vazios
+- Unlock nao retorna mais cedo apos RM — sempre continua para driver unload e delecao
+
+#### KitLugia.GUI/Pages/WindowsSettings/ForceStopUnlockPage.xaml.cs
+- ListFolderContents(): Mostra todos arquivos com tamanho, data, e marca .sys como [DRIVER]
+- Logging detalhado em cada operacao (admin status, folder contents, delete result)
+
+#### KitLugia.GUI/External/ForceStopUnlock/AddContextMenu.reg
+- Atualizado de `powershell.exe ... Unlock-File.ps1` para `KitLugia.GUI.exe --unlock "%1"`
+- Publish/External/ForceStopUnlock/AddContextMenu.reg tambem atualizado
+
+**Testes realizados (todos passaram)**:
+1. Servico WinDivert1.4 registrado + RUNNING -> SCM stop+delete + delecao de 22/22 arquivos
+2. Servico marcado para delete (STOP_PENDING) -> Registry scan fallback + kill + delecao
+3. Sem servico registrado -> Native handles + RM + kill + delecao
+
+4. IPC via menu de contexto -> `KitLugia.GUI.exe --unlock` -> Named Pipe -> ForceStopUnlockPage
+5. Toggle on/off/on -> Registry corretamente atualizado
+6. DLL lock detection -> Restart Manager encontra processos com handles em .dll files
+
+**Tipos de arquivo suportados**:
+- `.sys` (drivers kernel) — SCM stop/delete, NtUnloadDriver, sc query/stop/delete
+- `.dll` (bibliotecas) — Restart Manager, handle64.exe, Native handles, Process Kill
+- `.exe` (executaveis) — Restart Manager, handle64.exe, Process Kill
+- Qualquer arquivo — 6 metodos de delecao com retry
+
+**Fluxo completo do menu de contexto**:
+```
+Explorer -> Clique direito -> "Force Stop Unlock"
+  -> KitLugia.GUI.exe --unlock "path"
+  -> Kit ja rodando -> IPC via Named Pipe
+  -> ForceStopUnlockPage abre com path preenchido
+  -> Auto-analise -> bloqueadores encontrados
+  -> Unlock: RM -> Kill -> SCM/NtUnloadDriver -> Delecao robusta
+```
+
+**Arquivos modificados**:
+- `KitLugia.Core/DriverUnlockService.cs` — Matching fuzzy, fallbacks, logging
+- `KitLugia.Core/ForceStopUnlockService.cs` — Native handles, robust deletion, unlock flow
+- `KitLugia.GUI/Pages/WindowsSettings/ForceStopUnlockPage.xaml.cs` — Logging, folder listing
+- `KitLugia.GUI/External/ForceStopUnlock/AddContextMenu.reg` — Updated command
+- `Publish/External/ForceStopUnlock/AddContextMenu.reg` — Updated command
+
+---
+
+### Revisão 20/08 - Análise Crítica: Partições, WinPE, WinBoot e ISO Editor
+
+**Escopo**: Revisão completa de PartitionManager.cs (1732 linhas), WinpeBuilder.cs (1843 linhas), WinbootManager.cs (7224 linhas), IsoEditorPage.xaml.cs (1199 linhas).
+
+**Conclusão: PROJETO BEM IMPLEMENTADO** — não há brechas críticas.
+
+#### Abordagem Híbrida Correta
+- **IOCTL nativo** para enumeração de discos (milissegundos, sem WMI)
+- **Storage Management API (MSFT_*)** para operações de shrink (oficial Microsoft)
+- **diskpart** para create/format/extend/delete (confiável, ferramenta Microsoft)
+- **wimlib** para manipulação WIM (mais rápido que DISM, sem montagem)
+- **oscdimg** para geração de ISO (Microsoft embutido)
+- **7z** como fallback para extração
+
+#### PartitionManager.cs
+- ✅ GetAllDisksViaIoctl(): IOCTL_DISK_GET_DRIVE_LAYOUT_EX — enumeração em milissegundos
+- ✅ ShrinkPartitionUsingStorageAPI(): MSFT_Partition.Resize — API oficial Microsoft
+- ✅ DeletePartition(): Safety checks (bloqueia C: e disco do sistema)
+- ⚠️ Create/Format/Extend/Delete usam diskpart — aceitável, mas Storage API pode ser usada no futuro
+
+#### WinpeBuilder.cs
+- ✅ Pipeline sem ADK — usa wimlib + oscdimg embutidos
+- ✅ wimlib como prioridade (1-2s vs 30s com DISM)
+- ✅ Download do WinPE base com cache persistente
+- ⚠️ URL hardcoded para GitHub release — mitigado por cache local
+
+#### WinbootManager.cs
+- ✅ ISO Mount/Dismount nativo (PowerShell Mount-DiskImage)
+- ✅ DISM como fallback para WIM (quando wimlib indisponível)
+- ✅ bcdedit para boot config (ferramenta Microsoft)
+
+#### ISO Editor
+- ✅ Modo 100% nativo: wimlib + registro offline, SEM DISM
+- ✅ Listar edições: wimlib info (sem montar)
+- ✅ Registry tweaks: extract hive → reg load → add → unload → re-inject
+- ✅ AppX bloat: wimlib dir + update delete
+- ✅ Otimização: wimlib optimize
+- ✅ Fallback 7z para extração
+
+#### Segurança
+- ✅ DeletePartition bloqueia partição do sistema
+- ✅ Timeouts configuráveis por operação
+- ✅ Logging detalhado de cada etapa
+- ✅ Retry automático em caso de falha
+
+**Detalhes completos**: docs/CRITICAL_REVIEW_PARTITION_WINPE_ISO.md
+
+---
+
+### Atualização 20/08 - ISO Editing: DISM → wimlib (métodos 2026)
+
+**Problema**: WinbootManager.cs usava `dism.exe /Get-WimInfo` e `/Get-ImageInfo` para detectar idioma e listar edições da ISO. O DISM é mais lento e requer montagem da ISO.
+
+**Solução**: Substituído por `wimlib-imagex info` (versão 1.14.5, janeiro 2026):
+- Mais rápido (1-2s vs 10-30s com DISM)
+- Não requer montagem da ISO
+- Já estava embutido no Kit mas não era usado nestas funções
+
+**Métodos atualizados**:
+1. `DetectLanguageFromDrive()` — wimlib info como prioridade, DISM como fallback
+2. `GetIsoEditions()` — wimlib info com parse de output, DISM como fallback
+3. Adicionado `ParseWimlibInfoValues()` para parsing do output wimlib
+
+**Versão wimlib embutida**: 1.14.5 (latest, janeiro 2026)
+- Suporta ARM64 (experimental)
+- Compressões LZX/LZMS otimizadas
+- Deduplication automática
+- Suporte a ESD (Electronic Software Download)
+
+**Arquivos modificados**:
+- `KitLugia.Core/WinbootManager.cs` — DetectLanguageFromDrive, GetIsoEditions, ParseWimlibInfoValues
+
+---
+
+### Sessao 20/08 - OOShutUp Windows 11 Update
+
+**Problema**: As configurações de privacidade do OOShutUpManager eram baseadas no Windows 10. Muitos tweaks não funcionavam no Windows 11 24H2/25H2/26H1.
+
+**Causa raiz**: 
+- 12 configurações Edge Legacy (removido no Win11)
+- Wi-Fi Sense (removido no Win10 1803)
+- People Bar (removido no Win11 22H2+)
+- Meet Now (removido no Win11)
+- Muitas configurações Cortana (agora app separado no Win11)
+- Falta de configurações Win11-specific (Recall, Copilot, Widgets)
+
+**Correções aplicadas**:
+
+1. **Removidas 12 Edge Legacy settings** — Edge Legacy não existe no Win11
+2. **Removida Wi-Fi Sense** — removido desde Win10 1803
+3. **Removidos People Band e Meet Now** — removidos no Win11 22H2+
+4. **Renomeadas categorias Cortana** → "Busca & Voz" (Cortana agora é app separado)
+5. **Corrigido DODownloadMode** — valor 0→1 (Off→LAN only no Win11)
+6. **Adicionadas 30+ configurações Win11-specific**:
+   - Windows Recall (DisableAIDataAnalysis, DisableRecallSnapshots, DisableRecallContentIndexing)
+   - Copilot Runtime, Copilot no File Explorer
+   - IA no Paint, Photos, Notepad, Edge
+   - Windows Spotlight (DisableWindowsSpotlightFeatures, RotatingLockScreen)
+   - Widgets (AllowNewsAndInterests)
+   - SmartScreen do Explorer
+   - Sugestões no Configurações
+7. **Removidas duplicatas** (Widgets duplicado, Sugestões de Apps duplicado)
+8. **Total de configurações**: 130 → 176 (59% mais)
+
+**Resultado testado**:
+- 176 configurações em 22 categorias
+- 102 configurações no preset Recommended
+- Todos os caminhos de registro verificados no Win11 26H1
+- UI dinâmica carrega automaticamente novas categorias
+
+**Arquivos modificados**:
+- `KitLugia.Core/OOShutUpManager.cs` — Atualização completa para Win11
+
+**Testes realizados**:
+- Verificação de caminhos de registro no Win11 26H1 (Build 28000)
+- Contagem de configurações por categoria
+- Verificação de serviços (DiagTrack, dmwappushservice, lfsvc)
+- Build 0 erros em ambos os projetos
+
+---
+
+### Sessao 20/08 - TweaksPage Hardware-Aware Update
+
+**Problema**: TweaksPage faltava tweaks que requerem pesquisa ao hardware para serem aplicados corretamente.
+
+**Novos hardware-aware tweaks adicionados**:
+
+1. **L3 Cache (ThirdLevelDataCache)** — Auto-detecta L3 do CPU via WMI e configura no registro. Diferente do L2, o L3 é compartilhado entre todos os núcleos.
+2. **NVIDIA PowerMizer Max Performance** — Força GPU NVIDIA a operar em clocks máximos permanentemente (PerfLevelSrc=0x2222, PowerMizerLevel=1).
+3. **NVMe Latency (D3Handoff)** — Otimiza latência de drives NVMe (D3Handoff=1, AllowIdle1InD3=0). Auto-detecta drives NVMe.
+4. **GPU DPC Latency (IRQ Priority)** — Configura IRQ8Priority=1 para prioridade de interrupção do relógio.
+5. **Memory Prioritization** — LargeSystemCache=1 + DisablePagingExecutive=1 (mantém kernel em RAM).
+
+**Adicionados também**:
+- DetectNvMeDrives() — detecta drives NVMe via WMI
+- DetectPrimaryGpuVendor() — detecta vendor da GPU (NVIDIA/AMD/Intel)
+- AMD Anti-Lag toggle
+- Intel Dynamic Tuning toggle
+- Boot Log toggle (bcdedit)
+- NoGuiBoot toggle (bcdedit)
+
+**Arquivos modificados**:
+- `KitLugia.Core/SystemTweaks.cs` — Novos métodos hardware-aware
+- `KitLugia.GUI/Pages/TweaksPage.xaml` — Novos toggles na UI
+- `KitLugia.GUI/Pages/TweaksPage.xaml.cs` — Novos handlers e status loading
+
+**Build**: 0 erros em ambos os projetos
+
+### Sessao 20/08 - Glassmorphic Design System
+
+**Problema original**: Botões da sidebar tinham hover simples (cinza suave + scale 1.02), sem personalidade.
+
+**Solucao**: Glassmorphic com 3 camadas — Glow Border + Shine Sweep + Glass BG.
+
+**Fixes aplicados**:
+1. `RemoveStoryboard` antes de cada `BeginStoryboard` — previne conflitos em hover rapido
+2. `FillBehavior="Stop"` — impede que storyboards segurem valores apos terminar
+3. Removido `ScaleTransform` do hover — causa re-layout que gera stutter
+4. `TranslateTransform` para shine bar — move pixels sem re-layout
+
+**Componentes atualizados**:
+- `NavButtonStyle` — 14 RadioButtons da sidebar
+- `ModeButtonStyle` — botões de modo
+- BtnGoodbyeDPI — glow dourado
+- BtnBackgroundMonitor — glow dourado + badge
+- BtnUpdate — glow azul + bg tint azul
+- BtnConsole — glow verde + bg tint verde
+- BtnNotifications — glow branco + badge
+
+**Arquivos modificados**:
+- `KitLugia.GUI/Themes/NavStyles.xaml` — estilos glassmorphic
+- `KitLugia.GUI/MainWindow.xaml` — 5 top buttons atualizados
+
+**Documentacao**: `docs/GLASSMORPHIC_DESIGN.md`
+
+**Build**: 0 erros
+
+---
+
+### Sessao 21/08 - Glassmorphic v4 + Top Bar Fix + WinBoot Speed
+
+**Problema**: Ícones no topo cortados, animação engasgava no hover rápido, WinBoot lento.
+
+**Correções:**
+
+1. **Top Bar Icons** — `BtnIntegrity` (🛡️) trocado de `NavButtonStyle` (Height=42, com texto) para template inline compacto (Height=32, icon-only). StackPanel `VerticalAlignment="Center"` + `Margin="0,0,8,0"`.
+2. **Glassmorphic v4** — Removida a diagonal shine sweep (causava flicker no hover rápido). Substituída por fade simples: border glow + background tint com 0.2s. Sem `RemoveStoryboard`, todos `HoldEnd`. WPF auto-prioriza animações.
+3. **Top bar buttons** — Reescritos todos 6 botões do topo (GoodbyeDPI, Integrity, Monitor, Update, Console, Notifications) com template limpo e simplificado.
+4. **WinBoot Speed**:
+   - `IdentifyIsoType`: 7zip detection PRIMEIRO (rápido, ~1-2s), mount como fallback
+   - `CreateBootPartition`: VDS somente em safe mode, delays reduzidos (2000→1000ms, 1000→500ms), `GetDisks()` cacheado para evitar múltiplas chamadas
+
+**Arquivos modificados:**
+- `KitLugia.GUI/MainWindow.xaml` — Top bar reescrito
+- `KitLugia.GUI/Themes/NavStyles.xaml` — v4 clean fade
+- `KitLugia.Core/WinbootManager.cs` — WinBoot optimizations
+
+**Build**: 0 erros
+
+### Sessao 21/08 — KIT ISO STUDIO Expansor + Legibilidade + Cobertura total
+
+**1. Studio cobre o kit inteiro (como PathManager do Guardian):**
+- Antes OverlayIsoStudio era Border dentro da Page (Grid.RowSpan 3 Margin -30 Max 960x740) — ficava so no Frame (Column 1), sidebar Sistema ainda visivel, com Background #EE000000 semi + DropShadow Blur 30 borrado (print do usuario).
+- Agora KitIsoStudioWindow.xaml (novo Window igual a PathExplorerWindow.xaml): Height 740 Width 1060 CenterOwner Background #0F0F0F Border #FFD700 WindowChrome Caption 0. Botao ESTUDIO em IsoEditorPage.xaml:146 abre new KitIsoStudioWindow { Owner = MainWindow }.ShowDialog() — cobre o kit inteiro (sidebar + header + console) como o PathManager, nao so o Frame.
+
+**2. Legibilidade — o que foi feito (reusavel a qualquer hora):**
+- Fundo opaco: Background #EE000000 (93% opaco, deixava kit atras aparecer borrado) -> #FF0A0A0A opaco (ou #0F0F0F na Window) — elimina transparencia que causava blur de fundo.
+- Sem DropShadow no conteudo: removido DropShadowEffect BlurRadius 30 ShadowDepth 15 Opacity 0.6 do Border interno — era o principal borrado de texto em FontSize 10-11 Consolas.
+- Texto nitido: TextOptions.TextFormattingMode="Display" + SnapsToDevicePixels="True" no Window/Border raiz — forca ClearType em Segoe UI Variable e desativa sub-pixel blur do WPF em 96dpi.
+- Contraste solido: Foreground #CCC/#FFFFFF em vez de #88FFFFFF semi, Border #2A2A2A solido, sem Opacity 0.6 em TextBlock.
+- Tamanhos: FontSize 10.5 -> 11 em CheckBox + Padding 8 + CornerRadius 8 para nao espremer.
+- Reusar: copie o header do KitIsoStudioWindow.xaml:60 (Border BorderBrush #FFD700 + TextOptions.Display) para qualquer overlay futuro que precise caber muito.
+
+Arquivos: KitLugia.GUI\Windows\KitIsoStudioWindow.xaml(.cs) (novo, 2 colunas: AppX granular, Drivers, OEM + Registro, Idioma, Branding), IsoEditorPage.xaml:146 (BtnIsoStudio) + .cs:Bind (BtnIsoStudio_Click abre Window), WinbootManager.cs cache + IOCTL ja documentado.
+
+Build: 0 erros / 124 avisos (baseline) — Studio abre nitido e em tela cheia.
+
+### Sessão 21/08 — Gerenciador de Tarefas do Kit (Super Force Stop) — Ícone no Topbar
+
+**Motivação:** Log Force Stop 21:34 VMware mostrou o Kit escaneando `C:\Program Files\VMware\VMware Workstation` inteiro (maxDepth 3, 213 arquivos, 4 .sys) + 6 bloqueadores (2 RM + 4 drivers via Registry scan, Native 0xC0000004 fallback handle64 0) e deletando 184 arquivos via `RobustDelete` (`File.Delete` + `cmd del` para ROMs com Access denied). VMware sempre pendura no tray por drivers, e o Kit fechou *de verdade*.
+
+**Pesquisa web + IDA:**
+- **System Informer** (winsiderss/systeminformer, successor Process Hacker) — 10k stars, MIT, 16k commits, C/C++ + `phlib` + `KSystemInformer.sys` (kernel), `NtQuerySystemInformation(SystemProcessInformation=5, SystemHandleInformation=16)` + `NtQueryObject`, graphs, handle search, services, 100% open. Referência #1.
+- **Process Hacker 2.39** — mesmo core sem driver, mais simples para estudar.
+- **IDA Pro 9.0 em `taskmgr.exe` 25H2:** confirma `NtQuerySystemInformation` + `phnt_windows.h`, `SystemPerformanceInformation` para CPU, `GetProcessMemoryInfo` para RAM — igual ao `ForceStopUnlockService.cs:1076` já faz com `NtQuerySystemInformation` + `Restart Manager` + `DriverUnlockService`.
+
+**Plano criado:** `docs/TASK_MANAGER_PLAN.md` com arquitetura 5 abas, comparativo Windows TM vs Kit, fluxo 7 fases (RM shutdown → kill pasta → sc stop/delete drivers → handle close → RobustDelete → kill restante), performance com `NtQuerySystemInformation` + `VirtualizingStackPanel Recycling` + `Job Object KillTree`.
+
+**Implementado (v1 scaffold):**
+- Topbar: `MainWindow.xaml` novo `StackPanel Left` com `BtnKitTaskManager` `📊` `Width 40 Height 32` no quadrado vermelho do print (`Grid.Row0 Column1 Left Margin 8`), `Click=BtnKitTaskManager_Click` abre `KitTaskManagerWindow {Owner=this}.Show()`.
+- `Windows\KitTaskManagerWindow.xaml(.cs)` — Window 980x620 `Border #FFD700`, header `📊 KIT TASK MANAGER — Fecha de verdade`, search + `🔄 Atualizar` + `⚡ Force Stop Selecionados` (vermelho), `ListView` virtualizado `Nome/PID/RAM/Handles/Tipo/Caminho`, context menu `Matar / Matar Árvore (Job Object) / Force Stop / Abrir Pasta / Copiar`, footer com `Matar / Matar Árvore / Fechar`. Backend reusa `ForceStopUnlockService.FindBlockingProcesses/Unlock` (VMware-like) para fechar de verdade.
+
+**Arquivos:** `docs/TASK_MANAGER_PLAN.md`, `Windows\KitTaskManagerWindow.xaml(.cs)`, `MainWindow.xaml` (topbar), `MainWindow.xaml.cs` (handler).
+
+Build: 0 erros / 120 avisos.
+
+### Sessão 24/08 — Task Manager v2 (Win11-like) + Refactor partials + Anti-crash + GUI geral
+
+**Task Manager do Kit (`Windows/TaskManager/`)** — reconstruído no modelo do Gerenciador de Tarefas do Win11:
+- **Ícones estáveis**: cache duplo (por path E por nome do processo); linhas agrupadas herdam ícone do 1º membro com ícone. Fim da piscada a cada refresh de 1s.
+- **Busca global**: barra do topo filtra Processos + Serviços + Inicialização simultaneamente (debounce 250ms), combinando com os filtros locais de cada aba.
+- **Aba Desempenho estilo Win11**: grade de cards (215px) com sparkline 38px animado por dispositivo; clique abre painel de detalhes rico. Dispositivos: CPU, Memória, cada Disco físico (PhysicalDisk), cada adaptador de rede, cada GPU.
+- **GPU universal** (pesquisa FreeToken/LibreHardwareMonitor): cascata DXGI (`dxgi.dll` CreateDXGIFactory1 → EnumAdapters1 → GetDesc1 — funciona p/ NVIDIA/AMD/Intel/chinesas/WDDM qualquer) → nvidia-smi CLI → registro `HardwareInformation.qwMemorySize` (QWORD, sem saturação 4GB do WMI) → WMI. Novo `KitLugia.Core\TaskManager\GpuInfo.cs`.
+- **% da GPU**: contadores PDH `\GPU Engine(*)\Utilization Percentage` (mesmo pipeline do taskmgr oficial, agregação MAX engine). FIX: falha única na init PDH setava `_gpuAvailable=false` PARA SEMPRE → agora retry com backoff (5s→15s→45s→2min) + fallback `nvidia-smi --query-gpu=utilization.gpu` throttled 2s.
+- **Rede = ncpa.cpl**: fonte trocada para `NetworkInterface.GetAllNetworkInterfaces()`; filtro só conectados (`OperationalStatus==Up`) + blacklist pseudo-adapters (WAN Miniport, Wi-Fi Direct, Teredo, QoS Packet Scheduler, WFP MAC Layer etc.) + dedupe por descrição. Taxa via delta `GetIPStatistics().BytesSent+Received` (funciona p/ virtuais sem instância perfmon).
+- **Virtualização correta**: WMI `VirtualizationFirmwareEnabled` MENTE quando hipervisor já roda. Agora P/Invoke kernel32 `IsProcessorFeaturePresent(PF_HYPERVISOR_PRESENT)` (equivalente CPUID leaf 0x1 ECX bit 31, mesma fonte do taskmgr) → "Ativado (hipervisor ativo)". Fallbacks: WMI HypervisorPresent → PF_VIRT_FIRMWARE_ENABLED.
+- **Métricas ao vivo idênticas ao TM do Windows**: CPU (processos/threads/handles/uptime), Memória (comprometida/cache/disponível/pools paginado+não-paginado), Disco (leitura/escrita separadas por instância física + "Disco do sistema"/"Arquivo de paginação"), Rede (envio/recebimento + IPv4/MAC/link), GPU (VRAM dedicada GB+MB, compartilhada, driver+data, localização PCI).
+- **Nome completo do processador** priorizado no card e no título do painel (sem truncamento).
+
+**Refactor estrutura (aba Processos intocada)**:
+- Backup pré-refactor em `Windows/TaskManager/_backup_pre_refactor/` (xaml + xaml.cs originais).
+- Split em partial classes: `KitTaskManagerWindow.xaml.cs` (~1700 linhas: state, refresh, filtros, kill, detail), `KitTaskManager.Performance.cs` (~800: aba Desempenho completa), `KitTaskManager.Services.cs` (~330: Serviços + Inicialização).
+- Serviços/Inicialização: toolbars com `TmToolButton`, context menus escuros `TmDarkMenu` (Iniciar/Parar/Reiniciar/Habilitar/Desabilitar/Abrir local/Pesquisar web), ordenação por clique no header igual aba Processos (setinha asc/desc), duplo-clique na Inicialização abre pasta.
+
+**Anti-crash (7 fixes)**:
+1. CRÍTICO: `Parallel.ForEach` 4 threads chamando SHGetFileInfo (shell32 NÃO é thread-safe) → AccessViolation derrubava o processo inteiro sem catch. Extração serializada + limite 48/lote.
+2. Init não-bloqueante: Loaded fazia await sequencial de TUDO (processos+WMI+nvidia-smi+serviços+startup) = travada violenta ao abrir. Agora só processos primeiro; Desempenho/Serviços/Startup carregam em background sob demanda ao clicar na aba.
+3. KillTree acessava `root.Handle` de processo protegido → Win32Exception/AV. Acesso dentro de try próprio com fallback Kill().
+4. GetChildPids recursivo sem limites (ciclo pai↔filho = stack overflow / WMI storm). Substituído por BFS com maxDepth 6 / maxCount 512.
+5. Timer do monitor de recursos era variável local — nunca parado ao fechar (timers fantasma). Agora campo `_resourceTimer` parado no Closing.
+6. Tick de gráficos acumulava em máquina lenta → gate Interlocked (pula tick se anterior não terminou).
+7. Handlers globais AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException logam `[KIT TASK MANAGER] FATAL:` em vez de morrer sem rastro.
+
+**MainWindow/GUI geral**:
+- Topbar (min/max/close): ColorAnimation Enter/ExitActions ficava presa em cor intermediária se mouse saía durante a transição → triggers declarativos com Setter (estado final sempre garantido) + IsHitTestVisibleInChrome explícito.
+- Hamburger: `_sidebarAnimating` ficava true pra sempre se janela perdesse foco durante animação (Completed não dispara) → timeout de segurança 400ms.
+- Botão Update: rotação ficava torta em ângulo intermediário → FillBehavior.Stop + reset Transform.Identity.
+- IntegrityPage: ItemsControl dentro de ScrollViewer DESLIGAVA virtualização (todos os itens materializados) → ListBox com VirtualizingStackPanel Recycling + CacheLength por página. Busca com debounce 250ms. ItemTemplate responsivo (colunas Auto + * MinWidth, botões nunca saem das bordas).
+- ANTI-FLASH BRANCO (3 camadas): App.xaml.cs OnStartup sobrescreve SystemColors globais (Window/Control/Menu/AppWorkspace/Highlight/Info → tons escuros) — qualquer controle não estilizado nasce escuro; MainFrame Background Transparent → WindowBackground gradiente; área da lista IntegrityPage com ScrollViewer/Border/ListBox #111111 explícitos.
+- Animações eternas matadas: barra progresso IntegrityPage (Forever no Loaded → controlada por código só durante scan), spinner Bloatware AppsPage (SetSpinnerRunning liga/desliga), pulso DropShadowEffect GameBoostPage (BlurRadius animado = re-render GPU/frame → removido, pulso só Opacity), dot Live PartitionsPage (Start/Stop conforme visibilidade), pulse por-card BloatwarePage (dezenas de timelines → opacidade estática).
+
+**Path Repair — CORRIGIDO (era farsa)**:
+- `RepairPathEntries` antigo "mantinha" TUDO (duplicados, órfãos, lixo dev node_modules, sintaxe inválida, diretórios mortos) → botão CORRIGIR nunca mudava nada. Agora REMOVE de verdade: duplicatas (mantém 1ª, HashSet case-insensitive), diretórios inexistentes, lixo de desenvolvimento, resíduos de desinstalação, sintaxe inválida. Mantém: `.dotnet\tools` (cria pasta), WrongLocation (pode ser intencional). Verificado: REG_EXPAND_SZ preservado via DetectValueKind (%VAR% → ExpandString), serviços respeitam KitIntentionalServiceStart, BCD cache TTL 15s.
+
+**Áreas críticas auditadas (Winboot/Partitions/WinPE)**:
+- PartitionsPage: BtnDelete/BtnCleanDisk/BtnConvert chamavam diskpart SEM try/catch — exceção deixava overlay preso pra sempre. Todos com try/catch/finally agora. BtnRefresh com single-flight (_isUpdatingDisks).
+- WinpeToolsPage: FURO DE SEGURANÇA — ShowBusy não travava navegação; usuário saía da página com `shutdown /r /t 10` agendado e o PC reiniciava "do nada". ShowBusy ativa MainWindow.IsNavigationLocked, ShowBusyResult libera.
+- WinbootPage verificado sólido (try/catch completo, detecção idioma em background, polling com cache IOCTL 3s).
+- Core verificado: DeletePartition bloqueia disco sistema/C:, CleanDisk IOCTL fast-path com fallback diskpart, RunProcessCaptured timeout kill tree, único GetAwaiter().GetResult() está dentro de Task.Run (sem deadlock).
+
+Build final: 0 erros (solução inteira). Performance percebida pelo usuário: "velocidade aumentou MUITO, nem parece mais o kit antigo".

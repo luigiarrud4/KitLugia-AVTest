@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Diagnostics;
 using System.Windows.Forms;
@@ -1174,6 +1174,7 @@ namespace KitLugia.GUI.Services
 
             System.Threading.Tasks.Task.Run(() => AutoFixGameBarPresenceWriter());
             System.Threading.Tasks.Task.Run(() => AutoFixCommunityProcesses());
+            System.Threading.Tasks.Task.Run(() => AutoFixForceStopContextMenu());
 
             try
             {
@@ -1674,6 +1675,25 @@ namespace KitLugia.GUI.Services
             if (TelemetryTasksDisabled) SystemTweaks.ApplyTelemetryScheduledTasks(true);
         }
 
+        private void AutoFixForceStopContextMenu()
+        {
+            try
+            {
+                if (!SystemTweaks.IsForceStopUnlockAdded()) return;
+                string currentExe = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'), "KitLugia.GUI.exe");
+                if (!System.IO.File.Exists(currentExe))
+                    currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(currentExe)) return;
+                var existing = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock\command", "", null) as string;
+                if (existing != null && !existing.Contains(currentExe, StringComparison.OrdinalIgnoreCase))
+                {
+                    SystemTweaks.AddForceStopUnlock();
+                    KitLugia.Core.Logger.Log($"[FORCE STOP] Menu de contexto reconfigurado para versão atual: {currentExe}");
+                }
+            }
+            catch (Exception ex) { KitLugia.Core.Logger.Log($"[FORCE STOP] AutoFix menu: {ex.Message}"); }
+        }
+
         public void LoadSettings()
         {
             try
@@ -1835,7 +1855,8 @@ namespace KitLugia.GUI.Services
             try
             {
                 _monitorTimer?.Stop();
-                KitLugia.Core.Logger.Log("⏸️ TrayIcon: Monitoramento pausado (janela perdeu foco)");
+                StopAdvancedMonitor();
+                KitLugia.Core.Logger.Log("⏸️ TrayIcon: Monitoramento pausado (janela oculta)");
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
@@ -1848,7 +1869,8 @@ namespace KitLugia.GUI.Services
                 if (IsTrayEnabled && !_monitorTimer.IsEnabled)
                 {
                     _monitorTimer?.Start();
-                    KitLugia.Core.Logger.Log("▶️ TrayIcon: Monitoramento retomado (janela ganhou foco)");
+                    StartAdvancedMonitor();
+                    KitLugia.Core.Logger.Log("▶️ TrayIcon: Monitoramento retomado (janela visível)");
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }

@@ -48,6 +48,14 @@ static RE_WS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\s+").expect("invalid regex")
 });
 
+// ── MFT scanner (raw NTFS $MFT read, Windows only) ────────────────
+
+#[cfg(windows)]
+pub mod mft;
+
+// ── Ultra-fast process scanner ────────────────────────────────
+pub mod task_scan;
+
 // ── Core logic ────────────────────────────────────────────────────
 
 fn sift4_distance(s1: &str, s2: &str, _max_offset: i32) -> i32 {

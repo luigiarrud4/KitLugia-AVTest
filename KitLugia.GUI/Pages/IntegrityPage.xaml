@@ -6,6 +6,7 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
       mc:Ignorable="d" 
       Title="Integridade do Sistema"
+      Background="{StaticResource WindowBackground}"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Page.Resources>
@@ -53,18 +54,7 @@
 
         <!-- 1.1 Loading Progress Bar -->
         <Border Grid.Row="1" x:Name="ProgressBarContainer" Visibility="Collapsed" Margin="0,0,0,10" Height="4" CornerRadius="2" Background="#222">
-            <Border x:Name="ProgressBarFill" Width="100" Height="4" CornerRadius="2" Background="{StaticResource AccentColor}" HorizontalAlignment="Left">
-                <Border.Triggers>
-                    <EventTrigger RoutedEvent="Loaded">
-                        <BeginStoryboard>
-                            <Storyboard RepeatBehavior="Forever">
-                                <DoubleAnimation Storyboard.TargetProperty="Width" 
-                                    From="50" To="300" Duration="00:00:01.2" AutoReverse="True"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
-                </Border.Triggers>
-            </Border>
+            <Border x:Name="ProgressBarFill" Width="100" Height="4" CornerRadius="2" Background="{StaticResource AccentColor}" HorizontalAlignment="Left"/>
         </Border>
 
         <!-- 2. BOTÕES E PESQUISA -->
@@ -142,78 +132,143 @@
                     Width="130" Height="36" Background="#222" Foreground="White" BorderBrush="#444" BorderThickness="1" Cursor="Hand" Style="{StaticResource SecondaryButtonStyle}"/>
         </Grid>
 
-        <!-- 3. LISTA DE ITENS COM VIRTUALIZAÇÃO -->
-        <Border Grid.Row="3" Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="8">
-            <Grid>
-                <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto" Padding="0"
-                              VirtualizingPanel.ScrollUnit="Item"
-                              VirtualizingPanel.VirtualizationMode="Recycling">
-                    <ItemsControl x:Name="ItemsList"
-                                  VirtualizingPanel.IsVirtualizing="True"
-                                  VirtualizingPanel.VirtualizationMode="Recycling"
-                                  ScrollViewer.IsDeferredScrollingEnabled="False"
-                                  VirtualizingPanel.CacheLength="5,5">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
-                                                       VirtualizingPanel.VirtualizationMode="Recycling"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,0,0,1" Padding="15,10" Background="#161616" BorderBrush="#222" BorderThickness="0,0,0,1">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="40"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="40"/>
-                                            <ColumnDefinition Width="140"/>
-                                            <ColumnDefinition Width="140"/>
-                                        </Grid.ColumnDefinitions>
+        <!-- 3. LISTA DE ITENS COM VIRTUALIZAÇÃO REAL -->
+        <!-- ListBox tem ScrollViewer próprio + UI virtualização nativa. O padrão anterior
+             (ItemsControl dentro de ScrollViewer) desligava a virtualização: TODOS os itens
+             eram materializados de uma vez, congelando a página em listas grandes. -->
+        <Border Grid.Row="3" Background="#111111" BorderBrush="#333333" BorderThickness="1" CornerRadius="8">
+          <Grid>
+            <!-- Fundo escuro global: o template default do ListBox/ScrollViewer usa fundo
+                 BRANCO do sistema. Enquanto a lista materializa (UI thread ocupada setando
+                 ~900 itens), o WPF mostra o fundo NÃO renderizado = flash branco. -->
+            <Grid.Resources>
+                <Style TargetType="ScrollViewer">
+                    <Setter Property="Background" Value="#111111"/>
+                </Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="#111111"/>
+                </Style>
+            </Grid.Resources>
+            <ListBox x:Name="ItemsList"
+                     Background="#111111"
+                     Foreground="White"
+                     BorderThickness="0"
+                     HorizontalContentAlignment="Stretch"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     VirtualizingPanel.CacheLength="1,2"
+                     VirtualizingPanel.CacheLengthUnit="Page"
+                     ScrollViewer.IsDeferredScrollingEnabled="False"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
+                                                VirtualizingPanel.VirtualizationMode="Recycling"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0,0,0,1"/>
+                        <Setter Property="Background" Value="#161616"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="#222" BorderThickness="0,0,0,1" Padding="15,10">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#1E1E22"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="#23232A"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <!-- Responsivo: colunas fixas viram Auto (encolhem quando falta espaço),
+                             a de conteúdo é * com MinWidth; sem larguras somadas > viewport -->
+                        <Border Padding="15,10" Background="#161616" BorderBrush="#222" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="*" MinWidth="120"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                                        <!-- Escudo -->
-                                        <TextBlock Text="🛡️" VerticalAlignment="Center" FontSize="18" Opacity="0.7"/>
+                                <!-- Escudo -->
+                                <TextBlock Text="🛡️" VerticalAlignment="Center" FontSize="18" Opacity="0.7"/>
 
-                                        <!-- Nome e Categoria -->
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,10,0">
-                                            <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="11"/>
-                                        </StackPanel>
+                                <!-- Nome e Categoria -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,10,0">
+                                    <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="11"/>
+                                </StackPanel>
 
-                                        <!-- BOTÃO DE INFORMAÇÃO -->
-                                        <Button Grid.Column="2" Click="BtnInfo_Click" Tag="{Binding Description}"
-                                                Background="Transparent" BorderThickness="0" 
-                                                HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                Width="30" Height="30" Cursor="Help"
-                                                ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
-                                            <Button.ToolTip>
-                                                <ToolTip Content="{Binding Description}"/>
-                                            </Button.ToolTip>
-                                            <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="Transparent">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter Property="Opacity" Value="1"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
+                                <!-- BOTÃO DE INFORMAÇÃO + EXPLORADOR DE PATH -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Button Click="BtnInfo_Click" Tag="{Binding Description}"
+                                            Background="Transparent" BorderThickness="0"
+                                            Width="30" Height="30" Cursor="Help"
+                                            ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                                        <Button.ToolTip>
+                                            <ToolTip Content="{Binding Description}"/>
+                                        </Button.ToolTip>
+                                        <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="Transparent">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Opacity" Value="1"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
 
-                                        <!-- Badge de Status -->
-                                        <Border Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,15,0"
-                                                CornerRadius="4" Padding="10,4" MinWidth="100" x:Name="StatusBadge">
-                                            <TextBlock x:Name="TxtStatus" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                        </Border>
+                                    <Button x:Name="BtnPathExplore" Click="BtnPathExplore_Click" Tag="{Binding}"
+                                            Background="Transparent" BorderThickness="0" Visibility="Collapsed"
+                                            Width="30" Height="30" Cursor="Hand"
+                                            ToolTip="Ver o PATH atual, o que falta e adicionar caminhos ausentes">
+                                        <TextBlock Text="➕" FontSize="15" Foreground="#FFD700" Opacity="0.75"/>
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="Transparent">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Opacity" Value="1"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </StackPanel>
 
-                                        <!-- Botão de Ação -->
-                                        <Button Grid.Column="4" Click="BtnToggleItem_Click" Tag="{Binding}"
-                                                Height="32" Width="120" Cursor="Hand" HorizontalAlignment="Right"
-                                                x:Name="BtnAction" FontWeight="SemiBold" FontSize="11">
+                                <!-- Badge de Status -->
+                                <Border Grid.Column="3" VerticalAlignment="Center" Margin="10,0"
+                                        CornerRadius="4" Padding="10,4" MinWidth="100" x:Name="StatusBadge">
+                                    <TextBlock x:Name="TxtStatus" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Botão de Ação -->
+                                <Button Grid.Column="4" Click="BtnToggleItem_Click" Tag="{Binding}"
+                                        Height="32" Width="110" Cursor="Hand" HorizontalAlignment="Right"
+                                        x:Name="BtnAction" FontWeight="SemiBold" FontSize="11">
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
                                                     <Border x:Name="bdr" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
@@ -235,6 +290,11 @@
                                 </Border>
 
                                 <DataTemplate.Triggers>
+                                    <!-- ITENS DE PATH: mostra o botão + (Explorador de PATH) -->
+                                    <DataTrigger Binding="{Binding IsPathItem}" Value="True">
+                                        <Setter TargetName="BtnPathExplore" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+
                                     <!-- ESTADO: MODIFICADO -->
                                     <DataTrigger Binding="{Binding Status}" Value="MODIFIED">
                                         <Setter TargetName="StatusBadge" Property="Background" Value="#25C42B1C"/>
@@ -273,16 +333,15 @@
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                </ListBox.ItemTemplate>
+            </ListBox>
 
-                <!-- Empty state quando pesquisa não encontra nada -->
-                <TextBlock x:Name="EmptyState" Text="🔍 Nenhum item encontrado para esta pesquisa." 
-                           Foreground="#666" FontSize="14"
-                           VerticalAlignment="Center" HorizontalAlignment="Center"
-                           Visibility="Collapsed"/>
-            </Grid>
+            <!-- Empty state quando pesquisa não encontra nada -->
+            <TextBlock x:Name="EmptyState" Text="🔍 Nenhum item encontrado para esta pesquisa."
+                       Foreground="#666" FontSize="14" IsHitTestVisible="False"
+                       VerticalAlignment="Center" HorizontalAlignment="Center"
+                       Visibility="Collapsed"/>
+          </Grid>
         </Border>
     </Grid>
 </Page>

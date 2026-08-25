@@ -298,14 +298,7 @@ namespace KitLugia.Core
                 SafeValue = 0, UnsafeValue = 1,
                 Level = PrivacyLevel.Recommended, Category = "Copilot & IA"
             },
-            new() {
-                Name = "Widgets com IA (News Feed)",
-                Description = "Desativa o painel de Widgets com feed de notícias e IA.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Dsh",
-                ValueName = "AllowNewsAndInterests",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Copilot & IA"
-            },
+            // (Widgets duplicado removido — movido para seção Widgets acima)
             new() {
                 Name = "Telemetria de IA do Office",
                 Description = "Desativa o envio de dados de uso das funções de IA do Microsoft Office.",
@@ -489,23 +482,15 @@ namespace KitLugia.Core
                 Level = PrivacyLevel.Limited, Category = "OneDrive"
             },
 
-            // ====================== WI-FI SENSE ======================
-            new() {
-                Name = "Wi-Fi Sense (Hotspot Automático)",
-                Description = "Desativa conexão automática a hotspots sugeridos.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WcmSvc\wifinetworkmanager\config",
-                ValueName = "AutoConnectAllowedOEM",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Wi-Fi"
-            },
+            // Wi-Fi Sense foi removido no Windows 10 1803+ — não aplicável no Win11
 
             // ====================== WINDOWS UPDATE ======================
             new() {
                 Name = "Otimização de Entrega (P2P)",
-                Description = "Impede que seu PC envie updates para outros na internet.",
+                Description = "Impede que seu PC envie updates para outros na internet (0=Off, 1=LAN, 3=PCs+LAN).",
                 RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config",
                 ValueName = "DODownloadMode",
-                SafeValue = 0, UnsafeValue = 3,
+                SafeValue = 1, UnsafeValue = 3,
                 Level = PrivacyLevel.Recommended, Category = "Updates"
             },
             new() {
@@ -969,103 +954,7 @@ namespace KitLugia.Core
                 SafeValue = 1, UnsafeValue = 0,
                 Level = PrivacyLevel.NotRecommended, Category = "Edge (New)"
             },
-            // ====================== EDGE LEGACY ======================
-            new() {
-                Name = "Edge Legacy - Do Not Track",
-                Description = "Habilita Do Not Track no Edge Legacy.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main",
-                ValueName = "DoNotTrack",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Page Prediction",
-                Description = "Desativa predição de página (FlipAhead).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\FlipAhead",
-                ValueName = "FPEnabled",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Sugestões de Pesquisa",
-                Description = "Desativa sugestões de pesquisa no Edge Legacy.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main",
-                ValueName = "ShowSearchSuggestionsGlobal",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Cortana",
-                Description = "Desativa Cortana no Edge Legacy.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\ServiceUI",
-                ValueName = "EnableCortana",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Histórico de Pesquisa",
-                Description = "Desativa mostrando histórico de pesquisa.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\ServiceUI\ShowSearchHistory",
-                ValueName = "@",
-                SafeValue = 0, UnsafeValue = "",
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Sugestões de Formulário",
-                Description = "Desativa sugestões de formulário no Edge Legacy.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main",
-                ValueName = "Use FormSuggest",
-                SafeValue = "no", UnsafeValue = "yes",
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Licenças de Mídia",
-                Description = "Desativa salvamento de licenças de mídia protegidas.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Privacy",
-                ValueName = "EnableEncryptedMediaExtensions",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Screen Reader",
-                Description = "Não otimiza resultados de busca para screen reader.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main",
-                ValueName = "OptimizeWindowsSearchResultsForScreenReaders",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - SmartScreen",
-                Description = "Desativa SmartScreen no Edge Legacy (recomendado manter ativado).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\PhishingFilter",
-                ValueName = "EnabledV9",
-                SafeValue = 4, UnsafeValue = 0,
-                Level = PrivacyLevel.NotRecommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Dropdown na Barra de Endereço",
-                Description = "Desativa dropdown na barra de endereço (recomendado manter ativado).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\PolicyManager\current\device\Browser",
-                ValueName = "AllowAddressBarDropdown",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.NotRecommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Tab Preloading",
-                Description = "Desativa carregamento de abas em background (recomendado manter ativado).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\MicrosoftEdge\TabPreloader",
-                ValueName = "AllowTabPreloading",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.NotRecommended, Category = "Edge (Legacy)"
-            },
-            new() {
-                Name = "Edge Legacy - Prelaunch",
-                Description = "Desativa prelanch do Edge Legacy.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\MicrosoftEdge\Main",
-                ValueName = "AllowPrelaunch",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Edge (Legacy)"
-            },
+            // Edge Legacy foi removido no Windows 11 — substituído pelo Edge Chromium
             // ====================== SYNCHRONIZATION ======================
             new() {
                 Name = "Sync - Todas as Configurações",
@@ -1123,104 +1012,74 @@ namespace KitLugia.Core
                 SafeValue = 1, UnsafeValue = 0,
                 Level = PrivacyLevel.NotRecommended, Category = "Sincronização"
             },
-            // ====================== CORTANA ======================
+            // ====================== BUSCA & VOZ (Win11) ======================
+            // Cortana agora é um app separado no Win11 — a maioria das policies antigas são ignoradas
             new() {
-                Name = "Cortana - Consentimento",
-                Description = "Desativa e reseta Cortana.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Windows Search",
-                ValueName = "CortanaConsent",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Limited, Category = "Cortana"
-            },
-            new() {
-                Name = "Cortana - Input Personalization",
-                Description = "Desativa personalização de entrada.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Personalization\Settings",
-                ValueName = "AcceptedPrivacyPolicy",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Limited, Category = "Cortana"
-            },
-            new() {
-                Name = "Cortana - Coleta de Texto Implícito",
-                Description = "Restringe coleta de texto implícito.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\InputPersonalization",
-                ValueName = "RestrictImplicitTextCollection",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Limited, Category = "Cortana"
-            },
-            new() {
-                Name = "Cortana - Coleta de Tinta Implícito",
-                Description = "Restringe coleta de tinta implícito.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\InputPersonalization",
-                ValueName = "RestrictImplicitInkCollection",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Limited, Category = "Cortana"
-            },
-            new() {
-                Name = "Cortana - Harvest Contacts",
-                Description = "Desativa coleta de contatos.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore",
-                ValueName = "HarvestContacts",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Limited, Category = "Cortana"
-            },
-            new() {
-                Name = "Cortana - Online Speech Recognition",
-                Description = "Desativa reconhecimento de fala online.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\InputPersonalization",
-                ValueName = "AllowInputPersonalization",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Limited, Category = "Cortana"
-            },
-            new() {
-                Name = "Cortana - Resultados Web",
-                Description = "Desativa resultados web na busca.",
+                Name = "Busca - Resultados Web",
+                Description = "Desativa resultados web e Bing na pesquisa do Windows.",
                 RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Search",
                 ValueName = "ConnectedSearchUseWeb",
                 SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Cortana"
+                Level = PrivacyLevel.Recommended, Category = "Busca"
             },
             new() {
-                Name = "Cortana - Download de Modelos de Fala",
-                Description = "Desativa download de modelos de fala.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Preferences",
-                ValueName = "ModelDownloadAllowed",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Limited, Category = "Cortana"
-            },
-            new() {
-                Name = "Cortana - Localização na Busca",
-                Description = "Cortana e busca não podem usar localização.",
+                Name = "Busca - Localização",
+                Description = "Impede que a barra de pesquisa use sua localização.",
                 RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Search",
                 ValueName = "AllowSearchToUseLocation",
                 SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Cortana"
+                Level = PrivacyLevel.Recommended, Category = "Busca"
             },
             new() {
-                Name = "Cortana - Acima da Tela de Bloqueio",
-                Description = "Desativa Cortana acima da tela de bloqueio (recomendado manter ativado).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Search",
-                ValueName = "AllowCortanaAboveLock",
+                Name = "Busca - Download de Modelos de Fala",
+                Description = "Desativa download de modelos de reconhecimento de fala.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Preferences",
+                ValueName = "ModelDownloadAllowed",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Limited, Category = "Busca"
+            },
+            new() {
+                Name = "Reconhecimento de Fala Online",
+                Description = "Desativa reconhecimento de fala online (online speech recognition).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\InputPersonalization",
+                ValueName = "AllowInputPersonalization",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Limited, Category = "Busca"
+            },
+            // Personalização de Input (ainda funciona no Win11)
+            new() {
+                Name = "Input - Personalização",
+                Description = "Desativa personalização de entrada e coleta de dados de digitação.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Personalization\Settings",
+                ValueName = "AcceptedPrivacyPolicy",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Limited, Category = "Busca"
+            },
+            new() {
+                Name = "Input - Coleta de Texto",
+                Description = "Restringe coleta de texto implícito para personalização.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\InputPersonalization",
+                ValueName = "RestrictImplicitTextCollection",
                 SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.NotRecommended, Category = "Cortana"
+                Level = PrivacyLevel.Limited, Category = "Busca"
             },
             new() {
-                Name = "Cortana - Cloud Search",
-                Description = "Desativa busca na nuvem.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Search",
-                ValueName = "AllowCloudSearch",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Cortana"
+                Name = "Input - Coleta de Tinta",
+                Description = "Restringe coleta de tinta (ink) para personalização.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\InputPersonalization",
+                ValueName = "RestrictImplicitInkCollection",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Limited, Category = "Busca"
             },
-            // ====================== EXPLORER ======================
             new() {
-                Name = "Explorer - Sugestões de Apps",
-                Description = "Desativa sugestões ocasionais de apps no Menu Iniciar.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
-                ValueName = "SystemPaneSuggestionsEnabled",
+                Name = "Input - Coleta de Contatos",
+                Description = "Desativa coleta de contatos para autocomplete.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore",
+                ValueName = "HarvestContacts",
                 SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Explorer"
+                Level = PrivacyLevel.Limited, Category = "Busca"
             },
+            // (Sugestões de Apps duplicado removido — já existe em Publicidade)
             new() {
                 Name = "Explorer - Jump Lists",
                 Description = "Não mostra itens recentes em Jump Lists.",
@@ -1270,38 +1129,23 @@ namespace KitLugia.Core
                 SafeValue = 0, UnsafeValue = 1,
                 Level = PrivacyLevel.Recommended, Category = "Tela de Bloqueio"
             },
-            // ====================== TASKBAR ======================
-            new() {
-                Name = "Taskbar - Ícone de Pessoas",
-                Description = "Desativa ícone de Pessoas na barra de tarefas.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People",
-                ValueName = "PeopleBand",
-                SafeValue = 0, UnsafeValue = 2,
-                Level = PrivacyLevel.Recommended, Category = "Taskbar"
-            },
+            // ====================== TASKBAR (Win11) ======================
             new() {
                 Name = "Taskbar - Caixa de Pesquisa",
-                Description = "Desativa caixa de pesquisa na barra de tarefas (recomendado manter ativado).",
+                Description = "Define modo da barra de pesquisa na tarefas (0=Oculto, 1=Ícone, 2=Caixa).",
                 RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Search",
                 ValueName = "SearchboxTaskbarMode",
-                SafeValue = 2, UnsafeValue = 0,
-                Level = PrivacyLevel.NotRecommended, Category = "Taskbar"
+                SafeValue = 1, UnsafeValue = 2,
+                Level = PrivacyLevel.Limited, Category = "Taskbar"
             },
+            // ====================== WIDGETS (Win11) ======================
             new() {
-                Name = "Taskbar - Meet Now",
-                Description = "Desativa botão Meet Now na barra de tarefas.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
-                ValueName = "HideSCAMeetNow",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Taskbar"
-            },
-            new() {
-                Name = "Taskbar - News and Interests",
-                Description = "Desativa News and Interests na barra de tarefas.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Feeds",
-                ValueName = "ShellFeedsTaskbarViewMode",
-                SafeValue = 2, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Taskbar"
+                Name = "Widgets - Painel de Notícias",
+                Description = "Desativa o painel de Widgets com feed de notícias (Win11).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Dsh",
+                ValueName = "AllowNewsAndInterests",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Recommended, Category = "Widgets"
             },
             // ====================== MISC ======================
             new() {
@@ -1480,6 +1324,178 @@ namespace KitLugia.Core
                 SafeValue = 3, UnsafeValue = 4,
                 Level = PrivacyLevel.NotRecommended, Category = "Misc",
                 IsService = true, ServiceName = "wuauserv"
+            },
+
+            // ====================== WINDOWS 11 ESPECÍFICO ======================
+            new() {
+                Name = "Windows Recall - Desativar",
+                Description = "Desativa completamente o Windows Recall (captura automática de telas por IA).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "DisableAIDataAnalysis",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
+            },
+            new() {
+                Name = "Windows Recall - Snapshots",
+                Description = "Impede que o Recall salve snapshots de tela no disco.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "DisableRecallSnapshots",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
+            },
+            new() {
+                Name = "Windows Recall - Indexação",
+                Description = "Desativa indexação de conteúdo pelo Recall para busca semântica.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "DisableRecallContentIndexing",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
+            },
+            new() {
+                Name = "Copilot Runtime",
+                Description = "Desativa o serviço de runtime do Copilot em segundo plano.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "DisableCopilotRuntime",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
+            },
+            new() {
+                Name = "Copilot no File Explorer",
+                Description = "Remove o Copilot do File Explorer (Win11 24H2+).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "TurnOffWindowsCopilotForFileExplorer",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Limited, Category = "Recall & IA"
+            },
+            new() {
+                Name = "IA no Paint",
+                Description = "Desativa Generative Fill e funções de IA no Paint.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "DisablePaintAIFeatures",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Limited, Category = "Recall & IA"
+            },
+            new() {
+                Name = "IA no Photos",
+                Description = "Desativa funções de IA no app Fotos (remoção de fundo, etc.).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "DisablePhotosAIFeatures",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Limited, Category = "Recall & IA"
+            },
+            new() {
+                Name = "Telemetria de IA do Edge",
+                Description = "Desativa dados de uso das funções de IA do Edge.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge",
+                ValueName = "AIChatEnabled",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
+            },
+            new() {
+                Name = "IA na Pesquisa do Windows",
+                Description = "Desativa resultados de IA na barra de pesquisa.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
+                ValueName = "IsAADCloudSearchEnabled",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
+            },
+            new() {
+                Name = "IA no Notepad",
+                Description = "Desativa sugestões de IA no Notepad (Win11 24H2+).",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Notepad",
+                ValueName = "ShowCopilotSuggestions",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Limited, Category = "Recall & IA"
+            },
+            // ====================== WINDOWS SPOTLIGHT ======================
+            new() {
+                Name = "Spotlight na Tela de Bloqueio",
+                Description = "Desativa imagens e dicas da Microsoft na tela de bloqueio.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\CloudContent",
+                ValueName = "DisableWindowsSpotlightFeatures",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Limited, Category = "Tela de Bloqueio"
+            },
+            new() {
+                Name = "Conteúdo Sugerido",
+                Description = "Desativa conteúdo sugerido pela Microsoft (dicas, apps, etc.).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\CloudContent",
+                ValueName = "DisableSoftLanding",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Recommended, Category = "Tela de Bloqueio"
+            },
+            new() {
+                Name = "Spotlight no Desktop",
+                Description = "Desativa Windows Spotlight no desktop (Win11 23H2+).",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
+                ValueName = "RotatingLockScreenEnabled",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Limited, Category = "Tela de Bloqueio"
+            },
+            new() {
+                Name = "Dicas na Tela de Bloqueio",
+                Description = "Remove dicas e truques da tela de bloqueio.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
+                ValueName = "RotatingLockScreenOverlayEnabled",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Recommended, Category = "Tela de Bloqueio"
+            },
+            new() {
+                Name = "Fatos Curiosos na Tela de Bloqueio",
+                Description = "Desativa fatos curiosos e dicas na tela de bloqueio.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
+                ValueName = "SubscribedContent-338387Enabled",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Recommended, Category = "Tela de Bloqueio"
+            },
+            // ====================== LIMPEZA DE BLOATWARE ======================
+            new() {
+                Name = "Desativar MSN News no Widgets",
+                Description = "Remove o feed de notícias MSN do painel de Widgets (Win11).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Dsh",
+                ValueName = "AllowNewsAndInterests",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Recommended, Category = "Widgets"
+            },
+            new() {
+                Name = "Telemetria de Experiência do Dispositivo",
+                Description = "Desativa telemetria de experiência do dispositivo (Device Census).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection",
+                ValueName = "LimitDiagnosticLogCollection",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Recommended, Category = "Telemetria"
+            },
+            new() {
+                Name = "SmartScreen do Explorador",
+                Description = "Desativa SmartScreen do Explorer para apps (recomendado manter).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer",
+                ValueName = "SmartScreenEnabled",
+                SafeValue = "Off", UnsafeValue = "RequireAdmin",
+                Level = PrivacyLevel.NotRecommended, Category = "Segurança"
+            },
+            new() {
+                Name = "SmartScreen para Apps Store",
+                Description = "Desativa SmartScreen para apps da Store (recomendado manter).",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer",
+                ValueName = "SmartScreenEnabled",
+                SafeValue = "Off", UnsafeValue = "RequireAdmin",
+                Level = PrivacyLevel.NotRecommended, Category = "Segurança"
+            },
+            new() {
+                Name = "Experiência de Uso do Windows",
+                Description = "Desativa a Experiência de Uso do Windows ( relatórios de uso ).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection",
+                ValueName = "DoNotShowFeedbackNotifications",
+                SafeValue = 1, UnsafeValue = 0,
+                Level = PrivacyLevel.Recommended, Category = "Telemetria"
+            },
+            new() {
+                Name = "Desativar suggested content in Settings",
+                Description = "Remove sugestões e anúncios no app Configurações do Windows 11.",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
+                ValueName = "SubscribedContent-338393Enabled",
+                SafeValue = 0, UnsafeValue = 1,
+                Level = PrivacyLevel.Recommended, Category = "Publicidade"
             },
         };
 

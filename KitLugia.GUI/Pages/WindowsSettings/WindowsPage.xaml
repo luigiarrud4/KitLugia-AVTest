@@ -24,64 +24,78 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="0" Click="BtnForceStopUnlock_Click" Padding="0" HorizontalAlignment="Stretch" Cursor="Hand" ToolTip="Libere arquivos bloqueados por processos no Windows">
+                    <!-- Card 1: Force Stop Unlock -->
+                    <Button Grid.Column="0" Click="BtnForceStopUnlock_Click" Padding="0" HorizontalAlignment="Stretch" Height="Auto" Cursor="Hand" ToolTip="Libere arquivos bloqueados por processos no Windows">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="BgBorder" CornerRadius="8" Background="#2A1A3A" BorderBrush="#AA44CC" BorderThickness="1" SnapsToDevicePixels="True">
                                     <StackPanel Margin="14,14">
                                         <TextBlock Text="&#x1F513;" FontSize="26"/>
                                         <TextBlock Text="Force Stop Unlock" FontSize="15" FontWeight="SemiBold" Foreground="#DD88CC" Margin="0,8,0,3"/>
-                                        <TextBlock Text="Desbloqueie arquivos travados por processos — direto no bot&#xE3;o direito" FontSize="11" Foreground="#AA55AA" TextWrapping="Wrap"/>
+                                        <TextBlock Text="Desbloqueie arquivos travados por processos — direto no botão direito" FontSize="11" Foreground="#AA55AA" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                                 <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="BgBorder" Property="Background" Value="#3A2A4A"/></Trigger>
-                                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="BgBorder" Property="Background" Value="#4A3A5A"/></Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="BgBorder" Property="Background" Value="#3A2A4A"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="BgBorder" Property="Background" Value="#4A3A5A"/>
+                                    </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
 
-                    <Button Grid.Column="2" Click="BtnContextMenu_Click" Padding="0" HorizontalAlignment="Stretch" Cursor="Hand"
-                            ToolTip="Gerencie tudo que aparece no bot&#xE3;o direito — Windows vs terceiros, com pr&#xE9;via visual">
+                    <!-- Card 2: Menu de Contexto (gerenciar existentes) -->
+                    <Button Grid.Column="2" Click="BtnContextMenu_Click" Padding="0" HorizontalAlignment="Stretch" Height="Auto" Cursor="Hand"
+                            ToolTip="Veja, habilite, desabilite ou delete itens do menu de contexto — Windows x terceiros com prévia visual">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="BgBorder" CornerRadius="8" Background="#1A2A1E" BorderBrush="#33AA55" BorderThickness="1" SnapsToDevicePixels="True">
                                     <StackPanel Margin="14,14">
                                         <TextBlock Text="&#x1F5B1;&#xFE0F;" FontSize="26"/>
                                         <TextBlock Text="Menu de Contexto" FontSize="15" FontWeight="SemiBold" Foreground="#77DD99" Margin="0,8,0,3"/>
-                                        <TextBlock Text="Gerencie tudo que aparece no bot&#xE3;o direito — Windows vs terceiros, com pr&#xE9;via visual" FontSize="11" Foreground="#559966" TextWrapping="Wrap"/>
+                                        <TextBlock Text="Gerencie tudo que aparece no botão direito — Windows vs terceiros, com prévia visual" FontSize="11" Foreground="#559966" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                                 <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="BgBorder" Property="Background" Value="#2A3A2E"/></Trigger>
-                                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="BgBorder" Property="Background" Value="#3A4A3E"/></Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="BgBorder" Property="Background" Value="#2A3A2E"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="BgBorder" Property="Background" Value="#3A4A3E"/>
+                                    </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
 
-                    <Button Grid.Column="4" Click="BtnContextMenuAdd_Click" Padding="0" HorizontalAlignment="Stretch" Cursor="Hand"
-                            ToolTip="Adicione super vers&#xF5;es dos comandos: Take Ownership turbo, Terminal, PowerShell 7 e mais">
+                    <!-- Card 3: Adicionar ao Menu (super comandos) -->
+                    <Button Grid.Column="4" Click="BtnContextMenuAdd_Click" Padding="0" HorizontalAlignment="Stretch" Height="Auto" Cursor="Hand"
+                            ToolTip="Adicione super versões dos comandos: Take Ownership turbo, Terminal, PowerShell 7 e mais">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="BgBorder" CornerRadius="8" Background="#2A2415" BorderBrush="#AA9933" BorderThickness="1" SnapsToDevicePixels="True">
                                     <StackPanel Margin="14,14">
                                         <TextBlock Text="&#x26A1;" FontSize="26"/>
                                         <TextBlock Text="Adicionar ao Menu" FontSize="15" FontWeight="SemiBold" Foreground="#EEDD77" Margin="0,8,0,3"/>
-                                        <TextBlock Text="Super comandos turbinados: Take Ownership r&#xE1;pido, Terminal, PowerShell e mais" FontSize="11" Foreground="#AA9955" TextWrapping="Wrap"/>
+                                        <TextBlock Text="Super comandos turbinados: Take Ownership rápido, Terminal, PowerShell e mais" FontSize="11" Foreground="#AA9955" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                                 <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="BgBorder" Property="Background" Value="#3A3425"/></Trigger>
-                                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="BgBorder" Property="Background" Value="#4A4435"/></Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="BgBorder" Property="Background" Value="#3A3425"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="BgBorder" Property="Background" Value="#4A4435"/>
+                                    </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
                 </Grid>
 
-                <!-- SECAO: DISPOSITIVOS (Teclado, Mouse, Som, Impressoras, Bluetooth) -->
                 <!-- ================================================================== -->
                 <TextBlock Text="&#x1F5A5;&#xFE0F; Dispositivos" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,12"/>
 

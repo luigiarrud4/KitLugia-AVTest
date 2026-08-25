@@ -74,12 +74,7 @@ namespace KitLugia.GUI.Pages
             };
             _logTimer.Tick += FlushLogQueue;
             Loaded += OnLoaded;
-            Unloaded += (_, _) =>
-            {
-                _logTimer.Stop();
-                try { WinbootManager.OnLogUpdate -= QueueLogUpdate; } catch { }
-                try { WinbootManager.OnLogReplace -= HandleLogReplace; } catch { }
-            };
+            Unloaded += WinpeToolsPage_Unloaded;
         }
 
         private async void OnLoaded(object s, RoutedEventArgs e)
@@ -720,6 +715,14 @@ namespace KitLugia.GUI.Pages
             ProgressFill.Width = 0;
             _lastProgressPct = 0;
             PanelOpFooter.Visibility = Visibility.Collapsed;
+
+            // SEGURANÇA: bloqueia navegação enquanto uma operação de boot/reboot está em curso.
+            // Sair da página com shutdown /r /t 10 agendado deixava o usuário sem aviso
+            // de que o PC ia reiniciar sozinho.
+            if (System.Windows.Application.Current.MainWindow is MainWindow mw)
+            {
+                mw.IsNavigationLocked = true;
+            }
         }
 
         private void UpdateStatus(string status)
@@ -742,6 +745,12 @@ namespace KitLugia.GUI.Pages
             var resultColor = IsErrorText(result) ? _errorBrush : _successBrush;
             TxtOpDesc.Inlines.Add(new Run(result) { Foreground = resultColor });
             PanelOpFooter.Visibility = Visibility.Visible;
+
+            // Operação concluída: libera a navegação novamente
+            if (System.Windows.Application.Current.MainWindow is MainWindow mwDone)
+            {
+                mwDone.IsNavigationLocked = false;
+            }
 
             if (IsErrorText(result))
             {
@@ -978,6 +987,24 @@ namespace KitLugia.GUI.Pages
         }
 
         #endregion
+        public void Cleanup()
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
+            _logTimer?.Stop();
+            _logTimer = null;
+            try { WinbootManager.OnLogUpdate -= QueueLogUpdate; } catch { }
+            try { WinbootManager.OnLogReplace -= HandleLogReplace; } catch { }
+            Loaded -= OnLoaded;
+            this.Unloaded -= WinpeToolsPage_Unloaded;
+            this.DataContext = null;
+        }
+
+        private void WinpeToolsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
     }
 
     public class PartitionListItem

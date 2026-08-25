@@ -168,8 +168,8 @@
                         </StackPanel>
 
                         <Border x:Name="BloatwareLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" x:Name="BloatwareSpinnerHost">
+                                <ContentControl x:Name="BloatwareSpinner" Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Analisando..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
                                 <TextBlock x:Name="TxtBloatwareProgress" Foreground="#FFD700" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
                             </StackPanel>
@@ -478,7 +478,17 @@
                                                 </CheckBox.LayoutTransform>
                                             </CheckBox>
                                             <Grid Grid.Column="1" Width="32" Height="32" VerticalAlignment="Center">
-                                                <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <Image Source="{Binding Icon}" Width="32" Height="32" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <ContentControl.Style>
+                                                        <Style TargetType="ContentControl">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ContentControl.Style>
+                                                </ContentControl>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>

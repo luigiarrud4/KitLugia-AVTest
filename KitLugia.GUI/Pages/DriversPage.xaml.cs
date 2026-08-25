@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -23,17 +24,20 @@ namespace KitLugia.GUI.Pages
     public partial class DriversPage : Page
     {
         private List<DriverItem> _allDrivers = new();
+        private List<KernelDriverInfo> _allKernelDrivers = new();
         private CancellationTokenSource? _cts;
         private bool _isDriverOperation;
 
-        public DriversPage()
+        public DriversPage(int tabIndex = 0)
         {
             InitializeComponent();
             _cts = new CancellationTokenSource();
             // Carrega drivers em background para não travar a UI
             _ = Task.Run(() => LoadDrivers());
+            _ = Task.Run(() => LoadKernelDrivers());
             CheckVerifierStatus(); // Inicia a checagem da aba Diagnóstico
 
+            Loaded += (s, e) => { if (MainTabs != null) MainTabs.SelectedIndex = tabIndex; };
             this.Unloaded += DriversPage_Unloaded;
         }
 
@@ -48,11 +52,18 @@ namespace KitLugia.GUI.Pages
 
             _allDrivers?.Clear();
             _allDrivers = null!;
+            _allKernelDrivers?.Clear();
+            _allKernelDrivers = null!;
 
             if (GridDrivers != null)
             {
                 GridDrivers.ItemsSource = null;
                 GridDrivers.Items.Clear();
+            }
+            if (GridKernel != null)
+            {
+                GridKernel.ItemsSource = null;
+                GridKernel.Items.Clear();
             }
 
             this.Unloaded -= DriversPage_Unloaded;
@@ -60,7 +71,7 @@ namespace KitLugia.GUI.Pages
 
             this.DataContext = null;
 
-
+            MemoryHelper.TrimWorkingSet();
 
         }
 
@@ -293,7 +304,138 @@ namespace KitLugia.GUI.Pages
         #endregion
 
         // =========================================================
-        // ABA 2: DIAGNÓSTICO (BSOD / VERIFIER)
+        // ABA 2: DRIVERS DE INICIALIZAÇÃO (KERNEL - Registry Type 1/2)
+        // =========================================================
+        #region Kernel Drivers Logic
+
+        private async Task LoadKernelDrivers()
+        {
+            try
+            {
+                await Dispatcher.InvokeAsync(() => SetLoading(true, "Analisando drivers de inicialização..."));
+                var token = _cts?.Token ?? CancellationToken.None;
+                var drivers = await Task.Run(() => KernelDriverManager.GetKernelDrivers(includeDisabled: false), token);
+                _allKernelDrivers = drivers;
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    ApplyKernelFilter();
+                    UpdateKernelSummary();
+                    SetLoading(false);
+                });
+            }
+            catch (OperationCanceledException) { await Dispatcher.InvokeAsync(() => SetLoading(false)); }
+            catch (Exception ex)
+            {
+                Logger.LogError("LoadKernelDrivers", ex.Message);
+                await Dispatcher.InvokeAsync(() => SetLoading(false));
+            }
+        }
+
+        private void UpdateKernelSummary()
+        {
+            var (total, third, boot, sys, auto) = KernelDriverManager.GetSummary(_allKernelDrivers);
+            int risk = _allKernelDrivers.Count(d => d.IsThirdParty && d.StartValue <= 1);
+            if (TxtKernelTotal != null) TxtKernelTotal.Text = total.ToString();
+            if (TxtKernelMs != null) TxtKernelMs.Text = (total - third).ToString();
+            if (TxtKernelThird != null) TxtKernelThird.Text = third.ToString();
+            if (TxtKernelRisk != null) TxtKernelRisk.Text = risk.ToString();
+        }
+
+        private void ApplyKernelFilter()
+        {
+            if (_allKernelDrivers == null || GridKernel == null) return;
+            string filter = TxtKernelFilter?.Text?.ToLower().Trim() ?? "";
+            bool thirdOnly = ChkKernelThirdOnly?.IsChecked == true;
+            bool riskOnly = ChkKernelRiskOnly?.IsChecked == true;
+
+            int startSel = CboKernelStart?.SelectedIndex ?? 0;
+            int? wantedStart = startSel switch { 1 => 0, 2 => 1, 3 => 2, 4 => 3, _ => null };
+
+            var filtered = _allKernelDrivers.Where(d =>
+            {
+                if (wantedStart.HasValue && d.StartValue != wantedStart.Value) return false;
+                if (thirdOnly && !d.IsThirdParty) return false;
+                if (riskOnly && !(d.IsThirdParty && d.StartValue <= 1)) return false;
+                if (!string.IsNullOrEmpty(filter))
+                {
+                    if (!d.Name.ToLower().Contains(filter) && !(d.ImagePath ?? "").ToLower().Contains(filter) && !(d.ParentSoftware ?? "").ToLower().Contains(filter))
+                        return false;
+                }
+                return true;
+            }).ToList();
+
+            // Ordena: risco primeiro (Boot terceiros no topo)
+            filtered = filtered.OrderBy(d => d.IsThirdParty && d.StartValue <= 1 ? 0 : d.IsThirdParty ? 1 : 2).ThenBy(d => d.StartValue).ThenBy(d => d.Name).ToList();
+
+            GridKernel.ItemsSource = filtered;
+            if (TxtKernelCount != null) TxtKernelCount.Text = $"{filtered.Count} drivers";
+        }
+
+        private void TxtKernelFilter_TextChanged(object sender, TextChangedEventArgs e) => ApplyKernelFilter();
+        private void CboKernelStart_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyKernelFilter();
+        private void ChkKernelThirdOnly_Click(object sender, RoutedEventArgs e) => ApplyKernelFilter();
+        private void ChkKernelRiskOnly_Click(object sender, RoutedEventArgs e) => ApplyKernelFilter();
+
+        private async void BtnReloadKernel_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isDriverOperation) return;
+            _isDriverOperation = true;
+            try { await LoadKernelDrivers(); } finally { _isDriverOperation = false; }
+        }
+
+        private void BtnCopyKernel_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var list = GridKernel.ItemsSource as IEnumerable<KernelDriverInfo>;
+                if (list == null) return;
+                var lines = list.Select(d => $"{d.StartIcon} {d.Name,-30} {d.StartName,-8} {(d.IsThirdParty ? "TERCEIROS" : "Microsoft"),-10} {d.ParentSoftware} | {d.ImagePath}");
+                Clipboard.SetText(string.Join(Environment.NewLine, lines));
+                if (Application.Current.MainWindow is MainWindow mw) mw.ShowSuccess("COPIADO", $"{list.Count()} linhas copiadas.");
+            }
+            catch (Exception ex) { Logger.LogError("BtnCopyKernel", ex.Message); }
+        }
+
+        private void CtxKernelCopyName_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridKernel.SelectedItem is KernelDriverInfo d) Clipboard.SetText(d.Name);
+        }
+        private void CtxKernelCopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridKernel.SelectedItem is KernelDriverInfo d) Clipboard.SetText(string.IsNullOrWhiteSpace(d.ResolvedPath) ? d.ImagePath : d.ResolvedPath);
+        }
+        private void CtxKernelOpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (GridKernel.SelectedItem is not KernelDriverInfo d) return;
+                string p = d.ResolvedPath;
+                if (string.IsNullOrWhiteSpace(p) || !File.Exists(p))
+                {
+                    if (Application.Current.MainWindow is MainWindow mw) mw.ShowError("ERRO", $"Arquivo não encontrado:\n{d.ImagePath}");
+                    return;
+                }
+                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{p}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex) { Logger.LogError("CtxKernelOpenFolder", ex.Message); }
+        }
+        private void CtxKernelViewJson_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (GridKernel.SelectedItem is not KernelDriverInfo d) return;
+                string json = System.Text.Json.JsonSerializer.Serialize(d, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                Clipboard.SetText(json);
+                if (Application.Current.MainWindow is MainWindow mw) mw.ShowInfo("JSON", "Detalhes copiados como JSON.");
+            }
+            catch (Exception ex) { Logger.LogError("CtxKernelViewJson", ex.Message); }
+        }
+
+        #endregion
+
+        // =========================================================
+        // ABA 3: DIAGNÓSTICO (BSOD / VERIFIER)
         // =========================================================
         #region Diagnostics Logic
 

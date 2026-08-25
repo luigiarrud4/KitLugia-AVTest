@@ -130,17 +130,25 @@
                         <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Orientation="Horizontal">
                            <Border x:Name="BdrLiveBadge" Background="#33FFD600" BorderBrush="#FFD600" BorderThickness="1" CornerRadius="4" Padding="6,2" Visibility="Collapsed" Margin="0,0,10,0">
                                <StackPanel Orientation="Horizontal">
+                                   <!-- Pulso controlado pela visibilidade do badge (antes: Forever no Loaded) -->
                                    <Ellipse Width="6" Height="6" Fill="#FFD600" VerticalAlignment="Center" Margin="0,0,6,0">
                                        <Ellipse.Style>
                                            <Style TargetType="Ellipse">
+                                               <Setter Property="Opacity" Value="0.5"/>
                                                <Style.Triggers>
-                                                   <EventTrigger RoutedEvent="Loaded">
-                                                       <BeginStoryboard>
-                                                           <Storyboard>
-                                                               <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.2" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever"/>
-                                                           </Storyboard>
-                                                       </BeginStoryboard>
-                                                   </EventTrigger>
+                                                   <DataTrigger Binding="{Binding Visibility, ElementName=BdrLiveBadge}" Value="Visible">
+                                                       <Setter Property="Opacity" Value="1"/>
+                                                       <DataTrigger.EnterActions>
+                                                           <BeginStoryboard x:Name="LiveBadgePulse">
+                                                               <Storyboard>
+                                                                   <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.2" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever"/>
+                                                               </Storyboard>
+                                                           </BeginStoryboard>
+                                                       </DataTrigger.EnterActions>
+                                                       <DataTrigger.ExitActions>
+                                                           <StopStoryboard BeginStoryboardName="LiveBadgePulse"/>
+                                                       </DataTrigger.ExitActions>
+                                                   </DataTrigger>
                                                </Style.Triggers>
                                            </Style>
                                        </Ellipse.Style>
@@ -392,13 +400,8 @@
                                         <RotateTransform x:Name="RotationTransform" Angle="0"/>
                                     </TextBlock.RenderTransform>
                                     <TextBlock.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetName="RotationTransform" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="0:0:2" RepeatBehavior="Forever"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
+                                        <!-- Rotação controlada por SetGearSpin() no code-behind:
+                                             só gira enquanto o overlay de operação está aberto -->
                                     </TextBlock.Triggers>
                                 </TextBlock>
                                 <TextBlock x:Name="TxtOpStatus" Text="Status: Processando..." Foreground="{StaticResource TextMuted}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
@@ -421,13 +424,30 @@
 
                     <!-- Live Aesthetic Log (Corner Pinned) -->
                     <StackPanel Grid.Row="2" x:Name="PanelLiveActivity" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,-20">
-                        <!-- Pulsing Red Dot -->
-                        <Ellipse Width="6" Height="6" Fill="#FFFF3D00" Margin="0,0,6,0" VerticalAlignment="Center">
-                            <Ellipse.Triggers>
-                                <EventTrigger RoutedEvent="Loaded">
-                                    <BeginStoryboard Storyboard="{StaticResource LivePulseStoryboard}"/>
-                                </EventTrigger>
-                            </Ellipse.Triggers>
+                        <!-- Pulsing Red Dot — pulso só quando o painel de atividade está visível
+                             (antes: Storyboard Forever no Loaded, consumindo CPU sempre) -->
+                        <Ellipse Width="6" Height="6" Fill="#FFFF3D00" Margin="0,0,6,0" VerticalAlignment="Center"
+                                 x:Name="LiveActivityDot">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Visibility, ElementName=PanelLiveActivity}" Value="Visible">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="LivePulseBegin">
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.2" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="LivePulseBegin"/>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
                         </Ellipse>
                         <TextBlock x:Name="TxtLiveActivity" Text="..." Foreground="{StaticResource TextMuted}" FontSize="9" FontFamily="Consolas" 
                                    VerticalAlignment="Center" Opacity="0.5" TextTrimming="CharacterEllipsis" MaxWidth="350"/>

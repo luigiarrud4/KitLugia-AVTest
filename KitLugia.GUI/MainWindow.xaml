@@ -36,7 +36,7 @@
             </Grid.RowDefinitions>
 
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280"/>
+                <ColumnDefinition x:Name="SidebarColumn" Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -46,7 +46,8 @@
                     Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
                     Panel.ZIndex="99999"
                     Visibility="Visible"
-                    Opacity="0">
+                    Opacity="0"
+                    IsHitTestVisible="False">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1" x:Name="SplashGradient">
                         <GradientStop Color="#0A0A0A" Offset="0"/>
@@ -117,6 +118,97 @@
                     </StackPanel>
                 </Grid>
             </Border>
+
+            <!-- ========================================================= -->
+            <!-- ÁREA BOTÃO GERENCIADOR (Esquerda - quadrado vermelho do print) -->
+            <!-- ========================================================= -->
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        WindowChrome.IsHitTestVisibleInChrome="True" Margin="8,6,0,0" Panel.ZIndex="9999">
+                <!-- HAMBURGER MENU TOGGLE -->
+                <Button x:Name="BtnHamburger" Width="40" Height="32" Click="BtnHamburger_Click"
+                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                        ToolTip="Abrir/Fechar Menu Lateral">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" Padding="4">
+                                <Grid Width="16" Height="14">
+                                    <Rectangle x:Name="line1" Width="16" Height="2" Fill="#CCCCCC" HorizontalAlignment="Center" VerticalAlignment="Top" RadiusX="1" RadiusY="1">
+                                        <Rectangle.RenderTransform>
+                                            <TranslateTransform X="0" Y="0"/>
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                    <Rectangle x:Name="line2" Width="16" Height="2" Fill="#CCCCCC" HorizontalAlignment="Center" VerticalAlignment="Center" RadiusX="1" RadiusY="1"/>
+                                    <Rectangle x:Name="line3" Width="16" Height="2" Fill="#CCCCCC" HorizontalAlignment="Center" VerticalAlignment="Bottom" RadiusX="1" RadiusY="1">
+                                        <Rectangle.RenderTransform>
+                                            <TranslateTransform X="0" Y="0"/>
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#22FFD700"/>
+                                    <Setter TargetName="line1" Property="Fill" Value="#FFD700"/>
+                                    <Setter TargetName="line2" Property="Fill" Value="#FFD700"/>
+                                    <Setter TargetName="line3" Property="Fill" Value="#FFD700"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#44FFD700"/>
+                                    <Setter TargetName="line1" Property="Fill" Value="#FFFFFF"/>
+                                    <Setter TargetName="line2" Property="Fill" Value="#FFFFFF"/>
+                                    <Setter TargetName="line3" Property="Fill" Value="#FFFFFF"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+                <Button x:Name="BtnKitTaskManager" Width="40" Height="32" Click="BtnKitTaskManager_Click"
+                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                        ToolTip="Gerenciador de Tarefas do Kit — fecha apps de verdade (Force Stop + drivers)">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                </Border.RenderTransform>
+                                <Grid Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <!-- Ícone de gráfico de barras (Task Manager) -->
+                            <Path Fill="#808080" Data="M1,14 L1,10 Q1,9 2,9 L4,9 Q5,9 5,10 L5,14 Q5,15 4,15 L2,15 Q1,15 1,14Z M6.5,14 L6.5,6 Q6.5,5 7.5,5 L9.5,5 Q10.5,5 10.5,6 L10.5,14 Q10.5,15 9.5,15 L7.5,15 Q6.5,15 6.5,14Z M12,14 L12,1 Q12,0 13,0 L15,0 Q16,0 16,1 L16,14 Q16,15 15,15 L13,15 Q12,15 12,14Z" x:Name="taskManagerIcon"/>
+                        </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.1" Duration="0:0:0.15"/>
+                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.1" Duration="0:0:0.15"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15"/>
+                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#22FFD700"/>
+                                    <Setter TargetName="taskManagerIcon" Property="Fill" Value="#FFD700"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#55FFD700"/>
+                                    <Setter TargetName="bdr" Property="RenderTransform">
+                                        <Setter.Value><ScaleTransform ScaleX="0.92" ScaleY="0.92"/></Setter.Value>
+                                    </Setter>
+                                    <Setter TargetName="taskManagerIcon" Property="Fill" Value="#FFFFFF"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </StackPanel>
 
             <!-- ========================================================= -->
             <!-- &#xC1;REA DE BOT&#xD5;ES SUPERIORES (Direita) -->
@@ -200,6 +292,12 @@
                                     </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#22FFD700"/>
                                 </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#55FFD700"/>
+                                    <Setter TargetName="bdr" Property="RenderTransform">
+                                        <Setter.Value><ScaleTransform ScaleX="0.9" ScaleY="0.9"/></Setter.Value>
+                                    </Setter>
+                                </Trigger>
                                 <DataTrigger Binding="{Binding GoodbyeDPIActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                     <Setter TargetName="wifiIcon" Property="Foreground" Value="#FFD700"/>
                                 </DataTrigger>
@@ -270,6 +368,12 @@
                                     </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#22FFD700"/>
                                 </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#55FFD700"/>
+                                    <Setter TargetName="bdr" Property="RenderTransform">
+                                        <Setter.Value><ScaleTransform ScaleX="0.9" ScaleY="0.9"/></Setter.Value>
+                                    </Setter>
+                                </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
@@ -321,6 +425,12 @@
                                     <Setter TargetName="bdr" Property="Background" Value="#222196F3"/>
                                     <Setter TargetName="refreshIcon" Property="Foreground" Value="#FFFFFF"/>
                                 </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#552196F3"/>
+                                    <Setter TargetName="bdr" Property="RenderTransform">
+                                        <Setter.Value><ScaleTransform ScaleX="0.9" ScaleY="0.9"/></Setter.Value>
+                                    </Setter>
+                                </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
@@ -366,6 +476,12 @@
                                         </BeginStoryboard>
                                     </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#2200FF00"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#5500FF00"/>
+                                    <Setter TargetName="bdr" Property="RenderTransform">
+                                        <Setter.Value><ScaleTransform ScaleX="0.9" ScaleY="0.9"/></Setter.Value>
+                                    </Setter>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -423,106 +539,69 @@
                                     </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#22FFFFFF"/>
                                 </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#55FFFFFF"/>
+                                    <Setter TargetName="bdr" Property="RenderTransform">
+                                        <Setter.Value><ScaleTransform ScaleX="0.9" ScaleY="0.9"/></Setter.Value>
+                                    </Setter>
+                                </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
 
-                <!-- BOT&#xD5;ES DE JANELA -->
+                <!-- BOT&#xD5;ES DE JANELA — triggers declarativos: o estado final SEMPRE &#xE9; aplicado,
+                     mesmo se o mouse sair no meio da transi&#xE7;&#xE3;o (anima&#xE7;&#xF5;es com Enter/ExitActions
+                     podiam ficar presas em cor intermedi&#xE1;ria). Handoff=And para trocar sem flash. -->
                 <Button Content="&#x2212;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnMinimize_Click">
+                        BorderThickness="0" Click="BtnMinimize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 17: Transi&#xE7;&#xE3;o suave de cor no bot&#xE3;o minimizar (0.15s) - MainWindow.xaml linha ~160-178 -->
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="#33FFFFFF" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="Transparent" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#33FFFFFF"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#50FFFFFF"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
                 <Button Content="&#x25A1;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnMaximize_Click">
+                        BorderThickness="0" Click="BtnMaximize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 18: Transi&#xE7;&#xE3;o suave de cor no bot&#xE3;o maximizar (0.15s) - MainWindow.xaml linha ~179-197 -->
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="#33FFFFFF" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="Transparent" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#33FFFFFF"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#50FFFFFF"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
                 <Button Content="&#x2715;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnClose_Click">
+                        BorderThickness="0" Click="BtnClose_Click" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 15: Transi&#xE7;&#xE3;o suave de cor no bot&#xE3;o fechar (0.15s) - MainWindow.xaml linha ~198-217 -->
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="#C42B1C" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="Transparent" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#C42B1C"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bdr" Property="Background" Value="#E81123"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -534,7 +613,7 @@
             <!-- MENU LATERAL (ESQUERDA) -->
             <!-- ========================================================= -->
             <Border x:Name="SidebarPanel" Grid.Row="0" Grid.Column="0" Background="{StaticResource SidebarBackground}"
-                    BorderThickness="0,0,1,0" BorderBrush="{StaticResource CardBorder}" Opacity="0">
+                    BorderThickness="0,0,1,0" BorderBrush="{StaticResource CardBorder}" Opacity="0" Width="280">
                 <Grid Margin="15,25">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -715,6 +794,7 @@
                                      Foreground="{StaticResource AccentColor}"
                                      Click="NavButton_Click"
                                      ToolTip="GameBoost Inteligente - Algoritmo ProBalance Style"/>
+                        
                         <!-- BOT&#xC3;O DIAGN&#xD3;STICO -->
                         <RadioButton x:Name="BtnDiagnostic" GroupName="Menu" Tag="&#x1F52C;" Content="Diagn&#xF3;stico (Debug)" 
                                      Style="{StaticResource NavButtonStyle}" 
@@ -731,7 +811,7 @@
             <!-- CONTE&#xDA;DO PRINCIPAL (DIREITA) -->
             <!-- ========================================================= -->
             <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 5: Fade-in ao navegar entre p&#xE1;ginas (0.25s) - MainWindow.xaml linha ~357 -->
-            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="Transparent" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated">
+            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="{StaticResource WindowBackground}" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated">
                 <Frame.RenderTransform>
                     <ScaleTransform ScaleX="1" ScaleY="1" CenterX="0.5" CenterY="0.5"/>
                 </Frame.RenderTransform>

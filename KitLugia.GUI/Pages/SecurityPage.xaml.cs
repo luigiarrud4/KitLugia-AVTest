@@ -128,17 +128,26 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool enable = ChkDefender.IsChecked == true;
             ChkDefender.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                if (enable) SystemTweaks.EnableMSDefender();
-                else SystemTweaks.DisableMSDefender();
-            });
 
-            ChkDefender.IsEnabled = true;
-            ShowNotification(enable ? "✅ Defender Ativado" : "⚠️ Defender Desativado",
-                enable ? "Windows Defender foi reativado." : "Windows Defender foi desativado. Seu PC está vulnerável.");
-            _ = LoadStateAsync();
+                await Task.Run(() =>
+                {
+                    if (enable) SystemTweaks.EnableMSDefender();
+                    else SystemTweaks.DisableMSDefender();
+                });
+
+                ChkDefender.IsEnabled = true;
+                ShowNotification(enable ? "✅ Defender Ativado" : "⚠️ Defender Desativado",
+                    enable ? "Windows Defender foi reativado." : "Windows Defender foi desativado. Seu PC está vulnerável.");
+                _ = LoadStateAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkDefender_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkRealtimeProtection_Click(object sender, RoutedEventArgs e)
@@ -146,15 +155,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool enable = ChkRealtimeProtection.IsChecked == true;
             ChkRealtimeProtection.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                string keyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection";
-                Registry.SetValue(keyPath, "DisableRealtimeMonitoring", enable ? 0 : 1, RegistryValueKind.DWord);
-            });
 
-            ChkRealtimeProtection.IsEnabled = true;
-            ShowNotification(enable ? "✅ Proteção em Tempo Real Ativada" : "⚠️ Proteção em Tempo Real Desativada", "");
+                await Task.Run(() =>
+                {
+                    string keyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection";
+                    Registry.SetValue(keyPath, "DisableRealtimeMonitoring", enable ? 0 : 1, RegistryValueKind.DWord);
+                });
+
+                ChkRealtimeProtection.IsEnabled = true;
+                ShowNotification(enable ? "✅ Proteção em Tempo Real Ativada" : "⚠️ Proteção em Tempo Real Desativada", "");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkRealtimeProtection_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkVBS_Click(object sender, RoutedEventArgs e)
@@ -210,16 +228,25 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool enable = ChkFirewall.IsChecked == true;
             ChkFirewall.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                string action = enable ? "on" : "off";
-                SystemUtils.RunExternalProcess("netsh", $"advfirewall set allprofiles state {action}", hidden: true);
-            });
 
-            ChkFirewall.IsEnabled = true;
-            ShowNotification(enable ? "✅ Firewall Ativado" : "⚠️ Firewall Desativado", "");
-            _ = LoadStateAsync();
+                await Task.Run(() =>
+                {
+                    string action = enable ? "on" : "off";
+                    SystemUtils.RunExternalProcess("netsh", $"advfirewall set allprofiles state {action}", hidden: true);
+                });
+
+                ChkFirewall.IsEnabled = true;
+                ShowNotification(enable ? "✅ Firewall Ativado" : "⚠️ Firewall Desativado", "");
+                _ = LoadStateAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkFirewall_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkRemoteRegistry_Click(object sender, RoutedEventArgs e)
@@ -227,17 +254,26 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkRemoteRegistry.IsChecked == true; // checked = desativado (mais seguro)
             ChkRemoteRegistry.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                string action = disable ? "disabled" : "auto";
-                SystemUtils.RunExternalProcess("sc", $"config RemoteRegistry start= {action}", hidden: true);
-                if (disable)
-                    SystemUtils.RunExternalProcess("sc", "stop RemoteRegistry", hidden: true);
-            });
 
-            ChkRemoteRegistry.IsEnabled = true;
-            ShowNotification(disable ? "✅ Registro Remoto Desativado" : "⚠️ Registro Remoto Ativado", "");
+                await Task.Run(() =>
+                {
+                    string action = disable ? "disabled" : "auto";
+                    SystemUtils.RunExternalProcess("sc", $"config RemoteRegistry start= {action}", hidden: true);
+                    if (disable)
+                        SystemUtils.RunExternalProcess("sc", "stop RemoteRegistry", hidden: true);
+                });
+
+                ChkRemoteRegistry.IsEnabled = true;
+                ShowNotification(disable ? "✅ Registro Remoto Desativado" : "⚠️ Registro Remoto Ativado", "");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkRemoteRegistry_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkRDP_Click(object sender, RoutedEventArgs e)
@@ -245,15 +281,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkRDP.IsChecked == true; // checked = desativado (mais seguro)
             ChkRDP.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server",
-                    "fDenyTSConnections", disable ? 1 : 0, RegistryValueKind.DWord);
-            });
 
-            ChkRDP.IsEnabled = true;
-            ShowNotification(disable ? "✅ RDP Desativado" : "⚠️ RDP Ativado", "");
+                await Task.Run(() =>
+                {
+                    Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server",
+                        "fDenyTSConnections", disable ? 1 : 0, RegistryValueKind.DWord);
+                });
+
+                ChkRDP.IsEnabled = true;
+                ShowNotification(disable ? "✅ RDP Desativado" : "⚠️ RDP Ativado", "");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkRDP_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkTelemetry_Click(object sender, RoutedEventArgs e)
@@ -261,17 +306,26 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkTelemetry.IsChecked == true;
             ChkTelemetry.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection",
-                    "AllowTelemetry", disable ? 0 : 3, RegistryValueKind.DWord);
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection",
-                    "AllowTelemetry", disable ? 0 : 3, RegistryValueKind.DWord);
-            });
 
-            ChkTelemetry.IsEnabled = true;
-            ShowNotification(disable ? "✅ Telemetria Desativada" : "ℹ️ Telemetria Ativada", "");
+                await Task.Run(() =>
+                {
+                    Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection",
+                        "AllowTelemetry", disable ? 0 : 3, RegistryValueKind.DWord);
+                    Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection",
+                        "AllowTelemetry", disable ? 0 : 3, RegistryValueKind.DWord);
+                });
+
+                ChkTelemetry.IsEnabled = true;
+                ShowNotification(disable ? "✅ Telemetria Desativada" : "ℹ️ Telemetria Ativada", "");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkTelemetry_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkActivityHistory_Click(object sender, RoutedEventArgs e)
@@ -279,17 +333,26 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkActivityHistory.IsChecked == true;
             ChkActivityHistory.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System",
-                    "PublishUserActivities", disable ? 0 : 1, RegistryValueKind.DWord);
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System",
-                    "UploadUserActivities", disable ? 0 : 1, RegistryValueKind.DWord);
-            });
 
-            ChkActivityHistory.IsEnabled = true;
-            ShowNotification(disable ? "✅ Histórico de Atividades Desativado" : "ℹ️ Histórico de Atividades Ativado", "");
+                await Task.Run(() =>
+                {
+                    Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System",
+                        "PublishUserActivities", disable ? 0 : 1, RegistryValueKind.DWord);
+                    Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System",
+                        "UploadUserActivities", disable ? 0 : 1, RegistryValueKind.DWord);
+                });
+
+                ChkActivityHistory.IsEnabled = true;
+                ShowNotification(disable ? "✅ Histórico de Atividades Desativado" : "ℹ️ Histórico de Atividades Ativado", "");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkActivityHistory_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkAdID_Click(object sender, RoutedEventArgs e)
@@ -297,15 +360,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkAdID.IsChecked == true;
             ChkAdID.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo",
-                    "Enabled", disable ? 0 : 1, RegistryValueKind.DWord);
-            });
 
-            ChkAdID.IsEnabled = true;
-            ShowNotification(disable ? "✅ ID de Publicidade Desativado" : "ℹ️ ID de Publicidade Ativado", "");
+                await Task.Run(() =>
+                {
+                    Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo",
+                        "Enabled", disable ? 0 : 1, RegistryValueKind.DWord);
+                });
+
+                ChkAdID.IsEnabled = true;
+                ShowNotification(disable ? "✅ ID de Publicidade Desativado" : "ℹ️ ID de Publicidade Ativado", "");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkAdID_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void ChkLocation_Click(object sender, RoutedEventArgs e)
@@ -313,15 +385,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkLocation.IsChecked == true;
             ChkLocation.IsEnabled = false;
-
-            await Task.Run(() =>
+            try
             {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors",
-                    "DisableLocation", disable ? 1 : 0, RegistryValueKind.DWord);
-            });
 
-            ChkLocation.IsEnabled = true;
-            ShowNotification(disable ? "✅ Localização Desativada" : "ℹ️ Localização Ativada", "");
+                await Task.Run(() =>
+                {
+                    Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors",
+                        "DisableLocation", disable ? 1 : 0, RegistryValueKind.DWord);
+                });
+
+                ChkLocation.IsEnabled = true;
+                ShowNotification(disable ? "✅ Localização Desativada" : "ℹ️ Localização Ativada", "");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SECURITY] Erro em ChkLocation_Click: {ex.Message}");
+                ShowNotification("❌ Erro", ex.Message);
+                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
+            }
         }
 
         private async void CmbUACLevel_SelectionChanged(object sender, SelectionChangedEventArgs e)

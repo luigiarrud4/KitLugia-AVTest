@@ -144,9 +144,10 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button x:Name="BtnCleanup" Content="&#x1F9F9; LIMPAR LIXO" Width="140" Height="38" Margin="0,0,10,0" Click="BtnCleanup_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                    <Button x:Name="BtnBack" Content="&#x2190; VOLTAR" Width="120" Height="38" Margin="0,0,10,0" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                    <Button x:Name="BtnCreate" Content="&#x1F680; INICIAR CRIA&#xC7;&#xC3;O" Width="180" Height="38" FontSize="14" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
+                    <Button x:Name="BtnCleanup" Content="&#x1F9F9; LIMPAR LIXO" Width="130" Height="38" Margin="0,0,8,0" Click="BtnCleanup_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="BtnIsoStudio" Content="&#x1F9EC; ESTÚDIO" Width="130" Height="38" Margin="0,0,8,0" Click="BtnIsoStudio_Click" Style="{StaticResource SecondaryButtonStyle}" ToolTip="Abre o KIT ISO STUDIO — expansor para personalização avançada que não cabe no estilo padrão"/>
+                    <Button x:Name="BtnBack" Content="&#x2190; VOLTAR" Width="110" Height="38" Margin="0,0,8,0" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="BtnCreate" Content="&#x1F680; INICIAR CRIA&#xC7;&#xC3;O" Width="170" Height="38" FontSize="14" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -273,6 +274,165 @@
                         <Button Content="CANCELAR" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Height="38" FontWeight="Bold" Padding="15,8" Margin="0,0,10,0" Cursor="Hand"/>
                         <Button Content="&#x1F680; INICIAR AGORA" Click="BtnConfirmStart_Click" Style="{StaticResource GoldButtonStyle}" Height="38" FontWeight="Bold" Padding="15,8" Cursor="Hand"/>
                     </StackPanel>
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- KIT ISO STUDIO — Expansor (cobre o kit inteiro, nítido, sem blur) -->
+        <Border x:Name="OverlayIsoStudio" Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Grid.ColumnSpan="2" Background="#FF0A0A0A" Visibility="Collapsed" Panel.ZIndex="100" Margin="-30" TextOptions.TextFormattingMode="Display" SnapsToDevicePixels="True">
+            <Border Background="#0F0F0F" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="0" Margin="0" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header Studio -->
+                    <Border Background="#1A1A1A" CornerRadius="14,14,0,0" Padding="18" BorderBrush="#222" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🧬" FontSize="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="KIT ISO STUDIO" FontSize="18" FontWeight="ExtraBold" Foreground="#FFD700" VerticalAlignment="Center"/>
+                                    <Border Background="#FFD700" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="EXPANSOR" FontSize="9" FontWeight="Bold" Foreground="Black"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Expansor integrado — foge do estilo do kit para caber dezenas de personalizações reais da ISO" FontSize="11" Foreground="#AAA" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="ⓘ" FontSize="16" Foreground="#FFD700" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Este painel usa layout expandido (2 colunas, scroll, cards) para comportar muito mais opções que o card padrão do kit"/>
+                                <Button Content="✕" Width="32" Height="32" Click="BtnCloseIsoStudio_Click" Background="#222" Foreground="White" BorderThickness="0" Cursor="Hand" FontSize="14" ToolTip="Fechar"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Conteúdo expansor 2 colunas -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Coluna Esquerda -->
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="🧩 AppX Granular (40+ pacotes)" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Desmarque individualmente — muito além do preset &quot;Remover Bloatware&quot;" FontSize="10" Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <WrapPanel>
+                                            <CheckBox Content="Copilot" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Xbox" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Clipchamp" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Bing" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Solitaire" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Phone Link" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Teams" IsChecked="False" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Cortana" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="Maps" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                            <CheckBox Content="OneDrive" IsChecked="False" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
+                                        </WrapPanel>
+                                        <Button Content="Aplicar aos 40+ (marca preset)" Height="28" Margin="0,8,0,0" Click="BtnIsoStudioApplyDebloat_Click" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="💾 Drivers &amp; Boot" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Injeção real via $WinPEDriver$ + boot BIOS+UEFI" FontSize="10" Foreground="#888" Margin="0,0,0,8"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="TxtStudioDriverFolder" IsReadOnly="True" Text="Nenhuma pasta selecionada" Background="#111" Foreground="#888" BorderBrush="#333" Padding="8" Height="30" VerticalContentAlignment="Center"/>
+                                            <Button Grid.Column="1" Content="📁" Width="36" Height="30" Margin="6,0,0,0" Click="BtnStudioPickDriverFolder_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                        </Grid>
+                                        <CheckBox x:Name="ChkStudioInjectDrivers" Content="Injetar drivers desta pasta na ISO" Margin="0,8,0,0" Foreground="White" FontSize="11"/>
+                                        <CheckBox Content="Forçar boot duplo BIOS+UEFI (oscdimg)" IsChecked="True" Margin="0,6,0,0" Foreground="White" FontSize="11"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" BorderBrush="#2A2A2A" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="🗂️ Arquivos OEM &amp; Support" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <CheckBox Content="Remover Support\" Margin="0,0,0,6" Foreground="White" FontSize="11"/>
+                                        <CheckBox Content="Adicionar $OEM$ (scripts pós-instalação)" Margin="0,0,0,6" Foreground="White" FontSize="11"/>
+                                        <CheckBox Content="Ei.cfg genérico (desbloqueia edições)" IsChecked="True" Margin="0,0,0,6" Foreground="White" FontSize="11"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Coluna Direita -->
+                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="🔧 Registro Avançado" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Cole .reg — será injetado offline via wimlib no registro do WIM" FontSize="10" Foreground="#888" Margin="0,0,0,8"/>
+                                        <TextBox x:Name="TxtStudioReg" Height="90" AcceptsReturn="True" TextWrapping="Wrap" Background="#0F0F0F" Foreground="#CCC" BorderBrush="#333" FontFamily="Consolas" FontSize="10" Padding="8" VerticalScrollBarVisibility="Auto" Text="Windows Registry Editor Version 5.00&#x0a;&#x0a;[HKEY_LOCAL_MACHINE\SOFTWARE\Exemplo]&#x0a;&quot;Valor&quot;=dword:00000001"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button Content="Importar .reg" Width="110" Height="28" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
+                                            <Button Content="Limpar" Width="80" Height="28" Margin="8,0,0,0" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="🌐 Idioma &amp; Região" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Margin="0,0,6,0">
+                                                <TextBlock Text="Idioma base" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                                <ComboBox Height="30" SelectedIndex="0" Style="{StaticResource DarkComboBoxStyle}">
+                                                    <ComboBoxItem Content="pt-BR"/>
+                                                    <ComboBoxItem Content="en-US"/>
+                                                    <ComboBoxItem Content="es-ES"/>
+                                                </ComboBox>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                                <TextBlock Text="TimeZone" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                                <ComboBox Height="30" SelectedIndex="0" Style="{StaticResource DarkComboBoxStyle}">
+                                                    <ComboBoxItem Content="E. South America"/>
+                                                    <ComboBoxItem Content="Eastern US"/>
+                                                </ComboBox>
+                                            </StackPanel>
+                                        </Grid>
+                                        <CheckBox Content="Adicionar pacote de idioma pt-BR (se faltar)" Margin="0,8,0,0" Foreground="White" FontSize="11"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" BorderBrush="#2A2A2A" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="🏷️ OEM Branding" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBox Text="Fabricante" Background="#111" Foreground="White" BorderBrush="#333" Padding="8" Height="30" Margin="0,0,0,6"/>
+                                        <TextBox Text="Modelo" Background="#111" Foreground="White" BorderBrush="#333" Padding="8" Height="30" Margin="0,0,0,6"/>
+                                        <TextBox Text="URL de suporte" Background="#111" Foreground="White" BorderBrush="#333" Padding="8" Height="30"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+
+                    <!-- Footer Studio -->
+                    <Border Grid.Row="2" Background="#111" CornerRadius="0,0,14,14" Padding="14" BorderBrush="#222" BorderThickness="0,1,0,0">
+                        <Grid>
+                            <TextBlock Text="💡 Dica: este expansor cabe muito mais — use o scroll. Tudo sincroniza com o painel padrão antes de INICIAR CRIAÇÃO." FontSize="10" Foreground="#888" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="FECHAR" Width="110" Height="36" Click="BtnCloseIsoStudio_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
+                                <Button Content="✅ APLICAR E FECHAR" Width="170" Height="36" Click="BtnApplyIsoStudio_Click" Style="{StaticResource GoldButtonStyle}" FontWeight="Bold"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
         </Border>

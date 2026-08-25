@@ -1,0 +1,86 @@
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TEMPLATE DE PÁGINA XAML — KitLugia GUI
+     ═══════════════════════════════════════════════════════════════════════
+     INSTRUÇÕES:
+     1. Copie e renomeie para SuaPagina.xaml
+     2. Copie o .cs correspondente (_PageTemplate.xaml.cs)
+     3. Namespace: KitLugia.GUI.Pages
+     4. x:Class: KitLugia.GUI.Pages.SuaPagina
+     
+     PADRÕES DE ENCODING:
+     - Salvar como UTF-8 com BOM
+     - Usar entidades XML para caracteres especiais: &#xE7;=ç, &#xF5;=õ, &#xC9;=É
+     - OU usar Unicode escapes: \u00E7=ç, \u00F5=õ, \u00C9=É
+     - NUNCA usar caracteres latinos diretamente sem entidade/escape
+     
+     PADRÕES VISUAIS:
+     - Background: CardBackground (StaticResource)
+     - Border: CardBorder (StaticResource), CornerRadius="8"
+     - Fonte: Segoe UI Variable Display (definida no Page-level FontFamily)
+     - Cores de status: #6CB55F (ativo/inativo), #888 (padrão), #FFD700 (destaque)
+     - Título: FontSize="32" FontWeight="SemiBold"
+     - Subtítulo: Foreground="#A0A0A0"
+     - Cards: Padding="15", Margin="0,0,0,15"
+     ═══════════════════════════════════════════════════════════════════════ -->
+<Page x:Class="KitLugia.GUI.Pages.SuaPagina"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
+      Title="SuaPagina"
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
+
+            <!-- TÍTULO -->
+            <TextBlock Text="T&#xED;tulo da P&#xE1;gina" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Descri&#xE7;&#xE3;o curta do que esta p&#xE1;gina faz." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+
+            <!-- CARD DE EXEMPLO -->
+            <TextBlock Text="Se&#xE7;&#xE3;o" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <!-- ITEM COM TOGGLE -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Descri&#xE7;&#xE3;o detalhada do tweak para o tooltip."/>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Nome do Tweak" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Descri&#xE7;&#xE3;o curta do tweak." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusLabel" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+
+                        <CheckBox x:Name="ChkToggle" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkToggle_Click"/>
+                    </Grid>
+
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- ITEM SEM TOGGLE ( informativo ) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Informa&#xE7;&#xE3;o adicional."/>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Item Informativo" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Descri&#xE7;&#xE3;o." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</Page>
