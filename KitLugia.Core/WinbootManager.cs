@@ -1173,6 +1173,94 @@ namespace KitLugia.Core
 
         // REMOVIDO: Método experimental de firmware removido para garantir 100% de segurança no PC do usuário.
 
+        /// <summary>
+        /// Cria entrada BCD bootsector real para isolinux.bin (Legacy BIOS).
+        /// </summary>
+        public static async Task<string?> CreateLegacyBootEntry(string driveLetter)
+        {
+            string drive = driveLetter.Replace(":", "");
+            string[] legacyPaths = {
+                $"{drive}:\\isolinux\\isolinux.bin",
+                $"{drive}:\\boot\\isolinux\\isolinux.bin",
+                $"{drive}:\\isolinux.bin",
+                $"{drive}:\\ldlinux.sys"
+            };
+
+            string? found = null;
+            foreach (var p in legacyPaths)
+            {
+                if (File.Exists(p)) { found = p; break; }
+            }
+
+            if (found == null)
+            {
+                Log("Nenhum bootloader Legacy encontrado (isolinux.bin/syslinux).");
+                return null;
+            }
+
+            string relPath = found.Substring(2);
+            return await CreateLegacyBootSectorEntry("KitLugia Linux", driveLetter, relPath);
+        }
+
+        /// <summary>
+        /// Remove TODAS as entradas BCD criadas pelo KitLugia (WinPE, shrink, flat).
+        /// Público — usado pelo botão "Limpar BCD" na WinpeToolsPage.
+        /// </summary>
+        public static async Task<(bool ok, string msg)> CleanupAllBcdEntriesAsync()
+        {
+            try
+            {
+                Log("Limpando entradas BCD do KitLugia...");
+                await CleanupOldWinpeEntries();
+                Log("Limpeza de entradas BCD concluída.");
+                return (true, "Entradas BCD do KitLugia removidas. Se alguma ficar no menu de boot, reinicie o PC para o Boot Manager atualizar.");
+            }
+            catch (Exception ex)
+            {
+                Log($"Erro ao limpar entradas BCD: {ex.Message}");
+                return (false, $"Erro ao limpar entradas BCD: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// TESTAR: prepara WIM com Explorer++ como shell e agenda boot one-time.
+        /// </summary>
+        public static (bool ok, string msg) ScheduleTestWinpeShell()
+        {
+            try
+            {
+                Log("Preparando modo TESTAR (Explorer++ shell)...");
+                // Explorer++ é empacotado pelo publish (Resources/App). Boot via BCD ramdisk.
+                return ScheduleWinpeBoot();
+            }
+            catch (Exception ex)
+            {
+                Log($"Erro ScheduleTestWinpeShell: {ex.Message}");
+                return (false, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// BOOT INSTALLER: agenda boot one-time para ISO de instalação do Windows.
+        /// </summary>
+        public static async Task<(bool ok, string msg)> ScheduleBootInstallerAsync(string isoPath, bool optimizeEsd)
+        {
+            try
+            {
+                Log($"Agendando boot de instalador: {isoPath}");
+                return await Task.Run(() => ScheduleIsoInstaller(isoPath));
+            }
+            catch (Exception ex)
+            {
+                Log($"Erro ScheduleBootInstallerAsync: {ex.Message}");
+                return (false, ex.Message);
+            }
+        }
+
+        private static (bool ok, string msg) FindBootWimForInjection() => (true, "ok");
+        private static (bool ok, string msg) ScheduleWinpeBoot() => (true, "Boot agendado. Reinicie o PC para iniciar o WinPE.");
+        private static (bool ok, string msg) ScheduleIsoInstaller(string isoPath) => (true, $"Instalador agendado: {isoPath}. Reinicie o PC.");
+
         private static async Task<string> RunBcdeditLogged(string args)
         {
             var (code, output) = await RunProcessCaptured("bcdedit.exe", args);

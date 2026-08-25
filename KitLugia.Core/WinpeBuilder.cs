@@ -107,7 +107,7 @@ namespace KitLugia.Core
         }
 
         // Resolve o wimlib-imagex.exe embutido (modifica WIM sem montar via DISM).
-        private static string? FindBundledWimlib()
+        internal static string? FindBundledWimlib()
         {
             var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
