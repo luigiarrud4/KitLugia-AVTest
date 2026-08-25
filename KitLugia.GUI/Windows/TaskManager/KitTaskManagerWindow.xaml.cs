@@ -105,6 +105,11 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             InitializeComponent();
 
+            // FIX HARD ERROR: suprime o box "Exception Processing Message 0xC0000005" que
+            // aparece em máquinas com drives de rede/USB ausentes quando shell32 tenta
+            // carregar ícones. Com SEM_FAILCRITICALERRORS as APIs falham silenciosamente.
+            ProgramIconHelper.SuppressHardErrorDialogs();
+
             // Captura exceções que escapariam e derrubariam o app (crash report no log)
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {

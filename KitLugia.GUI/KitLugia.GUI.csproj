@@ -7,7 +7,10 @@
 		<StartupObject>KitLugia.GUI.Program</StartupObject>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		
+
+		<!-- Permite restore/build do projeto Windows no Linux (CI GitHub Actions) -->
+		<EnableWindowsTargeting>true</EnableWindowsTargeting>
+
 		<NoWarn>$(NoWarn);WFAC010;CS1668;XLS0414</NoWarn>
 
 		

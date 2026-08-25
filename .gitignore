@@ -375,3 +375,4 @@ KL_WINPE/
 *.wim
 # IDA Free installer (104 MB - acima do limite do GitHub)
 KitLugia.GUI/Tools/IDA Free/
+KitLugia.Core/Resources/KitLugiaEFI/deps/refind/
