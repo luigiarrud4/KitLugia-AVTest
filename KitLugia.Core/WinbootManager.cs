@@ -5307,6 +5307,172 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
         }
 
         /// <summary>
+        /// Gera o script PowerShell do shrink (shrink.ps1) — usa o módulo Storage
+        /// (Get-PartitionSupportedSize / Resize-Partition) em vez de diskpart.
+        /// Muito mais confiável: objetos estruturados, erros claros, sem parsing pt-BR/en-US.
+        /// O startnet.cmd gerado chama este script; diskpart fica apenas como fallback.
+        /// </summary>
+        private static string GenerateShrinkPs1(int embedDiskN, int embedPartN, long embedShrinkMB)
+        {
+            var sb = new StringBuilder();
+            sb.Append(@"#Requires -RunAsAdministrator
+# ============================================================
+#  KitLugia WinPE Shrink — PowerShell Storage module
+#  Mais confiavel que diskpart: objetos estruturados, erros claros,
+#  querymax real (Get-PartitionSupportedSize), sem parsing de texto.
+# ============================================================
+$ErrorActionPreference = 'Stop'
+$LogFile = 'C:\KitLugia_WinPE_Log.txt'
+$Result  = [ordered]@{
+    Tool = 'powershell-storage'; Status = 'STARTED';
+    Disk = $null; Part = $null; RequestedMB = $null; ActualMB = $null;
+    Error = $null; Timestamp = (Get-Date -Format s)
+}
+
+function Write-Log([string]$m) {
+    $line = ""[$(Get-Date -Format HH:mm:ss)] $m""
+    Write-Host $line
+    Add-Content -Path $LogFile -Value $line -ErrorAction SilentlyContinue
+}
+
+function Save-And-Reboot([bool]$ok) {
+    try {
+        $Result.Timestamp = (Get-Date -Format s)
+        $Result | ConvertTo-Json | Set-Content -Path 'C:\KitLugia_Shrink_Result.json' -Force
+        # Espelha para a particao Windows se acessivel (o Kit le depois do reboot)
+        $winVol = Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.Path -and (Test-Path (Join-Path $_.Path 'Windows\System32\config\SOFTWARE')) }
+        if ($winVol) {
+            $Result | ConvertTo-Json | Set-Content -Path (Join-Path $winVol.Path 'KitLugia_Shrink_Result.json') -Force
+            Remove-Item -Force (Join-Path $winVol.Path 'KL_SHRINK_TARGET.dat') -ErrorAction SilentlyContinue
+        }
+    } catch { Write-Log ""Aviso ao salvar resultado: $_"" }
+    Write-Log ""Concluido (ok=$ok). Reiniciando em 8s...""
+    Start-Sleep 8
+    wpeutil reboot
+}
+
+try {
+    Import-Module Storage -ErrorAction Stop
+    Write-Log 'Modulo Storage carregado.'
+} catch {
+    Write-Log ""FATAL: modulo Storage indisponivel: $_""
+    $Result.Status = 'NO_STORAGE_MODULE'; $Result.Error = ""$_""
+    Save-And-Reboot $false
+    exit 1
+}
+
+# ---- 1. Resolver alvo: embed > X:\shrink_config.ini > marcador > scan Windows ----
+$diskN = {embedDisk}; $partN = {embedPart}; $shrinkMb = {embedMb}
+$source = 'embedded'
+
+if ($partN -le 0 -or $shrinkMb -le 0) {
+    Write-Log 'Valores embed incompletos — lendo X:\shrink_config.ini...'
+    if (Test-Path 'X:\shrink_config.ini') {
+        Get-Content 'X:\shrink_config.ini' | ForEach-Object {{
+            $k,$v = $_ -split '=',2
+            switch ($k) {{
+                'DISK_N'   {{ if ([int]$v -ge 0) {{ $diskN = [int]$v }} }}
+                'PART_N'   {{ if ([int]$v -gt 0) {{ $partN = [int]$v }} }}
+                'SHRINK_MB' {{ if ([long]$v -gt 0) {{ $shrinkMb = [long]$v }} }}
+            }}
+        }}
+        $source = 'config-ini'
+    }
+}
+
+if ($partN -le 0) {
+    Write-Log 'Ainda sem alvo — procurando KL_SHRINK_TARGET.dat nos volumes...'
+    foreach ($vol in (Get-Volume -ErrorAction SilentlyContinue | Where-Object DriveLetter)) {
+        $marker = ""$($vol.DriveLetter):\KL_SHRINK_TARGET.dat""
+        if (Test-Path $marker) {{
+            $p = Get-Partition -DriveLetter $vol.DriveLetter -ErrorAction SilentlyContinue
+            if ($p) {{ $diskN = $p.DiskNumber; $partN = $p.PartitionNumber }}
+            Get-Content $marker | ForEach-Object {{
+                $k,$v = $_ -split '=',2
+                if ($k -eq 'SHRINK_MB') {{ $shrinkMb = [long]$v }}
+            }}
+            $source = 'marker'
+            break
+        }}
+    }
+}
+
+if ($partN -le 0) {
+    Write-Log 'Ultimo recurso: escaneando por particao Windows...'
+    foreach ($p in (Get-Partition -ErrorAction SilentlyContinue)) {
+        try {{
+            $vol = $p | Get-Volume -ErrorAction SilentlyContinue
+            if ($vol -and (Test-Path (Join-Path $vol.Path 'Windows\System32\config\SOFTWARE'))) {{
+                $diskN = $p.DiskNumber; $partN = $p.PartitionNumber; $source = 'scan-windows'
+                break
+            }}
+        }} catch {{ }}
+    }
+}
+
+$Result.Disk = $diskN; $Result.Part = $partN; $Result.RequestedMB = $shrinkMb
+Write-Log ""Alvo resolvido via $source : disco=$diskN part=$partN shrink=${shrinkMb}MB""
+
+if ($partN -le 0) {{
+    Write-Log 'FATAL: nenhuma particao alvo encontrada.'
+    $Result.Status = 'NO_TARGET'; $Result.Error = 'nenhuma particao alvo encontrada'
+    Save-And-Reboot $false
+    exit 1
+}}
+
+# ---- 2. Validar com querymax REAL (estruturado, nao texto) ----
+try {{
+    $partition = Get-Partition -DiskNumber $diskN -PartitionNumber $partN -ErrorAction Stop
+    $supported = $partition | Get-PartitionSupportedSize -ErrorAction Stop
+    $curSize   = [long]$partition.Size
+    $sizeMin   = [long]$supported.SizeMin
+    $maxShrinkBytes = $curSize - $sizeMin
+    $maxShrinkMb     = [math]::Floor($maxShrinkBytes / 1MB)
+
+    Write-Log ""Particao: $([math]::Round($curSize/1GB,1)) GB | Minimo pos-shrink: $([math]::Round($sizeMin/1GB,1)) GB | Encolhivel: ${maxShrinkMb} MB""
+
+    if ($maxShrinkMb -lt 100) {{
+        Write-Log 'FATAL: espaco encolhivel insuficiente (<100 MB). Fragmentacao ou paginafile ativo.'
+        $Result.Status = 'INSUFFICIENT_SPACE'; $Result.Error = ""encolhivel=${{maxShrinkMb}}MB < 100MB""
+        Save-And-Reboot $false
+        exit 1
+    }}
+
+    $actualShrinkMb = [math]::Min($shrinkMb, $maxShrinkMb)
+    if ($actualShrinkMb -lt $shrinkMb) {{
+        Write-Log ""AVISO: pediu ${{shrinkMb}}MB mas so da ${{actualShrinkMb}}MB. Encolhendo o maximo possivel.""
+    }}
+
+    $newSizeBytes = $curSize - ($actualShrinkMb * 1MB)
+
+    # ---- 3. Executar o shrink ----
+    Write-Log ""Encolhendo para $([math]::Round($newSizeBytes/1GB,1)) GB (reducao de ${actualShrinkMb} MB)...""
+    Resize-Partition -DiskNumber $diskN -PartitionNumber $partN -Size $newSizeBytes -ErrorAction Stop
+
+    # ---- 4. Verificar resultado ----
+    $after = Get-Partition -DiskNumber $diskN -PartitionNumber $partN
+    $delta = [math]::Round(($curSize - [long]$after.Size) / 1MB)
+    Write-Log ""SUCESSO: particao reduziu ${delta} MB (pedido: ${{shrinkMb}}MB).""
+
+    $Result.Status  = 'OK'
+    $Result.ActualMB = $delta
+    Save-And-Reboot $true
+}}
+catch {{
+    Write-Log ""FATAL: $_""
+    $Result.Status = 'ERROR'; $Result.Error = ""$_""
+    Save-And-Reboot $false
+    exit 1
+}}
+");
+            return sb.ToString()
+                .Replace("{embedDisk}", embedDiskN.ToString())
+                .Replace("{embedPart}", embedPartN.ToString())
+                .Replace("{embedMb}", embedShrinkMB.ToString());
+        }
+
+
+        /// <summary>
         /// Fase 2 (dentro do WinPE): Continua o shrink com a partição offline
         /// </summary>
         public static async Task<(bool ok, string msg)> ContinueShrinkInWinpe(string targetDrive, long targetSizeMB, CancellationToken ct = default)
@@ -5683,24 +5849,29 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
 
                 Log("Config + marcador escritos. Injetando script de shrink no WIM...");
 
-                // 3c. Injetar script + config no WIM via wimlib (rápido, sem montar)
+                // 3c. NOVO FLUXO: montar o WIM 1× e fazer TODA a verificação/injeção dentro da
+                //     montagem — ANTES do reboot. O usuário sabe na hora se o PowerShell Storage
+                //     está disponível; sem surpresa dentro do WinPE (onde não há rede nem ajuda).
                 string shrinkScript = RamdiskStartnetCmd(disk, part, (int)shrinkMB64);
+                string ps1Script = GenerateShrinkPs1(disk, part, shrinkMB64);
                 string scriptName = "startnet.cmd";
-                bool scriptOk = await WinpeBuilder.UpdateWimWithScriptAsync(wimPath, shrinkScript, scriptName);
-                bool configOk = await WinpeBuilder.InjectConfigIntoWimAsync(wimPath, configContent);
-                if (scriptOk && configOk)
+
+                var prepResult = await WinpeBuilder.PrepareShrinkWinpeAsync(
+                    wimPath, shrinkScript, ps1Script, configContent, scriptName);
+
+                if (!prepResult.PowerShellAvailable)
                 {
-                    Log($"Script ({scriptName}) + shrink_config.ini injetados no WIM via wimlib.");
+                    return (false,
+                        "AVISO: este boot.wim NÃO tem PowerShell/módulo Storage.\n\n" +
+                        $"O Kit tentaria usar diskpart como fallback (menos confiável).\n" +
+                        "Recomendado: baixe o WinPE-base mais recente (botão Baixar WinPE) " +
+                        "que já inclui WinPE-PowerShell + Storage.\n\n" +
+                        $"Detalhe técnico: {prepResult.Detail}");
                 }
-                else
-                {
-                    Log("wimlib incompleto; usando DISM mount/commit único como fallback.");
-                    bool bothInjected = await WinpeBuilder.InjectBootFilesIntoWimAsync(wimPath, shrinkScript, configContent, scriptName);
-                    if (bothInjected)
-                        Log($"Script ({scriptName}) + config injetados no WIM via DISM.");
-                    else
-                        Log("Aviso: não foi possível injetar script/config no WIM.");
-                }
+
+                Log($"Preparação completa: PowerShell={prepResult.PowerShellAvailable}, " +
+                    $"Storage={prepResult.StorageModuleAvailable}, PS1 injetado={prepResult.Ps1Injected}, " +
+                    $"startnet={prepResult.StartnetInjected}, config={prepResult.ConfigInjected}.");
 
                 // 4. Configurar bootsequence via BCD ramdisk
                 try

@@ -648,6 +648,100 @@ namespace KitLugia.Core
         /// <summary>
         /// Injetar shrink_config.ini na raiz do WIM. Tenta wimlib primeiro, depois DISM.
         /// </summary>
+        /// <summary>
+        /// Resultado da preparação do shrink WinPE (verificação ANTES do reboot).
+        /// </summary>
+        public sealed record ShrinkPrepResult(
+            bool PowerShellAvailable,
+            bool StorageModuleAvailable,
+            bool Ps1Injected,
+            bool StartnetInjected,
+            bool ConfigInjected,
+            string Detail);
+
+        /// <summary>
+        /// Prepara o boot.wim para o shrink via PowerShell Storage module.
+        /// Monta o WIM UMA VEZ, verifica PowerShell + módulo Storage DENTRO da montagem,
+        /// copia shrink.ps1 + startnet.cmd + shrink_config.ini, desmonta com commit.
+        /// A verificação acontece NO HOST (antes do reboot) — sem surpresa dentro do WinPE.
+        /// </summary>
+        public static async Task<ShrinkPrepResult> PrepareShrinkWinpeAsync(
+            string wimPath, string startnetContent, string ps1Content,
+            string configContent, string scriptName = "startnet.cmd")
+        {
+            string mountDir = Path.Combine(WinpeCacheDir, "mount_shrink");
+            bool mounted = false;
+            try
+            {
+                if (Directory.Exists(mountDir))
+                {
+                    try { Directory.Delete(mountDir, true); } catch { }
+                    await RunDism("dism.exe", "/Cleanup-Mountpoints", 30000);
+                }
+                Directory.CreateDirectory(mountDir);
+
+                Log($"Montando {Path.GetFileName(wimPath)} para preparação do shrink...");
+                var (mntCode, mntOut) = await RunDism("dism.exe",
+                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
+                if (mntCode != 0 && !mntOut.Contains("already mounted"))
+                    return new ShrinkPrepResult(false, false, false, false, false, $"falha ao montar WIM: {mntOut}");
+                mounted = true;
+
+                // ── VERIFICAÇÃO 1: PowerShell existe no WIM? ──
+                string psExe = Path.Combine(mountDir, "Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+                bool psOk = File.Exists(psExe);
+                Log($"Verificação no WIM: powershell.exe = {(psOk ? "PRESENTE" : "AUSENTE")}");
+
+                // ── VERIFICAÇÃO 2: módulo Storage presente? ──
+                string storageModule = Path.Combine(mountDir,
+                    "Windows", "System32", "WindowsPowerShell", "v1.0", "Modules", "Storage");
+                bool storageOk = Directory.Exists(storageModule) &&
+                                 (File.Exists(Path.Combine(storageModule, "Storage.psd1")) ||
+                                  Directory.EnumerateFiles(storageModule, "*.dll", SearchOption.AllDirectories).Any());
+                Log($"Verificação no WIM: módulo Storage = {(storageOk ? "PRESENTE" : "AUSENTE")}");
+
+                // ── Injeta os 3 arquivos dentro da montagem ──
+                // startnet.cmd
+                string system32 = Path.Combine(mountDir, "Windows", "System32");
+                Directory.CreateDirectory(system32);
+                await File.WriteAllTextAsync(Path.Combine(system32, scriptName), startnetContent, Encoding.ASCII);
+
+                // shrink.ps1 na raiz (X:\shrink.ps1)
+                await File.WriteAllTextAsync(Path.Combine(mountDir, "shrink.ps1"), ps1Content, Encoding.ASCII);
+
+                // shrink_config.ini na raiz (X:\shrink_config.ini)
+                await File.WriteAllTextAsync(Path.Combine(mountDir, "shrink_config.ini"), configContent, Encoding.ASCII);
+
+                Log("startnet.cmd + shrink.ps1 + shrink_config.ini copiados para a montagem.");
+
+                // ── Desmonta com commit ──
+                var (cmtCode, cmtOut) = await RunDism("dism.exe",
+                    $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
+                mounted = false;
+                if (cmtCode != 0)
+                    return new ShrinkPrepResult(psOk, storageOk, true, true, true, $"falha ao desmontar/commit: {cmtOut}");
+
+                Log("WIM desmontado com sucesso (commit).");
+
+                string detail = psOk
+                    ? (storageOk ? "PowerShell + Storage OK" : "PowerShell OK mas Storage ausente — PS1 fará fallback interno")
+                    : "PowerShell ausente — usar diskpart fallback";
+                return new ShrinkPrepResult(psOk, storageOk, true, true, true, detail);
+            }
+            catch (Exception ex)
+            {
+                return new ShrinkPrepResult(false, false, false, false, false, ex.Message);
+            }
+            finally
+            {
+                if (mounted)
+                {
+                    try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                }
+            }
+        }
+
         public static async Task<bool> InjectConfigIntoWimAsync(string wimPath, string configContent)
         {
             string? wimlibExe = FindBundledWimlib();
