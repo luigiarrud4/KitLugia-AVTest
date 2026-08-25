@@ -614,7 +614,8 @@ namespace KitLugia.GUI.Pages
                         long realMax = await PartitionManager.GetMaxShrinkMb(next.DriveLetter); 
                         Dispatcher.Invoke(() => 
                         { 
-                            if (_neighborPartition == next && !ChkMergeMode.IsChecked == true) 
+                            // Em modo merge (DISM), o vizinho inteiro é movido — não usa o shrink máximo
+                            if (_neighborPartition == next && ChkMergeMode.IsChecked != true) 
                                 _maxNeighborMb = realMax; 
                         }); 
                     }); 
@@ -741,26 +742,13 @@ namespace KitLugia.GUI.Pages
         {
             if (_selectedPartition == null || !await ShowConfirm("MOVER", "Mover partição via Imaging?")) return;
             SetActionBusy(true, "Movendo...", active: _selectedPartition);
-            string tempWim = Path.Combine(Path.GetTempPath(), $"move_{_selectedPartition.Index}.wim");
             try
             {
-                if (await PartitionManager.CaptureVolumeImage(_selectedPartition.DriveLetter, tempWim, UpdateProgress))
-                {
-                    string letter = _selectedPartition.DriveLetter;
-                    if (await PartitionManager.DeletePartition(_selectedPartition.DiskIndex, _selectedPartition.Index, letter))
-                    {
-                        int size = (int)(_selectedPartition.Size / (1024*1024));
-                        if (await PartitionManager.CreatePartition(_selectedPartition.DiskIndex, size, "ntfs", "Moved"))
-                        {
-                            await Task.Delay(2000);
-                            await PartitionManager.ApplyVolumeImage(tempWim, $"{letter}\\", UpdateProgress);
-                            try { File.Delete(tempWim); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                            SetActionBusy(false); ShowSuccess("Sucesso", "Movida.");
-                            LoadDisks(); return;
-                        }
-                    }
-                }
-                SetActionBusy(false); ShowError("Erro", "Falha ao mover.");
+                bool ok = await PartitionManager.MovePartition(_selectedPartition.DiskIndex, _selectedPartition.Index, _selectedPartition.DriveLetter, UpdateProgress);
+                SetActionBusy(false);
+                if (ok) ShowSuccess("Sucesso", "Movida.");
+                else ShowError("Erro", "Falha ao mover.");
+                LoadDisks();
             }
             catch (Exception ex)
             {
@@ -784,9 +772,15 @@ namespace KitLugia.GUI.Pages
             if (_selectedPartition == null) return;
             string? l = await ShowInputOverlay("LETRA", "Nova letra:", "");
             if (string.IsNullOrEmpty(l)) return;
+            l = l.Trim().ToUpperInvariant().Replace(":", "");
+            if (l.Length != 1 || l[0] < 'A' || l[0] > 'Z') { ShowError("Letra Inválida", "Digite uma única letra de A a Z."); return; }
+            if (l == "C") { ShowError("Protegido", "C: é a partição do sistema. Não é possível reatribuí-la."); return; }
             SetActionBusy(true, "Alterando...");
-            await PartitionManager.ChangeDriveLetter(_selectedPartition.DriveLetter, l.ToUpper());
-            SetActionBusy(false); LoadDisks();
+            bool ok = await PartitionManager.ChangeDriveLetter(_selectedPartition.DriveLetter, l, _selectedPartition.DiskIndex, _selectedPartition.Index);
+            SetActionBusy(false);
+            if (ok) ShowSuccess("Sucesso", $"Letra alterada para {l}:.");
+            else ShowError("Erro", "Não foi possível alterar a letra.");
+            LoadDisks();
         }
 
         private async void BtnCheckFS_Click(object sender, RoutedEventArgs e)

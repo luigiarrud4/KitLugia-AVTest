@@ -83,50 +83,25 @@
 
                     <!-- STEP 1: PREPARAR WINPE -->
                     <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel>
+                            <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                            <WrapPanel Orientation="Horizontal">
                                 <Button x:Name="BtnPrepareWinpe" Content="PREPARAR" Click="BtnPrepareWinpe_Click"
-                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="120" Margin="0,0,8,0"/>
+                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="112" Margin="0,0,8,4"/>
+                                <Button x:Name="BtnTestShell" Content="TESTAR SHELL" Click="BtnTestShell_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#88CCFF" BorderBrush="#225588" Width="104" Margin="0,0,8,4"
+                                        ToolTip="Injeta Explorer++.exe no WinPE e agenda reboot via bootsequence one-time: o WinPE boota com o Explorer++ como file manager (modo GUI de inspecao manual)"/>
+                                <Button x:Name="BtnBootInstaller" Content="BOOT INSTALADOR" Click="BtnBootInstaller_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#88FFAA" BorderBrush="#225522" Width="112" Margin="0,0,8,4"
+                                        ToolTip="Seleciona uma ISO do Windows e agenda reboot direto no Windows Setup (instalador grafico), sem criar particoes nem abrir o WinPE comum - util para testar ISOs"/>
                                 <Button x:Name="BtnRemoveWinpe" Content="REMOVER" Click="BtnRemoveWinpe_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="90"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- STEP 1B: VALIDATION OS -->
-                    <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="1b. VALIDATION OS" FontSize="15" FontWeight="Bold" Foreground="#66BBFF"/>
-                                    <Border Background="#224488" CornerRadius="4" Padding="6,1" Margin="8,0,0,0">
-                                        <TextBlock Text="WPF OK!" FontSize="9" FontWeight="Bold" Foreground="#66BBFF"/>
-                                    </Border>
-                                </StackPanel>
-                                <TextBlock Text="Windows 11 leve da Microsoft com suporte oficial a WPF/.NET. Boot RAMDISK + bootsequence." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button x:Name="BtnPrepareValos" Content="PREPARAR" Click="BtnPrepareValos_Click"
-                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="120" Margin="0,0,8,0"/>
-                                <Button x:Name="BtnBootValos" Content="TESTAR" Click="BtnBootValos_Click"
-                                        Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="11" FontWeight="Bold" Width="90" Margin="0,0,8,0"
-                                        IsEnabled="False"/>
-                                <Button x:Name="BtnRemoveValos" Content="REMOVER" Click="BtnRemoveValos_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="80"/>
-                            </StackPanel>
-                        </Grid>
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="88" Margin="0,0,8,4"/>
+                                <Button x:Name="BtnCleanBcd" Content="LIMPAR BCD" Click="BtnCleanBcd_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Foreground="#FFAA44" BorderBrush="#554422" Width="88" Margin="0,0,0,4"
+                                        ToolTip="Remove todas as entradas do Boot Manager criadas pelo KitLugia (WinPE, shrink)"/>
+                            </WrapPanel>
+                        </StackPanel>
                     </Border>
 
                     <!-- PARTITION LIST + SHRINK ACTION -->
@@ -305,7 +280,14 @@
                         <TextBlock Foreground="{StaticResource TextMuted}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,4">
                             WinPE + config em C:\Program Files\KitLugia\WinPE\
                             Logs em C:\KitLugia_WinPE_Log.txt
+
                         </TextBlock>
+                        <Border Background="#22332200" BorderBrush="#88FFAA44" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,0,0,4">
+                            <TextBlock FontSize="9" Foreground="#FFAA44" TextWrapping="Wrap">
+                                <Run Text="Secure Boot: " FontWeight="Bold"/>
+                                <Run Text="pode bloquear o boot do WinPE. Se travar na tela preta, desligue no BIOS."/>
+                            </TextBlock>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -344,9 +326,19 @@
 
                     <!-- Detail log (scrollavel) -->
                     <Border Background="#0A0A0A" CornerRadius="6" Padding="8" MaxHeight="120" Margin="0,8,0,0">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
-                        </ScrollViewer>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
+                            </ScrollViewer>
+                            <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="📋 Copiar log"
+                                       Foreground="#555" FontSize="9" Cursor="Hand"
+                                       HorizontalAlignment="Right" Margin="0,4,0,0"
+                                       MouseDown="TxtCopyOpLog_MouseDown"/>
+                        </Grid>
                     </Border>
 
                     <!-- Warning -->
@@ -393,12 +385,15 @@
                     <Border Background="#112222" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="10" Margin="0,0,0,8">
                         <StackPanel>
                             <TextBlock Text="SISTEMA PARA EXECUTAR O SHRINK:" FontSize="10" Foreground="{StaticResource TextMuted}"/>
-                            <RadioButton x:Name="RadioWinpe" GroupName="ShrinkOs" Content="WinPE Padrao" IsChecked="True"
-                                         Checked="RadioShrinkOs_Checked" FontSize="12" Foreground="White" Margin="0,4,0,0"/>
-                            <RadioButton x:Name="RadioValos" GroupName="ShrinkOs" Content="Validation OS" IsChecked="False"
-                                         Checked="RadioShrinkOs_Checked" FontSize="12" Foreground="White" Margin="0,2,0,0"/>
-                            <TextBlock x:Name="TxtOsStatus" Text="" Foreground="{StaticResource TextMuted}" FontSize="9" Margin="0,2,0,0"/>
+                            <TextBlock Text="WinPE Padrao" FontWeight="Bold" Foreground="White" FontSize="12" Margin="0,4,0,0"/>
                         </StackPanel>
+                    </Border>
+                    <!-- Secure Boot warning -->
+                    <Border Background="#22332200" BorderBrush="#88FF8800" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,8">
+                        <TextBlock FontSize="9" Foreground="#FFAA44" TextWrapping="Wrap">
+                            <Run Text="ATENCAO: " FontWeight="Bold"/>
+                            <Run Text="Se travar na tela preta ao reiniciar, desligue o Secure Boot no BIOS (Secure Boot &gt; Disabled) e tente novamente."/>
+                        </TextBlock>
                     </Border>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Content="CANCELAR" Click="BtnCancelShrink_Click" Style="{StaticResource SecondaryButtonStyle}" Width="100" Height="36" Margin="0,0,10,0"/>

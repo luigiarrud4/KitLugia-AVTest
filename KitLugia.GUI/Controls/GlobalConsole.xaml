@@ -5,7 +5,38 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="200" d:DesignWidth="800">
+             d:DesignHeight="200" d:DesignWidth="800"
+             Unloaded="UserControl_Unloaded">
+
+    <UserControl.Resources>
+        <!-- Estilo escuro para o ListBox virtualizado do terminal -->
+        <Style x:Key="VLogItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#DDDDDD"/>
+            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderThickness="0" Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#22395D"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A1A1A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
 
     <Border Background="#0A0A0A" BorderBrush="{StaticResource AccentColor}" BorderThickness="0,1,0,0">
         <Grid>
@@ -20,25 +51,29 @@
             <Border Grid.Row="0" Background="#151515" BorderBrush="#333" BorderThickness="0,0,0,1">
                 <Grid Margin="10,0">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                         <TextBlock Text=">_ TERMINAL DO SISTEMA" FontFamily="Consolas" Foreground="#00FF00" FontWeight="Bold" FontSize="12"/>
-                        <TextBlock x:Name="TxtTitleStatus" Text=" | Monitorando..." FontFamily="Consolas" Foreground="#666" FontSize="12"/>
+                        <TextBlock x:Name="TxtTitleStatus" Text=" | Logs ILIMITADOS (virtualizado)" FontFamily="Consolas" Foreground="#888" FontSize="12" Margin="6,0,0,0"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <!-- Checkbox para remover limite de logs -->
-                        <CheckBox x:Name="ChkRemoveLimit" Content="Sem Limite" 
-                                  Foreground="#888" Background="Transparent" BorderThickness="0"
-                                  FontFamily="Consolas" FontSize="11" Margin="0,0,10,0"
-                                  Checked="ChkRemoveLimit_Checked" Unchecked="ChkRemoveLimit_Unchecked"
-                                  ToolTip="Remove limite de 500 linhas para capturar logs completos"/>
-                        
-                        <!-- Botão Copiar -->
-                        <Button x:Name="BtnCopy" Content="COPIAR" Click="BtnCopy_Click" 
+                    <!-- Busca -->
+                    <Border Grid.Column="1" Background="#0F0F0F" BorderBrush="#333" BorderThickness="1" CornerRadius="2" Margin="4,0" VerticalAlignment="Center" Height="20">
+                        <TextBox x:Name="TxtSearch" Background="Transparent" BorderThickness="0" Foreground="#AAA"
+                                 FontFamily="Consolas" FontSize="11" VerticalContentAlignment="Center"
+                                 Padding="4,1" TextChanged="TxtSearch_TextChanged"
+                                 ToolTip="Digite para filtrar as linhas do log (filtra as linhas em memória)"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtCount" Text="" FontFamily="Consolas" Foreground="#666" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                        <!-- Botão Copiar seleção -->
+                        <Button x:Name="BtnCopySelection" Content="COPIAR SELEÇÃO" Click="BtnCopySelection_Click" 
                                 Background="Transparent" Foreground="#888" BorderThickness="0" 
                                 FontFamily="Consolas" FontSize="11" Cursor="Hand" Margin="0,0,10,0">
                             <Button.Template>
@@ -54,7 +89,25 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                        
+
+                        <!-- Botão Copiar tudo -->
+                        <Button x:Name="BtnCopyAll" Content="COPIAR TUDO" Click="BtnCopyAll_Click"
+                                Background="Transparent" Foreground="#888" BorderThickness="0" 
+                                FontFamily="Consolas" FontSize="11" Cursor="Hand" Margin="0,0,10,0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
                         <!-- Botão Limpar -->
                         <Button x:Name="BtnClear" Content="LIMPAR" Click="BtnClear_Click"
                                 Background="Transparent" Foreground="#888" BorderThickness="0" 
@@ -72,7 +125,7 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                        
+
                         <!-- Botão Fechar -->
                         <Button Content="X" Click="BtnClose_Click" 
                                 Background="Transparent" Foreground="#FF5555" BorderThickness="0" 
@@ -94,10 +147,35 @@
                 </Grid>
             </Border>
 
-            <!-- ÁREA DE TEXTO (LOGS) -->
-            <ScrollViewer x:Name="LogScroller" Grid.Row="1" VerticalScrollBarVisibility="Auto" Background="Transparent" Margin="5">
-                <TextBox x:Name="TxtLog" Background="Transparent" BorderThickness="0" FontFamily="Consolas" FontSize="12" Foreground="#DDDDDD" TextWrapping="Wrap" Margin="2,1" IsReadOnly="True" TextChanged="TxtLog_TextChanged"/>
-            </ScrollViewer>
+            <!-- ÁREA DE LOG (VIRTUALIZADA) -->
+            <Grid Grid.Row="1" Margin="5">
+                <ListBox x:Name="LogList"
+                         Background="Transparent" BorderThickness="0"
+                         FontFamily="Consolas" FontSize="12" Foreground="#DDDDDD"
+                         ItemContainerStyle="{StaticResource VLogItemStyle}"
+                         SelectionMode="Extended"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#DDDDDD"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ContextMenu>
+                        <ContextMenu Background="#1E1E1E" Foreground="#DDD" BorderBrush="#444" BorderThickness="1">
+                            <MenuItem Header="Copiar seleção" Click="MnuCopySelection_Click" InputGestureText="Ctrl+C"/>
+                            <MenuItem Header="Copiar tudo" Click="MnuCopyAll_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Selecionar tudo" Click="MnuSelectAll_Click" InputGestureText="Ctrl+A"/>
+                            <Separator/>
+                            <MenuItem Header="Limpar console" Click="MnuClear_Click"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                </ListBox>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

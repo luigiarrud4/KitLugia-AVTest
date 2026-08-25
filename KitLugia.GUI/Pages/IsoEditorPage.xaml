@@ -10,6 +10,55 @@
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Page.Resources>
+        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="30" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#333333" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="BorderBrush" Value="#444444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton" Template="{StaticResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
+                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Margin" Value="0,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
     </Page.Resources>
 
     <Grid Margin="30">
@@ -23,8 +72,8 @@
         <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
             <TextBlock Text="&#x1F4BF;" FontSize="32" Margin="0,0,15,0" VerticalAlignment="Center"/>
             <StackPanel>
-                <TextBlock Text="ISO EDITOR (WINHANCE)" FontSize="26" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
-                <TextBlock Text="Editor de ISO Profissional - Montagem, Debloat, Features e Redu&#xE7;&#xE3;o de Tamanho" FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
+                <TextBlock Text="KIT ISO EDITOR" FontSize="26" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
+                <TextBlock Text="Editor de ISO Rapido (wimlib) - Debloat, Features e Redu&#xE7;&#xE3;o de Tamanho" FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
             </StackPanel>
         </StackPanel>
 
@@ -46,6 +95,8 @@
                             <Button Grid.Column="1" Content="BUSCAR ISO" Padding="20,0" Margin="10,0,0,0" Click="BtnSelectIso_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                         </Grid>
                         <TextBlock x:Name="TxtDetectedIsoType" Text="" FontSize="11" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0" FontWeight="Bold"/>
+                        <Button x:Name="BtnAnalyzeIso" Content="&#x1F50D; ANALISAR EDI&#xC7;&#xD5;ES (wimlib)" Margin="0,15,0,0" Height="36" Click="BtnAnalyzeIso_Click" Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False"/>
+                        <TextBlock x:Name="TxtAnalysisResult" Text="" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
 
@@ -54,9 +105,9 @@
                     <StackPanel>
                         <TextBlock Text="&#x2754; COMO FUNCIONA O ISO EDITOR" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <TextBlock Text="1. Sele&#xE7;&#xE3;o: Escolha o arquivo ISO de instala&#xE7;&#xE3;o do Windows." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="2. Montagem: A ISO ser&#xE1; montada automaticamente ao clicar em INICIAR CRIA&#xC7;&#xC3;O." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="3. Configura&#xE7;&#xE3;o: Escolha as op&#xE7;&#xF5;es de debloat, features e redu&#xE7;&#xE3;o de tamanho." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="4. Cria&#xE7;&#xE3;o: A ISO final ser&#xE1; criada com todas as modifica&#xE7;&#xF5;es aplicadas." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="2. An&#xE1;lise: wimlib lista as edi&#xE7;&#xF5;es (indices) em 1-2s, sem montar nada." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="3. Configura&#xE7;&#xE3;o: strip de edi&#xE7;&#xE3;o, tweaks de registro e arquivos soltos (r&#xE1;pido) / drivers+AppX (lento)." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="4. Cria&#xE7;&#xE3;o: ISO final boot&#xE1;vel (BIOS+UEFI) via oscdimg, com as modifica&#xE7;&#xF5;es aplicadas." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
                     </StackPanel>
                 </Border>
 
@@ -88,21 +139,21 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="Aten&#xE7;&#xE3;o: Este processo modificar&#xE1; a ISO selecionada." FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                    <TextBlock x:Name="TxtModeHint" Text="Modo: Rapido (wimlib, sem montar)" FontSize="11" Foreground="{StaticResource AccentColor}"/>
                     <TextBlock Text="Certifique-se de que possui backup da ISO original." FontSize="11" Foreground="{StaticResource TextMuted}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button x:Name="BtnCleanup" Content="&#x1F9F9; LIMPAR LIXO" Width="140" Margin="0,0,10,0" Click="BtnCleanup_Click" Background="#2A2A2A" BorderBrush="#FFD700" Foreground="#FFD700" Padding="10" Cursor="Hand"/>
-                    <Button x:Name="BtnBack" Content="&#x2190; VOLTAR" Width="120" Margin="0,0,10,0" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                    <Button x:Name="BtnCreate" Content="&#x1F680; INICIAR CRIA&#xC7;&#xC3;O" Width="180" FontSize="14" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
+                    <Button x:Name="BtnCleanup" Content="&#x1F9F9; LIMPAR LIXO" Width="140" Height="38" Margin="0,0,10,0" Click="BtnCleanup_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="BtnBack" Content="&#x2190; VOLTAR" Width="120" Height="38" Margin="0,0,10,0" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="BtnCreate" Content="&#x1F680; INICIAR CRIA&#xC7;&#xC3;O" Width="180" Height="38" FontSize="14" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Overlay de Configura&#xE7;&#xE3;o -->
         <Border x:Name="OverlayConfig" Grid.Row="0" Grid.RowSpan="2" Background="#CC000000" Visibility="Collapsed">
-            <Border Background="#1E1E1E" BorderBrush="#FFD700" BorderThickness="2" CornerRadius="8" MaxWidth="700" MaxHeight="650" Margin="50" VerticalAlignment="Center">
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15" MaxWidth="780" MaxHeight="700" Margin="50" VerticalAlignment="Center">
                 <Border.Effect>
                     <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="10" Opacity="0.5"/>
                 </Border.Effect>
@@ -122,7 +173,7 @@
                         <TextBlock x:Name="TxtConfigIsoInfo" Text="ISO n&#xE3;o selecionada" Foreground="#FFD700" FontSize="14" TextWrapping="Wrap"/>
                     </Border>
 
-                    <!-- Checkboxes de Op&#xE7;&#xF5;es (Chris Titus WinUtil) -->
+                    <!-- Checkboxes de Op&#xE7;&#xF5;es -->
                     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <!-- Destino da ISO -->
@@ -136,82 +187,191 @@
                                 <Button x:Name="BtnSelectIsoDest" Grid.Column="1" Content="&#x1F4C2;" Click="BtnSelectIsoDest_Click" Width="40" Margin="10,0,0,0" Background="#2A2A2A" BorderBrush="#FFD700" Foreground="#FFD700" Cursor="Hand"/>
                             </Grid>
 
-                            <TextBlock Text="&#x2699;&#xFE0F; OP&#xC7;&#xD5;ES DO CHRIS TITUS WINUTIL" FontSize="14" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,10"/>
-                            
+                            <!-- Edi&#xE7;&#xE3;o e Compress&#xE3;o (Modo Rapido) -->
+                            <TextBlock Text="&#x1F504; EDI&#xC7;&#xC3;O &amp; COMPRESS&#xC3;O (wimlib - R&#xC1;PIDO)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,10"/>
+                            <Grid Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="15"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Edi&#xE7;&#xE3;o a manter (strip da ISO multi-edi&#xE7;&#xE3;o):" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,5"/>
+                                    <ComboBox x:Name="ComboEditions" Height="38" Style="{StaticResource DarkComboBoxStyle}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" Foreground="White" Padding="5"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Compress&#xE3;o (ap&#xF3;s export):" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,5"/>
+                                    <ComboBox x:Name="ComboCompression" Height="38" SelectedIndex="1" Style="{StaticResource DarkComboBoxStyle}">
+                                        <ComboBoxItem Content="LZMS (m&#xE1;xima redu&#xE7;&#xE3;o, mais lento)"/>
+                                        <ComboBoxItem Content="LZX (balanceado, r&#xE1;pido - recomendado)"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                            <CheckBox x:Name="ChkStripEdition" Content="Manter apenas a edi&#xE7;&#xE3;o acima e recomprimir (export via wimlib, sem montar)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="ESD tamb&#xE9;m vira install.wim normal aqui (permite tweaks depois). R&#xE1;pido." Foreground="#4CAF50" FontSize="11" Margin="25,0,0,15"/>
+
+                            <!-- Tweaks de registro (Modo Rapido) -->
+                            <TextBlock Text="&#x2699;&#xFE0F; TWEAKS DE REGISTRO (wimlib - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkBypassRequirements" Content="Bypass de Requisitos de Sistema (TPM, CPU, RAM, Secure Boot)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableTelemetry" Content="Desabilitar Telemetria" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableOneDrive" Content="Desabilitar OneDrive" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableCopilot" Content="Desabilitar Copilot" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkRemoveAI" Content="Desabilitar Copilot e Windows Recall (reg. no-mount, SEM DISM)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="Pol&#xED;ticas TurnOffWindowsCopilot + DisableAIDataAnalysis (24H2/25H2) - r&#xE1;pido, via wimlib" Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
+                            <CheckBox x:Name="ChkDisableBitLocker" Content="Desabilitar BitLocker" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableReservedStorage" Content="Desabilitar Reserved Storage" Style="{StaticResource DarkCheckBoxStyle}"/>
+
+                            <!-- Arquivos soltos (Modo Rapido) -->
+                            <TextBlock Text="&#x1F4C2; ARQUIVOS SOLTOS (wimlib - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkDisableSponsoredApps" Content="Desabilitar Apps Patrocinados (ei.cfg sem vers&#xE3;o/edition + setup)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkRemoveDefaultStorePackages" Content="Remover apps padr&#xE3;o da Store (pol&#xED;tica RemoveDefaultMicrosoftStorePackages - 24H2/25H2)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableChat" Content="Desabilitar &#xCD;cone do Chat" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkRemoveSupportFolder" Content="Remover Pasta Support\" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="&#x26A0;&#xFE0F; Chat/patrocinados aplicados via registro+arquivos soltos (r&#xE1;pido, no-mount)." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
+
+                            <!-- Automacao pos-setup (2026) -->
+                            <TextBlock Text="&#x1F916; AUTOMA&#xC7;&#xC3;O P&#xD3;S-SETUP (2026 - wimlib - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkSetupComplete" Content="SetupComplete.cmd: rodar KitLugiaSetup automaticamente no 1&#xBA; boot (p&#xF3;s-setup, SYSTEM)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkConXLegacyFix" Content="Fix Setup 24H2/25H2 (ConX): for&#xE7;ar setup.exe com /legacy no boot.wim" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="SetupComplete.cmd (MS Learn 2026) roda com privil&#xE9;gio SYSTEM logo ap&#xF3;s o setup; o fix ConX restaura instala&#xE7;&#xE3;o desatendida nas vers&#xF5;es 24H2/25H2." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
+
+                            <!-- Op&#xE7;&#xF5;es de customiza&#xE7;&#xE3;o (wimlib + pnputil, SEM montar) -->
+                            <TextBlock Text="&#x23F3; CUSTOMIZA&#xC7;&#xC3;O (wimlib + pnputil - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkInjectDrivers" Content="Injetar Drivers do Sistema Atual" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="Exporta drivers do sistema (pnputil) para $WinPEDriver$ - o Setup.exe do WinPE injeta no driverstore" Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
+                            <CheckBox x:Name="ChkDebloatPreset" Content="Remover Bloatware (AppX)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="Remove 40+ apps bloatware: Copilot, Xbox, Clipchamp, Bing, Solitaire, Phone Link, etc." Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
+                            <CheckBox x:Name="ChkCleanupWinSxS" Content="Otimizar WIM (wimlib optimize - remove espaco dos updates)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="Reconstrucao estrutural em segundos (sem recompressao - o export ja comprimiu)" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="25,0,0,5"/>
+
+                            <!-- Outras op&#xE7;&#xF5;es (mista) -->
+                            <TextBlock Text="&#x1F4C1; OUTRAS OP&#xC7;&#xD5;ES" FontSize="14" FontWeight="Bold" Foreground="#FFD700" Margin="0,5,0,5"/>
+                            <CheckBox x:Name="ChkDisableUpdateOOBE" Content="Desabilitar Windows Update no OOBE" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableTeams" Content="Prevenir Instala&#xE7;&#xE3;o do Teams" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableOutlook" Content="Prevenir Instala&#xE7;&#xE3;o do Novo Outlook" Style="{StaticResource DarkCheckBoxStyle}"/>
+
                             <!-- Bot&#xF5;es de Sele&#xE7;&#xE3;o R&#xE1;pida -->
-                            <Grid Margin="0,0,0,15">
+                            <Grid Margin="0,15,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Button x:Name="BtnSelectAll" Grid.Column="0" Content="&#x2705; Selecionar Todos" Click="BtnSelectAll_Click" Background="#2A2A2A" BorderBrush="#FFD700" Foreground="#FFD700" Padding="10" Margin="0,0,5,0" Cursor="Hand"/>
-                                <Button x:Name="BtnDeselectAll" Grid.Column="1" Content="&#x274C; Desmarcar Todos" Click="BtnDeselectAll_Click" Background="#2A2A2A" BorderBrush="#FFD700" Foreground="#FFD700" Padding="10" Margin="5,0,0,0" Cursor="Hand"/>
+                                <Button x:Name="BtnSelectAll" Grid.Column="0" Content="&#x2705; Selecionar Todas R&#xE1;pidas" Click="BtnSelectAll_Click" Style="{StaticResource SecondaryButtonStyle}" Height="36" Margin="0,0,5,0"/>
+                                <Button x:Name="BtnDeselectAll" Grid.Column="1" Content="&#x274C; Desmarcar Todas" Click="BtnDeselectAll_Click" Style="{StaticResource SecondaryButtonStyle}" Height="36" Margin="5,0,0,0"/>
                             </Grid>
-
-                            <CheckBox x:Name="ChkInjectDrivers" Content="Injetar Drivers do Sistema Atual" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Exporta todos os drivers do sistema e injeta na ISO (install.wim e boot.wim)" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDebloatPreset" Content="Remover Bloatware (AppX)" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Remove 20+ apps bloatware: Bing, Solitaire, Sticky Notes, Paint, etc." Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkBypassRequirements" Content="Bypass de Requisitos de Sistema" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Bypass TPM, CPU, RAM, Secure Boot, Storage checks" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableSponsoredApps" Content="Desabilitar Apps Patrocinados" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Desabilita instala&#xE7;&#xE3;o de apps patrocinados e sugest&#xF5;es" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableTelemetry" Content="Desabilitar Telemetria" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Desabilita coleta de dados e telemetria do Windows" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableOneDrive" Content="Desabilitar OneDrive" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Desabilita backup de pasta e instala&#xE7;&#xE3;o do OneDrive" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableCopilot" Content="Desabilitar Copilot" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Desabilita Windows Copilot e sugest&#xF5;es de busca" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableUpdateOOBE" Content="Desabilitar Windows Update no OOBE" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Desabilita updates durante a configura&#xE7;&#xE3;o inicial (reativado no primeiro login)" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableTeams" Content="Prevenir Instala&#xE7;&#xE3;o do Teams" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Bloqueia instala&#xE7;&#xE3;o autom&#xE1;tica do Microsoft Teams" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableOutlook" Content="Prevenir Instala&#xE7;&#xE3;o do Novo Outlook" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Bloqueia instala&#xE7;&#xE3;o autom&#xE1;tica do novo Outlook" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableBitLocker" Content="Desabilitar BitLocker" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Desabilita criptografia de dispositivo BitLocker" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableChat" Content="Desabilitar &#xCD;cone do Chat" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Remove &#xED;cone do Chat da barra de tarefas" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkDisableReservedStorage" Content="Desabilitar Reserved Storage" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Desabilita armazenamento reservado do Windows" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkCleanupWinSxS" Content="Limpar WinSxS com /ResetBase" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Remove vers&#xF5;es superadas de componentes. Economia: ~1-2GB" Foreground="#AAA" FontSize="11" Margin="25,0,0,5"/>
-                            <TextBlock Text="&#x26A0;&#xFE0F; PODE CAUSAR TRAVAMENTO NA DESMONTAGEM (15+ minutos)" Foreground="#FF6B6B" FontSize="10" FontWeight="Bold" Margin="25,0,0,15"/>
-
-                            <CheckBox x:Name="ChkRemoveSupportFolder" Content="Remover Pasta Support\" Foreground="White" Margin="0,10"/>
-                            <TextBlock Text="Remove pasta support\ da ISO (arquivos de suporte)" Foreground="#AAA" FontSize="11" Margin="25,0,0,15"/>
                         </StackPanel>
                     </ScrollViewer>
 
                     <!-- Bot&#xF5;es -->
                     <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                        <Button Content="CANCELAR" Click="BtnCancelConfig_Click" Background="#FF4444" Foreground="White" FontWeight="Bold" Padding="15,8" Margin="0,0,10,0" Cursor="Hand"/>
-                        <Button Content="&#x1F680; INICIAR AGORA" Click="BtnConfirmStart_Click" Style="{StaticResource GoldButtonStyle}" FontWeight="Bold" Padding="15,8" Cursor="Hand"/>
+                        <Button Content="CANCELAR" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Height="38" FontWeight="Bold" Padding="15,8" Margin="0,0,10,0" Cursor="Hand"/>
+                        <Button Content="&#x1F680; INICIAR AGORA" Click="BtnConfirmStart_Click" Style="{StaticResource GoldButtonStyle}" Height="38" FontWeight="Bold" Padding="15,8" Cursor="Hand"/>
                     </StackPanel>
                 </Grid>
             </Border>
         </Border>
 
-        <!-- Loading Overlay -->
+        <!-- Loading Overlay (padrao WinpeToolsPage/UpdatePage: progresso real + log em tempo real) -->
         <Border x:Name="OverlayBusy" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-30">
-            <StackPanel VerticalAlignment="Center">
-                <ProgressBar IsIndeterminate="True" Width="250" Height="4" Foreground="{StaticResource AccentColor}" Background="#111111" BorderThickness="0" Margin="0,0,0,15"/>
-                <TextBlock x:Name="TxtBusyStatus" Text="Processando..." Foreground="White" HorizontalAlignment="Center" FontSize="16" FontWeight="SemiBold"/>
-                <TextBlock Text="Opera&#xE7;&#xE3;o cr&#xED;tica. N&#xE3;o feche o KitLugia." Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
-            </StackPanel>
+            <Border Background="#1A1A1A" CornerRadius="12" Padding="30" Width="540"
+                    BorderBrush="#FFD700" BorderThickness="1"
+                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Border.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="10" Opacity="0.5"/>
+                </Border.Effect>
+                <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock x:Name="TxtOpTitle" Text="&#x1F4BF; KIT ISO EDITOR - EXECUTANDO" FontSize="18" FontWeight="Bold"
+                               Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+                    <!-- Barra de Progresso Real -->
+                    <Border Background="#333333" CornerRadius="6" Height="22" Margin="0,0,0,5">
+                        <Grid>
+                            <Border x:Name="ProgressFill" Background="#FFD700" CornerRadius="6"
+                                    HorizontalAlignment="Left" Width="0"/>
+                            <TextBlock x:Name="TxtProgressPercent" Text="0%"
+                                       FontSize="11" FontWeight="Bold" Foreground="#FFFFFF"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Steps / Status -->
+                    <TextBlock x:Name="TxtProgressStep" Text="Inicializando..."
+                               FontSize="11" Foreground="#FFD700" Margin="0,2,0,0" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TxtProgressStatus" Text="Aguarde..."
+                               FontSize="13" Foreground="#E0E0E0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+
+                    <!-- Detail log (scrollavel) -->
+                    <Border Background="#0A0A0A" CornerRadius="6" Padding="8" MaxHeight="130" Margin="0,8,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
+                            </ScrollViewer>
+                            <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="&#x1F4CB; Copiar log"
+                                       Foreground="#555" FontSize="9" Cursor="Hand"
+                                       HorizontalAlignment="Right" Margin="0,4,0,0"
+                                       MouseDown="TxtCopyOpLog_MouseDown"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Warning -->
+                    <Border Background="#22FF3D00" BorderBrush="#88FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,8,0,0">
+                        <TextBlock Text="ACAO CRITICA: NAO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Cancel button (cancela entre etapas) -->
+                    <Button x:Name="BtnCancelOp" Content="CANCELAR" Click="BtnCancelOp_Click"
+                            Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="34"
+                            HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="#FF8888" BorderBrush="#552222"/>
+                </StackPanel>
+
+                <!-- Rodela estilo Windows 11 em linha propria abaixo do conteudo (nunca cobre o texto vermelho) -->
+                <Grid Grid.Row="1" Width="44" Height="44" RenderTransformOrigin="0.5,0.5"
+                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,10,14,0">
+                    <Grid.RenderTransform>
+                        <RotateTransform x:Name="SpinnerRotateIso"/>
+                    </Grid.RenderTransform>
+                    <Grid.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever">
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1.4"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Grid.Triggers>
+                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Ellipse.RenderTransform><TranslateTransform X="0" Y="-16"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Ellipse.RenderTransform><TranslateTransform X="15.2" Y="-4.9"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Ellipse.RenderTransform><TranslateTransform X="9.4" Y="12.9"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Ellipse.RenderTransform><TranslateTransform X="-9.4" Y="12.9"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Ellipse.RenderTransform><TranslateTransform X="-15.2" Y="-4.9"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                </Grid>
+            </Grid>
         </Border>
-    </Grid>
+    </Border>
+</Grid>
 </Page>

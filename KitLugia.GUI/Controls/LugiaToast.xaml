@@ -131,23 +131,54 @@
                 </Rectangle.Style>
             </Rectangle>
 
-            <!-- &#xCD;cone Emoji -->
-            <TextBlock Grid.Column="1" FontSize="18" Margin="10,0,10,0" VerticalAlignment="Center" FontFamily="Segoe UI Emoji">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Text" Value="&#x2139;&#xFE0F;"/>
-                        <!-- Padr&#xE3;o Info -->
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding ToastType}" Value="Success">
-                                <Setter Property="Text" Value="&#x2705;"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding ToastType}" Value="Error">
-                                <Setter Property="Text" Value="&#x26A0;&#xFE0F;"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
+            <!-- Ícone Emoji + Spinner de Progresso (toasts de progresso) -->
+            <Grid Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock FontSize="18" Margin="10,0,10,0" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="&#x2139;&#xFE0F;"/>
+                            <!-- Padrão Info -->
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ToastType}" Value="Success">
+                                    <Setter Property="Text" Value="&#x2705;"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ToastType}" Value="Error">
+                                    <Setter Property="Text" Value="&#x26A0;&#xFE0F;"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsProgress}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Spinner girando (visível apenas em toasts de progresso) -->
+                <Ellipse x:Name="ProgressSpinner" Width="18" Height="18" Stroke="{DynamicResource AccentColor}" StrokeThickness="2.5" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="22 13" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.Style>
+                        <Style TargetType="Ellipse">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsProgress}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Ellipse.Style>
+                    <Ellipse.RenderTransform>
+                        <RotateTransform x:Name="ProgressSpinnerRotate"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever">
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:0.8"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Ellipse.Triggers>
+                </Ellipse>
+            </Grid>
 
             <!-- T&#xED;tulo e Texto -->
             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,12,5,12">

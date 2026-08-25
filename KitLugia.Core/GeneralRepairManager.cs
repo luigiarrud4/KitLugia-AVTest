@@ -1209,6 +1209,84 @@ namespace KitLugia.Core
 
 
 
+            // =================================================================
+            // 19. PATH / SISTEMA (Reparar PATH Dinamico)
+            // =================================================================
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar PATH do Sistema (Adiciona Programas Faltantes)",
+                Category = "PATH/Sistema",
+                Icon = "🔧",
+                Description = "Recupera o PATH a partir dos executaveis encontrados no disco (winget, node, git, 7z, dotnet, cargo, pwsh) e adiciona os que faltam. Funciona mesmo quando o registro falha. Baseado na solucao que funcionou de primeira (scan de .exe no disco).",
+                Execute = () => {
+                    Logger.Log("Iniciando reparo dinamico do PATH (scan de executaveis no disco)...");
+                    var recovered = PathRepair.RecoverFromExecutableScan();
+                    int count = 0;
+                    foreach (var kvp in recovered)
+                    {
+                        Logger.Log($"[PATH RECOVERED] {kvp.Key} -> {kvp.Value}");
+                        count++;
+                    }
+                    // Aplica reparo ao User PATH: adiciona programas faltantes, nunca remove
+                    try
+                    {
+                        var userPathValue = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
+                        if (!string.IsNullOrEmpty(userPathValue))
+                        {
+                            var (fmtChanged, fmtPath, fmtMsg) = PathRepair.RepairPath(userPathValue);
+                            // Adiciona os programas encontrados no disco que ainda faltam (somente adicao)
+                            var (finalUserPath, addedPaths) = PathRepair.EnsureUserPathMinimum(fmtPath, recovered);
+                            bool userChanged = fmtChanged || addedPaths.Count > 0;
+                            if (userChanged)
+                            {
+                                Environment.SetEnvironmentVariable("PATH", finalUserPath, EnvironmentVariableTarget.User);
+                                foreach (var added in addedPaths)
+                                {
+                                    Logger.Log($"[PATH REPAIR USER] {added}");
+                                }
+                                Logger.Log($"[PATH REPAIR USER] {fmtMsg}");
+                            }
+                            else
+                            {
+                                Logger.Log($"[PATH REPAIR USER] {fmtMsg}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning("PATHRepair", $"Falha ao reparar User PATH: {ex.Message}");
+                    }
+                    // Aplica reparo ao System PATH (se tiver acesso)
+                    try
+                    {
+                        var sysPathValue = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);
+                        if (!string.IsNullOrEmpty(sysPathValue))
+                        {
+                            var entries = PathRepair.DiagnosePath(sysPathValue, "System");
+                            var (repairedPath, actions) = PathRepair.RepairPathEntries(entries, "System");
+                            repairedPath = PathRepair.EnsureSystemPathMinimum(repairedPath);
+                            bool sysChanged = !sysPathValue.Equals(repairedPath, StringComparison.OrdinalIgnoreCase);
+                            if (sysChanged)
+                            {
+                                Environment.SetEnvironmentVariable("PATH", repairedPath, EnvironmentVariableTarget.Machine);
+                                Logger.Log($"[PATH REPAIR SYSTEM] Reparado. Acoes: {string.Join("; ", actions)}");
+                            }
+                            else
+                            {
+                                Logger.Log("[PATH REPAIR SYSTEM] PATH do sistema ja esta correto.");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning("PATHRepair", $"Nao foi possivel alterar PATH do sistema (requer admin): {ex.Message}");
+                    }
+                    Logger.Log($"[SUCESSO] Recuperacao de PATH concluida. Executaveis encontrados: {count}. Reinicie o terminal para ver as mudancas.");
+                }
+            });
+
+
             return repairs;
         }
     }

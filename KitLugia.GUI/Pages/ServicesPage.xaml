@@ -92,7 +92,7 @@
                     </StackPanel>
 
                     <Border Grid.Row="1" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
-                        <DataGrid x:Name="GridStartup" SelectionMode="Single">
+                        <DataGrid x:Name="GridStartup" SelectionMode="Single" PreviewMouseRightButtonDown="GridStartup_PreviewMouseRightButtonDown">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="250" IsReadOnly="True" SortMemberPath="Name">
                                     <DataGridTextColumn.ElementStyle>
@@ -191,6 +191,8 @@
                                     <MenuItem Header="&#x23F3; Converter para Admin Elevado (Atraso 2min)" Click="MenuConvertToAdminDelayed_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
                                     <Separator Background="#333"/>
                                     <MenuItem Header="&#x25B6; Executar Agora (Testar)" Click="MenuRunNow_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#4CAF50" FontWeight="Bold"/>
+                                    <MenuItem x:Name="MenuOpenLocation" Header="&#x1F4C1; Abrir Local do Arquivo" Click="MenuOpenLocation_Click" Style="{StaticResource ServiceMenuItem}" Foreground="White"
+                                              ToolTip="Abre no Explorer a pasta do arquivo deste item"/>
                                     <MenuItem Header="&#x2699; Editar Argumentos..." Click="MenuEditArgs_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
                                     <Separator Background="#333"/>
                                     <MenuItem Header="Remover Permanentemente" Click="BtnRemoveStartup_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61"/>
@@ -200,6 +202,8 @@
                     </Border>
 
                     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                        <Button Content="&#x1F4C1; Abrir Local do Arquivo" Click="BtnOpenStartupLocation_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0"
+                                ToolTip="Abre no Explorer a pasta do arquivo do item selecionado na lista de inicializa&#xE7;&#xE3;o"/>
                         <Button Content="Remover" Click="BtnRemoveStartup_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Foreground="#FF6F61"/>
                         <Button Content="Desabilitar / Habilitar Selecionado" Click="BtnToggleStartup_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0"/>
 

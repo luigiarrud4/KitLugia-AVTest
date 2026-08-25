@@ -78,6 +78,7 @@ namespace KitLugia.GUI.Pages
                 bool gdiScaling = SystemTweaks.IsGdiScalingDisabled();
 
                 bool l2CacheSet = SystemTweaks.IsSecondLevelDataCacheSet();
+                bool rmCacheLocSet = SystemTweaks.IsRmCacheLocSet();
                 bool nagleDisabled = SystemTweaks.IsNagleAlgorithmDisabled();
                 bool coreParkingDisabled = SystemTweaks.IsCoreParkingDisabled();
                 var cpuInfo = SystemTweaks.GetCpuInfo();
@@ -148,6 +149,27 @@ namespace KitLugia.GUI.Pages
                     UpdateLabel(StatusSmartScreenExplorer, smartScreenExplorerDisabled, "Desativado", "Ativo");
                     ChkSmartScreenExplorer.IsChecked = smartScreenExplorerDisabled;
 
+                    // Telemetria e relatórios
+                    bool diagTrackOff = SystemTweaks.IsServiceDisabled("DiagTrack");
+                    UpdateLabel(StatusDiagTrackSvc, diagTrackOff, "Desativado", "Ativo");
+                    ChkDiagTrackSvc.IsChecked = diagTrackOff;
+
+                    bool wapPushOff = SystemTweaks.IsServiceDisabled("dmwappushservice");
+                    UpdateLabel(StatusDmwappushSvc, wapPushOff, "Desativado", "Ativo");
+                    ChkDmwappushSvc.IsChecked = wapPushOff;
+
+                    bool werOff = SystemTweaks.IsServiceDisabled("WerSvc");
+                    UpdateLabel(StatusWerSvc, werOff, "Desativado", "Ativo");
+                    ChkWerSvc.IsChecked = werOff;
+
+                    bool pcaOff = SystemTweaks.IsServiceDisabled("PcaSvc");
+                    UpdateLabel(StatusPcaSvc, pcaOff, "Desativado", "Ativo");
+                    ChkPcaSvc.IsChecked = pcaOff;
+
+                    bool telTasksOff = SystemTweaks.AreTelemetryTasksDisabled();
+                    UpdateLabel(StatusTelemetryTasks, telTasksOff, "Desativadas", "Ativas");
+                    ChkTelemetryTasks.IsChecked = telTasksOff;
+
                     ChkBackgroundApps.IsChecked = backgroundApps;
                     UpdateLabel(StatusBackgroundApps, backgroundApps, "Desativado", "Padrão");
 
@@ -187,6 +209,12 @@ namespace KitLugia.GUI.Pages
                     // Hardware & Rede
                     ChkL2Cache.IsChecked = l2CacheSet;
                     UpdateLabel(StatusL2Cache, l2CacheSet, "Aplicado", "Padrão");
+
+                    ChkRmCacheLoc.IsChecked = rmCacheLocSet;
+                    UpdateLabel(StatusRmCacheLoc, rmCacheLocSet, "Aplicado", "Padrão");
+                    InfoRmCacheLoc.Text = rmCacheLocSet
+                        ? $"Aplicado: {Environment.ProcessorCount} núcleos lógicos (NVIDIA)."
+                        : "Configurado com o numero de nucleos logicos.";
 
                     string cacheStr = cacheKb > 0 ? $"{cacheKb} KB" : "Não definido";
                     InfoCpu.Text = $"CPU: {cpuInfo.Name}  |  L2: {cpuInfo.L2CacheKb} KB  |  L3: {cpuInfo.L3CacheKb} KB  |  Registry: {cacheStr}";
@@ -964,6 +992,109 @@ namespace KitLugia.GUI.Pages
                     : "Proteção do Explorer reativada.");
         }
 
+        // --- TELEMETRIA E RELATÓRIOS ---
+
+        private void SaveTelemetryPreference(string property, bool value)
+        {
+            try
+            {
+                var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
+                if (tray == null) return;
+                switch (property)
+                {
+                    case "DiagTrack": tray.DiagTrackSvcDisabled = value; break;
+                    case "Dmwappush": tray.DmwappushSvcDisabled = value; break;
+                    case "WerSvc": tray.WerSvcDisabled = value; break;
+                    case "PcaSvc": tray.PcaSvcDisabled = value; break;
+                    case "TelemetryTasks": tray.TelemetryTasksDisabled = value; break;
+                }
+                tray.SaveSettings();
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        private async void ChkDiagTrackSvc_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool disable = ChkDiagTrackSvc.IsChecked == true;
+            ChkDiagTrackSvc.IsEnabled = false;
+            await Task.Run(() => SystemTweaks.SetServiceStartup("DiagTrack", disable));
+            ChkDiagTrackSvc.IsEnabled = true;
+            UpdateLabel(StatusDiagTrackSvc, disable, "Desativado", "Ativo");
+            SaveTelemetryPreference("DiagTrack", disable);
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("Telemetria (DiagTrack)", disable
+                    ? "Serviço DiagTrack desativado. A preferência será reaplicada a cada inicialização."
+                    : "Serviço DiagTrack restaurado.");
+        }
+
+        private async void ChkDmwappushSvc_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool disable = ChkDmwappushSvc.IsChecked == true;
+            ChkDmwappushSvc.IsEnabled = false;
+            await Task.Run(() => SystemTweaks.SetServiceStartup("dmwappushservice", disable));
+            ChkDmwappushSvc.IsEnabled = true;
+            UpdateLabel(StatusDmwappushSvc, disable, "Desativado", "Ativo");
+            SaveTelemetryPreference("Dmwappush", disable);
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("WAP Push (dmwappushservice)", disable
+                    ? "Serviço WAP Push desativado. A preferência será reaplicada a cada inicialização."
+                    : "Serviço WAP Push restaurado.");
+        }
+
+        private async void ChkWerSvc_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool disable = ChkWerSvc.IsChecked == true;
+            ChkWerSvc.IsEnabled = false;
+            await Task.Run(() => SystemTweaks.SetServiceStartup("WerSvc", disable));
+            ChkWerSvc.IsEnabled = true;
+            UpdateLabel(StatusWerSvc, disable, "Desativado", "Ativo");
+            SaveTelemetryPreference("WerSvc", disable);
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("Relatório de Erros (WerSvc)", disable
+                    ? "Serviço WerSvc desativado. A preferência será reaplicada a cada inicialização."
+                    : "Serviço WerSvc restaurado.");
+        }
+
+        private async void ChkPcaSvc_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool disable = ChkPcaSvc.IsChecked == true;
+            ChkPcaSvc.IsEnabled = false;
+            await Task.Run(() => SystemTweaks.SetServiceStartup("PcaSvc", disable));
+            ChkPcaSvc.IsEnabled = true;
+            UpdateLabel(StatusPcaSvc, disable, "Desativado", "Ativo");
+            SaveTelemetryPreference("PcaSvc", disable);
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("Compatibilidade (PcaSvc)", disable
+                    ? "Serviço PcaSvc desativado. A preferência será reaplicada a cada inicialização."
+                    : "Serviço PcaSvc restaurado.");
+        }
+
+        private async void ChkTelemetryTasks_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            bool disable = ChkTelemetryTasks.IsChecked == true;
+            ChkTelemetryTasks.IsEnabled = false;
+            await Task.Run(() => SystemTweaks.ApplyTelemetryScheduledTasks(disable));
+            ChkTelemetryTasks.IsEnabled = true;
+            bool nowOff = SystemTweaks.AreTelemetryTasksDisabled();
+            UpdateLabel(StatusTelemetryTasks, nowOff, "Desativadas", "Ativas");
+            SaveTelemetryPreference("TelemetryTasks", nowOff);
+            if (nowOff != disable)
+            {
+                ChkTelemetryTasks.IsChecked = nowOff;
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("Tarefas de Telemetria", "Algumas tarefas nao puderam ser alteradas (provavelmente protegidas).");
+            }
+            else if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("Tarefas de Telemetria", disable
+                    ? "Tarefas de telemetria desativadas (Application Experience + CEIP). A preferência será reaplicada a cada inicialização."
+                    : "Tarefas de telemetria reativadas.");
+        }
+
         // --- HARDWARE & REDE ---
 
         private void BuildVramRows()
@@ -1284,6 +1415,34 @@ namespace KitLugia.GUI.Pages
                 UpdateLabel(StatusL2Cache, targetActive, "Aplicado", "Padrão");
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("CACHE CPU", targetActive ? "Cache L2/L3 configurado conforme sua CPU." : "Cache L2/L3 restaurado para padrão.");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkRmCacheLoc_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkRmCacheLoc.IsChecked == true;
+                var result = await Task.Run(() => SystemTweaks.ToggleRmCacheLocTweak());
+                if (!result.Success)
+                {
+                    ChkRmCacheLoc.IsChecked = !targetActive;
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowError("RMCACHELOC", result.Message);
+                }
+                else
+                {
+                    UpdateLabel(StatusRmCacheLoc, targetActive, "Aplicado", "Padrão");
+                    InfoRmCacheLoc.Text = targetActive
+                        ? $"Aplicado: {Environment.ProcessorCount} núcleos lógicos (NVIDIA)."
+                        : "Configurado com o numero de nucleos logicos.";
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowInfo("RMCACHELOC", result.Message);
+                }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }

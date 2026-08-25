@@ -20,8 +20,11 @@
 		<PublishReadyToRun>true</PublishReadyToRun>
 		<PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
 		<DebugType>embedded</DebugType>
-		<EnableXamlDiagnostics>false</EnableXamlDiagnostics>
-		<XamlDebuggingInformation>False</XamlDebuggingInformation>
+		<!-- XAML Hot Reload: desligado em Release, ligado em Debug (necessario p/ XAML Hot Reload funcionar) -->
+		<EnableXamlDiagnostics Condition="'$(Configuration)' == 'Debug'">true</EnableXamlDiagnostics>
+		<EnableXamlDiagnostics Condition="'$(Configuration)' != 'Debug'">false</EnableXamlDiagnostics>
+		<XamlDebuggingInformation Condition="'$(Configuration)' == 'Debug'">True</XamlDebuggingInformation>
+		<XamlDebuggingInformation Condition="'$(Configuration)' != 'Debug'">False</XamlDebuggingInformation>
 <Version>2.0.29</Version>
 <AssemblyVersion>2.0.29.0</AssemblyVersion>
 <FileVersion>2.0.29.0</FileVersion>
@@ -60,6 +63,9 @@
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
 	  <Content Include="External\ForceStopUnlock\**\*">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="External\WindowsUpdate\**\*" Condition="Exists('External\WindowsUpdate')">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
 	  <Content Include="Resources\**\*">

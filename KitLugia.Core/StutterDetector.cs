@@ -324,12 +324,17 @@ namespace KitLugia.Core
         {
             try
             {
-                var sorted = Process.GetProcesses()
-                    .Where(p =>
-                    {
-                        try { return p.TotalProcessorTime.TotalMilliseconds > 0 && p.Id != 0 && p.SessionId != 0; }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-                    })
+                var allProcs = Process.GetProcesses();
+                var sorted = new List<Process>();
+                foreach (var p in allProcs)
+                {
+                    bool keep = false;
+                    try { keep = p.TotalProcessorTime.TotalMilliseconds > 0 && p.Id != 0 && p.SessionId != 0; }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    if (keep) sorted.Add(p);
+                    else { try { p.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } }
+                }
+                var top3 = sorted
                     .OrderByDescending(p =>
                     {
                         try { return p.TotalProcessorTime.TotalMilliseconds; }
@@ -337,6 +342,9 @@ namespace KitLugia.Core
                     })
                     .Take(3)
                     .ToList();
+                foreach (var p in sorted)
+                    if (!top3.Contains(p)) { try { p.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } }
+                sorted = top3;
 
                 if (sorted.Count > 0)
                 {

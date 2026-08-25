@@ -135,11 +135,20 @@ namespace KitLugia.Core
                 long size = 0;
                 foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                 {
-                    try { size += new FileInfo(file).Length; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    try { size += new FileInfo(file).Length; } catch { /* arquivo inacessível durante enumeração — ignora */ }
                 }
                 return size;
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+            {
+                // Pasta protegida/em uso — irrelevante para o cálculo do cache
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Unknown", $"GetDirectorySize({path}): {ex.Message}");
+                return 0;
+            }
         }
 
         private record BrowserDefinition(string Name, string Icon, List<string> CachePaths);

@@ -129,7 +129,7 @@ namespace KitLugia.Core
                 using var proc = Process.GetProcessById(pid);
                 SetProcessWorkingSetSize(proc.Handle, (IntPtr)(-1), (IntPtr)(-1));
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch { /* processo já foi encerrado entre o scan e o trim — normal */ }
         }
 
         public static (bool Success, string Message) Optimize() => Optimize(CleaningMode.Normal);

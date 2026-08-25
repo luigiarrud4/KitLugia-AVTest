@@ -1,0 +1,123 @@
+<Window x:Class="KitLugia.GUI.Windows.DeepUninstallSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configurações do Desinstalador" Height="470" Width="520"
+        WindowStartupLocation="CenterOwner"
+        TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Consolas, Segoe UI Emoji"
+        TextElement.Foreground="White"
+        Background="#0F0F0F"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize">
+    <Window.Resources>
+        <Style x:Key="SettingsToggle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#E6E6E6"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type CheckBox}">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="track" Width="40" Height="20" CornerRadius="10"
+                                    Background="#333333" BorderBrush="#444" BorderThickness="1"
+                                    VerticalAlignment="Center">
+                                <Ellipse x:Name="thumb" Width="14" Height="14" Fill="#888"
+                                         HorizontalAlignment="Left" Margin="3,0,0,0"/>
+                            </Border>
+                            <ContentPresenter VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="track" Property="Background" Value="#2F4D2F"/>
+                                <Setter TargetName="track" Property="BorderBrush" Value="#4CAF50"/>
+                                <Setter TargetName="thumb" Property="Fill" Value="#FFD700"/>
+                                <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="thumb" Property="Margin" Value="0,0,3,0"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="TooltipText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#777"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="50,0,0,4"/>
+        </Style>
+    </Window.Resources>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="0"/>
+    </WindowChrome.WindowChrome>
+    <Border BorderBrush="#FFD700" BorderThickness="1">
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Grid Grid.Row="0">
+                <TextBlock Text="⚙️ Configurações do Desinstalador" FontSize="15" FontWeight="SemiBold" Foreground="#FFD700"
+                           HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                <TextBlock x:Name="BtnClose" Text="&#x2715;" FontSize="12" Foreground="#666"
+                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Cursor="Hand" Margin="0,0,4,0" MouseDown="BtnClose_MouseDown"/>
+            </Grid>
+
+            <!-- Toggles -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,10,0,8">
+                <StackPanel>
+                    <CheckBox x:Name="ChkRecycleBin" Style="{StaticResource SettingsToggle}"
+                              Content="Enviar para a Lixeira (em vez de apagar permanentemente)"
+                              Checked="ChkToggled" Unchecked="ChkToggled"/>
+                    <TextBlock Style="{StaticResource TooltipText}"
+                               Text="DelToBin (Revo): arquivos e pastas removidos vão para a Lixeira e podem ser recuperados. Desligue para exclusão permanente."/>
+
+                    <CheckBox x:Name="ChkKillProcesses" Style="{StaticResource SettingsToggle}"
+                              Content="Encerrar processos do aplicativo antes de desinstalar"
+                              Checked="ChkToggled" Unchecked="ChkToggled"/>
+                    <TextBlock Style="{StaticResource TooltipText}"
+                               Text="StopRunExe (Revo): o kit mata os processos do app (exe na pasta de instalação) antes de rodar o desinstalador, evitando falhas de arquivos em uso."/>
+
+                    <CheckBox x:Name="ChkDisableScan" Style="{StaticResource SettingsToggle}"
+                              Content="Não escanear resíduos automaticamente após desinstalar"
+                              Checked="ChkToggled" Unchecked="ChkToggled"/>
+                    <TextBlock Style="{StaticResource TooltipText}"
+                               Text="Pula a fase 2 (scan de arquivos + registro). O review com os caminhos não abre; a remoção é tratada como concluída."/>
+
+                    <CheckBox x:Name="ChkSelectLeftovers" Style="{StaticResource SettingsToggle}"
+                              Content="Marcar resíduos seguros por padrão no review"
+                              Checked="ChkToggled" Unchecked="ChkToggled"/>
+                    <TextBlock Style="{StaticResource TooltipText}"
+                               Text="Selecionar itens Seguros/Moderados automaticamente na tela de revisão (Revo: 'Select leftovers by default'). Desligue para revisar item por item."/>
+
+                    <CheckBox x:Name="ChkIgnore24H" Style="{StaticResource SettingsToggle}"
+                              Content="Ignorar resíduos acessados nas últimas 24 horas"
+                              Checked="ChkToggled" Unchecked="ChkToggled"/>
+                    <TextBlock Style="{StaticResource TooltipText}"
+                               Text="Revo: arquivos/pastas acessados recentemente provavelmente ainda estão em uso — o scan não os lista. Desligado por padrão."/>
+
+                    <Border Background="#151515" CornerRadius="4" BorderBrush="#2A2A2A" BorderThickness="1" Padding="8" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="🔄 Undo persistente" FontWeight="SemiBold" Foreground="#FFD700" FontSize="12"/>
+                            <TextBlock Text="Backups de arquivos e chaves de registro (.reg) agora ficam em %LOCALAPPDATA%\KitLugia — sobrevivem ao reboot. Use a aba 'Histórico' na página de Apps para restaurar." 
+                                       FontSize="11" Foreground="#999" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Footer -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Fechar" Width="90" Height="32" Margin="0,0,0,0"
+                        Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"
+                        Cursor="Hand" Click="BtnClose_Click"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

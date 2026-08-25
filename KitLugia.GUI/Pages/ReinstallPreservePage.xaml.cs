@@ -16,7 +16,7 @@ namespace KitLugia.GUI.Pages
     {
         private bool _winpeReady;
         private string? _isoPath;
-        private List<DriveInfo> _drives = new();
+        private List<(string Letter, ulong Free, ulong Size, uint Disk, uint Part)> _targets = new();
 
         public ReinstallPreservePage()
         {
@@ -28,6 +28,7 @@ namespace KitLugia.GUI.Pages
         {
             await CheckWinpeStatusAsync();
             await RefreshDrivesAsync();
+            LoadWinpeLogs();
         }
 
         #region WinPE Status
@@ -70,23 +71,70 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                TxtStatusBar.Text = "Carregando unidades...";
-                var result = await Task.Run(() => DriveInfo.GetDrives()
-                    .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
-                    .ToList());
+                TxtStatusBar.Text = "Carregando unidades (Storage API)...";
+                var targets = await Task.Run(() =>
+                {
+                    var list = new List<(string Letter, ulong Free, ulong Size, uint Disk, uint Part)>();
+                    var disks = PartitionManager.GetAllDisks() ?? new List<DiskInfoEx>();
+                    foreach (var disk in disks)
+                    {
+                        foreach (var part in disk.Partitions)
+                        {
+                            if (part.IsUnallocated) continue;
+                            string letter = part.DriveLetter?.Trim().TrimEnd(':');
+                            if (string.IsNullOrEmpty(letter) || letter.Length != 1 || letter[0] < 'A' || letter[0] > 'Z') continue;
+                            list.Add((letter.ToUpperInvariant(), part.FreeSpace, part.Size, disk.Index, part.Index));
+                        }
+                    }
+                    return list.OrderBy(x => x.Letter).ToList();
+                });
 
-                _drives = result ?? new();
-                CboTargetDrive.ItemsSource = _drives.Select(d => $"{d.Name}  ({d.TotalSize / 1024 / 1024 / 1024:F0} GB)").ToList();
+                _targets = targets;
+                CboTargetDrive.ItemsSource = targets
+                    .Select(t => $"{t.Letter}:  ({t.Free / 1024.0 / 1024 / 1024:F0} GB livre de {t.Size / 1024.0 / 1024 / 1024:F0} GB)  [Disco {t.Disk} Part {t.Part}]")
+                    .ToList();
                 if (CboTargetDrive.Items.Count > 0)
                     CboTargetDrive.SelectedIndex = 0;
 
-                TxtStatusBar.Text = $"{_drives.Count} unidade(s) encontrada(s).";
+                TxtStatusBar.Text = $"{targets.Count} volume(s) elegivel(eis) encontrado(s).";
             }
             catch (Exception ex)
             {
                 TxtStatusBar.Text = $"Erro ao carregar discos: {ex.Message}";
             }
         }
+
+        /// <summary>
+        /// Lê os logs persistentes gerados pelo WinPE (shrink + fresh install) e mostra na página.
+        /// </summary>
+        private void LoadWinpeLogs()
+        {
+            try
+            {
+                var logs = WinbootManager.ReadAllWinpeLogs();
+                if (logs.Count == 0)
+                {
+                    TxtOperationLog.Text = "Nenhum log do WinPE encontrado ainda.\nApos o reboot e a operacao, o resultado aparecera aqui.";
+                    return;
+                }
+
+                var sb = new System.Text.StringBuilder();
+                foreach (var kv in logs)
+                {
+                    sb.AppendLine($"===== {kv.Key} =====");
+                    sb.AppendLine(kv.Value);
+                    sb.AppendLine();
+                }
+                TxtOperationLog.Text = sb.ToString().TrimEnd();
+            }
+            catch (Exception ex)
+            {
+                TxtOperationLog.Text = $"Erro ao ler logs: {ex.Message}";
+            }
+        }
+
+        private void BtnRefreshLog_Click(object sender, RoutedEventArgs e)
+            => LoadWinpeLogs();
 
         #endregion
 
@@ -197,14 +245,37 @@ namespace KitLugia.GUI.Pages
         {
             bool hasIso = !string.IsNullOrEmpty(_isoPath) && File.Exists(_isoPath);
             bool hasWinpe = _winpeReady;
-            bool hasDrive = CboTargetDrive.SelectedIndex >= 0;
+            int selIdx = CboTargetDrive.SelectedIndex;
 
-            BtnStart.IsEnabled = hasIso && hasWinpe && hasDrive;
-            TxtReadyStatus.Text = hasIso && hasWinpe && hasDrive
-                ? "Pronto para iniciar. Revise as opcoes e clique em INICIAR FRESH INSTALL."
-                : (!hasWinpe ? "Prepare o WinPE primeiro."
-                    : !hasIso ? "Carregue um ISO do Windows."
-                    : "Selecione a particao alvo.");
+            ulong freeGb = 0;
+            bool hasSpace = false;
+            if (selIdx >= 0 && selIdx < _targets.Count)
+            {
+                freeGb = _targets[selIdx].Free / (1024UL * 1024 * 1024);
+                hasSpace = freeGb >= 10; // apenas informativo — o WinPE deleta o Windows antigo se faltar espaco
+            }
+
+            // O WinPE inicia de qualquer jeito: se nao houver espaco, ele deleta o Windows antigo
+            // e extrai o ISO dentro do proprio WinPE. O botao so exige ISO + alvo selecionado.
+            BtnStart.IsEnabled = hasIso && (selIdx >= 0);
+            TxtReadyStatus.Text =
+                !hasIso ? "Carregue um ISO do Windows."
+                : selIdx < 0 ? "Selecione a particao alvo."
+                : !hasWinpe && !hasSpace ? $"WinPE ausente (sera preparado automaticamente ao iniciar) e espaco livre baixo ({freeGb} GB): o WinPE deletara o Windows antigo e extraira o ISO no proprio WinPE."
+                : !hasWinpe ? "WinPE nao preparado — sera preparado automaticamente ao iniciar."
+                : !hasSpace ? $"Espaco livre baixo ({freeGb} GB): o WinPE deletara o Windows antigo e extraira o ISO dentro do proprio WinPE."
+                : "Pronto para iniciar. O WinPE removera o Windows antigo e aplicara a imagem DIRETAMENTE na particao alvo, preservando seus dados.";
+        }
+
+        /// <summary>
+        /// Extrai o indice numerico da edicao selecionada (ex: "2 - Windows Pro" → "2").
+        /// </summary>
+        private string GetSelectedEditionIndex()
+        {
+            string? item = CboEdition.SelectedItem as string;
+            if (string.IsNullOrEmpty(item)) return "1";
+            var m = System.Text.RegularExpressions.Regex.Match(item, @"^\s*(\d+)");
+            return m.Success ? m.Groups[1].Value : "1";
         }
 
         private void BtnRefreshDisks_Click(object sender, RoutedEventArgs e)
@@ -216,9 +287,17 @@ namespace KitLugia.GUI.Pages
             if (CboTargetDrive.SelectedItem is string driveStr && driveStr.Length > 0)
                 targetDrive = driveStr.Substring(0, 1);
 
-            string summary = $"WinPE: {(_winpeReady ? "Pronto" : "Ausente")}\n" +
+            string freeInfo = "";
+            if (CboTargetDrive.SelectedIndex >= 0 && CboTargetDrive.SelectedIndex < _targets.Count)
+            {
+                var t = _targets[CboTargetDrive.SelectedIndex];
+                freeInfo = $"Espaco livre: {t.Free / 1024.0 / 1024 / 1024:F0} GB\n";
+            }
+
+            string summary = $"WinPE: {(_winpeReady ? "Pronto" : "Ausente (sera preparado automaticamente)")}\n" +
                              $"ISO: {Path.GetFileName(_isoPath)}\n" +
                              $"Particao alvo: {targetDrive}:\\\n" +
+                             $"{freeInfo}" +
                              $"Edicao: {CboEdition.SelectedItem}\n\n" +
                              $"Preservar:\n" +
                              $"  - Perfis de usuario: {(ChkPreserveUsers.IsChecked == true ? "Sim" : "Nao")}\n" +
@@ -226,7 +305,9 @@ namespace KitLugia.GUI.Pages
                              $"  - Registry (Str. C): {(ChkPreserveRegistry.IsChecked == true ? "Sim" : "Nao")}\n" +
                              $"  - Personalizacao: {(ChkPreservePersonalization.IsChecked == true ? "Sim" : "Nao")}\n" +
                              $"  - Drivers: {(ChkPreserveDrivers.IsChecked == true ? "Sim" : "Nao")}\n\n" +
-                             $"O PC sera reiniciado no WinPE para executar a operacao.";
+                             $"O WinPE aplicara a imagem do Windows direto na particao {targetDrive}:\\\n" +
+                             $"e restaurara seus dados em seguida.\n" +
+                             $"Se faltar espaco, o WinPE deleta o Windows antigo para liberar.";
 
             TxtConfirmSummary.Text = summary;
             ChkConfirm.IsChecked = false;
@@ -249,12 +330,14 @@ namespace KitLugia.GUI.Pages
 
             ShowBusy("INICIANDO FRESH INSTALL + PRESERVACAO",
                 "Preparando configuracao e agendando reboot no WinPE...\n\n" +
-                "1. Salvar registry do Windows atual\n" +
-                "2. Escrever script de instalacao\n" +
-                "3. Agendar reboot no WinPE\n\n" +
+                "1. Resolver particao alvo + ESP (Storage API)\n" +
+                "2. Exportar drivers e config para a particao alvo\n" +
+                "3. Extrair install.wim para a particao alvo (se couber; senao, o WinPE extrai)\n" +
+                "4. Agendar reboot unico no WinPE (bootsequence)\n\n" +
                 "O WinPE executara:\n" +
-                "  - Mover dados para C:\\!\n" +
-                "  - Aplicar Windows novo via DISM\n" +
+                "  - Backup dos dados na propria particao (Z:\\!)\n" +
+                "  - Deletar o Windows antigo para liberar espaco (se necessario)\n" +
+                "  - Aplicar a imagem do Windows DIRETO no disco\n" +
                 "  - Mesclar registry (se ativado)\n" +
                 "  - Restaurar dados\n" +
                 "  - Reboot no Windows novo");
@@ -262,7 +345,7 @@ namespace KitLugia.GUI.Pages
             try
             {
                 string targetDrive = (CboTargetDrive.SelectedItem as string)?[0].ToString() ?? "C";
-                string edition = CboEdition.SelectedItem as string ?? "1";
+                string edition = GetSelectedEditionIndex();
                 string isoPath = _isoPath ?? "";
 
                 var options = new PreservationOptions
@@ -286,13 +369,15 @@ namespace KitLugia.GUI.Pages
                 {
                     ShowBusyResult($"{msg}\n\n" +
                         $"O PC sera reiniciado em 10 segundos.\n" +
-                        $"O WinPE executara o fresh install com preservacao.\n" +
-                        $"Apos a conclusao, o Windows novo iniciara com seus dados.");
+                        $"O WinPE aplicara a imagem direto na particao {targetDrive}:\\ com preservacao.\n" +
+                        $"O resultado ficara em KitLugia_FreshInstall_Log.txt na raiz do alvo.");
                 }
                 else
                 {
                     ShowBusyResult($"Falha ao agendar operacao.\n{msg}");
                 }
+
+                LoadWinpeLogs();
             }
             catch (Exception ex)
             {

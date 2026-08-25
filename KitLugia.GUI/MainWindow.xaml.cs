@@ -155,6 +155,7 @@ namespace KitLugia.GUI
         ForceStopUnlock,
         WinpeTools,
         ReinstallPreserve,
+        WindowsUpdate,
     }
 
     public partial class MainWindow : Window, INotifyPropertyChanged
@@ -1192,6 +1193,7 @@ namespace KitLugia.GUI
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 PageType.WinpeTools => new WinpeToolsPage(),
                 PageType.ReinstallPreserve => new ReinstallPreservePage(),
+                PageType.WindowsUpdate => new WindowsUpdatePage(),
                 _ => null
             };
 
@@ -2173,6 +2175,7 @@ namespace KitLugia.GUI
                 var toast = new LugiaToast();
                 toast.SetContent(title, initialMessage, NotificationType.Info);
                 toast.NotificationId = $"PROGRESS|{taskId}";
+                toast.IsProgress = true;
 
                 _progressToasts[taskId] = toast;
 

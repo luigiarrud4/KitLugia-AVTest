@@ -277,10 +277,19 @@ namespace KitLugia.Core
                             friendlyName = generatedName;
                         }
 
+                        string aumid = BuildAumid(package) ?? "";
+                        if (!string.IsNullOrEmpty(aumid))
+                        {
+                            var startApps = GetStartAppsFriendlyNames();
+                            if (startApps.TryGetValue(aumid, out var sa) && !string.IsNullOrWhiteSpace(sa))
+                                friendlyName = sa;
+                        }
+
                         appStatuses.Add(new BloatwareApp
                         {
                             DisplayName = friendlyName,
                             PackageName = fullName,
+                            Aumid = aumid,
                             IsInstalled = true,
                             StoreId = "",
                             Icon = null,
@@ -319,8 +328,96 @@ namespace KitLugia.Core
                     }
                 }
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch { /* pacote UWP com manifesto inacessível/instalação quebrada — nome do fallback GetStartAppsFriendlyNames cobre */ }
             return null;
+        }
+
+        /// <summary>
+        /// Constrói o AUMID (App User Model ID) do pacote: FamilyName!AppId.
+        /// O AppId vem do elemento &lt;Application Id="..."&gt; do AppxManifest.xml.
+        /// </summary>
+        private static string? BuildAumid(Windows.ApplicationModel.Package package)
+        {
+            try
+            {
+                string family = package.Id.FamilyName;
+                if (string.IsNullOrWhiteSpace(family)) return null;
+
+                string manifestPath = Path.Combine(package.InstalledLocation.Path, "AppxManifest.xml");
+                if (!File.Exists(manifestPath)) return null;
+
+                var doc = XDocument.Load(manifestPath);
+                var root = doc.Root;
+                if (root == null) return null;
+
+                var ns = root.GetDefaultNamespace();
+                string? appId = root
+                    .Element(ns + "Applications")?
+                    .Elements(ns + "Application")
+                    .Select(a => (string?)a.Attribute("Id"))
+                    .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+                if (string.IsNullOrWhiteSpace(appId)) return null;
+
+                return $"{family}!{appId}";
+            }
+            catch { /* pacote UWP com manifesto inacessível — AUMID cai para null */ return null; }
+        }
+
+        private static Dictionary<string, string>? _startAppsFriendlyNames;
+        private static readonly object StartAppsLock = new();
+
+        /// <summary>
+        /// Cache do nome amigável real (menu Iniciar) por AUMID via Get-StartApps.
+        /// </summary>
+        private static Dictionary<string, string> GetStartAppsFriendlyNames()
+        {
+            if (_startAppsFriendlyNames != null) return _startAppsFriendlyNames;
+            lock (StartAppsLock)
+            {
+                if (_startAppsFriendlyNames != null) return _startAppsFriendlyNames;
+
+                var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    using var p = new Process
+                    {
+                        StartInfo = new ProcessStartInfo("powershell.exe",
+                            "-NoProfile -NonInteractive -Command \"Get-StartApps | ConvertTo-Json -Compress\"")
+                        {
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true
+                        }
+                    };
+                    p.Start();
+                    string output = p.StandardOutput.ReadToEnd();
+                    if (!p.WaitForExit(15000))
+                    {
+                        try { p.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    }
+
+                    using var doc = JsonDocument.Parse(output);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in doc.RootElement.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("AppID", out var idEl) && idEl.ValueKind == JsonValueKind.String &&
+                                item.TryGetProperty("Name", out var nameEl) && nameEl.ValueKind == JsonValueKind.String)
+                            {
+                                string id = idEl.GetString() ?? "";
+                                string nm = nameEl.GetString() ?? "";
+                                if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(nm))
+                                    map[id] = nm;
+                            }
+                        }
+                    }
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                _startAppsFriendlyNames = map;
+                return map;
+            }
         }
 
         public static (bool Success, string Message) RemoveBloatwareApp(string packageFullName)
@@ -460,16 +557,66 @@ namespace KitLugia.Core
                 await Task.Run(() => DeepUninstaller.KillProcessesForApp(displayName, extraExeNames: new List<string> { packageFullName.Split('_')[0] }));
 
                 string packageNameBase = packageFullName.Split('_')[0];
+                var errors = new List<string>();
 
+                // 1) Remove via PackageManager — verifica o RESULTADO real (antes era engolido
+                //    e o app sempre reportava sucesso mesmo sem remover nada).
                 try
                 {
                     var pm = new Windows.Management.Deployment.PackageManager();
-                    await pm.RemovePackageAsync(packageFullName);
+
+                    // RemovePackageAsync (usuário atual) — se falhar, fallback via PowerShell.
+                    bool removed = false;
+                    string? lastError = null;
+                    try
+                    {
+                        var op = pm.RemovePackageAsync(packageFullName);
+                        var dr = await op;
+                        if (dr != null && !string.IsNullOrWhiteSpace(dr.ErrorText))
+                        {
+                            lastError = dr.ErrorText;
+                        }
+                        else
+                        {
+                            removed = true;
+                        }
+                    }
+                    catch (Exception ex) { lastError = ex.Message; }
+
+                    if (!removed)
+                    {
+                        errors.Add($"RemovePackageAsync: {lastError ?? "falha desconhecida"}");
+
+                        // Fallback 2: PowerShell Remove-AppxPackage -AllUsers (robusto p/ apps provisionados)
+                        try
+                        {
+                            string ps = $"Remove-AppxPackage -AllUsers -Package '{packageFullName.Replace("'", "''")}' -ErrorAction Stop";
+                            using var proc = new Process
+                            {
+                                StartInfo = new ProcessStartInfo
+                                {
+                                    FileName = "powershell.exe",
+                                    Arguments = $"-NoProfile -Command \"{ps}\"",
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true,
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError = true
+                                }
+                            };
+                            proc.Start();
+                            string err = await proc.StandardError.ReadToEndAsync();
+                            await proc.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+                            if (proc.ExitCode != 0)
+                                errors.Add($"Remove-AppxPackage: {err.Trim()}");
+                        }
+                        catch (Exception ex) { errors.Add($"Remove-AppxPackage: {ex.Message}"); }
+                    }
                 }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                catch (Exception ex) { errors.Add($"PackageManager: {ex.Message}"); }
 
                 await Task.Delay(800);
 
+                // 2) Limpar pasta de dados %LocalAppData%\Packages\<base>*
                 try
                 {
                     string localPackages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages");
@@ -483,6 +630,7 @@ namespace KitLugia.Core
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
+                // 3) Limpar pasta em WindowsApps
                 try
                 {
                     string winApps = Path.Combine(
@@ -513,6 +661,7 @@ namespace KitLugia.Core
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
+                // 4) Remover provisionamento (DISM) — apps pré-instalados voltam se não fizer isso
                 try
                 {
                     using var searcher = new ManagementObjectSearcher(
@@ -528,16 +677,35 @@ namespace KitLugia.Core
                                     FileName = "dism",
                                     Arguments = $"/online /remove-provisionedappxpackage /packagename:{app["PackageName"]} /quiet",
                                     UseShellExecute = false,
-                                    CreateNoWindow = true
+                                    CreateNoWindow = true,
+                                    RedirectStandardError = true
                                 }
                             };
                             process.Start();
+                            string err = await process.StandardError.ReadToEndAsync();
                             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
                         }
                         catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                // 5) VERIFICAÇÃO REAL: o pacote ainda existe? (FindPackages casa por PACKAGE NAME, não FullName)
+                bool stillInstalled = false;
+                try
+                {
+                    var pm = new Windows.Management.Deployment.PackageManager();
+                    var found = pm.FindPackages(packageNameBase).FirstOrDefault()
+                        ?? pm.FindPackagesForUser("", packageNameBase).FirstOrDefault();
+                    stillInstalled = found != null;
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                if (stillInstalled && errors.Count == 0)
+                    errors.Add("O pacote ainda está registrado após a remoção");
+
+                if (errors.Count > 0)
+                    return (false, string.Join(" | ", errors));
 
                 return (true, "Deep Uninstall concluído com sucesso");
             }
@@ -7672,6 +7840,197 @@ namespace KitLugia.Core
         }
 
         // ============================================================
+        // RMCACHELOC (NVIDIA Resource Manager Cache)
+        // RmCacheLoc e um valor do driver NVIDIA (Resource Manager) aplicado
+        // via .inf; muitos guias de otimizacao o configuram com o numero de
+        // nucleos LOGICOS da CPU para melhorar a localidade de cache no
+        // driver. Requer admin (HKLM).
+        // ============================================================
+
+        private const string GpuClassRegPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
+        private const string GpuVideoRegRoot = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Video";
+
+        private static bool RegKeyIsNvidia(RegistryKey key)
+        {
+            try
+            {
+                // Gatilho 1: nome do adaptador (mais comum)
+                var desc = (key.GetValue("DriverDesc") ?? key.GetValue("HardwareInformation.AdapterString"))?.ToString() ?? "";
+                if (desc.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+
+                // Gatilho 2: MatchingDeviceId com vendor PCI NVIDIA (ven_10de)
+                // — pega a placa mesmo se DriverDesc estiver vazio/estranho
+                var match = key.GetValue("MatchingDeviceId")?.ToString() ?? "";
+                if (match.StartsWith(@"pci\ven_10de", StringComparison.OrdinalIgnoreCase)) return true;
+
+                // Gatilho 3: DLLs do driver user-mode instaladas (nvlddmkm/nvldumd).
+                // REG_MULTI_SZ retorna string[] — juntar antes de procurar.
+                var drvObj = key.GetValue("InstalledDisplayDrivers");
+                string drv = drvObj is string[] drvArr ? string.Join(",", drvArr) : drvObj?.ToString() ?? "";
+                if (drv.IndexOf("nvlddmkm", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    drv.IndexOf("nvldumd", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+
+                // Gatilho 4: ProviderName NVIDIA
+                var prov = key.GetValue("ProviderName")?.ToString() ?? "";
+                return prov.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Resolve TODOS os caminhos de registro onde o driver NVIDIA le/grava config,
+        /// com gatilhos em cascata para nunca ficar sem alvos:
+        /// 1) PnP software key (Control\Class\{4d36e968-...}\00xx) — caminho canonico
+        ///    (a placa pode estar em 0000 OU 0004).
+        /// 2) Espelho Control\Video\{GUID}\0000 — um por adaptador
+        ///    (ex: ...\Video\{3E046CDA-9115-11F1-8047-0E12A5BE7880}\0000).
+        /// Cada caminho e validado por 4 gatilhos (DriverDesc-2/AdapterString, ven_10de,
+        /// InstalledDisplayDrivers, ProviderName).
+        /// 3) FALLBACK: se NENHUM match NVIDIA for encontrado, retorna TODAS as subchaves
+        ///    de display (Class e Video GUIDs) que tenham DriverDesc — "aplica em todas
+        ///    que existirem" em vez de aplicar simplesmente nada.
+        /// </summary>
+        private static List<string> FindNvidiaAdapterRegPaths()
+        {
+            var paths = new List<string>();
+            try
+            {
+                using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+
+                // 1) Control\Class (PnP software key) — 0000, 0001, 0004...
+                using (var displayClass = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"))
+                {
+                    if (displayClass != null)
+                    {
+                        foreach (var subName in displayClass.GetSubKeyNames())
+                        {
+                            if (!int.TryParse(subName, out _)) continue;
+                            using var k = displayClass.OpenSubKey(subName);
+                            if (k != null && RegKeyIsNvidia(k))
+                                paths.Add($@"{GpuClassRegPath}\{subName}");
+                        }
+                    }
+                }
+
+                // 2) Control\Video\{GUID}\0000 — espelho por adaptador
+                using (var videoRoot = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Video"))
+                {
+                    if (videoRoot != null)
+                    {
+                        foreach (var guid in videoRoot.GetSubKeyNames())
+                        {
+                            if (!guid.StartsWith("{")) continue;
+                            using var k = videoRoot.OpenSubKey(guid + @"\0000");
+                            if (k != null && RegKeyIsNvidia(k))
+                                paths.Add($@"{GpuVideoRegRoot}\{guid}\0000");
+                        }
+                    }
+                }
+
+                // 3) FALLBACK: nada NVIDIA encontrado — pega TODAS as chaves de display
+                if (paths.Count == 0)
+                {
+                    using (var displayClass = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"))
+                    {
+                        if (displayClass != null)
+                        {
+                            foreach (var subName in displayClass.GetSubKeyNames())
+                            {
+                                if (!int.TryParse(subName, out _)) continue;
+                                using var k = displayClass.OpenSubKey(subName);
+                                if (k != null && !string.IsNullOrEmpty(k.GetValue("DriverDesc")?.ToString()))
+                                    paths.Add($@"{GpuClassRegPath}\{subName}");
+                            }
+                        }
+                    }
+                    using (var videoRoot = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Video"))
+                    {
+                        if (videoRoot != null)
+                        {
+                            foreach (var guid in videoRoot.GetSubKeyNames())
+                            {
+                                if (!guid.StartsWith("{")) continue;
+                                using var k = videoRoot.OpenSubKey(guid + @"\0000");
+                                if (k != null && !string.IsNullOrEmpty(k.GetValue("DriverDesc")?.ToString()))
+                                    paths.Add($@"{GpuVideoRegRoot}\{guid}\0000");
+                            }
+                        }
+                    }
+                    if (paths.Count > 0)
+                        Logger.Log("RmCacheLoc: nenhuma chave NVIDIA explicita — fallback aplicado em todas as chaves de display encontradas.");
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            return paths;
+        }
+
+        public static bool IsRmCacheLocSet()
+        {
+            try
+            {
+                foreach (var path in FindNvidiaAdapterRegPaths())
+                {
+                    var val = Registry.GetValue(path, "RmCacheLoc", 0);
+                    if (val != null && Convert.ToInt32(val) > 0) return true;
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            return false;
+        }
+
+        public static void ApplyRmCacheLocTweak()
+        {
+            try
+            {
+                int logicalProcessors = Environment.ProcessorCount;
+                var paths = FindNvidiaAdapterRegPaths();
+                int created = 0;
+                foreach (var path in paths)
+                {
+                    // MUDANCA AGRESSIVA (mesmo padrao do tweak de VRAM): CreateSubKey
+                    // cria a chave se ela nao existir — nunca falha por chave ausente.
+                    string subPath = path.Replace(@"HKEY_LOCAL_MACHINE\", "");
+                    bool existed = Registry.LocalMachine.OpenSubKey(subPath) != null;
+                    using (var key = Registry.LocalMachine.CreateSubKey(subPath, true))
+                    {
+                        if (key == null) continue;
+                        key.SetValue("RmCacheLoc", logicalProcessors, RegistryValueKind.DWord);
+                        if (!existed) created++;
+                    }
+                }
+                Logger.Log($"RmCacheLoc configurado em {paths.Count} chave(s) NVIDIA ({created} criada(s)): {logicalProcessors} nucleos logicos.");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        public static void RevertRmCacheLocTweak()
+        {
+            try
+            {
+                foreach (var path in FindNvidiaAdapterRegPaths())
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(path.Replace("HKEY_LOCAL_MACHINE\\", ""), true);
+                    key?.DeleteValue("RmCacheLoc", false);
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        public static (bool Success, string Message) ToggleRmCacheLocTweak()
+        {
+            if (IsRmCacheLocSet())
+            {
+                RevertRmCacheLocTweak();
+                return (true, "RmCacheLoc restaurado para padrão.");
+            }
+            else
+            {
+                ApplyRmCacheLocTweak();
+                return (true, $"RmCacheLoc configurado com {Environment.ProcessorCount} núcleos lógicos.");
+            }
+        }
+
+        // ============================================================
         // SHUTDOWN TWEAKS (WaitToKill, AutoEndTasks, ClearPageFile, VerboseStatus)
         // ============================================================
 
@@ -8788,6 +9147,169 @@ namespace KitLugia.Core
         {
             try { return GetAllUserContextMenuEntries().Count; }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
+        }
+
+        #endregion
+
+        #region Telemetria e Relatorios (servicos + tarefas agendadas)
+
+        /// <summary>
+        /// Servicos de telemetria/reportes seguros de desativar. DefaultStart: 2=demand, 3=auto.
+        /// </summary>
+        public static readonly (string Service, string Display, int DefaultStart)[] TelemetryServices =
+        {
+            ("DiagTrack", "Telemetria (Connected User Experiences)", 3),
+            ("dmwappushservice", "WAP Push Message Routing", 2),
+            ("WerSvc", "Relatorio de Erros do Windows", 2),
+            ("PcaSvc", "Assistente de Compatibilidade de Programas", 3),
+        };
+
+        /// <summary>
+        /// Pastas do Task Scheduler cujas tarefas sao telemetria/reportes (seguro desativar todas).
+        /// </summary>
+        public static readonly string[] TelemetryTaskFolders =
+        {
+            @"\Microsoft\Windows\Application Experience\",
+            @"\Microsoft\Windows\Customer Experience Improvement Program\",
+        };
+
+        private static void RunSc(string args)
+        {
+            try
+            {
+                using var p = Process.Start(new ProcessStartInfo("sc.exe", args)
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                });
+                p?.WaitForExit(15000);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"sc.exe falhou ({args}): {ex.Message}");
+            }
+        }
+
+        public static bool IsServiceDisabled(string service)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{service}");
+                return key?.GetValue("Start") is int s && s == 4;
+            }
+            catch { return false; }
+        }
+
+        public static string GetServiceStartMode(string service)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{service}");
+                return key?.GetValue("Start") is int s
+                    ? s switch { 0 => "boot", 1 => "system", 2 => "demand", 3 => "auto", 4 => "disabled", _ => "demand" }
+                    : "demand";
+            }
+            catch { return "demand"; }
+        }
+
+        /// <summary>
+        /// Desativa/restaura um servico. Ao desativar, guarda o Start original em
+        /// HKCU\Software\KitLugia\Tweaks\ServiceOriginals para restaurar depois.
+        /// </summary>
+        public static void SetServiceStartup(string service, bool disable)
+        {
+            try
+            {
+                string start;
+                if (disable)
+                {
+                    using var save = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\KitLugia\Tweaks\ServiceOriginals");
+                    save?.SetValue(service, GetServiceStartMode(service), RegistryValueKind.String);
+                    start = "disabled";
+                    RunSc($"config {service} start= disabled");
+                    RunSc($"stop {service}");
+                    Logger.Log($"Servico desativado: {service} (start= disabled)");
+                }
+                else
+                {
+                    string original = "demand";
+                    using var save = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\KitLugia\Tweaks\ServiceOriginals");
+                    string? stored = save?.GetValue(service) as string;
+                    if (!string.IsNullOrEmpty(stored)) original = stored;
+                    else
+                    {
+                        var def = TelemetryServices.FirstOrDefault(t => t.Service == service);
+                        original = def.DefaultStart == 3 ? "auto" : "demand";
+                    }
+                    start = original;
+                    RunSc($"config {service} start= {original}");
+                    Logger.Log($"Servico restaurado: {service} (start= {original})");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao alterar servico {service}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Desativa/reativa TODAS as tarefas das pastas de telemetria. Retorna o numero de tarefas alteradas.
+        /// </summary>
+        public static int ApplyTelemetryScheduledTasks(bool disable)
+        {
+            int changed = 0;
+            try
+            {
+                using (var ts = new Microsoft.Win32.TaskScheduler.TaskService())
+                {
+                    foreach (var folderPath in TelemetryTaskFolders)
+                    {
+                        var folder = ts.GetFolder(folderPath);
+                        if (folder == null) continue;
+                        foreach (var task in folder.Tasks)
+                        {
+                            try
+                            {
+                                if (task.Enabled == disable) continue;
+                                task.Enabled = disable;
+                                changed++;
+                                Logger.Log($"Tarefa {(disable ? "desativada" : "ativada")}: {task.Path}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"Tarefa inacessivel: {task.Path} - {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao alterar tarefas de telemetria: {ex.Message}");
+            }
+            return changed;
+        }
+
+        /// <summary>
+        /// True se TODAS as tarefas monitoradas estao desativadas (ou a pasta nao existe).
+        /// </summary>
+        public static bool AreTelemetryTasksDisabled()
+        {
+            try
+            {
+                using (var ts = new Microsoft.Win32.TaskScheduler.TaskService())
+                {
+                    foreach (var folderPath in TelemetryTaskFolders)
+                    {
+                        var folder = ts.GetFolder(folderPath);
+                        if (folder == null) continue;
+                        foreach (var task in folder.Tasks)
+                            if (task.Enabled) return false;
+                    }
+                }
+                return true;
+            }
+            catch { return true; }
         }
 
         #endregion

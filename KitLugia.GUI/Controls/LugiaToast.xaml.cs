@@ -26,6 +26,15 @@ namespace KitLugia.GUI.Controls
         public string NotificationId { get; set; } = string.Empty;
         public NotificationType ToastType { get; private set; }
 
+        // True para toasts de progresso em tempo real: mostra o spinner girando
+        // no lugar do emoji. Vira False ao concluir (TransitionToType).
+        private bool _isProgress;
+        public bool IsProgress
+        {
+            get => _isProgress;
+            set { _isProgress = value; OnPropertyChanged(nameof(IsProgress)); }
+        }
+
         public LugiaToast()
         {
             InitializeComponent();
@@ -136,6 +145,9 @@ namespace KitLugia.GUI.Controls
         {
             // Para o timer antigo
             _lifeTimer.Stop();
+
+            // Sai do modo progresso (spinner some, emoji do tipo final aparece)
+            IsProgress = false;
 
             // Atualiza propriedades
             ToastType = newType;

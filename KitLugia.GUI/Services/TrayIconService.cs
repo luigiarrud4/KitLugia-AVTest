@@ -526,6 +526,21 @@ namespace KitLugia.GUI.Services
         
 
         public bool GameBarPresenceWriterDisabled { get; set; } = false;
+
+        // Otimizações da comunidade (Reddit) - aplicadas uma vez no startup conforme preferência
+        public bool SmartScreenDisabled { get; set; } = false;
+        public bool EdgeUpdateDisabled { get; set; } = false;
+        public bool CompatTelRunnerDisabled { get; set; } = false;
+        public bool SearchIndexerDisabled { get; set; } = false;
+        public bool TextInputHostDisabled { get; set; } = false;
+
+        // Telemetria e relatórios - serviços + tarefas agendadas (aplicadas no startup conforme preferência)
+        public bool DiagTrackSvcDisabled { get; set; } = false;
+        public bool DmwappushSvcDisabled { get; set; } = false;
+        public bool WerSvcDisabled { get; set; } = false;
+        public bool PcaSvcDisabled { get; set; } = false;
+        public bool TelemetryTasksDisabled { get; set; } = false;
+
         public bool IsInitialized { get; private set; } = false;
 
         // RAM Limiter - Variáveis e configurações
@@ -633,6 +648,7 @@ namespace KitLugia.GUI.Services
             public bool IsVip { get; set; } = false;
             public DateTime LastTrimTime { get; set; } = DateTime.MinValue;
             public long LastKnownWs { get; set; } = 0;
+            public long LastSeenTick { get; set; } = 0;
         }
 
 
@@ -666,6 +682,7 @@ namespace KitLugia.GUI.Services
 
         // Background Features
         public bool GamePriorityEnabled { get; set; } = false;
+        public bool ForegroundBoostEnabled { get; set; } = true;
         public bool StandbyCleanEnabled { get; set; } = false;
         public bool MemoryLeakDetectionEnabled { get; set; } = false;
         public bool DpcMonitorEnabled { get; set; } = false;
@@ -705,7 +722,9 @@ namespace KitLugia.GUI.Services
         }
 
         /// <summary>
-        /// Verifica se o auto-start está habilitado e se o caminho da tarefa corresponde à versão atual
+        /// Verifica se o auto-start está habilitado em QUALQUER um dos 3 métodos:
+        /// HKCU Run (universal), pasta Startup (.lnk no AppData) ou Task Scheduler.
+        /// Retorna true se qualquer um apontar para o executável atual.
         /// </summary>
         public static bool IsAutoStartEnabled()
         {
@@ -714,36 +733,59 @@ namespace KitLugia.GUI.Services
                 string currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 if (string.IsNullOrEmpty(currentPath)) return false;
 
-                // 1. Verificar Task Scheduler primeiro
-                using (var ts = new TaskService())
-                {
-                    var task = ts.GetTask("KitLugia");
-                    if (task != null)
-                    {
-                        if (!task.Enabled) return false;
+                // 1. HKCU Run — método universal, funciona com e sem admin
+                if (CheckRegistryAutoStart(currentPath)) return true;
 
-                        foreach (var action in task.Definition.Actions)
+                // 2. Pasta Startup (.lnk no %APPDATA%\...\Startup) — sem depender de serviço
+                if (CheckStartupFolderAutoStart(currentPath)) return true;
+
+                // 3. Task Scheduler (best-effort; pode não disparar em conta sem admin)
+                try
+                {
+                    using (var ts = new TaskService())
+                    {
+                        var task = ts.GetTask("KitLugia");
+                        if (task != null && task.Enabled)
                         {
-                            if (action is ExecAction execAction)
+                            foreach (var action in task.Definition.Actions)
                             {
-                                string taskPath = execAction.Path;
-                                if (string.Equals(taskPath, currentPath, StringComparison.OrdinalIgnoreCase))
-                                    return true;
-                                else
-                                    KitLugia.Core.Logger.Log($"⚠️ Auto-Start aponta para versão antiga: {taskPath} != {currentPath}");
+                                if (action is ExecAction execAction)
+                                {
+                                    string taskPath = execAction.Path;
+                                    if (string.Equals(taskPath, currentPath, StringComparison.OrdinalIgnoreCase))
+                                        return true;
+                                    else
+                                        KitLugia.Core.Logger.Log($"⚠️ Auto-Start aponta para versão antiga: {taskPath} != {currentPath}");
+                                }
                             }
                         }
                     }
                 }
+                catch { /* Task Scheduler indisponível — ignorar */ }
 
-                // 2. Fallback: verificar Registry Run key (caso SetAutoStart tenha caído no fallback)
-                return CheckRegistryAutoStart(currentPath);
+                return false;
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.LogError("IsAutoStartEnabled", $"Erro: {ex.Message}");
-                return CheckRegistryAutoStart();
+                return false;
             }
+        }
+
+        private static bool CheckStartupFolderAutoStart(string currentPath)
+        {
+            try
+            {
+                string startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                string lnk = System.IO.Path.Combine(startup, "KitLugia.lnk");
+                if (!File.Exists(lnk)) return false;
+
+                dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+                dynamic shortcut = shell.CreateShortcut(lnk);
+                string target = shortcut.TargetPath?.ToString() ?? "";
+                return string.Equals(target, currentPath, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
         }
 
         private static bool CheckRegistryAutoStart(string? currentPath = null)
@@ -833,62 +875,89 @@ namespace KitLugia.GUI.Services
                 string path = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 if (string.IsNullOrEmpty(path)) return;
 
+                if (!enable)
+                {
+                    // ===== DESLIGAR: remove os 3 métodos — nunca deixa lixo =====
+                    try
+                    {
+                        using var ts = new TaskService();
+                        var t = ts.GetTask("KitLugia");
+                        if (t != null)
+                        {
+                            ts.RootFolder.DeleteTask("KitLugia");
+                            KitLugia.Core.Logger.Log("✅ Tarefa agendada removida");
+                        }
+                    }
+                    catch { /* Task Scheduler indisponível — registry/lnk abaixo resolvem */ }
+                    SetRegistryEntry(false, path);
+                    SetStartupShortcut(false, path);
+                    KitLugia.Core.Logger.Log("✅ Auto-start desativado (Registry / Startup / Task limpos)");
+                    return;
+                }
 
                 CleanupOldTask();
 
+                // ===== MÉTODO 1 (universal): HKCU Run — funciona com ou sem admin =====
+                bool regOk = SetRegistryEntry(true, path);
+                if (regOk)
+                    KitLugia.Core.Logger.Log($"✅ Auto-start via Registry Run: {path} --tray");
+                else
+                    KitLugia.Core.Logger.Log($"⚠️ Registry Run falhou, tentando pasta Startup...");
 
-                try
+                // ===== MÉTODO 2 (fallback): .lnk na pasta Startup (fica no AppData) =====
+                if (!regOk)
                 {
-                    using (var ts = new TaskService())
-                    {
-                        if (enable)
-                        {
-                            // Remover entrada antiga do Registry se existir
-                            try
-                            {
-                                using var regKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
-                                if (regKey?.GetValue("KitLugia") != null)
-                                {
-                                    KitLugia.Core.Logger.Log("Removendo entrada antiga do Registry...");
-                                    regKey.DeleteValue("KitLugia", false);
-                                }
-                            }
-                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    bool lnkOk = SetStartupShortcut(true, path);
+                    KitLugia.Core.Logger.Log(lnkOk
+                        ? $"✅ Auto-start via pasta Startup: {path}"
+                        : "❌ Falha ao criar atalho na pasta Startup");
+                }
 
-                            // Verificar se tarefa já existe com caminho correto
+                // ===== MÉTODO 3 (elevado, best-effort): Task Scheduler =====
+                // Só quando o app roda como admin: registro com RunLevel.Highest sem
+                // privilégios "registra" a tarefa mas ela NUNCA dispara (falha silenciosa).
+                // Se a tarefa for criada/habilitada, remove Registry + .lnk para não duplicar o boot.
+                if (IsRunningElevated())
+                {
+                    try
+                    {
+                        using (var ts = new TaskService())
+                        {
                             var existingTask = ts.GetTask("KitLugia");
+
+                            // Tarefa existente com caminho correto → apenas habilitar e usar ela
                             if (existingTask != null)
                             {
-                                // Verificar se o caminho já está correto
                                 bool pathMatches = false;
                                 foreach (var action in existingTask.Definition.Actions)
                                 {
-                                    if (action is ExecAction execAction)
+                                    if (action is ExecAction execAction &&
+                                        string.Equals(execAction.Path, path, StringComparison.OrdinalIgnoreCase))
                                     {
-                                        if (string.Equals(execAction.Path, path, StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            pathMatches = true;
-                                            break;
-                                        }
+                                        pathMatches = true;
+                                        break;
                                     }
                                 }
 
-                                if (pathMatches)
+                                // Só reutiliza se a task antiga já tiver os 2 triggers (Boot + Logon).
+                                // Task criada ANTES da sessao 08/08 (so LogonTrigger) nao tem o
+                                // "inicia junto do boot" — nesse caso cai fora e e recriada abaixo.
+                                if (pathMatches && TaskHasBootTrigger(existingTask))
                                 {
-                                    KitLugia.Core.Logger.Log("✅ Tarefa já existe com caminho correto, apenas habilitando...");
                                     existingTask.Enabled = true;
                                     existingTask.RegisterChanges();
-                                    KitLugia.Core.Logger.Log("✅ Tarefa agendada habilitada: " + path);
+                                    SetRegistryEntry(false, path);
+                                    SetStartupShortcut(false, path);
+                                    KitLugia.Core.Logger.Log("✅ Tarefa agendada existente habilitada (substitui Registry/Startup)");
                                     return;
                                 }
-                                else
-                                {
-                                    KitLugia.Core.Logger.Log("🔄 Tarefa existe com caminho incorreto, recriando...");
-                                    ts.RootFolder.DeleteTask("KitLugia");
-                                }
+                                KitLugia.Core.Logger.Log((pathMatches
+                                    ? "🔄 Tarefa existe sem BootTrigger, recriando com boot+logon..."
+                                    : "🔄 Tarefa existe com caminho incorreto, recriando..."));
+                                ts.RootFolder.DeleteTask("KitLugia");
                             }
 
-                            // Criar nova tarefa com privilégios admin + alta prioridade de boot
+                            // Criar nova tarefa com privilégios de logon + prioridade de boot
                             var td = ts.NewTask();
                             td.RegistrationInfo.Description = "KitLugia Auto-Startup (Admin Mode)";
                             td.Principal.RunLevel = TaskRunLevel.Highest;
@@ -899,59 +968,38 @@ namespace KitLugia.GUI.Services
                             td.Settings.AllowHardTerminate = false;
 
                             // ★ OTIMIZAÇÃO TIPO WALLPAPER ENGINE: Priority High (1) = HIGH_PRIORITY_CLASS
-                            // Padrão do Task Scheduler é 7 (BELOW_NORMAL) — lento demais para boot
-                            bool turboBoot = SystemTweaks.IsTurboBootEnabled();
-                            td.Settings.Priority = turboBoot ? ProcessPriorityClass.High : ProcessPriorityClass.Normal;
+                            // Sempre High — requisito do usuário: kit inicia "junto com o sistema" sem fome de CPU
+                            // (padrão do Task Scheduler é 7 = BELOW_NORMAL, que atrasa o boot do app)
+                            td.Settings.Priority = ProcessPriorityClass.High;
 
-                            // ★ Restart on failure: se o processo morrer nos primeiros 30s depois do logon, tentar 2x
                             td.Settings.RestartCount = 2;
                             td.Settings.RestartInterval = TimeSpan.FromMinutes(1);
 
-                            // Trigger: Logon imediato para inicialização rápida
-                            var trigger = new LogonTrigger
-                            {
-                                Delay = TimeSpan.Zero,
-                                Enabled = true
-                            };
+                            var trigger = new LogonTrigger { Delay = TimeSpan.Zero, Enabled = true };
                             td.Triggers.Add(trigger);
 
-                            // Action: Executar com --tray
+                            // BootTrigger: inicia junto do boot do Windows (nao so no logon).
+                            // Com InteractiveToken o agendador dispara a task o mais cedo
+                            // possivel (com Fast Startup / auto-login, antes da sessao pronta).
+                            // MultipleInstances = IgnoreNew evita processo duplo caso Logon
+                            // e Boot disparem na mea sequencia.
+                            td.Triggers.Add(new BootTrigger { Delay = TimeSpan.Zero, Enabled = true });
+                            td.Settings.MultipleInstances = TaskInstancesPolicy.IgnoreNew;
+
                             td.Actions.Add(new ExecAction(path, "--tray", Path.GetDirectoryName(path)));
 
-                            // Registrar tarefa
                             ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
-                            KitLugia.Core.Logger.Log($"✅ Tarefa agendada com privilégios admin criada: {path}" +
-                                $" (Priority: {(turboBoot ? "High" : "Normal")})");
-                        }
-                        else
-                        {
-                            // Remover tarefa
-                            var task = ts.GetTask("KitLugia");
-                            if (task != null)
-                            {
-                                ts.RootFolder.DeleteTask("KitLugia");
-                                KitLugia.Core.Logger.Log("✅ Tarefa agendada removida");
-                            }
+
+                            // Tarefa é o método ativo → remove os demais para não duplicar o boot
+                            SetRegistryEntry(false, path);
+                            SetStartupShortcut(false, path);
+                            KitLugia.Core.Logger.Log($"✅ Tarefa agendada admin criada: {path} (Priority: High)");
                         }
                     }
-                }
-                catch (Exception taskEx)
-                {
-                    KitLugia.Core.Logger.Log($"ERRO no Task Scheduler: {taskEx.Message}");
-
-                    // Fallback para Registry (sem privilégios admin)
-                    KitLugia.Core.Logger.Log("Usando fallback Registry Run (sem privilégios admin)...");
-                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
-                    if (key != null)
+                    catch (Exception taskEx)
                     {
-                        if (enable)
-                        {
-                            key.SetValue("KitLugia", $"\"{path}\" --tray");
-                        }
-                        else
-                        {
-                            key.DeleteValue("KitLugia", false);
-                        }
+                        // Registry (ou .lnk) já garantiram o auto-start — apenas registra
+                        KitLugia.Core.Logger.Log($"⚠️ Task Scheduler indisponível ({taskEx.Message}) — usando Registry/Startup já criado");
                     }
                 }
             }
@@ -959,6 +1007,74 @@ namespace KitLugia.GUI.Services
             {
                 KitLugia.Core.Logger.Log($"SetAutoStart ERROR: {ex.Message}");
             }
+        }
+
+        /// <summary>Grava/remove a entrada HKCU Run (método universal, sem admin).</summary>
+        private static bool SetRegistryEntry(bool enable, string path)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true)
+                                ?? Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+                if (key == null) return false;
+                if (enable)
+                    key.SetValue("KitLugia", $"\"{path}\" --tray");
+                else
+                    key.DeleteValue("KitLugia", false);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogWarning("SetRegistryEntry", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>Cria/remove o atalho na pasta Startup (fica no AppData, não depende de serviço).</summary>
+        private static bool SetStartupShortcut(bool enable, string path)
+        {
+            try
+            {
+                string startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                string lnk = Path.Combine(startup, "KitLugia.lnk");
+                if (enable)
+                {
+                    if (!Directory.Exists(startup)) Directory.CreateDirectory(startup);
+                    return KitLugia.Core.StartupManager.CreateShortcut(lnk, path, "--tray", "KitLugia Auto-Startup", Path.GetDirectoryName(path) ?? "");
+                }
+                if (File.Exists(lnk)) File.Delete(lnk);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogWarning("SetStartupShortcut", ex.Message);
+                return false;
+            }
+        }
+
+        private static bool IsRunningElevated()
+        {
+            try
+            {
+                using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+            catch { return false; }
+        }
+
+        private static bool TaskHasBootTrigger(Microsoft.Win32.TaskScheduler.Task task)
+        {
+            try
+            {
+                foreach (var trigger in task.Definition.Triggers)
+                {
+                    if (trigger is Microsoft.Win32.TaskScheduler.BootTrigger)
+                        return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         // Adaptive Data
@@ -1057,6 +1173,7 @@ namespace KitLugia.GUI.Services
             LoadSettings();
 
             System.Threading.Tasks.Task.Run(() => AutoFixGameBarPresenceWriter());
+            System.Threading.Tasks.Task.Run(() => AutoFixCommunityProcesses());
 
             try
             {
@@ -1288,6 +1405,7 @@ namespace KitLugia.GUI.Services
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    finally { proc.Dispose(); }
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -1305,6 +1423,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("Interval", MonitorIntervalSeconds);
                 key.SetValue("CleaningMode", (int)SelectedCleaningMode);
                 key.SetValue("GamePriority", GamePriorityEnabled ? 1 : 0);
+                key.SetValue("ForegroundBoost", ForegroundBoostEnabled ? 1 : 0);
                 key.SetValue("StandbyClean", StandbyCleanEnabled ? 1 : 0);
                 key.SetValue("AntiLeak", MemoryLeakDetectionEnabled ? 1 : 0);
                 key.SetValue("FocusAssist", FocusAssistEnabled ? 1 : 0);
@@ -1326,59 +1445,233 @@ namespace KitLugia.GUI.Services
                 key.SetValue("AdvancedMonitorIntervalMs", AdvancedMonitorIntervalMs);
                 key.SetValue("RamLimiterIntervalMs", RamLimiterIntervalMs);
                 key.SetValue("GameBarPresenceWriterDisabled", GameBarPresenceWriterDisabled ? 1 : 0);
+                key.SetValue("SmartScreenDisabled", SmartScreenDisabled ? 1 : 0);
+                key.SetValue("EdgeUpdateDisabled", EdgeUpdateDisabled ? 1 : 0);
+                key.SetValue("CompatTelRunnerDisabled", CompatTelRunnerDisabled ? 1 : 0);
+                key.SetValue("SearchIndexerDisabled", SearchIndexerDisabled ? 1 : 0);
+                key.SetValue("TextInputHostDisabled", TextInputHostDisabled ? 1 : 0);
+                key.SetValue("DiagTrackSvcDisabled", DiagTrackSvcDisabled ? 1 : 0);
+                key.SetValue("DmwappushSvcDisabled", DmwappushSvcDisabled ? 1 : 0);
+                key.SetValue("WerSvcDisabled", WerSvcDisabled ? 1 : 0);
+                key.SetValue("PcaSvcDisabled", PcaSvcDisabled ? 1 : 0);
+                key.SetValue("TelemetryTasksDisabled", TelemetryTasksDisabled ? 1 : 0);
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
-        /// Auto-fix: se o usuário desativou GameBarPresenceWriter antes e o Windows recriou o .exe, re-desativa
+        /// Auto-fix: se o usuário desativou GameBarPresenceWriter antes e o Windows recriou o .exe, re-desativa.
+        /// Roda na inicialização do kit e pode ser chamado pela UI (público).
+        /// Não depende SÓ da flag salva: a existência do .bak já é prova de que o usuário desativou.
         /// </summary>
-        private void AutoFixGameBarPresenceWriter()
+        public void AutoFixGameBarPresenceWriter()
         {
-            if (!GameBarPresenceWriterDisabled) return;
-
             try
             {
                 string system32 = Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32");
                 string gameBarPath = Path.Combine(system32, "GameBarPresenceWriter.exe");
                 string backupPath = Path.Combine(system32, "GameBarPresenceWriter.exe.bak");
 
-                // Se o .exe existe E o .bak também, Windows recriou - precisa re-desativar
-                if (File.Exists(gameBarPath) && File.Exists(backupPath))
+                bool exeExists = File.Exists(gameBarPath);
+                bool bakExists = File.Exists(backupPath);
+
+                // Nada a fazer: preferência não é desativar E nunca houve .bak
+                if (!GameBarPresenceWriterDisabled && !bakExists) return;
+
+                // Já desativado (só .bak) — nada a fazer
+                if (bakExists && !exeExists) return;
+
+                // Chegou aqui: .exe existe e o usuário quer desativado (flag salva OU .bak antigo)
+                if (!exeExists) return;
+
+                KitLugia.Core.Logger.Log("⚠️ GameBarPresenceWriter: Windows recriou o .exe - re-desativando...");
+
+                // Matar processo antes de mexer no arquivo
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM GameBarPresenceWriter.exe", true);
+                System.Threading.Thread.Sleep(500);
+
+                if (bakExists)
                 {
-                    KitLugia.Core.Logger.Log("⚠️ GameBarPresenceWriter: Windows recriou o .exe - re-desativando...");
-
-                    // Take ownership
-                    SystemUtils.RunExternalProcess("takeown", $"/f \"{gameBarPath}\"", true);
-                    SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
-
-                    // Matar processo
-                    SystemUtils.RunExternalProcess("taskkill", "/F /IM GameBarPresenceWriter.exe", true);
-                    System.Threading.Thread.Sleep(500);
-
-                    // Excluir .bak antigo
-                    File.Delete(backupPath);
-
-                    // Renomear .exe → .bak
-                    File.Move(gameBarPath, backupPath);
-                    KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter re-desativado automaticamente na inicialização.");
+                    try
+                    {
+                        SystemUtils.RunExternalProcess("takeown", $"/f \"{backupPath}\"", true);
+                        SystemUtils.RunExternalProcess("icacls", $"\"{backupPath}\" /grant *S-1-3-4:F /t /c /l", true);
+                        File.Delete(backupPath);
+                    }
+                    catch (Exception ex) { KitLugia.Core.Logger.Log($"⚠️ GameBarPresenceWriter: erro ao limpar .bak antigo: {ex.Message}"); }
                 }
-                else if (File.Exists(gameBarPath) && !File.Exists(backupPath))
-                {
-                    // Nunca foi desativado antes, mas o usuário quer desativar
-                    KitLugia.Core.Logger.Log("ℹ️ GameBarPresenceWriter ativo - desativando conforme preferência salva...");
-                    SystemUtils.RunExternalProcess("takeown", $"/f \"{gameBarPath}\"", true);
-                    SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
-                    SystemUtils.RunExternalProcess("taskkill", "/F /IM GameBarPresenceWriter.exe", true);
-                    System.Threading.Thread.Sleep(500);
-                    File.Move(gameBarPath, backupPath);
-                    KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter desativado conforme preferência.");
-                }
+
+                // Take ownership do .exe e renomeia para .bak
+                SystemUtils.RunExternalProcess("takeown", $"/f \"{gameBarPath}\"", true);
+                SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
+
+                File.Move(gameBarPath, backupPath);
+                KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter re-desativado (renomeado para .bak).");
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"⚠️ GameBarPresenceWriter auto-fix: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Aplica/desfaz uma otimização da comunidade (Reddit) pelo método correto do processo:
+        /// - SmartScreen: política EnableSmartScreen + Explorer SmartScreenEnabled (registro)
+        /// - MicrosoftEdgeUpdate: serviços edgeupdate/edgeupdatem + tarefas agendadas MachineCore/UA
+        /// - CompatTelRunner: serviço DiagTrack + tarefas Compatibility Appraiser/ProgramDataUpdater
+        /// - SearchIndexer: serviço WSearch
+        /// - TextInputHost: IFEO (Image File Execution Options) apontando para systray (bloqueio sem renomear)
+        /// Nenhum arquivo é renomeado (TrustedInstaller reverte rename em updates; registro/serviços persistem).
+        /// </summary>
+        public void ApplyCommunityProcessToggle(string name, bool disable)
+        {
+            try
+            {
+                switch (name)
+                {
+                    case "SmartScreen":
+                        ApplySmartScreen(disable);
+                        break;
+                    case "EdgeUpdate":
+                        ApplyEdgeUpdate(disable);
+                        break;
+                    case "CompatTelRunner":
+                        ApplyCompatTelRunner(disable);
+                        break;
+                    case "SearchIndexer":
+                        ApplySearchIndexer(disable);
+                        break;
+                    case "TextInputHost":
+                        ApplyTextInputHost(disable);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Community toggle {name}: {ex.Message}");
+            }
+        }
+
+        private void ApplySmartScreen(bool disable)
+        {
+            if (disable)
+            {
+                using var polKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\System");
+                polKey?.SetValue("EnableSmartScreen", 0, RegistryValueKind.DWord);
+                using var expKey = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer");
+                expKey?.SetValue("SmartScreenEnabled", "Off", RegistryValueKind.String);
+                KitLugia.Core.Logger.Log("🛡️ SmartScreen desativado (política EnableSmartScreen=0 + Explorer=Off)");
+            }
+            else
+            {
+                using var polKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\System", true);
+                polKey?.DeleteValue("EnableSmartScreen", false);
+                using var expKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer", true);
+                expKey?.DeleteValue("SmartScreenEnabled", false);
+                KitLugia.Core.Logger.Log("🔄 SmartScreen restaurado");
+            }
+        }
+
+        private void ApplyEdgeUpdate(bool disable)
+        {
+            string[] services = { "edgeupdate", "edgeupdatem" };
+            string[] tasks = { "MicrosoftEdgeUpdateTaskMachineCore", "MicrosoftEdgeUpdateTaskMachineUA" };
+
+            if (disable)
+            {
+                foreach (var svc in services)
+                    SystemUtils.RunExternalProcess("sc", $"config {svc} start= disabled", true, true, true);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Disable", true, true, true);
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM MicrosoftEdgeUpdate.exe", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ MicrosoftEdgeUpdate desativado (serviços + tarefas agendadas)");
+            }
+            else
+            {
+                foreach (var svc in services)
+                    SystemUtils.RunExternalProcess("sc", $"config {svc} start= auto", true, true, true);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Enable", true, true, true);
+                KitLugia.Core.Logger.Log("🔄 MicrosoftEdgeUpdate restaurado");
+            }
+        }
+
+        private void ApplyCompatTelRunner(bool disable)
+        {
+            string[] tasks = { @"Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
+                               @"Microsoft\Windows\Application Experience\ProgramDataUpdater",
+                               @"Microsoft\Windows\Application Experience\StartupAppTask" };
+
+            if (disable)
+            {
+                SystemUtils.RunExternalProcess("sc", "config DiagTrack start= disabled", true, true, true);
+                using var polKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\DataCollection");
+                polKey?.SetValue("AllowTelemetry", 0, RegistryValueKind.DWord);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Disable", true, true, true);
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM CompatTelRunner.exe", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ CompatTelRunner desativado (DiagTrack + AllowTelemetry=0 + tarefas)");
+            }
+            else
+            {
+                SystemUtils.RunExternalProcess("sc", "config DiagTrack start= auto", true, true, true);
+                using var polKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\DataCollection", true);
+                polKey?.DeleteValue("AllowTelemetry", false);
+                foreach (var task in tasks)
+                    SystemUtils.RunExternalProcess("schtasks", $"/Change /TN \"{task}\" /Enable", true, true, true);
+                KitLugia.Core.Logger.Log("🔄 CompatTelRunner restaurado");
+            }
+        }
+
+        private void ApplySearchIndexer(bool disable)
+        {
+            if (disable)
+            {
+                SystemUtils.RunExternalProcess("sc", "config WSearch start= disabled", true, true, true);
+                SystemUtils.RunExternalProcess("sc", "stop WSearch", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ SearchIndexer desativado (serviço WSearch)");
+            }
+            else
+            {
+                SystemUtils.RunExternalProcess("sc", "config WSearch start= delayed-auto", true, true, true);
+                KitLugia.Core.Logger.Log("🔄 SearchIndexer restaurado (delayed-auto)");
+            }
+        }
+
+        private void ApplyTextInputHost(bool disable)
+        {
+            const string ifeoPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\TextInputHost.exe";
+            if (disable)
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(ifeoPath);
+                key?.SetValue("Debugger", "%SystemRoot%\\system32\\systray.exe", RegistryValueKind.String);
+                SystemUtils.RunExternalProcess("taskkill", "/F /IM TextInputHost.exe", true, true, true);
+                KitLugia.Core.Logger.Log("🛡️ TextInputHost bloqueado via IFEO (emoji Win+. e teclado virtual desativados)");
+            }
+            else
+            {
+                Registry.LocalMachine.DeleteSubKeyTree(ifeoPath, false);
+                KitLugia.Core.Logger.Log("🔄 TextInputHost restaurado (IFEO removido)");
+            }
+        }
+
+        /// <summary>
+        /// Auto-fix: aplica uma única vez no startup as otimizações da comunidade salvas.
+        /// Idempotente — se já desativado, não faz nada de novo.
+        /// </summary>
+        private void AutoFixCommunityProcesses()
+        {
+            if (SmartScreenDisabled) ApplyCommunityProcessToggle("SmartScreen", true);
+            if (EdgeUpdateDisabled) ApplyCommunityProcessToggle("EdgeUpdate", true);
+            if (CompatTelRunnerDisabled) ApplyCommunityProcessToggle("CompatTelRunner", true);
+            if (SearchIndexerDisabled) ApplyCommunityProcessToggle("SearchIndexer", true);
+            if (TextInputHostDisabled) ApplyCommunityProcessToggle("TextInputHost", true);
+
+            if (DiagTrackSvcDisabled) SystemTweaks.SetServiceStartup("DiagTrack", true);
+            if (DmwappushSvcDisabled) SystemTweaks.SetServiceStartup("dmwappushservice", true);
+            if (WerSvcDisabled) SystemTweaks.SetServiceStartup("WerSvc", true);
+            if (PcaSvcDisabled) SystemTweaks.SetServiceStartup("PcaSvc", true);
+            if (TelemetryTasksDisabled) SystemTweaks.ApplyTelemetryScheduledTasks(true);
         }
 
         public void LoadSettings()
@@ -1399,6 +1692,7 @@ namespace KitLugia.GUI.Services
                 MonitorIntervalSeconds = (int)key.GetValue("Interval", 30);
                 SelectedCleaningMode = (MemoryOptimizer.CleaningMode)(int)key.GetValue("CleaningMode", (int)MemoryOptimizer.CleaningMode.Normal);
                 GamePriorityEnabled = (int)key.GetValue("GamePriority", 0) == 1;
+                ForegroundBoostEnabled = (int)key.GetValue("ForegroundBoost", 1) == 1;
                 StandbyCleanEnabled = (int)key.GetValue("StandbyClean", 0) == 1;
                 MemoryLeakDetectionEnabled = (int)key.GetValue("AntiLeak", 0) == 1;
                 FocusAssistEnabled = (int)key.GetValue("FocusAssist", 0) == 1;
@@ -1414,15 +1708,75 @@ namespace KitLugia.GUI.Services
 
                 EnableSmartAlerts = (int)key.GetValue("EnableSmartAlerts", 1) == 1;
                 EnableBehaviorAnalysis = (int)key.GetValue("EnableBehaviorAnalysis", 1) == 1;
-                HighRamThresholdMB = (long)key.GetValue("HighRamThresholdMB", 2048);
-                HighCpuThresholdPercent = (double)key.GetValue("HighCpuThresholdPercent", 80.0);
+                HighRamThresholdMB = ReadLongSetting(key, "HighRamThresholdMB", 2048);
+                HighCpuThresholdPercent = ReadDoubleSetting(key, "HighCpuThresholdPercent", 80.0);
                 AdvancedMonitorIntervalMs = (int)key.GetValue("AdvancedMonitorIntervalMs", 2000);
                 RamLimiterIntervalMs = (int)key.GetValue("RamLimiterIntervalMs", 1000);
                 GameBarPresenceWriterDisabled = (int)key.GetValue("GameBarPresenceWriterDisabled", 0) == 1;
+                SmartScreenDisabled = (int)key.GetValue("SmartScreenDisabled", 0) == 1;
+                EdgeUpdateDisabled = (int)key.GetValue("EdgeUpdateDisabled", 0) == 1;
+                CompatTelRunnerDisabled = (int)key.GetValue("CompatTelRunnerDisabled", 0) == 1;
+                SearchIndexerDisabled = (int)key.GetValue("SearchIndexerDisabled", 0) == 1;
+                TextInputHostDisabled = (int)key.GetValue("TextInputHostDisabled", 0) == 1;
+                DiagTrackSvcDisabled = (int)key.GetValue("DiagTrackSvcDisabled", 0) == 1;
+                DmwappushSvcDisabled = (int)key.GetValue("DmwappushSvcDisabled", 0) == 1;
+                WerSvcDisabled = (int)key.GetValue("WerSvcDisabled", 0) == 1;
+                PcaSvcDisabled = (int)key.GetValue("PcaSvcDisabled", 0) == 1;
+                TelemetryTasksDisabled = (int)key.GetValue("TelemetryTasksDisabled", 0) == 1;
 
                 _monitorTimer.Interval = TimeSpan.FromSeconds(MonitorIntervalSeconds);
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ LoadSettings: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        // Leitura defensiva de settings: o registro pode guardar int/long/double/string
+        // de formas diferentes (REG_DWORD, REG_QWORD, REG_BINARY, REG_SZ) — nunca
+        // castar direto, senão UM valor com tipo errado aborta o LoadSettings inteiro
+        // e o resto das preferências cai para default silenciosamente.
+        private static long ReadLongSetting(Microsoft.Win32.RegistryKey key, string name, long def)
+        {
+            try
+            {
+                var v = key.GetValue(name);
+                if (v == null) return def;
+                return v switch
+                {
+                    long l => l,
+                    int i => i,
+                    double d => (long)d,
+                    string s when long.TryParse(s, out var l2) => l2,
+                    string s when double.TryParse(s, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var d2) => (long)d2,
+                    byte[] b when b.Length == 8 => BitConverter.ToInt64(b, 0),
+                    byte[] b when b.Length == 4 => BitConverter.ToInt32(b, 0),
+                    _ => def
+                };
+            }
+            catch { return def; }
+        }
+
+        private static double ReadDoubleSetting(Microsoft.Win32.RegistryKey key, string name, double def)
+        {
+            try
+            {
+                var v = key.GetValue(name);
+                if (v == null) return def;
+                return v switch
+                {
+                    double d => d,
+                    int i => i,
+                    long l => l,
+                    string s when double.TryParse(s, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var d2) => d2,
+                    byte[] b when b.Length == 8 => BitConverter.ToDouble(b, 0),
+                    byte[] b when b.Length == 4 => BitConverter.ToInt32(b, 0),
+                    _ => def
+                };
+            }
+            catch { return def; }
         }
 
         private void RunSafetyProfiler()
@@ -1504,6 +1858,8 @@ namespace KitLugia.GUI.Services
         {
             try
             {
+                _monitorTickCounter = unchecked(_monitorTickCounter + 1);
+
                 // 0. Download Boost Auto-Detection
                 if (DownloadBoostEnabled)
                 {
@@ -1623,6 +1979,7 @@ namespace KitLugia.GUI.Services
                         profile.TotalCyclesVisible++;
                         if (proc.Id == foregroundPid) profile.CyclesForeground++;
                         profile.LastKnownWs = proc.WorkingSet64;
+                        profile.LastSeenTick = _monitorTickCounter;
 
                         // Promotion logic:
                         // 1. Known browsers/apps
@@ -1635,12 +1992,33 @@ namespace KitLugia.GUI.Services
                             if (isKnownVip || isHeavyUse)
                             {
                                 profile.IsVip = true;
-                                // Log promotion event indirectly via CSV later or debug
+                                // Log promotion indirectly via CSV (later or debug)
                             }
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    finally { proc.Dispose(); }
+                }
 
+                PruneDeadProcessProfiles();
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        private long _monitorTickCounter = 0;
+
+        private void PruneDeadProcessProfiles()
+        {
+            try
+            {
+                if (_processProfiles.Count <= 60) return;
+
+                // Remove perfis que nao foram vistos nos ultimos 60 ticks (30min a 30s/tick)
+                var cutoff = _monitorTickCounter - 60;
+                foreach (var key in _processProfiles.Keys.ToList())
+                {
+                    if (_processProfiles.TryGetValue(key, out var p) && p.LastSeenTick < cutoff)
+                        _processProfiles.TryRemove(key, out _);
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -1979,7 +2357,7 @@ namespace KitLugia.GUI.Services
                     {
                         using var oldProc = Process.GetProcessById((int)_lastBoostedPid);
                         // Restaura CPUPriority
-                        if (oldProc.PriorityClass != _lastOriginalPriority)
+                        if (ForegroundBoostEnabled && oldProc.PriorityClass != _lastOriginalPriority)
                             oldProc.PriorityClass = _lastOriginalPriority;
 
                         // Restaura I/O Normal (2) e Page Priority Default (5)
@@ -2008,7 +2386,7 @@ namespace KitLugia.GUI.Services
                 _lastOriginalPriority = proc.PriorityClass;
 
                 // Tweak 1: CPU Priority para High ou AboveNormal
-                if (proc.PriorityClass != ProcessPriorityClass.High && proc.PriorityClass != ProcessPriorityClass.RealTime)
+                if (ForegroundBoostEnabled && proc.PriorityClass != ProcessPriorityClass.High && proc.PriorityClass != ProcessPriorityClass.RealTime)
                 {
                     proc.PriorityClass = ProcessPriorityClass.High;
                 }
@@ -2247,9 +2625,11 @@ namespace KitLugia.GUI.Services
                 if (systemProcess == IntPtr.Zero)
                 {
                     // Fallback: tenta lsass.exe (Local Security Authority)
-                    var lsass = Process.GetProcessesByName("lsass").FirstOrDefault();
-                    if (lsass != null)
-                        systemProcess = Win32Api.OpenProcess(Win32Api.PROCESS_QUERY_INFORMATION, false, lsass.Id);
+                    using (var lsass = Process.GetProcessesByName("lsass").FirstOrDefault())
+                    {
+                        if (lsass != null)
+                            systemProcess = Win32Api.OpenProcess(Win32Api.PROCESS_QUERY_INFORMATION, false, lsass.Id);
+                    }
                 }
 
                 if (systemProcess == IntPtr.Zero) return false;
@@ -2382,12 +2762,15 @@ namespace KitLugia.GUI.Services
                 bool elevated = false;
                 try
                 {
-                    if (proc.PriorityClass != targetPriority && targetPriority != ProcessPriorityClass.RealTime)
-                        proc.PriorityClass = targetPriority;
-                    else if (targetPriority == ProcessPriorityClass.RealTime && proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        try { proc.PriorityClass = ProcessPriorityClass.RealTime; }
-                        catch { proc.PriorityClass = ProcessPriorityClass.High; }
+                        if (proc.PriorityClass != targetPriority && targetPriority != ProcessPriorityClass.RealTime)
+                            proc.PriorityClass = targetPriority;
+                        else if (targetPriority == ProcessPriorityClass.RealTime && proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            try { proc.PriorityClass = ProcessPriorityClass.RealTime; }
+                            catch { proc.PriorityClass = ProcessPriorityClass.High; }
+                        }
                     }
                 }
                 catch (System.ComponentModel.Win32Exception) when (!elevated)
@@ -2398,8 +2781,11 @@ namespace KitLugia.GUI.Services
                         elevated = true;
                         try
                         {
-                            proc.PriorityClass = targetPriority;
-                            KitLugia.Core.Logger.Log($"✅ Prioridade aplicada com privilégios elevados: {name}");
+                            if (ForegroundBoostEnabled)
+                            {
+                                proc.PriorityClass = targetPriority;
+                                KitLugia.Core.Logger.Log($"✅ Prioridade aplicada com privilégios elevados: {name}");
+                            }
                         }
                         catch { KitLugia.Core.Logger.Log($"⚠️ Mesmo elevado, falha ao alterar {name} (PPL bloqueia)"); }
                     }
@@ -2446,10 +2832,13 @@ namespace KitLugia.GUI.Services
 
                 try
                 {
-                    if (proc.PriorityClass != ProcessPriorityClass.High &&
-                        proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        proc.PriorityClass = ProcessPriorityClass.High;
+                        if (proc.PriorityClass != ProcessPriorityClass.High &&
+                            proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            proc.PriorityClass = ProcessPriorityClass.High;
+                        }
                     }
                 }
                 catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 5)
@@ -2485,10 +2874,13 @@ namespace KitLugia.GUI.Services
 
                 try
                 {
-                    if (proc.PriorityClass != ProcessPriorityClass.High &&
-                        proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        proc.PriorityClass = ProcessPriorityClass.High;
+                        if (proc.PriorityClass != ProcessPriorityClass.High &&
+                            proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            proc.PriorityClass = ProcessPriorityClass.High;
+                        }
                     }
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2527,10 +2919,13 @@ namespace KitLugia.GUI.Services
 
                 try
                 {
-                    if (proc.PriorityClass != ProcessPriorityClass.High &&
-                        proc.PriorityClass != ProcessPriorityClass.RealTime)
+                    if (ForegroundBoostEnabled)
                     {
-                        proc.PriorityClass = ProcessPriorityClass.High;
+                        if (proc.PriorityClass != ProcessPriorityClass.High &&
+                            proc.PriorityClass != ProcessPriorityClass.RealTime)
+                        {
+                            proc.PriorityClass = ProcessPriorityClass.High;
+                        }
                     }
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2746,6 +3141,7 @@ namespace KitLugia.GUI.Services
                             }
                         }
                         catch (Exception ex) { ConditionalLog.LogOnce("ProBalanceThrottle", ex); }
+                        finally { proc.Dispose(); }
                     }
                 }
             });
@@ -2861,9 +3257,15 @@ namespace KitLugia.GUI.Services
             {
                 using var proc = Process.GetProcessById((int)pid);
 
-                if (proc.PriorityClass == ProcessPriorityClass.High)
+                // Restaura prioridade para Normal ao sair do foreground
+                if (ForegroundBoostEnabled)
                 {
-                    proc.PriorityClass = ProcessPriorityClass.Normal;
+                    if (proc.PriorityClass == ProcessPriorityClass.High ||
+                        proc.PriorityClass == ProcessPriorityClass.RealTime ||
+                        proc.PriorityClass == ProcessPriorityClass.AboveNormal)
+                    {
+                        proc.PriorityClass = ProcessPriorityClass.Normal;
+                    }
                 }
 
                 try { Win32Api.SetProcessIoPriority(proc.Handle, 2); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2913,11 +3315,36 @@ namespace KitLugia.GUI.Services
         }
 
 
+        // Reverte o boost do foreground atual (usado ao desligar o toggle "Boost do App Ativo")
+        public void RevertCurrentBoost()
+        {
+            try
+            {
+                if (_currentBoostedPid != 0)
+                {
+                    RevertBoost(_currentBoostedPid);
+                    _currentBoostedPid = 0;
+                }
+
+                if (_lastBoostedPid != 0)
+                {
+                    try
+                    {
+                        using var oldProc = Process.GetProcessById((int)_lastBoostedPid);
+                        if (oldProc.PriorityClass != _lastOriginalPriority)
+                            oldProc.PriorityClass = _lastOriginalPriority;
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    _lastBoostedPid = 0;
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
         public void ShutdownGameBoost()
         {
             try
             {
-
                 if (_useWinEventHook && _winEventHook != IntPtr.Zero)
                 {
                     Win32Api.UnhookWinEvent(_winEventHook);
@@ -4048,16 +4475,8 @@ namespace KitLugia.GUI.Services
         /// </summary>
         private string GetMainWindowTitle(int processId)
         {
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("explorer"))
-                {
-                    // Implementação simplificada - poderia usar EnumWindows para mais precisão
-                    return $"PID:{processId}";
-                }
-                return $"PID:{processId}";
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return $"PID:{processId}"; }
+            // Implementação simplificada - poderia usar EnumWindows para mais precisão
+            return $"PID:{processId}";
         }
         
         

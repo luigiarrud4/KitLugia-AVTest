@@ -571,14 +571,19 @@ namespace KitLugia.Core
                     Logger.Log($"Total de arquivos para criar ISO: {totalFiles}");
 
                     // Comando oscdimg para criar ISO UDF bootável:
-                    // -g: Use GPT (para EFI)
                     // -h: Include hidden files
                     // -k: Include system files
                     // -m: Ignore maximum image size
+                    // -o: Optimize (dedup) - escreve uma unica copia de arquivos repetidos
                     // -u2: UDF file system (versão 2)
                     // -udfver102: UDF version 1.02
                     // -l: Volume label
-                    string args = $"-g -h -k -m -u2 -udfver102 -l\"KitLugia_Custom\" \"{sourceDir}\" \"{targetIso}\"";
+                    // -bootdata:2#p0,e,b"<etfsboot>"#pEF,e,b"<efisys>": setores de boot
+                    //   BIOS (p0, El Torito) + UEFI (pEF) - SEM isso a ISO NAO boota.
+                    //   (mesmo padrao usado pelo WinpeBuilder.GerarIsoFinalAsync)
+                    string bootArgs = DetectBootSectorArgs(sourceDir);
+                    string args = $"-h -k -m -o -u2 -udfver102 {bootArgs}-l\"KitLugia_Custom\" \"{sourceDir}\" \"{targetIso}\"";
+                    Logger.Log($"Setores de boot: {(string.IsNullOrEmpty(bootArgs) ? "NAO encontrados (ISO pode nao bootar)" : bootArgs.Trim())}");
 
                     Logger.Log($"Executando oscdimg: {args}");
 
@@ -606,6 +611,53 @@ namespace KitLugia.Core
                     return (false, $"Exceção ao criar ISO: {ex.Message}");
                 }
             });
+        }
+
+        /// <summary>
+        /// Detecta os arquivos de boot (etfsboot.com + efisys.bin) dentro do conteudo
+        /// extraido da ISO e monta o argumento -bootdata do oscdimg (dual BIOS+UEFI).
+        /// Sem eles, a ISO gerada nao e bootavel.
+        /// </summary>
+        private static string DetectBootSectorArgs(string sourceDir)
+        {
+            try
+            {
+                string etfs = FindFile(sourceDir, "etfsboot.com");
+                string efisys = FindFile(sourceDir, "efisys.bin");
+                if (!string.IsNullOrEmpty(etfs) && !string.IsNullOrEmpty(efisys))
+                {
+                    return $"-bootdata:2#p0,e,b\"{etfs}\"#pEF,e,b\"{efisys}\" ";
+                }
+                // Fallback: algum arquivo de boot presente mas sem o par completo
+                if (!string.IsNullOrEmpty(etfs))
+                    return $"-bootdata:1#p0,e,b\"{etfs}\" ";
+                if (!string.IsNullOrEmpty(efisys))
+                    return $"-bootdata:1#pEF,e,b\"{efisys}\" ";
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao detectar setores de boot: {ex.Message}");
+            }
+            return "";
+        }
+
+        private static string FindFile(string root, string fileName)
+        {
+            foreach (var candidate in new[]
+                     {
+                         Path.Combine(root, "boot", fileName),
+                         Path.Combine(root, "efi", "microsoft", "boot", fileName),
+                         Path.Combine(root, "efi", "boot", fileName),
+                     })
+            {
+                if (File.Exists(candidate)) return candidate;
+            }
+            try
+            {
+                var found = Directory.EnumerateFiles(root, fileName, SearchOption.AllDirectories).FirstOrDefault();
+                return found ?? "";
+            }
+            catch { return ""; }
         }
 
         private static async Task<(int ExitCode, string Output)> RunProcessCaptured(string filename, string args)

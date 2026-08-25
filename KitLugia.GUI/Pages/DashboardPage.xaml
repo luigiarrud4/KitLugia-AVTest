@@ -342,7 +342,7 @@
                 <TextBlock Text="Sistema e Reparos" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4C0;" 
-                    Content="ISO Editor (Winhance)"
+                    Content="Kit ISO Editor"
                     ToolTip="Editor de ISO Profissional - Montagem, Debloat, Features e Redu&#xE7;&#xE3;o de Tamanho"
                     Click="BtnGoToIsoEditor_Click"/>
 
@@ -460,6 +460,14 @@
                     Content="Fresh Install + Preservação de Dados"
                     ToolTip="Instalar Windows novo via WinPE preservando perfis, programas e registry (Estratégia C)"
                     Click="BtnGoToReinstallPreserve_Click"/>
+
+                <!-- WINDOWS UPDATE (INSIDER) -->
+                <TextBlock Text="Windows Update (Insider)" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F504;"
+                    Content="Windows Update (OfflineInsiderEnroll)"
+                    ToolTip="Inscrever o dispositivo no Windows Insider (Canary/Dev/Beta/RP) via OfflineInsiderEnroll v2.6.6 by abbodi1406"
+                    Click="BtnGoToWindowsUpdate_Click"/>
 
             </StackPanel>
         </ScrollViewer>

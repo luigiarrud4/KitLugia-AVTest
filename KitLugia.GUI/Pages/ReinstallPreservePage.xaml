@@ -216,7 +216,7 @@
                             <Border Background="#11FF3D00" BorderBrush="#33FF3D00" BorderThickness="1" CornerRadius="6" Padding="10">
                                 <StackPanel>
                                     <TextBlock Text="⚠️ ATENÇÃO" FontSize="11" FontWeight="Bold" Foreground="#FFAA44"/>
-                                    <TextBlock Text="O WinPE será acionado e o PC será reiniciado. O Windows atual será substituído pelo novo. Backup dos dados será feito automaticamente em C:\!." Foreground="#CCCCCC" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    <TextBlock Text="O WinPE será acionado e o PC será reiniciado. A imagem do Windows será aplicada DIRETAMENTE na partição alvo, preservando seus dados (backup automático na própria partição)." Foreground="#CCCCCC" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -248,9 +248,14 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <StackPanel Grid.Row="0">
-                                <TextBlock Text="LOG DA OPERAÇÃO" FontSize="13" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Resultados da última execução." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                            <StackPanel Grid.Row="0" Orientation="Horizontal">
+                                <StackPanel>
+                                    <TextBlock Text="LOG DA OPERAÇÃO" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="Resultados da última execução (WinPE persistente)." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <Button x:Name="BtnRefreshLog" Content="ATUALIZAR LOG" Click="BtnRefreshLog_Click"
+                                        Margin="12,0,0,0" VerticalAlignment="Top" Padding="10,4" FontSize="10"
+                                        Style="{StaticResource SecondaryButtonStyle}"/>
                             </StackPanel>
                             <TextBox x:Name="TxtOperationLog" Grid.Row="1" IsReadOnly="True" FontFamily="Consolas" FontSize="9"
                                      Foreground="#0F0" Background="#0A0A0A" BorderThickness="0" MinHeight="60" MaxHeight="150"
@@ -281,21 +286,28 @@
                         </TextBlock>
 
                         <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
-                            <Run FontWeight="Bold" Foreground="White">Passo 3 — Mover Dados</Run>
+                            <Run FontWeight="Bold" Foreground="White">Passo 3 — Detectar Partição</Run>
                             <LineBreak/>
-                            WinPE move Users, ProgramData, registry para C:\!
-                            e aplica o Windows novo via DISM.
+                            Disco/partição alvo e ESP são resolvidos pela Storage API
+                            (sem depender de letra fixa).
                         </TextBlock>
 
                         <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
-                            <Run FontWeight="Bold" Foreground="White">Passo 4 — Merge Registry</Run>
+                            <Run FontWeight="Bold" Foreground="White">Passo 4 — Aplicar Imagem Direto</Run>
+                            <LineBreak/>
+                            WinPE monta o alvo como Z:, faz backup na própria
+                            partição e aplica o Windows novo via wimlib/DISM.
+                        </TextBlock>
+
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <Run FontWeight="Bold" Foreground="White">Passo 5 — Merge Registry</Run>
                             <LineBreak/>
                             Se ativado, mescla o registry antigo com o novo
                             para preservar programas instalados.
                         </TextBlock>
 
                         <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
-                            <Run FontWeight="Bold" Foreground="White">Passo 5 — Restaurar + Reboot</Run>
+                            <Run FontWeight="Bold" Foreground="White">Passo 6 — Restaurar + Reboot</Run>
                             <LineBreak/>
                             Dados são devolvidos e o PC reinicia no Windows novo
                             com tudo preservado.

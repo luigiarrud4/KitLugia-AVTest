@@ -159,7 +159,8 @@ namespace KitLugia.GUI.Pages
 
                 if (action.Name == "Correção VALORANT (VAN9005)")
                 {
-                    // Mostra o painel de diagnóstico integrado
+                    // Painel de diagnóstico é um overlay próprio; o flag não pode ficar preso
+                    _isRunningRepair = false;
                     ShowValorantDiagnosticPanel();
                     return;
                 }

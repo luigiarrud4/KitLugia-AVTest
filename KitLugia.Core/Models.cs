@@ -136,6 +136,8 @@ namespace KitLugia.Core
     {
         public string DisplayName { get; set; } = "";
         public string PackageName { get; set; } = "";
+        // AUMID (App User Model ID) p/ ícone real via shell:AppsFolder (ex.: FamilyName!AppId)
+        public string Aumid { get; set; } = "";
         public bool IsInstalled { get; set; }
         public string StoreId { get; set; } = "";
         public object? Icon { get; set; } // BitmapSource ou ImageSource

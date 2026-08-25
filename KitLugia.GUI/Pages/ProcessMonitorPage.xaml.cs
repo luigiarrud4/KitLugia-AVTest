@@ -108,23 +108,29 @@ namespace KitLugia.GUI.Pages
             // Process.GetProcesses + WMI queries off UI thread
             var currentProcesses = await Task.Run(() =>
             {
+                var result = new List<ProcessMonitorInfo>();
                 try
                 {
-                    return Process.GetProcesses()
-                        .Where(p => !string.IsNullOrEmpty(p.ProcessName))
-                        .Select(p => new ProcessMonitorInfo
+                    foreach (var proc in Process.GetProcesses())
+                    {
+                        try
                         {
-                            Id = p.Id,
-                            Name = p.ProcessName,
-                            CpuUsage = Math.Round(p.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
-                            RamUsage = FormatBytes(p.WorkingSet64),
-                            Priority = p.PriorityClass.ToString(),
-                            Status = p.Responding ? "Responding" : "Not Responding",
-                            NetworkUsage = "Detecting..."
-                        })
-                        .OrderByDescending(p => p.CpuUsage)
-                        .Take(50)
-                        .ToList();
+                            if (string.IsNullOrEmpty(proc.ProcessName)) continue;
+                            result.Add(new ProcessMonitorInfo
+                            {
+                                Id = proc.Id,
+                                Name = proc.ProcessName,
+                                CpuUsage = Math.Round(proc.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
+                                RamUsage = FormatBytes(proc.WorkingSet64),
+                                Priority = proc.PriorityClass.ToString(),
+                                Status = proc.Responding ? "Responding" : "Not Responding",
+                                NetworkUsage = "Detecting..."
+                            });
+                        }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        finally { proc.Dispose(); }
+                    }
+                    return result.OrderByDescending(p => p.CpuUsage).Take(50).ToList();
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<ProcessMonitorInfo>(); }
             });
@@ -180,21 +186,28 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                var currentProcesses = Process.GetProcesses()
-                    .Where(p => !string.IsNullOrEmpty(p.ProcessName))
-                    .Select(p => new ProcessMonitorInfo
+                var currentProcesses = new List<ProcessMonitorInfo>();
+                foreach (var proc in Process.GetProcesses())
                 {
-                    Id = p.Id,
-                    Name = p.ProcessName,
-                    CpuUsage = Math.Round(p.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
-                    RamUsage = FormatBytes(p.WorkingSet64),
-                    Priority = p.PriorityClass.ToString(),
-                    Status = p.Responding ? "Responding" : "Not Responding",
-                    NetworkUsage = GetProcessNetworkUsage(p.Id)
-                })
-                    .OrderByDescending(p => p.CpuUsage)
-                    .Take(50) // Limitar para performance
-                    .ToList();
+                    try
+                    {
+                        if (string.IsNullOrEmpty(proc.ProcessName)) continue;
+                        currentProcesses.Add(new ProcessMonitorInfo
+                        {
+                            Id = proc.Id,
+                            Name = proc.ProcessName,
+                            CpuUsage = Math.Round(proc.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
+                            RamUsage = FormatBytes(proc.WorkingSet64),
+                            Priority = proc.PriorityClass.ToString(),
+                            Status = proc.Responding ? "Responding" : "Not Responding",
+                            NetworkUsage = GetProcessNetworkUsage(proc.Id)
+                        });
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    finally { proc.Dispose(); }
+                }
+
+                currentProcesses = currentProcesses.OrderByDescending(p => p.CpuUsage).Take(50).ToList();
 
                 // Atualizar ObservableCollection de forma eficiente
                 foreach (var process in currentProcesses)
@@ -441,21 +454,28 @@ namespace KitLugia.GUI.Pages
         {
             return Task.Run(() =>
             {
-                var processes = Process.GetProcesses()
-                    .Where(p => !string.IsNullOrEmpty(p.ProcessName))
-                    .Select(p => new ProcessMonitorInfo
+                var processes = new List<ProcessMonitorInfo>();
+                foreach (var proc in Process.GetProcesses())
+                {
+                    try
                     {
-                        Id = p.Id,
-                        Name = p.ProcessName,
-                        CpuUsage = Math.Round(p.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
-                        RamUsage = FormatBytes(p.WorkingSet64),
-                        Priority = p.PriorityClass.ToString(),
-                        Status = p.Responding ? "Responding" : "Not Responding",
-                        NetworkUsage = "Detecting..."
-                    })
-                    .OrderByDescending(p => p.CpuUsage)
-                    .Take(50)
-                    .ToList();
+                        if (string.IsNullOrEmpty(proc.ProcessName)) continue;
+                        processes.Add(new ProcessMonitorInfo
+                        {
+                            Id = proc.Id,
+                            Name = proc.ProcessName,
+                            CpuUsage = Math.Round(proc.TotalProcessorTime.TotalMilliseconds / 1000.0, 2),
+                            RamUsage = FormatBytes(proc.WorkingSet64),
+                            Priority = proc.PriorityClass.ToString(),
+                            Status = proc.Responding ? "Responding" : "Not Responding",
+                            NetworkUsage = "Detecting..."
+                        });
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    finally { proc.Dispose(); }
+                }
+
+                processes = processes.OrderByDescending(p => p.CpuUsage).Take(50).ToList();
 
                 Dispatcher.Invoke(() =>
                 {

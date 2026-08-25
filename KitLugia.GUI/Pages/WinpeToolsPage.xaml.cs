@@ -20,8 +20,6 @@ namespace KitLugia.GUI.Pages
         private List<DiskInfoEx> _disks = new();
         private PartitionInfoEx _selectedPartition;
         private bool _isLoading;
-        private bool _winpeReady;
-        private bool _valosReady;
         private string _customIsoBootWimPath;
         private int _lastProgressPct;
 
@@ -30,9 +28,7 @@ namespace KitLugia.GUI.Pages
         private static readonly SolidColorBrush _errorBrush = new(System.Windows.Media.Color.FromRgb(0xFF, 0x69, 0x4B));
         private static readonly SolidColorBrush _successBrush = new(System.Windows.Media.Color.FromRgb(0x32, 0xCD, 0x32));
 
-        // Rastreamento do último par LineBreak+Run para HandleLogReplace
-        private Inline? _lastLogBreak;
-        private Inline? _lastLogRun;
+        // Rastreamento removido: HandleLogReplace encontra o último par dinamicamente
 
         // Cancelamento de operação em andamento
         private CancellationTokenSource? _cts;
@@ -67,22 +63,6 @@ namespace KitLugia.GUI.Pages
             (new Regex(@"Remocao WinPE concluida", RegexOptions.IgnoreCase),                            100,"WinPE removido!"),
             (new Regex(@"SUCESSO|sucesso|Sucesso", RegexOptions.IgnoreCase),                            100,"Concluído!"),
             (new Regex(@"ERRO|Falha|falha|Erro", RegexOptions.IgnoreCase),                              -1, "Erro!"),
-
-            // Validation OS steps
-            (new Regex(@"Resolvendo ISO.*Validation OS|ISO.*Validation OS", RegexOptions.IgnoreCase),     5,  "Resolvendo ISO..."),
-            (new Regex(@"ISO encontrado.*cache|ISO já existe", RegexOptions.IgnoreCase),                  5,  "ISO em cache"),
-            (new Regex(@"Baixando.*ISO|Download.*ISO", RegexOptions.IgnoreCase),                         10, "Baixando ISO..."),
-            (new Regex(@"ISO baixado com sucesso", RegexOptions.IgnoreCase),                             30, "ISO baixado!"),
-            (new Regex(@"Montando ISO.*WinVOS|extraindo WinVOS", RegexOptions.IgnoreCase),               35, "Montando ISO e extraindo WIM..."),
-            (new Regex(@"WinVOS\.wim copiado", RegexOptions.IgnoreCase),                                 45, "WIM copiado!"),
-            (new Regex(@"Adicionando suporte WPF|WPF support", RegexOptions.IgnoreCase),                 50, "Adicionando suporte WPF..."),
-            (new Regex(@"Suporte WPF adicionado", RegexOptions.IgnoreCase),                              65, "Suporte WPF OK!"),
-            (new Regex(@"startnet\.valos\.cmd criado", RegexOptions.IgnoreCase),                         70, "Script de boot criado!"),
-            (new Regex(@"Salvando alterações no WIM|WIM salvo com sucesso", RegexOptions.IgnoreCase),    75, "Salvando WIM..."),
-            (new Regex(@"Resolvendo boot\.sdi", RegexOptions.IgnoreCase),                                80, "Resolvendo boot.sdi..."),
-            (new Regex(@"Criando entrada BCD ramdisk|BCD.*Validation OS", RegexOptions.IgnoreCase),      85, "Criando entrada BCD..."),
-            (new Regex(@"Bootsequence configurado", RegexOptions.IgnoreCase),                            95, "Bootsequence configurado!"),
-            (new Regex(@"Validation OS preparado com sucesso", RegexOptions.IgnoreCase),                100, "Validation OS pronto!"),
         };
 
         public WinpeToolsPage()
@@ -124,9 +104,25 @@ namespace KitLugia.GUI.Pages
             Dispatcher.Invoke(() =>
             {
                 var inlines = TxtOpDesc.Inlines;
-                if (_lastLogBreak != null) { inlines.Remove(_lastLogBreak); _lastLogBreak = null; }
-                if (_lastLogRun != null) { inlines.Remove(_lastLogRun); _lastLogRun = null; }
-                AppendColoredLog(logLine);
+                // Remove o último par LineBreak+Run dinamicamente
+                if (inlines.Count >= 2)
+                {
+                    var last = inlines.LastInline;
+                    if (last is Run)
+                    {
+                        var prev = last.PreviousInline;
+                        if (prev is LineBreak)
+                        {
+                            inlines.Remove(last);
+                            inlines.Remove(prev);
+                        }
+                    }
+                }
+                var color = IsErrorText(logLine) ? _errorBrush
+                    : logLine.Contains("✅") || logLine.Contains("sucesso", StringComparison.OrdinalIgnoreCase)
+                        ? _successBrush : _infoBrush;
+                inlines.Add(new LineBreak());
+                inlines.Add(new Run(logLine) { Foreground = color });
                 AtualizarStatus(logLine);
             }, DispatcherPriority.Background);
         }
@@ -183,10 +179,8 @@ namespace KitLugia.GUI.Pages
             var color = IsErrorText(text) ? _errorBrush
                 : text.Contains("✅") || text.Contains("sucesso", StringComparison.OrdinalIgnoreCase)
                     ? _successBrush : _infoBrush;
-            _lastLogBreak = new LineBreak();
-            _lastLogRun = new Run(text) { Foreground = color };
-            TxtOpDesc.Inlines.Add(_lastLogBreak);
-            TxtOpDesc.Inlines.Add(_lastLogRun);
+            TxtOpDesc.Inlines.Add(new LineBreak());
+            TxtOpDesc.Inlines.Add(new Run(text) { Foreground = color });
         }
 
         private void ScrollOverlayToBottom()
@@ -275,7 +269,8 @@ namespace KitLugia.GUI.Pages
         private void UpdateShrinkButton()
         {
             bool hasPartition = _selectedPartition != null && !string.IsNullOrEmpty(_selectedPartition.DriveLetter);
-            BtnShrinkWinpe.IsEnabled = (_winpeReady || _valosReady) && hasPartition;
+            // WinPE nao precisa estar pronto: o fluxo prepara automaticamente ao agendar
+            BtnShrinkWinpe.IsEnabled = hasPartition;
         }
 
         #endregion
@@ -287,7 +282,6 @@ namespace KitLugia.GUI.Pages
             try
             {
                 bool found = await Task.Run(() => WinbootManager.IsWinpeReady());
-                _winpeReady = found;
 
                 if (found)
                 {
@@ -311,13 +305,6 @@ namespace KitLugia.GUI.Pages
                 TxtWinpeStatus.Text = "Erro ao verificar";
             }
 
-            // Verifica Validation OS
-            try
-            {
-                _valosReady = await Task.Run(() => WinbootManager.IsValidationOsReady());
-                BtnBootValos.IsEnabled = _valosReady;
-            }
-            catch { }
             UpdateShrinkButton();
         }
 
@@ -361,6 +348,115 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private async void BtnTestShell_Click(object sender, RoutedEventArgs e)
+        {
+            ShowBusy("AGENDANDO TESTE DO SHELL (EXPLORER++)",
+                "Injetando Explorer++.exe (file manager) no WinPE...\n\n" +
+                "1. Resolver Explorer++.exe (raiz do kit ou KitLugia.WinPE\\Explorer++)\n" +
+                "2. Injetar no WIM via wimlib\n" +
+                "3. Injetar startnet.cmd de teste (shrink pendente roda primeiro)\n" +
+                "4. Bootsequence one-time via BCD ramdisk\n\n" +
+                "O PC sera reiniciado em 10 segundos.\n" +
+                "O WinPE bootara com Explorer++ como file manager (sem kit interno).\n\n" +
+                "Se o WinPE nao estiver preparado, sera preparado automaticamente agora.");
+
+            try
+            {
+                UpdateStatus("Resolvendo Explorer++ e preparando WIM...");
+
+                var token = _cts?.Token ?? CancellationToken.None;
+                var (ok, msg) = await Task.Run(() =>
+                    WinbootManager.ScheduleTestWinpeShell(), token);
+
+                if (ok)
+                {
+                    ShowBusyResult($"{msg}\n\n" +
+                        "Apos o reboot, o WinPE boota com o Explorer++ como interface.\n" +
+                        "Ao voltar ao Windows, clique em VER LOGS.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha: {msg}");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                ShowBusyResult("Operacao cancelada pelo usuario.");
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
+        private async void BtnBootInstaller_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Selecionar ISO do Windows (boot direto no instalador)",
+                Filter = "Imagem ISO (*.iso)|*.iso|Todos os arquivos|*.*"
+            };
+            if (dlg.ShowDialog() != true) return;
+            string isoPath = dlg.FileName;
+
+            bool optimizeEsd = false;
+            if (System.Windows.Application.Current.MainWindow is MainWindow mw)
+                optimizeEsd = await mw.ShowConfirmationDialog(
+                    "Otimizar para RAM baixa (ESD solid)?\n\n" +
+                    "Converte o install.wim (6,8 GB) para ESD solid (~5 GB, economia de 1,8 GB).\n" +
+                    "Necessario para a fonte em RAM rodar com 8 GB de RAM.\n" +
+                    "Leva ~8-10 min e precisa de ~6 GB livres extras em C: durante a conversao.\n\n" +
+                    "Nao otimizar = fonte em RAM exige ~11 GB de RAM.");
+
+            ShowBusy("AGENDANDO BOOT DIRETO NO INSTALADOR",
+                $"ISO: {System.IO.Path.GetFileName(isoPath)}\n\n" +
+                "1. Montar a ISO (estilo Titus, sem extrair com 7z)\n" +
+                "2. Copiar Sources para C:\\KL_WINPE\\InstallISO (robocopy)\n" +
+                "3. Exportar imagem de Setup (index 2) do boot.wim para WIM unico (--boot)\n" +
+                (optimizeEsd ? "3.5. Otimizar install.wim para ESD solid (~5 GB, RAM baixa)\n" : "") +
+                "4. Injetar startnet.cmd + winpeshl.ini que lanca o shim setup.exe da raiz (fluxo nativo da midia) com /installfrom\n" +
+                "5. Bootsequence one-time via BCD ramdisk\n\n" +
+                "O PC sera reiniciado em 10 segundos.\n" +
+                "O Windows Setup (instalador) abre direto em modo grafico - sem criar particoes.\n\n" +
+                (optimizeEsd
+                    ? "Requer ~16 GB livres em C: (Sources 7.4 GB + otimizacao ESD ~6 GB temporarios).\n\n" +
+                      "FONTE EM RAM: com ESD (~5 GB), o install.wim cabe em 8 GB de RAM - a particao\n" +
+                      "de origem pode ser EXCLUIDA na tela do Setup (instalacao limpa)."
+                    : "Requer ~10 GB livres em C: (install.wim de 6.8 GB + boot.wim de Setup).\n\n" +
+                      "FONTE EM RAM: se o PC tiver RAM suficiente (>= 11 GB livres), o install.wim\n" +
+                      "e copiado para o RAMDISK X: do WinPE - ai a particao de origem pode ser\n" +
+                      "EXCLUIDA na tela do Setup (instalacao limpa). Sem RAM, o fallback usa a fonte\n" +
+                      "do disco e a particao com C:\\KL_WINPE deve permanecer intacta (0x80300001)."));
+
+            try
+            {
+                UpdateStatus("Montando ISO e preparando instalador...");
+
+                var token = _cts?.Token ?? CancellationToken.None;
+                var (ok, msg) = await Task.Run(() =>
+                    WinbootManager.ScheduleBootInstallerAsync(isoPath, optimizeEsd), token);
+
+                if (ok)
+                {
+                    ShowBusyResult($"{msg}\n\n" +
+                        "Apos o reboot, o Windows Setup abre direto.\n" +
+                        "Ao voltar ao Windows, os arquivos ficam em C:\\KL_WINPE\\InstallISO.");
+                }
+                else
+                {
+                    ShowBusyResult($"Falha: {msg}");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                ShowBusyResult("Operacao cancelada pelo usuario.");
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
         private async void BtnRemoveWinpe_Click(object sender, RoutedEventArgs e)
         {
             var result = System.Windows.MessageBox.Show(
@@ -393,18 +489,39 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private async void BtnCleanBcd_Click(object sender, RoutedEventArgs e)
+        {
+            var result = System.Windows.MessageBox.Show(
+                "Limpar entradas BCD do KitLugia?\n\n" +
+                "Vai remover TODAS as entradas de boot criadas pelo KitLugia\n" +
+                "(WinPE, shrink) do Windows Boot Manager.\n\n" +
+                "NAO remove arquivos (C:\\KL_WINPE\\ continua intacto).\n" +
+                "Deseja continuar?",
+                "Limpar BCD",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            ShowBusy("LIMPANDO BCD", "Removendo entradas do Boot Manager...");
+            try
+            {
+                var (ok, msg) = await Task.Run(() => WinbootManager.CleanupAllBcdEntriesAsync());
+                ShowBusyResult(ok ? msg : $"Falha: {msg}");
+                await CheckWinpeStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowBusyResult($"Erro: {ex.Message}");
+            }
+        }
+
         #endregion
 
         #region Step 2: Shrink via WinPE (com reboot)
 
         private void BtnShrinkWinpe_Click(object sender, RoutedEventArgs e)
         {
-            if (!_winpeReady && !_valosReady)
-            {
-                ShowToast("Nenhum sistema preparado. Execute PREPARAR WINPE ou VALIDATION OS primeiro.");
-                return;
-            }
-
             if (_selectedPartition == null)
             {
                 ShowToast("Selecione uma particao na lista.");
@@ -421,56 +538,14 @@ namespace KitLugia.GUI.Pages
                 $"{(double)_selectedPartition.Size / 1024 / 1024 / 1024:F1} GB  " +
                 $"{(double)_selectedPartition.FreeSpace / 1024 / 1024 / 1024:F1} GB livre";
 
-            // Atualiza status dos radios conforme o que está instalado
-            RadioWinpe.IsEnabled = _winpeReady;
-            RadioValos.IsEnabled = _valosReady;
-
-            // Pré-seleciona o que estiver disponível (WinPE prefere)
-            if (_winpeReady)
-                RadioWinpe.IsChecked = true;
-            else if (_valosReady)
-                RadioValos.IsChecked = true;
-
-            UpdateOsStatusText();
-
             long maxMB = Math.Max(1024, (long)(_selectedPartition.FreeSpace / (1024L * 1024) * 0.8));
             TxtShrinkMb.Text = Math.Min(maxMB, (long)(_selectedPartition.Size / (1024L * 1024) * 0.5)).ToString();
 
             OverlayShrink.Visibility = Visibility.Visible;
         }
 
-        private void UpdateOsStatusText()
-        {
-            // Pode ser chamado durante InitializeComponent (RadioButton Checked event)
-            // quando TxtOsStatus ainda nao foi criado
-            if (TxtOsStatus == null) return;
-            var parts = new List<string>();
-            if (_winpeReady) parts.Add("WinPE pronto");
-            if (_valosReady) parts.Add("Validation OS pronto");
-            TxtOsStatus.Text = parts.Count > 0
-                ? string.Join(" | ", parts)
-                : "Nenhum OS preparado. Execute PREPARAR primeiro.";
-        }
-
-        private void RadioShrinkOs_Checked(object sender, RoutedEventArgs e)
-        {
-            UpdateOsStatusText();
-        }
-
         private async void BtnConfirmShrinkWinpe_Click(object sender, RoutedEventArgs e)
         {
-            bool useValOs = RadioValos.IsChecked == true;
-            if (!useValOs && !_winpeReady)
-            {
-                ShowToast("WinPE nao esta instalado. Selecione Validation OS ou execute PREPARAR WINPE.");
-                return;
-            }
-            if (useValOs && !_valosReady)
-            {
-                ShowToast("Validation OS nao esta instalado. Selecione WinPE ou execute PREPARAR VALIDATION OS.");
-                return;
-            }
-
             if (_selectedPartition == null) return;
 
             if (!long.TryParse(TxtShrinkMb.Text, out long shrinkMb) || shrinkMb < 256)
@@ -482,11 +557,12 @@ namespace KitLugia.GUI.Pages
             string drive = _selectedPartition.DriveLetter;
             OverlayShrink.Visibility = Visibility.Collapsed;
 
-            string osName = useValOs ? "VALIDATION OS" : "WINPE";
+            const string osName = "WINPE";
             ShowBusy($"AGENDANDO SHRINK VIA {osName}",
                 $"Escrevendo configuracao e agendando reboot...\n\n" +
                 $"Alvo: {drive.Replace(":", "").Trim()}: | Reduzir: {shrinkMb} MB\n" +
                 $"OS: {osName}\n\n" +
+                $"Se o WinPE nao estiver preparado, sera preparado automaticamente agora.\n" +
                 $"O PC sera reiniciado em 10 segundos.\n" +
                 $"O {osName} executara o shrink automaticamente.");
 
@@ -496,7 +572,7 @@ namespace KitLugia.GUI.Pages
 
                 var token = _cts?.Token ?? CancellationToken.None;
                 var (ok, msg) = await Task.Run(() =>
-                    WinbootManager.ScheduleWinpeShrink(drive, shrinkMb, useValOs ? "validationos" : "winpe"), token);
+                    WinbootManager.ScheduleWinpeShrink(drive, shrinkMb), token);
 
                 if (ok)
                 {
@@ -522,6 +598,29 @@ namespace KitLugia.GUI.Pages
         #endregion
 
         #region Logs
+
+        private void TxtCopyOpLog_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var inline in TxtOpDesc.Inlines)
+                {
+                    if (inline is System.Windows.Documents.Run run)
+                        sb.Append(run.Text);
+                    else if (inline is System.Windows.Documents.LineBreak)
+                        sb.AppendLine();
+                }
+                string text = sb.ToString();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    System.Windows.Clipboard.SetText(text);
+                    TxtCopyOpLog.Text = "✅ Copiado!";
+                    _ = Task.Run(async () => { await Task.Delay(2000); Dispatcher.Invoke(() => TxtCopyOpLog.Text = "📋 Copiar log"); });
+                }
+            }
+            catch { }
+        }
 
         private void BtnCopyLog_Click(object sender, RoutedEventArgs e)
         {
@@ -613,7 +712,6 @@ namespace KitLugia.GUI.Pages
             OverlayBusy.Visibility = Visibility.Visible;
             TxtOpTitle.Text = title;
             TxtOpDesc.Inlines.Clear();
-            _lastLogBreak = _lastLogRun = null;
             TxtOpDesc.Inlines.Add(new Run(description) { Foreground = _infoBrush });
             TxtProgressPercent.Text = "0%";
             TxtProgressStep.Text = "Inicializando...";
@@ -671,7 +769,6 @@ namespace KitLugia.GUI.Pages
             _cts = null;
             OverlayBusy.Visibility = Visibility.Collapsed;
             TxtOpDesc.Inlines.Clear();
-            _lastLogBreak = _lastLogRun = null;
             _lastProgressPct = 0;
         }
 
@@ -873,153 +970,6 @@ namespace KitLugia.GUI.Pages
                 _customIsoBootWimPath = null;
                 TxtCustomIsoPath.Text = "Nenhum ISO carregado";
                 BtnPrepareCustomWinpe.IsEnabled = false;
-            }
-            catch (Exception ex)
-            {
-                ShowBusyResult($"Erro: {ex.Message}");
-            }
-        }
-
-        #endregion
-
-        #region Validation OS
-
-        private async void BtnPrepareValos_Click(object sender, RoutedEventArgs e)
-        {
-            ShowBusy("PREPARANDO VALIDATION OS",
-                "Baixando e configurando Validation OS (WinVOS) no disco local...\n\n" +
-                "1. Baixar ISO (se necessario)\n" +
-                "2. Extrair WinVOS.wim\n" +
-                "3. Adicionar suporte WPF\n" +
-                "4. Criar script de inicializacao\n" +
-                "5. Configurar entrada de boot RAMDISK\n\n" +
-                "O bootsequence sera configurado para o proximo reboot.\n" +
-                "Nenhuma particao extra sera criada.");
-
-            try
-            {
-                var (ok, msg) = await Task.Run(() =>
-                    WinbootManager.PrepareValidationOs());
-
-                if (ok)
-                {
-                    ShowBusyResult($"Validation OS pronto!\n\n{msg}\n\n" +
-                        "Reinicie o PC para testar. O menu de boot aparecera com a opcao\n" +
-                        "'KitLugia Validation OS (WPF Test)'.\n\n" +
-                        "Use o botao TESTAR para boot unico agora.");
-                }
-                else
-                {
-                    ShowBusyResult($"Falha ao preparar Validation OS.\n{msg}");
-                }
-
-                await CheckWinpeStatusAsync();
-            }
-            catch (Exception ex)
-            {
-                ShowBusyResult($"Erro: {ex.Message}");
-            }
-        }
-
-        private async void BtnBootValos_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_valosReady)
-            {
-                ShowToast("Validation OS nao encontrado. Execute PREPARAR primeiro.");
-                return;
-            }
-
-            var result = System.Windows.MessageBox.Show(
-                "Configurar bootsequence para Validation OS?\n\n" +
-                "Na proxima reinicializacao, o Validation OS sera carregado\n" +
-                "via RAMDISK com suporte a WPF.\n\n" +
-                "Deseja reiniciar agora?",
-                "Testar Validation OS",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result != MessageBoxResult.Yes) return;
-
-            try
-            {
-                // Procura GUID da entrada Validation OS no BCD
-                var psi = new ProcessStartInfo("bcdedit.exe", "/enum all")
-                {
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var proc = Process.Start(psi);
-                if (proc == null) { ShowToast("Falha ao executar bcdedit."); return; }
-                string enumOut = await proc.StandardOutput.ReadToEndAsync();
-                await proc.WaitForExitAsync();
-
-                if (proc.ExitCode == 0)
-                {
-                    string? foundGuid = null;
-                    var lines = enumOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var line in lines)
-                    {
-                        var trimmed = line.Trim();
-                        if (trimmed.StartsWith("identifier", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var parts = trimmed.Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
-                            foundGuid = parts.Length > 1 ? parts[1].Trim() : null;
-                        }
-                        else if (trimmed.StartsWith("description", StringComparison.OrdinalIgnoreCase) &&
-                                 trimmed.Contains("Validation OS", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (foundGuid != null)
-                            {
-                                var bsProc = Process.Start(new ProcessStartInfo("bcdedit.exe",
-                                    $"/bootsequence {foundGuid}")
-                                { UseShellExecute = false, CreateNoWindow = true });
-                                if (bsProc != null) await bsProc.WaitForExitAsync();
-
-                                if (bsProc?.ExitCode == 0)
-                                {
-                                    ShowBusy("REINICIANDO",
-                                        "Bootsequence configurado. Reiniciando em 5 segundos...\n" +
-                                        "Apos o reboot, o Validation OS sera carregado.");
-                                    await Task.Delay(5000);
-                                    Process.Start("shutdown.exe", "/r /t 0");
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                ShowToast("Entrada BCD do Validation OS nao encontrada. Execute PREPARAR novamente.");
-            }
-            catch (Exception ex)
-            {
-                ShowToast($"Erro: {ex.Message}");
-            }
-        }
-
-        private async void BtnRemoveValos_Click(object sender, RoutedEventArgs e)
-        {
-            var result = System.Windows.MessageBox.Show(
-                "Remover Validation OS?\n\n" +
-                "Isso vai:\n" +
-                "Remover a entrada de boot do BCD\n" +
-                "Deletar C:\\KL_WINPE\\validation_boot.wim\n\n" +
-                "Deseja continuar?",
-                "Remover Validation OS",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes) return;
-
-            ShowBusy("REMOVENDO VALIDATION OS", "Limpando artefatos...");
-            try
-            {
-                bool ok = await Task.Run(() => WinbootManager.RemoveValidationOs());
-                ShowBusyResult(ok
-                    ? "Validation OS removido com sucesso.\nEntrada BCD removida, arquivos deletados."
-                    : "Nenhuma entrada BCD do Validation OS encontrada para remover.");
-                await CheckWinpeStatusAsync();
             }
             catch (Exception ex)
             {

@@ -160,7 +160,7 @@ namespace KitLugia.GUI.Pages
                 if (token.IsCancellationRequested) return;
                 try
                 {
-                    var icon = AppIconHelper.GetAppIcon(items[i].Pkg, 32) ?? AppIconHelper.GetGenericStoreIcon();
+                    var icon = AppIconHelper.GetAppIcon(items[i].Pkg, 32, items[i].App.Aumid) ?? AppIconHelper.GetGenericStoreIcon();
                     results[i] = (items[i].Index, icon);
                 }
                 catch

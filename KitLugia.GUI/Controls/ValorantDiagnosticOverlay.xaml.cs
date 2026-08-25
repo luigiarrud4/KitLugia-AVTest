@@ -19,6 +19,7 @@ namespace KitLugia.GUI.Controls
         private bool _vbsEnabled = false;
         private bool _hvciEnabled = false;
         private bool _canApplyValorantRepair = false;
+        private bool _isClosed = false;
 
         public event EventHandler? Closed;
 
@@ -35,6 +36,7 @@ namespace KitLugia.GUI.Controls
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            _isClosed = true;
             Closed?.Invoke(this, EventArgs.Empty);
         }
 
@@ -48,17 +50,22 @@ namespace KitLugia.GUI.Controls
             BtnApplyValorantRepair.IsEnabled = false;
 
             await Task.Delay(500);
+            if (_isClosed) return;
 
             await CheckUEFIStatusAsync();
+            if (_isClosed) return;
             await Task.Delay(200);
 
             await CheckTPM20StatusAsync();
+            if (_isClosed) return;
             await Task.Delay(200);
 
             await CheckVBSStatusAsync();
+            if (_isClosed) return;
             await Task.Delay(200);
 
             await CheckHVCIStatusAsync();
+            if (_isClosed) return;
             await Task.Delay(200);
 
             EvaluateValorantRepairPossibility();
@@ -68,9 +75,12 @@ namespace KitLugia.GUI.Controls
         {
             try
             {
-                string result = SystemUtils.RunExternalProcess("powershell",
+                // Processo externo em background: nunca travar a UI thread durante o scan
+                string result = await Task.Run(() => SystemUtils.RunExternalProcess("powershell",
                     "-NoProfile -Command \"(Get-WmiObject -Class Win32_ComputerSystem).BootUpState\"",
-                    true);
+                    true));
+
+                if (_isClosed) return;
 
                 if (!result.Contains("Legacy", StringComparison.OrdinalIgnoreCase))
                 {
@@ -100,9 +110,11 @@ namespace KitLugia.GUI.Controls
                 // Verificação via Gerenciador de Dispositivos (Get-PnpDevice)
                 // Este método mostra exatamente o que aparece no Gerenciador de Dispositivos do Windows
                 // Inclui todos os nomes possíveis de TPM encontrados em diferentes fabricantes
-                string deviceManagerResult = SystemUtils.RunExternalProcess("powershell",
+                string deviceManagerResult = await Task.Run(() => SystemUtils.RunExternalProcess("powershell",
                     "-NoProfile -Command \"Get-PnpDevice | Where-Object { $_.FriendlyName -like '*TPM*' -or $_.FriendlyName -like '*Trusted Platform*' -or $_.FriendlyName -like '*Infineon*' -or $_.FriendlyName -like '*STMicroelectronics*' -or $_.FriendlyName -like '*Intel*' -or $_.FriendlyName -like '*AMD*' -or $_.FriendlyName -like '*Nationz*' -or $_.FriendlyName -like '*Nuvoton*' -or $_.FriendlyName -like '*FIPS*' -or $_.FriendlyName -like '*IFX*' -or $_.FriendlyName -like '*Winbond*' } | Select-Object FriendlyName, Status, InstanceId | ConvertTo-Json\"",
-                    true);
+                    true));
+
+                if (_isClosed) return;
 
                 if (!string.IsNullOrWhiteSpace(deviceManagerResult))
                 {
@@ -187,9 +199,11 @@ namespace KitLugia.GUI.Controls
         {
             try
             {
-                string result = SystemUtils.RunExternalProcess("reg",
+                string result = await Task.Run(() => SystemUtils.RunExternalProcess("reg",
                     @"query ""HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard"" /v EnableVirtualizationBasedSecurity",
-                    true);
+                    true));
+
+                if (_isClosed) return;
 
                 if (result.Contains("0x1"))
                 {
@@ -222,9 +236,11 @@ namespace KitLugia.GUI.Controls
         {
             try
             {
-                string result = SystemUtils.RunExternalProcess("reg",
+                string result = await Task.Run(() => SystemUtils.RunExternalProcess("reg",
                     @"query ""HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"" /v Enabled",
-                    true);
+                    true));
+
+                if (_isClosed) return;
 
                 if (result.Contains("0x1"))
                 {
@@ -337,14 +353,27 @@ namespace KitLugia.GUI.Controls
         {
             if (!_canApplyValorantRepair) return;
 
+            BtnApplyValorantRepair.IsEnabled = false;
+            TxtValorantOverallStatus.Text = "⚠️ Aplicando reparo...";
+            _ = ApplyValorantRepairAsync();
+        }
+
+        private async Task ApplyValorantRepairAsync()
+        {
             Logger.Log("Iniciando reparo do Valorant...");
             Logger.Log("Desativando VBS/HVCI para Vanguard...");
 
-            SystemUtils.RunExternalProcess("bcdedit", "/set hypervisorlaunchtype off", true);
-            SystemUtils.RunExternalProcess("reg",
-                @"add ""HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard"" /v EnableVirtualizationBasedSecurity /t REG_DWORD /d 0 /f", true);
-            SystemUtils.RunExternalProcess("reg",
-                @"add ""HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"" /v Enabled /t REG_DWORD /d 0 /f", true);
+            // Comandos em background: UI permanece responsiva durante a execucao
+            await Task.Run(() =>
+            {
+                SystemUtils.RunExternalProcess("bcdedit", "/set hypervisorlaunchtype off", true);
+                SystemUtils.RunExternalProcess("reg",
+                    @"add ""HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard"" /v EnableVirtualizationBasedSecurity /t REG_DWORD /d 0 /f", true);
+                SystemUtils.RunExternalProcess("reg",
+                    @"add ""HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"" /v Enabled /t REG_DWORD /d 0 /f", true);
+            });
+
+            if (_isClosed) return;
 
             Logger.Log("[SUCESSO] Reparo aplicado. Reinicie o PC para o Vanguard funcionar.");
 

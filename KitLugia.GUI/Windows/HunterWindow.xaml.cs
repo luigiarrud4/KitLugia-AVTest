@@ -20,8 +20,6 @@ namespace KitLugia.GUI.Windows
         [DllImport("user32.dll")]
         private static extern IntPtr WindowFromPhysicalPoint(int x, int y);
         [DllImport("user32.dll")]
-        private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
-        [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
@@ -41,8 +39,6 @@ namespace KitLugia.GUI.Windows
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll")]
         private static extern IntPtr GetParent(IntPtr hWnd);
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetWindow(IntPtr hWnd, int uCmd);
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
         [DllImport("user32.dll")]
@@ -70,10 +66,8 @@ namespace KitLugia.GUI.Windows
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT { public int X; public int Y; }
 
-        private const uint GA_ROOT = 2;
         private const int GWL_STYLE = -16;
         private const int GWL_EXSTYLE = -20;
-        private const int GW_HWNDPREV = 3;
         private const uint WS_POPUP = 0x80000000;
         private const uint WS_CAPTION = 0x00C00000;
         private const uint WS_SYSMENU = 0x00080000;
@@ -702,26 +696,13 @@ namespace KitLugia.GUI.Windows
             if (raw == IntPtr.Zero || GetWindowThreadProcessId(raw, out _) == _selfPid)
                 return IntPtr.Zero;
 
-            IntPtr root = GetAncestor(raw, GA_ROOT);
-            if (root == IntPtr.Zero) root = raw;
-
-            IntPtr bestTop = root;
-            IntPtr w = root;
-            while ((w = GetWindow(w, GW_HWNDPREV)) != IntPtr.Zero)
-            {
-                if (!IsWindowVisible(w)) continue;
-                GetWindowRect(w, out var r);
-                if (x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom)
-                {
-                    GetWindowThreadProcessId(w, out uint wp);
-                    if (wp == _selfPid) continue;
-                    bestTop = w;
-                }
-            }
-
-            IntPtr parent = GetParent(bestTop);
-            int style = GetWindowLong(bestTop, GWL_STYLE);
-            if (parent == IntPtr.Zero || (style & WS_POPUP) != 0) parent = bestTop;
+            // FindBestChild (WinSpy++ WindowFromPointEx.c): subir um nivel e
+            // enumerar TODOS os descendentes, escolhendo o MENOR visivel sob o
+            // ponto - inclusive netos (checkbox dentro de group-box). Sem walk
+            // de z-order: o alvo e o que WindowFromPoint achou, refinado.
+            IntPtr parent = GetParent(raw);
+            int style = GetWindowLong(raw, GWL_STYLE);
+            if (parent == IntPtr.Zero || (style & WS_POPUP) != 0) parent = raw;
 
             IntPtr bestChild = IntPtr.Zero;
             uint bestArea = uint.MaxValue;
@@ -729,7 +710,6 @@ namespace KitLugia.GUI.Windows
             EnumChildWindows(parent, (hwnd, _) =>
             {
                 if (!IsWindowVisible(hwnd)) return true;
-                if (GetParent(hwnd) != parent) return true;
                 GetWindowThreadProcessId(hwnd, out uint pid);
                 if (pid == _selfPid) return true;
                 GetWindowRect(hwnd, out var r);

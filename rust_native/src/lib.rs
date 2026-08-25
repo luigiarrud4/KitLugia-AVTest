@@ -104,13 +104,17 @@ fn confidence_generate_impl(display_name: &str, folder_name: &str) -> i32 {
     if display_name.eq_ignore_ascii_case(folder_name) {
         return 100;
     }
-    if display_name.len() >= folder_name.len()
-        && display_name[..folder_name.len()].eq_ignore_ascii_case(folder_name)
+    if !display_name.is_empty()
+        && display_name
+            .get(..folder_name.len())
+            .is_some_and(|p| p.eq_ignore_ascii_case(folder_name))
     {
         return 90;
     }
-    if folder_name.len() >= display_name.len()
-        && folder_name[..display_name.len()].eq_ignore_ascii_case(display_name)
+    if !folder_name.is_empty()
+        && folder_name
+            .get(..display_name.len())
+            .is_some_and(|f| f.eq_ignore_ascii_case(display_name))
     {
         return 85;
     }
@@ -570,4 +574,422 @@ pub extern "C" fn confidence_generate_ffi(
     let display = to_rust_string(display_name);
     let folder = to_rust_string(folder_name);
     confidence_generate_impl(&display, &folder)
+}
+
+// ── Native Registry Scanner (wimlib-style substitute for RegistryKey) ────────
+//
+// Mirrors the C# semantics of ScanSoftwareRecursive / ScanHiveForNames /
+// ScanHiveByValues in DeepUninstaller.cs, but enumerates the hive directly with
+// the Win32 RegEnumKeyExW / RegEnumValueW / RegQueryValueExW APIs:
+//   * skips SystemFolderNames + caller exclusions (case-insensitive)
+//   * name match uses Rust confidence_generate_impl (>= 70)
+//   * value match reads ONLY REG_SZ/REG_EXPAND_SZ data (skips binary blobs that
+//     .NET's GetValue() reads just to cast to string — a large chunk of the 151 ms)
+//     and reuses the same install-location / filename-confidence logic.
+//   * recursively descends for mode 1 (same depth guard: > 2 stops).
+
+#[cfg(windows)]
+mod native_registry {
+    use super::confidence_generate_impl;
+
+    #[link(name = "Advapi32")]
+    unsafe extern "system" {
+        fn RegOpenKeyExW(
+            key: isize,
+            subkey: *const u16,
+            options: u32,
+            desired: u32,
+            result: *mut isize,
+        ) -> i32;
+        fn RegCloseKey(key: isize) -> i32;
+        fn RegEnumKeyExW(
+            key: isize,
+            index: u32,
+            name: *mut u16,
+            name_len: *mut u32,
+            reserved: *mut u32,
+            class: *mut u16,
+            class_len: *mut u32,
+            last_write: *mut i64,
+        ) -> i32;
+        fn RegEnumValueW(
+            key: isize,
+            index: u32,
+            value_name: *mut u16,
+            value_name_len: *mut u32,
+            reserved: *mut u32,
+            vtype: *mut u32,
+            data: *mut u8,
+            data_len: *mut u32,
+        ) -> i32;
+        fn RegQueryValueExW(
+            key: isize,
+            value_name: *const u16,
+            reserved: *mut u32,
+            vtype: *mut u32,
+            data: *mut u8,
+            data_len: *mut u32,
+        ) -> i32;
+        fn ExpandEnvironmentStringsW(src: *const u16, dst: *mut u16, dst_len: u32) -> u32;
+    }
+
+    const ERROR_SUCCESS: i32 = 0;
+    const ERROR_MORE_DATA: i32 = 234;
+    const ERROR_NO_MORE_ITEMS: i32 = 259;
+    const ERROR_INSUFFICIENT_BUFFER: i32 = 122;
+    const KEY_READ: u32 = 0x20019;
+    const REG_SZ: u32 = 1;
+    const REG_EXPAND_SZ: u32 = 2;
+    const HKEY_CLASSES_ROOT: isize = 0x8000_0000;
+    const HKEY_CURRENT_USER: isize = 0x8000_0001;
+    const HKEY_LOCAL_MACHINE: isize = 0x8000_0002;
+    const HKEY_USERS: isize = 0x8000_0003;
+
+    fn wide(s: &str) -> Vec<u16> {
+        let mut v: Vec<u16> = s.encode_utf16().collect();
+        v.push(0);
+        v
+    }
+
+    fn hive_base(prefix: &str) -> isize {
+        match prefix {
+            "HKEY_CLASSES_ROOT" => HKEY_CLASSES_ROOT,
+            "HKEY_CURRENT_USER" => HKEY_CURRENT_USER,
+            "HKEY_LOCAL_MACHINE" => HKEY_LOCAL_MACHINE,
+            "HKEY_USERS" => HKEY_USERS,
+            _ => 0,
+        }
+    }
+
+    fn open_key(parent: isize, sub_path: &str) -> isize {
+        let sub_wide = wide(sub_path);
+        let mut handle: isize = 0;
+        let rc =
+            unsafe { RegOpenKeyExW(parent, sub_wide.as_ptr(), 0, KEY_READ, &mut handle) };
+        if rc != ERROR_SUCCESS || handle == 0 {
+            return 0;
+        }
+        handle
+    }
+
+    fn close_key(h: isize) {
+        if h != 0 {
+            unsafe { RegCloseKey(h) };
+        }
+    }
+
+    fn enumerate_children(key: isize) -> Vec<String> {
+        let mut names = Vec::new();
+        let mut idx: u32 = 0;
+        loop {
+            let mut buf = [0u16; 256];
+            let mut len: u32 = buf.len() as u32;
+            let rc = unsafe {
+                RegEnumKeyExW(
+                    key,
+                    idx,
+                    buf.as_mut_ptr(),
+                    &mut len,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            };
+            if rc == ERROR_NO_MORE_ITEMS {
+                break;
+            }
+            if rc == ERROR_MORE_DATA || rc == ERROR_INSUFFICIENT_BUFFER {
+                idx += 1;
+                continue;
+            }
+            if rc != ERROR_SUCCESS {
+                break;
+            }
+            if len > 0 {
+                names.push(String::from_utf16_lossy(&buf[..len as usize]));
+            }
+            idx += 1;
+        }
+        names
+    }
+
+    fn expand_value(raw: &[u16]) -> String {
+        let mut out = vec![0u16; 32768];
+        let rc = unsafe { ExpandEnvironmentStringsW(raw.as_ptr(), out.as_mut_ptr(), out.len() as u32) };
+        if rc > 0 {
+            let n = (rc as usize - 1).min(out.len());
+            String::from_utf16_lossy(&out[..n])
+        } else {
+            String::from_utf16_lossy(raw)
+        }
+    }
+
+    fn stem_of(data: &str) -> String {
+        let last = match data.rfind(['\\', '/']) {
+            Some(i) => &data[i + 1..],
+            None => data,
+        };
+        match last.rfind('.') {
+            Some(i) if i > 0 => last[..i].to_string(),
+            _ => last.to_string(),
+        }
+    }
+
+    fn dir_of(data: &str) -> String {
+        match data.rfind(['\\', '/']) {
+            Some(i) => data[..i].to_string(),
+            None => String::new(),
+        }
+    }
+
+    // Mirrors KeyHasValueReferencing in C#: only REG_SZ/REG_EXPAND_SZ values can be
+    // cast to string; binary/multi-reg values are skipped without reading data.
+    fn key_has_value_referencing(key: isize, install: &str, display: &str) -> bool {
+        let mut idx: u32 = 0;
+        loop {
+            let mut name_buf = vec![0u16; 256];
+            let mut name_len: u32 = name_buf.len() as u32;
+            let mut vtype: u32 = 0;
+            let mut data_len: u32 = 0;
+            let rc = unsafe {
+                RegEnumValueW(
+                    key,
+                    idx,
+                    name_buf.as_mut_ptr(),
+                    &mut name_len,
+                    std::ptr::null_mut(),
+                    &mut vtype,
+                    std::ptr::null_mut(),
+                    &mut data_len,
+                )
+            };
+            idx += 1; // always advance so ERROR_MORE_DATA/error can't loop forever
+            if rc == ERROR_NO_MORE_ITEMS {
+                break;
+            }
+            if rc == ERROR_MORE_DATA || rc == ERROR_INSUFFICIENT_BUFFER {
+                // value name too long for our buffer — re-attempt not feasible here;
+                // skip this entry and continue enumeration.
+                continue;
+            }
+            if rc != ERROR_SUCCESS {
+                break;
+            }
+            if vtype != REG_SZ && vtype != REG_EXPAND_SZ {
+                continue;
+            }
+            // Also skip the (Default)? No — C# GetValue("") returns default; but we
+            // only need value name from the enumeration; data query handles the rest.
+            let mut data = vec![0u8; data_len as usize];
+            let mut real_len: u32 = data_len;
+            let rc2 = unsafe {
+                RegQueryValueExW(
+                    key,
+                    name_buf.as_ptr(),
+                    std::ptr::null_mut(),
+                    &mut vtype,
+                    if data.is_empty() { std::ptr::null_mut() } else { data.as_mut_ptr() },
+                    &mut real_len,
+                )
+            };
+            if rc2 != ERROR_SUCCESS {
+                continue;
+            }
+            if real_len == 0 {
+                continue;
+            }
+            let word_count = (real_len as usize) / 2;
+            let raw: Vec<u16> = data[..word_count * 2]
+                .chunks_exact(2)
+                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .collect();
+            let text = if vtype == REG_EXPAND_SZ {
+                expand_value(&raw)
+            } else {
+                String::from_utf16_lossy(&raw)
+            };
+            let text: String = text.trim_end_matches('\0').to_string();
+            if text.is_empty() {
+                continue;
+            }
+            if !install.is_empty() {
+                let norm = install.trim_end_matches('\\');
+                if !norm.is_empty() {
+                    let tl = text.to_lowercase();
+                    let nl = norm.to_lowercase();
+                    if tl.contains(&nl) {
+                        return true;
+                    }
+                    let dir = dir_of(&text).to_lowercase();
+                    if !dir.is_empty() && dir.contains(&nl) {
+                        return true;
+                    }
+                }
+            }
+            if !display.is_empty() {
+                let stem = stem_of(&text);
+                if !stem.is_empty() && confidence_generate_impl(display, &stem) >= 85 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    const SYSTEM_FOLDERS: &[&str] = &[
+        "Microsoft", "Windows", "WinSxS", "System32", "SysWOW64", "Common Files",
+        "MSBuild", "Reference Assemblies", "WindowsApps", "Windows NT",
+        "WindowsPowerShell", "dotnet", "Assembly", "PackageManagement",
+        "Temporary Internet Files", "Temp", "Templates", "Start Menu", "Desktop",
+        "Favorites", "Fonts", "Installer", "Microsoft.NET", "Microsoft Shared",
+        "ModifiableWindowsApps", "Resources", "servicing", "VSS", "Help", "inf",
+        "L2Schemas", "Logs", "Media", "ModemLogs", "en-US", "Branding", "Cursors",
+        "Debug", "ImmersiveControlPanel", "Registration", "rescache", "SchCache",
+        "security", "ServicePackFiles", "Skin", "SoftwareDistribution", "Speech",
+        "systemprofile", "ConfigMsi", "Msi", "mui", "OCR", "ras", "twain_32", "Web",
+        "winsxs", "IME", "InputMethod", "DirectX", "VulkanRT", "CRT", "MFC", "ATL",
+    ];
+
+    fn name_skipped(name: &str, exclusions: &[String]) -> bool {
+        if name.is_empty() || name.len() < 2 {
+            return true;
+        }
+        if name.starts_with('.') || name.starts_with('_') {
+            return true;
+        }
+        if SYSTEM_FOLDERS.iter().any(|s| name.eq_ignore_ascii_case(s)) {
+            return true;
+        }
+        if exclusions.iter().any(|e| name.eq_ignore_ascii_case(e)) {
+            return true;
+        }
+        false
+    }
+
+    // Opens a key at the given FULL hive path (e.g. "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes").
+    // The root hive handle is reused for perf; the rest is opened via the key path.
+    fn open_full_path(full: &str) -> isize {
+        let (prefix, sub) = match full.find('\\') {
+            Some(i) => (&full[..i], &full[i + 1..]),
+            None => (full, ""),
+        };
+        let base = hive_base(prefix);
+        if base == 0 {
+            return 0;
+        }
+        if sub.is_empty() {
+            return base;
+        }
+        open_key(base, sub)
+    }
+
+    // Mirrors ScanSoftwareRecursive / ScanHiveForNames / ScanHiveByValues.
+    // mode: 0 = flat name+value (ScanHiveForNames), 1 = recursive name+value
+    // (ScanSoftwareRecursive), 2 = flat value-only (ScanHiveByValues).
+    fn scan_key(
+        full: &str,
+        display: &str,
+        install: &str,
+        exclusions: &[String],
+        mode: u32,
+        depth: u32,
+        results: &mut Vec<String>,
+    ) {
+        if mode == 1 && depth > 2 {
+            return;
+        }
+        let handle = open_full_path(full);
+        if handle == 0 {
+            return;
+        }
+        let names = enumerate_children(handle);
+        for name in names {
+            // mode 2 (ScanHiveByValues) only skips empty + SystemFolderNames.
+            let skipped = if mode == 2 {
+                name.is_empty()
+                    || SYSTEM_FOLDERS.iter().any(|s| name.eq_ignore_ascii_case(s))
+            } else {
+                name_skipped(&name, exclusions)
+            };
+            if skipped {
+                continue;
+            }
+            let child_full = format!("{}\\{}", full, name);
+            let mut name_match = false;
+            if mode != 2 && !display.is_empty() {
+                name_match = confidence_generate_impl(display, &name) >= 70;
+            }
+            let mut value_match = false;
+            if !install.is_empty() && (mode == 2 || !name_match) {
+                let child = open_key(handle, &name);
+                if child != 0 {
+                    value_match = key_has_value_referencing(child, install, display);
+                    close_key(child);
+                }
+            }
+            if name_match || value_match {
+                results.push(child_full.clone());
+            }
+            if mode == 1 {
+                scan_key(&child_full, display, install, exclusions, mode, depth + 1, results);
+            }
+        }
+        close_key(handle);
+    }
+
+    // Writes a result as a NUL-terminated UTF-16 string into the buffer.
+    fn write_result(buf: &mut [u16], pos: &mut usize, s: &str) -> bool {
+        let encoded: Vec<u16> = s.encode_utf16().collect();
+        if *pos + encoded.len() + 1 > buf.len() {
+            return false;
+        }
+        buf[*pos..(*pos + encoded.len())].copy_from_slice(&encoded);
+        *pos += encoded.len();
+        buf[*pos] = 0;
+        *pos += 1;
+        true
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn reg_scan_ffi(
+        root_path: *const u16,  // e.g. "HKEY_LOCAL_MACHINE\\SOFTWARE" or "HKEY_CURRENT_USER\\..."
+        display_name: *const u16,
+        install_location: *const u16,
+        exclusions: *const u16,  // ';'-separated, may be empty
+        mode: i32,               // 0 = flat names+value, 1 = recursive names+value, 2 = value-only flat
+        out_buf: *mut u16,
+        out_capacity: i32,
+    ) -> i32 {
+        let root = super::to_rust_string(root_path);
+        let display = super::to_rust_string(display_name);
+        let install = super::to_rust_string(install_location);
+        let ex_str = super::to_rust_string(exclusions);
+        let exclusions: Vec<String> = ex_str
+            .split(';')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let mut results: Vec<String> = Vec::new();
+        scan_key(
+            &root,
+            &display,
+            &install,
+            &exclusions,
+            mode as u32,
+            0,
+            &mut results,
+        );
+
+        // Serialize results as NUL-terminated UTF-16 into the caller's buffer.
+        let buf = unsafe { std::slice::from_raw_parts_mut(out_buf, out_capacity as usize) };
+        let mut pos: usize = 0;
+        for r in &results {
+            if !write_result(buf, &mut pos, r) {
+                return -(results.len() as i32 + 1); // buffer too small
+            }
+        }
+        results.len() as i32
+    }
 }

@@ -15,9 +15,9 @@ namespace KitLugia.GUI.Helpers
         private static readonly Dictionary<string, BitmapSource?> IconCache = new Dictionary<string, BitmapSource?>(500, StringComparer.OrdinalIgnoreCase);
         private static readonly object CacheLock = new object();
 
-        public static BitmapSource? GetAppIcon(string packageName, int size = 32)
+        public static BitmapSource? GetAppIcon(string packageName, int size = 32, string? aumid = null)
         {
-            string cacheKey = $"{packageName}_{size}";
+            string cacheKey = $"{packageName}_{aumid ?? ""}_{size}";
             lock (CacheLock)
             {
                 if (IconCache.ContainsKey(cacheKey))
@@ -27,10 +27,18 @@ namespace KitLugia.GUI.Helpers
             BitmapSource? icon = null;
             try
             {
-                string? iconPath = GetUwpIconPathNative(packageName);
-                if (!string.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath))
+                // 1) Ícone REAL via shell:AppsFolder (exige AUMID) — resolve ícones vazios
+                if (!string.IsNullOrWhiteSpace(aumid))
+                    icon = GetUwpIconViaShell(aumid, size);
+
+                // 2) Fallback: manifesto/registro/Assets
+                if (icon == null)
                 {
-                    icon = LoadImageFromFile(iconPath, size);
+                    string? iconPath = GetUwpIconPathNative(packageName);
+                    if (!string.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath))
+                    {
+                        icon = LoadImageFromFile(iconPath, size);
+                    }
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -176,7 +184,7 @@ namespace KitLugia.GUI.Helpers
                         return file;
                 }
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch { /* pasta de app protegida — ícone fica sem imagem */ }
 
             return null;
         }
@@ -206,7 +214,7 @@ namespace KitLugia.GUI.Helpers
                     }
                 }
             }
-            catch { Logger.LogWarning("AppIconHelper", "Exception suppressed"); }
+            catch { /* subpasta protegida — tenta o próximo app */ }
 
             return null;
         }
@@ -296,6 +304,82 @@ namespace KitLugia.GUI.Helpers
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
+
+        #region IShellItemImageFactory (ícone real do shell:AppsFolder)
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeSize
+        {
+            public int Width;
+            public int Height;
+        }
+
+        [Flags]
+        private enum SIIGBF : uint
+        {
+            ResizeToFit = 0x0,
+            BiggerSizeOk = 0x1,
+            MemoryOnly = 0x2,
+            IconOnly = 0x100,
+            ThumbnailOnly = 0x200,
+            InCacheOnly = 0x400
+        }
+
+        [ComImport]
+        [Guid("b63ea76d-1f85-456f-a19c-48159efa858b")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IShellItemImageFactory
+        {
+            [PreserveSig]
+            int GetImage([In] ref NativeSize size, [In] SIIGBF flags, out IntPtr hbm);
+        }
+
+        private static readonly Guid IID_IShellItemImageFactory = new("b63ea76d-1f85-456f-a19c-48159efa858b");
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern int SHCreateItemFromParsingName(string pszPath, IntPtr pbc, ref Guid riid, out IntPtr ppv);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        /// <summary>
+        /// Extrai o ícone REAL do app UWP via shell:AppsFolder\{AUMID}
+        /// (IShellItemImageFactory). Retorna null se o app não existir.
+        /// </summary>
+        private static BitmapSource? GetUwpIconViaShell(string aumid, int size)
+        {
+            if (string.IsNullOrWhiteSpace(aumid)) return null;
+            try
+            {
+                string path = "shell:AppsFolder\\" + aumid;
+                var guid = IID_IShellItemImageFactory;
+                if (SHCreateItemFromParsingName(path, IntPtr.Zero, ref guid, out IntPtr factory) != 0 || factory == IntPtr.Zero)
+                    return null;
+
+                try
+                {
+                    var shellFactory = (IShellItemImageFactory)Marshal.GetObjectForIUnknown(factory);
+                    var ns = new NativeSize { Width = size, Height = size };
+                    if (shellFactory.GetImage(ref ns, SIIGBF.BiggerSizeOk | SIIGBF.IconOnly, out IntPtr hbm) != 0 || hbm == IntPtr.Zero)
+                        return null;
+
+                    try
+                    {
+                        var source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                            hbm, IntPtr.Zero, Int32Rect.Empty,
+                            BitmapSizeOptions.FromWidthAndHeight(size, size));
+                        source.Freeze();
+                        return source;
+                    }
+                    finally { DeleteObject(hbm); }
+                }
+                finally { Marshal.Release(factory); }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
+        }
+
+        #endregion
 
         private static BitmapSource? _cachedGenericIcon;
         private static readonly object _genericIconLock = new();

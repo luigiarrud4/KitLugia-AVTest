@@ -242,13 +242,14 @@ namespace KitLugia.Core
                             try
                             {
                                 Directory.CreateDirectory(entry.ExpandedValue);
-                                repaired.Add(entry.CleanValue);
                                 actions.Add($"Criada pasta: {entry.CleanValue}");
                             }
                             catch
                             {
-                                actions.Add($"FALHA ao criar pasta: {entry.CleanValue}");
+                                actions.Add($"[AVISO] FALHA ao criar pasta (mantida no PATH): {entry.CleanValue}");
                             }
+                            // Nunca remover entrada existente: mantida mesmo se a criacao falhar
+                            repaired.Add(entry.CleanValue);
                         }
                         else
                         {
@@ -320,7 +321,12 @@ namespace KitLugia.Core
                     string cExpanded = Environment.ExpandEnvironmentVariables(c).TrimEnd('\\');
                     if (cExpanded.Equals(expanded, StringComparison.OrdinalIgnoreCase)) { found = true; break; }
                 }
-                if (!found) result.Add(m);
+                if (!found)
+                {
+                    // Marca como visto para evitar duplicar com entradas atuais equivalentes
+                    seen.Add(m);
+                    result.Add(m);
+                }
             }
 
             foreach (var c in currentEntries)
@@ -341,7 +347,14 @@ namespace KitLugia.Core
             foreach (var kvp in installedPaths)
             {
                 string pathToAdd = kvp.Value;
+                if (string.IsNullOrWhiteSpace(pathToAdd)) continue;
                 string expanded = pathToAdd.TrimEnd('\\');
+                // Nunca adicionar caminho que nao existe (exceto variaveis de ambiente)
+                if (!expanded.Contains('%') && !Directory.Exists(expanded))
+                {
+                    addedPaths.Add($"Ignorado (diretorio nao existe): {pathToAdd}");
+                    continue;
+                }
                 bool found = false;
 
                 foreach (var c in currentEntries)
@@ -366,9 +379,103 @@ namespace KitLugia.Core
             return (string.Join(";", result), addedPaths);
         }
 
+        private static readonly object _scanCacheLock = new();
+        private static Dictionary<string, string>? _scanCache;
+        private static DateTime _scanCacheTime;
+        private static readonly TimeSpan ScanCacheTtl = TimeSpan.FromMinutes(5);
+
+        public static Dictionary<string, string> RecoverFromExecutableScan(IEnumerable<string>? onlyTargets = null)
+        {
+            lock (_scanCacheLock)
+            {
+                // Cache com TTL: a varredura de disco custa ~30s e o PATH de programas
+                // instalados nao muda entre scans (Integrity chama isto ate 2x por scan).
+                if (_scanCache != null && DateTime.UtcNow - _scanCacheTime < ScanCacheTtl)
+                    return new Dictionary<string, string>(_scanCache, StringComparer.OrdinalIgnoreCase);
+            }
+
+            // Recuperacao baseada no disco: procura .exe conhecidos e retorna dir pai
+            var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string[] searchRoots = new[] {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            };
+            // Nome de arquivo -> nome do alvo (1 passada por raiz em vez de 1 por alvo:
+            // o antigo fazia GetFiles(AllDirectories) por alvo = 32 varreduras completas ~30s).
+            // pwsh.exe fora: instalacao MSIX e so um stub (reparse) inacessivel fora do
+            // WindowsApps - nunca encontrariavel; o pwsh classico ja tem check proprio.
+            var wanted = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["winget.exe"] = "winget", ["node.exe"] = "node", ["npm.cmd"] = "npm",
+                ["git.exe"] = "git", ["7z.exe"] = "7z",
+                ["dotnet.exe"] = "dotnet", ["cargo.exe"] = "cargo"
+            };
+            if (onlyTargets != null)
+            {
+                var requested = new HashSet<string>(onlyTargets, StringComparer.OrdinalIgnoreCase);
+                foreach (var kvp in wanted.ToList())
+                {
+                    if (!requested.Contains(kvp.Value)) wanted.Remove(kvp.Key);
+                }
+            }
+            // Subpastas que provavelmente NAO sao o local de instalacao principal do programa
+            string[] avoidSubstrings = new[] {
+                "node_modules", "\\.git\\", "\\.svn\\", "\\sdk\\", "\\examples\\",
+                "\\test\\", "\\tests\\", "\\cache\\", "\\scratch\\", "\\resources\\app\\"
+            };
+            foreach (var root in searchRoots)
+            {
+                if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
+                if (wanted.Count == 0) break;
+                try
+                {
+                    // Uma unica passada DFS por raiz (pulando subpastas pesadas), filtrando
+                    // por nome de arquivo - corta ~32 varreduras completas para 4.
+                    foreach (var file in EnumerateFilesSkippingHeavy(root))
+                    {
+                        string fileName = Path.GetFileName(file);
+                        if (wanted.TryGetValue(fileName, out string? targetName))
+                        {
+                            var dir = Path.GetDirectoryName(file);
+                            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                            string lower = dir.ToLowerInvariant();
+                            if (avoidSubstrings.Any(s => lower.Contains(s))) continue;
+                            // Preferencia do 7z: dir chamado 7-Zip/7zip ganha de 7z.exe interno
+                            // de outros apps (ex: NVIDIA App); entre genericos, o mais raso.
+                            if (targetName == "7z" && found.TryGetValue("7z", out string? prev7z))
+                            {
+                                bool curGood = lower.Contains("7-zip") || lower.Contains("7zip");
+                                string prevLower = prev7z.ToLowerInvariant();
+                                bool prevGood = prevLower.Contains("7-zip") || prevLower.Contains("7zip");
+                                if (prevGood && !curGood) continue;
+                                if (!curGood && !prevGood &&
+                                    lower.Count(c => c == '\\') > prevLower.Count(c => c == '\\'))
+                                    continue;
+                            }
+                            found[targetName] = dir;
+                            wanted.Remove(fileName);
+                            if (wanted.Count == 0) break;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Sem acesso (ou erro transiente): continua para as outras raizes
+                }
+            }
+            lock (_scanCacheLock)
+            {
+                _scanCache = found;
+                _scanCacheTime = DateTime.UtcNow;
+            }
+            return found;
+        }
+
         public static Dictionary<string, string> GetInstalledProgramPaths()
         {
-            var paths = new Dictionary<string, string>();
+            var paths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
@@ -429,7 +536,84 @@ namespace KitLugia.Core
             string cargoPath = Path.Combine(userProfile, ".cargo", "bin");
             if (Directory.Exists(cargoPath)) paths["cargo"] = cargoPath;
 
+            // 7-Zip (unico alvo sem local padrao garantido)
+            string[] zipPaths = {
+                Path.Combine(programFiles, "7-Zip"),
+                Path.Combine(programFilesX86, "7-Zip"),
+                Path.Combine(localAppData, "Programs", "7-Zip")
+            };
+            foreach (var p in zipPaths)
+            {
+                if (Directory.Exists(p)) { paths["7z"] = p; break; }
+            }
+
+            // Scan de disco como fallback para os alvos ainda nao cobertos pelos
+            // caminhos conhecidos (so os ausentes - na pratica, 7z quando nao ha 7-Zip;
+            // com tudo coberto o scan nem roda, custo ~0).
+            string[] allTargets = { "winget", "node", "npm", "git", "7z", "pwsh", "dotnet", "cargo" };
+            var missing = allTargets.Where(t => !paths.ContainsKey(t)).ToList();
+            var recovered = missing.Count > 0
+                ? RecoverFromExecutableScan(missing)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in recovered)
+            {
+                if (!paths.ContainsKey(kvp.Key)) paths[kvp.Key] = kvp.Value;
+            }
+
             return paths;
+        }
+
+        private static readonly string[] _skipScanDirs = new[]
+        {
+            "node_modules", ".git", ".svn", "temp", "cache", "caches", "logs",
+            "$recycle.bin", "downloads", "onedrive", "winsxs", "installer",
+            "webcache", "history", "cookies", "codelldb", "explorercache",
+            // Junctions classicas do perfil (apontam para AppData, ja varrido)
+            "Application Data", "Local Settings", "My Documents", "NetHood",
+            "PrintHood", "Recent", "SendTo", "Templates", "Start Menu",
+            // Arvores gigantes que ja sao cobertas pelos checks rapidos (ou nao sao alvo):
+            // nenhum alvo (winget/dotnet/git/node/npm/7z/cargo/pwsh) vive em *\Microsoft\*
+            // ou em AppData\Roaming (npm ja tem check proprio) ou em packages UWP.
+            "Microsoft Visual Studio", "Windows Kits", "WindowsApps", "dotnet",
+            "Git", "nodejs", "PowerShell", "Microsoft Edge", "Common Files",
+            "Microsoft", "AppData", "Roaming", "Packages", "ProgramData"
+        };
+
+        private static IEnumerable<string> EnumerateFilesSkippingHeavy(string root)
+        {
+            var stack = new Stack<(string Dir, int Depth)>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            stack.Push((root, 0));
+            while (stack.Count > 0)
+            {
+                var (dir, depth) = stack.Pop();
+                if (!visited.Add(dir)) continue;
+                // Programas instalados ficam em profundidade <= 4 (ex: LocalAppData\Programs\App\bin);
+                // profundidade maior e so lixo (packages UWP, extensoes, caches) - o cap tambem
+                // encerra qualquer ciclo de junction residual.
+                if (depth < 4)
+                {
+                    IEnumerable<string> subdirs;
+                    try { subdirs = Directory.EnumerateDirectories(dir); }
+                    catch { continue; }
+                    foreach (var sub in subdirs)
+                    {
+                        string name = Path.GetFileName(sub);
+                        if (name.Length > 0 && Array.IndexOf(_skipScanDirs, name) >= 0)
+                            continue;
+                        stack.Push((sub, depth + 1));
+                    }
+                }
+                // Filtro no kernel (FindFirstFile com mascara) em vez de listar todos os nomes.
+                foreach (var pattern in new[] { "*.exe", "*.cmd" })
+                {
+                    IEnumerable<string> files;
+                    try { files = Directory.EnumerateFiles(dir, pattern); }
+                    catch { continue; }
+                    foreach (var f in files)
+                        yield return f;
+                }
+            }
         }
 
         /// <summary>

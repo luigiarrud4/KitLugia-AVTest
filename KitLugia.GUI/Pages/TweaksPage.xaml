@@ -309,7 +309,7 @@
             </Border>
 
             <!-- GRUPO: SMARTCREEN -->
-            <TextBlock Text="SmartScreen e Navega&#xE7;&#xE3;o" FontSize="16" FontWeight="Bold" Foreground="#8AB4F8" Margin="0,25,0,15"/>
+            <TextBlock Text="Privacidade, SmartScreen e Telemetria" FontSize="16" FontWeight="Bold" Foreground="#8AB4F8" Margin="0,25,0,15"/>
             <Border CornerRadius="8" Padding="0">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -399,6 +399,196 @@
                             <TextBlock x:Name="StatusSmartScreenExplorer" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
                         </Border>
                         <CheckBox x:Name="ChkSmartScreenExplorer" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSmartScreenExplorer_Click" Margin="0,12,20,16"/>
+                    </Grid>
+
+                    <Separator Background="#254455" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Telemetria (DiagTrack) -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="O DiagTrack coleta telemetria de uso do sistema e apps e envia para a Microsoft. Desativar reduz uso de CPU/RAM/rede. O Windows Update pode reativa-lo apos grandes atualizacoes - o Kit reaplica automaticamente no boot se a preferencia estiver salva."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,16,15,12">
+                            <TextBlock Text="Desativar Telemetria (DiagTrack)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa o coletor de dados de telemetria da Microsoft. Reduz uso de CPU, RAM e rede." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusDiagTrackSvc" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkDiagTrackSvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDiagTrackSvc_Click" Margin="0,16,20,16"/>
+                    </Grid>
+
+                    <Separator Background="#254455" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- WAP Push (dmwappushservice) -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Servico de roteamento de mensagens WAP Push (notificacoes de apps da Loja e do sistema). Sem ele, push notifications podem nao chegar; nao afeta o funcionamento normal do Windows."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,16,15,12">
+                            <TextBlock Text="Desativar WAP Push (dmwappushservice)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa o roteador de mensagens push do Windows. Notificacoes de apps da Loja podem parar de chegar." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusDmwappushSvc" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkDmwappushSvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDmwappushSvc_Click" Margin="0,16,20,16"/>
+                    </Grid>
+
+                    <Separator Background="#254455" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Windows Error Reporting (WerSvc) -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Coleta e envia relatorios de erro do Windows para a Microsoft. Desativar nao impede que erros sejam registrados nem corrigidos localmente - so impede o envio."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,16,15,12">
+                            <TextBlock Text="Desativar Relatorio de Erros (WerSvc)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede o Windows de enviar relatorios de erro para a Microsoft." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusWerSvc" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkWerSvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkWerSvc_Click" Margin="0,16,20,16"/>
+                    </Grid>
+
+                    <Separator Background="#254455" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Program Compatibility Assistant (PcaSvc) -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Assistente de Compatibilidade de Programas: verifica problemas de compatibilidade e envia dados de uso de programas. Desativar pode dar mais desempenho e evitar travas de instaladores antigos."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,16,15,12">
+                            <TextBlock Text="Desativar Compatibilidade (PcaSvc)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desliga o Assistente de Compatibilidade de Programas e seus diagnosticos." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusPcaSvc" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkPcaSvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPcaSvc_Click" Margin="0,16,20,16"/>
+                    </Grid>
+
+                    <Separator Background="#254455" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Tarefas de telemetria (Agendador) -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Desativa todas as tarefas do Agendador nas pastas Application Experience (PcaPatchDbTask, DiskDiagnostic, ProgramDataUpdater, AitAgent...) e Customer Experience Improvement Program (CEIP). Tarefas protegidas podem nao mudar - o Kit avisa se sobrar alguma ativa."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,16,15,12">
+                            <TextBlock Text="Desativar Tarefas de Telemetria (Agendador)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desativa as tarefas de telemetria do Agendador (Application Experience + CEIP)." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusTelemetryTasks" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkTelemetryTasks" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTelemetryTasks_Click" Margin="0,16,20,16"/>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -1436,6 +1626,42 @@
                             <TextBlock x:Name="StatusL2Cache" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
                         </Border>
                         <CheckBox x:Name="ChkL2Cache" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkL2Cache_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <!-- RmCacheLoc (NVIDIA) -->
+                    <Grid Margin="20,0,20,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="RmCacheLoc e um valor do Resource Manager do driver NVIDIA (lido por nvlddmkm/RM.dll). Guias de otimizacao o configuram com o numero de nucleos LOGICOS da CPU. E aplicado na Class\{4d36e968...}\00xx e em todos os Video\{GUID}\0000 NVIDIA (requer admin). So tem efeito com GPU NVIDIA - AMD/Intel ignoram o valor."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="14" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="RmCacheLoc (NVIDIA)" FontSize="14" Foreground="White"/>
+                            <TextBlock x:Name="InfoRmCacheLoc" Text="Configurado com o numero de nucleos logicos." FontSize="11" Foreground="#A0A0A0" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusRmCacheLoc" Text="Verificando..." Foreground="#4FC3F7" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkRmCacheLoc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkRmCacheLoc_Click" Margin="0,10,20,10"/>
                     </Grid>
 
                     <!-- Nagle's Algorithm -->

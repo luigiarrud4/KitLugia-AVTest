@@ -28,7 +28,7 @@ namespace KitLugia.Core
             }
         }
 
-        public static string HashFile(string filePath)
+        public static string? HashFile(string filePath)
         {
             if (UseNative)
             {
@@ -52,7 +52,7 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
-        public static string HashBytes(byte[] data)
+        public static string? HashBytes(byte[] data)
         {
             if (UseNative && data != null && data.Length > 0)
             {

@@ -285,23 +285,29 @@ namespace KitLugia.GUI.Pages
                 {
                     var originalStatus = tweak.Status;
                     var result = await Task.Run(() => Guardian.ToggleTweak(tweak));
-                    
-                    await Task.Delay(2000);
 
-                    var verification = await Task.Run(() => Guardian.GetHarmfulTweaksWithStatus());
-                    _allTweaks = verification;
-                    var currentTweak = verification.FirstOrDefault(t => t.Name == tweak.Name);
-                    
-                    if (result.Success && currentTweak != null)
+                    // ToggleTweak já re-verifica o item via CheckTweak - SEM re-scan completo
+                    // de 2s+ (a otimização do scan removeu os 28 processos bcdedit e os
+                    // 94 ServiceControllers; o re-scan ficava ~10-20s à toa por toggle).
+                    var currentTweak = tweak;
+
+                    if (result.Success)
                     {
-                        if (currentTweak.Status == TweakStatus.OK && originalStatus == TweakStatus.MODIFIED)
-                            mainWindow.ShowSuccess("SUCESSO", "Item restaurado com sucesso.");
-                        else if (currentTweak.Status == TweakStatus.MODIFIED && originalStatus == TweakStatus.OK)
-                            mainWindow.ShowInfo("ATENÇÃO", "Item modificado (Personalizado).");
-                        else if (currentTweak.Status == TweakStatus.NOT_FOUND)
-                            mainWindow.ShowError("FALHA", "Item não encontrado no sistema.");
+                        if (currentTweak.Status != originalStatus)
+                        {
+                            if (currentTweak.Status == TweakStatus.OK && originalStatus == TweakStatus.MODIFIED)
+                                mainWindow.ShowSuccess("SUCESSO", "Item restaurado com sucesso.");
+                            else if (currentTweak.Status == TweakStatus.MODIFIED && originalStatus == TweakStatus.OK)
+                                mainWindow.ShowInfo("ATENÇÃO", "Item modificado (Personalizado).");
+                            else if (currentTweak.Status == TweakStatus.NOT_FOUND)
+                                mainWindow.ShowError("FALHA", "Item não encontrado no sistema.");
+                            else
+                                mainWindow.ShowError("FALHA", "A alteração não foi aplicada corretamente.");
+                        }
                         else
-                            mainWindow.ShowError("FALHA", "A alteração não foi aplicada corretamente.");
+                        {
+                            mainWindow.ShowInfo("INFO", result.Message ?? "Alteração aplicada.");
+                        }
                     }
                     else
                     {
@@ -370,9 +376,9 @@ namespace KitLugia.GUI.Pages
                             errorCount++;
                             failedTweaks.Add($"{t.Name}: {ex.Message}");
                         }
-                        await Task.Delay(150);
+                        // Delay mínimo entre serviços (dependências) - sem os antigos 150ms+800ms
+                        await Task.Delay(25);
                     }
-                    await Task.Delay(800);
                 });
 
                 string resultMessage;
