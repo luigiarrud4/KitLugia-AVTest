@@ -550,149 +550,58 @@
                     </Button.Template>
                 </Button>
 
-                <!-- BOT&#xD5;ES DE JANELA -->
+                <!-- BOT&#xD5;ES DE JANELA — triggers declarativos: o estado final SEMPRE &#xE9; aplicado,
+                     mesmo se o mouse sair no meio da transi&#xE7;&#xE3;o (anima&#xE7;&#xF5;es com Enter/ExitActions
+                     podiam ficar presas em cor intermedi&#xE1;ria). Handoff=And para trocar sem flash. -->
                 <Button Content="&#x2212;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnMinimize_Click">
+                        BorderThickness="0" Click="BtnMinimize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 17: Transi&#xE7;&#xE3;o suave de cor no bot&#xE3;o minimizar (0.15s) - MainWindow.xaml linha ~160-178 -->
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="#33FFFFFF" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="Transparent" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#33FFFFFF"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Background.Color" To="#50FFFFFF" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Background.Color" To="#33FFFFFF" Duration="0:0:0.1"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#50FFFFFF"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
                 <Button Content="&#x25A1;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnMaximize_Click">
+                        BorderThickness="0" Click="BtnMaximize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 18: Transi&#xE7;&#xE3;o suave de cor no bot&#xE3;o maximizar (0.15s) - MainWindow.xaml linha ~179-197 -->
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="#33FFFFFF" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="Transparent" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#33FFFFFF"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Background.Color" To="#50FFFFFF" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Background.Color" To="#33FFFFFF" Duration="0:0:0.1"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#50FFFFFF"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
                 <Button Content="&#x2715;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnClose_Click">
+                        BorderThickness="0" Click="BtnClose_Click" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 15: Transi&#xE7;&#xE3;o suave de cor no bot&#xE3;o fechar (0.15s) - MainWindow.xaml linha ~198-217 -->
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="#C42B1C" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="Background.Color"
-                                                               To="Transparent" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#C42B1C"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Background.Color" To="#E81123" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ColorAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Background.Color" To="#C42B1C" Duration="0:0:0.1"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
+                                    <Setter TargetName="bdr" Property="Background" Value="#E81123"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -902,7 +811,7 @@
             <!-- CONTE&#xDA;DO PRINCIPAL (DIREITA) -->
             <!-- ========================================================= -->
             <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 5: Fade-in ao navegar entre p&#xE1;ginas (0.25s) - MainWindow.xaml linha ~357 -->
-            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="Transparent" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated">
+            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="{StaticResource WindowBackground}" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated">
                 <Frame.RenderTransform>
                     <ScaleTransform ScaleX="1" ScaleY="1" CenterX="0.5" CenterY="0.5"/>
                 </Frame.RenderTransform>

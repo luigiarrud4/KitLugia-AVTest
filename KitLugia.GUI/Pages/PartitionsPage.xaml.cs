@@ -258,11 +258,23 @@ namespace KitLugia.GUI.Pages
 
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
+            if (_isUpdatingDisks) return; // single-flight: evita WMI/IOCTL storm de cliques rápidos
             string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Carregando Discos", "Partitions");
 
-            await Task.Run(() => LoadDisks());
-
-            Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Discos carregados com sucesso");
+            try
+            {
+                _isUpdatingDisks = true;
+                await Task.Run(() => LoadDisks());
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Discos carregados com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, false, ex.Message);
+            }
+            finally
+            {
+                _isUpdatingDisks = false;
+            }
         }
 
         private void BtnBack_Click(object sender, RoutedEventArgs e)
@@ -323,6 +335,27 @@ namespace KitLugia.GUI.Pages
                 if (busy) { TxtOpTitle.Text = title; TxtOpDesc.Text = desc; PanelProgress.Visibility = Visibility.Visible; PanelOpFooter.Visibility = Visibility.Collapsed; StartUsageMonitor(active, target); }
                 else StopUsageMonitor();
             });
+            SetGearSpin(busy);
+        }
+
+        /// <summary>Liga/desliga a rotação do engrenagem ⚙️ do overlay (economiza CPU quando fechado).</summary>
+        private void SetGearSpin(bool running)
+        {
+            try
+            {
+                if (RotationTransform is not System.Windows.Media.RotateTransform rt) return;
+                if (running)
+                {
+                    var spin = new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(2000)) { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
+                    rt.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, spin, System.Windows.Media.Animation.HandoffBehavior.SnapshotAndReplace);
+                }
+                else
+                {
+                    rt.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
+                    rt.Angle = 0;
+                }
+            }
+            catch { }
         }
 
         private bool _isMonitoringUsage = false;
@@ -764,10 +797,21 @@ namespace KitLugia.GUI.Pages
         {
             if (_selectedPartition == null || !await ShowConfirm("DELETAR", "Confirmar exclusão?")) return;
             SetActionBusy(true, "Deletando...");
-            bool ok = await PartitionManager.DeletePartition(_selectedPartition.DiskIndex, _selectedPartition.Index, _selectedPartition.DriveLetter);
-            SetActionBusy(false);
-            if (ok) ShowSuccess("Removida", "Partição deletada.");
-            LoadDisks();
+            try
+            {
+                bool ok = await PartitionManager.DeletePartition(_selectedPartition.DiskIndex, _selectedPartition.Index, _selectedPartition.DriveLetter);
+                if (ok) ShowSuccess("Removida", "Partição deletada.");
+                else ShowError("Erro", "Falha ao deletar partição.");
+            }
+            catch (Exception ex)
+            {
+                ShowError("Erro", ex.Message);
+            }
+            finally
+            {
+                SetActionBusy(false); // garante overlay fechado mesmo se diskpart explodir
+                LoadDisks();
+            }
         }
 
         private async void BtnAssignLetter_Click(object sender, RoutedEventArgs e)
@@ -808,8 +852,21 @@ namespace KitLugia.GUI.Pages
             if (CmbDisk.SelectedIndex < 0) return;
             if (!await ShowConfirm("LIMPAR DISCO", "APAGAR TUDO?")) return;
             SetActionBusy(true, "Limpando...");
-            await PartitionManager.CleanDisk(_disks[CmbDisk.SelectedIndex].Index);
-            SetActionBusy(false); LoadDisks();
+            try
+            {
+                bool ok = await PartitionManager.CleanDisk(_disks[CmbDisk.SelectedIndex].Index);
+                if (ok) ShowSuccess("Limpo", "Disco limpo com sucesso.");
+                else ShowError("Erro", "Falha ao limpar o disco.");
+            }
+            catch (Exception ex)
+            {
+                ShowError("Erro", ex.Message);
+            }
+            finally
+            {
+                SetActionBusy(false); // nunca deixa overlay preso
+                LoadDisks();
+            }
         }
 
         private async void BtnConvert_Click(object sender, RoutedEventArgs e)
@@ -818,21 +875,40 @@ namespace KitLugia.GUI.Pages
             string t = _disks[CmbDisk.SelectedIndex].PartitionStyle == "GPT" ? "MBR" : "GPT";
             if (!await ShowConfirm("CONVERTER", $"Converter para {t}?")) return;
             SetActionBusy(true, "Convertendo...");
-            await PartitionManager.ConvertDiskStyle(_disks[CmbDisk.SelectedIndex].Index, t);
-            SetActionBusy(false); LoadDisks();
+            try
+            {
+                await PartitionManager.ConvertDiskStyle(_disks[CmbDisk.SelectedIndex].Index, t);
+            }
+            catch (Exception ex)
+            {
+                ShowError("Erro", ex.Message);
+            }
+            finally
+            {
+                SetActionBusy(false);
+                LoadDisks();
+            }
         }
 
         private async void BtnDiskDetail_Click(object sender, RoutedEventArgs e)
         {
             if (CmbDisk.SelectedIndex < 0) return;
             SetActionBusy(true, "Carregando detalhes...");
-            string d = await PartitionManager.GetDiskDetail(_disks[CmbDisk.SelectedIndex].Index);
-            TxtOpTitle.Text = "📄 DETALHES DO DISCO";
-            TxtOpDesc.Text = d;
-            PanelProgress.Visibility = Visibility.Collapsed;
-            BdrSafetyWarning.Visibility = Visibility.Collapsed;
-            PanelLiveActivity.Visibility = Visibility.Collapsed;
-            PanelOpFooter.Visibility = Visibility.Visible;
+            try
+            {
+                string d = await PartitionManager.GetDiskDetail(_disks[CmbDisk.SelectedIndex].Index);
+                TxtOpTitle.Text = "📄 DETALHES DO DISCO";
+                TxtOpDesc.Text = d;
+                PanelProgress.Visibility = Visibility.Collapsed;
+                BdrSafetyWarning.Visibility = Visibility.Collapsed;
+                PanelLiveActivity.Visibility = Visibility.Collapsed;
+                PanelOpFooter.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                ShowError("Erro", ex.Message);
+                SetActionBusy(false);
+            }
         }
 
         private void BtnCloseOverlay_Click(object sender, RoutedEventArgs e)

@@ -48,6 +48,8 @@ namespace KitLugia.GUI.Windows.TaskManager
         private PerformanceCounter? _cpuCounter;
         private PerformanceCounter? _memAvailable;
         private long _totalMemBytes;
+        // Timer do monitor de recursos (antes era local e vazava ao fechar)
+        private DispatcherTimer? _resourceTimer;
 
         // Icon cache: path → BitmapSource
         private readonly Dictionary<string, BitmapSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
@@ -103,6 +105,16 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             InitializeComponent();
 
+            // Captura exceções que escapariam e derrubariam o app (crash report no log)
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                try { Logger.Log($"[KIT TASK MANAGER] FATAL: {e.ExceptionObject}"); } catch { }
+            };
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                try { Logger.Log($"[KIT TASK MANAGER] Task não observada: {e.Exception.GetBaseException().Message}"); e.SetObserved(); } catch { }
+            };
+
             _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _searchDebounce.Tick += SearchDebounce_Tick;
 
@@ -110,31 +122,45 @@ namespace KitLugia.GUI.Windows.TaskManager
             _refreshTimer.Tick += async (_, __) => await RefreshAsync();
 
             _graphTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _graphTimer.Tick += (_, __) => UpdatePerformanceGraphs();
+            _graphTimer.Tick += (_, __) => UpdatePerformanceGraphsSafe();
 
             _genericIcon = ProgramIconHelper.GetGenericIcon();
 
             Loaded += async (_, __) =>
             {
-                // Inicializa CollectionViewSource live uma única vez (evita recriar e perder SortDescriptions)
-                _groupedCvs = new CollectionViewSource { Source = _groupedLive };
-                _groupedCvs.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
-                DgProcesses.ItemsSource = _groupedCvs.View;
-                _cvsInitialized = true;
-                // Marca CPU como ordenação inicial (setinha ↓)
-                foreach (var col in DgProcesses.Columns) col.SortDirection = null;
-                var cpuCol = DgProcesses.Columns.FirstOrDefault(c => c.SortMemberPath == "CpuValue");
-                if (cpuCol != null) cpuCol.SortDirection = ListSortDirection.Descending;
-                ApplySorting();
+                try
+                {
+                    // Inicializa CollectionViewSource live uma única vez (evita recriar e perder SortDescriptions)
+                    _groupedCvs = new CollectionViewSource { Source = _groupedLive };
+                    _groupedCvs.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
+                    DgProcesses.ItemsSource = _groupedCvs.View;
+                    _cvsInitialized = true;
+                    // Marca CPU como ordenação inicial (setinha ↓)
+                    foreach (var col in DgProcesses.Columns) col.SortDirection = null;
+                    var cpuCol = DgProcesses.Columns.FirstOrDefault(c => c.SortMemberPath == "CpuValue");
+                    if (cpuCol != null) cpuCol.SortDirection = ListSortDirection.Descending;
+                    ApplySorting();
 
-                InitCounters();
-                await RefreshAsync();
-                _refreshTimer.Start();
-                StartResourceMonitor();
-                _graphTimer.Start();
-                await BuildPerfDevicesAsync();
-                await LoadServicesAsync();
-                await LoadStartupAppsAsync();
+                    // ── Inicialização NÃO-BLOQUEANTE (anti-travada violenta) ──
+                    // Contadores primeiro (rápido), depois o essencial: processos.
+                    // Serviços/Inicialização/Desempenho carregam SOB DEMANDA ao clicar na aba.
+                    InitCountersSafe();
+                    await RefreshAsync();
+                    _refreshTimer.Start();
+                    StartResourceMonitor();
+                    _graphTimer.Start();
+                    // Pesos pesados rodam em background SEM segurar a UI:
+                    _ = Task.Run(async () =>
+                    {
+                        try { await BuildPerfDevicesAsync(); } catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] PerfDevices: {ex.Message}"); } catch { } }
+                    });
+                    _ = LoadServicesWhenNeededAsync();
+                    _ = LoadStartupWhenNeededAsync();
+                }
+                catch (Exception ex)
+                {
+                    try { Logger.Log($"[KIT TASK MANAGER] Erro no Loaded: {ex.Message}"); } catch { }
+                }
             };
 
             Closing += (_, __) =>
@@ -143,6 +169,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 _refreshTimer?.Stop();
                 _graphTimer?.Stop();
                 _searchDebounce?.Stop();
+                _resourceTimer?.Stop(); // FIX: vazamento — antes nunca era parado
                 DisposeCounters();
                 ProcessIoHelper.ResetAll();
                 try { _refreshGate.Dispose(); } catch { }
@@ -163,6 +190,43 @@ namespace KitLugia.GUI.Windows.TaskManager
             _totalMemBytes = GetTotalPhysicalMemory();
         }
 
+        /// <summary>Versão blindada: nunca lança (PerformanceCounter pode falhar em ambientes restritos).</summary>
+        private void InitCountersSafe()
+        {
+            try { InitCounters(); }
+            catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] InitCounters: {ex.Message}"); } catch { } }
+        }
+
+        /// <summary>
+        /// Tick de gráficos blindado: pula se o tick anterior ainda não terminou (máquinas lentas
+        /// acumulavam renders e congelavam), e captura qualquer exceção para não derrubar o app.
+        /// </summary>
+        private int _graphTickRunning;
+        private void UpdatePerformanceGraphsSafe()
+        {
+            if (Interlocked.CompareExchange(ref _graphTickRunning, 1, 0) != 0) return; // tick anterior ainda rodando
+            try { UpdatePerformanceGraphs(); }
+            catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Graphs: {ex.Message}"); } catch { } }
+            finally { Interlocked.Exchange(ref _graphTickRunning, 0); }
+        }
+
+        // ── Lazy loading: Serviços/Inicialização só quando o usuário abre a aba ──
+        private bool _servicesLazyStarted;
+        private Task LoadServicesWhenNeededAsync()
+        {
+            if (_servicesLazyStarted) return Task.CompletedTask;
+            _servicesLazyStarted = true;
+            return LoadServicesAsync();
+        }
+
+        private bool _startupLazyStarted;
+        private Task LoadStartupWhenNeededAsync()
+        {
+            if (_startupLazyStarted) return Task.CompletedTask;
+            _startupLazyStarted = true;
+            return LoadStartupAppsAsync();
+        }
+
         private void DisposeCounters()
         {
             try { _cpuCounter?.Dispose(); } catch { }
@@ -173,8 +237,8 @@ namespace KitLugia.GUI.Windows.TaskManager
 
         private void StartResourceMonitor()
         {
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            timer.Tick += (_, __) =>
+            _resourceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _resourceTimer.Tick += (_, __) =>
             {
                 try
                 {
@@ -192,7 +256,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 }
                 catch { }
             };
-            timer.Start();
+            _resourceTimer.Start();
         }
 
         private static long GetTotalPhysicalMemory()
@@ -255,14 +319,17 @@ namespace KitLugia.GUI.Windows.TaskManager
                 case "Performance":
                     TabPerformance.Visibility = Visibility.Visible;
                     ActivateSidebarButton(BtnTabPerformance);
+                    _ = Task.Run(async () => { try { await BuildPerfDevicesAsync(); } catch { } });
                     break;
                 case "Services":
                     TabServices.Visibility = Visibility.Visible;
                     ActivateSidebarButton(BtnTabServices);
+                    if (_allServices.Count == 0) _ = LoadServicesWhenNeededAsync();
                     break;
                 case "Startup":
                     TabStartup.Visibility = Visibility.Visible;
                     ActivateSidebarButton(BtnTabStartup);
+                    if (_allStartupApps.Count == 0) _ = LoadStartupWhenNeededAsync();
                     break;
             }
         }
@@ -626,8 +693,11 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (rows.Count == 0) return;
             await Task.Run(() =>
             {
-                var opts = new ParallelOptions { MaxDegreeOfParallelism = 4 };
-                Parallel.ForEach(rows, opts, row =>
+                // FIX CRASH: SHGetFileInfo (shell32) NÃO é thread-safe. O Parallel.ForEach
+                // com 4 threads podia causar AccessViolationException em código nativo,
+                // que derruba o processo inteiro sem possibilidade de catch.
+                // Extração agora é serial + limitada por lote para não saturar a UI.
+                foreach (var row in rows.Take(48))
                 {
                     try
                     {
@@ -683,7 +753,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                         }), DispatcherPriority.Background);
                     }
                     catch { }
-                });
+                }
             });
             // Sem ApplyFilter — ProcessIcon notifica via INotify, linha virtualizada atualiza sozinha
         }
@@ -1269,20 +1339,34 @@ private void ApplyFilter(string query)
 
         private void KillTree(int pid)
         {
+            // FIX CRASH: GetChildPids recursivo podia explodir em ciclos de PID (pai↔filho)
+            // e o acesso a root.Handle em processo protegido lança Win32Exception/AV.
             try
             {
-                var children = GetChildPids(pid);
+                var children = GetChildPidsSafe(pid, maxDepth: 6, maxCount: 512);
                 foreach (var c in children)
                     try { using var p = Process.GetProcessById(c); p.Kill(entireProcessTree: true); } catch { }
-                using var root = Process.GetProcessById(pid);
+
                 IntPtr job = CreateJobObject(IntPtr.Zero, null);
                 if (job != IntPtr.Zero)
                 {
-                    try { AssignProcessToJobObject(job, root.Handle); } catch { }
-                    TerminateJobObject(job, 1);
-                    CloseHandle(job);
+                    try
+                    {
+                        using var root = Process.GetProcessById(pid);
+                        // Acessa .Handle dentro de try — processo protegido lança aqui
+                        AssignProcessToJobObject(job, root.Handle);
+                        TerminateJobObject(job, 1);
+                    }
+                    catch
+                    {
+                        try { using var p = Process.GetProcessById(pid); p.Kill(entireProcessTree: true); } catch { }
+                    }
+                    finally { CloseHandle(job); }
                 }
-                else root.Kill(entireProcessTree: true);
+                else
+                {
+                    try { using var root = Process.GetProcessById(pid); root.Kill(entireProcessTree: true); } catch { }
+                }
             }
             catch
             {
@@ -1291,6 +1375,44 @@ private void ApplyFilter(string query)
 
             // Also remove children from UI
             lock (_lock) { _allRows.RemoveAll(r => r.ParentPid == pid || r.Pid == pid); }
+        }
+
+        /// <summary>BFS com limites de profundidade e quantidade — imune a ciclos e explosões.</summary>
+        private List<int> GetChildPidsSafe(int parentPid, int maxDepth, int maxCount)
+        {
+            var res = new List<int>();
+            var visited = new HashSet<int> { parentPid };
+            var frontier = new List<int> { parentPid };
+            for (int depth = 0; depth < maxDepth && res.Count < maxCount && frontier.Count > 0; depth++)
+            {
+                var next = new List<int>();
+                foreach (var p in frontier)
+                {
+                    foreach (var c in GetDirectChildrenPids(p))
+                    {
+                        if (!visited.Add(c)) continue; // ciclo detectado
+                        res.Add(c);
+                        if (res.Count >= maxCount) return res;
+                        next.Add(c);
+                    }
+                }
+                frontier = next;
+            }
+            return res;
+        }
+
+        private List<int> GetDirectChildrenPids(int parentPid)
+        {
+            var res = new List<int>();
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    $"Select ProcessId From Win32_Process Where ParentProcessId={parentPid}");
+                foreach (var o in searcher.Get())
+                    try { res.Add(Convert.ToInt32(o["ProcessId"])); } catch { }
+            }
+            catch { }
+            return res;
         }
 
         private List<int> GetChildPids(int parentPid)

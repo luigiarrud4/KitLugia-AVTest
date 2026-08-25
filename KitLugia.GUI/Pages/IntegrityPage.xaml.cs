@@ -212,6 +212,29 @@ namespace KitLugia.GUI.Pages
         {
             if (LoadingOverlay != null) LoadingOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             if (ProgressBarContainer != null) ProgressBarContainer.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+            // Animação controlada por código: só existe enquanto o loading está visível.
+            // Antes era um Storyboard "Forever" no Loaded que continuava consumindo CPU
+            // mesmo com a barra Collapsed (invisível ≠ parado em WPF).
+            if (ProgressBarFill != null)
+            {
+                if (show)
+                {
+                    var sweep = new DoubleAnimation
+                    {
+                        From = 0,
+                        To = ProgressBarContainer?.ActualWidth ?? 300,
+                        Duration = TimeSpan.FromMilliseconds(1100),
+                        AutoReverse = true,
+                        RepeatBehavior = RepeatBehavior.Forever
+                    };
+                    ProgressBarFill.BeginAnimation(WidthProperty, sweep, HandoffBehavior.SnapshotAndReplace);
+                }
+                else
+                {
+                    ProgressBarFill.BeginAnimation(WidthProperty, null); // para e libera a animação
+                }
+            }
         }
 
         private void UpdateEmptyState()
@@ -421,6 +444,7 @@ namespace KitLugia.GUI.Pages
 
         #region Search & Filter
 
+        private System.Windows.Threading.DispatcherTimer? _searchDebounce;
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (!_isLoaded || _allTweaks == null) return;
@@ -429,7 +453,19 @@ namespace KitLugia.GUI.Pages
             if (BtnClearSearch != null)
                 BtnClearSearch.Visibility = string.IsNullOrEmpty(query) ? Visibility.Collapsed : Visibility.Visible;
 
-            ApplyFiltersAndUpdateList();
+            // FIX PERF: digitar disparava re-filtragem + re-criação da lista a CADA tecla.
+            // Debounce de 250ms agrupa digitação rápida numa única filtragem.
+            if (_searchDebounce == null)
+            {
+                _searchDebounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                _searchDebounce.Tick += (_, __) =>
+                {
+                    _searchDebounce.Stop();
+                    ApplyFiltersAndUpdateList();
+                };
+            }
+            _searchDebounce.Stop();
+            _searchDebounce.Start();
         }
 
         private void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)

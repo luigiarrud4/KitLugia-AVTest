@@ -226,16 +226,22 @@ namespace KitLugia.Core
 
         public static (string Path, List<string> Actions) RepairPathEntries(List<PathEntry> entries, string pathType)
         {
+            // FIX: o reparo antigo "mantinha" TUDO (duplicados, órfãos, lixo, sintaxe inválida),
+            // então o botão CORRIGIR nunca mudava nada além de reordenar. Agora remove
+            // DE VERDADE o que é inútil/quebrado e preserva o que é seguro.
             var repaired = new List<string>();
             var actions = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var entry in entries)
             {
                 switch (entry.Problem)
                 {
                     case PathEntryProblem.None:
-                        repaired.Add(entry.CleanValue);
+                        if (seen.Add(entry.CleanValue)) repaired.Add(entry.CleanValue);
+                        else actions.Add($"Removida duplicata: {entry.CleanValue}");
                         break;
+
                     case PathEntryProblem.Missing:
                         if (IsDotnetTools(entry))
                         {
@@ -243,52 +249,60 @@ namespace KitLugia.Core
                             {
                                 Directory.CreateDirectory(entry.ExpandedValue);
                                 actions.Add($"Criada pasta: {entry.CleanValue}");
+                                repaired.Add(entry.CleanValue); // pasta criada — mantém
                             }
                             catch
                             {
+                                // Sem permissão para criar: mantém (nunca quebra PATH do usuário)
+                                repaired.Add(entry.CleanValue);
                                 actions.Add($"[AVISO] FALHA ao criar pasta (mantida no PATH): {entry.CleanValue}");
                             }
-                            // Nunca remover entrada existente: mantida mesmo se a criacao falhar
-                            repaired.Add(entry.CleanValue);
                         }
                         else
                         {
-                            // Não remover, apenas manter e adicionar ao log
-                            repaired.Add(entry.CleanValue);
-                            actions.Add($"Mantido (não existe): {entry.CleanValue}");
+                            // Pasta não existe = entrada morta que atrasa resolução de executáveis.
+                            // REMOVIDA (era "Mantida (não existe)" antes — reparo não fazia nada).
+                            actions.Add($"Removida (diretório não existe): {entry.CleanValue}");
                         }
                         break;
+
                     case PathEntryProblem.WrongLocation:
-                        // Não remover caminhos de local errado, apenas manter
+                        // Caminho válido em local errado (sistema no User ou vice-versa):
+                        // NÃO remover — pode ser intencional. Apenas registra.
                         repaired.Add(entry.CleanValue);
-                        if (pathType == "User")
+                        actions.Add(pathType == "User"
+                            ? $"Mantido (caminho de sistema no User): {entry.CleanValue}"
+                            : $"Mantido (caminho de usuário no System): {entry.CleanValue}");
+                        break;
+
+                    case PathEntryProblem.Duplicate:
+                        // Duplicado: DiagnosePath já marca a 2ª+ ocorrência; aqui garante
+                        // que só a primeira entra no resultado final.
+                        if (seen.Add(entry.CleanValue))
                         {
-                            actions.Add($"Mantido (caminho de sistema no User): {entry.CleanValue}");
+                            repaired.Add(entry.CleanValue);
+                            actions.Add($"Mantida 1ª ocorrência: {entry.CleanValue}");
                         }
                         else
                         {
-                            actions.Add($"Mantido (caminho de usuário no System): {entry.CleanValue}");
+                            actions.Add($"REMOVIDA duplicata: {entry.CleanValue}");
                         }
                         break;
-                    case PathEntryProblem.Duplicate:
-                        // Manter apenas a primeira ocorrência
-                        repaired.Add(entry.CleanValue);
-                        actions.Add($"Mantido (duplicado): {entry.CleanValue}");
-                        break;
+
                     case PathEntryProblem.Junk:
-                        // Manter lixo de desenvolvimento
-                        repaired.Add(entry.CleanValue);
-                        actions.Add($"Mantido (lixo): {entry.CleanValue}");
+                        // Lixo de desenvolvimento (SDK internals, node_modules etc.): REMOVE.
+                        actions.Add($"REMOVIDO lixo de desenvolvimento: {entry.CleanValue}");
                         break;
+
                     case PathEntryProblem.Orphan:
-                        // Manter órfãos
-                        repaired.Add(entry.CleanValue);
-                        actions.Add($"Mantido (órfão): {entry.CleanValue}");
+                        // Resíduo de desinstalação: REMOVE.
+                        actions.Add($"REMOVIDO resíduo de desinstalação: {entry.CleanValue}");
                         break;
+
                     case PathEntryProblem.SyntaxError:
-                        // Manter mesmo com erro de sintaxe
-                        repaired.Add(entry.CleanValue);
-                        actions.Add($"Mantido (sintaxe inválida): {entry.CleanValue}");
+                        // Sintaxe inválida (aspas sobrando, ;;, caminho relativo): REMOVE —
+                        // o Windows ignora entradas malformadas, mas elas poluem e podem confundir.
+                        actions.Add($"REMOVIDA entrada com sintaxe inválida: {entry.RawValue}");
                         break;
                 }
             }

@@ -1597,26 +1597,33 @@ namespace KitLugia.GUI.Pages
             if (ComboPartitions.SelectedItem is not KitLugia.Core.PartitionInfo part) return;
             if (string.IsNullOrEmpty(part.DriveLetter)) return;
 
-            int requiredGB = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
-
-            var (hasEnough, freeGB, reqGB, message) = await Task.Run(() =>
-                WinbootManager.CheckSpaceForInstallation(part.DriveLetter, requiredGB));
-
-            if (!hasEnough)
+            try
             {
-                WinbootManager.Log($"⚠️ ESPAÇO INSUFICIENTE: {message}");
-                UpdateStatus($"⚠️ Espaço insuficiente: {freeGB} GB livres, necessário {reqGB} GB");
+                int requiredGB = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
 
-                System.Windows.MessageBox.Show(
-                    $"⚠️ ESPAÇO INSUFICIENTE\n\n{message}\n\n" +
-                    $"Libere espaço manualmente antes de criar a partição de instalação.",
-                    "Espaço Insuficiente — KitLugia WinBoot",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                var (hasEnough, freeGB, reqGB, message) = await Task.Run(() =>
+                    WinbootManager.CheckSpaceForInstallation(part.DriveLetter, requiredGB));
+
+                if (!hasEnough)
+                {
+                    WinbootManager.Log($"⚠️ ESPAÇO INSUFICIENTE: {message}");
+                    UpdateStatus($"⚠️ Espaço insuficiente: {freeGB} GB livres, necessário {reqGB} GB");
+
+                    System.Windows.MessageBox.Show(
+                        $"⚠️ ESPAÇO INSUFICIENTE\n\n{message}\n\n" +
+                        $"Libere espaço manualmente antes de criar a partição de instalação.",
+                        "Espaço Insuficiente — KitLugia WinBoot",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+                else
+                {
+                    UpdateStatus($"✅ Espaço OK: {freeGB} GB livres (necessário: {reqGB} GB)");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                UpdateStatus($"✅ Espaço OK: {freeGB} GB livres (necessário: {reqGB} GB)");
+                WinbootManager.Log($"⚠️ CheckSpaceAndWarn erro: {ex.Message}");
             }
         }
     }

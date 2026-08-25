@@ -34,6 +34,7 @@ namespace KitLugia.GUI.Pages
 
         public void Cleanup()
         {
+            _searchDebounce?.Stop(); // para o debounce ao sair da página
             DataContext = null;
             _allTweaks.Clear();
         }
@@ -650,11 +651,25 @@ namespace KitLugia.GUI.Pages
                     : $"Exibindo {list.Count} de {_allTweaks.Count} tweaks disponíveis";
         }
 
+        private System.Windows.Threading.DispatcherTimer? _searchDebounce;
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
             _currentFilter = TxtSearch.Text;
             BtnClearSearch.Visibility = string.IsNullOrEmpty(_currentFilter) ? Visibility.Collapsed : Visibility.Visible;
-            ApplyFilter();
+
+            // FIX PERF: a busca refiltra ~926 tweaks + recria a lista a CADA tecla.
+            // Debounce de 250ms agrupa digitação rápida (mesmo padrão da IntegrityPage).
+            if (_searchDebounce == null)
+            {
+                _searchDebounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                _searchDebounce.Tick += (_, __) =>
+                {
+                    _searchDebounce.Stop();
+                    ApplyFilter();
+                };
+            }
+            _searchDebounce.Stop();
+            _searchDebounce.Start();
         }
 
         private void BtnClearSearch_Click(object sender, RoutedEventArgs e)

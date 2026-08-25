@@ -76,6 +76,18 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 mw.NavigateToPage(PageType.ForceStopUnlock);
         }
 
+        private void BtnContextMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.NavigateToPage(PageType.ContextMenuManagerPage);
+        }
+
+        private void BtnContextMenuAdd_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.NavigateToPage(PageType.ContextMenuAddPage);
+        }
+
         private void BtnPowerPlan_Click(object sender, RoutedEventArgs e)
         {
             if (_isOperation) return;

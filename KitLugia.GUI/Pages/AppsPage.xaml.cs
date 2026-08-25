@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Data;
@@ -216,6 +217,9 @@ namespace KitLugia.GUI.Pages
             if (BloatwareLoadingPanel != null) BloatwareLoadingPanel.Visibility = Visibility.Visible;
             if (BloatwareList != null) BloatwareList.ItemsSource = null;
 
+            // Spinner só gira enquanto o painel está visível (Loaded-trigger girava para sempre)
+            SetSpinnerRunning(BloatwareSpinner, BloatwareLoadingPanel?.Visibility == Visibility.Visible);
+
             if (BloatwareIconProgressText != null) BloatwareIconProgressText.Text = "Ícones carregados: 0/0";
 
             string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Carregando Apps Bloatware", "Apps");
@@ -270,7 +274,30 @@ namespace KitLugia.GUI.Pages
             finally
             {
                 if (BloatwareLoadingPanel != null) BloatwareLoadingPanel.Visibility = Visibility.Collapsed;
+                SetSpinnerRunning(BloatwareSpinner, false); // para a rotação do spinner
                 Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, success, message);
+            }
+        }
+
+        /// <summary>
+        /// Liga/desliga a animação de um spinner em runtime. Storyboards com
+        /// RepeatBehavior=Forever disparados no Loaded continuam consumindo CPU
+        /// mesmo invisíveis; aqui a animação só existe enquanto necessário.
+        /// </summary>
+        private static void SetSpinnerRunning(System.Windows.Controls.ContentControl? spinner, bool running)
+        {
+            if (spinner?.RenderTransform is RotateTransform rt)
+            {
+                if (running)
+                {
+                    var spin = new DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(1400)) { RepeatBehavior = RepeatBehavior.Forever };
+                    rt.BeginAnimation(RotateTransform.AngleProperty, spin, HandoffBehavior.SnapshotAndReplace);
+                }
+                else
+                {
+                    rt.BeginAnimation(RotateTransform.AngleProperty, null);
+                    rt.Angle = 0;
+                }
             }
         }
 

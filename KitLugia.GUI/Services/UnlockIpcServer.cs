@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Threading;
@@ -57,18 +57,31 @@ namespace KitLugia.GUI.Services
                     // Wait for a client connection
                     await server.WaitForConnectionAsync(token);
 
-                    // Read the unlock path from the pipe
+                    // Read command from the pipe: "UNLOCK|path" ou "TAKEOWN|path"
                     using var reader = new StreamReader(server);
-                    string? path = await reader.ReadLineAsync(token);
+                    string? raw = await reader.ReadLineAsync(token);
 
-                    if (!string.IsNullOrEmpty(path) && File.Exists(path) || Directory.Exists(path))
+                    string cmd = "UNLOCK";
+                    string path = raw ?? "";
+                    int sep = path.IndexOf('|');
+                    if (sep > 0)
                     {
-                        Logger.Log($"[IPC] Unlock command received: {path}");
+                        cmd = path[..sep].ToUpperInvariant();
+                        path = path[(sep + 1)..];
+                    }
 
-                        // Dispatch to UI thread
+                    if (!string.IsNullOrEmpty(path) && (File.Exists(path) || Directory.Exists(path)))
+                    {
+                        Logger.Log($"[IPC] Comando recebido: {cmd} → {path}");
+
+                        string capturedCmd = cmd;
+                        string capturedPath = path;
                         Application.Current?.Dispatcher?.Invoke(() =>
                         {
-                            OpenUnlockWindow(path!);
+                            if (capturedCmd == "TAKEOWN")
+                                OpenTakeOwnership(capturedPath);
+                            else
+                                OpenUnlockWindow(capturedPath);
                         });
                     }
                 }
@@ -118,6 +131,74 @@ namespace KitLugia.GUI.Services
             catch (Exception ex)
             {
                 Logger.Log($"[IPC] Erro ao abrir unlock: {ex.Message}");
+            }
+        }
+
+
+        /// <summary>
+        /// Executa Take Ownership nativo in-process (FileTakeOwnership) e mostra resultado.
+        /// Chamado pelo IPC quando o usuário clica "Take Ownership Super" no Explorer.
+        /// </summary>
+        private static void OpenTakeOwnership(string path)
+        {
+            try
+            {
+                bool isDir = Directory.Exists(path);
+                string name = Path.GetFileName(path.TrimEnd('\\')) ?? path;
+
+                // Toast de progresso
+                if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mwProgress)
+                    mwProgress.ShowLoading($"👑 Assumindo propriedade de {name}...");
+
+                _ = Task.Run(() =>
+                {
+                    var result = FileTakeOwnership.TakeOwn(path, recursive: isDir, progress: done =>
+                    {
+                        // progresso aproximado a cada 10%
+                        // (total só é conhecido dentro do TakeOwn; usamos done como contador bruto aqui)
+                    });
+
+                    Application.Current?.Dispatcher?.Invoke(() =>
+                    {
+                        if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mw)
+                        {
+                            mw.HideLoading();
+                            if (result.Ok)
+                                mw.ShowSuccess("TAKE OWNERSHIP",
+                                    $"✅ {name}: {result.Success} item(ns) agora são seus." +
+                                    (isDir ? "\n(Recursivo — incluiu todas as subpastas)" : ""));
+                            else
+                                mw.ShowError("TAKE OWNERSHIP",
+                                    $"{name}: {result.Failed} falha(s) de {result.Total}.\n" +
+                                    string.Join("\n", result.Errors.Take(3)));
+                        }
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[IPC] Erro take ownership: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Envia comando TAKEOWN para a instância em execução (chamado pelo Program.cs).
+        /// </summary>
+        public static bool SendTakeOwnershipCommand(string path)
+        {
+            try
+            {
+                using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
+                client.Connect(2000);
+                using var writer = new StreamWriter(client) { AutoFlush = true };
+                writer.WriteLine("TAKEOWN|" + path);
+                Logger.Log($"[IPC] TakeOwnership enviado: {path}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[IPC] Falha ao enviar takeown: {ex.Message}");
+                return false;
             }
         }
 

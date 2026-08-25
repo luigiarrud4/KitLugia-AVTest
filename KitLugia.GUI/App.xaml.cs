@@ -18,6 +18,19 @@ namespace KitLugia.GUI
             // Renderização padrão (DirectWrite/hardware) - necessário para suporte a emojis, acentos e Unicode
             RenderOptions.ProcessRenderMode = RenderMode.Default;
 
+            // ANTI-FLASH BRANCO GLOBAL: sobrescreve as cores do SISTEMA que o WPF usa como
+            // fallback em templates default (ListBox/ScrollViewer/ComboBox/ToolTip etc.).
+            // Qualquer controle ainda não estilizado mostra essas cores — nunca branco.
+            var res = Resources;
+            res[System.Windows.SystemColors.WindowBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x11, 0x11, 0x11));
+            res[System.Windows.SystemColors.ControlBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A));
+            res[System.Windows.SystemColors.ControlLightBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x22, 0x22, 0x22));
+            res[System.Windows.SystemColors.ControlLightLightBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2A, 0x2A, 0x2A));
+            res[System.Windows.SystemColors.MenuBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A));
+            res[System.Windows.SystemColors.AppWorkspaceBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x0A, 0x0A, 0x0A));
+            res[System.Windows.SystemColors.HighlightBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00));
+            res[System.Windows.SystemColors.InfoBrushKey] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x25, 0x25, 0x25));
+
             if (e.Args.Length > 0)
             {
                 KitLugia.Core.Logger.Log($"Argumentos recebidos: {string.Join(", ", e.Args)}");

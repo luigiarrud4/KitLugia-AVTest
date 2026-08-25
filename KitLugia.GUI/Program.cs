@@ -27,6 +27,7 @@ namespace KitLugia.GUI
         {
             bool startMinimized = false;
             string? unlockPath = null;
+            string? takeOwnPath = null;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -38,6 +39,10 @@ namespace KitLugia.GUI
                 else if (lower == "--unlock" && i + 1 < args.Length)
                 {
                     unlockPath = args[++i];
+                }
+                else if (lower == "--takeown" && i + 1 < args.Length)
+                {
+                    takeOwnPath = args[++i];
                 }
             }
 
@@ -66,10 +71,14 @@ namespace KitLugia.GUI
             if (!acquired)
             {
                 // Já existe uma instância rodando
-                // Se --unlock foi passado, envia o caminho via IPC para a instância existente
+                // Se --unlock/--takeown foram passados, envia via IPC para a instância existente
                 if (!string.IsNullOrEmpty(unlockPath))
                 {
                     Services.UnlockIpcServer.SendUnlockCommand(unlockPath);
+                }
+                if (!string.IsNullOrEmpty(takeOwnPath))
+                {
+                    Services.UnlockIpcServer.SendTakeOwnershipCommand(takeOwnPath);
                 }
                 BringExistingToFront();
                 return;

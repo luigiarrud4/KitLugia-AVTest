@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Threading.Tasks;
@@ -114,6 +114,24 @@ namespace KitLugia.GUI.Pages
                 int explorerLaunchTo = SystemTweaks.GetExplorerLaunchToIndex();
                 bool iconCache = SystemTweaks.IsIconCacheIncreased();
                 bool pca = SystemTweaks.IsPCADisabled();
+
+                // Top Achados 2025
+                bool sleepStudy = SystemTweaks.IsSleepStudyDisabled();
+                bool ntfsPerf = SystemTweaks.IsNtfsOptimized();
+                bool fthOff = SystemTweaks.IsFthDisabled();
+                bool recallAI = SystemTweaks.IsWindowsAIAnalysisDisabled();
+                bool deliveryOpt = SystemTweaks.IsDeliveryOptimizationRestricted();
+                bool activityFeed = SystemTweaks.IsActivityFeedDisabled();
+                bool launchTrack = SystemTweaks.IsAppLaunchTrackingDisabled();
+                bool speech = SystemTweaks.IsOnlineSpeechRecognitionDisabled();
+                bool lockCam = SystemTweaks.IsLockScreenCameraDisabled();
+                bool perfTrack = SystemTweaks.IsPerfTrackDisabled();
+                bool experiment = SystemTweaks.IsExperimentationDisabled();
+                bool rsop = SystemTweaks.IsRsopLoggingDisabled();
+                bool wmp = SystemTweaks.IsWmpTelemetryDisabled();
+                bool maintenance = SystemTweaks.IsAutomaticMaintenanceConfigured();
+                bool storageSense = SystemTweaks.IsStorageSenseDisabled();
+                bool reservedStorage = SystemTweaks.IsReservedStorageDisabled();
 
                 // ========== ATUALIZAR UI NA THREAD PRINCIPAL ==========
                 Dispatcher.Invoke(() =>
@@ -341,6 +359,39 @@ namespace KitLugia.GUI.Pages
 
                     ChkPCA.IsChecked = pca;
                     UpdateLabel(StatusPCA, pca, "Desativado", "Ativo");
+
+                    ChkSleepStudy.IsChecked = sleepStudy;
+                    UpdateLabel(StatusSleepStudy, sleepStudy, "Desativado", "Ativo");
+                    ChkNtfsPerf.IsChecked = ntfsPerf;
+                    UpdateLabel(StatusNtfsPerf, ntfsPerf, "Otimizado", "Padrão");
+                    ChkFth.IsChecked = fthOff;
+                    UpdateLabel(StatusFth, fthOff, "Desativado", "Ativo");
+                    ChkRecallAI.IsChecked = recallAI;
+                    UpdateLabel(StatusRecallAI, recallAI, "Bloqueado", "Ativo");
+                    ChkDeliveryOpt.IsChecked = deliveryOpt;
+                    UpdateLabel(StatusDeliveryOpt, deliveryOpt, "Restrito", "P2P livre");
+                    ChkActivityFeed.IsChecked = activityFeed;
+                    UpdateLabel(StatusActivityFeed, activityFeed, "Desativado", "Ativo");
+                    ChkLaunchTrack.IsChecked = launchTrack;
+                    UpdateLabel(StatusLaunchTrack, launchTrack, "Desativado", "Ativo");
+                    ChkSpeech.IsChecked = speech;
+                    UpdateLabel(StatusSpeech, speech, "Desativado", "Ativo");
+                    ChkLockCam.IsChecked = lockCam;
+                    UpdateLabel(StatusLockCam, lockCam, "Bloqueada", "Livre");
+                    ChkPerfTrack.IsChecked = perfTrack;
+                    UpdateLabel(StatusPerfTrack, perfTrack, "Desativado", "Ativo");
+                    ChkExperiment.IsChecked = experiment;
+                    UpdateLabel(StatusExperiment, experiment, "Desativado", "Ativo");
+                    ChkRsop.IsChecked = rsop;
+                    UpdateLabel(StatusRsop, rsop, "Desativado", "Ativo");
+                    ChkWmp.IsChecked = wmp;
+                    UpdateLabel(StatusWmp, wmp, "Desativado", "Ativo");
+                    ChkMaintenance.IsChecked = maintenance;
+                    UpdateLabel(StatusMaintenance, maintenance, "Configurada", "Padrão");
+                    ChkStorageSense.IsChecked = storageSense;
+                    UpdateLabel(StatusStorageSense, storageSense, "Desativado", "Ativo");
+                    ChkReserveStorage.IsChecked = reservedStorage;
+                    UpdateLabel(StatusReserveStorage, reservedStorage, "Liberado", "Reservado");
 
                     _isLoading = false;
                 });
@@ -1083,16 +1134,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkDiagTrackSvc.IsChecked == true;
             ChkDiagTrackSvc.IsEnabled = false;
-            await Task.Run(() => SystemTweaks.SetServiceStartup("DiagTrack", disable));
-            ChkDiagTrackSvc.IsEnabled = true;
-            UpdateLabel(StatusDiagTrackSvc, disable, "Desativado", "Ativo");
+            try
+            {
+                await Task.Run(() => SystemTweaks.SetServiceStartup("DiagTrack", disable));
+                ChkDiagTrackSvc.IsEnabled = true;
+                UpdateLabel(StatusDiagTrackSvc, disable, "Desativado", "Ativo");
 
-            RecordTweak("DiagTrack", disable);
-            SaveTelemetryPreference("DiagTrack", disable);
-            if (Application.Current.MainWindow is MainWindow mw)
-                mw.ShowInfo("Telemetria (DiagTrack)", disable
-                    ? "Serviço DiagTrack desativado. A preferência será reaplicada a cada inicialização."
-                    : "Serviço DiagTrack restaurado.");
+                RecordTweak("DiagTrack", disable);
+                SaveTelemetryPreference("DiagTrack", disable);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("Telemetria (DiagTrack)", disable
+                        ? "Serviço DiagTrack desativado. A preferência será reaplicada a cada inicialização."
+                        : "Serviço DiagTrack restaurado.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[TWEAK] Erro em ChkDiagTrackSvc_Click: {ex.Message}");
+                System.Windows.MessageBox.Show($"Erro ao aplicar tweak: {ex.Message}", "Erro", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
 
         private async void ChkDmwappushSvc_Click(object sender, RoutedEventArgs e)
@@ -1100,16 +1159,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkDmwappushSvc.IsChecked == true;
             ChkDmwappushSvc.IsEnabled = false;
-            await Task.Run(() => SystemTweaks.SetServiceStartup("dmwappushservice", disable));
-            ChkDmwappushSvc.IsEnabled = true;
-            UpdateLabel(StatusDmwappushSvc, disable, "Desativado", "Ativo");
+            try
+            {
+                await Task.Run(() => SystemTweaks.SetServiceStartup("dmwappushservice", disable));
+                ChkDmwappushSvc.IsEnabled = true;
+                UpdateLabel(StatusDmwappushSvc, disable, "Desativado", "Ativo");
 
-            RecordTweak("Dmwappush", disable);
-            SaveTelemetryPreference("Dmwappush", disable);
-            if (Application.Current.MainWindow is MainWindow mw)
-                mw.ShowInfo("WAP Push (dmwappushservice)", disable
-                    ? "Serviço WAP Push desativado. A preferência será reaplicada a cada inicialização."
-                    : "Serviço WAP Push restaurado.");
+                RecordTweak("Dmwappush", disable);
+                SaveTelemetryPreference("Dmwappush", disable);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("WAP Push (dmwappushservice)", disable
+                        ? "Serviço WAP Push desativado. A preferência será reaplicada a cada inicialização."
+                        : "Serviço WAP Push restaurado.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[TWEAK] Erro em ChkDmwappushSvc_Click: {ex.Message}");
+                System.Windows.MessageBox.Show($"Erro ao aplicar tweak: {ex.Message}", "Erro", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
 
         private async void ChkWerSvc_Click(object sender, RoutedEventArgs e)
@@ -1117,16 +1184,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkWerSvc.IsChecked == true;
             ChkWerSvc.IsEnabled = false;
-            await Task.Run(() => SystemTweaks.SetServiceStartup("WerSvc", disable));
-            ChkWerSvc.IsEnabled = true;
-            UpdateLabel(StatusWerSvc, disable, "Desativado", "Ativo");
+            try
+            {
+                await Task.Run(() => SystemTweaks.SetServiceStartup("WerSvc", disable));
+                ChkWerSvc.IsEnabled = true;
+                UpdateLabel(StatusWerSvc, disable, "Desativado", "Ativo");
 
-            RecordTweak("WerSvc", disable);
-            SaveTelemetryPreference("WerSvc", disable);
-            if (Application.Current.MainWindow is MainWindow mw)
-                mw.ShowInfo("Relatório de Erros (WerSvc)", disable
-                    ? "Serviço WerSvc desativado. A preferência será reaplicada a cada inicialização."
-                    : "Serviço WerSvc restaurado.");
+                RecordTweak("WerSvc", disable);
+                SaveTelemetryPreference("WerSvc", disable);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("Relatório de Erros (WerSvc)", disable
+                        ? "Serviço WerSvc desativado. A preferência será reaplicada a cada inicialização."
+                        : "Serviço WerSvc restaurado.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[TWEAK] Erro em ChkWerSvc_Click: {ex.Message}");
+                System.Windows.MessageBox.Show($"Erro ao aplicar tweak: {ex.Message}", "Erro", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
 
         private async void ChkPcaSvc_Click(object sender, RoutedEventArgs e)
@@ -1134,16 +1209,24 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkPcaSvc.IsChecked == true;
             ChkPcaSvc.IsEnabled = false;
-            await Task.Run(() => SystemTweaks.SetServiceStartup("PcaSvc", disable));
-            ChkPcaSvc.IsEnabled = true;
-            UpdateLabel(StatusPcaSvc, disable, "Desativado", "Ativo");
+            try
+            {
+                await Task.Run(() => SystemTweaks.SetServiceStartup("PcaSvc", disable));
+                ChkPcaSvc.IsEnabled = true;
+                UpdateLabel(StatusPcaSvc, disable, "Desativado", "Ativo");
 
-            RecordTweak("PcaSvc", disable);
-            SaveTelemetryPreference("PcaSvc", disable);
-            if (Application.Current.MainWindow is MainWindow mw)
-                mw.ShowInfo("Compatibilidade (PcaSvc)", disable
-                    ? "Serviço PcaSvc desativado. A preferência será reaplicada a cada inicialização."
-                    : "Serviço PcaSvc restaurado.");
+                RecordTweak("PcaSvc", disable);
+                SaveTelemetryPreference("PcaSvc", disable);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("Compatibilidade (PcaSvc)", disable
+                        ? "Serviço PcaSvc desativado. A preferência será reaplicada a cada inicialização."
+                        : "Serviço PcaSvc restaurado.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[TWEAK] Erro em ChkPcaSvc_Click: {ex.Message}");
+                System.Windows.MessageBox.Show($"Erro ao aplicar tweak: {ex.Message}", "Erro", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
 
         private async void ChkTelemetryTasks_Click(object sender, RoutedEventArgs e)
@@ -1151,23 +1234,31 @@ namespace KitLugia.GUI.Pages
             if (_isLoading) return;
             bool disable = ChkTelemetryTasks.IsChecked == true;
             ChkTelemetryTasks.IsEnabled = false;
-            await Task.Run(() => SystemTweaks.ApplyTelemetryScheduledTasks(disable));
-            ChkTelemetryTasks.IsEnabled = true;
-            bool nowOff = SystemTweaks.AreTelemetryTasksDisabled();
-            UpdateLabel(StatusTelemetryTasks, nowOff, "Desativadas", "Ativas");
-
-            RecordTweak("TelemetryTasks", nowOff);
-            SaveTelemetryPreference("TelemetryTasks", nowOff);
-            if (nowOff != disable)
+            try
             {
-                ChkTelemetryTasks.IsChecked = nowOff;
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.ShowInfo("Tarefas de Telemetria", "Algumas tarefas nao puderam ser alteradas (provavelmente protegidas).");
+                await Task.Run(() => SystemTweaks.ApplyTelemetryScheduledTasks(disable));
+                ChkTelemetryTasks.IsEnabled = true;
+                bool nowOff = SystemTweaks.AreTelemetryTasksDisabled();
+                UpdateLabel(StatusTelemetryTasks, nowOff, "Desativadas", "Ativas");
+
+                RecordTweak("TelemetryTasks", nowOff);
+                SaveTelemetryPreference("TelemetryTasks", nowOff);
+                if (nowOff != disable)
+                {
+                    ChkTelemetryTasks.IsChecked = nowOff;
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowInfo("Tarefas de Telemetria", "Algumas tarefas nao puderam ser alteradas (provavelmente protegidas).");
+                }
+                else if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("Tarefas de Telemetria", disable
+                        ? "Tarefas de telemetria desativadas (Application Experience + CEIP). A preferência será reaplicada a cada inicialização."
+                        : "Tarefas de telemetria reativadas.");
             }
-            else if (Application.Current.MainWindow is MainWindow mw)
-                mw.ShowInfo("Tarefas de Telemetria", disable
-                    ? "Tarefas de telemetria desativadas (Application Experience + CEIP). A preferência será reaplicada a cada inicialização."
-                    : "Tarefas de telemetria reativadas.");
+            catch (Exception ex)
+            {
+                Logger.Log($"[TWEAK] Erro em ChkTelemetryTasks_Click: {ex.Message}");
+                System.Windows.MessageBox.Show($"Erro ao aplicar tweak: {ex.Message}", "Erro", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
 
         // --- HARDWARE & REDE ---
@@ -2093,6 +2184,97 @@ namespace KitLugia.GUI.Pages
                     mw.ShowInfo("SISTEMA", targetActive ? "PCA: Desativado" : "PCA: Ativo (padrão)");
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+
+        // ── Top Achados 2025 ──────────────────────────────────────────
+
+        private void ApplyTopAchado(string name, Action apply, Action revert, TextBlock status, System.Windows.Controls.CheckBox chk)
+        {
+            bool targetActive = chk.IsChecked == true;
+            Task.Run(() => { if (targetActive) apply(); else revert(); });
+            UpdateLabel(status, targetActive, "Aplicado", "Padrão");
+            RecordTweak(name, targetActive);
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo("TOP ACHADOS", $"{name}: {(targetActive ? "aplicado" : "revertido ao padrão")}");
+        }
+
+        private void ChkSleepStudy_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Sleep Study",
+            () => SystemTweaks.DisableSleepStudy(), () => SystemTweaks.EnableSleepStudy(), StatusSleepStudy, ChkSleepStudy);
+
+        private void ChkNtfsPerf_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("NTFS Performance",
+            () => SystemTweaks.OptimizeNtfsPerformance(), () => SystemTweaks.RevertNtfsPerformance(), StatusNtfsPerf, ChkNtfsPerf);
+
+        private void ChkFth_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Fault Tolerant Heap",
+            () => SystemTweaks.DisableFaultTolerantHeap(), () => SystemTweaks.EnableFaultTolerantHeap(), StatusFth, ChkFth);
+
+        private void ChkRecallAI_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Recall/IA",
+            () => SystemTweaks.DisableWindowsAIAnalysis(), () => SystemTweaks.EnableWindowsAIAnalysis(), StatusRecallAI, ChkRecallAI);
+
+        private void ChkDeliveryOpt_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Delivery Optimization",
+            () => SystemTweaks.RestrictDeliveryOptimization(), () => SystemTweaks.RevertDeliveryOptimization(), StatusDeliveryOpt, ChkDeliveryOpt);
+
+        private void ChkActivityFeed_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Activity Feed",
+            () => SystemTweaks.DisableActivityFeed(), () => SystemTweaks.EnableActivityFeed(), StatusActivityFeed, ChkActivityFeed);
+
+        private void ChkLaunchTrack_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("App Launch Tracking",
+            () => SystemTweaks.DisableAppLaunchTracking(), () => SystemTweaks.EnableAppLaunchTracking(), StatusLaunchTrack, ChkLaunchTrack);
+
+        private void ChkSpeech_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Fala Online",
+            () => SystemTweaks.DisableOnlineSpeechRecognition(), () => SystemTweaks.EnableOnlineSpeechRecognition(), StatusSpeech, ChkSpeech);
+
+        private void ChkLockCam_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Câmera Lock Screen",
+            () => SystemTweaks.DisableLockScreenCamera(), () => SystemTweaks.EnableLockScreenCamera(), StatusLockCam, ChkLockCam);
+
+        private void ChkPerfTrack_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("PerfTrack",
+            () => SystemTweaks.DisablePerfTrack(), () => SystemTweaks.EnablePerfTrack(), StatusPerfTrack, ChkPerfTrack);
+
+        private void ChkExperiment_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Experimentação MS",
+            () => SystemTweaks.DisableExperimentation(), () => SystemTweaks.EnableExperimentation(), StatusExperiment, ChkExperiment);
+
+        private void ChkRsop_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("RSoP Logging",
+            () => SystemTweaks.DisableRsopLogging(), () => SystemTweaks.EnableRsopLogging(), StatusRsop, ChkRsop);
+
+        private void ChkWmp_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Telemetria WMP",
+            () => SystemTweaks.DisableWmpTelemetry(), () => SystemTweaks.EnableWmpTelemetry(), StatusWmp, ChkWmp);
+
+        private void ChkMaintenance_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Manutenção Automática",
+            () => SystemTweaks.ConfigureAutomaticMaintenance(), () => SystemTweaks.RevertAutomaticMaintenance(), StatusMaintenance, ChkMaintenance);
+
+        private void ChkStorageSense_Click(object sender, RoutedEventArgs e) => ApplyTopAchado("Storage Sense",
+            () => SystemTweaks.DisableStorageSense(), () => SystemTweaks.EnableStorageSense(), StatusStorageSense, ChkStorageSense);
+
+        private async void ChkReserveStorage_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool disable = ChkReserveStorage.IsChecked == true;
+                ChkReserveStorage.IsEnabled = false;
+                UpdateLabel(StatusReserveStorage, false, "Processando...", "Processando...");
+                var (ok, msg) = await Task.Run(() => disable
+                    ? SystemTweaks.DisableReservedStorage()
+                    : SystemTweaks.EnableReservedStorage());
+                ChkReserveStorage.IsEnabled = true;
+                if (ok)
+                {
+                    UpdateLabel(StatusReserveStorage, disable, "Liberado", "Reservado");
+                    if (Application.Current.MainWindow is MainWindow mw) mw.ShowInfo("RESERVED STORAGE", msg);
+                }
+                else
+                {
+                    // reverte o checkbox visual se falhou
+                    ChkReserveStorage.IsChecked = !disable;
+                    UpdateLabel(StatusReserveStorage, !disable, "Liberado", "Reservado");
+                    if (Application.Current.MainWindow is MainWindow mw) mw.ShowError("RESERVED STORAGE", msg);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Unknown", $"ReservedStorage: {ex.Message}");
+            }
             finally { _isLoading = false; }
         }
 

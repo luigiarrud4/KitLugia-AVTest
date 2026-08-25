@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Page x:Class="KitLugia.GUI.Pages.TweaksPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -2198,6 +2198,264 @@
                             <TextBlock x:Name="StatusPCA" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
                         </Border>
                         <CheckBox x:Name="ChkPCA" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPCA_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
+
+            <!-- ═══════════════════ TOP ACHADOS 2025 ═══════════════════ -->
+            <Border Background="#1E1A10" BorderBrush="#8A6A1C" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,25,0,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="&#x2B50;" FontSize="18" Margin="0,0,8,0"/>
+                        <TextBlock Text="TOP ACHADOS 2025 — Novos Tweaks (Atlas OS / MS Learn)" FontSize="17" FontWeight="Bold" Foreground="#FFD700"/>
+                    </StackPanel>
+                    <TextBlock Text="Otimizações modernas descobertas em auditoria contra Atlas OS e políticas oficiais da Microsoft. Todas reversíveis." FontSize="12" Foreground="#A09478" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,10,0,0">
+                <StackPanel>
+
+                    <!-- 1. Sleep Study -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Sleep Study é o sistema de diagnóstico de energia do Modern Standby: grava continuamente o que drena bateria e escreve logs no disco. Em notebooks, gera I/O constante sem benefício para o usuário. Desativar desliga 3 event logs de energia + a tarefa agendada AnalyzeSystem. Reversível com 1 clique."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Sleep Study (Diagnóstico Modern Standby)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Para gravação contínua de logs de energia em notebooks." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusSleepStudy" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSleepStudy" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSleepStudy_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 2. NTFS Performance -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Duas otimizações NTFS via fsutil: (1) disablelastaccess — para de gravar data/hora de ÚLTIMO ACESSO a cada arquivo lido (uma escrita extra a cada leitura!); (2) disable8dot3 — para de gerar nomes curtos estilo DOS (ARQUIV~1.EXE) que só existem por compatibilidade ancient. Reduz I/O de disco em qualquer SSD ou HDD. Compatibilidade: nenhum programa moderno usa esses nomes curtos."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Otimizar NTFS (last access off + nomes 8.3 off)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Menos escritas em disco a cada acesso a arquivo." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusNtfsPerf" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkNtfsPerf" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNtfsPerf_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 3. FTH -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Fault Tolerant Heap: serviço que monitora crashes de apps e aplica automaticamente shims de compatibilidade. O problema: os shims podem MASCARAR bugs reais e adicionar overhead a cada crash. Desenvolvedores têm debuggers; usuários finais não ganham nada com isso. Requer reinício para valer. Reversível."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Fault Tolerant Heap (FTH)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Remove monitoração automática de crashes com shims." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusFth" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkFth" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkFth_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 4. Recall / AI -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Windows Recall / Copilot+: em PCs com NPU, o Windows tira SCREENSHOTS DA SUA TELA continuamente e indexa com IA local para você 'lembrar de tudo'. Riscos: senhas e dados sensíveis na tela ficam armazenados (o filtro da MS falhou em testes independentes). Esta política oficial (WindowsAI) bloqueia a análise de dados E impede ativação do Recall. Aplicar em PCs sem NPU também é seguro (não faz nada) e protege contra futuros updates."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Bloquear Recall / Análise IA do Windows" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede screenshots contínuos do Recall (Copilot+ PCs)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusRecallAI" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkRecallAI" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkRecallAI_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 5. Delivery Optimization -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Delivery Optimization: o Windows baixa updates via P2P e TAMBÉM FAZ UPLOAD de pedaços dos updates para outros PCs (na sua LAN ou até na internet!). Em jogos online, esse upload rouba banda e aumenta ping. Esta configuração limita ao modo LAN-only + cap de 10Mbps down / 5Mbps up. Updates continuam funcionando normalmente — só param de usar sua banda de upload como seed."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Restringir Delivery Optimization (upload P2P)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Para o upload P2P de updates; mantém downloads funcionando." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusDeliveryOpt" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkDeliveryOpt" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDeliveryOpt_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 6. Activity Feed -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Activity Feed / Timeline: o Windows registra TUDO que você abre, edita ou navega (inclusive em outros dispositivos vinculados à mesma conta MS) e sincroniza com a nuvem. Desativar: para o rastreamento local + upload das atividades. Efeito colateral: a Timeline antiga (Win10) some — mas ela já foi removida no Win11 de qualquer forma."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Activity Feed / Timeline" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Para registro e sincronização na nuvem do que você abre." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusActivityFeed" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkActivityFeed" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkActivityFeed_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 7-13 compactados em duas colunas? Não — manter padrão de linha única -->
+                    <!-- 7. App Launch Tracking -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Start_TrackProgs: o Windows monitora cada programa aberto para alimentar Timeline, sugestões do Menu Iniciar e telemetria. Desativar reduz rastreamento local e escritas no registro. Efeito visível: 'Mais usados' do Menu Iniciar fica menos preciso."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar rastreamento de apps abertos (App Launch)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Para o monitoramento Start_TrackProgs." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusLaunchTrack" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkLaunchTrack" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkLaunchTrack_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 8. Online Speech -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Reconhecimento de fala ONLINE: quando ativado (digitação por voz, Cortana legada), seu áudio vai para servidores da Microsoft para processamento. Desativar força processamento local (ou desliga a feature). Não afeta ditado offline do Win11 que já roda no dispositivo."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Reconhecimento de Fala Online" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede envio de áudio para servidores da Microsoft." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusSpeech" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkSpeech" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkSpeech_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 9. Lock Screen Camera -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Política oficial que impede a câmera de ser acionada a partir da tela de bloqueio (antes do login). Sem isso, alguém pode abrir apps de câmera SEM desbloquear o PC. Recomendado para desktops com webcam e notebooks usados em público."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Câmera na Tela de Bloqueio" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Ninguém acessa a webcam antes do login." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusLockCam" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkLockCam" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkLockCam_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 10. PerfTrack -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="PerfTrack: coleta métricas de performance de SOFTWARES (quais apps travam, quais são lentos) e alimenta a telemetria da Microsoft. Você não vê nenhum desses dados. Overhead mínimo mas puro telemetry. Reversível."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar PerfTrack" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Para coleta de performance de apps para telemetria." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusPerfTrack" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkPerfTrack" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPerfTrack_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 11. Experimentation -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Experimentation: permite que a Microsoft teste funcionalidades EXPERIMENTAIS remotamente na sua máquina (A/B testing do Windows). Sua instalação vira cobaia de testes. Desativar trava essas mudanças silenciosas. Reversível."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Experimentação da Microsoft" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede testes A/B remotos na sua instalação." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusExperiment" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkExperiment" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkExperiment_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 12. RSOP -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="RSoP (Resultant Set of Policy) Logging: registra o resultado de todas as GPOs aplicadas para auditoria corporativa. Em PC doméstico não tem função — só gera eventos e escritas. Desativar é seguro fora de domínio corporativo."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar RSoP Logging" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Auditoria de GPO corporativa — inútil fora de domínio." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusRsop" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkRsop" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkRsop_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 13. WMP Telemetry -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Windows Media Player: quando você toca mídia, envia um GUID único que identifica sua instalação + metadados do que está tocando. Desativar para esse envio. Afeta só o Media Player clássico/legacy."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Telemetria do Media Player" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Para envio de GUID único + metadados de mídia tocada." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusWmp" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkWmp" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkWmp_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 14. Automatic Maintenance -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Manutenção Automática do Windows: roda defrag, diagnósticos e scans em janelas de idle — e pode ACORDAR o PC do sono. Esta configuração impede o despertar automático e amplia a janela aleatória de execução. A manutenção continua acontecendo, só não mais te acorda de madrugada."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Configurar Manutenção Automática (não acordar PC)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Manutenção continua, mas nunca acorda o computador." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusMaintenance" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkMaintenance" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMaintenance_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 15. Storage Sense -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Storage Sense: limpa temporários, esvazia lixeira antiga e remove arquivos da pasta Downloads não abertos há X dias — AUTOMATICAMENTE. O problema: pode deletar coisa que você queria (Downloads é notório). Quem já usa a Limpeza do KitLugia não precisa dele. Desativar dá controle total sobre o que é apagado."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Desativar Storage Sense (limpeza automática)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Impede o Windows de deletar arquivos sozinho." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusStorageSense" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkStorageSense" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkStorageSense_Click"/>
+                    </Grid>
+                    <Separator Background="{StaticResource CardBorder}"/>
+
+                    <!-- 16. Reserved Storage -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:InfoButton Grid.Column="0" ToolTipText="Reserved Storage: desde o Win10 1903, o Windows RESERVA ~7GB do disco exclusivamente para Windows Update (garante que updates nunca falhem por falta de espaço). Em discos grandes ou bem gerenciados, são 7GB parados à toa. Desativar libera o espaço NA HORA; o WU continua funcionando (se um dia faltar espaço, ele pede limpeza em vez de falhar). ATENÇÃO: só vale a pena se você tem costume de manter o disco com folga. Operação via DISM leva alguns segundos."/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Liberar Reserved Storage (~7GB)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Devolve os ~7GB reservados para Windows Update." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StatusReserveStorage" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
+                        <CheckBox x:Name="ChkReserveStorage" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkReserveStorage_Click"/>
                     </Grid>
 
                 </StackPanel>

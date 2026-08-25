@@ -3944,3 +3944,49 @@ Build: 0 erros / 124 avisos (baseline) — Studio abre nitido e em tela cheia.
 **Arquivos:** `docs/TASK_MANAGER_PLAN.md`, `Windows\KitTaskManagerWindow.xaml(.cs)`, `MainWindow.xaml` (topbar), `MainWindow.xaml.cs` (handler).
 
 Build: 0 erros / 120 avisos.
+
+### Sessão 24/08 — Task Manager v2 (Win11-like) + Refactor partials + Anti-crash + GUI geral
+
+**Task Manager do Kit (`Windows/TaskManager/`)** — reconstruído no modelo do Gerenciador de Tarefas do Win11:
+- **Ícones estáveis**: cache duplo (por path E por nome do processo); linhas agrupadas herdam ícone do 1º membro com ícone. Fim da piscada a cada refresh de 1s.
+- **Busca global**: barra do topo filtra Processos + Serviços + Inicialização simultaneamente (debounce 250ms), combinando com os filtros locais de cada aba.
+- **Aba Desempenho estilo Win11**: grade de cards (215px) com sparkline 38px animado por dispositivo; clique abre painel de detalhes rico. Dispositivos: CPU, Memória, cada Disco físico (PhysicalDisk), cada adaptador de rede, cada GPU.
+- **GPU universal** (pesquisa FreeToken/LibreHardwareMonitor): cascata DXGI (`dxgi.dll` CreateDXGIFactory1 → EnumAdapters1 → GetDesc1 — funciona p/ NVIDIA/AMD/Intel/chinesas/WDDM qualquer) → nvidia-smi CLI → registro `HardwareInformation.qwMemorySize` (QWORD, sem saturação 4GB do WMI) → WMI. Novo `KitLugia.Core\TaskManager\GpuInfo.cs`.
+- **% da GPU**: contadores PDH `\GPU Engine(*)\Utilization Percentage` (mesmo pipeline do taskmgr oficial, agregação MAX engine). FIX: falha única na init PDH setava `_gpuAvailable=false` PARA SEMPRE → agora retry com backoff (5s→15s→45s→2min) + fallback `nvidia-smi --query-gpu=utilization.gpu` throttled 2s.
+- **Rede = ncpa.cpl**: fonte trocada para `NetworkInterface.GetAllNetworkInterfaces()`; filtro só conectados (`OperationalStatus==Up`) + blacklist pseudo-adapters (WAN Miniport, Wi-Fi Direct, Teredo, QoS Packet Scheduler, WFP MAC Layer etc.) + dedupe por descrição. Taxa via delta `GetIPStatistics().BytesSent+Received` (funciona p/ virtuais sem instância perfmon).
+- **Virtualização correta**: WMI `VirtualizationFirmwareEnabled` MENTE quando hipervisor já roda. Agora P/Invoke kernel32 `IsProcessorFeaturePresent(PF_HYPERVISOR_PRESENT)` (equivalente CPUID leaf 0x1 ECX bit 31, mesma fonte do taskmgr) → "Ativado (hipervisor ativo)". Fallbacks: WMI HypervisorPresent → PF_VIRT_FIRMWARE_ENABLED.
+- **Métricas ao vivo idênticas ao TM do Windows**: CPU (processos/threads/handles/uptime), Memória (comprometida/cache/disponível/pools paginado+não-paginado), Disco (leitura/escrita separadas por instância física + "Disco do sistema"/"Arquivo de paginação"), Rede (envio/recebimento + IPv4/MAC/link), GPU (VRAM dedicada GB+MB, compartilhada, driver+data, localização PCI).
+- **Nome completo do processador** priorizado no card e no título do painel (sem truncamento).
+
+**Refactor estrutura (aba Processos intocada)**:
+- Backup pré-refactor em `Windows/TaskManager/_backup_pre_refactor/` (xaml + xaml.cs originais).
+- Split em partial classes: `KitTaskManagerWindow.xaml.cs` (~1700 linhas: state, refresh, filtros, kill, detail), `KitTaskManager.Performance.cs` (~800: aba Desempenho completa), `KitTaskManager.Services.cs` (~330: Serviços + Inicialização).
+- Serviços/Inicialização: toolbars com `TmToolButton`, context menus escuros `TmDarkMenu` (Iniciar/Parar/Reiniciar/Habilitar/Desabilitar/Abrir local/Pesquisar web), ordenação por clique no header igual aba Processos (setinha asc/desc), duplo-clique na Inicialização abre pasta.
+
+**Anti-crash (7 fixes)**:
+1. CRÍTICO: `Parallel.ForEach` 4 threads chamando SHGetFileInfo (shell32 NÃO é thread-safe) → AccessViolation derrubava o processo inteiro sem catch. Extração serializada + limite 48/lote.
+2. Init não-bloqueante: Loaded fazia await sequencial de TUDO (processos+WMI+nvidia-smi+serviços+startup) = travada violenta ao abrir. Agora só processos primeiro; Desempenho/Serviços/Startup carregam em background sob demanda ao clicar na aba.
+3. KillTree acessava `root.Handle` de processo protegido → Win32Exception/AV. Acesso dentro de try próprio com fallback Kill().
+4. GetChildPids recursivo sem limites (ciclo pai↔filho = stack overflow / WMI storm). Substituído por BFS com maxDepth 6 / maxCount 512.
+5. Timer do monitor de recursos era variável local — nunca parado ao fechar (timers fantasma). Agora campo `_resourceTimer` parado no Closing.
+6. Tick de gráficos acumulava em máquina lenta → gate Interlocked (pula tick se anterior não terminou).
+7. Handlers globais AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException logam `[KIT TASK MANAGER] FATAL:` em vez de morrer sem rastro.
+
+**MainWindow/GUI geral**:
+- Topbar (min/max/close): ColorAnimation Enter/ExitActions ficava presa em cor intermediária se mouse saía durante a transição → triggers declarativos com Setter (estado final sempre garantido) + IsHitTestVisibleInChrome explícito.
+- Hamburger: `_sidebarAnimating` ficava true pra sempre se janela perdesse foco durante animação (Completed não dispara) → timeout de segurança 400ms.
+- Botão Update: rotação ficava torta em ângulo intermediário → FillBehavior.Stop + reset Transform.Identity.
+- IntegrityPage: ItemsControl dentro de ScrollViewer DESLIGAVA virtualização (todos os itens materializados) → ListBox com VirtualizingStackPanel Recycling + CacheLength por página. Busca com debounce 250ms. ItemTemplate responsivo (colunas Auto + * MinWidth, botões nunca saem das bordas).
+- ANTI-FLASH BRANCO (3 camadas): App.xaml.cs OnStartup sobrescreve SystemColors globais (Window/Control/Menu/AppWorkspace/Highlight/Info → tons escuros) — qualquer controle não estilizado nasce escuro; MainFrame Background Transparent → WindowBackground gradiente; área da lista IntegrityPage com ScrollViewer/Border/ListBox #111111 explícitos.
+- Animações eternas matadas: barra progresso IntegrityPage (Forever no Loaded → controlada por código só durante scan), spinner Bloatware AppsPage (SetSpinnerRunning liga/desliga), pulso DropShadowEffect GameBoostPage (BlurRadius animado = re-render GPU/frame → removido, pulso só Opacity), dot Live PartitionsPage (Start/Stop conforme visibilidade), pulse por-card BloatwarePage (dezenas de timelines → opacidade estática).
+
+**Path Repair — CORRIGIDO (era farsa)**:
+- `RepairPathEntries` antigo "mantinha" TUDO (duplicados, órfãos, lixo dev node_modules, sintaxe inválida, diretórios mortos) → botão CORRIGIR nunca mudava nada. Agora REMOVE de verdade: duplicatas (mantém 1ª, HashSet case-insensitive), diretórios inexistentes, lixo de desenvolvimento, resíduos de desinstalação, sintaxe inválida. Mantém: `.dotnet\tools` (cria pasta), WrongLocation (pode ser intencional). Verificado: REG_EXPAND_SZ preservado via DetectValueKind (%VAR% → ExpandString), serviços respeitam KitIntentionalServiceStart, BCD cache TTL 15s.
+
+**Áreas críticas auditadas (Winboot/Partitions/WinPE)**:
+- PartitionsPage: BtnDelete/BtnCleanDisk/BtnConvert chamavam diskpart SEM try/catch — exceção deixava overlay preso pra sempre. Todos com try/catch/finally agora. BtnRefresh com single-flight (_isUpdatingDisks).
+- WinpeToolsPage: FURO DE SEGURANÇA — ShowBusy não travava navegação; usuário saía da página com `shutdown /r /t 10` agendado e o PC reiniciava "do nada". ShowBusy ativa MainWindow.IsNavigationLocked, ShowBusyResult libera.
+- WinbootPage verificado sólido (try/catch completo, detecção idioma em background, polling com cache IOCTL 3s).
+- Core verificado: DeletePartition bloqueia disco sistema/C:, CleanDisk IOCTL fast-path com fallback diskpart, RunProcessCaptured timeout kill tree, único GetAwaiter().GetResult() está dentro de Task.Run (sem deadlock).
+
+Build final: 0 erros (solução inteira). Performance percebida pelo usuário: "velocidade aumentou MUITO, nem parece mais o kit antigo".

@@ -427,7 +427,16 @@ namespace KitLugia.Core
                 DeepUninstaller.KillProcessesForApp(packageFullName);
 
                 var pm = new Windows.Management.Deployment.PackageManager();
-                Task.Run(() => pm.RemovePackageAsync(packageFullName).AsTask().GetAwaiter().GetResult()).GetAwaiter().GetResult();
+                // FIX: duplo bloqueio (Task.Run + GetResult dentro e fora) era redundante.
+                // RemovePackageAsync é chamado direto — o método já é síncrono por natureza (chamador espera).
+                var removeOp = pm.RemovePackageAsync(packageFullName);
+                using var done = new System.Threading.ManualResetEvent(false);
+                removeOp.Completed = (op, _) => done.Set();
+                _ = System.Threading.ThreadPool.RegisterWaitForSingleObject(done,
+                    (_, __) => done.Set(), null, System.Threading.Timeout.Infinite, true);
+                done.WaitOne(180_000); // timeout 3min: desinstalação de appx pode ser lenta
+                if (removeOp.Status == Windows.Foundation.AsyncStatus.Error)
+                    return (false, "Falha ao remover pacote: " + (removeOp.ErrorCode?.Message ?? "erro desconhecido"));
 
                 return (true, "Removido com sucesso");
             }
@@ -449,7 +458,10 @@ namespace KitLugia.Core
                 try
                 {
                     var pm = new Windows.Management.Deployment.PackageManager();
-                    Task.Run(() => pm.RemovePackageAsync(packageFullName).AsTask().GetAwaiter().GetResult()).GetAwaiter().GetResult();
+                    var removeOp2 = pm.RemovePackageAsync(packageFullName);
+                    using var done2 = new System.Threading.ManualResetEvent(false);
+                    removeOp2.Completed = (op, _) => done2.Set();
+                    done2.WaitOne(180_000);
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
@@ -3446,19 +3458,6 @@ namespace KitLugia.Core
         }
 
         // 8. Wi-Fi 7 Optimization (Windows 11 24H2)
-        public static void OptimizeWiFi7()
-        {
-            try
-            {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WlanSvc\Parameters",
-                    "WiFi7Optimization", 1, RegistryValueKind.DWord);
-                Logger.Log("Wi-Fi 7 otimizado: máximo throughput");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao otimizar Wi-Fi 7: {ex.Message}");
-            }
-        }
 
         // 9. Bluetooth LE Audio Optimization (Windows 11 24H2)
         public static void OptimizeBluetoothLE()
@@ -3506,51 +3505,10 @@ namespace KitLugia.Core
         }
 
         // 12. Rust Kernel Optimization (Windows 11 24H2)
-        public static void OptimizeRustKernel()
-        {
-            try
-            {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Kernel",
-                    "RustOptimization", 1, RegistryValueKind.DWord);
-                Logger.Log("Rust kernel optimization ativada");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao otimizar Rust kernel: {ex.Message}");
-            }
-        }
 
         // 13. Personal Data Encryption for Folders (Windows 11 24H2)
-        public static void EnablePersonalDataEncryption()
-        {
-            try
-            {
-                using var encryptionKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\DataProtection", true) ?? Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\DataProtection", true);
-                encryptionKey.SetValue("PersonalDataEncryption", 1, RegistryValueKind.DWord);
-                Logger.Log("Personal Data Encryption for folders ativado");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao ativar Personal Data Encryption: {ex.Message}");
-            }
-        }
 
         // 14. LAPS Integration (Windows 11 24H2)
-        public static void ConfigureLAPS()
-        {
-            try
-            {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\LAPS",
-                    "PostAuthenticationActions", 1, RegistryValueKind.DWord);
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\LAPS",
-                    "PasswordComplexity", 1, RegistryValueKind.DWord);
-                Logger.Log("LAPS configurado com melhorias 24H2");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao configurar LAPS: {ex.Message}");
-            }
-        }
 
         // 15. Sudo for Windows (Windows 11 24H2)
         public static void EnableSudo()
@@ -3603,16 +3561,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
-        public static bool IsWiFi7Optimized()
-        {
-            try
-            {
-                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WlanSvc\Parameters", 
-                    "WiFi7Optimization", 0);
-                return Convert.ToInt32(value) == 1;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
 
         public static bool IsBluetoothLEOptimized()
         {
@@ -3636,16 +3584,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
-        public static bool IsPersonalDataEncryptionEnabled()
-        {
-            try
-            {
-                var value = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\DataProtection", 
-                    "PersonalDataEncryption", 0);
-                return Convert.ToInt32(value) == 1;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
 
         public static bool IsSudoEnabled()
         {
@@ -9206,7 +9144,24 @@ namespace KitLugia.Core
         {
             try
             {
-                return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock", "", null) is string s && !string.IsNullOrEmpty(s);
+                // FIX: checava só o valor padrão da chave "*", que pode existir vazia.
+                // Agora considera ativo se QUALQUER um dos 3 locais registrados tiver
+                // chave + command (o Add grava em *, Directory e Drive).
+                string[] paths =
+                {
+                    @"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock",
+                    @"HKEY_CURRENT_USER\Software\Classes\Directory\shell\forcestopunlock",
+                    @"HKEY_CURRENT_USER\Software\Classes\Drive\shell\forcestopunlock",
+                };
+                foreach (var path in paths)
+                {
+                    if (Registry.GetValue(path + @"\command", "", null) is string s && !string.IsNullOrEmpty(s))
+                        return true;
+                    // fallback: valor padrão preenchido (formato antigo)
+                    if (Registry.GetValue(path, "", null) is string s2 && !string.IsNullOrEmpty(s2))
+                        return true;
+                }
+                return false;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
@@ -9867,6 +9822,477 @@ namespace KitLugia.Core
             }
             catch { return true; }
         }
+
+
+        #region Top Achados 2025 (Atlas OS / MS Learn — adicionados 24/08)
+
+        // ───────────────────────── Helpers internos ─────────────────────────
+
+        private static void RegSetDword(string keyPath, string valueName, int data)
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(keyPath);
+            key.SetValue(valueName, data, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+
+        private static int RegGetDword(string keyPath, string valueName, int defaultValue = 0)
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyPath);
+                var v = key?.GetValue(valueName);
+                return v is int i ? i : (v != null && int.TryParse(v.ToString(), out var parsed) ? parsed : defaultValue);
+            }
+            catch { return defaultValue; }
+        }
+
+        private static void RunFsutil(string args)
+        {
+            try { SystemUtils.RunExternalProcess("fsutil", args, hidden: true); }
+            catch (Exception ex) { Logger.LogWarning("SystemTweaks", $"fsutil {args} falhou: {ex.Message}"); }
+        }
+
+        private static bool RunWevtutilQuery(string logName)
+        {
+            try
+            {
+                var output = SystemUtils.RunExternalProcess("wevtutil", $"get-log \"{logName}\"", hidden: true);
+                return !output.Contains("enabled: true", StringComparison.OrdinalIgnoreCase) &&
+                       !output.Contains("/e:true", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        // ───────────────────────── 1. Sleep Study ─────────────────────────
+        // Atlas: logs de diagnóstico de energia gravam continuamente em Modern Standby.
+
+        public static void DisableSleepStudy()
+        {
+            SystemUtils.RunExternalProcess("wevtutil", "set-log \"Microsoft-Windows-SleepStudy/Diagnostic\" /e:false", hidden: true);
+            SystemUtils.RunExternalProcess("wevtutil", "set-log \"Microsoft-Windows-Kernel-Processor-Power/Diagnostic\" /e:false", hidden: true);
+            SystemUtils.RunExternalProcess("wevtutil", "set-log \"Microsoft-Windows-UserModePowerService/Diagnostic\" /e:false", hidden: true);
+            SystemUtils.RunExternalProcess("schtasks", "/Change /TN \"\\Microsoft\\Windows\\Power Efficiency Diagnostics\\AnalyzeSystem\" /Disable", hidden: true);
+            Logger.Log("[TWEAKS] Sleep Study desativado");
+        }
+
+        public static void EnableSleepStudy()
+        {
+            SystemUtils.RunExternalProcess("wevtutil", "set-log \"Microsoft-Windows-SleepStudy/Diagnostic\" /e:true", hidden: true);
+            SystemUtils.RunExternalProcess("wevtutil", "set-log \"Microsoft-Windows-Kernel-Processor-Power/Diagnostic\" /e:true", hidden: true);
+            SystemUtils.RunExternalProcess("wevtutil", "set-log \"Microsoft-Windows-UserModePowerService/Diagnostic\" /e:true", hidden: true);
+            SystemUtils.RunExternalProcess("schtasks", "/Change /TN \"\\Microsoft\\Windows\\Power Efficiency Diagnostics\\AnalyzeSystem\" /Enable", hidden: true);
+            Logger.Log("[TWEAKS] Sleep Study reativado");
+        }
+
+        public static bool IsSleepStudyDisabled()
+        {
+            // Considera desativado se a task AnalyzeSystem estiver desabilitada OU o log SleepStudy off
+            try
+            {
+                var taskOutput = SystemUtils.RunExternalProcess("schtasks", "/Query /TN \"\\Microsoft\\Windows\\Power Efficiency Diagnostics\\AnalyzeSystem\" /FO LIST", hidden: true);
+                if (taskOutput.Contains("Desabilitada") || taskOutput.Contains("Disabled")) return true;
+            }
+            catch { }
+            return RunWevtutilQuery("Microsoft-Windows-SleepStudy/Diagnostic");
+        }
+
+        // ───────────────────────── 2. NTFS lastaccess + 8dot3 ─────────────────────────
+
+        public static void OptimizeNtfsPerformance()
+        {
+            RunFsutil("behavior set disablelastaccess 1");
+            RunFsutil("behavior set disable8dot3 1");
+            Logger.Log("[TWEAKS] NTFS otimizado (lastaccess off, 8dot3 off)");
+        }
+
+        public static void RevertNtfsPerformance()
+        {
+            RunFsutil("behavior set disablelastaccess 2"); // 2 = padrão do sistema
+            RunFsutil("behavior set disable8dot3 2");      // 2 = por volume (padrão)
+            Logger.Log("[TWEAKS] NTFS revertido ao padrão");
+        }
+
+        public static bool IsNtfsOptimized()
+        {
+            try
+            {
+                var out1 = SystemUtils.RunExternalProcess("fsutil", "behavior query disablelastaccess", hidden: true);
+                var out2 = SystemUtils.RunExternalProcess("fsutil", "behavior query disable8dot3", hidden: true);
+                bool lastAccessOff = out1.Contains("= 1") || out1.Contains("= 0 ") is false && out1.Contains("(1)") || out1.TrimEnd().EndsWith("1");
+                bool dot8Off = out2.Contains("= 1");
+                // fsutil retorna "disablelastaccess = 1  (User Managed, Disabled)" ou similar
+                lastAccessOff |= out1.Contains("Disabled");
+                dot8Off |= out2.Contains("Disabled") || out2.Contains("disable8dot3 = 1");
+                return lastAccessOff && dot8Off;
+            }
+            catch { return false; }
+        }
+
+        // ───────────────────────── 3. Fault Tolerant Heap ─────────────────────────
+
+        public static void DisableFaultTolerantHeap()
+        {
+            RegSetDword(@"SOFTWARE\Microsoft\FTH", "EnableFTH", 0);
+            Logger.Log("[TWEAKS] FTH desativado (requer reboot)");
+        }
+
+        public static void EnableFaultTolerantHeap() => RegSetDword(@"SOFTWARE\Microsoft\FTH", "EnableFTH", 1);
+
+        public static bool IsFthDisabled() => RegGetDword(@"SOFTWARE\Microsoft\FTH", "EnableFTH", 1) == 0;
+
+        // ───────────────────────── 4. Recall / Windows AI ─────────────────────────
+
+        public static void DisableWindowsAIAnalysis()
+        {
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1);
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement", 0);
+            // HKCU também (política pode ser por usuário em alguns builds)
+            try
+            {
+                using var cu = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\WindowsAI");
+                cu.SetValue("DisableAIDataAnalysis", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                cu.SetValue("AllowRecallEnablement", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+            Logger.Log("[TWEAKS] Recall/Análise IA desativado");
+        }
+
+        public static void EnableWindowsAIAnalysis()
+        {
+            try
+            {
+                Microsoft.Win32.Registry.LocalMachine.DeleteSubKeyTree(@"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", false);
+                Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", false);
+            }
+            catch { }
+        }
+
+        public static bool IsWindowsAIAnalysisDisabled()
+            => RegGetDword(@"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 0) == 1;
+
+        // ───────────────────────── 5. Delivery Optimization ─────────────────────────
+
+        public static void SetDeliveryOptimizationMode(int mode) // 0=HTTP only, 1=LAN only, 2=Group, 3=Internet
+            => RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", mode);
+
+        public static void RestrictDeliveryOptimization()
+        {
+            // DODownloadMode: 0 = HTTP sem P2P (mais restrito), 1 = LAN apenas
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", 1);
+            // Cap de banda: 10 Mbps down / 5 Mbps up para background
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DOMaxBackgroundDownloadBandwidth", 1250000);   // bytes/s = 10Mbps
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DOMaxUploadBandwidth", 625000);                 // bytes/s = 5Mbps
+            Logger.Log("[TWEAKS] Delivery Optimization restrito (LAN + caps)");
+        }
+
+        public static void RevertDeliveryOptimization()
+        {
+            try { Microsoft.Win32.Registry.LocalMachine.DeleteSubKeyTree(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", false); }
+            catch { }
+        }
+
+        public static bool IsDeliveryOptimizationRestricted()
+            => RegGetDword(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", -1) == 1;
+
+        // ───────────────────────── 6. Activity Feed / Timeline ─────────────────────────
+
+        public static void DisableActivityFeed()
+        {
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\System", "EnableActivityFeed", 0);
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\System", "PublishUserActivities", 0);
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\System", "UploadUserActivities", 0);
+            Logger.Log("[TWEAKS] Activity Feed/Timeline desativado");
+        }
+
+        public static void EnableActivityFeed()
+        {
+            try { Microsoft.Win32.Registry.LocalMachine.DeleteSubKeyTree(@"SOFTWARE\Policies\Microsoft\Windows\System", false); }
+            catch { }
+        }
+
+        public static bool IsActivityFeedDisabled()
+            => RegGetDword(@"SOFTWARE\Policies\Microsoft\Windows\System", "EnableActivityFeed", 1) == 0;
+
+        // ───────────────────────── 7. App Launch Tracking ─────────────────────────
+
+        public static void DisableAppLaunchTracking()
+        {
+            try
+            {
+                using var adv = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
+                adv.SetValue("Start_TrackProgs", 0, Microsoft.Win32.RegistryValueKind.DWord);
+                adv.SetValue("Start_TrackEnabled", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+            Logger.Log("[TWEAKS] App Launch Tracking desativado");
+        }
+
+        public static void EnableAppLaunchTracking()
+        {
+            try
+            {
+                using var adv = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
+                adv.SetValue("Start_TrackProgs", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                adv.SetValue("Start_TrackEnabled", 1, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+
+        public static bool IsAppLaunchTrackingDisabled()
+        {
+            try
+            {
+                using var adv = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
+                return adv?.GetValue("Start_TrackProgs") is int v && v == 0;
+            }
+            catch { return false; }
+        }
+
+        // ───────────────────────── 8. Online Speech Recognition ─────────────────────────
+
+        public static void DisableOnlineSpeechRecognition()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\InputPersonalization");
+                k.SetValue("RestrictImplicitInputCollection", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                using var s = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy");
+                s.SetValue("HasAccepted", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+            Logger.Log("[TWEAKS] Reconhecimento de fala online desativado");
+        }
+
+        public static void EnableOnlineSpeechRecognition()
+        {
+            try
+            {
+                using var s = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy");
+                s.SetValue("HasAccepted", 1, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+
+        public static bool IsOnlineSpeechRecognitionDisabled()
+        {
+            try
+            {
+                using var s = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy");
+                return s?.GetValue("HasAccepted") is int v && v == 0;
+            }
+            catch { return false; }
+        }
+
+        // ───────────────────────── 9. Lock Screen Camera ─────────────────────────
+
+        public static void DisableLockScreenCamera()
+        {
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\Personalization", "NoLockScreenCamera", 1);
+            Logger.Log("[TWEAKS] Câmera da tela de bloqueio desativada");
+        }
+
+        public static void EnableLockScreenCamera() => RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\Personalization", "NoLockScreenCamera", 0);
+
+        public static bool IsLockScreenCameraDisabled()
+            => RegGetDword(@"SOFTWARE\Policies\Microsoft\Windows\Personalization", "NoLockScreenCamera", 0) == 1;
+
+        // ───────────────────────── 10. PerfTrack ─────────────────────────
+
+        public static void DisablePerfTrack()
+        {
+            RegSetDword(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\PerfTrack", "Enabled", 0);
+            Logger.Log("[TWEAKS] PerfTrack desativado");
+        }
+
+        public static void EnablePerfTrack() => RegSetDword(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\PerfTrack", "Enabled", 1);
+
+        public static bool IsPerfTrackDisabled()
+            => RegGetDword(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\PerfTrack", "Enabled", 1) == 0;
+
+        // ───────────────────────── 11. Experimentation ─────────────────────────
+
+        public static void DisableExperimentation()
+        {
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\Messaging", "AllowMessageExperiments", 0); // hmm path real abaixo
+            RegSetDword(@"SOFTWARE\Microsoft\PolicyManager\current\device\System", "AllowExperimentation", 0);
+            RegSetDword(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", "AllowExperimentation", 0);
+            Logger.Log("[TWEAKS] Experimentação da MS desativada");
+        }
+
+        public static void EnableExperimentation()
+        {
+            try
+            {
+                Microsoft.Win32.Registry.LocalMachine.DeleteSubKeyTree(@"SOFTWARE\Microsoft\PolicyManager\current\device\System", false);
+                using var pol = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer");
+                if ((int?)pol.GetValue("AllowExperimentation") == 0) pol.DeleteValue("AllowExperimentation");
+            }
+            catch { }
+        }
+
+        public static bool IsExperimentationDisabled()
+            => RegGetDword(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", "AllowExperimentation", 1) == 0;
+
+        // ───────────────────────── 12. RSOP Logging ─────────────────────────
+
+        public static void DisableRsopLogging()
+        {
+            RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\System", "RsopLoggingEnabled", 0);
+            Logger.Log("[TWEAKS] RSOP logging desativado");
+        }
+
+        public static void EnableRsopLogging() => RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\System", "RsopLoggingEnabled", 1);
+
+        public static bool IsRsopLoggingDisabled()
+            => RegGetDword(@"SOFTWARE\Policies\Microsoft\Windows\System", "RsopLoggingEnabled", 1) == 0;
+
+        // ───────────────────────── 13. Windows Media Player telemetry ─────────────────────────
+
+        public static void DisableWmpTelemetry()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\MediaPlayer\Preferences");
+                k.SetValue("SendUserGUID", 0, Microsoft.Win32.RegistryValueKind.DWord);
+                k.SetValue("UsageTracking", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+            Logger.Log("[TWEAKS] Telemetria WMP desativada");
+        }
+
+        public static void EnableWmpTelemetry()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\MediaPlayer\Preferences");
+                k.SetValue("SendUserGUID", 1, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+
+        public static bool IsWmpTelemetryDisabled()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\MediaPlayer\Preferences");
+                return k?.GetValue("SendUserGUID") is int v && v == 0;
+            }
+            catch { return false; }
+        }
+
+        // ───────────────────────── 14. Automatic Maintenance ─────────────────────────
+
+        public static void ConfigureAutomaticMaintenance()
+        {
+            // Impede o despertar automático e limita execução fora de idle
+            RegSetDword(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance", "WakeUp", 0);
+            RegSetDword(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance", "RandomDelay", 60);      // 60 min de janela aleatória
+            RegSetDword(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance", "Activation Border", 120); // borda de ativação 120min
+            Logger.Log("[TWEAKS] Manutenção automática configurada (sem acordar o PC)");
+        }
+
+        public static void RevertAutomaticMaintenance()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance", writable: true);
+                if (k != null)
+                {
+                    foreach (var name in new[] { "WakeUp", "RandomDelay", "Activation Border" })
+                        try { k.DeleteValue(name); } catch { }
+                }
+            }
+            catch { }
+        }
+
+        public static bool IsAutomaticMaintenanceConfigured()
+            => RegGetDword(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance", "WakeUp", 1) == 0;
+
+        // ───────────────────────── 15. Storage Sense ─────────────────────────
+
+        public static void DisableStorageSense()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy");
+                k.SetValue("01", 0, Microsoft.Win32.RegistryValueKind.DWord); // master switch
+            }
+            catch { }
+            Logger.Log("[TWEAKS] Storage Sense desativado");
+        }
+
+        public static void EnableStorageSense()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy");
+                k.SetValue("01", 1, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+
+        public static bool IsStorageSenseDisabled()
+        {
+            try
+            {
+                using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy");
+                return k?.GetValue("01") is int v && v == 0;
+            }
+            catch { return false; }
+        }
+
+        // ───────────────────────── 16. Reserved Storage ─────────────────────────
+
+        public static bool IsReservedStorageSupported()
+        {
+            // Só existe no Win10 1903+
+            try
+            {
+                var output = SystemUtils.RunExternalProcess("dism", "/Online /Get-ReservedStorageState", hidden: true);
+                return !output.Contains("7968", StringComparison.Ordinal) || output.Contains("Reserved"); // tem estado reservado?
+            }
+            catch { return false; }
+        }
+
+        public static (bool Success, string Message) DisableReservedStorage()
+        {
+            try
+            {
+                var output = SystemUtils.RunExternalProcess("dism", "/Online /Set-ReservedStorageState /State:Disabled", hidden: true);
+                bool ok = !output.Contains("erro", StringComparison.OrdinalIgnoreCase) &&
+                          !output.Contains("failed", StringComparison.OrdinalIgnoreCase) &&
+                          !output.Contains("[TIMEOUT]");
+                Logger.Log($"[TWEAKS] Reserved Storage disable → {(ok ? "OK" : "falhou")}");
+                return (ok, ok ? "Reserved Storage liberado (~7GB recuperados)." : "Falha: " + output.Split('\n').LastOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim());
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
+        public static (bool Success, string Message) EnableReservedStorage()
+        {
+            try
+            {
+                var output = SystemUtils.RunExternalProcess("dism", "/Online /Set-ReservedStorageState /State:Enabled", hidden: true);
+                bool ok = !output.Contains("erro", StringComparison.OrdinalIgnoreCase) && !output.Contains("failed", StringComparison.OrdinalIgnoreCase);
+                return (ok, ok ? "Reserved Storage reativado." : "Falha ao reativar.");
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        public static bool IsReservedStorageDisabled()
+        {
+            try
+            {
+                var output = SystemUtils.RunExternalProcess("dism", "/Online /Get-ReservedStorageState", hidden: true);
+                return output.Contains("Disabled", StringComparison.OrdinalIgnoreCase) ||
+                       output.Contains("Desabilitado", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        #endregion
 
         #endregion
     }

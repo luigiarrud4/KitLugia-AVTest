@@ -512,7 +512,16 @@ namespace KitLugia.GUI.Pages
                 _ => 0 // Automatic
             };
 
-            await RunOptimizationFlow(settings);
+            try
+            {
+                await RunOptimizationFlow(settings);
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"[DASHBOARD] Erro na otimização inteligente: {ex.Message}");
+                if (Application.Current.MainWindow is MainWindow mwErr)
+                    mwErr.ShowError("ERRO", $"Falha na otimização: {ex.Message}");
+            }
         }
 
         private void PopulateEngineComboBox()

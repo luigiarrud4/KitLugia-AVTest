@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -153,6 +153,8 @@ namespace KitLugia.GUI
         ContextMenu,
         ContextMenuPreview,
         ForceStopUnlock,
+        ContextMenuManagerPage,
+        ContextMenuAddPage,
         WinpeTools,
         ReinstallPreserve,
         WindowsUpdate,
@@ -928,6 +930,8 @@ namespace KitLugia.GUI
                 DiagnosticPage => PageType.Diagnostic,
                 ContextMenuPage => PageType.ContextMenu,
                 ContextMenuPreviewPage => PageType.ContextMenuPreview,
+                ContextMenuManagerPage => PageType.ContextMenuManagerPage,
+                ContextMenuAddPage => PageType.ContextMenuAddPage,
                 ForceStopUnlockPage => PageType.ForceStopUnlock,
                 WinpeToolsPage => PageType.WinpeTools,
                 ReinstallPreservePage => PageType.ReinstallPreserve,
@@ -955,6 +959,8 @@ namespace KitLugia.GUI
                 PageType.Diagnostic => new DiagnosticPage(),
                 PageType.ContextMenu => new ContextMenuPage(),
                 PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
+                PageType.ContextMenuManagerPage => new ContextMenuManagerPage(),
+                PageType.ContextMenuAddPage => new ContextMenuAddPage(),
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 PageType.WinpeTools => new WinpeToolsPage(),
                 PageType.ReinstallPreserve => new ReinstallPreservePage(),
@@ -1172,7 +1178,7 @@ namespace KitLugia.GUI
         /// <summary>
         /// Navegação usando PageType enum (sem dependência de emojis)
         /// </summary>
-        public void NavigateToPage(PageType pageType, int tabIndex = 0)
+        public void NavigateToPage(PageType pageType, int tabIndex = 0, bool focusQuickAdd = false)
         {
             Page? newPage = pageType switch
             {
@@ -1210,6 +1216,8 @@ namespace KitLugia.GUI
                 PageType.Shrink => new ShrinkPage(),
                 PageType.ContextMenu => new ContextMenuPage(),
                 PageType.ContextMenuPreview => new ContextMenuPreviewPage(),
+                PageType.ContextMenuManagerPage => new ContextMenuManagerPage(),
+                PageType.ContextMenuAddPage => new ContextMenuAddPage(),
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 PageType.WinpeTools => new WinpeToolsPage(),
                 PageType.ReinstallPreserve => new ReinstallPreservePage(),
@@ -1220,6 +1228,12 @@ namespace KitLugia.GUI
             if (newPage != null)
             {
                 CleanupAndNavigate(newPage);
+
+                // A página de Add já mostra os super comandos em tela cheia — nada a rolar
+                if (focusQuickAdd && newPage is Pages.WindowsSettings.ContextMenuAddPage)
+                {
+                    // (página dedicada: os cards já estão visíveis no topo)
+                }
             }
             else
             {
@@ -1369,6 +1383,12 @@ namespace KitLugia.GUI
             _sidebarOpen = !_sidebarOpen;
             _sidebarAnimating = true;
 
+            // FIX: se a animação não completar (janela perde foco/renderização),
+            // o flag destrava sozinho em 400ms — senão o botão morre para sempre.
+            var safety = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            safety.Tick += (_, __) => { safety.Stop(); _sidebarAnimating = false; };
+            safety.Start();
+
             if (_sidebarOpen)
             {
                 // Open sidebar: make visible, fade in
@@ -1515,21 +1535,20 @@ namespace KitLugia.GUI
 
                 if (sender is Button btn)
                 {
-                    // Animação simples sem complexidade
-                    var storyboard = new Storyboard();
+                    // FIX: rotação 360° com auto-reverse implícito — antes o botão podia
+                    // ficar preso num ângulo intermediário se a navegação congelasse a UI.
+                    var rotate = new RotateTransform(0);
+                    btn.RenderTransform = rotate;
+                    btn.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
                     var animation = new DoubleAnimation
                     {
                         From = 0,
                         To = 360,
-                        Duration = TimeSpan.FromSeconds(1)
+                        Duration = TimeSpan.FromSeconds(0.8),
+                        FillBehavior = FillBehavior.Stop // volta ao estado base ao terminar
                     };
-                    
-                    Storyboard.SetTarget(animation, btn);
-                    Storyboard.SetTargetProperty(animation, new PropertyPath("RenderTransform.(RotateTransform.Angle)"));
-                    
-                    btn.RenderTransform = new RotateTransform(18);
-                    storyboard.Children.Add(animation);
-                    storyboard.Begin();
+                    animation.Completed += (_, __) => btn.RenderTransform = Transform.Identity;
+                    rotate.BeginAnimation(RotateTransform.AngleProperty, animation);
                 }
 
 

@@ -134,19 +134,15 @@
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <Ellipse x:Name="StatusIndicator" Width="20" Height="20" Fill="#00FF00"
                                      Stroke="#FFFFFF" StrokeThickness="2" Margin="0,0,15,0">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect x:Name="StatusGlow" Color="#00FF00" BlurRadius="15" ShadowDepth="0" Opacity="0.8"/>
-                                </Ellipse.Effect>
+                                <!-- FIX PERF: removido DropShadowEffect pulsante (BlurRadius animado 8→25
+                                     Forever). Blur em tempo real força re-renderização por frame na GPU.
+                                     O pulso agora é só Opacity do próprio Ellipse (barato, composição pura). -->
                                 <Ellipse.Triggers>
                                     <EventTrigger RoutedEvent="Ellipse.Loaded">
                                         <BeginStoryboard>
                                             <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                <DoubleAnimation Storyboard.TargetName="StatusGlow"
-                                                               Storyboard.TargetProperty="Opacity"
-                                                               From="0.3" To="1.0" Duration="0:0:1.5"/>
-                                                <DoubleAnimation Storyboard.TargetName="StatusGlow"
-                                                               Storyboard.TargetProperty="BlurRadius"
-                                                               From="8" To="25" Duration="0:0:1.5"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                               From="1.0" To="0.35" Duration="0:0:1.5"/>
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </EventTrigger>

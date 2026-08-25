@@ -1,4 +1,4 @@
-using KitLugia.Core;
+﻿using KitLugia.Core;
 using KitLugia.GUI.Helpers;
 using System;
 using System.Collections.Generic;
@@ -715,6 +715,14 @@ namespace KitLugia.GUI.Pages
             ProgressFill.Width = 0;
             _lastProgressPct = 0;
             PanelOpFooter.Visibility = Visibility.Collapsed;
+
+            // SEGURANÇA: bloqueia navegação enquanto uma operação de boot/reboot está em curso.
+            // Sair da página com shutdown /r /t 10 agendado deixava o usuário sem aviso
+            // de que o PC ia reiniciar sozinho.
+            if (System.Windows.Application.Current.MainWindow is MainWindow mw)
+            {
+                mw.IsNavigationLocked = true;
+            }
         }
 
         private void UpdateStatus(string status)
@@ -737,6 +745,12 @@ namespace KitLugia.GUI.Pages
             var resultColor = IsErrorText(result) ? _errorBrush : _successBrush;
             TxtOpDesc.Inlines.Add(new Run(result) { Foreground = resultColor });
             PanelOpFooter.Visibility = Visibility.Visible;
+
+            // Operação concluída: libera a navegação novamente
+            if (System.Windows.Application.Current.MainWindow is MainWindow mwDone)
+            {
+                mwDone.IsNavigationLocked = false;
+            }
 
             if (IsErrorText(result))
             {
