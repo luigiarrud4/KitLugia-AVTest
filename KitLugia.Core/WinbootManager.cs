@@ -5519,7 +5519,13 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
         {
             long shrinkMb = embedShrinkMB > 0 ? embedShrinkMB : 10000;
             int diskN = embedDiskN >= 0 ? embedDiskN : 0;
+            // FIX: sentinel correto é 0 (o script agora usa "if PART_N GTR 0"),
+            // mas mantemos coerência: se caller passou part válida, usa; senão 0 = modo scan.
             int partN = embedPartN > 0 ? embedPartN : 0;
+            if (partN > 0)
+                Log($"StartnetCmd embed: DISK={diskN} PART={partN} SHRINK={shrinkMb}MB (atalho direto, sem scan)");
+            else
+                Log("StartnetCmd embed: sem partição embedada — WinPE fará scan por marcador/Windows");
             var sb = new StringBuilder();
             sb.AppendLine("@echo off");
             sb.AppendLine("setlocal enabledelayedexpansion");
@@ -5534,7 +5540,9 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             sb.AppendLine("set DISK_N=!EMBED_DISK_N!");
             sb.AppendLine("set PART_N=!EMBED_PART_N!");
             sb.AppendLine("set SHRINK_MB=!EMBED_SHRINK_MB!");
-            sb.AppendLine("if not \"!DISK_N!\"==\"0\" if not \"!PART_N!\"==\"0\" goto :run");
+            // FIX DISK 0: valores embedados sao validos inclusive para disco 0.
+            // PART_N > 0 e o unico requisito real (sentinel de ausencia e 0).
+            sb.AppendLine("if !PART_N! GTR 0 goto :run");
             sb.AppendLine();
             sb.AppendLine("rem --- Fallback: read shrink_config.ini from WIM ---");
             sb.AppendLine("if exist X:\\shrink_config.ini (");
@@ -5590,12 +5598,37 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             sb.AppendLine("  )");
             sb.AppendLine(")");
             sb.AppendLine(":run");
-            sb.AppendLine("if \"!PART_N!\"==\"0\" ( echo ERROR: Target partition not found. Rebooting... & wpeutil reboot )");
+            sb.AppendLine("if !PART_N! LEQ 0 ( echo ERROR: Target partition not found. Rebooting... & wpeutil reboot )");
+            sb.AppendLine("rem --- FIX: querymax primeiro; nunca mente Status OK se falhar ---");
+            sb.AppendLine("echo select disk !DISK_N! > X:\\q.txt");
+            sb.AppendLine("echo select partition !PART_N! >> X:\\q.txt");
+            sb.AppendLine("echo assign letter=Z >> X:\\q.txt");
+            sb.AppendLine("echo shrink querymax >> X:\\q.txt");
+            sb.AppendLine("diskpart /s X:\\q.txt > X:\\querymax_out.txt 2>&1");
+            sb.AppendLine("set QUERYMAX=0");
+            sb.AppendLine("for /f \"tokens=2\" %%m in ('findstr /i \"in MB\" X:\\querymax_out.txt 2^>nul') do set QUERYMAX=%%m");
+            sb.AppendLine("echo select volume Z > X:\\qr.txt");
+            sb.AppendLine("echo remove letter=Z >> X:\\qr.txt");
+            sb.AppendLine("diskpart /s X:\\qr.txt >nul 2>&1");
+            sb.AppendLine("echo Espaco disponivel para shrink: !QUERYMAX! MB (desejado: !SHRINK_MB! MB)");
+            sb.AppendLine("if !QUERYMAX! LSS !SHRINK_MB! (");
+            sb.AppendLine("  echo ERRO: espaco insuficiente. Reduza o valor do shrink.");
+            sb.AppendLine("  echo select disk !DISK_N! > X:\\l.txt");
+            sb.AppendLine("  echo select partition !PART_N! >> X:\\l.txt");
+            sb.AppendLine("  echo assign letter=Z >> X:\\l.txt");
+            sb.AppendLine("  diskpart /s X:\\l.txt >nul 2>&1");
+            sb.AppendLine("  echo [KitLugia WinPE Shrink] > X:\\result.log");
+            sb.AppendLine("  echo Status: FALHOU - querymax=!QUERYMAX!MB menor que desejado=!SHRINK_MB!MB >> X:\\result.log");
+            sb.AppendLine("  if exist Z:\\ copy /y X:\\result.log Z:\\KitLugia_WinPE_Log.txt >nul");
+            sb.AppendLine("  if exist Z:\\KL_SHRINK_TARGET.dat del /f /q Z:\\KL_SHRINK_TARGET.dat >nul 2>&1");
+            sb.AppendLine("  echo NAO vai reiniciar automaticamente - verifique o erro acima.");
+            sb.AppendLine("  pause");
+            sb.AppendLine("  wpeutil reboot");
+            sb.AppendLine(")");
             sb.AppendLine("echo select disk !DISK_N! > X:\\s.txt");
             sb.AppendLine("echo select partition !PART_N! >> X:\\s.txt");
             sb.AppendLine("echo assign letter=Z >> X:\\s.txt");
             sb.AppendLine("echo shrink desired=!SHRINK_MB! >> X:\\s.txt");
-            sb.AppendLine("echo remove letter=Z >> X:\\s.txt");
             sb.AppendLine("diskpart /s X:\\s.txt");
             sb.AppendLine("echo Shrink done. Writing persistent log...");
             sb.AppendLine("echo [KitLugia WinPE Shrink] > X:\\result.log");

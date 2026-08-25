@@ -1,0 +1,188 @@
+﻿<Window x:Class="KitLugia.GUI.Windows.PathGuideWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Guia do PATH" Height="700" Width="580" MinWidth="520" MinHeight="520"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        WindowStartupLocation="CenterOwner"
+        TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Consolas, Segoe UI Emoji"
+        TextElement.Foreground="White"
+        Background="#0F0F0F"
+        ShowInTaskbar="False">
+    <Window.Resources>
+        <Style x:Key="GuideSection" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#FFD700"/>
+            <Setter Property="Margin" Value="0,18,0,8"/>
+        </Style>
+        <Style x:Key="GuideBody" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#CCC"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+    </Window.Resources>
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="4"/>
+    </WindowChrome.WindowChrome>
+
+    <Border BorderBrush="#FFD700" BorderThickness="1">
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Grid Grid.Row="0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="💡 Guia do Explorador de PATH" FontSize="16" FontWeight="SemiBold" Foreground="#FFD700"/>
+                    <TextBlock Text="Entenda as cores, os avisos e como adicionar caminhos"
+                               FontSize="11" Foreground="#777" Margin="12,4,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock x:Name="BtnClose" Text="&#x2715;" FontSize="12" Foreground="#666"
+                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Cursor="Hand" Margin="0,0,4,0" MouseDown="BtnClose_MouseDown"/>
+            </Grid>
+
+            <!-- Content -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                <StackPanel Margin="0,0,12,10">
+
+                    <!-- 1. Cores -->
+                    <TextBlock Style="{StaticResource GuideSection}" Text="🎨 Como ler as entradas (cores)"/>
+                    <Grid Margin="4,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="✅" Foreground="#4CAF50" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
+                            <Run Text="Verde" FontWeight="Bold" Foreground="#4CAF50"/>
+                            <Run Text=" - a pasta existe. Tudo certo, nada a fazer."/>
+                        </TextBlock>
+                    </Grid>
+                    <Grid Margin="4,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="⚠️" Foreground="#FFA500" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
+                            <Run Text="Laranja" FontWeight="Bold" Foreground="#FFA500"/>
+                            <Run Text=" - a pasta não existe neste PC. Entrada de programa desinstalado ou nunca instalado (ex: C:\ProgramData\chocolatey\bin sem o Chocolatey). Remover é seguro."/>
+                        </TextBlock>
+                    </Grid>
+                    <Grid Margin="4,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🔄" Foreground="#FFD700" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
+                            <Run Text="Dourado" FontWeight="Bold" Foreground="#FFD700"/>
+                            <Run Text=" - caminho no lugar errado: entrada de sistema no PATH do Usuário (ou de usuário no PATH do Sistema)."/>
+                        </TextBlock>
+                    </Grid>
+                    <Grid Margin="4,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🔁" Foreground="#FF6F61" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
+                            <Run Text="Vermelho (duplicado)" FontWeight="Bold" Foreground="#FF6F61"/>
+                            <Run Text=" - o mesmo caminho aparece 2+ vezes (comparação sem diferenciar maiúsculas). Remover a cópia extra não causa dano."/>
+                        </TextBlock>
+                    </Grid>
+                    <Grid Margin="4,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🧹" Foreground="#999999" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
+                            <Run Text="Cinza (lixo)" FontWeight="Bold" Foreground="#999999"/>
+                            <Run Text=" - entrada vazia ou caminho interno de SDK do .NET que não deve ficar no PATH. Pode remover."/>
+                        </TextBlock>
+                    </Grid>
+                    <Grid Margin="4,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🗑️" Foreground="#999999" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
+                            <Run Text="Cinza (resíduo)" FontWeight="Bold" Foreground="#999999"/>
+                            <Run Text=" - sobra de desinstalação de programa. Pode remover."/>
+                        </TextBlock>
+                    </Grid>
+                    <Grid Margin="4,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="❌" Foreground="#FF6F61" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
+                            <Run Text="Vermelho (erro de sintaxe)" FontWeight="Bold" Foreground="#FF6F61"/>
+                            <Run Text=" - caminho malformado (aspas/barra errada). Corrigir ou remover."/>
+                        </TextBlock>
+                    </Grid>
+
+                    <!-- 2. Seções -->
+                    <TextBlock Style="{StaticResource GuideSection}" Text="📋 O que cada painel mostra"/>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="PATH do SISTEMA" FontWeight="Bold"/>
+                        <Run Text=" (HKLM) - vale para todos os usuários. "/>
+                        <Run Text="PATH do USUÁRIO" FontWeight="Bold"/>
+                        <Run Text=" (HKCU) - vale só para a sua conta. Os dois são somados na hora de achar comandos."/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="Entradas atuais" FontWeight="Bold"/>
+                        <Run Text=" - cada caminho com seu diagnóstico (cores acima). Passe o mouse para ver o detalhe e a ação recomendada."/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="Ausentes - recomendados adicionar" FontWeight="Bold"/>
+                        <Run Text=" - o kit lista: (a) os essenciais de sistema (system32, Wbem, PowerShell...); (b) programas instalados que não estão no PATH (7-Zip, Git, Node, cargo, npm, winget...). Clique em "/>
+                        <Run Text="➕ Adicionar" FontWeight="Bold" Foreground="#A5D6A7"/>
+                        <Run Text=" para incluir com dedup automático. Se a pasta ainda não existir, ele pergunta antes de adicionar (PATH é só texto - a entrada passa a valer quando a pasta for criada)."/>
+                    </TextBlock>
+
+                    <!-- 3. Como acha -->
+                    <TextBlock Style="{StaticResource GuideSection}" Text="⚡ Como o kit acha programas ausentes"/>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="1. Indexador nativo USN/MFT" FontWeight="Bold"/>
+                        <Run Text=" (embutido, requer admin): lê a Master File Table do volume direto - acha 7-Zip, Git, Node, cargo etc. em ~8s na 1a vez (cache em disco, depois ~milissegundos), sem depender de nada externo."/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="2. Varredura direta" FontWeight="Bold"/>
+                        <Run Text=" - sem admin, procura em pastas comuns de instalação (mais lento, mas funciona sempre)."/>
+                    </TextBlock>
+
+                    <!-- 4. Dicas -->
+                    <TextBlock Style="{StaticResource GuideSection}" Text="💡 Dicas"/>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="• Rode o kit como administrador" FontWeight="Bold"/>
+                        <Run Text=" para o indexador nativo funcionar e para adicionar ao PATH do Sistema."/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="• " FontWeight="Bold"/>
+                        <Run Text="Aviso laranja não é erro: " FontWeight="Bold"/>
+                        <Run Text="é só um alerta de pasta inexistente. Se o programa foi desinstalado, remova a entrada com tranquilidade."/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="• Duplicatas (system32 x2, Wbem x2...) " FontWeight="Bold"/>
+                        <Run Text="são inofensivas para o Windows, mas podem ser removidas com segurança para deixar o PATH limpo."/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource GuideBody}">
+                        <Run Text="• " FontWeight="Bold"/>
+                        <Run Text="Abrir Editor do Windows..." FontWeight="Bold"/>
+                        <Run Text=" abre a janela nativa de variáveis de ambiente (sysdm.cpl) para edição manual avançada."/>
+                    </TextBlock>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

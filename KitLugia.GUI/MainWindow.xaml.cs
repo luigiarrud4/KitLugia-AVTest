@@ -1152,7 +1152,24 @@ namespace KitLugia.GUI
         /// <summary>
         /// Navegação usando PageType enum (sem dependência de emojis)
         /// </summary>
-        public void NavigateToPage(PageType pageType, int tabIndex = 0)
+                /// <summary>
+        /// Navega para a página Force Stop Unlock com o caminho pré-preenchido (usado pelo IPC).
+        /// </summary>
+        public void NavigateToUnlock(string path)
+        {
+            try
+            {
+                CleanupAndNavigate(new Pages.WindowsSettings.ForceStopUnlockPage());
+                Logger.Log($"[NAV] Unlock path recebido via IPC: {path}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NAV] Erro ao navegar para unlock: {ex.Message}");
+                NavigateToPage(PageType.ForceStopUnlock);
+            }
+        }
+
+public void NavigateToPage(PageType pageType, int tabIndex = 0)
         {
             Page? newPage = pageType switch
             {

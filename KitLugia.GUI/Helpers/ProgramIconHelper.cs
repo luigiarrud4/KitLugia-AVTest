@@ -35,6 +35,29 @@ namespace KitLugia.GUI.Helpers
         private const uint SHGFI_SMALLICON = 0x1;
         private const uint SHGFI_USEFILEATTRIBUTES = 0x10;
 
+        // ───────── FIX HARD ERROR BOX ("Exception Processing Message 0xC0000005") ─────────
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        [System.Runtime.InteropServices.PreserveSig]
+        private static extern uint SetErrorMode(uint uMode);
+
+        private const uint SEM_FAILCRITICALERRORS = 0x0001;
+        private const uint SEM_NOGPFAULTERRORBOX = 0x0002;
+        private static bool _errorModeSet;
+
+        /// <summary>Suprime hard-error boxes do Windows neste processo (chamar 1× no startup).</summary>
+        public static void SuppressHardErrorDialogs()
+        {
+            if (_errorModeSet) return;
+            try
+            {
+                var current = SetErrorMode(0);
+                SetErrorMode(current | SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+                _errorModeSet = true;
+                Logger.Log("[ICON HELPER] Hard error dialogs suprimidos (SEM_FAILCRITICALERRORS)");
+            }
+            catch { /* não crítico */ }
+        }
+
         // Cache temporário para evitar reprocessar caminhos
         private static readonly Dictionary<string, BitmapSource?> PathCache = new(200, StringComparer.OrdinalIgnoreCase);
         private static readonly object CacheLock = new();
