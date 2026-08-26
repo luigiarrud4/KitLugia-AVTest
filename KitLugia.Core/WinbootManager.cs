@@ -6410,11 +6410,28 @@ catch {{
                         "    set RAMSRC=X:\\sources\\!ISOFILE!\r\n" +
                         "    echo [KitLugia] Fonte ja presente em RAM X:. >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
                         "  )\r\n" +
+                        "  rem === Bypass TPM/CPU/SecureBoot/RAM: o Setup le estas chaves na checagem de HW ===\r\n" +
+                        "  rem (aplicadas no registry do WinPE ativo ANTES de lancar o setup.exe)\r\n" +
+                        "  reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassTPMCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "  reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassSecureBootCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "  reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassCPUCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "  reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassRAMCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "  reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassStorageCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "  reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassDiskCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "  echo [KitLugia] Bypass TPM 2.0/CPU/SecureBoot aplicado ao registry do WinPE. >> !ISODRV!:\\KL_WINPE\\installer_boot_log.txt\r\n" +
                         "  if defined RAMSRC (\r\n" +
                         "    start \"\" \"%SystemDrive%\\setup.exe\" /installfrom:!RAMSRC!\r\n" +
                         "  ) else (\r\n" +
                         "    start \"\" \"%SystemDrive%\\setup.exe\" /installfrom:!ISODRV!:\\KL_WINPE\\InstallISO\\Sources\\!ISOFILE!\r\n" +
                         "  )\r\n" +
+                        "rem === Bypass TPM/CPU/SecureBoot (ramo sem /installfrom) ===\r\n" +
+                        "reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassTPMCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassSecureBootCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassCPUCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassRAMCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassStorageCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+                        "reg.exe add \"HKLM\\SYSTEM\\Setup\\LabConfig\" /v BypassDiskCheck /t REG_DWORD /d 1 /f >nul 2>&1\r\n" +
+"  )\r\n" +
                         ") else (\r\n" +
                         "  echo [KitLugia] install.wim/esd NAO encontrado em nenhum volume - Setup sem /installfrom > %SystemDrive%\\installer_boot_log.txt\r\n" +
                         "  start \"\" \"%SystemDrive%\\setup.exe\"\r\n" +
