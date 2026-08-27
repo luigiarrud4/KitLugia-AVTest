@@ -105,6 +105,15 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             InitializeComponent();
 
+            // FIX minimizar: janela tem ShowInTaskbar=False (tool window filha).
+            // Minimizar criava janela órfã invisível sem botão na taskbar — com explorer.exe
+            // fechado aparecia como "vários gerenciadores abertos" impossível de restaurar.
+            // Remove botão minimizar do XAML e bloqueia minimize via sistema (Win+Down, Alt+Space).
+            StateChanged += (_, __) =>
+            {
+                if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+            };
+
             // FIX HARD ERROR: suprime o box "Exception Processing Message 0xC0000005" que
             // aparece em máquinas com drives de rede/USB ausentes quando shell32 tenta
             // carregar ícones. Com SEM_FAILCRITICALERRORS as APIs falham silenciosamente.
@@ -131,7 +140,7 @@ namespace KitLugia.GUI.Windows.TaskManager
 
             _genericIcon = ProgramIconHelper.GetGenericIcon();
 
-            Loaded += async (_, __) =>
+            Loaded += (_, __) =>
             {
                 try
                 {
@@ -146,11 +155,13 @@ namespace KitLugia.GUI.Windows.TaskManager
                     if (cpuCol != null) cpuCol.SortDirection = ListSortDirection.Descending;
                     ApplySorting();
 
-                    // ── Inicialização NÃO-BLOQUEANTE (anti-travada violenta) ──
-                    // Contadores primeiro (rápido), depois o essencial: processos.
-                    // Serviços/Inicialização/Desempenho carregam SOB DEMANDA ao clicar na aba.
-                    InitCountersSafe();
-                    await RefreshAsync();
+                    // ── Abertura INSTANTÂNEA (fire-and-forget) ──
+                    // NUNCA await aqui — a janela aparece em <50ms, dados populam depois.
+                    TxtStatus.Text = "Carregando processos...";
+                    // Contadores são lentos (PerformanceCounter cria registry + NtQuery) — off UI
+                    _ = Task.Run(() => InitCountersSafe());
+                    // Primeiro refresh sem bloquear UI; timers já iniciam para não perder tick
+                    _ = RefreshAsync();
                     _refreshTimer.Start();
                     StartResourceMonitor();
                     _graphTimer.Start();
@@ -292,8 +303,23 @@ namespace KitLugia.GUI.Windows.TaskManager
         // ══════════════════════════════════════════════
         private void BtnToggleMaximize_Click(object sender, RoutedEventArgs e) =>
             WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-        private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            // Remove WS_MINIMIZEBOX do system menu (Alt+Space / Win+Down)
+            try
+            {
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                int style = GetWindowLong(hwnd, -16);
+                style &= ~0x00020000; // WS_MINIMIZEBOX
+                SetWindowLong(hwnd, -16, style);
+            }
+            catch { }
+        }
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
         // ══════════════════════════════════════════════
         //  TAB SWITCHING
@@ -444,7 +470,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             var token = cts.Token;
             try
             {
-                // Network + GPU em paralelo, 100% off-UI (antes GPU bloqueava UI na 1a chamada)
+                // Pipeline paralelo: net + gpu + snapshot de PIDs rodam juntos (primeiro paint ~40% mais rápido)
                 var netTask = Task.Run(() =>
                 {
                     try { return NetworkTrafficMonitor.GetActiveTcpConnectionsPerPid(); }
@@ -455,54 +481,60 @@ namespace KitLugia.GUI.Windows.TaskManager
                     try { return (float)GpuMonitor.GetTotalGpuUtilization(); }
                     catch { return -1f; }
                 }, token);
+                var snapTask = Task.Run(() =>
+                {
+                    try { return Process.GetProcesses(); }
+                    catch { return Array.Empty<Process>(); }
+                }, token);
 
-                await Task.WhenAll(netTask, gpuTask);
+                await Task.WhenAll(netTask, gpuTask, snapTask);
                 if (token.IsCancellationRequested) return;
                 var netConnections = netTask.Result;
                 float gpuTotal = gpuTask.Result;
+                var snapProcesses = snapTask.Result;
                 _networkConnections = netConnections;
-                _lastGpuPct = gpuTotal; // alimenta gráfico GPU na aba Desempenho
+                _lastGpuPct = gpuTotal;
 
-                // UI update rápido (não bloqueia) — agenda no dispatcher mas não espera
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     TxtGpuUsage.Text = gpuTotal >= 0 ? $"{gpuTotal:F0}%" : "N/A";
                     TxtGpuUsage.Foreground = gpuTotal >= 0 ? GetHeatColor(gpuTotal, 70, 90) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88));
-                    TxtStatus.Text = "Atualizando processos...";
                 }), DispatcherPriority.Background);
 
+                var swEnum = Stopwatch.StartNew();
                 var rows = await Task.Run(() =>
                 {
                     token.ThrowIfCancellationRequested();
                     var result = new List<ProcessRow>(320);
-                    Process[] processes;
-                    try { processes = Process.GetProcesses(); }
-                    catch { return result; }
+                    // snapshot já coletado em paralelo com net/gpu (evita 2× GetProcesses)
+                    Process[] processes = snapProcesses;
+                    if (processes.Length == 0) return result;
 
                     // Fast path: enumeração nativa (Rust) entrega parentPid + handleCount sem WMI
                     var fastMap = SafeProcessHelper.TryEnumerateFast();
                     Dictionary<int, int>? parentPidDict = null;
                     if (fastMap == null)
                     {
-                        // Fallback WMI só quando nativo indisponível — 1 query em vez de 300
-                        parentPidDict = new Dictionary<int, int>(processes.Length);
-                        try
+                        // Fallback CIM (WsMan, sucessor WMI) → WMI DCOM via NativeHardware.Cim — nunca trava WinPE
+                        try { parentPidDict = NativeHardware.GetParentPidsViaCim(); if (parentPidDict.Count==0) parentPidDict = new Dictionary<int,int>(processes.Length); } catch { parentPidDict = new Dictionary<int,int>(processes.Length); }
+                        if (parentPidDict.Count == 0)
                         {
-                            using var searcher = new System.Management.ManagementObjectSearcher(
-                                "SELECT ProcessId, ParentProcessId FROM Win32_Process");
-                            using var wmiResults = searcher.Get();
-                            foreach (System.Management.ManagementObject obj in wmiResults)
+                            try
                             {
-                                try
+                                var cimRows = NativeHardware.Cim.Query("SELECT ProcessId, ParentProcessId FROM Win32_Process");
+                                foreach (var r in cimRows)
                                 {
-                                    int pid = Convert.ToInt32(obj["ProcessId"]);
-                                    int ppid = Convert.ToInt32(obj["ParentProcessId"]);
-                                    parentPidDict[pid] = ppid;
+                                    try
+                                    {
+                                        int pid = Convert.ToInt32(r.TryGetValue("ProcessId", out var a) ? a ?? 0 : 0);
+                                        int ppid = Convert.ToInt32(r.TryGetValue("ParentProcessId", out var b) ? b ?? 0 : 0);
+                                        parentPidDict[pid] = ppid;
+                                    }
+                                    catch { }
                                 }
-                                catch { }
                             }
+                            catch { }
                         }
-                        catch { }
                     }
 
                     // Batch de paths: 1 buffer reutilizado para todos os PIDs (evita 300 allocs)
@@ -525,8 +557,8 @@ namespace KitLugia.GUI.Windows.TaskManager
                             string path = pathMap.TryGetValue(pid, out var cached) ? cached : "";
                             bool hasWindow = false;
                             try { hasWindow = p.MainWindowHandle != IntPtr.Zero; } catch { }
-                            int threads = 0;
-                            try { threads = p.Threads.Count; } catch { }
+                            // Threads.Count é caro (NtQuerySystemInformation por processo ~0,8ms × 250 = 200ms) — lista mostra "—", detalhe carrega sob demanda
+                            string threadsStr = "—";
                             int handles = 0;
                             if (fastMap != null && fastMap.TryGetValue(pid, out var fm))
                                 handles = (int)fm.HandleCount;
@@ -594,7 +626,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                                 RamMB = ramMb,
                                 RamValue = ramVal,
                                 Handles = handles.ToString(),
-                                Threads = threads.ToString(),
+                                Threads = threadsStr,
                                 Group = group,
                                 Status = hasWindow ? "Executando" : (group == "Processos do Windows" ? "Serviço" : "Segundo plano"),
                                 Disk = disk,
@@ -800,26 +832,16 @@ namespace KitLugia.GUI.Windows.TaskManager
         // ══════════════════════════════════════════════
         private static Dictionary<int, int> GetBatchParentPids(List<ProcessRow> rows)
         {
-            var result = new Dictionary<int, int>();
-            if (rows.Count == 0) return result;
-            try
+            if (rows.Count == 0) return new Dictionary<int, int>();
+            // Nativo Rust → CIM (WsMan sucessor) → WMI fallback via NativeHardware
+            var fast = SafeProcessHelper.TryEnumerateFast();
+            if (fast != null)
             {
-                using var searcher = new System.Management.ManagementObjectSearcher(
-                    "SELECT ProcessId, ParentProcessId FROM Win32_Process");
-                using var results = searcher.Get();
-                foreach (System.Management.ManagementObject obj in results)
-                {
-                    try
-                    {
-                        int pid = Convert.ToInt32(obj["ProcessId"]);
-                        int parentPid = Convert.ToInt32(obj["ParentProcessId"]);
-                        result[pid] = parentPid;
-                    }
-                    catch { }
-                }
+                var d = new Dictionary<int, int>(fast.Count);
+                foreach (var kv in fast) d[kv.Key] = (int)kv.Value.ParentPid;
+                return d;
             }
-            catch { }
-            return result;
+            return NativeHardware.GetParentPidsViaCim();
         }
 
         // ══════════════════════════════════════════════
@@ -911,6 +933,9 @@ private void ApplyFilter(string query)
         {
             List<ProcessRow> rows;
             lock (_lock) { rows = _allRows.ToList(); }
+            // snapshot para evitar closure sobre lista mutável
+            bool isFirstLoad = false;
+            try { isFirstLoad = _groupedLive.Count == 0 && string.IsNullOrEmpty(query); } catch { }
 
             _ = Task.Run(() =>
             {
@@ -1026,6 +1051,28 @@ private void ApplyFilter(string query)
 
                     if (_cvsInitialized && _groupedCvs != null)
                     {
+                        // FAST PATH primeira carga: sem diff O(n²), só Add direto (~30ms vs ~250ms)
+                        if (isFirstLoad)
+                        {
+                            int Rank0(string g) => g == "Aplicativos" ? 0 : g == "Processos em segundo plano" ? 1 : 2;
+                            grouped = (_currentSortColumn switch
+                            {
+                                "CpuValue" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.CpuValue).ThenBy(r => r.DisplayName) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.CpuValue).ThenBy(r => r.DisplayName),
+                                "RamValue" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.RamValue) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.RamValue),
+                                "DisplayName" or "Name" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.DisplayName) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.DisplayName),
+                                "Status" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.Status) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.Status),
+                                _ => grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.CpuValue)
+                            }).ToList();
+                            _filteredRows = grouped;
+                            _groupedLive.Clear();
+                            foreach (var g in grouped) _groupedLive.Add(g);
+                            TxtProcessCount.Text = $"— {total} processos ({apps} apps, {bg} segundo plano, {win} Windows)";
+                            foreach (var col in DgProcesses.Columns) col.SortDirection = null;
+                            var activeCol0 = DgProcesses.Columns.FirstOrDefault(c => c.SortMemberPath == _currentSortColumn);
+                            if (activeCol0 != null) activeCol0.SortDirection = _currentSortDirection;
+                        }
+                        else
+                        {
                         var childs = _groupedLive.Where(r => r.IsChild).ToList();
                         foreach (var ch in childs) _groupedLive.Remove(ch);
                         int Rank(string g) => g == "Aplicativos" ? 0 : g == "Processos em segundo plano" ? 1 : 2;
@@ -1046,12 +1093,20 @@ private void ApplyFilter(string query)
                             if (existingDict.TryGetValue(fresh.GroupKey, out var ex)) ex.UpdateFrom(fresh);
                             else _groupedLive.Add(fresh);
                         }
+                        // index map O(1) ao invés de scan O(n²) — corta 150*150 buscas por refresh
+                        var indexMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                        for (int j = 0; j < _groupedLive.Count; j++) indexMap[_groupedLive[j].GroupKey] = j;
                         for (int i = 0; i < grouped.Count; i++)
                         {
                             var desired = grouped[i];
-                            int cur = -1;
-                            for (int j = 0; j < _groupedLive.Count; j++) if (_groupedLive[j].GroupKey == desired.GroupKey) { cur = j; break; }
-                            if (cur >= 0 && cur != i) _groupedLive.Move(cur, i);
+                            if (!indexMap.TryGetValue(desired.GroupKey, out int cur)) continue;
+                            if (cur != i)
+                            {
+                                _groupedLive.Move(cur, i);
+                                // reindex após Move (só faixa afetada)
+                                int lo = Math.Min(cur, i), hi = Math.Max(cur, i);
+                                for (int k = lo; k <= hi && k < _groupedLive.Count; k++) indexMap[_groupedLive[k].GroupKey] = k;
+                            }
                         }
                         var expanded = _groupedLive.Where(r => !r.IsChild && r.IsExpanded && r.RawChildren.Count > 0).ToList();
                         foreach (var parent in expanded.AsEnumerable().Reverse())
@@ -1080,6 +1135,7 @@ private void ApplyFilter(string query)
                         var activeCol = DgProcesses.Columns.FirstOrDefault(c => c.SortMemberPath == _currentSortColumn);
                         if (activeCol != null) activeCol.SortDirection = _currentSortDirection;
                         if (sv != null) Dispatcher.BeginInvoke(new Action(() => { try { sv.ScrollToVerticalOffset(savedOffset); } catch { } }), DispatcherPriority.Loaded);
+                        }
                     }
                     else
                     {
@@ -1254,14 +1310,11 @@ private void ApplyFilter(string query)
             try
             {
                 if (proc == null || proc.HasExited) return "—";
-                // Use WMI to get owner
-                using var searcher = new System.Management.ManagementObjectSearcher(
-                    $"SELECT Owner FROM Win32_Process WHERE ProcessId={proc.Id}");
-                foreach (var obj in searcher.Get())
-                {
-                    var owner = obj["Owner"];
-                    return owner?.ToString() ?? "—";
-                }
+                // Nativo token (0.1ms, sem WMI) → CIM fallback se nativo falhar
+                string fast = SafeProcessHelper.GetProcessUserFast(proc.Id);
+                if (!string.IsNullOrEmpty(fast) && fast != "—") return fast;
+                var rows = NativeHardware.Cim.Query($"SELECT Owner FROM Win32_Process WHERE ProcessId={proc.Id}");
+                if (rows.Count > 0 && rows[0].TryGetValue("Owner", out var o) && o != null) return o.ToString() ?? "—";
             }
             catch { }
             return "—";
@@ -1411,10 +1464,17 @@ private void ApplyFilter(string query)
             var res = new List<int>();
             try
             {
-                using var searcher = new System.Management.ManagementObjectSearcher(
-                    $"Select ProcessId From Win32_Process Where ParentProcessId={parentPid}");
-                foreach (var o in searcher.Get())
-                    try { res.Add(Convert.ToInt32(o["ProcessId"])); } catch { }
+                // 1) Nativo Rust (NtQuerySystemInformation) — instantâneo
+                var fast = SafeProcessHelper.TryEnumerateFast();
+                if (fast != null)
+                {
+                    foreach (var kv in fast) if ((int)kv.Value.ParentPid == parentPid) res.Add(kv.Key);
+                    return res;
+                }
+                // 2) CIM (WsMan sucessor WMI) → WMI fallback via NativeHardware
+                var rows = NativeHardware.Cim.Query($"Select ProcessId From Win32_Process Where ParentProcessId={parentPid}");
+                foreach (var r in rows)
+                    try { res.Add(Convert.ToInt32(r.TryGetValue("ProcessId", out var v) ? v ?? 0 : 0)); } catch { }
             }
             catch { }
             return res;
@@ -1422,12 +1482,21 @@ private void ApplyFilter(string query)
 
         private List<int> GetChildPids(int parentPid)
         {
+            // Legado recursivo — agora delega ao nativo + CIM, evita WMI DCOM travado
             var res = new List<int>();
             try
             {
-                using var searcher = new System.Management.ManagementObjectSearcher(
-                    $"Select ProcessId From Win32_Process Where ParentProcessId={parentPid}");
-                foreach (var o in searcher.Get()) res.Add(Convert.ToInt32(o["ProcessId"]));
+                var fast = SafeProcessHelper.TryEnumerateFast();
+                if (fast != null)
+                {
+                    // BFS via nativo já está em GetChildPidsSafe, aqui só retorna filhos diretos recursivo fallback
+                    foreach (var kv in fast) if ((int)kv.Value.ParentPid == parentPid) res.Add(kv.Key);
+                    var snapshot = res.ToList();
+                    foreach (var c in snapshot) res.AddRange(GetChildPids(c));
+                    return res;
+                }
+                var rows = NativeHardware.Cim.Query($"Select ProcessId From Win32_Process Where ParentProcessId={parentPid}");
+                foreach (var r in rows) res.Add(Convert.ToInt32(r.TryGetValue("ProcessId", out var v) ? v ?? 0 : 0));
                 foreach (var c in res.ToList()) res.AddRange(GetChildPids(c));
             }
             catch { }

@@ -5,170 +5,374 @@
       Title="Force Stop Unlock"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Arial">
 
+    <Page.Resources>
+        <!-- TabItem estilo ServicesPage -->
+        <Style TargetType="TabItem">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="#888"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="0,0,0,3" Margin="0,0,10,0">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#FFD700" />
+                                <Setter Property="Foreground" Value="#FFD700" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="40,30,40,50" MaxWidth="800" HorizontalAlignment="Left">
+        <StackPanel Margin="40,30,40,50" MaxWidth="850" HorizontalAlignment="Left">
 
             <!-- TITLE -->
-            <TextBlock Text="&#x1F513; Force Stop Unlock" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="White"/>
-            <TextBlock Text="Libere arquivos bloqueados por processos no Windows — diretamente pelo Explorer ou pela janela do Kit." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,25" TextWrapping="Wrap"/>
+            <TextBlock Text="&#x1F4C1; Operações de Arquivo" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="White"/>
+            <TextBlock Text="Force Stop Unlock + Take Ownership — clique direito inteligente. A página começa no Force Stop; troque para Take Ownership no topo para assumir permissões." Foreground="#A0A0A0" Margin="0,0,0,18" TextWrapping="Wrap" FontSize="13"/>
 
-            <!-- QUICK SCAN CARD -->
-            <Border CornerRadius="10" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="20" Margin="0,0,0,20">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0" Margin="0,0,0,14">
-                        <TextBlock Text="&#x1F50D; Esc&#x00E2;ner R&#x00E1;pido" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="Cole o caminho de um arquivo ou pasta bloqueada para identificar processos" FontSize="12" Foreground="#888" Margin="0,2,0,0"/>
-                    </StackPanel>
-
-                    <Grid Grid.Row="1" Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Border Grid.Column="0" CornerRadius="6" Background="#12122A" BorderBrush="#3A3A50" BorderThickness="1" Padding="10,0">
-                            <TextBox x:Name="TxtQuickPath" Background="Transparent" Foreground="White"
-                                     BorderThickness="0" FontSize="13" VerticalContentAlignment="Center" Height="34"
-                                     Text=""/>
-                        </Border>
-
-                        <Button Grid.Column="1" Content="&#x1F50D; Analisar" Width="90" Height="34"
-                                Background="#3355AA" Foreground="White" BorderThickness="0"
-                                FontWeight="SemiBold" Cursor="Hand" Click="BtnQuickAnalyze_Click"
-                                x:Name="BtnQuickAnalyze" Margin="8,0,0,0"/>
-
-                        <Button Grid.Column="2" Content="&#x1F5D1; Tentar Deletar" Width="130" Height="34"
-                                Background="#AA4444" Foreground="White" BorderThickness="0"
-                                FontWeight="SemiBold" Cursor="Hand" Click="BtnTryDelete_Click"
-                                x:Name="BtnTryDelete" Margin="8,0,0,0"/>
-
-                        <Button Grid.Column="3" Content="&#x1F4C2; Abrir Janela" Width="120" Height="34"
-                                Background="#222244" Foreground="#AAA" BorderThickness="0"
-                                Cursor="Hand" Click="BtnOpenWindow_Click" Margin="8,0,0,0"/>
-                    </Grid>
-
-                    <Border x:Name="QuickResultPanel" Grid.Row="2" Visibility="Collapsed"
-                            CornerRadius="6" Background="#12122A" BorderBrush="#3A3A50" BorderThickness="1" Padding="14">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock x:Name="TxtQuickResult" Grid.Row="0" Text="" FontSize="13" Foreground="#CCC" TextWrapping="Wrap"/>
-                            <TextBlock x:Name="TxtQuickDetail" Grid.Row="1" Text="" FontSize="11" Foreground="#888" Margin="0,4,0,8" TextWrapping="Wrap"/>
-
-                            <!-- Process list with checkboxes -->
-                            <ListBox x:Name="QuickProcessList" Grid.Row="2" Background="Transparent" BorderThickness="0"
-                                     MaxHeight="150" Margin="0,0,0,8">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border CornerRadius="4" Background="#16162A" Padding="10,6" Margin="0,0,0,4">
-                                            <StackPanel Orientation="Horizontal">
-                                                <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                <TextBlock Text="{Binding DisplayLabel}" FontSize="12" Foreground="#DDD" VerticalAlignment="Center"/>
-                                                <Border CornerRadius="3" Background="#222244" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding HandleType}" FontSize="9" Foreground="#8888CC"/>
-                                                </Border>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-
-                            <!-- Action button -->
-                            <Button x:Name="BtnQuickRelease" Grid.Row="3" Content="⚡ Liberar Selecionados" Height="34"
-                                    Background="#AA3333" Foreground="White" BorderThickness="0"
-                                    FontWeight="SemiBold" Cursor="Hand" Click="BtnQuickRelease_Click"
-                                    HorizontalAlignment="Left" Padding="16,0" Visibility="Collapsed"/>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <!-- TOGGLE CARD -->
-            <Border CornerRadius="10" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="20" Margin="0,0,0,20">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Border Grid.Column="0" Width="48" Height="48" CornerRadius="10" Background="#222244" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="&#x1F4CC;" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Menu de Contexto do Explorer" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="Adiciona 'Force Stop Unlock' ao clique direito de arquivos, pastas e unidades" FontSize="12" Foreground="#888" Margin="0,2,0,0"/>
-                    </StackPanel>
-
-                    <CheckBox x:Name="ChkEnable" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}"
-                              Cursor="Hand" VerticalAlignment="Center" Margin="16,0,0,0"
-                              Click="ChkEnable_Click"/>
-                </Grid>
-            </Border>
-
-            <!-- STATUS CARDS -->
-            <Grid Margin="0,0,0,20">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="15"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
-                    <StackPanel>
-                        <TextBlock Text="&#x1F6E0;&#xFE0F; Handle Tool" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
-                        <TextBlock x:Name="TxtHandleStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
-                        <TextBlock Text="handle64.exe (Sysinternals) — para identificar handles individuais" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
-                    </StackPanel>
-                </Border>
-
-                <Border Grid.Column="2" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
-                    <StackPanel>
-                        <TextBlock Text="&#x1F4CB; Menu de Contexto" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
-                        <TextBlock x:Name="TxtMenuStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
-                        <TextBlock Text="Clique direito em qualquer arquivo ou pasta no Explorer" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- HOW IT WORKS -->
-            <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,0,0,20">
-                <StackPanel>
-                    <TextBlock Text="&#x2139;&#xFE0F; Como Funciona" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
-                    <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="20">
-                        <Run Text="1. "/><Run Text="Restart Manager API" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" — fecha handles sem matar processos (mais limpo)"/>
-                        <LineBreak/>
-                        <Run Text="2. "/><Run Text="Handle tool (Sysinternals)" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" — fecha handles individuais de processos especificos"/>
-                        <LineBreak/>
-                        <Run Text="3. "/><Run Text="Finalizar processo" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" — ultimo recurso, mata processos que ainda bloqueiam"/>
-                    </TextBlock>
+            <!-- TOGGLE TOPO: seletor rápido (espelha as abas) -->
+            <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#2A2A40" BorderThickness="1" Padding="6" Margin="0,0,0,16" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="BtnModeUnlock" Content="&#x1F513; Force Stop Unlock" Padding="18,8" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="13" Cursor="Hand" Click="BtnModeUnlock_Click">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#3355AA"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button x:Name="BtnModeTakeOwn" Content="&#x1F451; Take Ownership" Padding="18,8" FontWeight="SemiBold" FontSize="13" Cursor="Hand" Click="BtnModeTakeOwn_Click">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#1E1E32"/>
+                                <Setter Property="Foreground" Value="#AAA"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}" BorderBrush="#3A3A50" BorderThickness="1">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </Border>
 
-            <!-- REQUIREMENTS -->
-            <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+            <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0" SelectionChanged="MainTabs_SelectionChanged">
+
+                <!-- ==================== ABA 0: FORCE STOP UNLOCK ==================== -->
+                <TabItem Header="&#x1F513; Force Stop Unlock">
+                    <StackPanel Margin="0,16,0,0">
+
+                        <!-- QUICK SCAN CARD -->
+                        <Border CornerRadius="10" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="20" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <TextBlock Text="&#x1F50D; Escâner Rápido" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Cole o caminho de um arquivo ou pasta bloqueada para identificar processos" FontSize="12" Foreground="#888" Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <Grid Grid.Row="1" Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" CornerRadius="6" Background="#12122A" BorderBrush="#3A3A50" BorderThickness="1" Padding="10,0">
+                                        <TextBox x:Name="TxtQuickPath" Background="Transparent" Foreground="White"
+                                                 BorderThickness="0" FontSize="13" VerticalContentAlignment="Center" Height="34"
+                                                 Text=""/>
+                                    </Border>
+
+                                    <Button Grid.Column="1" Content="&#x1F50D; Analisar" Width="90" Height="34"
+                                            Background="#3355AA" Foreground="White" BorderThickness="0"
+                                            FontWeight="SemiBold" Cursor="Hand" Click="BtnQuickAnalyze_Click"
+                                            x:Name="BtnQuickAnalyze" Margin="8,0,0,0"/>
+
+                                    <Button Grid.Column="2" Content="&#x1F5D1; Tentar Deletar" Width="130" Height="34"
+                                            Background="#AA4444" Foreground="White" BorderThickness="0"
+                                            FontWeight="SemiBold" Cursor="Hand" Click="BtnTryDelete_Click"
+                                            x:Name="BtnTryDelete" Margin="8,0,0,0"/>
+
+                                    <Button Grid.Column="3" Content="&#x1F4C2; Abrir Janela" Width="120" Height="34"
+                                            Background="#222244" Foreground="#AAA" BorderThickness="0"
+                                            Cursor="Hand" Click="BtnOpenWindow_Click" Margin="8,0,0,0"/>
+                                </Grid>
+
+                                <Border x:Name="QuickResultPanel" Grid.Row="2" Visibility="Collapsed"
+                                        CornerRadius="6" Background="#12122A" BorderBrush="#3A3A50" BorderThickness="1" Padding="14">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock x:Name="TxtQuickResult" Grid.Row="0" Text="" FontSize="13" Foreground="#CCC" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="TxtQuickDetail" Grid.Row="1" Text="" FontSize="11" Foreground="#888" Margin="0,4,0,8" TextWrapping="Wrap"/>
+
+                                        <ListBox x:Name="QuickProcessList" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                                                 MaxHeight="150" Margin="0,0,0,8">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="4" Background="#16162A" Padding="10,6" Margin="0,0,0,4">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                            <TextBlock Text="{Binding DisplayLabel}" FontSize="12" Foreground="#DDD" VerticalAlignment="Center"/>
+                                                            <Border CornerRadius="3" Background="#222244" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding HandleType}" FontSize="9" Foreground="#8888CC"/>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+
+                                        <Button x:Name="BtnQuickRelease" Grid.Row="3" Content="⚡ Liberar Selecionados" Height="34"
+                                                Background="#AA3333" Foreground="White" BorderThickness="0"
+                                                FontWeight="SemiBold" Cursor="Hand" Click="BtnQuickRelease_Click"
+                                                HorizontalAlignment="Left" Padding="16,0" Visibility="Collapsed"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- TOGGLE CARD ForceStop -->
+                        <Border CornerRadius="10" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="20" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Width="48" Height="48" CornerRadius="10" Background="#222244" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="&#x1F4CC;" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Menu de Contexto — Force Stop" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Adiciona 'Force Stop Unlock' ao clique direito de arquivos, pastas e unidades" FontSize="12" Foreground="#888" Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="ChkEnable" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}"
+                                          Cursor="Hand" VerticalAlignment="Center" Margin="16,0,0,0"
+                                          Click="ChkEnable_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- STATUS CARDS -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="15"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F6E0;&#xFE0F; Handle Tool" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock x:Name="TxtHandleStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
+                                    <TextBlock Text="handle64.exe (Sysinternals) — para identificar handles individuais" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F4CB; Menu de Contexto" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock x:Name="TxtMenuStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
+                                    <TextBlock Text="Clique direito em qualquer arquivo ou pasta no Explorer" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- HOW IT WORKS -->
+                        <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="&#x2139;&#xFE0F; Como Funciona" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="20">
+                                    <Run Text="1. "/><Run Text="Restart Manager API" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" — fecha handles sem matar processos (mais limpo)"/>
+                                    <LineBreak/>
+                                    <Run Text="2. "/><Run Text="Handle tool (Sysinternals)" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" — fecha handles individuais de processos específicos"/>
+                                    <LineBreak/>
+                                    <Run Text="3. "/><Run Text="Finalizar processo" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" — último recurso, mata processos que ainda bloqueiam"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </TabItem>
+
+                <!-- ==================== ABA 1: TAKE OWNERSHIP ==================== -->
+                <TabItem Header="&#x1F451; Take Ownership">
+                    <StackPanel Margin="0,16,0,0">
+
+                        <!-- TAKE OWNERSHIP CARD — reaproveita mesma TextBox -->
+                        <Border CornerRadius="10" Background="#1A1A28" BorderBrush="#AA9933" BorderThickness="1" Padding="20" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <TextBlock Text="&#x1F451; Assumir Propriedade" FontSize="16" FontWeight="SemiBold" Foreground="#FFD700"/>
+                                    <TextBlock Text="Cole o caminho e assuma controle total (TrustedInstaller → Administradores). Usa FileTakeOwnership in-process, zero spawn." FontSize="12" Foreground="#888" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <Grid Grid.Row="1" Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" CornerRadius="6" Background="#12122A" BorderBrush="#3A3A50" BorderThickness="1" Padding="10,0">
+                                        <TextBox x:Name="TxtTakeOwnPath" Background="Transparent" Foreground="White"
+                                                 BorderThickness="0" FontSize="13" VerticalContentAlignment="Center" Height="34"
+                                                 Text=""/>
+                                    </Border>
+
+                                    <Button Grid.Column="1" Content="&#x1F50D; Ver Permissões" Width="135" Height="34"
+                                            Background="#333355" Foreground="White" BorderThickness="0"
+                                            FontWeight="SemiBold" Cursor="Hand" Click="BtnTakeOwnAnalyze_Click"
+                                            x:Name="BtnTakeOwnAnalyze" Margin="8,0,0,0"/>
+
+                                    <Button Grid.Column="2" Content="&#x1F451; Assumir" Width="130" Height="34"
+                                            Background="#AA9933" Foreground="White" BorderThickness="0"
+                                            FontWeight="SemiBold" Cursor="Hand" Click="BtnTakeOwnExecute_Click"
+                                            x:Name="BtnTakeOwnExecute" Margin="8,0,0,0"/>
+                                </Grid>
+
+                                <WrapPanel Grid.Row="2" Margin="0,0,0,10">
+                                    <CheckBox x:Name="ChkRecursive" Content="Recursivo (incluir subpastas e arquivos)" Foreground="#AAA" FontSize="12" Margin="0,0,24,0" IsChecked="True" VerticalAlignment="Center"/>
+                                    <CheckBox x:Name="ChkTakeOwnFullControl" Content="Conceder FullControl em pastas (completo)" Foreground="#AAA" FontSize="12" IsChecked="True" VerticalAlignment="Center" ToolTip="Desmarque para modo rápido (só dono) — 70ms→1ms por pasta"/>
+                                </WrapPanel>
+
+                                <Border x:Name="TakeOwnResultPanel" Grid.Row="3" Visibility="Collapsed"
+                                        CornerRadius="6" Background="#12122A" BorderBrush="#3A3A50" BorderThickness="1" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock x:Name="TxtTakeOwnResult" Text="" FontSize="13" Foreground="#CCC" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="TxtTakeOwnDetail" Text="" FontSize="11" Foreground="#888" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        <Grid Margin="0,10,0,0">
+                                            <ProgressBar x:Name="TakeOwnProgress" Height="6" Visibility="Collapsed" IsIndeterminate="True" Foreground="#FFD700" Background="#222" Minimum="0" Maximum="100" Value="0"/>
+                                            <TextBlock x:Name="TxtTakeOwnProgress" Text="" FontSize="10" Foreground="#FFD700" HorizontalAlignment="Right" Margin="0,-16,0,0" Visibility="Collapsed"/>
+                                        </Grid>
+                                        <TextBlock x:Name="TxtTakeOwnCurrentFile" Text="" FontSize="10" Foreground="#666" Margin="0,4,0,0" Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- TOGGLE CARD TakeOwn Kit -->
+                        <Border CornerRadius="10" Background="#1A1A28" BorderBrush="#AA9933" BorderThickness="1" Padding="20" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Width="48" Height="48" CornerRadius="10" Background="#332A00" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="&#x1F451;" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Menu de Contexto — Take Ownership" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Adiciona 'Take Ownership (KitLugia)' ao clique direito — via Kit (--takeown), in-process" FontSize="12" Foreground="#888" Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="ChkTakeOwnEnable" Grid.Column="2" Style="{StaticResource ToggleSwitchStyle}"
+                                          Cursor="Hand" VerticalAlignment="Center" Margin="16,0,0,0"
+                                          Click="ChkTakeOwnEnable_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- STATUS -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="15"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="&#x1F512; Permissões" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock x:Name="TxtTakeOwnMenuStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
+                                    <TextBlock Text="Assume propriedade + FullControl para Administradores" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="&#x26A1; Tecnologia" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock Text="In-process (SeTakeOwnershipPrivilege + ACL nativo). Sem takeown.exe/icacls." FontSize="12" Foreground="#888" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Recursivo instantâneo, com progresso" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- HOW IT WORKS TAKEOWN -->
+                        <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="&#x2139;&#xFE0F; Como Funciona (Take Ownership)" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="20">
+                                    <Run Text="1. "/><Run Text="Habilita privilégios" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" SeTakeOwnership/SeBackup/SeRestore"/>
+                                    <LineBreak/>
+                                    <Run Text="2. "/><Run Text="SetOwner → Administradores" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" em todos os itens (arquivo ou pasta recursiva)"/>
+                                    <LineBreak/>
+                                    <Run Text="3. "/><Run Text="Concede FullControl" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" com herança ContainerInherit+ObjectInherit"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </TabItem>
+
+            </TabControl>
+
+            <!-- REQUIREMENTS (fora das abas, comum) -->
+            <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,16,0,16">
                 <StackPanel>
                     <TextBlock Text="&#x26A0;&#xFE0F; Requisitos" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
                     <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="20">
                         <Run Text="&#x2022; "/><Run Text="Windows 10 ou superior" Foreground="#CCC"/>
                         <LineBreak/>
-                        <Run Text="&#x2022; "/><Run Text="Permissoes de Administrador" Foreground="#CCC"/><Run Text=" — necessario para liberar handles de outros processos"/>
+                        <Run Text="&#x2022; "/><Run Text="Permissões de Administrador" Foreground="#CCC"/><Run Text=" — necessário para liberar handles e alterar ACLs"/>
                         <LineBreak/>
-                        <Run Text="&#x2022; "/><Run Text="Use com cuidado" Foreground="#FF6F61" FontWeight="Bold"/><Run Text=" — encerrar processos do sistema pode causar instabilidade"/>
+                        <Run Text="&#x2022; "/><Run Text="Use com cuidado" Foreground="#FF6F61" FontWeight="Bold"/><Run Text=" — encerrar processos do sistema ou alterar ACLs críticas pode causar instabilidade"/>
                     </TextBlock>
                 </StackPanel>
             </Border>
@@ -192,14 +396,12 @@
                                 Cursor="Hand" Click="BtnScanMenu_Click" Margin="8,0,0,0"/>
                     </Grid>
 
-                    <!-- Filter bar -->
                     <StackPanel x:Name="MenuFilterBar" Orientation="Horizontal" Margin="0,0,0,10" Visibility="Collapsed">
                         <RadioButton x:Name="RdMenuAll" Content="Todas" Foreground="#AAA" FontSize="12" IsChecked="True" Margin="0,0,12,0" Click="MenuFilter_Changed"/>
                         <RadioButton x:Name="RdMenuKit" Content="KitLugia" Foreground="#88CC88" FontSize="12" Margin="0,0,12,0" Click="MenuFilter_Changed"/>
                         <RadioButton x:Name="RdMenuThird" Content="Terceiros" Foreground="#FFAA44" FontSize="12" Margin="0,0,12,0" Click="MenuFilter_Changed"/>
                     </StackPanel>
 
-                    <!-- Action bar -->
                     <Grid x:Name="MenuActionBar" Margin="0,0,0,10" Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -213,7 +415,6 @@
                                 FontWeight="SemiBold" Cursor="Hand" Click="BtnRemoveSelected_Click"/>
                     </Grid>
 
-                    <!-- Entry list -->
                     <ListBox x:Name="MenuEntryList" Background="Transparent" BorderThickness="0" MaxHeight="300"
                              Visibility="Collapsed" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemContainerStyle>
@@ -278,7 +479,6 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- Empty state -->
                     <TextBlock x:Name="TxtMenuEmpty" Text="Clique em Escanear para ver todas as entradas do menu de contexto" FontSize="12" Foreground="#555" TextAlignment="Center" Margin="0,10,0,0"/>
                 </StackPanel>
             </Border>

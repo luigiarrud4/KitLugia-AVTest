@@ -136,44 +136,42 @@ namespace KitLugia.GUI.Services
 
 
         /// <summary>
-        /// Executa Take Ownership nativo in-process (FileTakeOwnership) e mostra resultado.
-        /// Chamado pelo IPC quando o usuário clica "Take Ownership Super" no Explorer.
+        /// Abre a página unificada na aba Take Ownership (reaproveita File Operations).
+        /// Chamado pelo IPC quando o usuário clica "Take Ownership (KitLugia)" no Explorer.
+        /// Reaproveita a mesma página do Force Stop — só muda a aba e pré-preenche.
         /// </summary>
         private static void OpenTakeOwnership(string path)
         {
             try
             {
-                bool isDir = Directory.Exists(path);
-                string name = Path.GetFileName(path.TrimEnd('\\')) ?? path;
-
-                // Toast de progresso
-                if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mwProgress)
-                    mwProgress.ShowLoading($"👑 Assumindo propriedade de {name}...");
-
-                _ = Task.Run(() =>
+                if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mw)
                 {
-                    var result = FileTakeOwnership.TakeOwn(path, recursive: isDir, progress: done =>
+                    if (mw.WindowState == WindowState.Minimized)
+                        mw.WindowState = WindowState.Normal;
+                    mw.Activate();
+                    mw.Focus();
+                    mw.NavigateToTakeOwn(path);
+                }
+                else
+                {
+                    // Fallback headless (sem MainWindow): executa direto e mostra toast quando possível
+                    bool isDir = Directory.Exists(path);
+                    string name = Path.GetFileName(path.TrimEnd('\\')) ?? path;
+                    _ = Task.Run(() =>
                     {
-                        // progresso aproximado a cada 10%
-                        // (total só é conhecido dentro do TakeOwn; usamos done como contador bruto aqui)
-                    });
-
-                    Application.Current?.Dispatcher?.Invoke(() =>
-                    {
-                        if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mw)
+                        var result = FileTakeOwnership.TakeOwn(path, recursive: isDir);
+                        Application.Current?.Dispatcher?.Invoke(() =>
                         {
-                            mw.HideLoading();
-                            if (result.Ok)
-                                mw.ShowSuccess("TAKE OWNERSHIP",
-                                    $"✅ {name}: {result.Success} item(ns) agora são seus." +
-                                    (isDir ? "\n(Recursivo — incluiu todas as subpastas)" : ""));
-                            else
-                                mw.ShowError("TAKE OWNERSHIP",
-                                    $"{name}: {result.Failed} falha(s) de {result.Total}.\n" +
-                                    string.Join("\n", result.Errors.Take(3)));
-                        }
+                            if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mw2)
+                            {
+                                if (result.Ok)
+                                    mw2.ShowSuccess("TAKE OWNERSHIP", $"✅ {name}: {result.Success} item(ns) agora são seus." + (isDir ? "\n(Recursivo — incluiu todas as subpastas)" : ""));
+                                else
+                                    mw2.ShowError("TAKE OWNERSHIP", $"{name}: {result.Failed} falha(s) de {result.Total}.\n" + string.Join("\n", result.Errors.Take(3)));
+                            }
+                        });
                     });
-                });
+                }
             }
             catch (Exception ex)
             {

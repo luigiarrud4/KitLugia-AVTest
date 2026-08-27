@@ -1,5 +1,8 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,17 +21,61 @@ namespace KitLugia.GUI.Pages.WindowsSettings
     public partial class ForceStopUnlockPage : Page
     {
         private bool _isLoading;
+        private int _initialTab = 0;
 
-        public ForceStopUnlockPage()
+        public ForceStopUnlockPage(int initialTab = 0)
         {
+            _initialTab = initialTab;
             InitializeComponent();
-            this.Loaded += async (s, e) => await RefreshStatus();
+            this.Loaded += async (s, e) =>
+            {
+                if (MainTabs != null) MainTabs.SelectedIndex = _initialTab;
+                UpdateTopToggle();
+                await RefreshStatus();
+            };
             this.Unloaded += (s, e) => Cleanup();
         }
 
         public void Cleanup()
         {
             this.DataContext = null;
+        }
+
+        private void UpdateTopToggle()
+        {
+            if (BtnModeUnlock == null || BtnModeTakeOwn == null || MainTabs == null) return;
+            bool isUnlock = MainTabs.SelectedIndex == 0;
+            BtnModeUnlock.Background = isUnlock ? new SolidColorBrush(Color.FromRgb(0x33, 0x55, 0xAA)) : new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x32));
+            BtnModeUnlock.Foreground = isUnlock ? Brushes.White : new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+            BtnModeTakeOwn.Background = !isUnlock ? new SolidColorBrush(Color.FromRgb(0xAA, 0x99, 0x33)) : new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x32));
+            BtnModeTakeOwn.Foreground = !isUnlock ? Brushes.White : new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+        }
+
+        private void BtnModeUnlock_Click(object sender, RoutedEventArgs e)
+        {
+            if (MainTabs != null) MainTabs.SelectedIndex = 0;
+        }
+
+        private void BtnModeTakeOwn_Click(object sender, RoutedEventArgs e)
+        {
+            if (MainTabs != null) MainTabs.SelectedIndex = 1;
+        }
+
+        private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateTopToggle();
+            // Sync path between tabs so the same path is available in both modes
+            try
+            {
+                if (TxtQuickPath != null && TxtTakeOwnPath != null)
+                {
+                    if (MainTabs.SelectedIndex == 1 && !string.IsNullOrWhiteSpace(TxtQuickPath.Text) && string.IsNullOrWhiteSpace(TxtTakeOwnPath.Text))
+                        TxtTakeOwnPath.Text = TxtQuickPath.Text;
+                    else if (MainTabs.SelectedIndex == 0 && !string.IsNullOrWhiteSpace(TxtTakeOwnPath.Text) && string.IsNullOrWhiteSpace(TxtQuickPath.Text))
+                        TxtQuickPath.Text = TxtTakeOwnPath.Text;
+                }
+            }
+            catch { }
         }
 
         private async Task RefreshStatus()
@@ -39,6 +86,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 await Task.Run(() =>
                 {
                     bool isAdded = SystemTweaks.IsForceStopUnlockAdded();
+                    bool isTakeOwnAdded = SystemTweaks.IsTakeOwnershipKitAdded();
                     string handlePath = Path.Combine(
                         AppDomain.CurrentDomain.BaseDirectory,
                         "External", "ForceStopUnlock", "handle64.exe");
@@ -46,11 +94,21 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
                     Dispatcher.Invoke(() =>
                     {
-                        ChkEnable.IsChecked = isAdded;
-                        TxtMenuStatus.Text = isAdded ? "✅ Ativo no menu de contexto" : "❌ Inativo";
-                        TxtMenuStatus.Foreground = isAdded
-                            ? Brushes.LightGreen
-                            : Brushes.Gray;
+                        if (ChkEnable != null)
+                            ChkEnable.IsChecked = isAdded;
+                        if (TxtMenuStatus != null)
+                        {
+                            TxtMenuStatus.Text = isAdded ? "✅ Ativo no menu de contexto" : "❌ Inativo";
+                            TxtMenuStatus.Foreground = isAdded ? Brushes.LightGreen : Brushes.Gray;
+                        }
+
+                        if (ChkTakeOwnEnable != null)
+                            ChkTakeOwnEnable.IsChecked = isTakeOwnAdded;
+                        if (TxtTakeOwnMenuStatus != null)
+                        {
+                            TxtTakeOwnMenuStatus.Text = isTakeOwnAdded ? "✅ Ativo no menu de contexto" : "❌ Inativo";
+                            TxtTakeOwnMenuStatus.Foreground = isTakeOwnAdded ? Brushes.LightGreen : Brushes.Gray;
+                        }
 
                         TxtHandleStatus.Text = handleExists ? "✅ Incluso no Kit" : "⚠️ Não encontrado";
                         TxtHandleStatus.Foreground = handleExists
@@ -90,14 +148,42 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             finally { _isLoading = false; }
         }
 
+        private async void ChkTakeOwnEnable_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool target = ChkTakeOwnEnable.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (target) SystemTweaks.AddTakeOwnershipKit();
+                    else SystemTweaks.RemoveTakeOwnershipKit();
+                });
+
+                if (Application.Current.MainWindow is MainWindow mw)
+                {
+                    if (target)
+                        mw.ShowSuccess("TAKE OWNERSHIP", "Opção 'Take Ownership (KitLugia)' adicionada ao menu de contexto.");
+                    else
+                        mw.ShowInfo("TAKE OWNERSHIP", "Opção removida do menu de contexto.");
+                }
+
+                await RefreshStatus();
+            }
+            catch { Logger.LogWarning("TakeOwnership", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
         /// <summary>
-        /// Called by MainWindow when user right-clicks a file/folder in Explorer.
-        /// Pre-fills the path and triggers analysis automatically.
+        /// Called by MainWindow when user right-clicks a file/folder for unlock.
+        /// Pre-fills the path and triggers analysis automatically (aba 0).
         /// </summary>
         public void PreFillAndAnalyze(string path)
         {
-            TxtQuickPath.Text = path;
-            // Trigger the analyze button click
+            if (MainTabs != null) MainTabs.SelectedIndex = 0;
+            if (TxtQuickPath != null) TxtQuickPath.Text = path;
+            if (TxtTakeOwnPath != null) TxtTakeOwnPath.Text = path;
             if (BtnQuickAnalyze != null)
             {
                 BtnQuickAnalyze.RaiseEvent(new RoutedEventArgs(
@@ -105,17 +191,213 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
         }
 
+        /// <summary>
+        /// Called by MainWindow / IPC when --takeown arrives. Abre na aba 1 e pré-preenche.
+        /// </summary>
+        public void PreFillAndTakeOwn(string path)
+        {
+            if (MainTabs != null) MainTabs.SelectedIndex = 1;
+            if (TxtTakeOwnPath != null) TxtTakeOwnPath.Text = path;
+            if (TxtQuickPath != null) TxtQuickPath.Text = path;
+            // Auto-analisa permissões
+            if (BtnTakeOwnAnalyze != null)
+            {
+                BtnTakeOwnAnalyze.RaiseEvent(new RoutedEventArgs(
+                    System.Windows.Controls.Primitives.ButtonBase.ClickEvent, BtnTakeOwnAnalyze));
+            }
+        }
+
+        // ─── Take Ownership logic ────────────────────────────────
+
+        private async void BtnTakeOwnAnalyze_Click(object sender, RoutedEventArgs e)
+        {
+            string path = (TxtTakeOwnPath?.Text ?? TxtQuickPath?.Text ?? "").Trim();
+            if (string.IsNullOrEmpty(path))
+            {
+                TakeOwnResultPanel.Visibility = Visibility.Visible;
+                TxtTakeOwnResult.Text = "❌ Cole um caminho primeiro.";
+                TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
+                TxtTakeOwnDetail.Text = "";
+                return;
+            }
+
+            // Sync to other box
+            if (TxtQuickPath != null) TxtQuickPath.Text = path;
+            if (TxtTakeOwnPath != null) TxtTakeOwnPath.Text = path;
+
+            TakeOwnResultPanel.Visibility = Visibility.Visible;
+            TxtTakeOwnResult.Text = "🔍 Verificando permissões...";
+            TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(170, 170, 170));
+            TxtTakeOwnDetail.Text = "";
+            TakeOwnProgress.Visibility = Visibility.Visible;
+
+            try
+            {
+                var info = await Task.Run(() => GetAclSummary(path));
+                TakeOwnProgress.Visibility = Visibility.Collapsed;
+
+                if (info.Exists)
+                {
+                    TxtTakeOwnResult.Text = $"📋 {info.Name} — dono atual: {info.Owner}";
+                    TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 215, 0));
+                    TxtTakeOwnDetail.Text = info.Detail + "\n\nClique em 'Assumir' para tornar-se dono (Administradores + FullControl).";
+                }
+                else
+                {
+                    TxtTakeOwnResult.Text = "❌ Caminho não encontrado.";
+                    TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
+                    TxtTakeOwnDetail.Text = path;
+                }
+            }
+            catch (Exception ex)
+            {
+                TakeOwnProgress.Visibility = Visibility.Collapsed;
+                TxtTakeOwnResult.Text = $"❌ Erro: {ex.Message}";
+                TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
+            }
+        }
+
+        private async void BtnTakeOwnExecute_Click(object sender, RoutedEventArgs e)
+        {
+            string path = (TxtTakeOwnPath?.Text ?? TxtQuickPath?.Text ?? "").Trim();
+            if (string.IsNullOrEmpty(path))
+            {
+                TakeOwnResultPanel.Visibility = Visibility.Visible;
+                TxtTakeOwnResult.Text = "❌ Cole um caminho primeiro.";
+                TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
+                return;
+            }
+
+            bool recursive = ChkRecursive?.IsChecked == true;
+            bool grantFullControl = ChkTakeOwnFullControl?.IsChecked == true;
+            bool isDir = Directory.Exists(path);
+
+            BtnTakeOwnExecute.IsEnabled = false;
+            BtnTakeOwnExecute.Content = "⏳ Assumindo...";
+            TakeOwnResultPanel.Visibility = Visibility.Visible;
+            TakeOwnProgress.Visibility = Visibility.Visible;
+            TakeOwnProgress.IsIndeterminate = true;
+            TakeOwnProgress.Value = 0;
+            TxtTakeOwnProgress.Visibility = Visibility.Visible;
+            TxtTakeOwnProgress.Text = "Coletando arquivos...";
+            TxtTakeOwnCurrentFile.Visibility = Visibility.Collapsed;
+            TxtTakeOwnCurrentFile.Text = "";
+            TxtTakeOwnResult.Text = $"👑 Assumindo {(isDir ? "pasta" : "arquivo")} {(recursive && isDir ? "(recursivo)" : "")} {(grantFullControl ? "(completo)" : "(rápido)")}...";
+            TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 215, 0));
+            TxtTakeOwnDetail.Text = $"{path}\nIsso pode levar alguns segundos em pastas grandes.";
+
+            try
+            {
+                var result = await Task.Run(() => FileTakeOwnership.TakeOwn(path, recursive, (done, total, cur) =>
+                {
+                    // throttling: Dispatcher a cada 10 ou nos 3 primeiros
+                    Dispatcher.Invoke(() =>
+                    {
+                        TakeOwnProgress.IsIndeterminate = false;
+                        TakeOwnProgress.Maximum = Math.Max(1, total);
+                        TakeOwnProgress.Value = done;
+                        TxtTakeOwnProgress.Text = $"{done} / {total}  ({done * 100 / Math.Max(1, total)}%)";
+                        if (!string.IsNullOrEmpty(cur))
+                        {
+                            TxtTakeOwnCurrentFile.Visibility = Visibility.Visible;
+                            TxtTakeOwnCurrentFile.Text = "→ " + Path.GetFileName(cur);
+                        }
+                    });
+                }, grantFullControl));
+                TakeOwnProgress.Visibility = Visibility.Collapsed;
+
+                if (result.Ok)
+                {
+                    TxtTakeOwnResult.Text = $"✅ {result.Success}/{result.Total} item(ns) agora são seus!";
+                    TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(100, 220, 100));
+                    TxtTakeOwnDetail.Text = isDir && recursive ? "Recursivo — incluiu todas as subpastas e arquivos." : "Pronto para editar/deletar.";
+                    TxtTakeOwnProgress.Visibility = Visibility.Collapsed;
+                    TxtTakeOwnCurrentFile.Visibility = Visibility.Collapsed;
+
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowSuccess("TAKE OWNERSHIP", $"✅ {Path.GetFileName(path)}: {result.Success} item(ns) assumidos.");
+                }
+                else
+                {
+                    TxtTakeOwnResult.Text = $"⚠️ {result.Success}/{result.Total} ok, {result.Failed} falha(s)";
+                    TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 200, 100));
+                    TxtTakeOwnDetail.Text = string.Join("\n", result.Errors.Take(5));
+                    TxtTakeOwnProgress.Visibility = Visibility.Collapsed;
+                    TxtTakeOwnCurrentFile.Visibility = Visibility.Collapsed;
+
+                    if (Application.Current.MainWindow is MainWindow mw)
+                        mw.ShowError("TAKE OWNERSHIP", $"{Path.GetFileName(path)}: {result.Failed} falha(s).\n" + string.Join("\n", result.Errors.Take(3)));
+                }
+            }
+            catch (Exception ex)
+            {
+                TakeOwnProgress.Visibility = Visibility.Collapsed;
+                TxtTakeOwnResult.Text = $"❌ Erro: {ex.Message}";
+                TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
+                TxtTakeOwnDetail.Text = "";
+            }
+            finally
+            {
+                BtnTakeOwnExecute.IsEnabled = true;
+                BtnTakeOwnExecute.Content = "👑 Assumir";
+                // mantém progresso visível no sucesso/erro, esconde só no catch
+            }
+        }
+
+        private static (bool Exists, string Name, string Owner, string Detail) GetAclSummary(string path)
+        {
+            try
+            {
+                if (!File.Exists(path) && !Directory.Exists(path))
+                    return (false, "", "", "");
+
+                string name = Path.GetFileName(path.TrimEnd('\\')) ?? path;
+                string owner = "?";
+                string detail = "";
+
+                try
+                {
+                    if (Directory.Exists(path))
+                    {
+                        var di = new DirectoryInfo(path);
+                        var sec = di.GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access | AccessControlSections.Group);
+                        owner = sec.GetOwner(typeof(NTAccount))?.ToString() ?? "?";
+                        var rules = sec.GetAccessRules(true, false, typeof(NTAccount));
+                        detail = $"Tipo: Pasta  |  Regras: {rules.Count}  |  Dono: {owner}";
+                    }
+                    else
+                    {
+                        var fi = new FileInfo(path);
+                        var sec = fi.GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access | AccessControlSections.Group);
+                        owner = sec.GetOwner(typeof(NTAccount))?.ToString() ?? "?";
+                        var rules = sec.GetAccessRules(true, false, typeof(NTAccount));
+                        detail = $"Tipo: Arquivo  |  Tamanho: {fi.Length} bytes  |  Regras: {rules.Count}  |  Dono: {owner}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    detail = $"Não foi possível ler ACL: {ex.Message}";
+                }
+
+                return (true, name, owner, detail);
+            }
+            catch { return (false, "", "", ""); }
+        }
+
         private List<KitLugia.Core.BlockingProcessInfo> _quickResults = new();
 
         private async void BtnQuickAnalyze_Click(object sender, RoutedEventArgs e)
         {
             string path = TxtQuickPath?.Text?.Trim();
+            if (string.IsNullOrEmpty(path)) path = TxtTakeOwnPath?.Text?.Trim();
             if (string.IsNullOrEmpty(path)) return;
+
+            // sync
+            if (TxtTakeOwnPath != null) TxtTakeOwnPath.Text = path;
 
             Logger.Log($"[FORCE STOP UI] === Analisar clicado para: {path}");
             Logger.Log($"[FORCE STOP UI] Admin: {SystemUtils.IsRunningAsAdministrator()}");
 
-            // List folder contents immediately
             string folderContents = ListFolderContents(path);
             Logger.Log($"[FORCE STOP UI] Conteudo do caminho:\n{folderContents}");
 
@@ -179,12 +461,12 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         private async void BtnTryDelete_Click(object sender, RoutedEventArgs e)
         {
             string path = TxtQuickPath?.Text?.Trim();
+            if (string.IsNullOrEmpty(path)) path = TxtTakeOwnPath?.Text?.Trim();
             if (string.IsNullOrEmpty(path)) return;
 
             Logger.Log($"[FORCE STOP UI] === Tentar Deletar clicado para: {path}");
             Logger.Log($"[FORCE STOP UI] Admin: {SystemUtils.IsRunningAsAdministrator()}");
 
-            // List folder contents immediately
             string folderContents = ListFolderContents(path);
             Logger.Log($"[FORCE STOP UI] Conteudo do caminho:\n{folderContents}");
 
@@ -211,12 +493,10 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
             try
             {
-                // Force delete via cmd /c (admin)
                 Logger.Log($"[FORCE STOP UI] Executando ForceDeleteViaCmd...");
                 var (deleted, errorMsg) = await Task.Run(() => ForceDeleteViaCmd(path));
                 Logger.Log($"[FORCE STOP UI] Resultado do delete: Success={deleted}, Error={errorMsg}");
 
-                // Check if file still exists after delete attempt
                 bool stillExists = File.Exists(path) || Directory.Exists(path);
                 Logger.Log($"[FORCE STOP UI] Arquivo ainda existe apos delete: {stillExists}");
 
@@ -230,7 +510,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     return;
                 }
 
-                // Delete failed - run full analysis to find what is blocking
                 TxtQuickResult.Text = "\U0001f512 Arquivo bloqueado - identificando bloqueadores...";
                 TxtQuickResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 200, 100));
                 TxtQuickDetail.Text = $"Windows nao conseguiu deletar: {errorMsg}";
@@ -241,7 +520,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
                 if (_quickResults.Count == 0)
                 {
-                    // No process found - try driver scan specifically
                     Logger.Log($"[FORCE STOP UI] Nenhum processo encontrado, tentando driver scan especifico...");
                     _quickResults = await Task.Run(() =>
                     {
@@ -295,12 +573,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
         }
 
-
-        /// <summary>
-        /// Force-delete a file or folder using cmd /c with admin privileges.
-        /// Bypasses .NET File.Delete restrictions on files held by kernel drivers.
-        /// Returns (success, errorMessage).
-        /// </summary>
         private static (bool Success, string Error) ForceDeleteViaCmd(string path)
         {
             Logger.Log($"[FORCE DELETE] Iniciado para: {path}");
@@ -311,7 +583,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 if (!File.Exists(path) && !Directory.Exists(path))
                 {
                     Logger.Log($"[FORCE DELETE] Arquivo/pasta ja nao existe.");
-                    return (true, ""); // already gone
+                    return (true, "");
                 }
 
                 bool isDir = Directory.Exists(path);
@@ -338,8 +610,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     return (false, "Nao foi possivel iniciar cmd.exe");
                 }
 
-                proc.WaitForExit(10000); // 10s timeout
-
+                proc.WaitForExit(10000);
                 string stdout = proc.StandardOutput.ReadToEnd();
                 string stderr = proc.StandardError.ReadToEnd();
                 Logger.Log($"[FORCE DELETE] cmd.exe exit code: {proc.ExitCode}");
@@ -348,12 +619,10 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 if (!string.IsNullOrEmpty(stderr))
                     Logger.Log($"[FORCE DELETE] stderr: {stderr.Trim()}");
 
-                // Check if file/folder is actually gone
                 bool gone = !File.Exists(path) && !Directory.Exists(path);
                 Logger.Log($"[FORCE DELETE] Arquivo existe apos comando: {!gone}");
                 if (gone) return (true, "");
 
-                // File still exists after del — held by a driver or system
                 string reason = proc.ExitCode == 0
                     ? "Arquivo segurado por driver ou processo do sistema (del retornou 0 mas arquivo ainda existe)"
                     : $"cmd.exe exit code: {proc.ExitCode}";
@@ -372,10 +641,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
         }
 
-        /// <summary>
-        /// Lists all files and subfolders in the given path for debugging.
-        /// Returns a formatted string with the listing.
-        /// </summary>
         private static string ListFolderContents(string path)
         {
             try
@@ -393,7 +658,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 sb.AppendLine($"Pasta: {path}");
                 sb.AppendLine($"---");
 
-                // List subdirectories
                 try
                 {
                     foreach (var dir in Directory.EnumerateDirectories(path))
@@ -404,7 +668,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 }
                 catch (Exception ex) { sb.AppendLine($"Erro ao listar pastas: {ex.Message}"); }
 
-                // List files
                 try
                 {
                     foreach (var file in Directory.EnumerateFiles(path))
@@ -419,7 +682,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 }
                 catch (Exception ex) { sb.AppendLine($"Erro ao listar arquivos: {ex.Message}"); }
 
-                // Recursive listing of subdirectories (1 level)
                 try
                 {
                     foreach (var dir in Directory.EnumerateDirectories(path))
@@ -455,6 +717,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         private async void BtnQuickRelease_Click(object sender, RoutedEventArgs e)
         {
             string path = TxtQuickPath?.Text?.Trim();
+            if (string.IsNullOrEmpty(path)) path = TxtTakeOwnPath?.Text?.Trim();
             if (string.IsNullOrEmpty(path) || _quickResults.Count == 0) return;
 
             var selected = _quickResults.Where(r => r.IsSelected).ToList();
@@ -491,7 +754,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     ? "Erros: " + string.Join("; ", result.Errors.Take(3))
                     : "Re-analisando...";
 
-                // Re-analyze to verify
                 await Task.Delay(500);
                 _quickResults = await Task.Run(() => ForceStopUnlockService.FindBlockingProcesses(path));
 
@@ -502,7 +764,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     QuickProcessList.ItemsSource = null;
                     BtnQuickRelease.Visibility = Visibility.Collapsed;
 
-                    // Retry the delete if it was triggered by Tentar Deletar
                     if (_retryDeleteAfterRelease && !string.IsNullOrEmpty(_pendingDeletePath))
                     {
                         TxtQuickDetail.Text = "Re-tentando delete...";
@@ -563,12 +824,10 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 {
                     Owner = Window.GetWindow(this)
                 };
-
-                // Pass the path from the quick scan if available
                 string path = TxtQuickPath?.Text?.Trim();
+                if (string.IsNullOrEmpty(path)) path = TxtTakeOwnPath?.Text?.Trim();
                 if (!string.IsNullOrEmpty(path) && (File.Exists(path) || Directory.Exists(path)))
                 {
-                    // Set the path in the window after it loads
                     win.Loaded += (s, ev) =>
                     {
                         var txtPath = win.FindName("TxtPath") as TextBox;
@@ -576,7 +835,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                             txtPath.Text = path;
                     };
                 }
-
                 win.ShowDialog();
             }
             catch (Exception ex)
@@ -672,7 +930,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                         mw.ShowInfo("MENU DE CONTEXTO", "Nenhuma entrada foi removida.");
                 }
 
-                // Rescan
                 await System.Threading.Tasks.Task.Run(() =>
                 {
                     _menuEntries = ForceStopUnlockService.ScanContextMenuEntries();

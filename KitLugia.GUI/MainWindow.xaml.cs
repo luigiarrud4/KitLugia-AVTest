@@ -1249,7 +1249,7 @@ namespace KitLugia.GUI
         {
             try
             {
-                var page = new Pages.WindowsSettings.ForceStopUnlockPage();
+                var page = new Pages.WindowsSettings.ForceStopUnlockPage(0);
                 CleanupAndNavigate(page);
 
                 // Highlight the ForceStopUnlock nav button
@@ -1260,11 +1260,31 @@ namespace KitLugia.GUI
                 {
                     await Task.Delay(300);
                     page.PreFillAndAnalyze(path);
-                });
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
             }
             catch (Exception ex)
             {
                 Logger.Log($"[NAV] Erro ao navegar para unlock: {ex.Message}");
+                NavigateToPage(PageType.ForceStopUnlock);
+            }
+        }
+
+        public void NavigateToTakeOwn(string path)
+        {
+            try
+            {
+                var page = new Pages.WindowsSettings.ForceStopUnlockPage(1);
+                CleanupAndNavigate(page);
+                HighlightNavItem("ForceStopUnlock");
+                _ = Dispatcher.BeginInvoke(async () =>
+                {
+                    await Task.Delay(300);
+                    page.PreFillAndTakeOwn(path);
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NAV] Erro ao navegar para takeown: {ex.Message}");
                 NavigateToPage(PageType.ForceStopUnlock);
             }
         }

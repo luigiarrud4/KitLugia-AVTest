@@ -8862,6 +8862,138 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
+        // --- Take Ownership via Kit (IPC --takeown) — versão “SUPER” usando FileTakeOwnership in-process ---
+        public static bool IsTakeOwnershipKitAdded()
+        {
+            try
+            {
+                string[] paths =
+                {
+                    @"HKEY_CURRENT_USER\Software\Classes\*\shell\kittakeown",
+                    @"HKEY_CURRENT_USER\Software\Classes\Directory\shell\kittakeown",
+                    @"HKEY_CURRENT_USER\Software\Classes\Drive\shell\kittakeown",
+                };
+                foreach (var p in paths)
+                {
+                    if (Registry.GetValue(p + @"\command", "", null) is string s && !string.IsNullOrEmpty(s))
+                        return true;
+                    if (Registry.GetValue(p, "", null) is string s2 && !string.IsNullOrEmpty(s2))
+                        return true;
+                }
+                return false;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+        public static void AddTakeOwnershipKit()
+        {
+            try
+            {
+                RemoveTakeOwnershipKit();
+                string exePath = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+                exePath = System.IO.Path.Combine(exePath, "KitLugia.GUI.exe");
+                if (!System.IO.File.Exists(exePath))
+                    exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(exePath)) return;
+
+                string cmd = $"\"{exePath}\" --takeown \"%1\"";
+                string icon = "%SystemRoot%\\System32\\imageres.dll,-78";
+                string[] shellPaths =
+                {
+                    @"Software\Classes\*\shell",
+                    @"Software\Classes\Directory\shell",
+                    @"Software\Classes\Drive\shell"
+                };
+                foreach (var shellPath in shellPaths)
+                {
+                    using var k = Registry.CurrentUser.CreateSubKey(shellPath + @"\kittakeown");
+                    k?.SetValue("", "👑 Take Ownership (KitLugia)");
+                    k?.SetValue("Icon", icon);
+                    k?.SetValue("HasLUAShield", "");
+                    using var c = Registry.CurrentUser.CreateSubKey(shellPath + @"\kittakeown\command");
+                    c?.SetValue("", cmd);
+                }
+                Logger.Log($"[TAKEOWN KIT] Menu de contexto registrado: {cmd}");
+            }
+            catch (Exception ex) { Logger.Log($"[TAKEOWN KIT] Erro ao registrar: {ex.Message}"); }
+        }
+        public static void RemoveTakeOwnershipKit()
+        {
+            try
+            {
+                string[] shellPaths =
+                {
+                    @"Software\Classes\*\shell",
+                    @"Software\Classes\Directory\shell",
+                    @"Software\Classes\Drive\shell"
+                };
+                string[] keyNames = { "kittakeown", "kit_takeown", "kit_takeownership" };
+                foreach (var shellPath in shellPaths)
+                    foreach (var keyName in keyNames)
+                        try { using var s = Registry.CurrentUser.OpenSubKey(shellPath, true); s?.DeleteSubKeyTree(keyName, false); } catch { }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        /// <summary>Chamado a cada abertura do Kit: se o exe mudou de pasta (update/cópia), atualiza o comando do menu para o Kit mais recente.</summary>
+        public static void RefreshContextMenuPathsIfNeeded()
+        {
+            try
+            {
+                string currentExe = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+                currentExe = System.IO.Path.Combine(currentExe, "KitLugia.GUI.exe");
+                if (!System.IO.File.Exists(currentExe))
+                    currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(currentExe)) return;
+
+                // Take Ownership (kittakeown)
+                if (IsTakeOwnershipKitAdded())
+                {
+                    string[] checkPaths =
+                    {
+                        @"HKEY_CURRENT_USER\Software\Classes\*\shell\kittakeown\command",
+                        @"HKEY_CURRENT_USER\Software\Classes\Directory\shell\kittakeown\command",
+                        @"HKEY_CURRENT_USER\Software\Classes\Drive\shell\kittakeown\command"
+                    };
+                    bool needsUpdate = false;
+                    foreach (var p in checkPaths)
+                    {
+                        var cmd = Registry.GetValue(p, "", null) as string;
+                        if (!string.IsNullOrEmpty(cmd) && cmd.IndexOf(currentExe, StringComparison.OrdinalIgnoreCase) < 0)
+                        { needsUpdate = true; break; }
+                    }
+                    if (needsUpdate)
+                    {
+                        Logger.Log($"[TAKEOWN KIT] Atualizando caminho do menu para Kit mais recente: {currentExe}");
+                        AddTakeOwnershipKit();
+                    }
+                }
+
+                // Force Stop Unlock (forcestopunlock)
+                if (IsForceStopUnlockAdded())
+                {
+                    string[] checkPaths =
+                    {
+                        @"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock\command",
+                        @"HKEY_CURRENT_USER\Software\Classes\Directory\shell\forcestopunlock\command",
+                        @"HKEY_CURRENT_USER\Software\Classes\Drive\shell\forcestopunlock\command"
+                    };
+                    bool needsUpdate = false;
+                    foreach (var p in checkPaths)
+                    {
+                        var cmd = Registry.GetValue(p, "", null) as string;
+                        if (!string.IsNullOrEmpty(cmd) && cmd.IndexOf(currentExe, StringComparison.OrdinalIgnoreCase) < 0)
+                        { needsUpdate = true; break; }
+                    }
+                    if (needsUpdate)
+                    {
+                        Logger.Log($"[FORCE STOP] Atualizando caminho do menu para Kit mais recente: {currentExe}");
+                        AddForceStopUnlock();
+                    }
+                }
+            }
+            catch (Exception ex) { Logger.Log($"[CTX REFRESH] {ex.Message}"); }
+        }
+
         // --- Force Close (exefile) ---
         public static bool IsForceCloseAdded()
         {

@@ -21,6 +21,7 @@ namespace KitLugia.GUI
         private static Mutex? _mutex;
 
         public static string? UnlockPath { get; private set; }
+        public static string? TakeOwnPath { get; private set; }
 
         [STAThread]
         public static void Main(string[] args)
@@ -47,6 +48,7 @@ namespace KitLugia.GUI
             }
 
             UnlockPath = unlockPath;
+            TakeOwnPath = takeOwnPath;
 
             // ★ OTIMIZAÇÃO: boost self priority to High so the tray icon + watchdog load faster.
             // Padrão é Normal — fica atrás de outros apps de boot na disputa por CPU.

@@ -111,33 +111,116 @@ namespace KitLugia.GUI.Windows.TaskManager
         private readonly Dictionary<string, (string adapter, string conn, string mac, string speed, string ip)> _hwNets = new(StringComparer.OrdinalIgnoreCase);
         private string _hwRamSpeed = "?", _hwRamFormFactor = "?", _hwRamSlotsUsed = "?", _hwRamSlotsTotal = "?";
 
-        // ══════════════════════════════════════════════
-        //  CPU CACHE — NATIVO: GetLogicalProcessorInformationEx (RelationCache) + CIM/WMI fallback
-        //  Sucessor WMI: NativeHardware (nativo <15ms, funciona WinPE / WmiPrvSE travado)
-        // ══════════════════════════════════════════════
         private static (string l1, string l2, string l3) ReadCpuCacheFromRegistry()
         {
-            try { return NativeHardware.GetCpuCacheNative(); }
+            try
+            {
+                // Fonte primária: Win32_CacheMemory (soma real por nível — funciona em híbridos)
+                // Level 3→ L1, Level 4→ L2, Level 5→ L3 (Win32_CacheMemory começa em 3)
+                try
+                {
+                    long l1b = 0, l2b = 0, l3m = 0;
+                    var lvlVals = new Dictionary<int, List<long>>();
+                    using var s = new System.Management.ManagementObjectSearcher("SELECT Level,InstalledSize FROM Win32_CacheMemory");
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        int lvl = Convert.ToInt32(o["Level"] ?? 0);
+                        long sz = Convert.ToInt64(o["InstalledSize"] ?? 0L); // KB
+                        if (sz <= 0) continue;
+                        if (!lvlVals.TryGetValue(lvl, out var lst)) lvlVals[lvl] = lst = new List<long>();
+                        lst.Add(sz);
+                    }
+                    // L1 = Level 3 → soma (cada núcleo tem L1)
+                    if (lvlVals.TryGetValue(3, out var v3)) l1b = v3.Sum();
+                    // L2 = Level 4 → soma (clusters P+E)
+                    if (lvlVals.TryGetValue(4, out var v4)) l2b = v4.Sum();
+                    // L3 = Level 5 → MAX (compartilhado, WMI duplica por dies)
+                    if (lvlVals.TryGetValue(5, out var v5)) l3m = v5.Count > 0 ? v5.Max() : 0;
+
+                    if (l1b > 0 || l2b > 0 || l3m > 0)
+                    {
+                        string Fmt(long kb) => kb >= 1024 ? $"{kb / 1024.0:F1} MB" : $"{kb} KB";
+                        if (l1b == 0) l1b = Environment.ProcessorCount * 64; // fallback
+                        return (Fmt(l1b), Fmt(l2b), l3m > 0 ? Fmt(l3m) : "—");
+                    }
+                }
+                catch { }
+
+                // Fallback: Win32_Processor (L2/L3)
+                int l2f = 0, l3f = 0;
+                try
+                {
+                    using var s = new System.Management.ManagementObjectSearcher("SELECT L2CacheSize,L3CacheSize FROM Win32_Processor");
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        l2f = Convert.ToInt32(o["L2CacheSize"] ?? 0);
+                        l3f = Convert.ToInt32(o["L3CacheSize"] ?? 0);
+                        break;
+                    }
+                }
+                catch { }
+                long l1e = Environment.ProcessorCount * 64L;
+                string Fmt2(long kb) => kb >= 1024 ? $"{kb / 1024.0:F1} MB" : $"{kb} KB";
+                return (Fmt2(l1e), l2f > 0 ? Fmt2(l2f) : "?", l3f > 0 ? Fmt2(l3f) : "—");
+            }
             catch { return ("?", "?", "?"); }
         }
 
         // ══════════════════════════════════════════════
-        //          // IsProcessorFeaturePresent agora via NativeHardware (mantido alias para compat)
+        //  VIRTUALIZAÇÃO — mesma técnica do taskmgr.exe (reversing confirmado):
+        //  CPUID folha 0x01, bit 31 do ECX = "hypervisor present".
+        //  O WMI VirtualizationFirmwareEnabled só mostra o estado do firmware e
+        //  reporta false quando o hipervisor JÁ está em execução (Hyper-V/VBS).
+        //  Usamos IsProcessorFeaturePresent(PF_VIRT_FIRMWARE_ENABLED) + detecção
+        //  de hipervisor via registry/registry keys do Windows.
+        // ══════════════════════════════════════════════
         [DllImport("kernel32.dll")]
         private static extern bool IsProcessorFeaturePresent(uint processorFeature);
-        private const uint PF_VIRT_FIRMWARE_ENABLED = 21;
-        private const uint PF_HYPERVISOR_PRESENT = 22;
+        private const uint PF_VIRT_FIRMWARE_ENABLED = 21; // virtualização habilitada no firmware
+        private const uint PF_HYPERVISOR_PRESENT = 22;    // hipervisor EM EXECUÇÃO
 
         private static string DetectVirtualizationState()
         {
-            try { return NativeHardware.GetVirtualizationNative(); }
+            try
+            {
+                bool hypervisorRunning = Environment.OSVersion.Version.Build >= 10240 &&
+                    (IsProcessorFeaturePresent(PF_HYPERVISOR_PRESENT) || IsHypervisorPresentViaCpuid());
+                if (hypervisorRunning) return "Ativado (hipervisor ativo)";
+
+                bool fwEnabled = IsProcessorFeaturePresent(PF_VIRT_FIRMWARE_ENABLED);
+                if (!fwEnabled)
+                {
+                    // Fallback WMI: VirtualizationFirmwareEnabled
+                    try
+                    {
+                        using var s = new System.Management.ManagementObjectSearcher("SELECT VirtualizationFirmwareEnabled FROM Win32_Processor");
+                        foreach (System.Management.ManagementObject o in s.Get())
+                        {
+                            if (o["VirtualizationFirmwareEnabled"] is bool vb && vb) { fwEnabled = true; break; }
+                            if (o["VirtualizationFirmwareEnabled"] != null) break; // leu valor definitivo false
+                        }
+                    }
+                    catch { }
+                }
+                return fwEnabled ? "Ativado" : "Desativado";
+            }
             catch { return "?"; }
         }
 
+        /// <summary>
+        /// Lê "HypervisorPresent" via WMI Win32_ComputerSystem (confiável p/ Hyper-V, VBS,
+        /// VMware Workstation com hypercall ativo etc). Complementa o P/Invoke.
+        /// </summary>
         private static bool IsHypervisorPresentViaCpuid()
         {
-            try { return NativeHardware.GetVirtualizationNative().Contains("hipervisor", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
+            try
+            {
+                using var s = new System.Management.ManagementObjectSearcher("SELECT HypervisorPresent FROM Win32_ComputerSystem");
+                foreach (System.Management.ManagementObject o in s.Get())
+                    return o["HypervisorPresent"] is bool hb && hb;
+            }
+            catch { }
+            return false;
         }
 
         private async Task BuildPerfDevicesAsync()
@@ -151,14 +234,25 @@ namespace KitLugia.GUI.Windows.TaskManager
                 try { disks.AddRange(new PerformanceCounterCategory("PhysicalDisk").GetInstanceNames()); } catch { }
                 try { nets.AddRange(new PerformanceCounterCategory("Network Interface").GetInstanceNames()); } catch { }
 
-                // ── CPU completa — NATIVO (Registry + GetLogicalProcessorInformationEx + IsProcessorFeaturePresent)
-                // Sucessor WMI: NativeHardware (CIM WsMan 30% mais rápido) → fallback WMI DCOM
-                string cpuName = NativeHardware.GetCpuNameNative();
-                string virt = NativeHardware.GetVirtualizationNative();
-                string sockets = NativeHardware.GetCpuSocketsNative();
-                string clock = NativeHardware.GetCpuClockNative();
+                // ── CPU completa ──
+                string cpuName = "", virt = "Desativado", sockets = "1", clock = "?";
+                virt = DetectVirtualizationState(); // P/Invoke kernel32 — mesma fonte do taskmgr
+                try
+                {
+                    using var s = new System.Management.ManagementObjectSearcher("SELECT Name,MaxClockSpeed,SocketDesignation FROM Win32_Processor");
+                    var sockSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        cpuName = o["Name"]?.ToString() ?? cpuName;
+                        clock = $"{Convert.ToDouble(o["MaxClockSpeed"]) / 1000.0:F2} GHz";
+                        sockSet.Add(o["SocketDesignation"]?.ToString() ?? "CPU 0");
+                        break;
+                    }
+                    sockets = Math.Max(1, sockSet.Count).ToString();
+                }
+                catch { }
                 if (string.IsNullOrWhiteSpace(cpuName)) cpuName = $"CPU ({Environment.ProcessorCount} núcleos)";
-                var (l1, l2, l3) = ReadCpuCacheFromRegistry(); // nativo + CIM fallback interno
+                var (l1, l2, l3) = ReadCpuCacheFromRegistry();
 
                 // ── GPUs completas — MODELO UNIVERSAL ──
                 // Fontes em cascata, funciona p/ NVIDIA, AMD, Intel e qualquer WDDM:
@@ -200,28 +294,24 @@ namespace KitLugia.GUI.Windows.TaskManager
                 }
                 catch { }
 
-                // CIM (WsMan, 30% mais rápido que WMI DCOM) → fallback WMI legado via NativeHardware.Cim
+                // WMI: datas de driver + PNP (para o registro) — cobre tudo que tem driver exposto
                 var wmiGpus = new List<(string name, string driver, string date, string pnp, ulong adapterRam)>();
                 try
                 {
-                    var rows = NativeHardware.Cim.Query("SELECT Name,DriverVersion,DriverDate,PNPDeviceID,AdapterRAM FROM Win32_VideoController");
-                    foreach (var r in rows)
+                    using var s = new System.Management.ManagementObjectSearcher("SELECT Name,DriverVersion,DriverDate,PNPDeviceID,AdapterRAM FROM Win32_VideoController");
+                    foreach (System.Management.ManagementObject o in s.Get())
                     {
                         string d = "—";
                         try
                         {
-                            var dd = r.TryGetValue("DriverDate", out var v) ? v?.ToString() : null;
-                            if (!string.IsNullOrEmpty(dd))
-                                d = System.Management.ManagementDateTimeConverter.ToDateTime(dd).ToString("dd/MM/yyyy");
+                            if (o["DriverDate"] != null)
+                                d = System.Management.ManagementDateTimeConverter.ToDateTime(o["DriverDate"]?.ToString() ?? "").ToString("dd/MM/yyyy");
                         }
                         catch { }
                         ulong ram = 0;
-                        try { ram = Convert.ToUInt64(r.TryGetValue("AdapterRAM", out var av) ? av ?? (ulong)0 : (ulong)0); } catch { }
-                        wmiGpus.Add((r.TryGetValue("Name", out var nv) ? nv?.ToString() ?? "GPU" : "GPU",
-                                     r.TryGetValue("DriverVersion", out var dv) ? dv?.ToString() ?? "—" : "—",
-                                     d,
-                                     r.TryGetValue("PNPDeviceID", out var pv) ? pv?.ToString() ?? "" : "",
-                                     ram));
+                        try { ram = Convert.ToUInt64(o["AdapterRAM"] ?? (ulong)0); } catch { }
+                        wmiGpus.Add((o["Name"]?.ToString() ?? "GPU", o["DriverVersion"]?.ToString() ?? "—", d,
+                                     o["PNPDeviceID"]?.ToString() ?? "", ram));
                     }
                 }
                 catch { }
@@ -289,15 +379,32 @@ namespace KitLugia.GUI.Windows.TaskManager
                     }
                 }
 
-                // ── Discos completos — NATIVO (IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS) + CIM fallback
-                // Sucessor WMI: NativeHardware (nativo <10ms, funciona WinPE / WmiPrvSE travado) → CIM → WMI
+                // ── Discos completos (modelo, capacidade, disco do sistema, pagefile) ──
                 var diskInfo = new Dictionary<string, (string, string, string, bool, bool)>(StringComparer.OrdinalIgnoreCase);
                 var systemDrive = System.IO.Path.GetPathRoot(Environment.SystemDirectory)?.TrimEnd('\\') ?? "C:";
-                var pageDrives = NativeHardware.GetPagefileDrives();
-                var driveToPhysical = NativeHardware.MapLogicalToPhysicalNative();
-                var byIndex = NativeHardware.GetDiskStaticInfoNative();
+                var pageDrives = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 try
                 {
+                    using var s = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_PageFileUsage");
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        string n = o["Name"]?.ToString() ?? ""; // ex: C:\pagefile.sys
+                        var root = System.IO.Path.GetPathRoot(n)?.TrimEnd('\\');
+                        if (!string.IsNullOrEmpty(root)) pageDrives.Add(root);
+                    }
+                }
+                catch { }
+                var driveToPhysical = MapLogicalToPhysical();
+                try
+                {
+                    using var s = new System.Management.ManagementObjectSearcher("SELECT Model,Size,Index FROM Win32_DiskDrive");
+                    var byIndex = new Dictionary<int, (string model, string sizeGb)>();
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        int idx = Convert.ToInt32(o["Index"] ?? 0);
+                        ulong sz = 0; try { sz = Convert.ToUInt64(o["Size"] ?? (ulong)0); } catch { }
+                        byIndex[idx] = (o["Model"]?.ToString() ?? "?", $"{sz / 1024 / 1024 / 1024:N0} GB");
+                    }
                     foreach (var inst in disks)
                     {
                         // instância PhysicalDisk: "0 C:" → extrai número físico
@@ -359,9 +466,35 @@ namespace KitLugia.GUI.Windows.TaskManager
                     netInfo[nic.desc] = (nic.desc, nic.conn, FormatMac(nic.mac), FormatLinkSpeed(nic.speed), nic.ip);
                 nets = allNics.Select(x => x.desc).ToList();
 
-                // ── RAM completa — NATIVO SMBIOS (GetSystemFirmwareTable 'RSMB') <15ms vs WMI 80ms
-                // Sucessor WMI: NativeHardware (nativo + CIM → WMI fallback)
-                var (ramSpeed, ramFF, slotsUsed, slotsTotal) = NativeHardware.GetRamInfoNative();
+                // ── RAM completa ──
+                string ramSpeed = "?", ramFF = "?", slotsUsed = "?", slotsTotal = "?";
+                try
+                {
+                    int used = 0; ulong totCap = 0; string spd = "?", ff = "?", memType = "";
+                    using (var s = new System.Management.ManagementObjectSearcher("SELECT Capacity,Speed,ConfiguredClockSpeed,SMBIOSMemoryType,FormFactor FROM Win32_PhysicalMemory"))
+                        foreach (System.Management.ManagementObject o in s.Get())
+                        {
+                            used++;
+                            try { totCap += Convert.ToUInt64(o["Capacity"]); } catch { }
+                            // Speed pode ser 0 quando ConfiguredClockSpeed tem o valor (DDR5)
+                            uint s1 = 0, s2 = 0;
+                            try { s1 = Convert.ToUInt32(o["Speed"] ?? 0u); } catch { }
+                            try { s2 = Convert.ToUInt32(o["ConfiguredClockSpeed"] ?? 0u); } catch { }
+                            uint best = s2 > 0 ? s2 : s1;
+                            if (best > 0) spd = best.ToString();
+                            int ffCode = Convert.ToInt32(o["FormFactor"] ?? 0);
+                            ff = ffCode switch { 8 => "DIMM", 12 => "SODIMM", _ => ffCode.ToString() };
+                            int tp = Convert.ToInt32(o["SMBIOSMemoryType"] ?? 0);
+                            memType = tp switch { 20 => "DDR", 21 => "DDR2", 22 => "DDR2 FB-DIMM", 24 => "DDR3", 26 => "DDR4", 34 => "DDR5", 0 => "", _ => $"DDR?" };
+                        }
+                    int total = 0;
+                    using (var s = new System.Management.ManagementObjectSearcher("SELECT MemoryDevices FROM Win32_PhysicalMemoryArray"))
+                        foreach (System.Management.ManagementObject o in s.Get())
+                        { try { total += Convert.ToInt32(o["MemoryDevices"]); } catch { } }
+                    string typeSuffix = string.IsNullOrEmpty(memType) ? "" : $" {memType}";
+                    ramSpeed = $"{spd} MHz{typeSuffix}"; ramFF = ff; slotsUsed = used.ToString(); slotsTotal = total > 0 ? total.ToString() : "?";
+                }
+                catch { }
 
                 return (disks, nets, cpuName, virt, sockets, clock, l1, l2, l3, gpus, diskInfo, netInfo, ramSpeed, ramFF, slotsUsed, slotsTotal);
             });
@@ -451,11 +584,42 @@ namespace KitLugia.GUI.Windows.TaskManager
             });
         }
 
-        /// <summary>Mapeia índice físico do disco → letras (NATIVO IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS + CIM/WMI fallback).</summary>
+        /// <summary>Mapeia índice físico do disco → letras de unidade (via associações WMI).</summary>
         private static Dictionary<int, List<string>> MapLogicalToPhysical()
         {
-            try { return NativeHardware.MapLogicalToPhysicalNative(); }
-            catch { return new Dictionary<int, List<string>>(); }
+            var map = new Dictionary<int, List<string>>();
+            try
+            {
+                // Associação Win32_DiskDriveToDiskPartition + Win32_LogicalDiskToPartition
+                var partToPhys = new Dictionary<string, int>();
+                using (var s = new System.Management.ManagementObjectSearcher(
+                    "SELECT Antecedent,Dependent FROM Win32_DiskDriveToDiskPartition"))
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        var ant = o["Antecedent"]?.ToString() ?? "";
+                        var dep = o["Dependent"]?.ToString() ?? "";
+                        var mP = System.Text.RegularExpressions.Regex.Match(ant, @"DiskIndex=""(\d+)""");
+                        var mM = System.Text.RegularExpressions.Regex.Match(dep, @"DeviceId=""([^""]+)""");
+                        if (mP.Success && mM.Success) partToPhys[mM.Groups[1].Value.Replace("\\\\", "\\")] = int.Parse(mP.Groups[1].Value);
+                    }
+                using (var s = new System.Management.ManagementObjectSearcher(
+                    "SELECT Antecedent,Dependent FROM Win32_LogicalDiskToPartition"))
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        var ant = o["Antecedent"]?.ToString() ?? "";
+                        var dep = o["Dependent"]?.ToString() ?? "";
+                        var mL = System.Text.RegularExpressions.Regex.Match(dep, @"DeviceId=""([^""]+)""");
+                        var mM = System.Text.RegularExpressions.Regex.Match(ant, @"DeviceId=""([^""]+)""");
+                        if (mL.Success && mM.Success && partToPhys.TryGetValue(mM.Groups[1].Value.Replace("\\\\", "\\"), out int phys))
+                        {
+                            string letter = mL.Groups[1].Value;
+                            if (!map.TryGetValue(phys, out var list)) map[phys] = list = new List<string>();
+                            list.Add(letter);
+                        }
+                    }
+            }
+            catch { }
+            return map;
         }
 
         private static string ExtractDriveLetters(string physicalDiskInstance)

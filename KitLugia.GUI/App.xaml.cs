@@ -46,19 +46,37 @@ namespace KitLugia.GUI
                 return;
             }
 
-            // Modo --unlock: abre a janela Force Stop Unlock diretamente (via context menu)
+            // Modo --unlock / --takeown: abre a janela Force Stop Unlock diretamente (via context menu)
             string? unlockPath = KitLugia.GUI.Program.UnlockPath;
-            if (!string.IsNullOrEmpty(unlockPath))
+            string? takeOwnPath = KitLugia.GUI.Program.TakeOwnPath;
+            if (!string.IsNullOrEmpty(unlockPath) || !string.IsNullOrEmpty(takeOwnPath))
             {
-                KitLugia.Core.Logger.Log($"[FORCE STOP] Modo unlock ativado: {unlockPath}");
+                bool isTakeOwn = !string.IsNullOrEmpty(takeOwnPath);
+                string targetPath = isTakeOwn ? takeOwnPath! : unlockPath!;
+                KitLugia.Core.Logger.Log($"[FILE OPS] Modo {(isTakeOwn ? "takeown" : "unlock")} ativado: {targetPath}");
                 base.OnStartup(e);
-                OpenForceStopUnlock(unlockPath);
+                // IPC ainda precisa escutar mesmo no cold-start
+                KitLugia.GUI.Services.UnlockIpcServer.Start();
+                _ = Task.Run(() => KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded());
+                // Cria MainWindow mas já navega pra aba correta antes de Show
+                var mwEarly = new MainWindow();
+                if (!StartMinimized) mwEarly.Show();
+                // Aguarda a janela carregar e navega
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(600);
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        if (isTakeOwn) mwEarly.NavigateToTakeOwn(targetPath);
+                        else mwEarly.NavigateToUnlock(targetPath);
+                    });
+                });
                 return;
             }
 
             base.OnStartup(e);
 
-            // Start IPC server to receive --unlock commands from other instances
+            // Start IPC server to receive --unlock/--takeown commands from other instances
             KitLugia.GUI.Services.UnlockIpcServer.Start();
 
             // Sempre verifica .NET Desktop Runtime e oferece instalação direta (sem abrir site) — prompt inline
@@ -80,6 +98,7 @@ namespace KitLugia.GUI
 
             // Always run startup method check in background so the window appears first
             _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
+            _ = Task.Run(() => KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded());
 
             var mainWindow = new MainWindow();
             
