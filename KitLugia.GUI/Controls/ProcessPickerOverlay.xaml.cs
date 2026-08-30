@@ -34,14 +34,14 @@ namespace KitLugia.GUI.Controls
     /// </summary>
     public partial class ProcessPickerOverlay : UserControl
     {
-        // Evento disparado quando o usuário confirma: (processName, limitMB)
-        public event Action<string, long>? ProcessSelected;
+        // Evento disparado quando o usuário confirma: (processNames, limitMB)
+        public event Action<List<string>, long>? ProcessSelected;
 
         // Evento disparado quando o overlay é fechado sem confirmar
         public event Action? OverlayClosed;
 
         private List<ProcessEntry> _allEntries = new();
-        private ProcessEntry? _selectedEntry;
+        private readonly HashSet<ProcessEntry> _selectedEntries = new();
 
         // Cor de destaque para item selecionado
         private static readonly SolidColorBrush _selectedBg =
@@ -64,9 +64,9 @@ namespace KitLugia.GUI.Controls
             {
                 Visibility = Visibility.Visible;
                 TxtSearch.Text = "";
-                TxtSelectedProcess.Text = "Nenhum processo selecionado";
+                _selectedEntries.Clear();
+                UpdateFooterText();
                 BtnConfirm.IsEnabled = false;
-                _selectedEntry = null;
                 await RefreshAsync();
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -312,20 +312,23 @@ namespace KitLugia.GUI.Controls
             // Hover
             row.MouseEnter += (s, e) =>
             {
-                if (row.Tag is ProcessEntry pe && pe != _selectedEntry)
+                if (row.Tag is ProcessEntry pe && !_selectedEntries.Contains(pe))
                     row.Background = _hoverBg;
             };
             row.MouseLeave += (s, e) =>
             {
-                if (row.Tag is ProcessEntry pe && pe != _selectedEntry)
+                if (row.Tag is ProcessEntry pe && !_selectedEntries.Contains(pe))
                     row.Background = _normalBg;
             };
 
-            // Click �?" seleciona
+            // Click: Ctrl segurado = toggle multi-selecao; senao = selecao unica
             row.MouseLeftButtonDown += (s, e) =>
             {
                 if (row.Tag is ProcessEntry pe)
-                    SelectEntry(pe, row);
+                {
+                    bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+                    SelectEntry(pe, row, toggle: ctrl);
+                }
             };
 
             // Double-click �?" confirma direto
@@ -333,7 +336,8 @@ namespace KitLugia.GUI.Controls
             {
                 if (e.ClickCount == 2 && row.Tag is ProcessEntry pe)
                 {
-                    SelectEntry(pe, row);
+                    bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+                    SelectEntry(pe, row, toggle: ctrl);
                     BtnConfirm_Click(this, new RoutedEventArgs());
                 }
             };
@@ -344,33 +348,121 @@ namespace KitLugia.GUI.Controls
 
         // �"?�"?�"✅ Seleção �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
 
-        private void SelectEntry(ProcessEntry entry, Border row)
+        private void SelectEntry(ProcessEntry entry, Border row, bool toggle = false)
         {
-            // Desmarca o anterior
-            if (_selectedEntry?.RowBorder != null)
+            if (toggle)
             {
-                _selectedEntry.RowBorder.Background = _normalBg;
-                _selectedEntry.RowBorder.BorderThickness = new Thickness(0);
-                // Oculta check mark
-                HideCheck(_selectedEntry.RowBorder);
+                // Ctrl+click: alternar seleção
+                if (_selectedEntries.Contains(entry))
+                {
+                    _selectedEntries.Remove(entry);
+                    row.Background = _normalBg;
+                    row.BorderThickness = new Thickness(0);
+                    HideCheck(row);
+                }
+                else
+                {
+                    _selectedEntries.Add(entry);
+                    row.Background = _selectedBg;
+                    row.BorderBrush = new SolidColorBrush(Color.FromArgb(100, 255, 215, 0));
+                    row.BorderThickness = new Thickness(1);
+                    ShowCheck(row);
+                }
+            }
+            else
+            {
+                // Clique normal: limpa tudo e seleciona só este
+                ClearAllSelections();
+                _selectedEntries.Add(entry);
+                row.Background = _selectedBg;
+                row.BorderBrush = new SolidColorBrush(Color.FromArgb(100, 255, 215, 0));
+                row.BorderThickness = new Thickness(1);
+                ShowCheck(row);
             }
 
-            _selectedEntry = entry;
+            UpdateFooterText();
 
-            // Marca o novo
-            row.Background = _selectedBg;
-            row.BorderBrush = new SolidColorBrush(Color.FromArgb(100, 255, 215, 0));
-            row.BorderThickness = new Thickness(1);
-            ShowCheck(row);
+            // Sugere limite inteligente baseado no tipo + uso atual
+            if (_selectedEntries.Count > 0)
+            {
+                long maxRam = _selectedEntries.Max(e => e.TotalRamMB);
+                long suggested = SuggestSmartLimit(_selectedEntries, maxRam);
+                TxtLimitMB.Text = suggested.ToString();
+                // Mostra aviso se o limite sugerido é menor que o uso atual
+                if (suggested < maxRam)
+                {
+                    TxtSelectedProcess.Text += $"\n\u26A0\uFE0F Aviso: limite ({suggested}MB) < uso atual ({maxRam}MB). " +
+                        "O KitLugia usará o commit size como floor para evitar crash.";
+                }
+            }
+        }
 
-            TxtSelectedProcess.Text = $"Selecionado: {entry.DisplayName}  ({entry.TotalRamMB} MB em uso)";
-            BtnConfirm.IsEnabled = true;
+        private void ClearAllSelections()
+        {
+            foreach (var e in _selectedEntries)
+            {
+                if (e.RowBorder != null)
+                {
+                    e.RowBorder.Background = _normalBg;
+                    e.RowBorder.BorderThickness = new Thickness(0);
+                    HideCheck(e.RowBorder);
+                }
+            }
+            _selectedEntries.Clear();
+        }
 
-            // Sugere limite = 150% do uso atual, mínimo 200MB
-            long suggested = entry.TotalRamMB > 0
-                ? Math.Max(200, (long)(entry.TotalRamMB * 1.5))
-                : 500;
-            TxtLimitMB.Text = suggested.ToString();
+        /// <summary>
+        /// Sugere limite inteligente baseado no tipo do processo.
+        /// Electron/Chromium precisam de mais folga para não quebrar.
+        /// </summary>
+        private static long SuggestSmartLimit(HashSet<ProcessEntry> selected, long maxRamMB)
+        {
+            // Pega o nome do maior consumidor
+            string name = selected.OrderByDescending(e => e.TotalRamMB).First().ProcessName.ToLowerInvariant();
+
+            // Electron/Chromium: 2x o uso atual ou mínimo 300MB (apps crasham abaixo disso)
+            if (name is "discord" or "slack" or "teams" or "code" or "spotify" or
+                "telegram" or "signal" or "whatsapp" or "notion" or "figma" or "obsidian" or
+                "electron" || name.Contains("opera") || name.Contains("chrome") ||
+                name.Contains("msedge") || name.Contains("brave") || name.Contains("vivialdi") ||
+                name.Contains("chromium") || name.Contains("firefox"))
+            {
+                return maxRamMB > 0 ? Math.Max(300, (long)(maxRamMB * 2.0)) : 500;
+            }
+
+            // Heavy apps (games, creative): 1.5x ou mínimo 400MB
+            if (name.Contains("steam") || name.Contains("epicgames") || name.Contains("unity") ||
+                name.Contains("blender") || name.Contains("photoshop"))
+            {
+                return maxRamMB > 0 ? Math.Max(400, (long)(maxRamMB * 1.5)) : 600;
+            }
+
+            // Apps comuns: 1.5x ou mínimo 200MB
+            return maxRamMB > 0 ? Math.Max(200, (long)(maxRamMB * 1.5)) : 400;
+        }
+
+        private void UpdateFooterText()
+        {
+            if (_selectedEntries.Count == 0)
+            {
+                TxtSelectedProcess.Text = "Nenhum processo selecionado";
+                BtnConfirm.Content = "\u2705 Adicionar Limite";
+                BtnConfirm.IsEnabled = false;
+            }
+            else if (_selectedEntries.Count == 1)
+            {
+                var e = _selectedEntries.First();
+                TxtSelectedProcess.Text = $"Selecionado: {e.DisplayName}  ({e.TotalRamMB} MB em uso)";
+                BtnConfirm.Content = "\u2705 Adicionar Limite";
+                BtnConfirm.IsEnabled = true;
+            }
+            else
+            {
+                long total = _selectedEntries.Sum(e => e.TotalRamMB);
+                TxtSelectedProcess.Text = $"Selecionados: {_selectedEntries.Count} processos  ({total} MB em uso)";
+                BtnConfirm.Content = $"\u2705 Adicionar {_selectedEntries.Count} Limites";
+                BtnConfirm.IsEnabled = true;
+            }
         }
 
         private static void ShowCheck(Border row)
@@ -419,9 +511,8 @@ namespace KitLugia.GUI.Controls
 
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
-            _selectedEntry = null;
-            TxtSelectedProcess.Text = "Nenhum processo selecionado";
-            BtnConfirm.IsEnabled = false;
+            _selectedEntries.Clear();
+            UpdateFooterText();
             await RefreshAsync();
         }
 
@@ -475,7 +566,7 @@ namespace KitLugia.GUI.Controls
 
         private void BtnConfirm_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedEntry == null) return;
+            if (_selectedEntries.Count == 0) return;
 
             if (!long.TryParse(TxtLimitMB.Text?.Trim(), out long limitMB) || limitMB < 50)
             {
@@ -484,7 +575,8 @@ namespace KitLugia.GUI.Controls
                 return;
             }
 
-            ProcessSelected?.Invoke(_selectedEntry.ProcessName, limitMB);
+            var names = _selectedEntries.Select(e => e.ProcessName).ToList();
+            ProcessSelected?.Invoke(names, limitMB);
             Visibility = Visibility.Collapsed;
         }
     }

@@ -88,6 +88,20 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 mw.NavigateToPage(PageType.ContextMenuAddPage);
         }
 
+        private void BtnStoreRemake_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Igual TaskManager: janela separada arrastável para fora do Kit (não Page presa no Frame)
+                var owner = Application.Current?.MainWindow;
+                var w = new Windows.KitStore.KitStoreWindow();
+                if (owner != null && owner.IsVisible) w.Owner = owner;
+                w.Show();
+                KitLugia.Core.Logger.Log("[STORE] KitStore aberta como janela separada (igual TaskManager).");
+            }
+            catch (Exception ex) { KitLugia.Core.Logger.Log($"[STORE] Erro abrir KitStore: {ex.Message}"); }
+        }
+
         private void BtnPowerPlan_Click(object sender, RoutedEventArgs e)
         {
             if (_isOperation) return;

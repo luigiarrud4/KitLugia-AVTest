@@ -158,6 +158,7 @@ namespace KitLugia.GUI
         WinpeTools,
         ReinstallPreserve,
         WindowsUpdate,
+        StoreRemake,
     }
 
     public partial class MainWindow : Window, INotifyPropertyChanged
@@ -964,6 +965,7 @@ namespace KitLugia.GUI
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 PageType.WinpeTools => new WinpeToolsPage(),
                 PageType.ReinstallPreserve => new ReinstallPreservePage(),
+                PageType.StoreRemake => new Pages.WindowsSettings.StoreRemakePage(),
                 _ => new DashboardPage()
             };
         }
@@ -1180,6 +1182,18 @@ namespace KitLugia.GUI
         /// </summary>
         public void NavigateToPage(PageType pageType, int tabIndex = 0, bool focusQuickAdd = false)
         {
+            // Store sempre como janela separada igual TaskManager — não prende no Frame (pesquisei TaskManager: BtnKitTaskManager_Click faz new Window {Owner=this}.Show())
+            if (pageType == PageType.StoreRemake)
+            {
+                try
+                {
+                    var w = new Windows.KitStore.KitStoreWindow { Owner = this };
+                    w.Show();
+                    KitLugia.Core.Logger.Log("[STORE] KitStore aberta via NavigateToPage (janela separada).");
+                }
+                catch (Exception ex) { KitLugia.Core.Logger.Log($"[STORE] Erro Navigate Store: {ex.Message}"); }
+                return;
+            }
             Page? newPage = pageType switch
             {
                 PageType.Dashboard => new DashboardPage(),
@@ -1222,6 +1236,7 @@ namespace KitLugia.GUI
                 PageType.WinpeTools => new WinpeToolsPage(),
                 PageType.ReinstallPreserve => new ReinstallPreservePage(),
                 PageType.WindowsUpdate => new WindowsUpdatePage(),
+                PageType.StoreRemake => new Pages.WindowsSettings.StoreRemakePage(),
                 _ => null
             };
 

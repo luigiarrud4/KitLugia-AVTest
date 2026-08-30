@@ -1,0 +1,103 @@
+<Window x:Class="KitLugia.GUI.Windows.StoreRemakeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Microsoft Store Remake — KitLugia" Height="820" Width="1280" MinWidth="1000" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="#202020"
+        ShowInTaskbar="True"
+        WindowStyle="None"
+        TextElement.Foreground="White"
+        TextElement.FontFamily="Segoe UI Variable, Segoe UI">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="32" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="6"/>
+    </WindowChrome.WindowChrome>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title bar — idêntico TaskManager mas com título Store e minimize liberado -->
+        <Border Grid.Row="0" Background="#1E1E1E" BorderBrush="#2A2A2A" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Border Width="20" Height="20" CornerRadius="4" Background="#0F1A2E" BorderBrush="#0078D4" BorderThickness="1">
+                        <TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#4CC2FF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Microsoft Store Remake" FontSize="12" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    <TextBlock Text=" — KitLugia" FontSize="11" Foreground="#6A6A6A" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                </StackPanel>
+                <!-- drag area -->
+                <Rectangle Grid.Column="1" Fill="Transparent" WindowChrome.IsHitTestVisibleInChrome="True"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="BtnMinimize" Width="46" Height="32" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand" Click="BtnMinimize_Click"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" Padding="0">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#333333"/></Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button x:Name="BtnMaximize" Width="46" Height="32" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand" Click="BtnMaximize_Click"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock x:Name="IconMaximize" Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#333333"/></Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Width="46" Height="32" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand" Click="BtnClose_Click"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="b" Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#E81123"/><Setter Property="Foreground" Value="White"/></Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Frame x:Name="MainFrame" Grid.Row="1" NavigationUIVisibility="Hidden" Background="#202020"/>
+    </Grid>
+</Window>

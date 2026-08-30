@@ -31,8 +31,11 @@
                         <StackPanel>
                             <TextBlock Text="&#x1F4BE; Selecionar Processo para Monitorar"
                                        FontSize="15" FontWeight="Bold" Foreground="#FFD700"/>
-                            <TextBlock Text="Escolha um processo. O KitLugia aplicar&#xE1; EmptyWorkingSet quando exceder o limite."
+                            <TextBlock Text="Escolha um ou mais processos. Segure Ctrl para selecionar v&#xE1;rios."
                                        FontSize="11" Foreground="#888" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock FontSize="10" Foreground="#666" Margin="0,2,0,0">
+                                <Run Text="O KitLugia trima a mem&#xF3;ria "/> <Run Text="de forma segura" FontWeight="SemiBold" Foreground="#AAA"/> <Run Text=" quando exceder o limite, preservando m&#xED;nimo essencial do app."/>
+                            </TextBlock>
                         </StackPanel>
                         <Button Grid.Column="1" Content="&#x2715;" Width="28" Height="28"
                                 Background="Transparent" Foreground="#666" BorderThickness="0"

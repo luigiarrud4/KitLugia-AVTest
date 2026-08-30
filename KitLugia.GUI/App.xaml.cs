@@ -74,6 +74,17 @@ namespace KitLugia.GUI
                 return;
             }
 
+            // Modo --kitstore: abre só o KitStore standalone (pasta dedicada KitStore, sem precisar do Kit)
+            if (e.Args.Contains("--kitstore") || e.Args.Contains("--store"))
+            {
+                base.OnStartup(e);
+                KitLugia.Core.Logger.Log("[STORE] Modo --kitstore ativado — abrindo KitStore standalone");
+                KitLugia.GUI.Services.UnlockIpcServer.Start();
+                var sw = new Windows.KitStore.KitStoreWindow();
+                sw.Show();
+                return;
+            }
+
             base.OnStartup(e);
 
             // Start IPC server to receive --unlock/--takeown commands from other instances

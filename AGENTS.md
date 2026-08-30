@@ -3990,3 +3990,104 @@ Build: 0 erros / 120 avisos.
 - Core verificado: DeletePartition bloqueia disco sistema/C:, CleanDisk IOCTL fast-path com fallback diskpart, RunProcessCaptured timeout kill tree, único GetAwaiter().GetResult() está dentro de Task.Run (sem deadlock).
 
 Build final: 0 erros (solução inteira). Performance percebida pelo usuário: "velocidade aumentou MUITO, nem parece mais o kit antigo".
+
+### Sessao 28/08 — KitStore "Microsoft Store remake": busca instantanea, icones, progresso modal, scroll
+
+Frente "Microsoft Store remake" (abaixo do Menu de Contexto na WindowsPage / janela KitStore destacável).
+Contexto: janela separada + polimento visual já entregues nas rodadas anteriores (27-28/08). Nesta
+rodada os 3 pontos pendentes relatados pelo usuário: scroll travado, icones errados (Kimi→Opencode),
+e dinamismo/visual inferior a MS Store (busca mostrava só o layout sem os apps de verdade).
+
+1. **CAUSA RAIZ do scroll travado**: varios `ScrollViewer` aninhados (LvApps/SearchScroll/LvDownloads/
+   LogScroll + MainScroll) cada um capturando o wheel para si sem nunca devolver ao MainScroll.
+   Correção: método unico reutilizável `RouteWheel(e, outer, inner)` — o container interno rola
+   enquanto tem conteúdo, e ao chegar no topo/fim repassa o restante ao MainScroll. Handlers dedicados
+   p/ cada container (antes LvDownloads apontava errado pro handler do LvApps). `SearchScroll` ganhou
+   `PanningMode=Both` + `CanContentScroll=False`.
+
+2. **BUSCA INSTANTANEA (o salto real de dinamismo)** — antes cada termo spawnava `winget search`
+   (500ms-2s). Agora a Store lê o proprio índice SQLite do winget:
+   - O índice é `Public/index.db` (8.2 MB, 14.619 pacotes) DENTRO do `source2.msix` em
+     `%LOCALAPPDATA%\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\AC\INetCache\`. Técnica
+     validada por pesquisa web (etducky.com/blog/winget-source-index + UniGetUI).
+   - **`KitLugia.Core\KitStore\SqliteReader.cs`** (novo): leitor SQLite read-only ZERO dependência
+     (não existe Microsoft.Data.Sqlite no projeto e não queria puxar). Percorre b-tree leaf/interior,
+     decodifica varints + serial types. QUIRK CRÍTICO aprendido: células de b-tree table estao
+     armazenadas em ordem DEScrescente de endereço (cell[0] no endereço mais ALTO — a 1ª célula era
+     lida de tras pra frente); e o payload do record ocupa os ÚLTIMOS payloadLen bytes da célula
+     (célula = payloadLen varint + rowid varint + record no fim). VALIDADO contra o índice real:
+     14.168 linhas, `Mozilla.Firefox`/`Microsoft.VisualStudio` resolvem certo.
+   - **`StoreEngine.FindLocalIndexDb` / `QueryWingetSearchLocal` / `EnsureLocalIndex`**: localiza o
+     msix (OrderByDescending por LastWriteTime), extrai index.db p/ `%TEMP%\KitStoreIndex`, cacheia a
+     lista em memória (16k apps: id/name/moniker/latest_version; publisher derivado do prefixo do id;
+     moniker "None" → vazio). Fallback: CLI `QueryWingetSearch` antigo só se o índice faltar.
+   - **Busca ao vivo com debounce 400ms**: `TxtSearch.TextChanged` → `ScheduleLiveSearch` →
+     DispatcherTimer → `DoSearchAsync`. Digitar já mostra os cards (como MS Store), Enter ainda força.
+
+3. **ICONES ERRADOS (Kimi → outro app) — causa raiz**: apps NÃO instalados (resultados de busca) não
+   têm entrada no uninstall registry, então `TryResolveIconPath` retornava null e TODOS caíam numa
+   `GetGenericIcon()` única e errada (o ícone "fantasma" repetido em todo mundo). Correção: fallback
+   vira um **monograma-avatar** (`MakeMonogramIcon`): inicial do nome sobre cor estável derivada por
+   FNV-1a 32 (determinístico entre execuções — `string.GetHashCode` é randomizado por processo, NÃO usar).
+   Desenhado via DrawingVisual + RenderTargetBitmap (thread-safe em background) e Freeze(). Apps
+   instalados continuam resolvendo ícone REAL pelo registry (Brave segue correto).
+
+4. **PROGRESSO MODAL CENTRALIZADO (igual UpdatePage)**: o painel inline de progresso virou overlay
+   fixo `InstallProgressPanel` (Grid `Grid.ColumnSpan=2` + `Panel.ZIndex=99` `#CC0D0D0D`), card 440px
+   `#1E1E1E` com borda dourada, barra 22px `#FFD700`, status grande + porcentagem. `SetProgress` usa
+   largura interna 388px (era 460 do inline).
+
+5. **Log + copiar**: `BtnCopyLog` já existia e funciona; os logs da Store já fluem pro log do Kit via
+   `KitLugia.Core.Logger.Log` (dispara `OnLogReceived`).
+
+Arquivos: `KitLugia.Core\KitStore\SqliteReader.cs` (novo), `KitLugia.Core\KitStore\StoreEngine.cs`
+(+QueryWingetSearchLocal/FindLocalIndexDb/EnsureLocalIndex), `KitLugia.GUI\Pages\WindowsSettings\StoreRemakePage.xaml(.cs)`
+(RouteWheel + handlers de scroll, MakeMonogramIcon, busca ao vivo debounce, overlay modal).
+
+Build: 0 erros (Core + GUI). Obs: SQLite leitor validado por programa de teste descartável contra o
+index.db real antes de integrar (não foi no chute).
+
+Pendências futuras (não feitas nesta rodada):
+- [ ] Popular Description/Tag/categoria dos 14k pacotes no card de Detalhes (índice já tem tags2/commands2).
+- [ ] Detecção de app "fantasma" (ex: Minecraft Preview Demo que sempre volta) — pendente.
+
+### Sessao 25/08 (noite) - RAM Limiter v2: modelo combinado + auto-regulavel
+
+**Problema**: usuarios colocavam Discord 300MB / Opera GX 200MB e os apps crashavam
+("app parou de funcionar", "nao responde"). O EmptyWorkingSet(-1,-1) esvaziava TUDO
+de uma vez causando page fault storm (57K+ faults em 6s).
+
+**Pesquisa**: testamos todas as APIs do Windows:
+- EmptyWorkingSet(-1,-1): perigoso, libera tudo
+- SetProcessWorkingSetSizeEx (soft/MAX_DISABLE): OS ignora quando tem RAM livre
+- VirtualUnlock: nao funciona em paginas nao-lockadas
+- SetProcessInformation (MemoryPriority): funcao, mas sozinha e insuficiente
+
+**Solucao**: modelo COMBINADO de 3 tecnicas:
+1. `SetProcessInformation(MemoryPriority=VERY_LOW)` — OS trimma este processo primeiro
+2. `SetProcessWorkingSetSizeEx(min=floor, max=target, HARD)` — ceiling que OS enforce
+3. `EmptyWorkingSet` condicional — kickstart quando WS > 150% do target
+
+**Testes reais (com Discord rodando)**:
+- Discord 1403MB → 271MB (3 ciclos, 15s, vivo)
+- devenv 404MB → 13MB (2 ciclos, vivo)
+- Opera GX 541MB → 31MB (2 ciclos, vivo)
+
+**Bug de handle**: `SetProcessInformation` precisa de `PROCESS_SET_INFORMATION` (0x0200),
+mas o handle so tinha `PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION` (0x0500).
+O `SetProcessInformation` falhava silenciosamente — MemoryPriority nunca era aplicado.
+Corrigido adicionando 0x0200 ao handle.
+
+**Bug de floor**: `commitSize * 0.9` como floor impedia qualquer trim (commit e virtual,
+ele sempre e maior que o WS). Trocado para `30% × WS` como floor.
+
+**v2 - auto-regulavel**: `SafeAutoRegulate=true` (padrao, sem toggle extra).
+- Sem cooldown: reacao a cada ciclo do timer
+- Intervalo: 1000ms (1s) — responsivo mas sem overhead
+- Apps oscilam naturalmente (sobe-trim-sobe) — comportamento esperado
+- Indicadores visuais: ⚠️ excedido (vermelho), 🎯 em foco (dourado), ✓ (cinza)
+- Badge v2 azul no titulo da secao
+
+**Documentacao**: `docs/RAM_LIMITER_INTELLIGENT.md` (v2)
+
+Build: 0 erros.

@@ -193,7 +193,7 @@ namespace KitLugia.GUI.Helpers
                     try
                     {
                         bool exists2 = File.Exists(cleanPath);
-                        uint flags2 = SHGFI_ICON | SHGFI_SMALLICON;
+                        uint flags2 = SHGFI_ICON | SHGFI_LARGEICON;
                         if (!exists2) flags2 |= SHGFI_USEFILEATTRIBUTES;
                         var shfi = new SHFILEINFO();
                         IntPtr hr = SHGetFileInfo(cleanPath, 0, ref shfi, (uint)Marshal.SizeOf(shfi), flags2);
@@ -303,11 +303,10 @@ namespace KitLugia.GUI.Helpers
         private static BitmapSource? TryExtractIconEx(string path, int index)
         {
             try
-            {
-                IntPtr[] large = new IntPtr[1];
-                IntPtr[] small = new IntPtr[1];
-                uint cnt = ExtractIconEx(path, index, large, small, 1);
-                IntPtr hIcon = small[0] != IntPtr.Zero ? small[0] : large[0];
+            {                    IntPtr[] large = new IntPtr[1];
+                    IntPtr[] small = new IntPtr[1];
+                    uint cnt = ExtractIconEx(path, index, large, small, 1);
+                    IntPtr hIcon = large[0] != IntPtr.Zero ? large[0] : small[0];
                 if (hIcon != IntPtr.Zero)
                 {
                     try
@@ -337,8 +336,7 @@ namespace KitLugia.GUI.Helpers
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.UriSource = new Uri(icoPath);
-                bitmap.DecodePixelWidth = 32;
+                bitmap.UriSource = new Uri(icoPath);                    bitmap.DecodePixelWidth = 64;
                 bitmap.EndInit();
                 bitmap.Freeze();
                 return bitmap;

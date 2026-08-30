@@ -456,7 +456,9 @@ namespace KitLugia.GUI.Windows.TaskManager
         private async Task RefreshAsync()
         {
             // Single-flight gate: evita sobreposição de refreshes quando UI dispara rápido
-            if (!await _refreshGate.WaitAsync(0)) return;
+            bool entered = false;
+            try { entered = await _refreshGate.WaitAsync(0); } catch (ObjectDisposedException) { return; } catch { return; }
+            if (!entered) return;
             _isRefreshing = true;
             var sw = Stopwatch.StartNew();
             var now = DateTime.UtcNow;
@@ -675,7 +677,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] RefreshAsync: {ex.Message}"); } catch { } }
-            finally { _isRefreshing = false; _refreshGate.Release(); }
+            finally { _isRefreshing = false; try { _refreshGate.Release(); } catch (ObjectDisposedException) { } catch (SemaphoreFullException) { } catch { } }
         }
 
         // ══════════════════════════════════════════════

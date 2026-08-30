@@ -227,18 +227,42 @@ namespace KitLugia.Core
 
         public static string? FindWingetPath()
         {
+            // 1) Cache do Kit
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\Paths");
+                if (key?.GetValue("Winget") is string saved && !string.IsNullOrWhiteSpace(saved) && File.Exists(saved)) return saved;
+            }
+            catch { }
+            // 2) LocalAppData WindowsApps (local user)
             string winApps = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Microsoft", "WindowsApps", "winget.exe");
             if (File.Exists(winApps)) return winApps;
-
+            // 3) where winget
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\Paths");
-                if (key?.GetValue("Winget") is string saved) return saved;
+                var wh = KitStore.StoreEngine.RunCapture("where", "winget", 3000);
+                var first = wh.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                              .Select(s => s.Trim().Trim('"'))
+                              .FirstOrDefault(s => s.EndsWith("winget.exe", StringComparison.OrdinalIgnoreCase) && File.Exists(s));
+                if (!string.IsNullOrEmpty(first)) return first;
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-
+            catch { }
+            // 4) Program Files WindowsApps (Store)
+            try
+            {
+                var pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                var wa = Path.Combine(pf, "WindowsApps");
+                if (Directory.Exists(wa))
+                {
+                    var cand = Directory.GetDirectories(wa, "Microsoft.DesktopAppInstaller_*")
+                                        .Select(d => Path.Combine(d, "winget.exe"))
+                                        .FirstOrDefault(File.Exists);
+                    if (cand != null) return cand;
+                }
+            }
+            catch { }
             return null;
         }
 

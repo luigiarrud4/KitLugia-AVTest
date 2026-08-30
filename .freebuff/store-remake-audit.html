@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KitLugia Store — Auditoria Visual Completa</title>
+<style>
+  :root {
+    --bg: #0e0e12; --card: #1a1a22; --card2: #22222e; --border: #2a2a38;
+    --blue: #0078D4; --green: #16c60c; --orange: #ff8c00; --red: #e74856;
+    --yellow: #f9f1a5; --purple: #b47cff; --cyan: #61d6d6;
+    --text: #e8e8ec; --muted: #8a8a9a; --dim: #5a5a6a;
+    --font: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.6; padding: 0; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  /* ── Hero ── */
+  .hero { background: linear-gradient(135deg, #0078D4 0%, #00458f 50%, #1a1a2e 100%); padding: 48px 40px 36px; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; top: -50%; right: -20%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%); pointer-events: none; }
+  .hero h1 { font-size: 28px; font-weight: 700; color: #fff; position: relative; z-index: 1; }
+  .hero .sub { color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 6px; position: relative; z-index: 1; }
+  .hero .pill { display: inline-block; background: rgba(255,255,255,0.15); color: #fff; padding: 3px 12px; border-radius: 20px; font-size: 11px; margin-top: 12px; backdrop-filter: blur(8px); position: relative; z-index: 1; }
+
+  /* ── Container ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* ── Section ── */
+  .section { margin-bottom: 32px; }
+  .section-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  .section-title .num { background: var(--blue); color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .section-title .num.red { background: var(--red); }
+  .section-title .num.orange { background: var(--orange); }
+  .section-title .num.green { background: var(--green); }
+  .section-title .num.purple { background: var(--purple); }
+
+  /* ── Card ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card.pill-blue { border-left: 3px solid var(--blue); }
+  .card.pill-red { border-left: 3px solid var(--red); }
+  .card.pill-green { border-left: 3px solid var(--green); }
+  .card.pill-orange { border-left: 3px solid var(--orange); }
+  .card.pill-purple { border-left: 3px solid var(--purple); }
+  .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .card p, .card li { font-size: 13px; color: var(--muted); }
+  .card ul { padding-left: 18px; margin-top: 6px; }
+  .card li { margin-bottom: 4px; }
+  .card code { background: #2a2a3a; padding: 1px 6px; border-radius: 4px; font-family: var(--mono); font-size: 12px; color: var(--cyan); }
+
+  /* ── Severity badge ── */
+  .sev { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 8px; }
+  .sev.critical { background: rgba(231,76,86,0.2); color: var(--red); }
+  .sev.major { background: rgba(255,140,0,0.2); color: var(--orange); }
+  .sev.minor { background: rgba(0,120,212,0.2); color: var(--blue); }
+  .sev.fixed { background: rgba(22,198,12,0.2); color: var(--green); }
+
+  /* ── Architecture Diagram ── */
+  .arch-diagram { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 16px; overflow-x: auto; }
+  .arch-diagram svg { width: 100%; height: auto; max-height: 500px; }
+
+  /* ── Flow diagram ── */
+  .flow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+  .flow-step { background: var(--card2); border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; font-size: 12px; color: var(--text); white-space: nowrap; position: relative; }
+  .flow-step.active { border-color: var(--blue); background: rgba(0,120,212,0.15); color: var(--blue); }
+  .flow-step.error { border-color: var(--red); background: rgba(231,76,86,0.1); color: var(--red); }
+  .flow-step.ok { border-color: var(--green); background: rgba(22,198,12,0.1); color: var(--green); }
+  .flow-arrow { color: var(--dim); font-size: 16px; flex-shrink: 0; }
+
+  /* ── Mock screenshots ── */
+  .mock { background: #111; border: 1px solid #333; border-radius: 8px; overflow: hidden; margin: 12px 0; }
+  .mock-titlebar { background: #1e1e1e; padding: 6px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #333; }
+  .mock-titlebar .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mock-titlebar .dot.r { background: #e74856; }
+  .mock-titlebar .dot.y { background: #f9f1a5; }
+  .mock-titlebar .dot.g { background: #16c60c; }
+  .mock-titlebar .title { color: #888; font-size: 11px; margin-left: 8px; }
+  .mock-body { padding: 16px; font-size: 12px; color: var(--muted); min-height: 80px; }
+  .mock-body .nav-bar { display: flex; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #2a2a2a; }
+  .mock-body .nav-bar span { font-size: 11px; color: #666; padding: 4px 10px; border-radius: 4px; }
+  .mock-body .nav-bar span.active { background: #2a2a2a; color: #fff; }
+
+  /* ── Diff block ── */
+  .diff { background: #0d0d14; border: 1px solid #1e1e2e; border-radius: 6px; padding: 12px; font-family: var(--mono); font-size: 11px; overflow-x: auto; margin: 8px 0; line-height: 1.7; }
+  .diff .removed { color: var(--red); background: rgba(231,76,86,0.08); display: block; padding: 0 4px; margin: 0 -4px; }
+  .diff .added { color: var(--green); background: rgba(22,198,12,0.08); display: block; padding: 0 4px; margin: 0 -4px; }
+  .diff .ctx { color: var(--dim); display: block; }
+
+  /* ── Code block ── */
+  .codeblock { background: #0d0d14; border: 1px solid #1e1e2e; border-radius: 6px; padding: 12px; font-family: var(--mono); font-size: 11px; overflow-x: auto; margin: 8px 0; line-height: 1.7; color: #aaa; }
+  .codeblock .kw { color: var(--purple); }
+  .codeblock .str { color: var(--green); }
+  .codeblock .fn { color: var(--cyan); }
+  .codeblock .cm { color: #555; font-style: italic; }
+  .codeblock .hl { background: rgba(0,120,212,0.15); display: block; margin: 0 -12px; padding: 0 12px; }
+
+  /* ── Table ── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0; }
+  .tbl th { background: var(--card2); text-align: left; padding: 8px 12px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); }
+  .tbl td { padding: 8px 12px; border-bottom: 1px solid #1e1e2e; color: var(--muted); }
+  .tbl tr:hover td { background: rgba(0,120,212,0.04); }
+
+  /* ── Tooltip ── */
+  .callout { background: rgba(0,120,212,0.08); border: 1px solid rgba(0,120,212,0.2); border-radius: 8px; padding: 12px 16px; margin: 10px 0; font-size: 12px; color: var(--text); }
+  .callout.warn { background: rgba(255,140,0,0.08); border-color: rgba(255,140,0,0.2); }
+  .callout.danger { background: rgba(231,76,86,0.08); border-color: rgba(231,76,86,0.2); }
+  .callout.success { background: rgba(22,198,12,0.08); border-color: rgba(22,198,12,0.2); }
+  .callout strong { color: var(--text); }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--card); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
+  .tabs button { flex: 1; padding: 8px 12px; border: none; background: transparent; color: var(--muted); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: background 0.2s; }
+  .tabs button:hover { background: var(--card2); }
+  .tabs button.active { background: var(--blue); color: #fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Grid ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* ── Progress bars ── */
+  .progress-demo { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+  .pbar { height: 8px; background: #1e1e2e; border-radius: 4px; overflow: hidden; position: relative; }
+  .pbar .fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+  .pbar .fill.blue { background: var(--blue); }
+  .pbar .fill.green { background: var(--green); }
+  .pbar .fill.orange { background: var(--orange); }
+  .pbar .pct { position: absolute; right: 0; top: -18px; font-size: 10px; color: var(--dim); }
+
+  /* ── Annotations ── */
+  .anno { display: flex; align-items: flex-start; gap: 10px; margin: 6px 0; font-size: 12px; }
+  .anno .marker { background: var(--blue); color: #fff; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+  .anno .marker.red { background: var(--red); }
+  .anno .marker.orange { background: var(--orange); }
+  .anno .marker.green { background: var(--green); }
+  .anno .marker.purple { background: var(--purple); }
+
+  /* ── Spinner animation ── */
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--dim); border-top-color: var(--blue); border-radius: 50%; animation: spin 1s linear infinite; vertical-align: middle; }
+
+  /* ── Section nav ── */
+  .side-nav { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 100; }
+  .side-nav a { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); transition: all 0.2s; }
+  .side-nav a:hover, .side-nav a.active { background: var(--blue); width: 10px; height: 10px; }
+  @media (max-width: 900px) { .side-nav { display: none; } }
+
+  /* ── Footer ── */
+  footer { text-align: center; padding: 24px; color: var(--dim); font-size: 11px; border-top: 1px solid var(--border); margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<div class="hero">
+  <h1>KitLugia Store — Auditoria Visual</h1>
+  <p class="sub">Análise completa do StoreRemakePage: arquitetura, bugs, fixes e fluxo de dados</p>
+  <span class="pill">18 Jul 2026 · StoreRemakePage.xaml + .cs · StoreEngine.cs · SqliteReader.cs</span>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════ TOC ═══════════════ -->
+<div class="section">
+  <div class="section-title">Navegação Rápida</div>
+  <div class="tabs" id="tocTabs">
+    <button class="active" onclick="showTab('arch')">Arquitetura</button>
+    <button onclick="showTab('bugs')">Bugs Ativos</button>
+    <button onclick="showTab('fixes')">Fixes Aplicados</button>
+    <button onclick="showTab('flow')">Fluxo de Dados</button>
+    <button onclick="showTab('plan')">Plano de Revisão</button>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB: ARQUITETURA ═══════════════ -->
+<div class="tab-content active" id="tab-arch">
+
+<div class="section">
+  <div class="section-title"><span class="num">1</span> Visão Geral da Arquitetura</div>
+  <div class="arch-diagram">
+    <svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', sans-serif">
+      <!-- Background -->
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0078D4" stop-opacity="0.15"/><stop offset="100%" stop-color="#0078D4" stop-opacity="0.03"/></linearGradient>
+        <filter id="glow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#0078D4"/></marker>
+        <marker id="arrowGreen" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#16c60c"/></marker>
+        <marker id="arrowOrange" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#ff8c00"/></marker>
+      </defs>
+
+      <!-- GUI Layer -->
+      <rect x="20" y="20" width="860" height="130" rx="10" fill="url(#g1)" stroke="#0078D4" stroke-opacity="0.3" stroke-width="1"/>
+      <text x="40" y="42" fill="#0078D4" font-size="11" font-weight="600">GUI LAYER — StoreRemakePage.xaml + .cs</text>
+
+      <!-- Tab nav -->
+      <rect x="40" y="56" width="70" height="32" rx="6" fill="#0078D4" fill-opacity="0.2" stroke="#0078D4" stroke-opacity="0.4"/>
+      <text x="55" y="76" fill="#0078D4" font-size="10">🏠 Início</text>
+      <rect x="120" y="56" width="60" height="32" rx="6" fill="#222" stroke="#333"/>
+      <text x="133" y="76" fill="#8a8a9a" font-size="10">🔍 Apps</text>
+      <rect x="190" y="56" width="60" height="32" rx="6" fill="#222" stroke="#333"/>
+      <text x="203" y="76" fill="#8a8a9a" font-size="10">🎮 Jogos</text>
+      <rect x="260" y="56" width="70" height="32" rx="6" fill="#222" stroke="#333"/>
+      <text x="273" y="76" fill="#8a8a9a" font-size="10">📚 Biblioteca</text>
+      <rect x="340" y="56" width="80" height="32" rx="6" fill="#222" stroke="#333"/>
+      <text x="351" y="76" fill="#8a8a9a" font-size="10">⬇️ Downloads</text>
+
+      <!-- Content panels -->
+      <rect x="40" y="100" width="180" height="40" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="56" y="124" fill="#16c60c" font-size="10">HomePanel (hero + cards)</text>
+      <rect x="240" y="100" width="200" height="40" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="256" y="124" fill="#ff8c00" font-size="10">StandardContent (search + list)</text>
+      <rect x="460" y="100" width="180" height="40" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="476" y="124" fill="#b47cff" font-size="10">DownloadsPanel (updates)</text>
+      <rect x="660" y="100" width="200" height="40" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="676" y="124" fill="#61d6d6" font-size="10">Popup: SearchDropdown (z=999)</text>
+
+      <!-- Core Layer -->
+      <rect x="20" y="190" width="560" height="130" rx="10" fill="rgba(22,198,12,0.04)" stroke="#16c60c" stroke-opacity="0.3" stroke-width="1"/>
+      <text x="40" y="212" fill="#16c60c" font-size="11" font-weight="600">CORE LAYER — KitLugia.Core.KitStore</text>
+
+      <rect x="40" y="226" width="160" height="50" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="52" y="246" fill="#fff" font-size="10" font-weight="600">StoreEngine.cs</text>
+      <text x="52" y="260" fill="#8a8a9a" font-size="9">FindWingetPath · QueryLocal</text>
+
+      <rect x="220" y="226" width="160" height="50" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="232" y="246" fill="#fff" font-size="10" font-weight="600">SqliteReader.cs</text>
+      <text x="232" y="260" fill="#8a8a9a" font-size="9">ReadIndex · GetPackages</text>
+
+      <rect x="400" y="226" width="160" height="50" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="412" y="246" fill="#fff" font-size="10" font-weight="600">StoreModels.cs</text>
+      <text x="412" y="260" fill="#8a8a9a" font-size="9">StoreAppVM · StoreResult</text>
+
+      <!-- System Layer -->
+      <rect x="600" y="190" width="280" height="130" rx="10" fill="rgba(255,140,0,0.04)" stroke="#ff8c00" stroke-opacity="0.3" stroke-width="1"/>
+      <text x="620" y="212" fill="#ff8c00" font-size="11" font-weight="600">SYSTEM LAYER</text>
+
+      <rect x="620" y="226" width="120" height="40" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="630" y="244" fill="#fff" font-size="10">winget.exe</text>
+      <text x="630" y="256" fill="#8a8a9a" font-size="9">CLI process</text>
+
+      <rect x="760" y="226" width="100" height="40" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="770" y="244" fill="#fff" font-size="10">choco.exe</text>
+      <text x="770" y="256" fill="#8a8a9a" font-size="9">CLI process</text>
+
+      <rect x="620" y="276" width="240" height="30" rx="6" fill="#1a1a22" stroke="#333"/>
+      <text x="632" y="296" fill="#8a8a9a" font-size="9">SQLite index: winget-cli/packages.db</text>
+
+      <!-- Connections -->
+      <line x1="130" y1="140" x2="130" y2="190" stroke="#0078D4" stroke-opacity="0.5" stroke-width="1.5" marker-end="url(#arrowBlue)"/>
+      <text x="135" y="168" fill="#0078D4" font-size="9">installed / search</text>
+
+      <line x1="340" y1="140" x2="340" y2="190" stroke="#0078D4" stroke-opacity="0.5" stroke-width="1.5" marker-end="url(#arrowBlue)"/>
+      <text x="345" y="168" fill="#0078D4" font-size="9">upgrade / install</text>
+
+      <line x1="550" y1="250" x2="620" y2="246" stroke="#ff8c00" stroke-opacity="0.5" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+      <line x1="380" y1="250" x2="620" y2="290" stroke="#ff8c00" stroke-opacity="0.5" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+
+      <!-- Floating widget -->
+      <rect x="660" y="350" width="220" height="60" rx="8" fill="#1a1a22" stroke="#0078D4" stroke-opacity="0.4" stroke-width="1" filter="url(#glow)"/>
+      <text x="680" y="372" fill="#fff" font-size="10" font-weight="600">ProgressWidget (z=90)</text>
+      <rect x="680" y="382" width="140" height="6" rx="3" fill="#1e1e2e"/>
+      <rect x="680" y="382" width="80" height="6" rx="3" fill="#0078D4"/>
+      <text x="830" y="390" fill="#8a8a9a" font-size="9">57%</text>
+      <text x="680" y="404" fill="#8a8a9a" font-size="9">Atualizando CapCut...</text>
+    </svg>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title"><span class="num">2</span> Mapa de Visibilidade dos Painéis</div>
+  <div class="card pill-blue">
+    <h3>Visibilidade por aba (quem mostra quem)</h3>
+    <table class="tbl">
+      <thead>
+        <tr><th>Aba</th><th>HomePanel</th><th>StandardContent</th><th>ListContainerBorder</th><th>DownloadsPanel</th><th>SearchGrid</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>🏠 Início</strong></td><td style="color:#16c60c">✅ Visible</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#e74856">❌ Collapsed</td></tr>
+        <tr><td><strong>🔍 Apps</strong></td><td style="color:#e74856">❌ Collapsed</td><td style="color:#16c60c">✅ Visible</td><td style="color:#16c60c">✅ Visible</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#ff8c00">cond.</td></tr>
+        <tr><td><strong>🎮 Jogos</strong></td><td style="color:#e74856">❌ Collapsed</td><td style="color:#16c60c">✅ Visible</td><td style="color:#16c60c">✅ Visible</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#ff8c00">cond.</td></tr>
+        <tr><td><strong>📚 Biblioteca</strong></td><td style="color:#e74856">❌ Collapsed</td><td style="color:#16c60c">✅ Visible</td><td style="color:#16c60c">✅ Visible</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#e74856">❌ Collapsed</td></tr>
+        <tr><td><strong>⬇️ Downloads</strong></td><td style="color:#e74856">❌ Collapsed</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#16c60c">✅ Visible</td><td style="color:#e74856">❌ Collapsed</td></tr>
+        <tr><td><strong>🔍 Busca result.</strong></td><td style="color:#e74856">❌ Collapsed</td><td style="color:#16c60c">✅ Visible</td><td style="color:#16c60c">✅ Visible</td><td style="color:#e74856">❌ Collapsed</td><td style="color:#16c60c">✅ Visible</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warn">
+      <strong>⚠️ Problema de layout:</strong> 5 painéis (HomePanel, StandardContent, ListContainerBorder, DownloadsPanel, SearchGrid) competem por espaço dentro do mesmo ScrollViewer. Trocar de aba requer <strong>explicitamente</strong> Collapsed em cada um — qualquer omissão causa espaço vazio.
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title"><span class="num">3</span> Nomes Importantes no XAML</div>
+  <div class="card pill-blue">
+    <table class="tbl">
+      <thead><tr><th>x:Name</th><th>Tipo</th><th>Pai</th><th>Função</th></tr></thead>
+      <tbody>
+        <tr><td><code>HomePanel</code></td><td>StackPanel</td><td>ScrollViewer</td><td>Hero cards + updates + popular apps</td></tr>
+        <tr><td><code>StandardContent</code></td><td>StackPanel</td><td>ScrollViewer</td><td>Stats + categories + search grid</td></tr>
+        <tr><td><code>ListContainerBorder</code></td><td>Border</td><td>StandardContent</td><td>ListView (Biblioteca) + SearchGrid</td></tr>
+        <tr><td><code>SearchGrid</code></td><td>ItemsControl</td><td>ListContainerBorder</td><td>Search results grid cards</td></tr>
+        <tr><td><code>DownloadsPanel</code></td><td>StackPanel</td><td>ScrollViewer</td><td>Updates e downloads</td></tr>
+        <tr><td><code>SearchPopup</code></td><td>Popup</td><td>Grid.Column=1</td><td>Live search dropdown (z=999)</td></tr>
+        <tr><td><code>InlineProgressPanel</code></td><td>Border</td><td>Grid.Column=1</td><td>Floating progress widget (z=90)</td></tr>
+        <tr><td><code>HeroCardMain</code></td><td>Border</td><td>HomePanel</td><td>Featured app hero card</td></tr>
+        <tr><td><code>LvDownloads</code></td><td>ListView</td><td>DownloadsPanel</td><td>Update items list</td></tr>
+        <tr><td><code>SearchInfoGrid</code></td><td>Grid</td><td>StandardContent</td><td>Search bar + filter buttons</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div><!-- /tab-arch -->
+
+<!-- ═══════════════ TAB: BUGS ATIVOS ═══════════════ -->
+<div class="tab-content" id="tab-bugs">
+
+<div class="section">
+  <div class="section-title"><span class="num red">!</span> Bugs Ativos (vistos nos screenshots do usuário)</div>
+
+  <!-- Bug 1 -->
+  <div class="card pill-red">
+    <h3>Bug #1: <code>\u2192</code> como texto literal nas versões <span class="sev critical">CRÍTICO</span></h3>
+    <p>Nas screenshots, o Downloads mostra <code>1.18.21 \u2192 1.18.25</code> em vez de <code>1.18.21 → 1.18.25</code></p>
+
+    <div class="diff" style="margin-top:10px">
+<span class="cm">// StoreRemakePage.xaml.cs — PopulateHomeSections()</span>
+<span class="removed">- HeroMainVersion.Text = main.HasUpdate ? $"{main.Version} \u2192 {main.AvailableVersion}" : main.Version;</span>
+<span class="added">+ HeroMainVersion.Text = main.HasUpdate ? $"{main.Version} → {main.AvailableVersion}" : main.Version;</span>
+<span class="cm">// ⚠️ \u2192 é sintaxe C# dentro de @"" (raw string), mas interpolate string "" NÃO interpola \u</span>
+<span class="cm">// Mesmo bug nas linhas 1035, 1045, 1120</span>
+    </div>
+
+    <div class="callout danger" style="margin-top:10px">
+      <strong>Causa raiz:</strong> Em C#, <code>$"\u2192"</code> não interpola o Unicode escape — ele é tratado como caracteres literais <code>\</code>, <code>u</code>, <code>2</code>, <code>1</code>, <code>9</code>, <code>2</code>. A sintaxe correta é <code>$"{(char)0x2192}"</code> ou simplesmente colar o caractere <code>→</code> direto. Este bug afeta o <strong>Hero card</strong> e os <strong>app cards na Home</strong>.
+    </div>
+
+    <div class="flow">
+      <div class="flow-step error">User vê "1.18.21 \u2192 1.18.25"</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">C# $"\u2192" não é Unicode</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step ok">Fix: usar → direto ou (char)0x2192</div>
+    </div>
+
+    <p style="margin-top:8px"><strong>Afeta 4 linhas:</strong> L1023, L1035, L1045, L1120 no .cs</p>
+  </div>
+
+  <!-- Bug 2 -->
+  <div class="card pill-red">
+    <h3>Bug #2: Ícones do Task Manager como quadrados <span class="sev major">MÉDIO</span></h3>
+    <p>Na screenshot do log section, o ícone de "Copiar" aparece como <code>□□□□□□</code> em vez do ícone Segoe MDL2 Assets.</p>
+
+    <div class="mock">
+      <div class="mock-titlebar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><span class="title">Log do Usuário</span></div>
+      <div class="mock-body" style="text-align: center; padding: 20px;">
+        <div style="color: #555; font-size: 40px; letter-spacing: 4px; font-family: 'Segoe MDL2 Assets', monospace;">□□□□□□</div>
+        <div style="color: #888; font-size: 11px; margin-top: 6px;">Segoe MDL2 Assets não renderiza — quadrados aparecem</div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <strong>Nota:</strong> O XAML atual do copy button já foi simplificado para apenas texto "Copiar" (sem ícone). Mas o <code>BtnCopyLog</code> no XAML original usava <code>FontFamily="Segoe MDL2 Assets"</code> com um glyph que não existe na versão da fonte do sistema. O <strong>KIT Task Manager</strong> tem o mesmo problema em processos listados.
+    </div>
+
+    <p><strong>Status:</strong> Já parcialmente corrigido (texto "Copiar" sem ícone). Task Manager pode precisar de fix separado.</p>
+  </div>
+
+  <!-- Bug 3 -->
+  <div class="card pill-orange">
+    <h3>Bug #3: Espaço vazio gigante no topo do Downloads <span class="sev major">MÉDIO</span></h3>
+    <p>A screenshot mostra um bloco cinza vazio de ~200px no topo antes do conteúdo "Atualizações e downloads".</p>
+
+    <div class="mock">
+      <div class="mock-titlebar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><span class="title">Downloads — o que o usuário vê</span></div>
+      <div class="mock-body" style="padding: 0;">
+        <div style="height: 120px; background: #1a1a22; border-bottom: 1px solid #333;"></div>
+        <div style="padding: 12px 16px; border-left: 3px solid var(--orange); background: rgba(255,140,0,0.05);">
+          <div style="color: var(--orange); font-size: 13px; font-weight: 600;">⚠️ Espaço vazio: DownloadUpdatesSection</div>
+          <div style="color: #666; font-size: 11px; margin-top: 4px;">DownloadsUpdatesSection tem Background="#1E1E1E" + CornerRadius + MinHeight implícito</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Causa:</strong> O <code>DownloadsUpdatesSection</code> é um <code>Border</code> com <code>Background="#1E1E1E"</code> que sempre é <code>Visibility.Visible</code>. Quando vazio, ele mostra apenas o título "Atualizações disponíveis (46)" mas com bastante padding/margin, criando o bloco cinza vazio. <strong>Fix:</strong> Reduzir padding/margin ou adicionar MinHeight=0.
+    </div>
+  </div>
+
+  <!-- Bug 4 -->
+  <div class="card pill-orange">
+    <h3>Bug #4: Busca não retorna resultados <span class="sev major">MÉDIO</span></h3>
+    <p>O usuário digita "Opera GX Stable" → clica Buscar → "Nenhum resultado" com a mensagem "(Nenhum resultado encontrado no index local)".</p>
+
+    <div class="flow">
+      <div class="flow-step">User digita "Opera GX Stable"</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Clica Buscar</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step error">QueryWingetSearchLocal()</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step error">Busca SQLite index vazio</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step error">Winget CLI search não é chamado como fallback</div>
+    </div>
+
+    <div class="codeblock">
+<span class="cm">// StoreEngine.cs — QueryWingetSearchLocal()</span>
+<span class="cm">// Busca no SQLite index (winget-cli/packages.db)</span>
+<span class="cm">// Se o index não foi baixado ou está vazio, retorna 0 resultados</span>
+<span class="cm">// ⚠️ Não há fallback para "winget search" via CLI</span>
+
+<span class="kw">public static</span> List&lt;StoreResult&gt; <span class="fn">QueryWingetSearchLocal</span>(<span class="kw">string</span> query)
+{
+    <span class="kw">var</span> dbPath = <span class="fn">FindLocalIndexDb</span>();  <span class="cm">// packages.db path</span>
+    <span class="kw">if</span> (dbPath == <span class="kw">null</span>) <span class="kw">return new</span>();  <span class="cm">// ← SEM INDEX = SEM RESULTADO</span>
+    <span class="cm">// ... SQLite query ...</span>
+}
+    </div>
+
+    <div class="callout danger">
+      <strong>Fix necessário:</strong> Adicionar fallback <code>winget search &lt;query&gt; --source winget</code> quando o index local retorna 0 resultados. O winget CLI sempre pode buscar online mesmo sem index local.
+    </div>
+  </div>
+</div>
+</div><!-- /tab-bugs -->
+
+<!-- ═══════════════ TAB: FIXES ═══════════════ -->
+<div class="tab-content" id="tab-fixes">
+
+<div class="section">
+  <div class="section-title"><span class="num green">✓</span> Fixes Aplicados Nesta Sessão</div>
+
+  <div class="card pill-green">
+    <h3>Fix #1: Search Dropdown Popup — fecha instantaneamente <span class="sev fixed">RESOLVIDO</span></h3>
+    <p>Debounce de 400ms chamava <code>DoSearchAsync()</code> que abria com <code>SearchPopup.IsOpen = false</code>.</p>
+    <div class="diff">
+<span class="removed">- _searchDebounce.Tick += async (s, e) => { _searchDebounce.Stop(); await DoSearchAsync(); };</span>
+<span class="added">+ _searchDebounce.Tick += (s, e) => { _searchDebounce.Stop(); /* live search: dropdown so */ };</span>
+<span class="cm">// Dropdown é alimentado por UpdateSearchDropdown() (cache内存) — sem winget</span>
+<span class="cm">// Busca winget completa só via Enter/Buscar</span>
+    </div>
+  </div>
+
+  <div class="card pill-green">
+    <h3>Fix #2: Busca bloqueada por _searchBusy <span class="sev fixed">RESOLVIDO</span></h3>
+    <p>O <code>Interlocked.Increment(_searchBusy)</code> do refresh inicial nunca era decrementado, bloqueando buscas futuras.</p>
+    <div class="diff">
+<span class="removed">- if (Interlocked.Increment(ref _searchBusy) != 0) return;  // ← trava pra sempre</span>
+<span class="added">+ Interlocked.Exchange(ref _searchBusy, 0);  // reset forçado</span>
+<span class="added">+ if (Interlocked.Increment(ref _searchBusy) != 0) { Log("Busca já em andamento"); return; }</span>
+    </div>
+  </div>
+
+  <div class="card pill-green">
+    <h3>Fix #3: Resultados escondidos atrás do HomePanel <span class="sev fixed">RESOLVIDO</span></h3>
+    <p><code>DoSearchAsync</code> nunca escondia o <code>HomePanel</code> ao mostrar resultados.</p>
+    <div class="diff">
+<span class="added">+ HomePanel.Visibility = Visibility.Collapsed;</span>
+<span class="added">+ try { ListContainerBorder.Visibility = Visibility.Visible; } catch { }</span>
+<span class="added">+ try { SearchInfoGrid.Visibility = Visibility.Visible; } catch { }</span>
+    </div>
+  </div>
+
+  <div class="card pill-green">
+    <h3>Fix #4: Tab Início não aparece por padrão <span class="sev fixed">RESOLVIDO</span></h3>
+    <p><code>ShowHome()</code> chamado duas vezes (Loaded + Refresh) causava flash Biblioteca→Home.</p>
+    <div class="diff">
+<span class="removed">- ShowHome(); // ← removido do OnLoadedAsync, já chamado em Refresh</span>
+<span class="added">+ /* ShowHome() é chamado apenas no fim de RefreshInstalledInternalAsync */</span>
+    </div>
+  </div>
+
+  <div class="card pill-green">
+    <h3>Fix #5: Hero cards sem ícones reais <span class="sev fixed">RESOLVIDO</span></h3>
+    <p><code>HeroSide1Image</code> e <code>HeroSide2Image</code> nunca eram populados.</p>
+    <div class="diff">
+<span class="added">+ Task.Run(() => { var ic = TryResolveIconPath(s1);</span>
+<span class="added">+     if (ic != null) Dispatcher.BeginInvoke(() => {</span>
+<span class="added">+         HeroSide1Icon.Visibility = Visibility.Collapsed;</span>
+<span class="added">+         HeroSide1Image.Visibility = Visibility.Visible;</span>
+<span class="added">+         HeroSide1Image.Source = ProgramIconHelper.GetIconFromFile(ic);</span>
+<span class="added">+     }); });</span>
+    </div>
+  </div>
+
+  <div class="card pill-green">
+    <h3>Fix #6: SearchBox XAML quebrado <span class="sev fixed">RESOLVIDO</span></h3>
+    <p>Template customizado <code>SearchBox</code> não tinha <code>PART_ContentHost</code>.</p>
+    <div class="diff">
+<span class="removed">- &lt;TextBox x:Name="TxtSearch" Style="{StaticResource SearchBox}" .../&gt;</span>
+<span class="added">+ &lt;TextBox x:Name="TxtSearch" ... /&gt; &lt;!-- TextBox nativo funciona --&gt;</span>
+    </div>
+  </div>
+</div>
+</div><!-- /tab-fixes -->
+
+<!-- ═══════════════ TAB: FLUXO ═══════════════ -->
+<div class="tab-content" id="tab-flow">
+
+<div class="section">
+  <div class="section-title"><span class="num purple">⚡</span> Fluxo de Dados: Carregamento Inicial</div>
+  <div class="card pill-purple">
+    <div class="flow">
+      <div class="flow-step active">Loaded → OnLoadedAsync()</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">FindWingetPath()</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">FindLocalIndexDb()</div>
+    </div>
+    <div class="flow" style="margin-top: 8px;">
+      <div class="flow-step active">RefreshInstalledInternalAsync()</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">GetInstalledWinget() — winget list</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">GetInstalledChoco() — choco list -lo</div>
+    </div>
+    <div class="flow" style="margin-top: 8px;">
+      <div class="flow-step">Merge duplicates (multi-arch)</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Detect updates (comparar versões)</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step active">ShowHome() → PopulateHomeSections()</div>
+    </div>
+
+    <div class="codeblock" style="margin-top: 12px;">
+<span class="cm">// StoreRemakePage.xaml.cs</span>
+<span class="kw">private async Task</span> <span class="fn">OnLoadedAsync</span>()
+{
+    Log("Detectando winget / choco / MS Store...");
+    _wingetPath = StoreEngine.<span class="fn">FindWingetPath</span>();
+<span class="hl">    <span class="kw">await</span> <span class="fn">RefreshInstalledInternalAsync</span>();  <span class="cm">// ← carrega tudo</span></span>
+}
+
+<span class="kw">private async Task</span> <span class="fn">RefreshInstalledInternalAsync</span>()
+{
+    <span class="kw">if</span> (Interlocked.Increment(ref _busy) != 0) <span class="kw">return</span>;
+    <span class="kw">try</span>
+    {
+        <span class="cm">// 1. Busca winget list + choco list</span>
+        <span class="kw">var</span> items = <span class="kw">await</span> Task.<span class="fn">Run</span>(() => StoreEngine.<span class="fn">GetInstalled</span>());
+<span class="hl">        <span class="cm">// 2. Atualiza UI</span></span>
+        Dispatcher.<span class="fn">BeginInvoke</span>(() =>
+        {
+            _installed.<span class="fn">Clear</span>();
+            <span class="kw">foreach</span> (<span class="kw">var</span> app <span class="kw">in</span> items) _installed.<span class="fn">Add</span>(app);
+            <span class="cm">// 3. Atualiza contadores</span>
+            NavLibCount.Text = <span class="str">$"Biblioteca · {_installed.Count}"</span>;
+<span class="hl">            <span class="cm">// 4. Mostra Home (ou Library se já ativa)</span></span>
+<span class="hl">            <span class="kw">if</span> (_activeTab == StoreTab.Home || _activeTab == <span class="kw">default</span>)</span>
+<span class="hl">                <span class="fn">ShowHome</span>();</span>
+        });
+    }
+    <span class="kw">finally</span> { Interlocked.Decrement(ref _busy); }
+}
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title"><span class="num purple">⚡</span> Fluxo de Busca (3 caminhos)</div>
+
+  <div class="grid-3">
+    <div class="card pill-blue">
+      <h3>1. Dropdown ao vivo</h3>
+      <div class="flow" style="flex-direction: column; align-items: flex-start;">
+        <div class="flow-step ok">TextChanged → UpdateSearchDropdown()</div>
+        <span class="flow-arrow">↓</span>
+        <div class="flow-step">Busca _installed (cache内存)</div>
+        <span class="flow-arrow">↓</span>
+        <div class="flow-step ok">Popup.IsOpen = true</div>
+      </div>
+      <p style="margin-top:8px"><strong>Latência:</strong> ~0ms (cache)</p>
+      <p><strong>Resultado:</strong> apps do cache local</p>
+    </div>
+
+    <div class="card pill-orange">
+      <h3>2. Busca completa (Enter/Buscar)</h3>
+      <div class="flow" style="flex-direction: column; align-items: flex-start;">
+        <div class="flow-step">DoSearchAsync()</div>
+        <span class="flow-arrow">↓</span>
+        <div class="flow-step error">QueryWingetSearchLocal()</div>
+        <span class="flow-arrow">↓</span>
+        <div class="flow-step error">SQLite index (pode vazio)</div>
+      </div>
+      <p style="margin-top:8px"><strong>Latência:</strong> 200ms-2s</p>
+      <p><strong>Problema:</strong> sem fallback CLI</p>
+    </div>
+
+    <div class="card pill-green">
+      <h3>3. Atualizar um app</h3>
+      <div class="flow" style="flex-direction: column; align-items: flex-start;">
+        <div class="flow-step">BtnUpgradeAll ou BtnUpdateOne</div>
+        <span class="flow-arrow">↓</span>
+        <div class="flow-step active">UpgradeOneAsync(app, force)</div>
+        <span class="flow-arrow">↓</span>
+        <div class="flow-step ok">winget upgrade --id X</div>
+      </div>
+      <p style="margin-top:8px"><strong>Progresso:</strong> parseia MB/MB do winget</p>
+      <p><strong>Widget:</strong> flutuante z=90</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title"><span class="num purple">⚡</span> Widget de Progresso Flutuante</div>
+  <div class="card pill-purple">
+    <h3>Posicionamento e rendering</h3>
+    <div class="mock">
+      <div class="mock-titlebar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><span class="title">Layout do widget</span></div>
+      <div class="mock-body" style="position: relative; min-height: 160px;">
+        <div style="position: absolute; bottom: 12px; right: 12px; background: #1a1a22; border: 1px solid #0078D4; border-radius: 10px; padding: 10px 14px; box-shadow: 0 4px 20px rgba(0,120,212,0.3); z-index: 90; width: 260px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <div class="spinner" style="border-top-color: #0078D4;"></div>
+            <span style="color: #fff; font-size: 11px; font-weight: 600;">Atualizando CapCut...</span>
+            <span style="color: #0078D4; font-size: 11px; margin-left: auto; font-weight: 700;">57%</span>
+          </div>
+          <div class="pbar"><div class="fill blue" style="width: 57%;"></div></div>
+          <div style="color: #666; font-size: 9px; margin-top: 4px;">72.3 MB / 127.8 MB</div>
+        </div>
+        <div style="color: #444; font-size: 10px; position: absolute; top: 12px; left: 12px;">Conteúdo do ScrollViewer (roda normalmente)</div>
+      </div>
+    </div>
+
+    <table class="tbl">
+      <thead><tr><th>Propriedade</th><th>Valor</th><th>Por quê</th></tr></thead>
+      <tbody>
+        <tr><td><code>Panel.ZIndex</code></td><td>90</td><td>Acima do conteúdo, abaixo do Popup (999)</td></tr>
+        <tr><td><code>VerticalAlignment</code></td><td>Bottom</td><td>Canto inferior direito</td></tr>
+        <tr><td><code>HorizontalAlignment</code></td><td>Right</td><td>Fixo, não rola</td></tr>
+        <tr><td><code>Margin</code></td><td>0,0,18,16</td><td>Afastado das bordas</td></tr>
+        <tr><td><code>Visibility</code></td><td>Collapsed (início)</td><td>Só aparece durante operações</td></tr>
+        <tr><td><code>Background</code></td><td>LinearGradient #EE1A1A1A → #DD0A0A0A</td><td>Sombra elegante, estilo LugiaToast</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div><!-- /tab-flow -->
+
+<!-- ═══════════════ TAB: PLANO ═══════════════ -->
+<div class="tab-content" id="tab-plan">
+
+<div class="section">
+  <div class="section-title"><span class="num orange">📋</span> Plano de Revisão Completa — Store</div>
+
+  <div class="card pill-red">
+    <h3>Fase 1: Bugs Críticos <span class="sev critical">IMEDIATO</span></h3>
+    <div class="anno"><div class="marker red">1</div><div><strong>Fix \u2192 literal</strong> — Trocar <code>\u2192</code> por <code>→</code> direto nas linhas L1023, L1035, L1045, L1120. Causa: <code>$"\u2192"</code> não interpola Unicode em C#.</div></div>
+    <div class="anno"><div class="marker red">2</div><div><strong>Fix busca sem resultados</strong> — Adicionar fallback <code>winget search</code> via CLI quando SQLite index retorna 0. O <code>QueryWingetSearchLocal</code> precisa de um <code>QueryWingetSearchCLI</code> como backup.</div></div>
+    <div class="anno"><div class="marker red">3</div><div><strong>Fix espaço vazio Downloads</strong> — <code>DownloadsUpdatesSection</code> com Background #1E1E1E cria bloco cinza visível mesmo vazio. Adicionar <code>MinHeight=0</code> ou condensar padding.</div></div>
+  </div>
+
+  <div class="card pill-orange">
+    <h3>Fase 2: Melhorias de UX <span class="sev major">CURTO PRAZO</span></h3>
+    <div class="anno"><div class="marker orange">4</div><div><strong>Ícones Downloads</strong> — Force button (&#xE74C;) precisa de fallback. Se Segoe MDL2 não renderiza, usar texto "Force" ou emoji.</div></div>
+    <div class="anno"><div class="marker orange">5</div><div><strong>Search dropdown popula em tempo real</strong> — Atualmente usa cache内存. Pode adicionar debounce de 300ms para buscas maiores, mantendo o dropdown aberto.</div></div>
+    <div class="anno"><div class="marker orange">6</div><div><strong>Cards clicáveis na Home</strong> — "Seus aplicativos" grid items e Hero cards devem abrir detalhes ou disparar upgrade.</div></div>
+    <div class="anno"><div class="marker orange">7</div><div><strong>Versão visível em todos os cards</strong> — Search results e Downloads mostram versão com badge UPDATE em verde.</div></div>
+  </div>
+
+  <div class="card pill-blue">
+    <h3>Fase 3: Funcionalidade Avançada <span class="sev minor">MÉDIO PRAZO</span></h3>
+    <div class="anno"><div class="marker purple">8</div><div><strong>Painel de detalhes do app</strong> — Clicar num card abre modal com publisher, versão, descrição, local de instalação, botões install/update/uninstall.</div></div>
+    <div class="anno"><div class="marker purple">9</div><div><strong>Historial de downloads</strong> — Aba separada mostrando operações anteriores (sucesso/erro, data, duração).</div></div>
+    <div class="anno"><div class="marker purple">10</div><div><strong>Changelog do app</strong> — Mostrar release notes quando disponível (winget show --verbose-logs).</div></div>
+    <div class="anno"><div class="marker purple">11</div><div><strong>Cache de ícones persistente</strong> — Salvar ícones resolvidos em disco para carregamento instantâneo.</div></div>
+  </div>
+
+  <div class="card pill-green">
+    <h3>Fase 4: Integração e Robustez <span class="sev fixed">LONGO PRAZO</span></h3>
+    <div class="anno"><div class="marker green">12</div><div><strong>Monitor de downloads</strong> — Processo winget em background com progresso real por arquivo.</div></div>
+    <div class="anno"><div class="marker green">13</div><div><strong> fila de operações</strong> — Enfileirar múltiplos upgrades e executar sequencialmente.</div></div>
+    <div class="anno"><div class="marker green">14</div><div><strong>Winget Import/Export</strong> — Sincronizar pacotes entre máquinas.</div></div>
+    <div class="anno"><div class="marker green">15</div><div><strong>Notificação Toast</strong> — Integrar com LugiaToast para updates disponíveis no boot.</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title"><span class="num green">📊</span> Prioridade × Esforço</div>
+  <div class="card">
+    <svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', sans-serif">
+      <!-- Axes -->
+      <line x1="60" y1="260" x2="560" y2="260" stroke="#333" stroke-width="1"/>
+      <line x1="60" y1="260" x2="60" y2="20" stroke="#333" stroke-width="1"/>
+      <text x="300" y="290" fill="#8a8a9a" font-size="11" text-anchor="middle">Esforço →</text>
+      <text x="20" y="140" fill="#8a8a9a" font-size="11" text-anchor="middle" transform="rotate(-90,20,140)">Prioridade →</text>
+
+      <!-- Quadrant labels -->
+      <text x="180" y="50" fill="#16c60c" font-size="10" opacity="0.5">Quick Wins</text>
+      <text x="420" y="50" fill="#0078D4" font-size="10" opacity="0.5">Big Projects</text>
+      <text x="180" y="240" fill="#ff8c00" font-size="10" opacity="0.5">Fill-ins</text>
+      <text x="420" y="240" fill="#e74856" font-size="10" opacity="0.5">Difficult</text>
+
+      <!-- Quadrant lines -->
+      <line x1="310" y1="20" x2="310" y2="260" stroke="#333" stroke-width="1" stroke-dasharray="4"/>
+      <line x1="60" y1="140" x2="560" y2="140" stroke="#333" stroke-width="1" stroke-dasharray="4"/>
+
+      <!-- Bubbles -->
+      <circle cx="140" cy="60" r="20" fill="#e74856" fill-opacity="0.3" stroke="#e74856" stroke-width="1.5"/>
+      <text x="140" y="64" fill="#e74856" font-size="10" text-anchor="middle">#1 \u2192</text>
+
+      <circle cx="200" cy="80" r="18" fill="#e74856" fill-opacity="0.3" stroke="#e74856" stroke-width="1.5"/>
+      <text x="200" y="84" fill="#e74856" font-size="10" text-anchor="middle">#2 busca</text>
+
+      <circle cx="160" cy="100" r="15" fill="#ff8c00" fill-opacity="0.3" stroke="#ff8c00" stroke-width="1.5"/>
+      <text x="160" y="104" fill="#ff8c00" font-size="10" text-anchor="middle">#3 empty</text>
+
+      <circle cx="260" cy="120" r="16" fill="#0078D4" fill-opacity="0.3" stroke="#0078D4" stroke-width="1.5"/>
+      <text x="260" y="124" fill="#0078D4" font-size="10" text-anchor="middle">#4 icons</text>
+
+      <circle cx="420" cy="80" r="22" fill="#b47cff" fill-opacity="0.3" stroke="#b47cff" stroke-width="1.5"/>
+      <text x="420" y="84" fill="#b47cff" font-size="10" text-anchor="middle">#8 detalhe</text>
+
+      <circle cx="350" cy="60" r="18" fill="#0078D4" fill-opacity="0.3" stroke="#0078D4" stroke-width="1.5"/>
+      <text x="350" y="64" fill="#0078D4" font-size="10" text-anchor="middle">#6 cards</text>
+
+      <circle cx="480" cy="180" r="20" fill="#16c60c" fill-opacity="0.3" stroke="#16c60c" stroke-width="1.5"/>
+      <text x="480" y="184" fill="#16c60c" font-size="10" text-anchor="middle">#12 monit</text>
+
+      <circle cx="300" cy="200" r="14" fill="#ff8c00" fill-opacity="0.3" stroke="#ff8c00" stroke-width="1.5"/>
+      <text x="300" y="204" fill="#ff8c00" font-size="10" text-anchor="middle">#5 drop</text>
+    </svg>
+  </div>
+</div>
+</div><!-- /tab-plan -->
+
+</div><!-- /container -->
+
+<footer>
+  KitLugia Store — Auditoria Visual · Gerado automaticamente · StoreRemakePage.xaml (801 linhas) + .cs (1661 linhas)
+</footer>
+
+<script>
+// Tab switching
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#tocTabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  const btns = document.querySelectorAll('#tocTabs button');
+  const map = { arch: 0, bugs: 1, fixes: 2, flow: 3, plan: 4 };
+  if (map[id] !== undefined) btns[map[id]].classList.add('active');
+}
+</script>
+</body>
+</html>

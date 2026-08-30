@@ -162,18 +162,19 @@ namespace KitLugia.GUI.Pages
                 bool exceeded = limit.LastKnownMB > limit.LimitMB;
                 statusTb.Text = limit.LastKnownMB > 0
                     ? $"Atual: {limit.LastKnownMB} MB" +
-                      $"{(exceeded ? " ⚠️ excedido" : " ✓")}" +
-                      $"{(limit.IsForeground ? " 🎯 em foco (pausado)" : "")}"
-                    : "Processo não está rodando";
+                      $"{(exceeded ? " \u26A0\uFE0F excedido" : " \u2713")}" +
+                      $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}"
+                    : "Processo n\u00E3o est\u00E1 rodando";
 
+                // excedido = vermelho, OK = cinza, foreground = dourado
                 statusTb.Foreground = exceeded
                     ? new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(255, 85, 85))
+                        System.Windows.Media.Color.FromRgb(255, 85, 85))  // excedido: vermelho
                     : limit.IsForeground
                         ? new System.Windows.Media.SolidColorBrush(
-                            System.Windows.Media.Color.FromRgb(255, 215, 0))
+                            System.Windows.Media.Color.FromRgb(255, 215, 0))  // em foco: dourado
                         : new System.Windows.Media.SolidColorBrush(
-                            System.Windows.Media.Color.FromRgb(102, 102, 102));
+                            System.Windows.Media.Color.FromRgb(102, 102, 102));  // OK: cinza
             }
         }
 
@@ -489,12 +490,12 @@ namespace KitLugia.GUI.Pages
             };
 
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // 0: Nome
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 1: Limite
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 2: MB
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 3: Gear
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 4: On/Off
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 6: Remove
 
             // Nome + status
             string displayName = string.IsNullOrEmpty(limit.ProcessName)
@@ -510,17 +511,18 @@ namespace KitLugia.GUI.Pages
                 FontSize = 12
             });
 
+            bool exceeded = limit.LastKnownMB > limit.LimitMB;
             string statusText = limit.LastKnownMB > 0
                 ? $"Atual: {limit.LastKnownMB} MB" +
-                  $"{(limit.LastKnownMB > limit.LimitMB ? " ⚠️ excedido" : " ✓")}" +
-                  $"{(limit.IsForeground ? " 🎯 em foco (pausado)" : "")}"
-                : "Processo não está rodando";
+                  $"{(exceeded ? " \u26A0\uFE0F excedido" : " \u2713")}" +
+                  $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}"
+                : "Processo n\u00E3o est\u00E1 rodando";
 
-            var statusColor = limit.LastKnownMB > limit.LimitMB
-                ? System.Windows.Media.Color.FromRgb(255, 85, 85)
+            var statusColor = exceeded
+                ? System.Windows.Media.Color.FromRgb(255, 85, 85)  // excedido: vermelho
                 : limit.IsForeground
-                    ? System.Windows.Media.Color.FromRgb(255, 215, 0)
-                    : System.Windows.Media.Color.FromRgb(102, 102, 102);
+                    ? System.Windows.Media.Color.FromRgb(255, 215, 0)  // em foco: dourado
+                    : System.Windows.Media.Color.FromRgb(102, 102, 102);  // OK: cinza
 
             nameStack.Children.Add(new TextBlock
             {
@@ -602,7 +604,7 @@ namespace KitLugia.GUI.Pages
             Grid.SetColumn(toggle, 4);
             grid.Children.Add(toggle);
 
-            // Botão remover
+            // Botao remover
             var removeBtn = new Button
             {
                 Content = "✕",
@@ -667,7 +669,7 @@ namespace KitLugia.GUI.Pages
             picker.Open();
         }
 
-        private void OnPickerProcessSelected(string name, long limitMB)
+        private void OnPickerProcessSelected(List<string> names, long limitMB)
         {
             if (_currentPicker == null) return;
             var mw = Application.Current.MainWindow as MainWindow;
@@ -678,7 +680,8 @@ namespace KitLugia.GUI.Pages
                 overlayContainer.Children.Remove(_currentPicker);
                 overlayContainer.Visibility = Visibility.Collapsed;
             }
-            OnProcessSelected(name, limitMB);
+            foreach (var name in names)
+                OnProcessSelected(name, limitMB);
             _currentPicker = null;
         }
 
@@ -726,7 +729,11 @@ namespace KitLugia.GUI.Pages
 
             tray.SetProcessRamLimit(processName, limitMB);
             LoadProcessLimits();
-            ShowNotification($"✅ Limite configurado", $"{processName} → {limitMB} MB");
+            // Mostra o mínimo seguro na notificação para o usuário saber que o app não vai quebrar
+            var tempLimit = new KitLugia.GUI.Services.TrayIconService.ProcessRamLimit { ProcessName = processName };
+            long safeMin = tempLimit.GetEffectiveMinMB();
+            ShowNotification("✅ Limite configurado",
+                $"{processName} → {limitMB} MB\nMínimo seguro: {safeMin} MB (app não será interrompido abaixo disso)");
         }
 
         private void BtnAddProcessLimit_Click(object sender, RoutedEventArgs e)
@@ -761,6 +768,7 @@ namespace KitLugia.GUI.Pages
             if (limit != null)
                 tray.SetProcessRamLimit(name, limit.LimitMB, chk.IsChecked == true);
         }
+
 
         private void BtnProcessGear_Click(object sender, RoutedEventArgs e)
         {
