@@ -401,9 +401,8 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="&#x1F9F9; Standby Clean" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Evita ac&#xFA;mulo de lixo" FontSize="11" Foreground="#888"/>
+                            <TextBlock Text="Configurado acima no card ISLC" FontSize="11" Foreground="#888"/>
                         </StackPanel>
-                        <CheckBox x:Name="ChkStandbyClean" Grid.Column="1" Style="{StaticResource TrayToggle}" IsChecked="True" Click="ChkBackgroundFeature_Click"/>
                     </Grid>
                     
                     <Grid Margin="0,5">
@@ -432,6 +431,32 @@
                 </StackPanel>
             </Border>
 
+            <!-- ISLC (Intelligent Standby List Cleaner) -->
+            <Border Style="{StaticResource SubtleCardStyle}" Padding="0" Margin="0,0,0,10">
+                <Grid Margin="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <controls:InfoButton Grid.Column="0" ToolTipText="ISLC (Intelligent Standby List Cleaner) - WagnardSoft. Limpa a Standby List (cache do Windows) quando ela fica grande demais. Threshold automatico: TotalRAM/8 (8GB=1024MB, 16GB=2048MB, 32GB=4096MB). Em jogos, a Standby List fica cheia de dados de niveis antigos. Quando o jogo precisa carregar mapa novo, o Windows precisa decidir QUEM remover - isso causa micro-stuttering e freezes. O ISLC limpa isso ANTES de acontecer. Nao fecha nenhum processo. Jogos: GTA V, RDR2, Cyberpunk 2077, Tarkov, Star Citizen, CoD"/>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Limpeza Inteligente de Standby (ISLC)" FontSize="15" Foreground="White"/>
+                        <TextBlock x:Name="TxtIslcDescription" Text="Threshold auto-calculado. Reduz stuttering e freezes em jogos." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <Border x:Name="IslcStatusBadge" Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A3020" BorderBrush="#308050" BorderThickness="1" Margin="0,0,15,0">
+                        <TextBlock x:Name="TxtIslcBadge" Text="Standby: --" FontSize="11" Foreground="#50C080" FontWeight="SemiBold"/>
+                    </Border>
+
+                    <CheckBox x:Name="ChkStandbyClean" Grid.Column="3" Style="{StaticResource TrayToggle}" Click="ChkBackgroundFeature_Click"/>
+                </Grid>
+            </Border>
+
+            <!-- ═══════════════ LIMITADOR DE RAM POR PROCESSO ═══════════════ -->
             <Border Style="{StaticResource SubtleCardStyle}" Padding="15" Margin="0,0,0,10">
                 <Grid>
                     <Grid.RowDefinitions>

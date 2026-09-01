@@ -99,6 +99,65 @@ namespace KitLugia.Core
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
+        // ISLC: GetPerformanceInfo para obter tamanho da Standby List
+        [StructLayout(LayoutKind.Sequential)]
+        public struct PERFORMANCE_INFORMATION
+        {
+            public int cb;
+            public IntPtr CommitTotal;
+            public IntPtr CommitLimit;
+            public IntPtr CommitPeak;
+            public IntPtr PhysicalAvailable;
+            public IntPtr PhysicalTotal;
+            public IntPtr SystemCache;
+            public IntPtr KernelTotal;
+            public IntPtr KernelPaged;
+            public IntPtr KernelNonPaged;
+            public IntPtr PageSize;
+            public int HandleCount;
+            public int ProcessCount;
+            public int ThreadCount;
+        }
+
+        [DllImport("psapi.dll", SetLastError = true)]
+        private static extern bool GetPerformanceInfo(ref PERFORMANCE_INFORMATION pPerformanceInformation, int cb);
+
+        /// <summary>
+        /// Retorna o tamanho da Standby List em MB (cache do Windows).
+        /// Usado pelo ISLC para decidir quando limpar.
+        /// </summary>
+        public static long GetStandbyListSizeMB()
+        {
+            try
+            {
+                var info = new PERFORMANCE_INFORMATION();
+                info.cb = Marshal.SizeOf(info);
+                if (GetPerformanceInfo(ref info, info.cb))
+                {
+                    // SystemCache = Standby List + System Working Set (em pages)
+                    long cachePages = info.SystemCache.ToInt64();
+                    long pageSize = info.PageSize.ToInt64();
+                    return (cachePages * pageSize) / (1024 * 1024);
+                }
+            }
+            catch { }
+            return 0;
+        }
+
+        /// <summary>
+        /// Limpa a Standby List (cache do Windows).
+        /// Equivale ao ISLC 'EmptyStandbyList.exe standbylist'.
+        /// </summary>
+        public static void PurgeStandbyList()
+        {
+            try
+            {
+                EnablePrivilege("SeProfileSingleProcessPrivilege");
+                ExecuteMemoryCommand(MemoryPurgeStandbyList);
+            }
+            catch { }
+        }
+
         public static MemoryInfo GetMemoryStats()
         {
             var m = new MEMORYSTATUSEX();

@@ -4091,3 +4091,46 @@ ele sempre e maior que o WS). Trocado para `30% × WS` como floor.
 **Documentacao**: `docs/RAM_LIMITER_INTELLIGENT.md` (v2)
 
 Build: 0 erros.
+
+### Sessao 25/08 (cont.) - Auditoria GameBoost Pro: 3 bugs que causavam crash de navegador
+
+**Problema**: usuario reportou que navegadores (Opera GX, Discord) crashavam as vezes.
+Auditoria completa da GameBoostPage + TrayIconService.GameBoost.
+
+**Achados**:
+1. `ApplyFireminOptimizations` (MonitorTick 30s) usava `EmptyWorkingSet(handle)` BRUTO em
+   processos VIP (opera, discord, chrome) quando WS > 300MB. Isto causava page fault storm.
+2. `DetectAndTrimLeaks` (MonitorTick quando RAM > 65%) usava `MemoryOptimizer.EmptyProcessWorkingSet`
+   que faz `SetProcessWorkingSetSize(-1, -1)` — o mesmo EmptyWorkingSet perigoso.
+3. ProBalance + Firemin conflitavam: ProBalance throttling BelowNormal + Firemin trim no mesmo
+   processo → duplo ataque quando usuario volta pro app.
+
+**Correcoes (TrayIconService.cs)**:
+1. `ApplyFireminOptimizations` → modelo combinado: VERY_LOW priority + hard ceiling (70% WS)
+   + floor (30% WS) + EWS so quando WS > 150% do target. Antes: EWS bruto todo ciclo.
+2. `DetectAndTrimLeaks` → modelo combinado: VERY_LOW + hard ceiling (60% WS) + floor (25% WS)
+   + EWS condicional. Antes: EmptyProcessWorkingSet(-1,-1).
+3. `ApplyProBalanceCore` → skip de processos que Firemin trimou nos ultimos 15 segundos.
+   Antes: ProBalance throttled todo background process independente de trim recente.
+
+**Bug de build**: `SetProcessWorkingSetSizeEx` espera `IntPtr`, nao `long`. Cast adicionado.
+
+**Testes reais (Opera GX + Discord rodando)**:
+- Opera GX (635 MB): VERY_LOW + ceiling 444MB + EWS kickstart → 36 MB, VIVO (reducao 94%)
+- Discord (430 MB): VERY_LOW + ceiling 301MB, EWS pulado (abaixo threshold) → oscila 351-676 MB,
+  VIVO E RESPONSIVO em todos os 18s de monitoramento
+- ProBalance skip: chrome (trim 5s) = SKIP, msedge (trim 20s) = PROCESSAR, code (60s) = PROCESSAR
+
+**Botoes da GameBoostPage verificados** (13 handlers): todos funcionando.
+GameBoostPage (.xaml + .xaml.cs): Card Status, Config Sistema (TrayIcon/AutoStart/UnparkCPU),
+Comportamento ao Fechar (CloseToTray/ProBalance), Motor (V1-V4/Custom), GameBarPresenceWriter,
+Otimizacoes Reddit (5 toggles), Download Boost (toggle/mode/threshold).
+
+**Notas adicionais**:
+- `_userExceptions` (discord, opera, chrome, etc.) exclui do GameBoost boost MAS NAO do Firemin.
+  Isso e correto — o Firemin deve trimar qualquer VIP.
+- `SetWin32PrioritySeparation(true)` e GLOBAL (registry). Afeta scheduler de TODOS processos.
+  So revertido no ShutdownGameBoost. Potencialmente problemático mas nao causa crash.
+- `BoostTimerResolution()` tambem e GLOBAL (NtSetTimerResolution 1ms). Afeta todos processos.
+
+Build: 0 erros.

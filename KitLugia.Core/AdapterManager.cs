@@ -67,6 +67,10 @@ namespace KitLugia.Core
 
                 foreach (var subKeyName in classKey.GetSubKeyNames().OrderBy(x => x))
                 {
+                    // Subchaves como "Properties", "NetCfgInstanceId" são metadados,
+                    // não adaptadores — ignorar (podem lançar SecurityException)
+                    if (!int.TryParse(subKeyName, out _)) continue;
+
                     try
                     {
                         using var adapterKey = classKey.OpenSubKey(subKeyName);

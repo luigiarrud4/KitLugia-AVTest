@@ -4,6 +4,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       mc:Ignorable="d" 
       d:DesignHeight="700" d:DesignWidth="900"
       Title="Privacy Manager"
@@ -204,6 +205,7 @@
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
 
                                                 <!-- Indicador de N&#xED;vel de Privacidade -->
@@ -231,7 +233,9 @@
                                                     <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextMuted}" FontSize="12" TextWrapping="Wrap"/>
                                                 </StackPanel>
 
-                                                <CheckBox Grid.Column="2"
+                                                <controls:InfoButton Grid.Column="2" ToolTipText="{Binding InfoTooltip}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+
+                                                <CheckBox Grid.Column="3"
                                                           IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                                           Style="{StaticResource ToggleSwitchStyle}"
                                                           HorizontalAlignment="Right"

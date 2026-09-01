@@ -5916,7 +5916,7 @@ catch {{
                             UseShellExecute = true,
                             Verb = "runas"
                         };
-                        System.Diagnostics.Process.Start(psi);
+                        using var _p = System.Diagnostics.Process.Start(psi);
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
@@ -6150,7 +6150,7 @@ catch {{
                             UseShellExecute = true,
                             Verb = "runas"
                         };
-                        System.Diagnostics.Process.Start(psi);
+                        using var _p = System.Diagnostics.Process.Start(psi);
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
@@ -6489,7 +6489,7 @@ catch {{
                             UseShellExecute = true,
                             Verb = "runas"
                         };
-                        System.Diagnostics.Process.Start(psi);
+                        using var _p = System.Diagnostics.Process.Start(psi);
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
@@ -7004,7 +7004,7 @@ catch {{
                             UseShellExecute = true,
                             Verb = "runas"
                         };
-                        System.Diagnostics.Process.Start(psi);
+                        using var _p = System.Diagnostics.Process.Start(psi);
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });

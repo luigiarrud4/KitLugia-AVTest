@@ -1097,14 +1097,6 @@ namespace KitLugia.Core
                 Level = PrivacyLevel.Recommended, Category = "Explorer"
             },
             new() {
-                Name = "Explorer - Histórico de Arquivos Recentes",
-                Description = "Impede que o Explorer mostre arquivos recentes no Acesso Rápido.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Explorer",
-                ValueName = "ShowRecent",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Explorer"
-            },
-            new() {
                 Name = "OneDrive - Acesso à Rede Antes do Login",
                 Description = "Desativa acesso à rede do OneDrive antes do login.",
                 RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\OneDrive",
@@ -1326,104 +1318,49 @@ namespace KitLugia.Core
                 IsService = true, ServiceName = "wuauserv"
             },
 
-            // ====================== WINDOWS 11 ESPECÍFICO ======================
+            // ====================== WINDOWS 11 2026 — NOVOS POLICIES ======================
+            // (Removidas duplicatas que estavam em "Copilot & IA" — esses são NOVOS)
             new() {
-                Name = "Windows Recall - Desativar",
-                Description = "Desativa completamente o Windows Recall (captura automática de telas por IA).",
+                Name = "Recall - Desativar Componente",
+                Description = "Remove completamente o componente Recall do sistema (24H2 KB5055627+). Requer reinício.",
                 RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
-                ValueName = "DisableAIDataAnalysis",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
-            },
-            new() {
-                Name = "Windows Recall - Snapshots",
-                Description = "Impede que o Recall salve snapshots de tela no disco.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
-                ValueName = "DisableRecallSnapshots",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
-            },
-            new() {
-                Name = "Windows Recall - Indexação",
-                Description = "Desativa indexação de conteúdo pelo Recall para busca semântica.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
-                ValueName = "DisableRecallContentIndexing",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
-            },
-            new() {
-                Name = "Copilot Runtime",
-                Description = "Desativa o serviço de runtime do Copilot em segundo plano.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
-                ValueName = "DisableCopilotRuntime",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
-            },
-            new() {
-                Name = "Copilot no File Explorer",
-                Description = "Remove o Copilot do File Explorer (Win11 24H2+).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
-                ValueName = "TurnOffWindowsCopilotForFileExplorer",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Limited, Category = "Recall & IA"
-            },
-            new() {
-                Name = "IA no Paint",
-                Description = "Desativa Generative Fill e funções de IA no Paint.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
-                ValueName = "DisablePaintAIFeatures",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Limited, Category = "Recall & IA"
-            },
-            new() {
-                Name = "IA no Photos",
-                Description = "Desativa funções de IA no app Fotos (remoção de fundo, etc.).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
-                ValueName = "DisablePhotosAIFeatures",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Limited, Category = "Recall & IA"
-            },
-            new() {
-                Name = "Telemetria de IA do Edge",
-                Description = "Desativa dados de uso das funções de IA do Edge.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge",
-                ValueName = "AIChatEnabled",
+                ValueName = "AllowRecallEnablement",
                 SafeValue = 0, UnsafeValue = 1,
                 Level = PrivacyLevel.Recommended, Category = "Recall & IA"
             },
             new() {
-                Name = "IA na Pesquisa do Windows",
-                Description = "Desativa resultados de IA na barra de pesquisa.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
-                ValueName = "IsAADCloudSearchEnabled",
+                Name = "Recall - Bloquear Exportação",
+                Description = "Impede que o Recall exporte snapshots para apps ou sites.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "AllowRecallExport",
                 SafeValue = 0, UnsafeValue = 1,
                 Level = PrivacyLevel.Recommended, Category = "Recall & IA"
             },
             new() {
-                Name = "IA no Notepad",
-                Description = "Desativa sugestões de IA no Notepad (Win11 24H2+).",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Notepad",
-                ValueName = "ShowCopilotSuggestions",
-                SafeValue = 0, UnsafeValue = 1,
+                Name = "Remover App Copilot",
+                Description = "Remove o app Microsoft Copilot do sistema (April 2026 Update+).",
+                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "RemoveCopilotApp",
+                SafeValue = 1, UnsafeValue = 0,
                 Level = PrivacyLevel.Limited, Category = "Recall & IA"
             },
-            // ====================== WINDOWS SPOTLIGHT ======================
             new() {
-                Name = "Spotlight na Tela de Bloqueio",
-                Description = "Desativa imagens e dicas da Microsoft na tela de bloqueio.",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\CloudContent",
-                ValueName = "DisableWindowsSpotlightFeatures",
+                Name = "Agent Connector - Política",
+                Description = "Controla conexões MCP Server/Host do Copilot (2026+). 0=Usuário controla, 1=Restrito.",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "AgentConnectorMinimumPolicy",
                 SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Limited, Category = "Tela de Bloqueio"
+                Level = PrivacyLevel.Recommended, Category = "Recall & IA"
             },
             new() {
-                Name = "Conteúdo Sugerido",
-                Description = "Desativa conteúdo sugerido pela Microsoft (dicas, apps, etc.).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\CloudContent",
-                ValueName = "DisableSoftLanding",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Tela de Bloqueio"
+                Name = "Agent Connector - Consentimento",
+                Description = "Define duração do consentimento de agentes em horas (padrão 720h = 30 dias).",
+                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
+                ValueName = "AgentConsentDuration",
+                SafeValue = 0, UnsafeValue = 720,
+                Level = PrivacyLevel.Limited, Category = "Recall & IA"
             },
+            // ====================== SPOTLIGHT (APENAS NÃO-DUPLICADOS) ======================
             new() {
                 Name = "Spotlight no Desktop",
                 Description = "Desativa Windows Spotlight no desktop (Win11 23H2+).",
@@ -1431,71 +1368,6 @@ namespace KitLugia.Core
                 ValueName = "RotatingLockScreenEnabled",
                 SafeValue = 0, UnsafeValue = 1,
                 Level = PrivacyLevel.Limited, Category = "Tela de Bloqueio"
-            },
-            new() {
-                Name = "Dicas na Tela de Bloqueio",
-                Description = "Remove dicas e truques da tela de bloqueio.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
-                ValueName = "RotatingLockScreenOverlayEnabled",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Tela de Bloqueio"
-            },
-            new() {
-                Name = "Fatos Curiosos na Tela de Bloqueio",
-                Description = "Desativa fatos curiosos e dicas na tela de bloqueio.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
-                ValueName = "SubscribedContent-338387Enabled",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Tela de Bloqueio"
-            },
-            // ====================== LIMPEZA DE BLOATWARE ======================
-            new() {
-                Name = "Desativar MSN News no Widgets",
-                Description = "Remove o feed de notícias MSN do painel de Widgets (Win11).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Dsh",
-                ValueName = "AllowNewsAndInterests",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Widgets"
-            },
-            new() {
-                Name = "Telemetria de Experiência do Dispositivo",
-                Description = "Desativa telemetria de experiência do dispositivo (Device Census).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection",
-                ValueName = "LimitDiagnosticLogCollection",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Telemetria"
-            },
-            new() {
-                Name = "SmartScreen do Explorador",
-                Description = "Desativa SmartScreen do Explorer para apps (recomendado manter).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer",
-                ValueName = "SmartScreenEnabled",
-                SafeValue = "Off", UnsafeValue = "RequireAdmin",
-                Level = PrivacyLevel.NotRecommended, Category = "Segurança"
-            },
-            new() {
-                Name = "SmartScreen para Apps Store",
-                Description = "Desativa SmartScreen para apps da Store (recomendado manter).",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer",
-                ValueName = "SmartScreenEnabled",
-                SafeValue = "Off", UnsafeValue = "RequireAdmin",
-                Level = PrivacyLevel.NotRecommended, Category = "Segurança"
-            },
-            new() {
-                Name = "Experiência de Uso do Windows",
-                Description = "Desativa a Experiência de Uso do Windows ( relatórios de uso ).",
-                RegistryPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection",
-                ValueName = "DoNotShowFeedbackNotifications",
-                SafeValue = 1, UnsafeValue = 0,
-                Level = PrivacyLevel.Recommended, Category = "Telemetria"
-            },
-            new() {
-                Name = "Desativar suggested content in Settings",
-                Description = "Remove sugestões e anúncios no app Configurações do Windows 11.",
-                RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
-                ValueName = "SubscribedContent-338393Enabled",
-                SafeValue = 0, UnsafeValue = 1,
-                Level = PrivacyLevel.Recommended, Category = "Publicidade"
             },
         };
 

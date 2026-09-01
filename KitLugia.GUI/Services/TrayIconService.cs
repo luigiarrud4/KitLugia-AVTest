@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Diagnostics;
 using System.Windows.Forms;
@@ -684,6 +684,10 @@ namespace KitLugia.GUI.Services
         public bool GamePriorityEnabled { get; set; } = false;
         public bool ForegroundBoostEnabled { get; set; } = true;
         public bool StandbyCleanEnabled { get; set; } = false;
+        public long IslcThresholdMB { get; set; } = SuggestIslcThresholdMB(); // ISLC: auto-calculado baseado na RAM do sistema
+        public long IslcLastCleanMB { get; set; } = 0; // Standby List no ultimo clean
+        public DateTime IslcLastCleanTime { get; set; } = DateTime.MinValue;
+        public int IslcCleanCount { get; set; } = 0; // quantas vezes limpos
         public bool MemoryLeakDetectionEnabled { get; set; } = false;
         public bool DpcMonitorEnabled { get; set; } = false;
         public bool FocusAssistEnabled { get; set; } = false;
@@ -1426,6 +1430,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("GamePriority", GamePriorityEnabled ? 1 : 0);
                 key.SetValue("ForegroundBoost", ForegroundBoostEnabled ? 1 : 0);
                 key.SetValue("StandbyClean", StandbyCleanEnabled ? 1 : 0);
+                key.SetValue("IslcThresholdMB", IslcThresholdMB);
                 key.SetValue("AntiLeak", MemoryLeakDetectionEnabled ? 1 : 0);
                 key.SetValue("FocusAssist", FocusAssistEnabled ? 1 : 0);
                 key.SetValue("TimerBoost", TimerBoost ? 1 : 0);
@@ -1714,6 +1719,7 @@ namespace KitLugia.GUI.Services
                 GamePriorityEnabled = (int)key.GetValue("GamePriority", 0) == 1;
                 ForegroundBoostEnabled = (int)key.GetValue("ForegroundBoost", 1) == 1;
                 StandbyCleanEnabled = (int)key.GetValue("StandbyClean", 0) == 1;
+                IslcThresholdMB = (long)key.GetValue("IslcThresholdMB", SuggestIslcThresholdMB());
                 MemoryLeakDetectionEnabled = (int)key.GetValue("AntiLeak", 0) == 1;
                 FocusAssistEnabled = (int)key.GetValue("FocusAssist", 0) == 1;
                 TimerBoost = (int)key.GetValue("TimerBoost", 0) == 1;
@@ -1942,7 +1948,9 @@ namespace KitLugia.GUI.Services
                 }
 
                 // 3. Game Priority Boost
-                if (GamePriorityEnabled)
+                // NOTA: OptimizeForegroundProcess so roda quando NAO ha hook ativo
+                // (hook/timer 250ms ja cuida do boost via CheckForegroundWindow)
+                if (GamePriorityEnabled && !_useWinEventHook && _foregroundCheckTimer == null)
                 {
                     OptimizeForegroundProcess();
                 }
@@ -2051,6 +2059,7 @@ namespace KitLugia.GUI.Services
             try
             {
                 // Firemin: trim suave para processos VIP usando o modelo combinado
+                // (mesmo modelo que o RAM Limiter - SEM EmptyWorkingSet bruto)
                 foreach (var profile in _processProfiles.Values)
                 {
                     if (!profile.IsVip) continue;
@@ -2074,11 +2083,26 @@ namespace KitLugia.GUI.Services
                                 {
                                     try
                                     {
-                                        // 1. Memory priority = LOW (trim suave)
-                                        SetProcessMemoryPriority(handle, Win32Api.MEMORY_PRIORITY_LOW);
+                                        long wsMB = profile.LastKnownWs / (1024 * 1024);
+                                        long targetMB = Math.Max(150, wsMB * 70 / 100); // trim 30% suave
+                                        long floorMB = Math.Max(60, wsMB * 30 / 100); // floor 30% do WS atual
 
-                                        // 2. EmptyWorkingSet (kickstart)
-                                        EmptyWorkingSet(handle);
+                                        // 1. Memory priority = VERY_LOW (OS trimma este processo primeiro)
+                                        SetProcessMemoryPriority(handle, Win32Api.MEMORY_PRIORITY_VERY_LOW);
+
+                                        // 2. Hard ceiling: min=floor, max=target
+                                        SetProcessWorkingSetSizeEx(handle,
+                                            (IntPtr)(floorMB * 1024 * 1024),
+                                            (IntPtr)(targetMB * 1024 * 1024),
+                                            0); // HARDWS_MAX_DISABLE
+
+                                        // 3. EmptyWorkingSet SO quando WS > 150% do target (kickstart)
+                                        if (wsMB > targetMB * 150 / 100)
+                                            EmptyWorkingSet(handle);
+
+                                        // 4. Restaura NORMAL quando dentro do target
+                                        if (wsMB <= targetMB)
+                                            SetProcessMemoryPriority(handle, Win32Api.MEMORY_PRIORITY_NORMAL);
                                     }
                                     finally { CloseHandle(handle); }
                                 }
@@ -2189,7 +2213,37 @@ namespace KitLugia.GUI.Services
 
                         if (currentWs > activeThreshold)
                         {
-                            MemoryOptimizer.EmptyProcessWorkingSet(proc.Id);
+                            // MODELO COMBINADO em vez de EmptyProcessWorkingSet bruto
+                            // (previne page fault storm em navegadores/Electron)
+                            try
+                            {
+                                IntPtr handle = OpenProcess(
+                                    PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION | 0x0200,
+                                    false, proc.Id);
+                                if (handle != IntPtr.Zero)
+                                {
+                                    try
+                                    {
+                                        long wsMB = (long)(currentWs / (1024 * 1024));
+                                        long targetMB = Math.Max(100, wsMB * 60 / 100); // trim 40% suave
+                                        long floorMB = Math.Max(50, wsMB * 25 / 100); // floor 25% do WS
+
+                                        SetProcessMemoryPriority(handle, Win32Api.MEMORY_PRIORITY_VERY_LOW);
+                                        SetProcessWorkingSetSizeEx(handle,
+                                            (IntPtr)(floorMB * 1024 * 1024),
+                                            (IntPtr)(targetMB * 1024 * 1024),
+                                            0); // HARDWS_MAX_DISABLE
+
+                                        if (wsMB > targetMB * 150 / 100)
+                                            EmptyWorkingSet(handle);
+
+                                        if (wsMB <= targetMB)
+                                            SetProcessMemoryPriority(handle, Win32Api.MEMORY_PRIORITY_NORMAL);
+                                    }
+                                    finally { CloseHandle(handle); }
+                                }
+                            }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2199,8 +2253,9 @@ namespace KitLugia.GUI.Services
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
-        private uint _lastBoostedPid = 0;
+        private long _lastBoostedPid = 0; // Interlocked-safe
         private ProcessPriorityClass _lastOriginalPriority = ProcessPriorityClass.Normal;
+        private readonly object _boostLock = new(); // Serializa boost/revert do hook
 
 
         public enum GameBoostEngine
@@ -2298,6 +2353,7 @@ namespace KitLugia.GUI.Services
         private uint _currentBoostedPid = 0;
         private IntPtr _lastForegroundHwnd = IntPtr.Zero;
         private DateTime _lastBoostTime = DateTime.MinValue;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, ProcessPriorityClass> _originalPriorities = new();
         private readonly TimeSpan _boostCooldown = TimeSpan.FromMilliseconds(50);
         private Win32Api.WinEventDelegate? _winEventDelegate;
         private IntPtr _winEventHook = IntPtr.Zero;
@@ -2357,7 +2413,10 @@ namespace KitLugia.GUI.Services
             // Rede (crítico para conectividade)
             "wpnService", "wpnUserService",
             // Input (crítico para mouse/teclado)
-            "ctfmon", "tabtip", "textinputhost"
+            "ctfmon", "tabtip", "textinputhost",
+            // Xbox/Gaming (crítico - gameplatformservices.dll_unloaded crash)
+            "xboxgamebarwidgets", "xboxpcappft", "gamebar", "gamingservices",
+            "xboxapp", "xboxidp", "gamelauncher"
         };
 
 
@@ -2395,10 +2454,10 @@ namespace KitLugia.GUI.Services
                         if (ForegroundBoostEnabled && oldProc.PriorityClass != _lastOriginalPriority)
                             oldProc.PriorityClass = _lastOriginalPriority;
 
-                        // Restaura I/O Normal (2) e Page Priority Default (5)
+                        // Restaura I/O Normal (2), Page Default (5), Memory NORMAL
                         Win32Api.SetProcessIoPriority(oldProc.Handle, 2);
                         Win32Api.SetProcessPagePriority(oldProc.Handle, 5);
-
+                        Win32Api.SetThreadMemoryPriority(oldProc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL);
 
                         SetEcoQoS(oldProc.Handle, true);
                     }
@@ -2551,6 +2610,10 @@ namespace KitLugia.GUI.Services
                     // Aplica boost ao novo processo
                     try
                     {
+                        // Salva prioridade ORIGINAL antes de boostar
+                        using var newProc = Process.GetProcessById((int)pid);
+                        _originalPriorities[pid] = newProc.PriorityClass;
+
                         ApplyBoostModern(pid);
                         _currentBoostedPid = pid;
 
@@ -2826,9 +2889,9 @@ namespace KitLugia.GUI.Services
                     }
                 }
 
-                try { Win32Api.SetProcessIoPriority(proc.Handle, config.IoPriorityLevel == 0 ? 2 : 3); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                try { Win32Api.SetProcessPagePriority(proc.Handle, 5); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                try { Win32Api.SetThreadMemoryPriority(proc.Handle, (uint)(config.ThreadMemoryPriority == 0 ? 5 : 3)); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessIoPriority(proc.Handle, config.IoPriorityLevel == 0 ? 2 : config.IoPriorityLevel == 1 ? 4 : 3); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetProcessPagePriority(proc.Handle, config.PagePriorityLevel == 0 ? 5 : config.PagePriorityLevel); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Win32Api.SetThreadMemoryPriority(proc.Handle, (uint)(config.ThreadMemoryPriority == 0 ? 5 : config.ThreadMemoryPriority)); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 try { SetEcoQoS(proc.Handle, config.EcoQoSEnabled); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
                 if (config.GameClassInfo)
@@ -2981,10 +3044,10 @@ namespace KitLugia.GUI.Services
             var v4Config = new CustomEngineConfig
             {
                 CpuPriority = "realtime",
-                IoPriorityLevel = 1,
-                PagePriorityLevel = 2,
+                IoPriorityLevel = 1,       // Critical I/O
+                PagePriorityLevel = 2,      // Very high page priority
                 TimerBoost = true,
-                EcoQoSEnabled = true,
+                EcoQoSEnabled = false,      // DISABLED: EcoQoS = power saving, NAO performance!
                 ProBalance = false,
                 NetworkBoost = true,
                 ThreadMemoryPriority = 0,
@@ -3144,6 +3207,11 @@ namespace KitLugia.GUI.Services
                             if (_proBalanceCooldowns.TryGetValue(pid, out var cooldownEnd) && now < cooldownEnd)
                                 continue;
 
+                            // Pula processos que o Firemin trimou recentemente (evita conflito duplo)
+                            if (_processProfiles.TryGetValue(name, out var prof) &&
+                                (DateTime.Now - prof.LastTrimTime).TotalSeconds < 15)
+                                continue;
+
                             double cpuUsage = GetProcessCpuUsage(proc);
 
                             if (cpuUsage > cpuThreshold)
@@ -3292,12 +3360,18 @@ namespace KitLugia.GUI.Services
             {
                 using var proc = Process.GetProcessById((int)pid);
 
-                // Restaura prioridade para Normal ao sair do foreground
+                // Restaura prioridade ORIGINAL ao sair do foreground
                 if (ForegroundBoostEnabled)
                 {
-                    if (proc.PriorityClass == ProcessPriorityClass.High ||
-                        proc.PriorityClass == ProcessPriorityClass.RealTime ||
-                        proc.PriorityClass == ProcessPriorityClass.AboveNormal)
+                    if (_originalPriorities.TryGetValue(pid, out var originalPriority))
+                    {
+                        if (proc.PriorityClass != originalPriority)
+                            proc.PriorityClass = originalPriority;
+                        _originalPriorities.TryRemove(pid, out _);
+                    }
+                    else if (proc.PriorityClass == ProcessPriorityClass.High ||
+                             proc.PriorityClass == ProcessPriorityClass.RealTime ||
+                             proc.PriorityClass == ProcessPriorityClass.AboveNormal)
                     {
                         proc.PriorityClass = ProcessPriorityClass.Normal;
                     }
@@ -3407,6 +3481,7 @@ namespace KitLugia.GUI.Services
                     _currentBoostedPid = 0;
                 }
 
+                _originalPriorities.Clear();
 
                 Win32Api.SetWin32PrioritySeparation(false);
                 Win32Api.RestoreTimerResolution();
@@ -3423,12 +3498,22 @@ namespace KitLugia.GUI.Services
         {
             try
             {
-                // On high RAM systems (32GB+), standby list is actually good for performance
-                // We only clear it if RAM is truly crowded (> 80%)
-                if (systemUsagePercent > 80)
+                long standbyMB = KitLugia.Core.MemoryOptimizer.GetStandbyListSizeMB();
+                IslcLastCleanMB = standbyMB;
+
+                if (standbyMB > IslcThresholdMB)
                 {
-                    // Use Normal instead of Alta to avoid heavy purging of useful cache
-                    MemoryOptimizer.Optimize(MemoryOptimizer.CleaningMode.Normal);
+                    // Purge e pesado (18GB+ pode travar UI) — roda em background
+                    _ = System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try
+                        {
+                            KitLugia.Core.MemoryOptimizer.PurgeStandbyList();
+                            IslcLastCleanTime = DateTime.Now;
+                            IslcCleanCount++;
+                        }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    });
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -4057,12 +4142,33 @@ namespace KitLugia.GUI.Services
         }
 
         /// <summary>
-        /// Aplica os limites de RAM com abordagem inteligente:
-        /// 1. Lê CommitSize + PeakWorkingSet via GetProcessMemoryInfo (não só WorkingSet64)
-        /// 2. Aprende o "resting state" (mínimo natural do app) ao longo do tempo
-        /// 3. Detecta page fault storms e para de trimar se o app está sofrendo
-        /// 4. Nunca trimma abaixo do resting state
-        /// 5. Trim adaptativo: mais agressivo quando longe do limite, mais suave perto dele
+        /// <summary>
+        /// Calcula o threshold ISLC ideal baseado na RAM total do sistema.
+        /// Baseado nas recomendações da comunidade ISLC (WagnardSoft):
+        /// - 8GB RAM → 1024MB threshold
+        /// - 16GB RAM → 2048MB threshold  
+        /// - 32GB RAM → 4096MB threshold
+        /// - 64GB+ RAM → 8192MB threshold
+        /// Fórmula: TotalRAM / 8 (mínimo 1024MB)
+        /// </summary>
+        public static long SuggestIslcThresholdMB()
+        {
+            try
+            {
+                var memStatus = new Win32Api.MEMORYSTATUSEX();
+                if (Win32Api.GlobalMemoryStatusEx(memStatus))
+                {
+                    long totalRamMB = (long)(memStatus.ullTotalPhys / (1024 * 1024));
+                    // Threshold = 1/8 da RAM total (mínimo 1024MB, máximo 16384MB)
+                    return Math.Clamp(totalRamMB / 8, 1024, 16384);
+                }
+            }
+            catch { /* fallback */ }
+            return 1024; // default para 8GB
+        }
+
+        /// <summary>
+        /// Aplica os limites de RAM configurados com trim gradual.
         /// </summary>
         private void ApplyProcessRamLimits()
         {
@@ -4079,239 +4185,101 @@ namespace KitLugia.GUI.Services
 
                 try
                 {
-                    // Debug: loga que o timer esta rodando
-                    if (limit.CheckCount == 0)
-                        KitLugia.Core.Logger.Log($"\U0001F504 RAM Limiter: primeira execucao para {limit.ProcessName} (limite={limit.LimitMB}MB)");
                     var processes = Process.GetProcessesByName(limit.ProcessName);
                     if (processes.Length == 0)
                     {
                         limit.LastKnownMB = 0;
                         limit.ConsecutiveTrimCount = 0;
                         limit.IsForeground = false;
-                        limit.StormBackoffLevel = 0;
                         continue;
                     }
 
-                    // ── FASE 1: Coleta de dados via GetProcessMemoryInfo ──
-                    long totalWsMB = 0;
-                    long totalCommitMB = 0;
-                    long maxPeakWsMB = 0;
-                    uint totalPageFaults = 0;
+                    // Soma RAM de todas as instancias e detecta foreground
+                    long totalRamMB = 0;
                     bool anyForeground = false;
 
                     foreach (var proc in processes)
                     {
                         try
                         {
+                            totalRamMB += proc.WorkingSet64 / (1024 * 1024);
                             if ((uint)proc.Id == foregroundPid)
                                 anyForeground = true;
-
-                            // Tenta ler detalhes avançados via handle
-                            IntPtr handle = OpenProcess(
-                                PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, proc.Id);
-                            if (handle != IntPtr.Zero)
-                            {
-                                try
-                                {
-                                    var (wsMB, commitMB, peakWs, faults) = GetProcessMemoryDetails(handle);
-                                    totalWsMB += wsMB;
-                                    totalCommitMB += commitMB;
-                                    if (peakWs > maxPeakWsMB) maxPeakWsMB = peakWs;
-                                    totalPageFaults += faults;
-                                }
-                                finally { CloseHandle(handle); }
-                            }
-                            else
-                            {
-                                // Fallback: WorkingSet64 do .NET
-                                totalWsMB += proc.WorkingSet64 / (1024 * 1024);
-                            }
                         }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        catch { }
                     }
 
-                    // ── FASE 2: Atualiza resting state tracker ──
-                    limit.CheckCount++;
-                    limit.LastKnownMB = totalWsMB;
-                    limit.CommitSizeMB = totalCommitMB;
-                    limit.PeakWorkingSetMB = maxPeakWsMB;
+                    limit.LastKnownMB = totalRamMB;
                     limit.IsForeground = anyForeground;
-                    if (totalWsMB > limit.PeakRamMB) limit.PeakRamMB = totalWsMB;
+                    if (totalRamMB > limit.PeakRamMB) limit.PeakRamMB = totalRamMB;
 
-                    // Aprende o resting state: menor working set observado onde o app estava estável
-                    // (só atualiza se o app não excedeu o limite — se excedeu, não é "resting")
-                    if (totalWsMB > 0 && totalWsMB <= limit.LimitMB)
-                    {
-                        if (limit.RestingWorkingSetMB == 0 || totalWsMB < limit.RestingWorkingSetMB)
-                            limit.RestingWorkingSetMB = totalWsMB;
-                    }
-
-                    // ── FASE 3: Detecta page fault storm ──
-                    if (limit.LastPageFaultCount > 0 && totalPageFaults > 0)
-                    {
-                        uint faultsDelta = totalPageFaults - limit.LastPageFaultCount;
-                        // Mais de 5000 page faults entre checks = o app está sofrendo
-                        if (faultsDelta > 5000 && limit.ConsecutiveTrimCount > 0)
-                        {
-                            limit.StormBackoffLevel = Math.Min(3, limit.StormBackoffLevel + 1);
-                            KitLugia.Core.Logger.Log(
-                                $"\u26A0\uFE0F RAM Limiter: {limit.ProcessName} " +
-                                $"page fault storm detectado ({faultsDelta} faults) " +
-                                $"\u2192 backoff n\u00EDvel {limit.StormBackoffLevel}");
-                        }
-                        else if (faultsDelta < 500 && limit.StormBackoffLevel > 0)
-                        {
-                            // Se estabilizou, reduz o backoff
-                            limit.StormBackoffLevel = Math.Max(0, limit.StormBackoffLevel - 1);
-                        }
-                    }
-                    limit.LastPageFaultCount = totalPageFaults;
-
-                    // ── FASE 4: Decide se trimma ──
+                    // Nao trimma se esta em foreground
                     if (anyForeground)
                     {
-                        foreach (var proc in processes) try { proc.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        foreach (var proc in processes) try { proc.Dispose(); } catch { }
                         continue;
                     }
 
-                    bool exceedsLimit = totalWsMB > limit.LimitMB;
-
-                    // ── SAFE GUARD: Limite abaixo do Commit Size = perigoso ──
-                    // Commit Size = memória que o app REALMENTE alocou (precisa).
-                    // Se o limite do usuário < Commit Size, o trim forçaria page-in storm.
-                    // Nesse caso, usamos Commit Size como floor mínimo.
-                    if (totalCommitMB > 0 && limit.LimitMB < totalCommitMB)
-                    {
-                        // Loga aviso apenas 1x (a cada 10 checks)
-                        if (limit.CheckCount % 10 == 1)
-                        {
-                            KitLugia.Core.Logger.Log(
-                                $"\u26A0\uFE0F RAM Limiter: {limit.ProcessName} " +
-                                $"limite ({limit.LimitMB}MB) < commit size ({totalCommitMB}MB) " +
-                                $"\u2192 usando commit como floor para evitar crash");
-                        }
-                        // Ajusta o floor para não ir abaixo do commit
-                        // (o app PRECISA dessa memória para funcionar)
-                    }
-
-                    // Cooldown: 1s no modo auto-regulavel (reacao instantanea),
-                    // 5s+ no modo classico (seguro para apps sensiveis)
-                    TimeSpan cooldown;
-                    if (limit.SafeAutoRegulate)
-                    {
-                        // Auto: cooldown minimo (1s) — trim a cada ciclo
-                        cooldown = TimeSpan.FromSeconds(1);
-                    }
-                    else
-                    {
-                        // Classico: cooldown adaptativo com backoff
-                        int stormMultiplier = 1 << limit.StormBackoffLevel;
-                        var baseCooldown = GetTrimCooldown(limit);
-                        cooldown = TimeSpan.FromMilliseconds(baseCooldown.TotalMilliseconds * stormMultiplier);
-                    }
-                    bool cooldownPassed = (DateTime.Now - limit.LastTrimTime) >= cooldown;
-
-                    // Debug: loga status do trim
-                    if (exceedsLimit && limit.CheckCount % 5 == 0)
-                    {
-                        var timeSinceTrim = (DateTime.Now - limit.LastTrimTime).TotalSeconds;
-                        KitLugia.Core.Logger.Log(
-                            $"\U0001F4CA RAM Limiter: {limit.ProcessName} WS={totalWsMB}MB limite={limit.LimitMB}MB " +
-                            $"excede={exceedsLimit} cooldown={cooldownPassed:F1}s/{cooldown.TotalSeconds:F1}s fg={anyForeground}");
-                    }
+                    bool exceedsLimit = totalRamMB > limit.LimitMB;
+                    bool cooldownPassed = (DateTime.Now - limit.LastTrimTime) >= GetTrimCooldown(limit);
 
                     if (exceedsLimit && cooldownPassed)
                     {
-                        long excessMB = totalWsMB - limit.LimitMB;
+                        long excessMB = totalRamMB - limit.LimitMB;
 
-                        // ===== TRIM COMBINADO (testado: Discord 1403MB -> 271MB) =====
-                        // 1. MemoryPriority = VERY_LOW (OS trimma primeiro)
-                        // 2. Hard ceiling (max = target, OS enforce)
-                        // 3. EmptyWorkingSet apenas quando WS > 150% do target
-                        // 4. Cooldown 5s para app recuperar entre trims
+                        // Trim gradual: reduz 30% do excesso por ciclo
+                        long targetMB = totalRamMB - (long)(excessMB * 0.30);
+                        targetMB = Math.Max(targetMB, limit.LimitMB);
 
-                        long floorMB = Math.Max(limit.GetEffectiveMinMB(), (long)(totalWsMB * 0.30));
-                        long targetMB = limit.LimitMB;
-                        long aggressiveThreshold = (long)(targetMB * 1.5);
-
+                        long targetBytes = targetMB * 1024 * 1024;
                         int trimmedCount = 0;
+
                         foreach (var proc in processes)
                         {
                             try
                             {
                                 IntPtr handle = OpenProcess(
-                                    PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION | 0x0200,
+                                    PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION,
                                     false, proc.Id);
                                 if (handle != IntPtr.Zero)
                                 {
                                     try
                                     {
-                                        // 1. Memory priority = VERY_LOW
-                                        SetProcessMemoryPriority(handle, Win32Api.MEMORY_PRIORITY_VERY_LOW);
-
-                                        // 2. Hard ceiling: min=floor, max=target
-                                        SetProcessWorkingSetSizeEx(
+                                        bool ok = SetProcessWorkingSetSizeEx(
                                             handle,
-                                            (IntPtr)(floorMB * 1024 * 1024),
-                                            (IntPtr)(targetMB * 1024 * 1024),
-                                            0);
-
-                                        // 3. EmptyWorkingSet quando WS > 150% do target
-                                        if (totalWsMB > aggressiveThreshold)
-                                        {
+                                            (IntPtr)(-1),
+                                            (IntPtr)targetBytes,
+                                            QUOTA_LIMITS_HARDWS_MAX_DISABLE);
+                                        if (!ok)
                                             EmptyWorkingSet(handle);
-                                        }
                                         trimmedCount++;
                                     }
                                     finally { CloseHandle(handle); }
                                 }
+                                else
+                                {
+                                    KitLugia.Core.MemoryOptimizer.EmptyProcessWorkingSet(proc.Id);
+                                    trimmedCount++;
+                                }
                             }
-                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                            catch { }
                         }
 
                         limit.LastTrimTime = DateTime.Now;
                         limit.ConsecutiveTrimCount++;
-
-                        if (trimmedCount > 0)
-                        {
-                            string mode = totalWsMB > aggressiveThreshold ? "AGRESSIVO" : "suave";
-                            KitLugia.Core.Logger.Log(
-                                $"\U0001F4BE RAM Limiter: {limit.ProcessName} "
-                                + $"{totalWsMB}MB (excesso: {excessMB}MB) "
-                                + $"floor: {floorMB}MB, target: {targetMB}MB, "
-                                + $"modo: {mode}, {trimmedCount} inst, "
-                                + $"trim #{limit.ConsecutiveTrimCount}");
-                        }
                     }
                     else if (!exceedsLimit)
                     {
                         if (limit.ConsecutiveTrimCount > 0)
                             limit.ConsecutiveTrimCount = 0;
-
-                        // Restaura memory priority para NORMAL
-                        foreach (var proc in processes)
-                        {
-                            try
-                            {
-                                IntPtr handle = OpenProcess(0x0200, false, proc.Id);
-                                if (handle != IntPtr.Zero)
-                                {
-                                    try { SetProcessMemoryPriority(handle, Win32Api.MEMORY_PRIORITY_NORMAL); }
-                                    finally { CloseHandle(handle); }
-                                }
-                            }
-                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                        }
                     }
-                    foreach (var proc in processes) try { proc.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                    foreach (var proc in processes) try { proc.Dispose(); } catch { }
                 }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                catch { }
             }
         }
 
-        /// <summary>
-        /// Aplica o limitador de CPU por Job Object (hard cap) para processos configurados.
-        /// </summary>
         private void ApplyProcessCpuLimits()
         {
             if (_processRamLimits.IsEmpty) return;
@@ -5147,6 +5115,8 @@ namespace KitLugia.GUI.Services
             public uint LastPageFaultCount { get; set; } = 0; // page faults no último check
             public int StormBackoffLevel { get; set; } = 0; // 0=normal, 1=cooldown 2x, 2=cooldown 4x
             public int CheckCount { get; set; } = 0; // quantas vezes foi verificado
+            public long EffectiveFloorFromCommit { get; set; } = 0; // floor baseado no commit (70% do commit quando commit > limite)
+            public bool CommitFloorLogged { get; set; } = false; // log do commit floor: 1x por sessão
 
             /// <summary>
             /// Retorna o mínimo seguro de working set para este processo (em MB).

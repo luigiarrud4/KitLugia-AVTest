@@ -33,6 +33,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         {
             InitializeComponent();
             Loaded += async (_, __) => await OnLoadedAsync();
+            Unloaded += StoreRemakePage_Unloaded;
             TxtSearch.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) { e.Handled = true; _ = DoSearchAsync(); } };
             // Busca ao vivo (igual MS Store): digitar já mostra apps, sem precisar clicar Buscar
             TxtSearch.TextChanged += (s, e) => ScheduleLiveSearch();
@@ -58,6 +59,13 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         {
             if (sender is FrameworkElement fe && fe.Tag is StoreAppVM app)
                 ShowAppDetail(app);
+        }
+
+        private void StoreRemakePage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try { _searchDebounce?.Stop(); } catch { }
+            try { _progressHideTimer?.Stop(); _progressHideTimer = null; } catch { }
+            try { _searchAnimTimer?.Stop(); _searchAnimTimer = null; } catch { }
         }
 
         private void ScheduleLiveSearch()

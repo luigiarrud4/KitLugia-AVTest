@@ -104,6 +104,9 @@ namespace KitLugia.GUI.Pages
             ChkTrayIcon.IsChecked = tray.IsTrayEnabled;
             ChkCloseToTray.IsChecked = tray.CloseToTray;
 
+            // ISLC: mostrar threshold auto-calculado
+            TxtIslcDescription.Text = $"Threshold: {tray.IslcThresholdMB} MB (auto). Reduz stuttering e freezes em jogos.";
+
             // Auto-Start - usa novo método que verifica o caminho
             try
             {
@@ -120,6 +123,7 @@ namespace KitLugia.GUI.Pages
         {
             RefreshRamDisplay();
             RefreshProcessLimitsStatus();
+            UpdateIslcStatus();
         }
 
         private void StartRamRefresh()
@@ -175,6 +179,12 @@ namespace KitLugia.GUI.Pages
                             System.Windows.Media.Color.FromRgb(255, 215, 0))  // em foco: dourado
                         : new System.Windows.Media.SolidColorBrush(
                             System.Windows.Media.Color.FromRgb(102, 102, 102));  // OK: cinza
+
+                // Floor/commit display removed (reverted to old RAM Limiter)
+                if (nameStack.Children.Count >= 3 && nameStack.Children[2] is TextBlock floorTb)
+                {
+                    floorTb.Text = "";
+                }
             }
         }
 
@@ -300,6 +310,26 @@ namespace KitLugia.GUI.Pages
             else if (cb == ChkCloseToTray) tray.CloseToTray = cb.IsChecked == true;
 
             tray.SaveSettings();
+        }
+
+        private void UpdateIslcStatus()
+        {
+            try
+            {
+                var tray = GetTrayService();
+                if (tray == null) return;
+                long standbyMB = KitLugia.Core.MemoryOptimizer.GetStandbyListSizeMB();
+                bool exceeded = standbyMB > tray.IslcThresholdMB;
+                TxtIslcBadge.Text = $"Standby: {standbyMB} MB";
+                // Verde quando OK, amarelo quando acima do threshold
+                IslcStatusBadge.Background = new System.Windows.Media.SolidColorBrush(
+                    exceeded ? System.Windows.Media.Color.FromRgb(40, 35, 10) : System.Windows.Media.Color.FromRgb(26, 48, 32));
+                IslcStatusBadge.BorderBrush = new System.Windows.Media.SolidColorBrush(
+                    exceeded ? System.Windows.Media.Color.FromRgb(200, 160, 40) : System.Windows.Media.Color.FromRgb(48, 128, 80));
+                TxtIslcBadge.Foreground = new System.Windows.Media.SolidColorBrush(
+                    exceeded ? System.Windows.Media.Color.FromRgb(255, 200, 60) : System.Windows.Media.Color.FromRgb(80, 192, 128));
+            }
+            catch { }
         }
 
         private void ChkAutoStart_Click(object sender, RoutedEventArgs e)
@@ -532,6 +562,19 @@ namespace KitLugia.GUI.Pages
                 FontSize = 10,
                 Margin = new Thickness(0, 2, 0, 0)
             });
+
+            // Linha 3: placeholder (floor/commit removed in revert)
+            var floorTb = new TextBlock
+            {
+                Text = "",
+                FontFamily = _emojiFont,
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(102, 102, 102)),
+                FontSize = 9,
+                Margin = new Thickness(0, 1, 0, 0),
+                Tag = "floorInfo"
+            };
+            nameStack.Children.Add(floorTb);
             Grid.SetColumn(nameStack, 0);
             grid.Children.Add(nameStack);
 
@@ -731,7 +774,7 @@ namespace KitLugia.GUI.Pages
             LoadProcessLimits();
             // Mostra o mínimo seguro na notificação para o usuário saber que o app não vai quebrar
             var tempLimit = new KitLugia.GUI.Services.TrayIconService.ProcessRamLimit { ProcessName = processName };
-            long safeMin = tempLimit.GetEffectiveMinMB();
+            long safeMin = 60; // old default minimum
             ShowNotification("✅ Limite configurado",
                 $"{processName} → {limitMB} MB\nMínimo seguro: {safeMin} MB (app não será interrompido abaixo disso)");
         }
@@ -828,5 +871,14 @@ namespace KitLugia.GUI.Pages
             ? $"Atual: {_limit.LastKnownMB} MB{(_limit.LastKnownMB > _limit.LimitMB ? " ⚠️ excedido" : "")}"
             : "Aguardando monitoramento...";
         public string StatusColor => _limit.LastKnownMB > _limit.LimitMB ? "#FF5555" : "#888888";
+        public string FloorCommitText
+        {
+            get
+            {
+                if (_limit.LastKnownMB <= 0) return "";
+                return $"Last: {_limit.LastKnownMB} MB | Limit: {_limit.LimitMB} MB" +
+                    (_limit.LastKnownMB > _limit.LimitMB ? " (excedido)" : "");
+            }
+        }
     }
 }

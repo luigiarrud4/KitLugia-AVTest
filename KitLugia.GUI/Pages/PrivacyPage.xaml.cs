@@ -148,9 +148,12 @@ namespace KitLugia.GUI.Pages
                     allSettings.Select(s => (s, state: s.CheckRegistryState())).ToList()
                 );
 
-                // Aplicar na UI thread
+                // Aplicar na UI thread (pula settings toggled nos ultimos 3s)
                 foreach (var (setting, state) in states)
                 {
+                    if (PrivacySettingViewModel.IsRecentlyToggled(setting.Name))
+                        continue;
+
                     if (setting.IsEnabled != state)
                         setting.IsEnabled = state;
                 }
@@ -465,6 +468,9 @@ namespace KitLugia.GUI.Pages
         private readonly Action _refreshCallback;
         private readonly Action _categoryRefreshCallback;
         private bool _isEnabled;
+        private static readonly Dictionary<string, DateTime> _pendingToggles = new();
+        public static bool IsRecentlyToggled(string name) =>
+            _pendingToggles.TryGetValue(name, out var t) && (DateTime.Now - t).TotalSeconds < 3;
 
         public PrivacySettingViewModel(OOShutUpManager.PrivacySetting model, Action refreshCallback, Action? categoryRefreshCallback = null)
         {
@@ -477,6 +483,7 @@ namespace KitLugia.GUI.Pages
         public string Name => _model.Name;
         public string Description => _model.Description;
         public OOShutUpManager.PrivacyLevel Level => _model.Level;
+        public string InfoTooltip => $"{_model.Description}\n\nRegistry: {_model.RegistryPath}\\{_model.ValueName}\nValor seguro: {_model.SafeValue ?? "(nenhum)"}\nNível: {_model.Level}";
 
         public bool IsEnabled
         {
@@ -488,6 +495,9 @@ namespace KitLugia.GUI.Pages
                     _isEnabled = value;
                     OnPropertyChanged(nameof(IsEnabled));
 
+                    // Registra momento do toggle (previne RefreshStatus de sobrescrever)
+                    _pendingToggles[_model.Name] = DateTime.Now;
+
                     // Aplica mudança em background
                     var model = _model;
                     if (value)
@@ -495,7 +505,7 @@ namespace KitLugia.GUI.Pages
                     else
                         Task.Run(() => { try { OOShutUpManager.RevertPrivacySetting(model); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } });
 
-                    _refreshCallback?.Invoke();
+                    // Atualiza checkbox da categoria (sem chamar RefreshStatus — o timer faz isso)
                     _categoryRefreshCallback?.Invoke();
                 }
             }
