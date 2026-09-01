@@ -1,4 +1,0 @@
-O argumento '%~dp0kl_deploy_get_version.ps1' para o parƒmetro -File nÆo existe. Forne‡a o caminho para um arquivo '.ps1' existente como um argumento para o parƒmetro -File.
-Windows PowerShell
-Copyright (C) Microsoft Corporation. All rights reserved.
-
