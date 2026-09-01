@@ -1,64 +1,115 @@
 @echo off
-chcp 65001 >nul
+chcp 65001 >nul 2>&1
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 if exist "C:\Program Files\Git\cmd\git.exe" set "PATH=C:\Program Files\Git\cmd;C:\Program Files\Git\bin;%PATH%"
 if exist "C:\Program Files\GitHub CLI\gh.exe" set "PATH=C:\Program Files\GitHub CLI;%PATH%"
 
 echo.
-echo  ╔══════════════════════════════════════════════════╗
-echo  ║          KITLUGIA DEPLOY                        ║
-echo  ╚══════════════════════════════════════════════════╝
+echo  ===============================================
+echo       KITLUGIA - DEPLOY
+echo  ===============================================
 echo.
 
-:: 1. Obter versao (PowerShell escreve no arquivo, batch le)
-echo  [1/6] Consultando versao no GitHub...
+:: === STEP 1: VERSION DETECTION ===
+echo  [1/6] Detecting latest version from GitHub...
 echo.
 
 set "VFILE=%TEMP%\kl_deploy_ver.txt"
+set "IFILE=%TEMP%\kl_deploy_info.txt"
 del "%VFILE%" 2>nul
+del "%IFILE%" 2>nul
 
-powershell -NoProfile -Command "$r=Invoke-RestMethod 'https://api.github.com/repos/luigiarrud4/KitLugia-AVTest/releases/latest' -UseBasicParsing -TimeoutSec 10; $v=$r.tag_name -replace '^v',''; $p=$v.Split('.'); $p[2]=[int]$p[2]+1; [IO.File]::WriteAllText('%VFILE%',('{0}.{1}.{2}' -f $p[0],$p[1],$p[2]))" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0kl_deploy_get_version.ps1" >nul 2>&1
 
+:: Parse result
 set "NEXT="
-if exist "%VFILE%" set /p "NEXT=<%VFILE%"
-if exist "%VFILE%" del "%VFILE%"
+set "CURRENT="
+set "VSOURCE="
+set "STATUS=error"
 
-if not defined NEXT (
-    echo  Nao foi possivel obter a versao. Informe manualmente.
-    echo.
-    set /p "VER=  Versao: "
-    goto :check_ver
-)
+if exist "%VFILE%" for /f "usebackq delims=" %%V in ("%VFILE%") do set "NEXT=%%V"
+if exist "%IFILE%" for /f "tokens=2 delims==" %%A in ('findstr "^status=" "%IFILE%"') do set "STATUS=%%A"
+if exist "%IFILE%" for /f "tokens=2 delims==" %%A in ('findstr "^source=" "%IFILE%"') do set "VSOURCE=%%A"
+if exist "%IFILE%" for /f "tokens=2 delims==" %%A in ('findstr "^current=" "%IFILE%"') do set "CURRENT=%%A"
 
-echo  ┌─────────────────────────────────────────────────┐
-echo  │  Proxima versao: v%NEXT%
-echo  └─────────────────────────────────────────────────┘
+:: Show detection result - use goto to avoid if/else block issues
 echo.
-echo  ENTER = publicar v%NEXT%
-echo  Ou digite outra versao (ex: 2.1.0)
+if not "!STATUS!"=="ok" goto :version_failed
+
+echo  ===============================================
+echo   Version Detection: SUCCESS
+echo  ===============================================
 echo.
-set /p "VER=  Versao: "
-if "%VER%"=="" set "VER=%NEXT%"
+echo   Source:        !VSOURCE!
+echo   Current:       v!CURRENT!
+echo   Next:          v!NEXT!
+echo.
+echo  ===============================================
+echo.
+goto :version_input
+
+:version_failed
+echo  ===============================================
+echo   Version Detection: FAILED
+echo  ===============================================
+echo.
+echo   All 4 automatic sources failed.
+echo   Check: internet, gh auth, repo visibility.
+echo.
+echo   Create release at:
+echo   https://github.com/luigiarrud4/KitLugia-AVTest/releases
+echo.
+
+:version_input
+:: Version input
+if not defined NEXT goto :manual_version
+echo   Press ENTER to publish v!NEXT!
+echo   Or type a different version, ex: 2.1.0
+echo.
+set /p "VER=  Version: "
+if "!VER!"=="" set "VER=!NEXT!"
+goto :check_ver
+
+:manual_version
+echo   Enter the version to publish, format X.Y.Z:
+echo.
+set /p "VER=  Version: "
 
 :check_ver
 if not defined VER (
-    echo  ERRO: Versao obrigatoria.
+    echo.
+    echo  ERROR: Version is required.
     pause
     exit /b 1
 )
 
+:: Validate version format X.Y.Z
+echo !VER! | findstr /r "^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*" >nul 2>&1
+if !errorlevel! neq 0 (
+    echo.
+    echo  ERROR: Invalid format "!VER!" - use X.Y.Z
+    set "VER="
+    set /p "VER=  Version: "
+    goto :check_ver
+)
+
 echo.
-echo  Publicando v%VER%...
+echo  -----------------------------------------------
+echo   Publishing v!VER!...
+echo  -----------------------------------------------
 echo.
 
-:: 2. Auth
-echo  [2/6] Autenticacao...
+:: === STEP 2: AUTH ===
+echo  [2/6] Authenticating with GitHub...
 gh auth status >nul 2>&1
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
+    echo  Not authenticated. Attempting login...
     gh auth login -h github.com -w
-    if %errorlevel% neq 0 (
-        echo  ERRO: auth falhou
+    if !errorlevel! neq 0 (
+        echo.
+        echo  ERROR: GitHub auth failed.
         pause
         exit /b 1
     )
@@ -66,44 +117,55 @@ if %errorlevel% neq 0 (
 echo  OK
 echo.
 
-:: 3. Build
-echo  [3/6] Build + ZIP + SHA256...
-powershell -ExecutionPolicy Bypass -File "Deploy.ps1" -Version "%VER%"
-if %errorlevel% neq 0 (
-    echo  ERRO no Deploy.ps1
+:: === STEP 3: BUILD ===
+echo  [3/6] Building + ZIP + SHA256...
+powershell -ExecutionPolicy Bypass -File "Deploy.ps1" -Version "!VER!"
+if !errorlevel! neq 0 (
+    echo.
+    echo  ERROR: Deploy.ps1 failed.
     pause
     exit /b 1
 )
 echo.
 
-:: 4. Release
-echo  [4/6] Criando release v%VER%...
-gh release create "v%VER%" --title "KitLugia v%VER%" --notes "Release automatica v%VER%" ./Publish/KITLUGIA2.zip ./Publish/KITLUGIA2.zip.sha256
-if %errorlevel% neq 0 echo  AVISO: release falhou, faca manualmente
+:: === STEP 4: RELEASE ===
+echo  [4/6] Creating GitHub release v!VER!...
+
+gh release view "v!VER!" --repo "luigiarrud4/KitLugia-AVTest" >nul 2>&1
+if !errorlevel! equ 0 (
+    echo  Release v!VER! exists. Uploading assets...
+    gh release upload "v!VER!" --repo "luigiarrud4/KitLugia-AVTest" ./Publish/KITLUGIA2.zip ./Publish/KITLUGIA2.zip.sha256 --clobber
+    if !errorlevel! neq 0 echo  WARNING: Asset upload failed.
+) else (
+    gh release create "v!VER!" --repo "luigiarrud4/KitLugia-AVTest" --title "KitLugia v!VER!" --notes "Release automatica v!VER!" ./Publish/KITLUGIA2.zip ./Publish/KITLUGIA2.zip.sha256
+    if !errorlevel! neq 0 echo  WARNING: Release creation failed.
+)
 echo.
 
-:: 5. Commit
+:: === STEP 5: COMMIT ===
 echo  [5/6] Git commit...
 git add -A
-set /p "MSG=  Mensagem (Enter = padrao): "
-if "%MSG%"=="" set "MSG=Deploy v%VER%"
-git commit -m "%MSG%"
-
-:: 6. Push
+set /p "MSG=  Message, Enter=default: "
+if "!MSG!"=="" set "MSG=Deploy v!VER!"
+git commit -m "!MSG!"
 echo.
-echo  [6/6] Git push...
+
+:: === STEP 6: PUSH ===
+echo  [6/6] Git push + tag...
 git push --set-upstream origin main 2>&1
 
-git tag -f "v%VER%"
-git push origin "v%VER%" --force 2>&1
-if %errorlevel% neq 0 (
-    git push origin --delete "v%VER%" 2>&1
-    git push origin "v%VER%" 2>&1
+git tag -f "v!VER!"
+git push origin "v!VER!" --force 2>&1
+if !errorlevel! neq 0 (
+    echo  Tag push failed. Retrying...
+    git push origin --delete "v!VER!" 2>&1
+    git push origin "v!VER!" 2>&1
 )
 
 echo.
-echo  ╔══════════════════════════════════════════════════╗
-echo  ║  KITLUGIA v%VER% PUBLICADO!
-echo  ╚══════════════════════════════════════════════════╝
+echo  ===============================================
+echo   KITLUGIA v!VER! PUBLISHED!
+echo  ===============================================
 echo.
 pause
+endlocal
