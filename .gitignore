@@ -376,3 +376,9 @@ KL_WINPE/
 # IDA Free installer (104 MB - acima do limite do GitHub)
 KitLugia.GUI/Tools/IDA Free/
 KitLugia.Core/Resources/KitLugiaEFI/deps/refind/
+
+# Deploy test artifacts
+%TESTDIR%/
+nul
+.freebuff
+test_deploy_version.ps1
