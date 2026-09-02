@@ -200,3 +200,18 @@ Estender `StartupManager.cs` para incluir:
 - [ ] Estender StartupManager
 - [ ] FileTypeManager básico
 - [ ] ShellExtensionsManager básico
+
+---
+
+## Pendências do Startup Module (migradas de startup-improvements-plan.md)
+
+### Bugs não corrigidos
+- [ ] **3a.** App duplicado em Run + Task Scheduler (ex: OneDrive inicia 2x)
+  - Verificar existência de task externa antes de converter para Admin
+- [ ] **3b.** Startup Folder + Run registry — funciona mas é frágil
+  - Ao reabilitar, StartupApproved\Run volta como enabled sem checar consistência
+- [ ] **4c.** Indicador de confiança para startup apps (estilo ServiceSafetyLevel)
+
+### Melhorias de UX pendentes
+- [ ] Botão "Restaurar itens removidos" — interface para apps do backup
+- [ ] Backup antes de remover permanentemente (HKCU\...\KitLugia\RemovedApps)
