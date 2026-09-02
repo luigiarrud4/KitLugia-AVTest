@@ -128,10 +128,7 @@ namespace KitLugia.GUI.Pages
                 var full = await Task.Run(() => StartupManager.GetStartupAppsWithDetails(true), cancellationToken);
                 lock (_startupAppsLock)
                 {
-                    if (full.Count > _allStartupApps.Count)
-                    {
-                        _allStartupApps = full;
-                    }
+                    _allStartupApps = full;
                 }
                 ApplyStartupFilter();
             }
@@ -211,7 +208,9 @@ namespace KitLugia.GUI.Pages
                     bool willEnable = selectedApp.Status == StartupStatus.Disabled;
                     string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"{(willEnable ? "Habilitando" : "Desabilitando")} {selectedApp.Name}", "Services");
 
+                    Logger.Log($"[STARTUP] Toggle '{selectedApp.Name}' -> {(willEnable ? "enable" : "disable")} (status={selectedApp.Status}, location={selectedApp.Location})");
                     var result = await Task.Run(() => StartupManager.SetStartupItemState(selectedApp.Name, willEnable));
+                    Logger.Log($"[STARTUP] Toggle result: success={result.Success}, msg={result.Message}");
 
                     Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
 
@@ -249,7 +248,9 @@ namespace KitLugia.GUI.Pages
                         if (!await mw.ShowConfirmationDialog($"Excluir '{selectedApp.Name}' permanentemente?")) return;
                         string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"Removendo {selectedApp.Name}", "Services");
 
+                        Logger.Log($"[STARTUP] Remove '{selectedApp.Name}' (location={selectedApp.Location}, command={selectedApp.FullCommand})");
                         var result = await Task.Run(() => StartupManager.RemoveStartupItem(selectedApp.Name));
+                        Logger.Log($"[STARTUP] Remove result: success={result.Success}, msg={result.Message}");
 
                         Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
 
