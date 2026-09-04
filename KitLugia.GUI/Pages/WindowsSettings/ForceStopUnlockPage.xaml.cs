@@ -41,6 +41,47 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             this.DataContext = null;
         }
 
+        /// <summary>
+        /// PROVA-DE-TUDO: take ownership / force stop exigem Administrador (SeTakeOwnership/
+        /// SeDebugPrivilege). Se o Kit está sem admin, oferece relançar ELEVADO com a mesma
+        /// operação (--takeown/--unlock) e não executa aqui (a instância elevada resolve).
+        /// Retorna true se deve prosseguir nesta instância.
+        /// </summary>
+        private bool EnsureElevatedForFileOp(string path, bool isTakeOwn)
+        {
+            if (SystemUtils.IsRunningAsAdministrator()) return true;
+
+            var ask = MessageBox.Show(
+                "O KitLugia está rodando SEM privilégios de administrador.\n\n" +
+                "Take Ownership / Force Stop podem falhar em arquivos protegidos " +
+                "(ex: Windows.old, TrustedInstaller, processos de outros usuários).\n\n" +
+                "Relançar o KitLugia elevado (UAC) para executar agora?",
+                "KitLugia — Privilégios de Administrador",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (ask != MessageBoxResult.Yes) return false;
+
+            try
+            {
+                string args = (isTakeOwn ? "--takeown " : "--unlock ") + $"\"{path}\"";
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                    Environment.ProcessPath ?? typeof(Program).Assembly.Location)
+                {
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    Arguments = args
+                });
+                Logger.Log($"[FILE OPS] Relançado elevado: {args}");
+                return false; // instância elevada fará a operação
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[FILE OPS] Falha ao relançar elevado: {ex.Message}");
+                MessageBox.Show($"Não foi possível relançar elevado: {ex.Message}",
+                    "KitLugia", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return true; // tenta mesmo assim (mostrará os erros reais)
+            }
+        }
+
         private void UpdateTopToggle()
         {
             if (BtnModeUnlock == null || BtnModeTakeOwn == null || MainTabs == null) return;
@@ -132,6 +173,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 {
                     if (target) SystemTweaks.AddForceStopUnlock();
                     else SystemTweaks.RemoveForceStopUnlock();
+                    // Persiste para o startup reaplicar com a config mais recente
+                    SystemTweaks.SaveContextMenuPref("forcestopunlock", target);
                 });
 
                 if (Application.Current.MainWindow is MainWindow mw)
@@ -159,6 +202,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 {
                     if (target) SystemTweaks.AddTakeOwnershipKit();
                     else SystemTweaks.RemoveTakeOwnershipKit();
+                    // Persiste para o startup reaplicar com a config mais recente
+                    SystemTweaks.SaveContextMenuPref("kittakeown", target);
                 });
 
                 if (Application.Current.MainWindow is MainWindow mw)
@@ -268,9 +313,16 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 return;
             }
 
+            if (!EnsureElevatedForFileOp(path, isTakeOwn: true)) return;
+
             bool recursive = ChkRecursive?.IsChecked == true;
             bool grantFullControl = ChkTakeOwnFullControl?.IsChecked == true;
             bool isDir = Directory.Exists(path);
+            if (!isDir)
+            {
+                int probe = FileTakeOwnership.ProbePath(path, out bool pExists, out bool pIsDir, out _);
+                isDir = pExists ? pIsDir : false;
+            }
 
             BtnTakeOwnExecute.IsEnabled = false;
             BtnTakeOwnExecute.Content = "⏳ Assumindo...";
@@ -311,6 +363,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     TxtTakeOwnResult.Text = $"✅ {result.Success}/{result.Total} item(ns) agora são seus!";
                     TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(100, 220, 100));
                     TxtTakeOwnDetail.Text = isDir && recursive ? "Recursivo — incluiu todas as subpastas e arquivos." : "Pronto para editar/deletar.";
+                    if (result.FallbackUsed)
+                        TxtTakeOwnDetail.Text += "\n" + result.FallbackMessage;
                     TxtTakeOwnProgress.Visibility = Visibility.Collapsed;
                     TxtTakeOwnCurrentFile.Visibility = Visibility.Collapsed;
 
@@ -322,6 +376,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     TxtTakeOwnResult.Text = $"⚠️ {result.Success}/{result.Total} ok, {result.Failed} falha(s)";
                     TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 200, 100));
                     TxtTakeOwnDetail.Text = string.Join("\n", result.Errors.Take(5));
+                    if (result.FallbackUsed)
+                        TxtTakeOwnDetail.Text += "\n" + result.FallbackMessage;
                     TxtTakeOwnProgress.Visibility = Visibility.Collapsed;
                     TxtTakeOwnCurrentFile.Visibility = Visibility.Collapsed;
 
@@ -349,7 +405,17 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             try
             {
                 if (!File.Exists(path) && !Directory.Exists(path))
-                    return (false, "", "", "");
+                {
+                    // .NET Exists retorna FALSE em caminhos com ACL negada (Windows.old) —
+                    // o probe nativo distingue "negado" de "não existe".
+                    int probe = FileTakeOwnership.ProbePath(path, out bool pExists, out bool pIsDir, out int errCode);
+                    if (!pExists && probe != 5 && probe != 21)
+                        return (false, "", "", "");
+                    return (true,
+                        Path.GetFileName(path.TrimEnd('\\')) ?? path,
+                        "(acesso negado)",
+                        $"A pasta/arquivo EXISTE mas a ACL nega leitura (erro {errCode}) — dono provável: TrustedInstaller/System (ex: Windows.old).\nClique em 'Assumir': o Kit usa SeTakeOwnershipPrivilege + fallback clássico takeown/icacls.");
+                }
 
                 string name = Path.GetFileName(path.TrimEnd('\\')) ?? path;
                 string owner = "?";
@@ -403,14 +469,20 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
             if (!File.Exists(path) && !Directory.Exists(path))
             {
-                Logger.Log($"[FORCE STOP UI] Caminho nao encontrado no sistema!");
-                QuickResultPanel.Visibility = Visibility.Visible;
-                TxtQuickResult.Text = "❌ Caminho não encontrado no sistema.";
-                TxtQuickResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
-                TxtQuickDetail.Text = folderContents;
-                QuickProcessList.ItemsSource = null;
-                BtnQuickRelease.Visibility = Visibility.Collapsed;
-                return;
+                int probe = FileTakeOwnership.ProbePath(path, out bool pExists, out bool pIsDir, out int errCode);
+                if (!pExists && probe != 5 && probe != 21)
+                {
+                    Logger.Log($"[FORCE STOP UI] Caminho nao encontrado no sistema!");
+                    QuickResultPanel.Visibility = Visibility.Visible;
+                    TxtQuickResult.Text = "❌ Caminho não encontrado no sistema.";
+                    TxtQuickResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
+                    TxtQuickDetail.Text = folderContents;
+                    QuickProcessList.ItemsSource = null;
+                    BtnQuickRelease.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                if (pExists)
+                    Logger.Log($"[FORCE STOP UI] Caminho existe mas ACL nega leitura (erro {errCode}) — continuando scan nativo.");
             }
 
             BtnQuickAnalyze.IsEnabled = false;
@@ -467,19 +539,27 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             Logger.Log($"[FORCE STOP UI] === Tentar Deletar clicado para: {path}");
             Logger.Log($"[FORCE STOP UI] Admin: {SystemUtils.IsRunningAsAdministrator()}");
 
+            if (!EnsureElevatedForFileOp(path, isTakeOwn: false)) return;
+
             string folderContents = ListFolderContents(path);
             Logger.Log($"[FORCE STOP UI] Conteudo do caminho:\n{folderContents}");
 
             if (!File.Exists(path) && !Directory.Exists(path))
             {
-                Logger.Log($"[FORCE STOP UI] Caminho nao encontrado no sistema!");
-                QuickResultPanel.Visibility = Visibility.Visible;
-                TxtQuickResult.Text = "❌ Caminho não encontrado no sistema.";
-                TxtQuickResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
-                TxtQuickDetail.Text = folderContents;
-                QuickProcessList.ItemsSource = null;
-                BtnQuickRelease.Visibility = Visibility.Collapsed;
-                return;
+                int probe = FileTakeOwnership.ProbePath(path, out bool pExists, out bool pIsDir, out int errCode);
+                if (!pExists && probe != 5 && probe != 21)
+                {
+                    Logger.Log($"[FORCE STOP UI] Caminho nao encontrado no sistema!");
+                    QuickResultPanel.Visibility = Visibility.Visible;
+                    TxtQuickResult.Text = "❌ Caminho não encontrado no sistema.";
+                    TxtQuickResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 120, 120));
+                    TxtQuickDetail.Text = folderContents;
+                    QuickProcessList.ItemsSource = null;
+                    BtnQuickRelease.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                if (pExists)
+                    Logger.Log($"[FORCE STOP UI] Caminho existe mas ACL nega leitura (erro {errCode}) — continuando.");
             }
 
             BtnTryDelete.IsEnabled = false;
@@ -726,6 +806,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 TxtQuickDetail.Text = "Nenhum processo selecionado.";
                 return;
             }
+
+            if (!EnsureElevatedForFileOp(path, isTakeOwn: false)) return;
 
             Logger.Log($"[FORCE STOP UI] === Liberar Selecionados para: {path}");
             foreach (var s in selected)

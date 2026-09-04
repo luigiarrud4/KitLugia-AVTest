@@ -62,29 +62,9 @@
                     </Grid>
                     
                     <Grid Margin="0,5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Rodar em segundo plano" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Minimiza ao clicar no X (mant&#xE9;m ativo)" FontSize="11" Foreground="#888888"/>
-                        </StackPanel>
-                        <CheckBox x:Name="ToggleCloseToTray" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
+                        <TextBlock Text="&#x1F4C1; Fechar (X) sempre minimiza para o tray — para sair por completo use o tray &#x2192; Sair Completamente" FontSize="11" Foreground="#7CFC00" TextWrapping="Wrap"/>
                     </Grid>
                     
-                    <Grid Margin="0,5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Minimizar para bandeja" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Ao fechar, minimiza para &#xED;cone na bandeja" FontSize="11" Foreground="#888888"/>
-                        </StackPanel>
-                        <CheckBox x:Name="ToggleTray" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
-                    </Grid>
-
                     <Grid Margin="0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>

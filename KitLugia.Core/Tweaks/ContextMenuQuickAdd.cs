@@ -35,6 +35,42 @@ public static class ContextMenuQuickAdd
         return exe;
     }
 
+    /// <summary>
+    /// Resolve a ação Add de qualquer item do menu de contexto (super OU clássico)
+    /// pelo ID persistido em HKCU\Software\KitLugia\ContextMenu. Usado pelo
+    /// ReapplyContextMenuPrefs do SystemTweaks no startup do Kit: o menu é
+    /// recriado com a configuração MAIS RECENTE (path do exe, comandos, ícones)
+    /// sempre que o Kit inicia, mesmo se algo removeu a entrada no meio tempo.
+    /// </summary>
+    public static Action? GetAddAction(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+
+        // Super items (catálogo GetItems) — case-SENSITIVE primeiro: os IDs super
+        // ("takeownership", "cmdhere", "pshere", "notepad", "vscode") convivem com os
+        // IDs clássicos capitalizados ("TakeOwnership", "CmdHere", ...) — se o usuário
+        // ativou a versão clássica no ContextMenuPage, ela DEVE reaplicar a clássica.
+        var item = GetItems().FirstOrDefault(i => string.Equals(i.Id, id, StringComparison.Ordinal));
+        if (item != null) return item.Add;
+
+        // Clássicos do SystemTweaks (IDs usados pelo ContextMenuPage)
+        return id.ToLowerInvariant() switch
+        {
+            "forcestopunlock" => SystemTweaks.AddForceStopUnlock,
+            "kittakeown" => SystemTweaks.AddTakeOwnershipKit,
+            "takeownership" => SystemTweaks.AddTakeOwnership,
+            "forceclose" => SystemTweaks.AddForceClose,
+            "cmdhere" => SystemTweaks.AddCmdHere,
+            "pshere" => SystemTweaks.AddPowerShellHere,
+            "cmdadmin" => SystemTweaks.AddCmdAdmin,
+            "psadmin" => SystemTweaks.AddPowerShellAdmin,
+            "notepad" => SystemTweaks.AddNotepad,
+            "copyaspath" => SystemTweaks.AddCopyAsPath,
+            "vscode" => SystemTweaks.AddVsCode,
+            _ => null,
+        };
+    }
+
 
     // ══════════════════ DETECÇÃO CONSISTENTE (Kit + legado) ══════════════════
     // O Kit já tinha versões clássicas destes comandos em SystemTweaks (AddTakeOwnership→runas,

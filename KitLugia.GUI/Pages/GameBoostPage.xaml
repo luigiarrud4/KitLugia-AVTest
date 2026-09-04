@@ -191,19 +191,6 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="MOSTRAR &#xCD;CONE" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                        <TextBlock Text="&#xCD;cone de bandeja na &#xE1;rea de notifica&#xE7;&#xE3;o" FontSize="11" Foreground="#888"/>
-                    </StackPanel>
-                    <ToggleButton x:Name="ChkTrayIcon" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
-                                  Checked="ChkTrayIcon_Click" Unchecked="ChkTrayIcon_Click"/>
-                </Grid>
-                
-                <Grid Margin="0,5">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="INICIAR COM WINDOWS" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                         <TextBlock Text="Inicia automaticamente com o sistema" FontSize="11" Foreground="#888"/>
                     </StackPanel>
@@ -224,6 +211,20 @@
                     <ToggleButton x:Name="ChkUnparkCpu" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
                                   Checked="ChkUnparkCpu_Click" Unchecked="ChkUnparkCpu_Click"/>
                 </Grid>
+
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="TURBO EXPLORER AUTOM&#xC1;TICO (F11)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                        <TextBlock Text="Quando o explorer.exe reiniciar (login/crash), aplica o F11 re-render na 1&#xAA; pasta aberta" FontSize="11" Foreground="#888"/>
+                        <TextBlock Text="&#x1F4C1; 'Ir direto ao arquivo' instant&#xE2;neo ap&#xF3;s reboot — sem precisar apertar Ctrl+F11" FontSize="10" Foreground="#FFD700" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ToggleButton x:Name="ChkExplorerAutoTurbo" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
+                                  Checked="ChkExplorerAutoTurbo_Click" Unchecked="ChkExplorerAutoTurbo_Click"/>
+                </Grid>
             </StackPanel>
         </Border>
         
@@ -231,19 +232,6 @@
         <Border Grid.Row="2" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="0,0,0,15">
             <StackPanel>
                 <TextBlock Text="COMPORTAMENTO AO FECHAR" Foreground="#666" FontSize="12" FontWeight="Bold" Margin="0,0,0,15"/>
-                
-                <Grid Margin="0,5">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Rodar em segundo plano" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                        <TextBlock Text="Minimiza ao clicar no X (mant&#xE9;m ativo)" FontSize="11" Foreground="#888"/>
-                    </StackPanel>
-                    <ToggleButton x:Name="ChkCloseToTray" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
-                                  Checked="ChkCloseToTray_Click" Unchecked="ChkCloseToTray_Click"/>
-                </Grid>
                 
                 <Grid Margin="0,5">
                     <Grid.ColumnDefinitions>

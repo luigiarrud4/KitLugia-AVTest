@@ -1970,7 +1970,7 @@ namespace KitLugia.Core
                     {
                         Log("ISO do KitLugia detectada. Preservando autounattend.xml existente mas patchando idioma/usuário.");
                         string xmlContent = File.ReadAllText(targetXml);
-                        string patchedXml = PatchUnattendXml(xmlContent, userName, password, detectedLanguage);
+                        string patchedXml = PatchUnattendXml(xmlContent, userName ?? "", password, detectedLanguage);
                         File.WriteAllText(targetXml, patchedXml, Encoding.UTF8);
                         Log($"Autounattend.xml patchado: idioma={detectedLanguage} usuário={userName}");
                     }
@@ -1978,7 +1978,7 @@ namespace KitLugia.Core
                     {
                         Log($"Custom XML detectado: {customXmlPath} — patchando idioma/usuário.");
                         string xmlContent = File.ReadAllText(customXmlPath);
-                        string patchedXml = PatchUnattendXml(xmlContent, userName, password, detectedLanguage);
+                        string patchedXml = PatchUnattendXml(xmlContent, userName ?? "", password, detectedLanguage);
                         File.WriteAllText(targetXml, patchedXml, Encoding.UTF8);
                         Log($"Arquivo Unattend customizado importado/patchado: idioma={detectedLanguage} usuário={userName}");
                     }

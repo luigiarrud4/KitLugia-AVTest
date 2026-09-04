@@ -1450,7 +1450,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                                 bmpDisk.Freeze();
                                 lock (_iconLock) _iconCache[a.Id.ToLowerInvariant()] = bmpDisk;
                                 var bd = bmpDisk;
-                                Dispatcher.BeginInvoke(new Action(() => { a.IconSource = bd; a.RaiseIcon(); }), System.Windows.Threading.DispatcherPriority.Background);
+                                _ = Dispatcher.BeginInvoke(new Action(() => { a.IconSource = bd; a.RaiseIcon(); }), System.Windows.Threading.DispatcherPriority.Background);
                                 return;
                             }
                             catch { }
@@ -1489,7 +1489,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                             }
                             catch { }
                             var b = bmp;
-                            Dispatcher.BeginInvoke(new Action(() => { a.IconSource = b; a.RaiseIcon(); }), System.Windows.Threading.DispatcherPriority.Background);
+                            _ = Dispatcher.BeginInvoke(new Action(() => { a.IconSource = b; a.RaiseIcon(); }), System.Windows.Threading.DispatcherPriority.Background);
                         }
                     }
                     catch { }

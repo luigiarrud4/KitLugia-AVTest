@@ -181,6 +181,74 @@ this.DataContext = null;
     ToolTipText="Descrição detalhada para o tooltip."/>
 ```
 
+## Padrões da Auditoria (03/09/2026)
+
+Padrões observados em 49 páginas que devem entrar em qualquer página nova:
+
+### 1. Guarda anti-reentrância em tick async (OBRIGATÓRIO)
+
+Se o `Tick` de um timer dispara trabalho async (WMI, queries, scans) que pode
+levar MAIS tempo que o intervalo do timer, ticks se sobrepõem e empilham
+chamadas. Exemplo real corrigido: `NetworkPage.RefreshAdapterStatus` (tick 3s,
+`ListPhysicalAdapters` WMI podia passar de 3s).
+
+```csharp
+private bool _refreshing; // campo
+
+// Tick:
+if (_refreshing) return;  // descarta tick que chegou durante o anterior
+_refreshing = true;
+try { _ = RefreshAsync(); }
+finally { _refreshing = false; }
+```
+
+Regra: **todo tick async precisa de guard**, mesmo com intervalo grande.
+
+### 2. Brushes cacheados, nunca por tick
+
+`new SolidColorBrush` por tick/por status = alocação + re-render a cada
+atualização. Criar `readonly` fields e reutilizar:
+
+```csharp
+private readonly SolidColorBrush _brushActive = new(Color.FromRgb(108, 203, 95));
+private readonly SolidColorBrush _brushDefault = new(Color.FromRgb(150, 150, 150));
+```
+
+Páginas que seguem: NetworkPage, TweaksPage. Exemplo de NÃO seguir: criar
+brush dentro de método chamado por timer.
+
+### 3. Eventos estáticos: unsubscribe OBRIGATÓRIO no Cleanup
+
+`WinbootManager.OnLogUpdate`, `InstallMonitor.OnChange`, etc. são estáticos —
+a página fica presa na memória para sempre se não desinscrever:
+
+```csharp
+public void Cleanup()
+{
+    WinbootManager.OnLogUpdate -= MeuHandler;
+    InstallMonitor.OnChange -= MeuHandler;
+}
+```
+
+### 4. Unloaded = rede de segurança do Cleanup
+
+O `Cleanup()` via reflection do `MainWindow.CleanupAndNavigate` **não roda**
+quando a navegação usa `MainFrame.Navigate()` direto. O hook `Unloaded`
+SEMPRE dispara. Então: registrar `Unloaded` no construtor, chamar `Cleanup()`
+no handler, e NUNCA depender só da chamada via reflection.
+
+### 5. Listas com refresh por segundo: update diff, não Clear+Add
+
+Para grids que atualizam a cada 1s (ProcessMonitorPage): manter a coleção e
+fazer update dos itens existentes / add novos / remover sumidos. `Clear()` +
+re-Add de centenas de itens a cada tick gera churn de bindings + scroll salta.
+
+### 6. Timer com Tick que re-renderiza UI: parar no Unloaded SEMPRE
+
+`_timer.Stop()` + `_timer = null` no Cleanup. Verificado em: PartitionsPage,
+NetworkPage, PrivacyPage, DiagnosticPage, ProcessMonitorPage, TraySettingsPage,
+StoreRemakePage, WinpeToolsPage — todos seguem, nenhum vaza.
+
 ## Anti-Patterns (NÃO FAZER)
 
 1. **❌ Usar `Thread.Sleep`** — trava a UI

@@ -34,8 +34,17 @@ namespace KitLugia.GUI.Pages
     {
         // ── State ──────────────────────────────────────────────────────
         private bool _isLoading;
+        private bool _refreshing; // guarda anti-reentrância: tick async NUNCA pode se sobrepor
         private CancellationTokenSource? _cts;
         // private DispatcherTimer? _timer; // descomentar se usar timer
+
+        // ── Brushes CACHEADOS ──────────────────────────────────────────
+        // NUNCA criar SolidColorBrush por tick/por status — aloca objeto + render pass.
+        // Criar readonly aqui e reutilizar (padrão NetworkPage/TweaksPage).
+        private readonly System.Windows.Media.SolidColorBrush _brushActive =
+            new(System.Windows.Media.Color.FromRgb(108, 203, 95));
+        private readonly System.Windows.Media.SolidColorBrush _brushDefault =
+            new(System.Windows.Media.Color.FromRgb(150, 150, 150));
 
         // ── Constructor ────────────────────────────────────────────────
         public SuaPagina()
@@ -75,6 +84,12 @@ namespace KitLugia.GUI.Pages
             // 2. Parar timers
             // _timer?.Stop();
             // _timer = null;
+
+            // 2b. SE subscreveu evento ESTÁTICO (WinbootManager.OnLogUpdate,
+            //     InstallMonitor.OnChange, Logger.OnLog...), desinscrever AQUI —
+            //     evento estático segura a página para sempre se ficar preso.
+            // WinbootManager.OnLogUpdate -= MeuHandler;
+            // InstallMonitor.OnChange -= MeuHandler;
 
             // 3. Unsubscribir event handlers (evita memory leaks)
             this.Loaded -= SuaPagina_Loaded;
@@ -130,6 +145,15 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        // Exemplo de timer com tick async — OBRIGATÓRIO o guard anti-reentrância:
+        // private void Timer_Tick(object? sender, EventArgs e)
+        // {
+        //     if (_refreshing || _isLoading) return; // tick anterior ainda rodando: descarta
+        //     _refreshing = true;
+        //     try { _ = RefreshAsync(); }
+        //     finally { _refreshing = false; }
+        // }
+
         // ── Event Handlers ─────────────────────────────────────────────
 
         // Exemplo de toggle:
@@ -162,9 +186,7 @@ namespace KitLugia.GUI.Pages
         private void UpdateLabel(TextBlock label, bool isActive, string textActive, string textInactive)
         {
             label.Text = isActive ? textActive : textInactive;
-            label.Foreground = isActive
-                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(108, 203, 95))
-                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(150, 150, 150));
+            label.Foreground = isActive ? _brushActive : _brushDefault; // reutiliza brush cacheado
         }
     }
 }

@@ -553,7 +553,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 {
                     if (!string.IsNullOrEmpty(nfo.adapter)) PerfDeviceTitle.Text = nfo.conn ?? inst;
                     StaticRow("Adaptador:", nfo.adapter);
-                    StaticRow("Conexão:", nfo.conn);
+                    StaticRow("Conexão:", nfo.conn ?? "");
                     StaticRow("Endereço IPv4:", nfo.ip);
                     StaticRow("Endereço MAC:", nfo.mac);
                     StaticRow("Velocidade:", nfo.speed);
@@ -774,10 +774,18 @@ namespace KitLugia.GUI.Windows.TaskManager
             }
             catch { }
             float netMB = 0;
-            try { netMB = (float)(_filteredRows.Sum(r => r.NetBytesPerSec) / (1024.0 * 1024.0)); } catch { }
+            try { lock (_lock) { netMB = (float)(_allRows.Sum(r => r.NetBytesPerSec) / (1024.0 * 1024.0)); } } catch { }
 
-            // Resumo da barra superior da aba Processos
-            TxtDiskUsage.Text = FormatBytesSpeed(diskMB * 1024 * 1024);
+            // Resumo da barra superior da aba Processos — escrita ÚNICA aqui (1 tick de 1s).
+            // Antes, RefreshAsync e este tick escreviam TxtDiskUsage/TxtNetUsage/TxtGpuUsage com
+            // fontes diferentes, e StartResourceMonitor (2s) amostrava os MESMOS contadores — os
+            // números piscavam alternando entre valores a cada segundo. SetMetricText só reescreve
+            // quando o texto muda, eliminando o flicker de re-render com o mesmo valor.
+            SetMetricText(TxtCpuUsage, $"{cpuVal:F0}%", GetHeatColor(cpuVal, 80, 95));
+            SetMetricText(TxtMemUsage, $"{ramVal:F0}%", GetHeatColor(ramVal, 70, 90));
+            SetMetricText(TxtDiskUsage, FormatBytesSpeed(diskMB * 1024 * 1024), GetHeatColor(diskMB > 0 ? diskMB : 0f, 50, 200));
+            SetMetricText(TxtNetUsage, FormatBytesSpeed(netMB * 1024 * 1024), netMB > 0 ? GetHeatColor(netMB, 5, 50) : _brushGray);
+            SetMetricText(TxtGpuUsage, _lastGpuPct >= 0 ? $"{_lastGpuPct:F0}%" : "N/A", _lastGpuPct >= 0 ? GetHeatColor(_lastGpuPct, 70, 90) : _brushGray);
             ChartNetText = FormatBytesSpeed(netMB * 1024 * 1024);
 
             // Atualiza cada dispositivo

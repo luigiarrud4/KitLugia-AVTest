@@ -40,7 +40,7 @@ namespace KitLugia.GUI.Windows.TaskManager
         private Dictionary<int, TimeSpan> _prevCpu = new();
         private DateTime _prevTime = DateTime.UtcNow;
         private readonly object _lock = new();
-        private bool _isRefreshing;
+        private bool _isClosed; // FIX crash em máquinas lentas: async continuations pós-Close
         private readonly SemaphoreSlim _refreshGate = new(1, 1);
         private CancellationTokenSource? _refreshCts;
 
@@ -48,9 +48,6 @@ namespace KitLugia.GUI.Windows.TaskManager
         private PerformanceCounter? _cpuCounter;
         private PerformanceCounter? _memAvailable;
         private long _totalMemBytes;
-        // Timer do monitor de recursos (antes era local e vazava ao fechar)
-        private DispatcherTimer? _resourceTimer;
-
         // Icon cache: path → BitmapSource
         private readonly Dictionary<string, BitmapSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _iconLock = new();
@@ -99,6 +96,38 @@ namespace KitLugia.GUI.Windows.TaskManager
         private static extern void GetPhysicallyInstalledSystemMemory(out long totalMemoryInKb);
 
         // ══════════════════════════════════════════════
+        //  SINGLETON + ABERTURA ÚNICA (compatibilidade multi-sistema)
+        //  Cada nova instância criava OUTRO conjunto de timers de 1s + contadores
+        //  PerformanceCounter. Em máquinas mais fracas, abrir várias vezes a janela
+        //  empilhava refreshes e o app congelava/crashava. Reusa a instância viva.
+        // ══════════════════════════════════════════════
+        private static KitTaskManagerWindow? _sharedInstance;
+        private static readonly object _instanceLock = new();
+
+        public static KitTaskManagerWindow OpenOrActivate(System.Windows.Window? owner)
+        {
+            lock (_instanceLock)
+            {
+                var existing = _sharedInstance;
+                if (existing != null && !existing._isClosed)
+                {
+                    try
+                    {
+                        if (existing.WindowState == WindowState.Minimized) existing.WindowState = WindowState.Normal;
+                        existing.Show();
+                        existing.Activate();
+                    }
+                    catch { }
+                    return existing;
+                }
+                var w = new KitTaskManagerWindow { Owner = owner };
+                _sharedInstance = w;
+                w.Closed += (_, __) => { lock (_instanceLock) { if (ReferenceEquals(_sharedInstance, w)) _sharedInstance = null; } };
+                return w;
+            }
+        }
+
+        // ══════════════════════════════════════════════
         //  CONSTRUCTOR
         // ══════════════════════════════════════════════
         public KitTaskManagerWindow()
@@ -119,21 +148,21 @@ namespace KitLugia.GUI.Windows.TaskManager
             // carregar ícones. Com SEM_FAILCRITICALERRORS as APIs falham silenciosamente.
             ProgramIconHelper.SuppressHardErrorDialogs();
 
-            // Captura exceções que escapariam e derrubariam o app (crash report no log)
-            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-            {
-                try { Logger.Log($"[KIT TASK MANAGER] FATAL: {e.ExceptionObject}"); } catch { }
-            };
-            TaskScheduler.UnobservedTaskException += (_, e) =>
-            {
-                try { Logger.Log($"[KIT TASK MANAGER] Task não observada: {e.Exception.GetBaseException().Message}"); e.SetObserved(); } catch { }
-            };
+            // Nota: handlers globais (DispatcherUnhandledException / UnobservedTaskException)
+            // foram movidos para App.RegisterGlobalExceptionHandlers — registrados UMA vez no
+            // startup. Aqui NÃO registramos mais por instância (vazava handlers a cada open).
 
             _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _searchDebounce.Tick += SearchDebounce_Tick;
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(_refreshSeconds) };
-            _refreshTimer.Tick += async (_, __) => await RefreshAsync();
+            // async void → QUALQUER exceção que escape do tick cairia no dispatcher e derrubaria o
+            // app inteiro. Try/catch extra garante que um tick falho nunca sai daqui sem log.
+            _refreshTimer.Tick += async (_, __) =>
+            {
+                try { await RefreshAsync(); }
+                catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Refresh tick: {ex.Message}"); } catch { } }
+            };
 
             _graphTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _graphTimer.Tick += (_, __) => UpdatePerformanceGraphsSafe();
@@ -163,15 +192,14 @@ namespace KitLugia.GUI.Windows.TaskManager
                     // Primeiro refresh sem bloquear UI; timers já iniciam para não perder tick
                     _ = RefreshAsync();
                     _refreshTimer.Start();
-                    StartResourceMonitor();
                     _graphTimer.Start();
-                    // Pesos pesados rodam em background SEM segurar a UI:
-                    _ = Task.Run(async () =>
-                    {
-                        try { await BuildPerfDevicesAsync(); } catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] PerfDevices: {ex.Message}"); } catch { } }
-                    });
-                    _ = LoadServicesWhenNeededAsync();
-                    _ = LoadStartupWhenNeededAsync();
+            // Pesos pesados rodam em background SEM segurar a UI:
+            _ = Task.Run(async () =>
+            {
+                try { await BuildPerfDevicesAsync(); } catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] PerfDevices: {ex.Message}"); } catch { } }
+            });
+            _ = LoadServicesWhenNeededSafeAsync();
+            _ = LoadStartupWhenNeededSafeAsync();
                 }
                 catch (Exception ex)
                 {
@@ -181,11 +209,11 @@ namespace KitLugia.GUI.Windows.TaskManager
 
             Closing += (_, __) =>
             {
+                _isClosed = true;
                 try { _refreshCts?.Cancel(); } catch { }
                 _refreshTimer?.Stop();
                 _graphTimer?.Stop();
                 _searchDebounce?.Stop();
-                _resourceTimer?.Stop(); // FIX: vazamento — antes nunca era parado
                 DisposeCounters();
                 ProcessIoHelper.ResetAll();
                 try { _refreshGate.Dispose(); } catch { }
@@ -243,36 +271,25 @@ namespace KitLugia.GUI.Windows.TaskManager
             return LoadStartupAppsAsync();
         }
 
+        // Versões blindadas p/ fire-and-forget do Loaded/SwitchTab: nunca deixam exceção escapar.
+        private async Task LoadServicesWhenNeededSafeAsync()
+        {
+            try { await LoadServicesWhenNeededAsync(); }
+            catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Services: {ex.Message}"); } catch { } }
+        }
+
+        private async Task LoadStartupWhenNeededSafeAsync()
+        {
+            try { await LoadStartupWhenNeededAsync(); }
+            catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Startup: {ex.Message}"); } catch { } }
+        }
+
         private void DisposeCounters()
         {
             try { _cpuCounter?.Dispose(); } catch { }
             try { _memAvailable?.Dispose(); } catch { }
             try { _diskReadCounter?.Dispose(); } catch { }
             try { _diskWriteCounter?.Dispose(); } catch { }
-        }
-
-        private void StartResourceMonitor()
-        {
-            _resourceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            _resourceTimer.Tick += (_, __) =>
-            {
-                try
-                {
-                    float cpu = 0;
-                    try { cpu = _cpuCounter?.NextValue() ?? 0; } catch { }
-                    float availMemMb = 0;
-                    try { availMemMb = _memAvailable?.NextValue() ?? 0; } catch { }
-                    long totalMemMb = _totalMemBytes / (1024 * 1024);
-                    float memPct = totalMemMb > 0 ? (1f - availMemMb / totalMemMb) * 100f : 0;
-
-                    TxtCpuUsage.Text = $"{cpu:F0}%";
-                    TxtCpuUsage.Foreground = GetHeatColor(cpu, 80, 95);
-                    TxtMemUsage.Text = $"{memPct:F0}%";
-                    TxtMemUsage.Foreground = GetHeatColor(memPct, 70, 90);
-                }
-                catch { }
-            };
-            _resourceTimer.Start();
         }
 
         private static long GetTotalPhysicalMemory()
@@ -355,12 +372,12 @@ namespace KitLugia.GUI.Windows.TaskManager
                 case "Services":
                     TabServices.Visibility = Visibility.Visible;
                     ActivateSidebarButton(BtnTabServices);
-                    if (_allServices.Count == 0) _ = LoadServicesWhenNeededAsync();
+                    if (_allServices.Count == 0) _ = LoadServicesWhenNeededSafeAsync();
                     break;
                 case "Startup":
                     TabStartup.Visibility = Visibility.Visible;
                     ActivateSidebarButton(BtnTabStartup);
-                    if (_allStartupApps.Count == 0) _ = LoadStartupWhenNeededAsync();
+                    if (_allStartupApps.Count == 0) _ = LoadStartupWhenNeededSafeAsync();
                     break;
             }
         }
@@ -421,14 +438,19 @@ namespace KitLugia.GUI.Windows.TaskManager
 
         private void SearchDebounce_Tick(object? sender, EventArgs e)
         {
-            _searchDebounce?.Stop();
-            var query = TxtSearch.Text?.Trim() ?? "";
-            if (query == _lastSearchQuery) return;
-            _lastSearchQuery = query;
-            ApplyFilter(query);
-            // Barra de busca GLOBAL: aplica o mesmo filtro nas outras abas
-            ApplyServiceFilter(GetServiceFilter());
-            ApplyStartupFilter();
+            try
+            {
+                _searchDebounce?.Stop();
+                if (_isClosed) return;
+                var query = TxtSearch.Text?.Trim() ?? "";
+                if (query == _lastSearchQuery) return;
+                _lastSearchQuery = query;
+                ApplyFilter(query);
+                // Barra de busca GLOBAL: aplica o mesmo filtro nas outras abas
+                ApplyServiceFilter(GetServiceFilter());
+                ApplyStartupFilter();
+            }
+            catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] SearchDebounce: {ex.Message}"); } catch { } }
         }
 
         private string GetServiceFilter() =>
@@ -459,7 +481,6 @@ namespace KitLugia.GUI.Windows.TaskManager
             bool entered = false;
             try { entered = await _refreshGate.WaitAsync(0); } catch (ObjectDisposedException) { return; } catch { return; }
             if (!entered) return;
-            _isRefreshing = true;
             var sw = Stopwatch.StartNew();
             var now = DateTime.UtcNow;
             var deltaMs = (now - _prevTime).TotalMilliseconds;
@@ -496,12 +517,6 @@ namespace KitLugia.GUI.Windows.TaskManager
                 var snapProcesses = snapTask.Result;
                 _networkConnections = netConnections;
                 _lastGpuPct = gpuTotal;
-
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    TxtGpuUsage.Text = gpuTotal >= 0 ? $"{gpuTotal:F0}%" : "N/A";
-                    TxtGpuUsage.Foreground = gpuTotal >= 0 ? GetHeatColor(gpuTotal, 70, 90) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88));
-                }), DispatcherPriority.Background);
 
                 var swEnum = Stopwatch.StartNew();
                 var rows = await Task.Run(() =>
@@ -658,26 +673,29 @@ namespace KitLugia.GUI.Windows.TaskManager
                 if (token.IsCancellationRequested) return;
                 lock (_lock) { _allRows = rows; }
 
-                // Ícones: carrega incremental e atualiza via INotify (sem recriar ItemsSource)
-                _ = LoadIconsIncrementalAsync(rows.Where(r => string.IsNullOrEmpty(r.IconPath) && !string.IsNullOrEmpty(r.Path)).Take(24).ToList());
+                // Ícones: carrega incremental e atualiza via INotify (sem recriar ItemsSource).
+                // Lote maior (96) + prioridade por CPU (linhas visíveis primeiro).
+                _ = LoadIconsIncrementalAsync(rows
+                    .Where(r => string.IsNullOrEmpty(r.IconPath) && !string.IsNullOrEmpty(r.Path))
+                    .OrderByDescending(r => r.CpuValue)
+                    .Take(96).ToList());
 
                 ApplyFilter(_lastSearchQuery);
 
                 sw.Stop();
-                Dispatcher.BeginInvoke(new Action(() =>
+                if (!_isClosed) _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    TxtStatus.Text = $"{rows.Count} processos em {sw.ElapsedMilliseconds}ms";
-                    double totalDisk = rows.Sum(r => r.DiskBytesPerSec);
-                    TxtDiskUsage.Text = FormatBytesSpeed(totalDisk);
-                    TxtDiskUsage.Foreground = GetHeatColor(totalDisk > 0 ? (float)(totalDisk / 1024 / 1024) : 0, 50, 200);
-                    double totalNet = rows.Sum(r => r.NetBytesPerSec);
-                    TxtNetUsage.Text = FormatBytesSpeed(totalNet);
-                    TxtNetUsage.Foreground = totalNet > 0 ? GetHeatColor((float)(totalNet / 1024 / 1024), 5, 50) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88));
+                    try
+                    {
+                        if (_isClosed) return;
+                        TxtStatus.Text = $"{rows.Count} processos em {sw.ElapsedMilliseconds}ms";
+                    }
+                    catch { }
                 }), DispatcherPriority.Background);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] RefreshAsync: {ex.Message}"); } catch { } }
-            finally { _isRefreshing = false; try { _refreshGate.Release(); } catch (ObjectDisposedException) { } catch (SemaphoreFullException) { } catch { } }
+            finally { try { _refreshGate.Release(); } catch (ObjectDisposedException) { } catch (SemaphoreFullException) { } catch { } }
         }
 
         // ══════════════════════════════════════════════
@@ -727,73 +745,88 @@ namespace KitLugia.GUI.Windows.TaskManager
             return "";
         }
 
+        private int _iconsLoadRunning; // guard anti-sobreposição (lote anterior ainda rodando → pula)
         private async Task LoadIconsIncrementalAsync(List<ProcessRow> rows)
         {
             if (rows.Count == 0) return;
-            await Task.Run(() =>
+            if (Interlocked.CompareExchange(ref _iconsLoadRunning, 1, 0) != 0) return;
+            try
             {
-                // FIX CRASH: SHGetFileInfo (shell32) NÃO é thread-safe. O Parallel.ForEach
-                // com 4 threads podia causar AccessViolationException em código nativo,
-                // que derruba o processo inteiro sem possibilidade de catch.
-                // Extração agora é serial + limitada por lote para não saturar a UI.
-                foreach (var row in rows.Take(48))
+                await Task.Run(() =>
                 {
-                    try
+                    // FIX CRASH: SHGetFileInfo (shell32) NÃO é thread-safe. O Parallel.ForEach
+                    // com 4 threads podia causar AccessViolationException em código nativo,
+                    // que derruba o processo inteiro sem possibilidade de catch.
+                    // Extração agora é serial + limitada por lote para não saturar a UI.
+                    // NOTA: com cache em disco (ProgramIconHelper), a 2ª abertura lê PNG (~1ms/ícone).
+                    foreach (var row in rows)
                     {
-                        if (string.IsNullOrEmpty(row.Path))
+                        try
                         {
-                            // Tenta resolver via System32 pelo nome (ex: dwm -> System32\dwm.exe)
-                            try
+                            if (string.IsNullOrEmpty(row.Path))
                             {
-                                string sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
-                                string cand = Path.Combine(sys, row.Name + ".exe");
-                                if (File.Exists(cand))
+                                // Tenta resolver via System32 pelo nome (ex: dwm -> System32\dwm.exe)
+                                try
                                 {
-                                    var ic2 = ProgramIconHelper.GetIconFromFile(cand);
-                                    if (ic2 != null)
+                                    string sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                                    string cand = Path.Combine(sys, row.Name + ".exe");
+                                    if (File.Exists(cand))
                                     {
-                                        lock (_iconLock) { _iconCache[row.Name] = ic2; }
-                                        Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = ic2; row.IconPath = cand; }), DispatcherPriority.Background);
-                                        return;
+                                        var ic2 = ProgramIconHelper.GetIconFromFile(cand);
+                                        if (ic2 != null)
+                                        {
+                                            lock (_iconLock) { _iconCache[row.Name] = ic2; }
+                                            Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = ic2; row.IconPath = cand; }), DispatcherPriority.Background);
+                                            continue;
+                                        }
                                     }
                                 }
+                                catch { }
+                                Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = _genericIcon; row.IconPath = ""; }), DispatcherPriority.Background);
+                                continue;
                             }
-                            catch { }
-                            Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = _genericIcon; row.IconPath = ""; }), DispatcherPriority.Background);
-                            return;
-                        }
-                        lock (_iconLock) { if (_iconCache.ContainsKey(row.Path)) { var cached = _iconCache[row.Path] ?? _genericIcon; Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = cached; row.IconPath = row.Path; }), DispatcherPriority.Background); return; } }
-                        BitmapSource? icon = null;
-                        // UWP: tenta AppIconHelper via manifest (evita SHGetFileInfo falhar por permissão)
-                        if (row.Path.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            try
+                            lock (_iconLock)
                             {
-                                string pkg = ExtractPackageName(row.Path);
-                                if (!string.IsNullOrEmpty(pkg))
-                                    icon = AppIconHelper.GetAppIcon(pkg, 32);
+                                if (_iconCache.ContainsKey(row.Path))
+                                {
+                                    var cached = _iconCache[row.Path] ?? _genericIcon;
+                                    Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = cached; row.IconPath = row.Path; }), DispatcherPriority.Background);
+                                    continue;
+                                }
                             }
-                            catch { }
+                            BitmapSource? icon = null;
+                            // UWP: tenta AppIconHelper via manifest (evita SHGetFileInfo falhar por permissão)
+                            if (row.Path.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                try
+                                {
+                                    string pkg = ExtractPackageName(row.Path);
+                                    if (!string.IsNullOrEmpty(pkg))
+                                        icon = AppIconHelper.GetAppIcon(pkg, 32);
+                                }
+                                catch { }
+                            }
+                            if (icon == null)
+                                icon = ProgramIconHelper.GetIconFromFile(row.Path);
+                            lock (_iconLock)
+                            {
+                                _iconCache[row.Path] = icon;
+                                // Cache também pela chave de nome: agrupamentos e processos sem
+                                // caminho resolvem o ícone instantaneamente no próximo refresh.
+                                if (icon != null && !string.IsNullOrEmpty(row.Name))
+                                    _iconCache[row.Name] = icon;
+                            }
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                row.ProcessIcon = icon ?? _genericIcon;
+                                row.IconPath = row.Path;
+                            }), DispatcherPriority.Background);
                         }
-                        if (icon == null)
-                            icon = ProgramIconHelper.GetIconFromFile(row.Path);
-                        lock (_iconLock)
-                        {
-                            _iconCache[row.Path] = icon;
-                            // Cache também pela chave de nome: agrupamentos e processos sem
-                            // caminho resolvem o ícone instantaneamente no próximo refresh.
-                            if (icon != null && !string.IsNullOrEmpty(row.Name))
-                                _iconCache[row.Name] = icon;
-                        }
-                        Dispatcher.BeginInvoke(new Action(() =>
-                        {
-                            row.ProcessIcon = icon ?? _genericIcon;
-                            row.IconPath = row.Path;
-                        }), DispatcherPriority.Background);
+                        catch { }
                     }
-                    catch { }
-                }
-            });
+                });
+            }
+            finally { Interlocked.Exchange(ref _iconsLoadRunning, 0); }
             // Sem ApplyFilter — ProcessIcon notifica via INotify, linha virtualizada atualiza sozinha
         }
 
@@ -1731,6 +1764,20 @@ private void ApplyFilter(string query)
             if (bytesPerSec < 1024 * 1024) return $"{bytesPerSec / 1024:F1} KB/s";
             if (bytesPerSec < 1024 * 1024 * 1024) return $"{bytesPerSec / (1024 * 1024):F1} MB/s";
             return $"{bytesPerSec / (1024 * 1024 * 1024):F2} GB/s";
+        }
+
+        /// <summary>
+        /// Escreve um número do resumo superior SOMENTE quando o texto muda — evita o "pisca-pisca"
+        /// de reescrever o mesmo valor a cada tick (que força re-render do TextBlock).
+        /// </summary>
+        private static void SetMetricText(System.Windows.Controls.TextBlock tb, string text, SolidColorBrush? brush)
+        {
+            if (tb == null) return;
+            if (!string.Equals(tb.Text, text, StringComparison.Ordinal))
+            {
+                tb.Text = text;
+                if (brush != null) tb.Foreground = brush;
+            }
         }
 
         // Frozen brush cache — created once, shared across all calls (thread-safe, zero GC)

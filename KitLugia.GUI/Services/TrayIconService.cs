@@ -71,6 +71,22 @@ namespace KitLugia.GUI.Services
 
         public const uint WM_CLOSE = 0x0010;
 
+        // --- Turbo Explorer (F11 re-render trick) ---
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        public const uint WM_KEYDOWN = 0x0100;
+        public const uint WM_KEYUP = 0x0101;
+        public const int VK_F11 = 0x7A;
+        public const string ExplorerWindowClass = "CabinetWClass";
+
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
@@ -543,6 +559,18 @@ namespace KitLugia.GUI.Services
 
         public bool IsInitialized { get; private set; } = false;
 
+        // === Turbo Explorer automático (watchdog do explorer.exe) ===
+        private System.Threading.Timer? _explorerWatchTimer;
+        private volatile int _explorerWatchPid;      // PID atual do explorer.exe da nossa sessão
+        private volatile bool _explorerTurboArmed;   // aguardando a 1ª janela de pasta p/ aplicar F11
+
+        /// <summary>
+        /// Quando ligado (default), o Kit detecta o processo explorer.exe. Ao (re)iniciar
+        /// (login do Windows, crash/restart do shell) ele re-aplica o truque F11 (re-render)
+        /// na 1ª janela de pasta que abrir — 1x por processo, sem piscar janela a janela.
+        /// </summary>
+        public bool ExplorerAutoTurbo { get; set; } = true;
+
         // RAM Limiter - Variáveis e configurações
         private DispatcherTimer? _ramLimiterTimer;
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ProcessRamLimit> _processRamLimits = new();
@@ -710,7 +738,8 @@ namespace KitLugia.GUI.Services
         }
 
         // Tray active state
-        public bool IsTrayEnabled { get; set; } = false;
+        // Ícone do tray é SEMPRE visível enquanto o Kit roda — a opção de ocultar foi removida.
+        public bool IsTrayEnabled { get; set; } = true;
         
         // Close to Tray (minimizar ao invés de fechar)
         public bool CloseToTray { get; set; } = true;
@@ -766,6 +795,10 @@ namespace KitLugia.GUI.Services
                     }
                 }
                 catch { /* Task Scheduler indisponível — ignorar */ }
+
+                // Preferência persistida: usuário ativou uma vez e as entradas foram
+                // apagadas depois (cleaner, uninstaller, reimagem) — a intenção continua viva
+                if (GetStartWithWindowsPref()) return true;
 
                 return false;
             }
@@ -872,6 +905,13 @@ namespace KitLugia.GUI.Services
             }
         }
 
+        /// <summary>
+        /// Ativa/desativa o auto-start nos 3 métodos (Registry Run + pasta Startup + Task Scheduler).
+        /// Os 3 coexistem de propósito: qualquer um deles que sobreviva a limpezas/exclusões
+        /// garante o boot do kit (o mutex de instância única evita processo duplicado).
+        /// A preferência é persistida em HKCU\Software\KitLugia\TraySettings\StartWithWindows
+        /// — não depende de AppData/settings do kit, então funciona até no primeiro boot.
+        /// </summary>
         public static void SetAutoStart(bool enable)
         {
             try
@@ -882,6 +922,7 @@ namespace KitLugia.GUI.Services
                 if (!enable)
                 {
                     // ===== DESLIGAR: remove os 3 métodos — nunca deixa lixo =====
+                    SetStartWithWindowsPref(false);
                     try
                     {
                         using var ts = new TaskService();
@@ -899,28 +940,24 @@ namespace KitLugia.GUI.Services
                     return;
                 }
 
+                SetStartWithWindowsPref(true);
                 CleanupOldTask();
 
                 // ===== MÉTODO 1 (universal): HKCU Run — funciona com ou sem admin =====
                 bool regOk = SetRegistryEntry(true, path);
-                if (regOk)
-                    KitLugia.Core.Logger.Log($"✅ Auto-start via Registry Run: {path} --tray");
-                else
-                    KitLugia.Core.Logger.Log($"⚠️ Registry Run falhou, tentando pasta Startup...");
+                KitLugia.Core.Logger.Log(regOk
+                    ? $"✅ Auto-start via Registry Run: {path} --tray"
+                    : "⚠️ Registry Run falhou");
 
-                // ===== MÉTODO 2 (fallback): .lnk na pasta Startup (fica no AppData) =====
-                if (!regOk)
-                {
-                    bool lnkOk = SetStartupShortcut(true, path);
-                    KitLugia.Core.Logger.Log(lnkOk
-                        ? $"✅ Auto-start via pasta Startup: {path}"
-                        : "❌ Falha ao criar atalho na pasta Startup");
-                }
+                // ===== MÉTODO 2: .lnk na pasta Startup (fica no AppData) — redundância ativa =====
+                bool lnkOk = SetStartupShortcut(true, path);
+                KitLugia.Core.Logger.Log(lnkOk
+                    ? $"✅ Auto-start via pasta Startup: {path}"
+                    : "⚠️ Falha ao criar atalho na pasta Startup");
 
                 // ===== MÉTODO 3 (elevado, best-effort): Task Scheduler =====
                 // Só quando o app roda como admin: registro com RunLevel.Highest sem
                 // privilégios "registra" a tarefa mas ela NUNCA dispara (falha silenciosa).
-                // Se a tarefa for criada/habilitada, remove Registry + .lnk para não duplicar o boot.
                 if (IsRunningElevated())
                 {
                     try
@@ -950,9 +987,7 @@ namespace KitLugia.GUI.Services
                                 {
                                     existingTask.Enabled = true;
                                     existingTask.RegisterChanges();
-                                    SetRegistryEntry(false, path);
-                                    SetStartupShortcut(false, path);
-                                    KitLugia.Core.Logger.Log("✅ Tarefa agendada existente habilitada (substitui Registry/Startup)");
+                                    KitLugia.Core.Logger.Log("✅ Tarefa agendada existente habilitada (Boot+Logon)");
                                     return;
                                 }
                                 KitLugia.Core.Logger.Log((pathMatches
@@ -993,16 +1028,12 @@ namespace KitLugia.GUI.Services
                             td.Actions.Add(new ExecAction(path, "--tray", Path.GetDirectoryName(path)));
 
                             ts.RootFolder.RegisterTaskDefinition("KitLugia", td);
-
-                            // Tarefa é o método ativo → remove os demais para não duplicar o boot
-                            SetRegistryEntry(false, path);
-                            SetStartupShortcut(false, path);
                             KitLugia.Core.Logger.Log($"✅ Tarefa agendada admin criada: {path} (Priority: High)");
                         }
                     }
                     catch (Exception taskEx)
                     {
-                        // Registry (ou .lnk) já garantiram o auto-start — apenas registra
+                        // Registry + .lnk já garantiram o auto-start — apenas registra
                         KitLugia.Core.Logger.Log($"⚠️ Task Scheduler indisponível ({taskEx.Message}) — usando Registry/Startup já criado");
                     }
                 }
@@ -1010,6 +1041,51 @@ namespace KitLugia.GUI.Services
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.Log($"SetAutoStart ERROR: {ex.Message}");
+            }
+        }
+
+        /// <summary>Persiste a preferência de auto-start (sobrevive a limpezas que apaguem as entradas).</summary>
+        private static void SetStartWithWindowsPref(bool enabled)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(@"Software\KitLugia\TraySettings");
+                key?.SetValue("StartWithWindows", enabled ? 1 : 0, RegistryValueKind.DWord);
+            }
+            catch { /* não crítico */ }
+        }
+
+        /// <summary>Lê a preferência persistida de auto-start.</summary>
+        public static bool GetStartWithWindowsPref()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\TraySettings");
+                var raw = key?.GetValue("StartWithWindows", 0);
+                return raw is int i ? i == 1 : Convert.ToInt32(raw ?? 0) == 1;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Garante que TODOS os métodos de auto-start (Registry Run, pasta Startup e Task
+        /// Scheduler) existam apontando para o executável ATUAL. Roda em todo start do kit:
+        /// se o usuário já ativou uma vez (preferência persistida ou qualquer entrada viva),
+        /// reconfigura tudo — mesmo se AppData/settings ainda não existirem ou se algum
+        /// limpeza/apagou as entradas desde a última execução.
+        /// </summary>
+        public static void EnsureAutoStartMethods()
+        {
+            try
+            {
+                bool desired = IsAutoStartEnabled(); // método vivo OU preferência persistida
+                if (!desired) return;
+                KitLugia.Core.Logger.Log("🔁 Reconfigurando auto-start em todos os métodos com o executável atual...");
+                SetAutoStart(true);
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogError("EnsureAutoStartMethods", $"Erro: {ex.Message}");
             }
         }
 
@@ -1180,6 +1256,10 @@ namespace KitLugia.GUI.Services
             System.Threading.Tasks.Task.Run(() => AutoFixCommunityProcesses());
             System.Threading.Tasks.Task.Run(() => AutoFixForceStopContextMenu());
 
+            // Watchdog do Turbo Explorer: quando o explorer.exe (re)aparece (login, crash,
+            // restart do shell), re-aplica o F11 re-render na 1ª janela de pasta que abrir.
+            StartExplorerWatchdog();
+
             try
             {
                 _trayIcon = new NotifyIcon
@@ -1194,8 +1274,8 @@ namespace KitLugia.GUI.Services
                 return;
             }
 
-            // ★ Show tray icon IMMEDIATELY before building menus
-            if (IsTrayEnabled && _trayIcon != null)
+            // ★ Show tray icon IMMEDIATELY before building menus — ícone é SEMPRE visível
+            if (_trayIcon != null)
             {
                 try
                 {
@@ -1261,6 +1341,11 @@ namespace KitLugia.GUI.Services
             menu.Items.Add(itemGameBoost);
 
             menu.Items.Add(new ToolStripSeparator());
+
+            var itemTurboExplorer = new ToolStripMenuItem("⚡ Turbo Explorer (F11)");
+            itemTurboExplorer.ToolTipText = "Envia F11 2x para a janela do Explorer mais recente — força re-render e acelera o 'ir direto ao arquivo'.";
+            itemTurboExplorer.Click += (s, e) => System.Threading.Tasks.Task.Run(() => TurboExplorerF11());
+            menu.Items.Add(itemTurboExplorer);
 
             // Boot Tray
             int bootAppCount = 0;
@@ -1354,7 +1439,7 @@ namespace KitLugia.GUI.Services
             // Double-click to open main window
             _trayIcon.DoubleClick += (s, e) => OnOpenMainWindow?.Invoke();
 
-            if (IsTrayEnabled && _trayIcon != null)
+            if (_trayIcon != null)
             {
                 if (_trayIcon.Visible)
                 {
@@ -1393,6 +1478,136 @@ namespace KitLugia.GUI.Services
             }
 
             IsInitialized = true;
+        }
+
+        private void StartExplorerWatchdog()
+        {
+            try
+            {
+                _explorerWatchTimer?.Dispose();
+                _explorerWatchTimer = new System.Threading.Timer(_ =>
+                {
+                    try { ExplorerTurboWatchdogTick(); }
+                    catch (Exception ex) { KitLugia.Core.Logger.LogError("ExplorerWatchdog", ex.Message); }
+                }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+            }
+            catch { /* watchdog é opcional — nunca derruba o kit */ }
+        }
+
+        /// <summary>
+        /// Detecta o explorer.exe da nossa sessão. Quando o processo (re)aparece — login do
+        /// Windows, crash ou restart do shell — arma o turbo. Na 1ª janela de pasta
+        /// (CabinetWClass) que abrir depois disso, aplica F11 2x (re-render). Depois desarma:
+        /// 1x por processo, sem piscar janela a janela.
+        /// </summary>
+        private void ExplorerTurboWatchdogTick()
+        {
+            if (!ExplorerAutoTurbo) { _explorerTurboArmed = false; return; }
+
+            int pid = GetSessionExplorerPid();
+            if (pid == 0)
+            {
+                // Explorer ainda não subiu (kit pode iniciar antes do shell no login)
+                _explorerWatchPid = 0;
+                _explorerTurboArmed = false;
+                return;
+            }
+
+            if (pid != _explorerWatchPid)
+            {
+                _explorerWatchPid = pid;
+                _explorerTurboArmed = true;
+                KitLugia.Core.Logger.Log($"⚡ Turbo Explorer: explorer.exe ativo (PID {pid}) — auto-turbo armado p/ a 1ª janela de pasta.");
+                return;
+            }
+
+            if (!_explorerTurboArmed) return;
+
+            IntPtr hwnd = FindTopExplorerWindow();
+            if (hwnd == IntPtr.Zero) return;   // ainda não abriu nenhuma pasta
+
+            _explorerTurboArmed = false;       // 1x por processo
+            var h = hwnd;
+            System.Threading.Tasks.Task.Run(() => ApplyF11Render(h, 400, "auto"));
+        }
+
+        private static int GetSessionExplorerPid()
+        {
+            int session = System.Diagnostics.Process.GetCurrentProcess().SessionId;
+            try
+            {
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName("explorer"))
+                {
+                    try
+                    {
+                        if (p.SessionId == session) { int id = p.Id; p.Dispose(); return id; }
+                    }
+                    catch { try { p.Dispose(); } catch { } }
+                }
+            }
+            catch { }
+            return 0;
+        }
+
+        /// <summary>Janela de pasta (CabinetWClass) mais recente em ordem de Z — não precisa de foco.</summary>
+        private static IntPtr FindTopExplorerWindow()
+        {
+            IntPtr found = IntPtr.Zero;
+            Win32Api.EnumWindows((hWnd, lParam) =>
+            {
+                if (!Win32Api.IsWindowVisible(hWnd)) return true;
+                var cls = new System.Text.StringBuilder(256);
+                Win32Api.GetClassName(hWnd, cls, cls.Capacity);
+                if (cls.ToString() == Win32Api.ExplorerWindowClass)
+                {
+                    found = hWnd;   // EnumWindows lista em ordem de Z — primeira = mais recente
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+            return found;
+        }
+
+        /// <summary>
+        /// Truque F11 do Explorer: entrar e sair de tela cheia força o Explorer a re-renderizar
+        /// a pasta, pulando a lógica bugada de rolagem/posicionamento — o "ir direto ao arquivo"
+        /// (ex.: navegador → Mostrar na pasta) passa a acertar na hora.
+        /// </summary>
+        private static void ApplyF11Render(IntPtr explorerWindow, int dwellMs, string source)
+        {
+            try
+            {
+                if (explorerWindow == IntPtr.Zero || !Win32Api.IsWindow(explorerWindow)) return;
+                Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYDOWN, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
+                Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYUP, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
+                System.Threading.Thread.Sleep(Math.Max(150, dwellMs));
+                Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYDOWN, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
+                Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYUP, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
+                KitLugia.Core.Logger.Log($"⚡ Turbo Explorer: F11 2x aplicado (re-render) — origem: {source}.");
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogError("ApplyF11Render", ex.Message);
+            }
+        }
+
+        /// <summary>Aplicação manual — item do tray "⚡ Turbo Explorer (F11)".</summary>
+        private void TurboExplorerF11()
+        {
+            try
+            {
+                IntPtr explorer = FindTopExplorerWindow();
+                if (explorer == IntPtr.Zero)
+                {
+                    KitLugia.Core.Logger.Log("⚡ Turbo Explorer: nenhuma janela do Explorer aberta.");
+                    return;
+                }
+                ApplyF11Render(explorer, 500, "manual (tray)");
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogError("TurboExplorerF11", ex.Message);
+            }
         }
 
         public void ShutdownTurboCharge()
@@ -1461,6 +1676,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("WerSvcDisabled", WerSvcDisabled ? 1 : 0);
                 key.SetValue("PcaSvcDisabled", PcaSvcDisabled ? 1 : 0);
                 key.SetValue("TelemetryTasksDisabled", TelemetryTasksDisabled ? 1 : 0);
+                key.SetValue("ExplorerAutoTurbo", ExplorerAutoTurbo ? 1 : 0);
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
@@ -1706,49 +1922,59 @@ namespace KitLugia.GUI.Services
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\TraySettings");
                 if (key == null)
                 {
-                    IsTrayEnabled = false; // Default on first run
+                    IsTrayEnabled = true; // Primeira execução (Kit "limpo") — ícone SEMPRE visível
                     return;
                 }
 
-                IsTrayEnabled = (int)key.GetValue("IsTrayEnabled", 0) == 1;
-                CloseToTray = (int)key.GetValue("CloseToTray", 1) == 1;
-                AutoCleanEnabled = (int)key.GetValue("AutoCleanEnabled", 0) == 1;
-                AutoCleanThresholdPercent = (int)key.GetValue("Threshold", 80);
-                MonitorIntervalSeconds = (int)key.GetValue("Interval", 30);
-                SelectedCleaningMode = (MemoryOptimizer.CleaningMode)(int)key.GetValue("CleaningMode", (int)MemoryOptimizer.CleaningMode.Normal);
-                GamePriorityEnabled = (int)key.GetValue("GamePriority", 0) == 1;
-                ForegroundBoostEnabled = (int)key.GetValue("ForegroundBoost", 1) == 1;
-                StandbyCleanEnabled = (int)key.GetValue("StandbyClean", 0) == 1;
-                IslcThresholdMB = (long)key.GetValue("IslcThresholdMB", SuggestIslcThresholdMB());
-                MemoryLeakDetectionEnabled = (int)key.GetValue("AntiLeak", 0) == 1;
-                FocusAssistEnabled = (int)key.GetValue("FocusAssist", 0) == 1;
-                TimerBoost = (int)key.GetValue("TimerBoost", 0) == 1;
-                NetworkBoost = (int)key.GetValue("NetworkBoost", 0) == 1;
-                DownloadBoostEnabled = (int)key.GetValue("DownloadBoostEnabled", 0) == 1;
+                // Ícone do tray agora é SEMPRE visível enquanto o Kit roda (opção de ocultar removida).
+                // Antes, um Kit limpo iniciava com o ícone DESLIGADO e "Close to Tray" o escondia no
+                // background — processo fantasma sem como reabrir (só via Gerenciador de Tarefas).
+                if (!ReadBoolSetting(key, "IsTrayEnabled", true))
+                    Logger.Log("🔔 Ícone do tray forçado a SEMPRE visível (preferência antiga 'ocultar' migrada para ON).");
+                IsTrayEnabled = true;
+
+                // X da janela SEMPRE minimiza para o tray (fechar de verdade = menu do tray >
+                // "Sair Completamente"). Opção de "rodar em segundo plano" removida das telas.
+                if (!ReadBoolSetting(key, "CloseToTray", true))
+                    Logger.Log("🔔 'Rodar em segundo plano' forçado a SEMPRE ATIVO (X minimiza para o tray — preferência antiga migrada).");
+                CloseToTray = true;
+                AutoCleanEnabled = ReadBoolSetting(key, "AutoCleanEnabled", false);
+                AutoCleanThresholdPercent = ReadIntSetting(key, "Threshold", 80);
+                MonitorIntervalSeconds = ReadIntSetting(key, "Interval", 30);
+                SelectedCleaningMode = (MemoryOptimizer.CleaningMode)ReadIntSetting(key, "CleaningMode", (int)MemoryOptimizer.CleaningMode.Normal);
+                GamePriorityEnabled = ReadBoolSetting(key, "GamePriority", false);
+                ForegroundBoostEnabled = ReadBoolSetting(key, "ForegroundBoost", true);
+                StandbyCleanEnabled = ReadBoolSetting(key, "StandbyClean", false);
+                IslcThresholdMB = ReadLongSetting(key, "IslcThresholdMB", SuggestIslcThresholdMB());
+                MemoryLeakDetectionEnabled = ReadBoolSetting(key, "AntiLeak", false);
+                FocusAssistEnabled = ReadBoolSetting(key, "FocusAssist", false);
+                TimerBoost = ReadBoolSetting(key, "TimerBoost", false);
+                NetworkBoost = ReadBoolSetting(key, "NetworkBoost", false);
+                DownloadBoostEnabled = ReadBoolSetting(key, "DownloadBoostEnabled", false);
                 DownloadBoostLevel = (string)key.GetValue("DownloadBoostLevel", "Auto");
                 double.TryParse((string)key.GetValue("DownloadBoostThreshold", "5.0"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var dbt);
                 DownloadBoostThreshold = dbt > 0 ? dbt : 5.0;
-                ProBalance = (int)key.GetValue("ProBalance", 0) == 1;
-                UnparkCpuEnabled = (int)key.GetValue("UnparkCpu", 0) == 1;
-                
+                ProBalance = ReadBoolSetting(key, "ProBalance", false);
+                UnparkCpuEnabled = ReadBoolSetting(key, "UnparkCpu", false);
 
-                EnableSmartAlerts = (int)key.GetValue("EnableSmartAlerts", 1) == 1;
-                EnableBehaviorAnalysis = (int)key.GetValue("EnableBehaviorAnalysis", 1) == 1;
+                EnableSmartAlerts = ReadBoolSetting(key, "EnableSmartAlerts", true);
+                EnableBehaviorAnalysis = ReadBoolSetting(key, "EnableBehaviorAnalysis", true);
                 HighRamThresholdMB = ReadLongSetting(key, "HighRamThresholdMB", 2048);
                 HighCpuThresholdPercent = ReadDoubleSetting(key, "HighCpuThresholdPercent", 80.0);
-                AdvancedMonitorIntervalMs = (int)key.GetValue("AdvancedMonitorIntervalMs", 2000);
-                RamLimiterIntervalMs = (int)key.GetValue("RamLimiterIntervalMs", 1000);
-                GameBarPresenceWriterDisabled = (int)key.GetValue("GameBarPresenceWriterDisabled", 0) == 1;
-                SmartScreenDisabled = (int)key.GetValue("SmartScreenDisabled", 0) == 1;
-                EdgeUpdateDisabled = (int)key.GetValue("EdgeUpdateDisabled", 0) == 1;
-                CompatTelRunnerDisabled = (int)key.GetValue("CompatTelRunnerDisabled", 0) == 1;
-                SearchIndexerDisabled = (int)key.GetValue("SearchIndexerDisabled", 0) == 1;
-                TextInputHostDisabled = (int)key.GetValue("TextInputHostDisabled", 0) == 1;
-                DiagTrackSvcDisabled = (int)key.GetValue("DiagTrackSvcDisabled", 0) == 1;
-                DmwappushSvcDisabled = (int)key.GetValue("DmwappushSvcDisabled", 0) == 1;
-                WerSvcDisabled = (int)key.GetValue("WerSvcDisabled", 0) == 1;
-                PcaSvcDisabled = (int)key.GetValue("PcaSvcDisabled", 0) == 1;
-                TelemetryTasksDisabled = (int)key.GetValue("TelemetryTasksDisabled", 0) == 1;
+                AdvancedMonitorIntervalMs = ReadIntSetting(key, "AdvancedMonitorIntervalMs", 2000);
+                RamLimiterIntervalMs = ReadIntSetting(key, "RamLimiterIntervalMs", 1000);
+                GameBarPresenceWriterDisabled = ReadBoolSetting(key, "GameBarPresenceWriterDisabled", false);
+                SmartScreenDisabled = ReadBoolSetting(key, "SmartScreenDisabled", false);
+                EdgeUpdateDisabled = ReadBoolSetting(key, "EdgeUpdateDisabled", false);
+                CompatTelRunnerDisabled = ReadBoolSetting(key, "CompatTelRunnerDisabled", false);
+                SearchIndexerDisabled = ReadBoolSetting(key, "SearchIndexerDisabled", false);
+                TextInputHostDisabled = ReadBoolSetting(key, "TextInputHostDisabled", false);
+                DiagTrackSvcDisabled = ReadBoolSetting(key, "DiagTrackSvcDisabled", false);
+                DmwappushSvcDisabled = ReadBoolSetting(key, "DmwappushSvcDisabled", false);
+                WerSvcDisabled = ReadBoolSetting(key, "WerSvcDisabled", false);
+                PcaSvcDisabled = ReadBoolSetting(key, "PcaSvcDisabled", false);
+                TelemetryTasksDisabled = ReadBoolSetting(key, "TelemetryTasksDisabled", false);
+                ExplorerAutoTurbo = ReadBoolSetting(key, "ExplorerAutoTurbo", true);
 
                 _monitorTimer.Interval = TimeSpan.FromSeconds(MonitorIntervalSeconds);
             }
@@ -1805,6 +2031,30 @@ namespace KitLugia.GUI.Services
             catch { return def; }
         }
 
+        private static int ReadIntSetting(Microsoft.Win32.RegistryKey key, string name, int def)
+        {
+            try
+            {
+                var v = key.GetValue(name);
+                if (v == null) return def;
+                return v switch
+                {
+                    int i => i,
+                    long l => (int)l,
+                    double d => (int)d,
+                    string s when int.TryParse(s, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out var i2) => i2,
+                    byte[] b when b.Length == 4 => BitConverter.ToInt32(b, 0),
+                    byte[] b when b.Length == 8 => (int)BitConverter.ToInt64(b, 0),
+                    _ => def
+                };
+            }
+            catch { return def; }
+        }
+
+        private static bool ReadBoolSetting(Microsoft.Win32.RegistryKey key, string name, bool def)
+            => ReadIntSetting(key, name, def ? 1 : 0) == 1;
+
         private void RunSafetyProfiler()
         {
             try
@@ -1844,15 +2094,19 @@ namespace KitLugia.GUI.Services
 
         public void SetTrayEnabled(bool enabled)
         {
-            IsTrayEnabled = enabled;
+            // Ícone do tray é SEMPRE visível enquanto o Kit roda — pedidos para ocultar são ignorados
+            // (mantido por compatibilidade com telas antigas que ainda chamam este método).
+            if (!enabled)
+                Logger.Log("🔔 Ícone do tray é sempre visível — solicitação de ocultar ignorada.");
+            IsTrayEnabled = true;
 
             if (Application.Current?.Dispatcher is { } d && !d.CheckAccess())
             {
-                d.BeginInvoke(new System.Action(() => ApplyTrayEnabledState(enabled)));
+                d.BeginInvoke(new System.Action(() => ApplyTrayEnabledState(true)));
                 return;
             }
 
-            ApplyTrayEnabledState(enabled);
+            ApplyTrayEnabledState(true);
         }
 
 
@@ -3776,6 +4030,9 @@ namespace KitLugia.GUI.Services
 
         private void DisposeCore()
         {
+            _explorerWatchTimer?.Dispose();
+            _explorerWatchTimer = null;
+
             if (_monitorTimer != null)
             {
                 _monitorTimer.Tick -= MonitorTick;

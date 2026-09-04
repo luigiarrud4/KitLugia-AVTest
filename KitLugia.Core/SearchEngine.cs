@@ -110,6 +110,10 @@ namespace KitLugia.Core
                 var securityTweaks = Guardian.GetAllTweaksDefinition();
                 foreach (var tweak in securityTweaks)
                 {
+                    // Itens de PATH (IsPathItem) sao consolidados em UM resultado abaixo -
+                    // nao poluem a busca com os 7 botoes separados (igual IntegrityPage).
+                    if (tweak.IsPathItem) continue;
+
                     _database.Add(new GlobalSearchResult
                     {
                         Title = tweak.Name,
@@ -128,6 +132,26 @@ namespace KitLugia.Core
                         ExecuteAction = () => Guardian.ToggleTweak(tweak)
                     });
                 }
+
+                // PATH consolidado (System + User): repara tudo de uma vez e adiciona
+                // os programas instalados que estao fora do PATH (winget, git, node...).
+                _database.Add(new GlobalSearchResult
+                {
+                    Title = "PATH do Sistema e do Usuário (Corrigir tudo)",
+                    Description = "Remove duplicatas e pastas inexistentes e adiciona programas instalados fora do PATH (winget, git, node, dotnet, npm, 7-Zip, cargo...). Um clique resolve tudo.",
+                    Icon = "📁",
+                    Type = SearchResultType.Tweak,
+                    IsToggle = true,
+                    CheckState = () => {
+                        try
+                        {
+                            var all = Guardian.GetHarmfulTweaksWithStatus();
+                            return all.Any(t => t.IsPathItem && t.Status == TweakStatus.MODIFIED);
+                        }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+                    },
+                    ExecuteAction = () => { var r = Guardian.RepairAllPathsOnce(); return (r.Changed, r.Summary); }
+                });
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 

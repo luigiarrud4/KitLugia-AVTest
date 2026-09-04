@@ -340,6 +340,7 @@ namespace KitLugia.GUI.Pages
                     int explorerLaunchTo = SystemTweaks.GetExplorerLaunchToIndex();
                     bool iconCache = SystemTweaks.IsIconCacheIncreased();
                     bool pca = SystemTweaks.IsPCADisabled();
+                    bool explorerTurbo = SystemTweaks.IsExplorerFolderDiscoveryDisabled();
 
                     ChkMenuDelay.IsChecked = menuDelay;
                     UpdateLabel(StatusMenuDelay, menuDelay, "0ms", "Padrão (400ms)");
@@ -359,6 +360,17 @@ namespace KitLugia.GUI.Pages
 
                     ChkPCA.IsChecked = pca;
                     UpdateLabel(StatusPCA, pca, "Desativado", "Ativo");
+
+                    ChkExplorerTurbo.IsChecked = explorerTurbo;
+                    UpdateLabel(StatusExplorerTurbo, explorerTurbo, "Turbo (Generic)", "Padrão");
+
+                    bool explorerThumbs = SystemTweaks.IsExplorerThumbnailsDisabled();
+                    ChkExplorerThumbs.IsChecked = explorerThumbs;
+                    UpdateLabel(StatusExplorerThumbs, explorerThumbs, "Sem miniaturas", "Com miniaturas");
+
+                    bool explorerAutoTurbo = (Application.Current.MainWindow as MainWindow)?.TrayService?.ExplorerAutoTurbo == true;
+                    ChkExplorerAutoTurbo.IsChecked = explorerAutoTurbo;
+                    UpdateLabel(StatusExplorerAutoTurbo, explorerAutoTurbo, "Automático", "Manual");
 
                     ChkSleepStudy.IsChecked = sleepStudy;
                     UpdateLabel(StatusSleepStudy, sleepStudy, "Desativado", "Ativo");
@@ -2182,6 +2194,82 @@ namespace KitLugia.GUI.Pages
                 RecordTweak("PCA", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("SISTEMA", targetActive ? "PCA: Desativado" : "PCA: Ativo (padrão)");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkExplorerTurbo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkExplorerTurbo.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.DisableExplorerFolderDiscovery();
+                    else SystemTweaks.RestoreExplorerFolderDiscovery();
+                });
+                UpdateLabel(StatusExplorerTurbo, targetActive, "Turbo (Generic)", "Padrão");
+
+                RecordTweak("ExplorerTurbo", targetActive);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("EXPLORER", targetActive
+                        ? "Turbo do Explorer ativado — pastas abrem sem análise de tipo (FolderType=NotSpecified). Novas janelas já abrem mais rápido."
+                        : "Turbo do Explorer desativado — Explorer volta a detectar o tipo de pasta automaticamente.");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkExplorerThumbs_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkExplorerThumbs.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    if (targetActive) SystemTweaks.DisableExplorerThumbnails();
+                    else SystemTweaks.RestoreExplorerThumbnails();
+                });
+                UpdateLabel(StatusExplorerThumbs, targetActive, "Sem miniaturas", "Com miniaturas");
+
+                RecordTweak("ExplorerThumbs", targetActive);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("EXPLORER", targetActive
+                        ? "Ir direto ao arquivo ativado — Explorer não gera miniaturas na abertura (IconsOnly=1). O destaque ao arquivo correto chega na hora, mesmo em pastas com milhares de arquivos."
+                        : "Miniaturas restauradas — Explorer volta a gerar previews; o destaque ao arquivo pode demorar novamente em pastas grandes.");
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            finally { _isLoading = false; }
+        }
+
+        private async void ChkExplorerAutoTurbo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+            try
+            {
+                bool targetActive = ChkExplorerAutoTurbo.IsChecked == true;
+                await Task.Run(() =>
+                {
+                    var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
+                    if (tray != null)
+                    {
+                        tray.ExplorerAutoTurbo = targetActive;
+                        tray.SaveSettings();
+                    }
+                });
+                UpdateLabel(StatusExplorerAutoTurbo, targetActive, "Automático", "Manual");
+
+                RecordTweak("ExplorerAutoTurbo", targetActive);
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("EXPLORER", targetActive
+                        ? "Turbo Explorer automático ATIVADO — quando o explorer.exe reiniciar (login/crash), o Kit aplica o F11 re-render sozinho na 1ª pasta aberta. 'Ir direto ao arquivo' continua instantâneo após reboot."
+                        : "Turbo Explorer automático DESATIVADO — o F11 só será aplicado manualmente (item ⚡ Turbo Explorer do tray ou Ctrl+F11).");
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             finally { _isLoading = false; }

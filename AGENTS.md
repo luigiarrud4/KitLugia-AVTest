@@ -4134,3 +4134,706 @@ Otimizacoes Reddit (5 toggles), Download Boost (toggle/mode/threshold).
 - `BoostTimerResolution()` tambem e GLOBAL (NtSetTimerResolution 1ms). Afeta todos processos.
 
 Build: 0 erros.
+
+### Sessao 03/09 — Kit Task Manager: numeros do resumo piscando (escrita unica por segundo)
+
+Sintoma: os 5 numeros grandes da barra de resumo (CPU/Memoria/Disco/Rede/GPU) piscavam,
+alternando entre valores mesmo com o sistema parado.
+
+Causa raiz (multi-placa: varios timers + fontes escrevendo os MESMOS TextBlocks):
+1. `TxtDiskUsage` tinha DOIS escritores com fontes diferentes: `RefreshAsync` (~1s, soma
+   de I/O por processo) e `UpdatePerformanceGraphs` (1s, contadores PhysicalDisk) — o
+   numero alternava entre os dois valores a cada segundo.
+2. CPU/Memoria eram amostrados do MESMO `_cpuCounter`/`_memAvailable` por dois timers
+   independentes (`StartResourceMonitor` 2s + graph tick 1s) — o `NextValue()` intercalado
+   corrompia as amostras (intervalo de amostragem oscilante).
+3. GPU/Rede/Disco eram escritos pelo `RefreshAsync` (tick async de duracao variavel)
+   enquanto o graph tick reescrevia o Disco — rajada de re-renders por segundo.
+
+Correcao (KitTaskManager.Performance.cs + KitTaskManagerWindow.xaml.cs):
+1. **Escrita UNICA da barra no graph tick (1s)**: `UpdatePerformanceGraphs` agora grava
+   todos os 5 numeros (ja le os contadores uma vez por tick). Removidos os escritores de
+   `RefreshAsync` (TxtGpuUsage/TxtDiskUsage/TxtNetUsage) e todo o `StartResourceMonitor`
+   (timer de 2s apagado — campo, Loaded call e Closing stop).
+2. **`SetMetricText` (helper novo)**: so reescreve o TextBlock quando o texto mudou —
+   valores iguais nao forcam re-render (causa visual do flicker).
+3. Rede passa a ser calculada de `_allRows` (lock) em vez de `_filteredRows` (evita soma
+   parcial quando ha filtro de busca).
+4. Net/GPU usam `_brushGray` congelado (sem alocar SolidColorBrush novo a cada tick).
+
+Build: 0 erros / 138 warnings (nullable pre-existentes).
+
+**A TESTAR (host)**: abrir Task Manager na aba Processos e observar a barra de resumo
+por ~10s — CPU/Memoria/Disco/Rede/GPU devem ficar estaveis (atualizacao suave 1x/s), sem
+alternar valores quando o sistema esta ocioso. Pausado/2s no combo da aba Desempenho
+agora congela a barra junto (comportamento esperado, mesma fonte).
+
+### Sessao 03/09 — Botões de janela XP + ícones de processos rápidos
+
+Pedido: botões de maximizar/minimizar às vezes aparecem estilo Windows XP em vez do tema do kit; ícones de processos devem carregar mais rápido.
+
+**Causa raiz (botões XP)**: MainWindow e KitTaskManagerWindow usavam WindowChrome com WindowStyle DEFAULT (SingleBorderWindow) + UseAeroCaptionButtons=False. O Windows ainda re-pintava a barra de título nativa (com botões clássicos) por cima da área do chrome em certos repaints (troca de tema/DPI/resolução) — o "de vez em quando".
+
+**Correção (padrão do projeto, igual StoreRemakeWindow/KitIsoStudioWindow)**:
+1. `MainWindow.xaml` + `KitTaskManagerWindow.xaml`: `WindowStyle="None"` — o frame nativo some 100%, os botões customizados (minimizar/maximizar/fechar) são os únicos possíveis; nunca mais XP.
+2. `MainWindow.xaml`: `ResizeMode="CanResizeWithGrip"` → `CanResize` (CanResizeWithGrip + WindowStyle=None lança exceção no init do WPF); adicionado `ResizeBorderThickness="6"` no WindowChrome (resize pelas bordas continua).
+3. Ambas janelas: `MaxWidth/MaxHeight` ligados a `SystemParameters.WorkArea` (mesmo padrão do KitIsoStudioWindow/PathExplorerWindow) — sem isso, janela borderless maximizada cobre a taskbar.
+
+**Causa raiz (ícones lentos)**: toda abertura do app re-extraía ícones do shell32 (SHGetFileInfo/ExtractIconEx) e o loop do Task Manager tinha 2 bugs de `return` dentro do `foreach` que abortavam o lote inteiro no 1º item já cacheado (além do cap de 24 ícones).
+
+**Correção**:
+1. `ProgramIconHelper.cs` — cache PERSISTENTE em disco (`%LOCALAPPDATA%\KitLugia\IconCache`): PNG por hash de caminho+índice+mtime (invalida sozinho se o exe mudar); 1ª execução extrai e grava, as seguintes leem do disco (~1ms/ícone). Parse de "caminho,índice" movido para o topo para o cache indexar pelo arquivo real.
+2. `KitTaskManagerWindow.xaml.cs` — LoadIconsIncrementalAsync: lote de 96 ícones priorizados por CPU, guard de concorrência `_iconsLoadRunning`, `continue` no lugar dos `return` (itens cacheados/sem caminho não abortam mais o lote).
+
+Build: 0 erros / 0 avisos (GUI). Resta testar no host: abrir/fechar o Task Manager 2x (2ª abertura com ícones instantâneos) e alternar tema do Windows com o app aberto (botões nunca mais XP).
+
+### Sessao 03/09 — Force Stop + Take Ownership PROVA-DE-TUDO (windows.old incluso)
+
+Pedido: "faça o force stop e o takeownership serem a prova de tudo" — takeown falhava em
+C:\Windows.old. Pesquisa web + reflexao sobre tudo que interfere:
+
+**TAKE OWNERSHIP (FileTakeOwnership.cs reescrito)**:
+- CAUSA RAIZ windows.old: .NET `Directory.Exists`/`File.Exists` retorna FALSE quando a ACL
+  nega leitura (windows.old inteiro e TrustedInstaller) → Kit dizia "Caminho não encontrado".
+  Novo `ProbePath()` (GetFileAttributesW): distingue nao-existe (erro 2/3/53) de
+  existe-mas-negado (erro 5/21) e segue com SetNamedSecurityInfo (WRITE_OWNER nao precisa ler).
+- BFS PAI→FILHO: dono da pasta ANTES dos filhos (árvores negadas destravam nível a nível;
+  a ordem folhas→raiz antiga falhava em tudo). Re-tenta enumeração 2x apos tomar posse.
+- Skip de reparse points (AttributesToSkip=ReparsePoint + check): evita loop infinito em
+  Windows.old\Documents and Settings → C:\Users (antes AttributesToSkip=0 seguia junctions!).
+- Itens negados: SetOwnerAndDaclNative (dono + substitui DACL por Administradores:F via
+  RawSecurityDescriptor/SetNamedSecurityInfo) — sem depender de leitura.
+- MODO RAPIDO agora usa SetNamedSecurityInfo OWNER-only tambem para ARQUIVOS (antes .NET
+  GetAccessControl, que exigia leitura).
+- Fallback classico automatico quando restam falhas: `takeown /f "path" /r /d y` +
+  `icacls "path" /grant *S-1-5-32-544:F /t /c /l /q` (SID locale-proof; takeown usa
+  semantica de backup — metodo comprovado da MS p/ windows.old). Result ganhou
+  FallbackUsed/FallbackMessage; UI mostra.
+- Sem admin: EnablePrivileges falha → erro claro "Execute como Administrador" (antes
+  falhava item a item sem explicar).
+- RestoreToTrustedInstaller agora usa SID S-1-5-80-... (locale-proof) + SetNamedSecurityInfo.
+
+**FORCE STOP (ForceStopUnlockService.cs)**:
+- EnableDebugPrivilege() no inicio do scan E do unlock — sem ele OpenProcess/DuplicateHandle
+  falham em processos de outros usuarios e o scan nativo "não acha nada" (causa classica).
+- KillProcess em cascata: Process.Kill → NtTerminateProcess → diagnostico PPL
+  (NtQueryInformationProcess class 61) com mensagem clara (anti-virus/EDR protegido).
+- Phase 2 e 7: pula processo proprio e processos ja encerrados (RM mata primeiro —
+  antes gerava erros fantasma "processo não encontrado").
+- Probe de existencia (FileTakeOwnership.ProbePath) no FindBlockingProcesses — paths
+  negados agora sao escaneados em vez de "Caminho invalido".
+
+**ELEVACAO (Program.cs + ForceStopUnlockPage + UnlockIpcServer)**:
+- Context menu lanca o Kit SEM runas → --unlock/--takeown agora relanca a mesma linha
+  elevada (UAC) automaticamente antes de qualquer operacao.
+- Se a instancia elevada acha o mutex ocupado (instancia principal sem admin), executa
+  HEADLESS (worker elevado: TakeOwn/Unlock direto + toast Windows) em vez de IPC p/ a
+  instancia nao-elevada (que falharia).
+- Pagina: botões Assumir/Liberar/Tentar Deletar checam admin e oferecem relançar elevado
+  (--takeown/--unlock "path"); analise/ACL usam ProbePath (mostra "existe mas acesso
+  negado" em vez de "não encontrado").
+
+Build: 0 erros / warnings nullable pre-existentes.
+
+**A TESTAR (host/VM)**: Take Ownership em C:\Windows.old (deve completar com fallback
+classico se necessario), Force Stop em arquivo travado por processo de outro usuario,
+menu de contexto com UAC, e cancelar o UAC (deve abrir a pagina normal).
+
+### Sessao 03/09 (teste real) — Force Stop / Take Ownership validados + 3 bugs reais corrigidos
+
+Teste REAL no host (nao VM): force stop em goodbyedpi rodando + takeown em arvore
+sintetica com DENY explicito (121 itens + junction loop) e UAC real.
+
+1. **Bug P/Invoke**: `GetCurrentProcessNative` sem EntryPoint → EntryPointNotFoundException
+   em kernel32 (SeDebugPrivilege NUNCA habilitava). Fix: `[DllImport("kernel32.dll",
+   EntryPoint = "GetCurrentProcess")]`. O force stop funcionou mesmo assim (admin ja tem
+   o privilegio por default), mas em fluxo sem admin era morte certa.
+
+2. **Bug probe**: o takeown em modo rapido (grantFullControlOnDirs=false — o usado pelo
+   worker headless) so trocava o OWNER e nunca o DACL → arvores com DENY explicito
+   (ex: `icacls /deny Lugia:(OI)(CI)RX`) continuavam bloqueadas apos "121/121 ok".
+   O probe inicial usava GetFileAttributesW, que PASSA em arquivo negado (processo
+   elevado/dono) — o probe certo e abrir para leitura (CreateFileW GENERIC_READ):
+   erro 5/21 = deny real. Fix: `CanReadOpen()` + substituicao de DACL so nos itens
+   que continuam negados.
+
+3. **Bug PACL vs SECURITY_DESCRIPTOR** (o mais grave): `SetOwnerAndDaclNative` passava
+   os bytes de um RawSecurityDescriptor como pDacl de SetNamedSecurityInfo — mas o
+   parametro e um PACL (ACL crua). O Windows lia o cabecalho do SD como cabecalho de
+   ACL → AceCount = OwnerOffset (0) → gravava DACL VAZIO → negava TUDO (ate o dono
+   elevado, icacls "Acesso negado"). Fix: passar `dacl.GetBinaryForm()` (RawAcl pura).
+
+Resultado final verificado: 121/121 ok, 161/161 arquivos legiveis, escrita OK,
+junction loop intacta, SDDL final `O:BA D:AI(A;;FA;;;BA)`, toast enviado.
+Force stop: achou WinDivert64 (.sys, descarregado via SCM) + odbyedpi (PID), matou,
+toast OK. Obs: teste matou o goodbyedpi do usuario (rodar os .cmd da pasta p/ voltar).
+
+### Sessao 03/09 (cont.) — Context menu: reapply automatico no startup
+
+Pedido: "quando o kit inicie ele recoloque os menus novamente com as novas
+configuracoes" — o RefreshContextMenuPathsIfNeeded antigo SO atualizava o path
+de itens que JÁ existiam; se algo removesse a entrada, ela nunca voltava.
+
+1. **Persistencia** (`HKCU\Software\KitLugia\ContextMenu`, DWORD por item):
+   `SystemTweaks.SaveContextMenuPref(id, enabled)` grava 1/remove o valor.
+2. **`SystemTweaks.ReapplyContextMenuPrefs()`** (novo): le todos os prefs ==1,
+   resolve a acao Add via `ContextMenuQuickAdd.GetAddAction(id)` (novo, catalogo:
+   super items por Id case-sensitive — "takeownership"/"cmdhere"/... — e classicos
+   capitalizados — "TakeOwnership"/"CmdHere"/...; case-sensitive evita colisao
+   entre super e classico) e recria a entrada idempotente com a config ATUAL
+   (path do exe, comandos, icones). Loga [CTX PREFS].
+3. **Gravacao do pref nos 3 fluxos de toggle**: ContextMenuPage.QuickAddToggle_Click
+   (item.Key), ContextMenuAddPage.ToggleAsync (item.Id), ForceStopUnlockPage
+   (forcestopunlock/kittakeown). Remocao manual pelo grid/lista tambem limpa o pref
+   (`ClearContextMenuPrefsForEntryName` mapeia nome da chave registry -> ids).
+4. **Startup** (App.xaml.cs, 2 pontos: normal + cold-start --unlock/--takeown):
+   `ReapplyContextMenuPrefs()` roda apos RefreshContextMenuPathsIfNeeded.
+
+Build: 0 erros. TESTADO no host: pref forcestopunlock semeado -> app iniciado ->
+log "[CTX PREFS] Menu de contexto recriado com config atual: forcestopunlock" +
+"1 item(ns) reaplicado(s)"; comando do menu = exe atual. Pref de teste removido.
+
+### Sessao 03/09 (cont.) — Auditoria Pages: gargalos/memory leaks
+
+Passada rapida nas 49 paginas em busca de gargalo/leak (timers, eventos estaticos,
+unloaded, alocacao por tick). Veredito: codigo ja segue a convencao (Unloaded +
+Cleanup via reflexao em CleanupAndNavigate, journal do Frame limpo pos-navegacao,
+CTS cancelados, eventos estaticos WinbootManager/InstallMonitor desinscritos).
+
+ACHADO + FIX (NetworkPage): `RefreshAdapterStatus` (tick 3s) nao tinha guarda
+anti-reentrancia — ListPhysicalAdapters (WMI) pode demorar > 3s e ticks se
+sobrepunham empilhando chamadas. Adicionado `_refreshingAdapters` (mesmo padrao
+do `_isLoading` do DNS). Build 0 erros/0 avisos.
+
+Observacoes (nao corrigidas, aceitaveis): PartitionsPage `Items.Refresh()` por
+segundo (so com ChkAutoRefresh ligado); ProcessMonitorPage diff-based OK;
+brushes novos por acao (nao por tick) nas paginas de status; StoreRemakePage
+16ms anim timer parado no Unloaded; DiagnosticPage usa reflexao para pausar
+timers do tray (fragil mas nao vaza).
+
+### Sessao 03/09 (cont.) — MainWindow/topbar animacoes + IntegrityPage comandos BCD
+
+1. **Topbar: botoes presos/estranhos na animacao** — causa raiz: cada botao de
+   icone (KitTaskManager, GoodbyeDPI, BackgroundMonitor, Update, Console,
+   Notifications) tinha no trigger IsPressed um `<Setter bdr.RenderTransform>`
+   que SUBSTITUIA o ScaleTransform inteiro — o clock de animacao do hover
+   (EnterActions, HoldEnd 1.1) ficava preso no objeto antigo; soltar o clique
+   fora do botao deixava ele em 1.1 ou com snap errado. Correcao: transform
+   nomeado `scale` + IsPressed com EnterActions/ExitActions animando
+   `scale.ScaleX/ScaleY` (0.9/0.92 -> 1) — nunca mais substitui o objeto.
+   Mesmo padrao aplicado nos 6 botoes.
+
+2. **IntegrityPage: comandos BCD "nao funcionavam"** — causa raiz em
+   `Guardian.ToggleTweak` (case Bcd): apos `bcdedit /set` com sucesso, o
+   CheckTweak pos-toggle lia o CACHE do `bcdedit /enum` (TTL 15s) que ainda
+   continha o valor ANTIGO -> status continuava MODIFIED -> UI dizia "FALHA:
+   alteracao nao aplicada" mesmo com o comando tendo funcionado. Correcao:
+   invalidar `_bcdEnumAttempted/_bcdEnumOutput/_bcdEnumError` apos sucesso do
+   toggle BCD para o re-check rodar bcdedit fresco.
+
+3. **Bonus**: campo morto `_isRefreshing` removido do KitTaskManagerWindow
+   (single-flight ja era feito pelo SemaphoreSlim `_refreshGate`).
+
+Build: 0 erros / 136 avisos (nullable pre-existentes).
+
+### Sessao 03/09 (cont.) — IntegrityPage FixAll travava com tudo ja corrigido
+
+Sintoma (instalacao limpa): RESTAURAR TODOS rodava os comandos, tudo era
+corrigido (score 100% ao reentrar na pagina), mas a UI CONGELAVA no fim com
+um item/botao em estado de correcao.
+
+Causa raiz (IntegrityPage.xaml.cs, BtnFixAll_Click):
+1. `UpdateUiState(isLoading: true)` no inicio desabilita a lista/botoes e deixa
+   BtnFixAll como "⏳ PROCESSANDO...", mas o fluxo de sucesso so fazia
+   `_isBusy = false; ShowLoadingOverlay(false)` — NUNCA `UpdateUiState(false)`.
+   Se qualquer passo final falhasse (ex.: excecao no re-scan pos-correcao
+   `GetHarmfulTweaksWithStatus`), _isBusy ficava true para sempre, a lista
+   ficava IsEnabled=false e o botao preso em "PROCESSANDO" — pagina congelada.
+2. Sem try/catch/finally: excecao pos-await escapava e nunca destravava.
+
+Correcoes:
+- BtnFixAll_Click reescrito com try/catch/finally: o finally SEMPRE executa
+  `_isBusy=false; UpdateUiState(isLoading:false); ShowLoadingOverlay(false)`;
+  catch loga + CompleteTask + ShowError (nunca congela a pagina).
+- BtnToggleItem_Click: RefreshFromAllTweaks movido para o finally (antes so
+  rodava no sucesso) — botao da linha nao fica mais preso em "⏳" quando o
+  toggle falha.
+
+Build: 0 erros / 136 avisos.
+
+### Sessao 03/09 (cont.) — WindowsUpdatePage: scroll travava sobre ComboBoxes no centro
+
+Sintoma: na pagina de Windows Update (ultima do Dashboard), com o mouse sobre
+elementos no centro (CmbPauseDays/CmbChannel), o scroll da pagina parava.
+
+Causa raiz (WindowsUpdatePage.xaml.cs): `DisableMouseWheelSelection` fazia
+`PreviewMouseWheel += (s,e) => e.Handled = true` SEMPRE — engolia o wheel e o
+ScrollViewer da pagina nunca recebia o evento quando o cursor estava sobre os
+ComboBox.
+
+Correcao: padrao RouteWheel do projeto (StoreRemakePage). ScrollViewer raiz
+nomeado `MainScroll`; o handler agora so bloqueia a troca de item com o popup
+FECHADO e repassa o delta ao MainScroll (`VerticalOffset - e.Delta/3.0`). Com
+o popup ABERTO mantem o comportamento padrao (wheel rola a lista). O scroll da
+pagina funciona em qualquer ponto.
+
+Bonus (WindowsUpdateManager.GetStatus — metodos antigos):
+- `LastCheckTime` era parseado e descartado (`DateTime.TryParse(..., out _)`)
+  — campo nunca preenchido; agora grava `status.LastCheckTime`.
+- bcdedit era lido com `ReadToEnd()` antes de `WaitForExit()` SEM timeout
+  (padrao de deadlock se o processo pendurar); agora usa
+  `ProcessRunner.Run("bcdedit", "/enum {current}", 10000)` (timeout + encoding
+  OEM, padrao do resto do Core).
+
+Build: 0 erros / 149 avisos (nullable pre-existentes).
+
+### Sessao 03/09 (madrugada) - Auto-start bulletproof (3 metodos sempre) + VRAM automatica consertada
+
+**Pedido 1 - Startup com Windows**: garantir que TODOS os locais que iniciam o kit sejam
+reconfigurados em toda execucao (funciona mesmo sem AppData na primeira vez).
+
+- `TrayIconService.SetAutoStart(true)`: agora garante os 3 metodos SIMULTANEAMENTE
+  (antes a Task Scheduler "substituia" Registry+Startup e apagava os outros — bastava
+  um cleaner apagar a task e o kit parava de iniciar). Registry Run + .lnk Startup +
+  Task (Boot+Logon) coexistem; o mutex de instancia unica evita processo duplo.
+- `SetStartWithWindowsPref/GetStartWithWindowsPref` (novo): preferencia persistida em
+  `HKCU\Software\KitLugia\TraySettings\StartWithWindows` — sobrevive a limpezas e nao
+  depende de AppData/settings JSON.
+- `IsAutoStartEnabled()`: agora faz OR com a preferencia persistida (intencao do usuario
+  continua viva mesmo com entradas apagadas).
+- `EnsureAutoStartMethods()` (novo): roda no startup (App.xaml.cs substituiu o
+  `CheckAndFixStartupMethods` passivo, que so corrigia caminhos de entradas EXISTENTES)
+  — se a preferencia ou qualquer metodo vivo existir, reconfigura tudo com o exe atual.
+- TESTADO no host: Registry Run + KitLugia.lnk + task (Status Pronto) criados juntos,
+  pref REG_DWORD 0x1, log "Reconfigurando auto-start em todos os metodos" a cada boot.
+
+**Pedido 2 - VRAM "Automatica" nao aplicava (Dashboard x TweaksPage)**:
+
+- CAUSA RAIZ 1: `CmbVram` item 0 = "Padrao (Automatico)" mapeava para `VramSizeMb=0`
+  e o Orchestrator passava 0 para `ApplyGpuVramTweak` — que INTERPRETA 0 como
+  "remover a chave". Ou seja, "Automatico" APAGAVA a VRAM em vez de aplicar o
+  recomendado pela RAM. Corrigido no Orchestrator: `VramSizeMb<=0` -> aplica
+  `GetRecommendedVramMb(RAM)` (nunca apaga).
+- CAUSA RAIZ 2: resolucao do caminho do registro diferente entre paginas. Dashboard
+  usava `FindGpuRegistryPathByDescription` (DriverDesc fuzzy); TweaksPage usa
+  `FindGpuRegistryPathByPnpId` (DeviceInstance/MatchingDeviceId). Se resolvessem chaves
+  diferentes, o tweak "aplicava" num lugar e a pagina lia outro. Dashboard agora usa
+  `GetAllGpuInfo()` (mesma resolucao PNP da TweaksPage); `ApplyAutomaticVramTweak`
+  tambem virou PNP-first com fallback por descricao.
+
+Build: 0 erros / 69 avisos (baseline pre-existentes). App rodando em tray (PID 6356).
+
+### Sessao 03/09 (cont.) - "Exception suppressed" eternos em IsNvMeLatencyOptimized/IsGpuDpcLatencyLow: HKLM curto quebrado
+
+Sintoma (host, TODO boot): `[AVISO] (Unknown): Exception suppressed [origem:
+SystemTweaks.cs:2025 IsNvMeLatencyOptimized]` + `:2112 IsGpuDpcLatencyLow`.
+
+CAUSA RAIZ (reproduzida com .NET puro): `Registry.GetValue/SetValue` estaticos NAO
+aceitam a forma curta `HKLM\` — lanca ArgumentException "nome valido de chave base"
+(exige o prefixo completo `HKEY_LOCAL_MACHINE\`). A forma curta so funciona na API de
+instancia (`Registry.LocalMachine.OpenSubKey`).
+
+Impacto real (alem do ruido de log): os Is* SEMPRE retornavam false → os toggles de
+"NVMe Latency" e "GPU DPC Latency" sempre apareciam desligados e NUNCA revertiam
+(ToggleNvMeLatency reaplicava em vez de desfazer).
+
+Corrigidos em SystemTweaks.cs (4 sitios + 1 lixo):
+- `NvMeServicePaths` (stornvme/nvme Parameters): prefixo completo HKEY_LOCAL_MACHINE;
+  Apply/Revert agora fazem `.Replace(@"HKEY_LOCAL_MACHINE\", "")`.
+- `IsGpuDpcLatencyLow` (IRQ8Priority) idem.
+- `IsAmdAntiLagEnabled` (HKLM\SOFTWARE\AMD\CN\GameFilters) idem — quebrado silencioso
+  em maquinas AMD (catch sem log).
+- `IsIntelDynamicTuningEnabled` (HKLM\SOFTWARE\Intel\Display\igfxcui) idem — quebrado
+  silencioso em maquinas Intel.
+- Removida var morta `nvmePowerPath` em ApplyNvMeLatencyTweaks.
+- Curiosidade: `IsNvidiaPowerMizerMaxPerformance` ja "funcionava" porque fazia
+  `$@"HKEY_LOCAL_MACHINE\{path.Substring(5)}"` (corta o HKLM\ e re-prefixa).
+
+VERIFICADO: build 0 erros; boot novo com ZERO "Exception suppressed"; ciclo
+write->read->revert do D3Handoff OK (Is* agora detecta o estado aplicado).
+
+### Sessao 03/09 (cont.) - Auditoria dos Is* da TweaksPage + novo toggle "Turbo do Explorer"
+
+**Auditoria dos tweaks da TweaksPage** (a pedido do usuario, apos o bug do HKLM curto):
+- Varredura de TODAS as chamadas estaticas Registry.GetValue/SetValue + instancia
+  OpenSubKey/CreateSubKey: nenhuma forma curta "HKLM\" restante (corrigidas na sessao
+  anterior). Verificacao empirica: boot novo com ZERO "Exception suppressed".
+- Normalizado `NvidiaPowerMizerPaths` (0000-0003): prefixo curto + hack `Substring(5)`
+  trocados por HKEY_LOCAL_MACHINE completo usado direto na leitura; Apply/Revert usam
+  Replace("HKEY_LOCAL_MACHINE\", "").
+- Observacao: TweaksPage tem bloco duplicado "Interface & Explorer" (le de novo dentro
+  do Dispatcher.Invoke, ~L338) — pre-existente, inofensivo (comportamento mantido).
+
+**Novo toggle "Turbo do Explorer (abrir pastas rapido)"** (TweaksPage, grupo "Interface
+e Explorer", apos PCA; handler ChkExplorerTurbo_Click):
+- `SystemTweaks.DisableExplorerFolderDiscovery` / `RestoreExplorerFolderDiscovery` /
+  `IsExplorerFolderDiscoveryDisabled` (novos): grava/le/apaga
+  `FolderType=NotSpecified` em `HKCU\...\Shell\Bags\AllFolders\Shell`.
+- POR QUE: Auto Folder Type Discovery (Win11 24H2/25H2+) "fareja" o conteudo de cada
+  pasta p/ decidir layout (Musica/Fotos/Videos) — em pastas grandes causa delay e
+  re-varredura. Forcar o modo generico abre instantaneo. Refs: makeuseof + xda (Jan/2026).
+- Reversivel; nao reinicia o Explorer (vale para janelas novas).
+
+**Diagnostico no host do usuario** (explorer lento):
+- `FolderType=NotSpecified` JA estava aplicado (valor solto, sem UI) — o toggle agora o
+  controla e mostra o estado.
+- `MenuShowDelay=0` e `Max Cached Icons=8192` ja ativos.
+- `StartupDelayInMSec` (HKCU\...\Explorer\Serialize) NAO setado — o toggle "Remover
+  Startup Delay" (ChkStartupDelay) esta OFF: se o "loading do explorer" = demora ate a
+  area de trabalho/logon, ligar ChkStartupDelay e o passo que falta nesta maquina.
+
+Build: 0 erros. App em tray (PID 30484), 0 "Exception suppressed" no boot.
+
+### Sessao 04/09 (12:40) — Turbo do Explorer: cor + toggle "Ir direto ao arquivo"
+
+Pedido do usuario: (1) o texto "Desliga a analise automatica de tipo de pasta" estava
+todo PRETO (ilegivel); (2) o Explorer abre rapido e carrega icones rapido, mas quando
+outra janela aponta para um arquivo (navegador -> "Mostrar na pasta") demora muito para
+levar ao item — mais facil descer a lista do que esperar.
+
+1. **Cor do texto** (TweaksPage.xaml): o TextBlock de descricao do Turbo do Explorer
+   nao tinha Foreground (os irmaos usam #A0A0A0) -> herdava preto. Adicionado
+   `Foreground="#A0A0A0"`.
+
+2. **Causa da demora ao destacar arquivo**: em `HKCU\...\Explorer\Advanced`,
+   `IconsOnly=0` (miniaturas LIGADAS) na maquina; Docs tem 2214 arquivos top-level.
+   Com miniaturas, o Explorer renderiza a pasta inteira antes de rolar/posicionar o
+   item selecionado (navegador -> Explorer). `IconsOnly=1` (Sempre mostrar icones)
+   elimina essa geracao na aberta.
+
+3. **Novo toggle "Ir direto ao arquivo (sem miniaturas)"** (TweaksPage, Interface e
+   Explorer, apos Turbo do Explorer; mesmo padrao ToolTip + badge + CheckBox):
+   - Core (SystemTweaks.cs): `IsExplorerThumbnailsDisabled` / `DisableExplorerThumbnails`
+     (IconsOnly=1 DWord em Explorer\Advanced) / `RestoreExplorerThumbnails`
+     (apaga o valor). Reversivel, status "Sem miniaturas"/"Com miniaturas".
+   - Code-behind: status no LoadCurrentStatus + `ChkExplorerThumbs_Click`.
+   - APLICADO NA MAQUINA (IconsOnly=1 confirmado por leitura) — pular direto ao
+     arquivo deve parar de demorar; reversible pelo toggle/seletor Explorer.
+
+Build: 0 erros / 150 warnings (baseline). App em tray (PID 30940), boot limpo.
+
+### Sessao 04/09 (13:10) — Pesquisa adicional: "pular direto ao arquivo" ainda lento
+
+Usuario: IconsOnly=1 ajudou um pouco, mas o Explorer ainda demora ao abrir pasta
+apontando para um arquivo. Pediu pesquisa extra na web.
+
+**Estado real da maquina verificado**:
+- FolderType=NotSpecified (AFTD OFF) e IconsOnly=1: ambos ativos.
+- GroupBy: 0 bags com agrupamento ativo (Downloads NAO agrupa por data) - descartado.
+- SortBy: 0 bags com override - Downloads usa o padrao do Windows (data/hora).
+- Preview/Details pane: nao ativo nos bags; ShowPreviewHandlers sem valor (default ON).
+- DisableSearchBoxSuggestions=1 (ja desativado).
+- **Overlay de icone de terceiro: `00avg` = AVG (ashShell.dll)** em HKLM+
+  WOW6432Node ShellIconOverlayIdentifiers - unico custo real por-arquivo restante.
+- OneDrive: instalado, mas Downloads NAO e redirecionado (pasta real local).
+
+**Metodos avaliados e descartados**:
+- Rename do overlay 00avg p/ "passar dos 15 slots": NAO funciona aqui (so ha ~10
+  overlays registrados; todos continuam dentro dos 15 carregados).
+- Truque CTRL+F11 (forcar render): workaround de bug de render, SEM equivalente
+  de registro limpo - nao da para virar toggle.
+- Desligar overlay do AVG por registro: o metodo correto e o proprio AVG UI
+  (Menu > Configuracoes > Geral > "Mostrar overlays de icone" desmarcado); mexer
+  no registro do antivirus seria intrusivo e o AVG se auto-repara.
+
+**Conclusao honesta**: as duas causas documentadas (AFTD + miniaturas) ja estao
+corrigidas. O restante (2.214 arquivos + overlay/scan do AVG por arquivo) e custo
+per-arquivo inevitavel; a alavanca restante segura e o toggle do proprio AVG.
+Sem novas chaves de registro seguras a adicionar.
+
+### Sessao 04/09 (14:10) - Turbo Explorer (F11) no tray: truque do re-render automatizado
+
+O usuario confirmou que o truque Ctrl+F11/F11 (entrar e sair de tela cheia no Explorer)
+faz o "ir direto ao arquivo" (ex.: navegador -> Mostrar na pasta) funcionar NA HORA,
+mesmo em pastas gigantes. O truque vale por sessao do explorer.exe (some ao reiniciar
+o Explorer/reboot) e nao tem equivalente em registro.
+
+**Implementado (TrayIconService.cs)**:
+1. `Win32Api`: + EnumWindows (delegate EnumWindowsProc), + PostMessage,
+   consts WM_KEYDOWN/WM_KEYUP/VK_F11, const ExplorerWindowClass="CabinetWClass".
+2. Item novo no menu do tray: **"⚡ Turbo Explorer (F11)"** (apos GameBoost).
+   Handler roda em Task.Run -> `TurboExplorerF11()`:
+   - EnumWindows acha a PRIMEIRA janela visivel de classe CabinetWClass (EnumWindows
+     lista em ordem de Z -> a mais recente, nao precisa de foco/foreground).
+   - PostMessage F11 down/up, Sleep 500ms, PostMessage F11 down/up (entra e sai de
+     tela cheia -> forca re-render; a rolagem bugada de posicionamento e pulada).
+   - Log "⚡ Turbo Explorer: F11 2x enviado...".
+
+**TESTADO (04/09 14:05, host)**: janela do Explorer aberta -> PostMessage F11 1x
+(rect 511,135 1071x729 -> 0,0 1920x1080 = fullscreen), F11 2x (voltou EXATAMENTE
+para 511,135 1071x729). Mecanismo comprovado sem foco/foreground. Janela de teste
+fechada via WM_CLOSE. Build: 0 erros / 0 avisos. App em tray (PID 9168), boot limpo.
+
+Obs: como o truque e por sessao do explorer.exe, o item do tray e o substituto
+de 1 clique para reaplicar apos reboot/restart do Explorer. Nao foi feito auto-aplicar
+em toda janela nova (F11 fullscreen piscaria a cada abertura - intrusivo).
+
+### Sessao 04/09 (13:30) - CAUSA RAIZ: RAM Limiter resets p/ 1000ms + aviso LoadSettings eterno
+
+Sintoma: usuario seta 500ms no TxtRamLimiterInterval (TraySettingsPage), recebe
+"✅ Intervalo atualizado", mas apos reiniciar o app volta para 1000ms. Toda sessao
+logava "LoadSettings: InvalidCastException: Unable to cast object of type
+'System.String' to type 'System.Int64'".
+
+Causa raiz (confirmada no host): o valor `IslcThresholdMB` do registro
+HKCU\Software\KitLugia\TraySettings esta gravado como REG_SZ String = "4069"
+(assim como HighRamThresholdMB/HighCpuThresholdPercent — esses 2 ja usavam
+ReadLongSetting/ReadDoubleSetting defensivos). `LoadSettings` fazia
+`IslcThresholdMB = (long)key.GetValue(...)` — cast de string boxed p/ long =
+InvalidCastException (Int64) — e o try/catch ABORTAVA o LoadSettings INTEIRO:
+tudo apos aquela linha (incluindo RamLimiterIntervalMs) caia para default 1000
+silenciosamente a cada boot. O "salvou" da pagina so valia em memoria; no
+restart o 1000 voltava (e qualquer SaveSettings posterior gravava 1000 por cima).
+
+Correcao (TrayIconService.cs LoadSettings):
+- TODOS os casts crus `(int)key.GetValue(...)` e o `(long)` do IslcThresholdMB
+  substituidos por leitores defensivos: ReadIntSetting (int/long/double/string/
+  byte[]) + ReadBoolSetting (int -> bool). LoadSettings nao aborta mais com UM
+  valor de tipo errado — cada setting se auto-protege com default individual.
+- Fix duplo: (1) RamLimiterIntervalMs carrega de REG_SZ "500" corretamente;
+  (2) o aviso "⚠️ LoadSettings: InvalidCastException" some de TODAS as sessoes.
+
+TESTADO (04/09 13:26, host): RamLimiterIntervalMs gravado de proposito como
+REG_SZ "500" -> app iniciou com "💾 RAM Limiter timer iniciado (500ms)" e
+0 InvalidCastException. Build: 0 erros / 0 avisos. App em tray (PID 38672).
+
+Obs: TraySettingsPage.TxtRamLimiterInterval_LostFocus ja salva certo
+(SetValue int = REG_DWORD); nao precisou mexer no lado de escrita.
+
+### Sessao 04/09 (cont.) - Turbo Explorer (F11): persistencia esclarecida
+
+Usuario confirmou que bastou 1x Ctrl+F11 e continuou rapido mesmo fechando e
+abrindo o Explorer (fechar janelas NAO reinicia o processo explorer.exe — o
+truque vale por processo; reboot/restart do shell ainda limpa). Mensagem do log
+do tray item ajustada para nao afirmar tempo de validade.
+
+### Sessao 04/09 (13:35) - Turbo Explorer AUTOMATICO: watchdog do explorer.exe
+
+Pedido do usuario: garantir que o truque F11 seja reaplicado sozinho quando o
+explorer.exe (re)iniciar — login do Windows, crash ou restart do shell.
+
+**Implementado (TrayIconService.cs)**:
+1. Pref `ExplorerAutoTurbo` (default TRUE) persistida em TraySettings
+   (SaveSettings/LoadSettings com os leitores defensivos novos).
+2. `StartExplorerWatchdog()` (chamado no Initialize): System.Threading.Timer a
+   cada 2s -> `ExplorerTurboWatchdogTick()`.
+3. Tick: acha o PID do explorer.exe da MESMA sessao (SessionId). Quando o PID
+   muda/aparece (login, crash/restart) -> ARMA o turbo + log. Armado, espera a
+   1ª janela de pasta (CabinetWClass, EnumWindows em ordem de Z) e aplica F11 2x
+   (dwell 400ms) via Task.Run -> DESARMA. 1x por processo: nao fica piscando
+   janela a janela.
+4. Refactor: TurboExplorerF11 (manual/tray) extraiu FindTopExplorerWindow() +
+   ApplyF11Render(hwnd, dwellMs, source) compartilhados com o watchdog.
+5. Edge cases: explorer ainda nao subiu no login (kit inicia antes) -> pid 0
+   desarma e re-arma quando aparecer; DisposeCore para o timer.
+
+**TESTADO (04/09 13:34, host)**: app lancado -> "explorer.exe ativo (PID 8356)
+— auto-turbo armado" -> Downloads aberto -> "F11 2x aplicado (re-render) —
+origem: auto" em ~7s (janela de pasta gigante demorou p/ materializar).
+Build: 0 erros. App em tray (PID 18488).
+
+### Sessao 04/09 (13:42) - Toggles de UI do Turbo Explorer automatico (TweaksPage + GameBoostPro)
+
+O watchdog `ExplorerAutoTurbo` (default true, sessao 13:35) ganhou controle visual
+nas 2 paginas pedidas pelo usuario, ambos persistindo via TraySettings\ExplorerAutoTurbo:
+
+1. **TweaksPage** (grupo Interface e Explorer, apos "Ir direto ao arquivo"): row nova
+   "Turbo Explorer automatico (F11 ao reiniciar)" — badge de status (Automático/Manual),
+   tooltip completo, CheckBox ToggleSwitchStyle. `ChkExplorerAutoTurbo_Click` seta
+   `tray.ExplorerAutoTurbo` + SaveSettings (padrao das outras rows); estado carregado
+   no LoadCurrentStatus do dispatcher via `(MainWindow)TrayService.ExplorerAutoTurbo`.
+
+2. **GameBoostPage** (CARD 2 "Configuracoes do Sistema", apos Unpark CPU): row
+   "TURBO EXPLORER AUTOMATICO (F11)" com GoldToggleStyle. Handler proprio
+   `ChkExplorerAutoTurbo_Click` (imediato + SaveSettings); estado inicial em
+   LoadGameBoostSettings e persistencia extra em SaveGameBoostSettings (tray + JSON
+   `explorerAutoTurbo`).
+
+Build: 0 erros / 138 avisos (baseline nullable). App em tray (PID 39292),
+ExplorerAutoTurbo pref = 1, watchdog armado, boot limpo (sem exceptions).
+
+### Sessao 04/09 (13:55) - Tray SEMPRE visivel (fim do processo fantasma) + auditoria da pag RAM
+
+Problema do usuario: em Kit limpo, fechar a janela deixava o app rodando em background
+SEM icone (Close-to-Tray com IsTrayEnabled=false no primeiro run = default false!).
+Ele tinha que matar via Gerenciador de Tarefas. Pedido: remover a opcao de ocultar o
+icone — o tray deve aparecer SEMPRE enquanto o Kit roda.
+
+**Core (TrayIconService.cs)**:
+1. `IsTrayEnabled` default TRUE (era false). Primeira execucao (key==null) -> true.
+2. LoadSettings: ignora preferencia antiga 0 -> forca true + log de migracao
+   ("...preferencia antiga 'ocultar' migrada para ON").
+3. Initialize: cria/mostra o icone SEMPRE (condicoes `IsTrayEnabled &&` removidas).
+4. SetTrayEnabled(false) agora e no-op com aviso (compatibilidade com telas antigas).
+
+**Toggles de "mostrar icone" REMOVIDOS das UIs (4 paginas + diag)**:
+- TraySettingsPage: removidos ChkEnableTray (Automação) e ChkTrayIcon (Comportamento ao
+  fechar) -> substituidos por linha verde estatica "🔔 Ícone na bandeja — SEMPRE VISÍVEL".
+- GameBoostPage CARD2: removida linha "MOSTRAR ÍCONE" (ChkTrayIcon + handler + refs;
+  JSON trayEnabled agora sempre true).
+- SettingsPage (gear): removida linha "Minimizar para bandeja" (ToggleTray -> controlava
+  SetTrayEnabled; MinimizeToTray do JSON agora fixo true). "Rodar em segundo plano"
+  (ToggleCloseToTray) continua = controla CloseToTray real.
+- DashboardPage: removido checkbox "1. Ícone de bandeja" do menu rapido (renumerados
+  2->1, 3->2) e ChkCrTray da coluna do criador -> linha verde estatica informativa.
+- DiagnosticPage: BtnToggleTray agora so reafirma (sempre ativo).
+
+**Auditoria da pag RAM (TraySettingsPage)**: handlers verificados (limpeza por modo,
+auto-clean, sliders, limites por processo com picker/arquivo, gear por processo, ISLC,
+intervalo) — todos wired. Fix: BtnConfigureAutoClean_Click criava
+`new AdvancedRamCleanSettingsPage()` descartado a cada clique (leak de Page) — removido.
+
+TESTADO (04/09 13:52, host): IsTrayEnabled gravado = 0 de proposito -> app iniciou com
+log "🔔 ... migrada para ON" + "📊 Tray Habilitado: ✅ SIM", icone saudavel, 0 exceptions.
+Build: 0 erros / 152 avisos (baseline). App em tray (PID 32700). Pref restaurada p/ 1.
+
+### Sessao 04/09 (14:05) - X sempre minimiza p/ tray (CloseToTray forçado) + toggle "segundo plano" removido
+
+Continuacao: alem do icone sempre visivel, o usuario quer que o X da janela SEMPRE
+minimize para o tray (fechar de verdade = menu do tray > "Sair Completamente"), e
+pediu para remover o toggle "Rodar em segundo plano" de todas as telas (agora e
+sempre verdade). Finalizar pelo Gerenciador de Tarefas/dev continua matando o
+processo normalmente.
+
+**Core (TrayIconService.cs LoadSettings)**: CloseToTray forçado true (migra valor 0
+antigo com log). MainWindow Window_Closing ja minimizava quando CloseToTray &&
+IsTrayEnabled (ambos true agora) -> X sempre esconde p/ o tray; saida completa via
+tray Sair Completamente / ForceShutdown / End Task.
+
+**Toggles removidos**:
+- TraySettingsPage: row "Rodar em segundo plano" (ChkCloseToTray) -> linha verde
+  "Fechar (X) sempre minimiza p/ o tray...".
+- GameBoostPage CARD3: removida row ChkCloseToTray (+handler, var closeToTray, refs;
+  JSON closeToTray agora true).
+- SettingsPage (gear): removida ToggleCloseToTray (+ handler/events/load; AppSettings.
+  CloseToTray agora true; linha verde informativa no lugar).
+- DashboardPage coluna criador: removida ChkCrBgRun ("Rodar em segundo plano") -> linha
+  verde informativa.
+
+TESTADO (04/09 14:02, host): CloseToTray gravado 0 de proposito -> boot com
+"'Rodar em segundo plano' forçado a SEMPRE ATIVO" + "Tray Habilitado SIM" +
+"Close to Tray: ATIVO", 0 exceptions. Build: 0 erros. App em tray (PID 11388).
+Pref restaurada p/ 1.
+
+### Sessao 04/09 (14:20) - IntegrityPage: 4 PATH do Guardian presos em "corrigir" (loop eterno)
+
+Sintoma: os itens PATH do Guardian (Caminhos Inexistentes, Entradas Duplicadas,
+Vulneravel a Hijacking, Variavel de Ambiente PATH Corrompida) ficavam SEMPRE como
+"corrigir" mesmo apos clicar corrigir, e o + (PathExplorer) mostrava o PATH certo.
+
+CAUSA RAIZ (provada com harness refletindo o codigo real, KitLugia.Core carregado):
+1. `PathRepair.EnsureSystemPathMinimum` re-adicionava SEMPRE os 7 "minimos" ao PATH do
+   sistema — inclusive `%SYSTEMROOT%\System32\OpenSSH\` e `%ProgramFiles%\PowerShell\7\`
+   mesmo quando a PASTA NAO EXISTIA no disco. Fluxo do "corrigir":
+   RepairPathEntries removia a pasta morta -> EnsureSystemPathMinimum re-adicionava ->
+   proximo scan via o diretorio inexistente -> MISSING/VULNERABLE/CORRUPTED de volta =
+   LOOP ETERNO. Na maquina do usuario: `C:\Program Files\PowerShell\7\` (nao existe) +
+   bloco Windows duplicado no inicio (installers prepend) = 4 itens presos.
+2. `Guardian.CheckPathProblems` (INCOMPLETE System) exigia OpenSSH no PATH mesmo em
+   maquinas SEM o recurso opcional instalado = falso "modificado" sem cura possivel.
+
+CORRECOES:
+- PathRepair.cs `EnsureSystemPathMinimum`: so adiciona um "minimo" cuja pasta existe
+  apos ExpandEnvironmentVariables (`if (!Directory.Exists(expanded)) continue;`).
+  Nunca mais re-adiciona pasta morta (loop morto).
+- Guardian.cs `CheckPathProblems` (System INCOMPLETE): requisitos essenciais agora sao
+  existencia-dependentes — array requiredDirs {system32, wbem, windowspowershell\v1.0,
+  openssh}; cada pasta so e exigida se `Directory.Exists(dir)` (sem falso positivo de
+  OpenSSH/recursos opcionais).
+
+VERIFICACAO (harness /tmp/pathguard, refs KitLugia.Core real):
+- Simulacao do corrigir ANTES: RepairPathEntries removia a pasta morta mas
+  EnsureSystemPathMinimum re-adicionava (`has PowerShell7: True` apos ensure).
+  DEPOIS do fix: `has PowerShell7: False` apos ensure; scan seguinte so WrongLocation.
+- Reflection em CheckPathProblems: PATH limpo SEM OpenSSH -> harmful=True SO porque a
+  pasta existe na maquina; com pasta inexistente o requisito e ignorado.
+- REPARO REAL APLICADO (elevado, aprovado pelo usuario): removidas 5 duplicatas do
+  bloco Windows + entrada morta PowerShell\7 via codigo de reparo do proprio app;
+  WRITE OK; re-checagem Guardian pos-write: os 4 itens harmful=False.
+- Scan final Guardian (registro ao vivo): os 8 itens PATH todos [OK]
+  (antes: 4 [MODIFIED]). Registry: 0 duplicatas, 0 dirs inexistentes.
+
+Build: 0 erros (GUI completo). App relancado (tray). Obs: valor Path gravado como
+REG_SZ (sem %vars restantes apos limpeza; equivalente ao que o proprio corrigir faria).
+
+### Sessao 04/09 (14:30) - Lado USER do PATH: mesmo loop do System + detector de apps fora do PATH verificado
+
+Pedido: auditar EnsureUserPathMinimum + Guardian "PATH do Usuário Incompleto" (mesma
+classe de bug do lado System) e confirmar se o detector de apps fora do PATH funciona
+(ex: trazer o winget de volta).
+
+BASELINE AO VIVO (harness /tmp/pathguard, KitLugia.Core real):
+- GetInstalledProgramPaths: 8 alvos (7z/cargo/dotnet/git/node/npm/winget) todos com
+  diretorio existente; 0 missing no User PATH atual; SIMULANDO WindowsApps fora do
+  PATH -> [winget] C:\...\Microsoft\WindowsApps CanAdd=True -> DETECTOR FUNCIONA
+  (o + do PathExplorer mostra e 1 clique restaura o winget).
+- BUG 1 confirmado: EnsureUserPathMinimum comparava pathToAdd NAO expandido contra
+  entradas expandidas -> %USERPROFILE%\.dotnet\tools NUNCA casava com C:\Users\X\...
+  ja presente -> re-adicionava a cada corrigir (duplicatas acumuladas).
+- BUG 2 confirmado: git (instalacao de maquina, no System PATH) era re-adicionado ao
+  User PATH pelo EnsureUserPathMinimum e exigido la pelo check -> poluicao + falso
+  "PATH do Usuário Incompleto" eterno.
+
+CORRECOES:
+- PathRepair.cs EnsureUserPathMinimum: comparacao SEMPRE expandida
+  (ExpandEnvironmentVariables em pathToAdd antes de comparar; adiciona a forma
+  original) + SKIP de entradas ja presentes no System PATH (GetSystemPathValue).
+  Duplicacao %-var morta; maquina-wide nao polui o User.
+- Guardian.cs CheckPathProblems User-INCOMPLETE: pasta inexistente -> nao exigir;
+  programa presente no System OU User PATH -> OK (sem falso positivo).
+
+VERIFICACAO (harness):
+- Dup %-var vs absoluto: added=1 ANTES -> added=0 DEPOIS.
+- Git no System so: added=1 ANTES -> added=0 DEPOIS.
+- Guardian User-INCOMPLETE via reflection: user-sem-git -> harmful=False (git no
+  System OK); user vazio -> harmful=True (cargo/npm em lugar nenhum - correto).
+- Detector winget: continua detectando (regressao zero).
+
+Build: 0 erros. App relancado (PID 38244), boot limpo.
+
+### Sessao 04/09 (14:35) - IntegrityPage: PATH consolidado em 1 card + CORRIGIR resolve tudo de uma vez
+
+Pedido: o botao de corrigir deve adicionar tudo de uma vez (sem abrir o menu +) e nao
+precisa haver varios botoes de PATH no IntegrityPage - pode ser um so.
+
+- Guardian.cs (novo, publico): `RepairAllPathsOnce()` -> System PATH (RepairPathEntries +
+  EnsureSystemPathMinimum) + User PATH (RepairPathEntries + EnsureUserPathMinimum com
+  installedPaths: adiciona winget/git/node/dotnet/npm/7z/cargo automaticamente).
+  Retorna (Changed, Summary) com as acoes.
+- IntegrityPage.xaml: NOVO card unico "PATH do Sistema e do Usuario" acima da lista
+  (row 3; lista foi para row 4): badge de status dinamico + botao unico
+  "CORRIGIR PATH (ADICIONA AUSENTES)" (BtnPathRepairAll) + botao ➕ que abre o
+  PathExplorer para inspecao manual. Itens IsPathItem removidos da lista
+  (ApplyFilters exclui `IsPathItem`) - os 7 botoes PATH separados sumiram.
+- IntegrityPage.xaml.cs: UpdatePathCardState() (verde "PATH OK" ou vermelho com as
+  pendencias em texto curto); BtnPathRepairAll_Click roda RepairAllPathsOnce em
+  background, re-le status via GetHarmfulTweaksWithStatus + RefreshFromAllTweaks
+  (sem scan completo de 2s+) e mostra o resumo.
+
+Build: 0 erros. App relancado (PID 21084). Card sempre visivel; CORRIGIR roda
+tambem quando esta OK (re-aplica/adiciona ausentes sob demanda).
+
+### Sessao 04/09 (14:40) - Verificacao do card PATH + GlobalSearch/RepairsPage consolidados
+
+Pedido: abrir IntegrityPage, clicar CORRIGIR PATH e conferir badge verde + resumo;
+conferir se outras paginas que listam tweaks (GlobalSearch/RepairsPage) nao mostram
+mais os 7 itens de PATH separados.
+
+RESULTADO DA VERIFICACAO (harness = mesmo codigo do botao):
+- IntegrityPage: 7 itens IsPathItem todos [OK] -> badge "✅ PATH OK" (verde).
+- Guardian.RepairAllPathsOnce() rodou DE VERDADE e achou o User PATH com o bloco
+  Windows inteiro DUPLICADO -> changed=True, dedup aplicado. Estado final: User PATH
+  41 entradas unicas, 0 duplicatas, 0 dirs mortos; winget/WindowsApps, npm, cargo,
+  .dotnet\tools, VS Code, 7-Zip, GitHub Desktop, WinGet Links PRESERVADOS.
+  2a execucao: changed=False ("ja estao corretos") -> converge (badge fica verde).
+- Refinamento: RepairAllPathsOnce agora filtra acoes informativas ("Mantido
+  WrongLocation"/"Ignorado") do resumo do dialogo - so mostra mudancas reais.
+
+OUTRAS PAGINAS:
+- RepairsPage usa GeneralRepairManager.GetAllRepairs(): JA tem UM unico item
+  consolidado "Reparar PATH do Sistema (Adiciona Programas Faltantes)" -> ok, nada a mudar.
+- SearchEngine (busca global): os 7 tweaks IsPathItem eram indexados separadamente;
+  agora sao FILTRADOS e substituidos por UM resultado "PATH do Sistema e do Usuario
+  (Corrigir tudo)" com CheckState agregado + ExecuteAction=RepairAllPathsOnce.
+
+Build: 0 erros. App relancado (PID 36232).

@@ -23,6 +23,7 @@ namespace KitLugia.GUI.Pages
     public partial class NetworkPage : Page
     {
         private bool _isLoading = true;
+        private bool _refreshingAdapters; // guarda anti-reentrância: ListPhysicalAdapters (WMI) pode demorar > 3s
         private readonly SolidColorBrush _colorActive = new SolidColorBrush(Color.FromRgb(108, 203, 95));
         private readonly SolidColorBrush _colorDefault = new SolidColorBrush(Color.FromRgb(150, 150, 150));
         private readonly SolidColorBrush _colorWarning = new SolidColorBrush(Color.FromRgb(244, 129, 32));
@@ -669,12 +670,16 @@ namespace KitLugia.GUI.Pages
                 await Task.Delay(2000);
 
             if (_physicalAdapters.Count == 0) return;
+            if (_refreshingAdapters) return; // tick anterior ainda rodando: não empilha
 
-            var refreshed = await Task.Run(() => AdapterManager.ListPhysicalAdapters());
-            if (refreshed.Count == 0) return;
-
-            await Dispatcher.InvokeAsync(() =>
+            _refreshingAdapters = true;
+            try
             {
+                var refreshed = await Task.Run(() => AdapterManager.ListPhysicalAdapters());
+                if (refreshed.Count == 0) return;
+
+                await Dispatcher.InvokeAsync(() =>
+                {
                 var prevIndex = CmbNetworkAdapter.SelectedIndex;
                 var prevName = prevIndex >= 0 && prevIndex < _physicalAdapters.Count
                     ? _physicalAdapters[prevIndex].ConnectionName : "";
@@ -695,7 +700,9 @@ namespace KitLugia.GUI.Pages
                 CmbNetworkAdapter.SelectedIndex = newIndex < _physicalAdapters.Count ? newIndex : 0;
                 UpdateAdapterInfoDisplay(CmbNetworkAdapter.SelectedIndex);
                 SetRefreshIndicator(DateTime.Now.ToString("HH:mm:ss"));
-            });
+                });
+            }
+            finally { _refreshingAdapters = false; }
         }
 
         // =========================================================
