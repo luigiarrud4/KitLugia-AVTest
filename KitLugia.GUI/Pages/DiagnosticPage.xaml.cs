@@ -243,15 +243,10 @@ namespace KitLugia.GUI.Pages
             bool isEnabled = trayService?.IsTrayEnabled == true;
             
 
-            if (isEnabled != _lastTrayEnabledState)
-            {
-                BtnToggleTray.Content = isEnabled
-                    ? "🌐 Tray Icon Service (ATIVO - Clique para Desligar)" 
-                    : "🌐 Tray Icon Service (DESLIGADO - Clique para Ligar)";
-                    
-                BtnToggleTray.Background = isEnabled ? _greenBrush : _grayBrush;
-                _lastTrayEnabledState = isEnabled;
-            }
+            // Ícone do tray é sempre visível enquanto o Kit roda (opção de ocultar removida)
+            BtnToggleTray.Content = "🌐 Tray Icon Service (SEMPRE ATIVO)";
+            BtnToggleTray.Background = _greenBrush;
+            _lastTrayEnabledState = true;
         }
 
         //  StringBuilder reutilizável para evitar alocações de string
@@ -294,11 +289,12 @@ namespace KitLugia.GUI.Pages
         // BOTÕES DE CONTROLE
         private void BtnToggleTray_Click(object sender, RoutedEventArgs e)
         {
+            // Ícone do tray é SEMPRE visível (opção de ocultar removida) — botão só reafirma.
             var tray = GetTrayService();
             if (tray != null)
             {
-                tray.SetTrayEnabled(!tray.IsTrayEnabled);
-                LogActivity(tray.IsTrayEnabled ? "🌐 Tray Icon ATIVADO" : "🌐 Tray Icon DESATIVADO");
+                tray.SetTrayEnabled(true);
+                LogActivity("🌐 Tray Icon sempre ATIVADO (ícone não pode ser ocultado)");
                 RefreshDiagnostics();
             }
         }

@@ -329,6 +329,15 @@ namespace KitLugia.Core
             foreach (var m in minimal)
             {
                 string expanded = Environment.ExpandEnvironmentVariables(m).TrimEnd('\\');
+
+                // NUNCA adicionar um "essencial" cuja pasta nao existe no disco
+                // (ex: OpenSSH so existe com o recurso opcional instalado;
+                //  %ProgramFiles%\\PowerShell\\7 so existe com o PS7 instalado).
+                // Adicionar pasta morta recria o flag "diretorio inexistente" no
+                // proximo scan -> loop eterno no Guardian (corrigir -> re-adiciona
+                // -> corrigir...).
+                if (!Directory.Exists(expanded)) continue;
+
                 bool found = false;
                 foreach (var c in currentEntries)
                 {
@@ -358,13 +367,22 @@ namespace KitLugia.Core
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var addedPaths = new List<string>();
 
+            // Instalacoes de maquina (git, node, dotnet, 7z, winget...) ja vivem no
+            // System PATH - duplicar no User PATH e poluicao que o Guardian voltava
+            // a exigir (falso "PATH do Usuario Incompleto") e o kit a re-adicionar.
+            var sysEntries = GetSystemPathValue().Split(';', StringSplitOptions.RemoveEmptyEntries);
+
             foreach (var kvp in installedPaths)
             {
                 string pathToAdd = kvp.Value;
                 if (string.IsNullOrWhiteSpace(pathToAdd)) continue;
-                string expanded = pathToAdd.TrimEnd('\\');
+
+                // Comparacao SEMPRE expandida: sem isso, %USERPROFILE%\.dotnet\tools nunca
+                // casa com C:\Users\X\.dotnet\tools ja presente e o kit re-adicionava a
+                // mesma pasta a CADA execucao (duplicatas acumuladas no User PATH).
+                string expanded = Environment.ExpandEnvironmentVariables(pathToAdd).TrimEnd('\\');
                 // Nunca adicionar caminho que nao existe (exceto variaveis de ambiente)
-                if (!expanded.Contains('%') && !Directory.Exists(expanded))
+                if (!pathToAdd.Contains('%') && !Directory.Exists(expanded))
                 {
                     addedPaths.Add($"Ignorado (diretorio nao existe): {pathToAdd}");
                     continue;
@@ -375,6 +393,19 @@ namespace KitLugia.Core
                 {
                     string cExpanded = Environment.ExpandEnvironmentVariables(c).TrimEnd('\\');
                     if (cExpanded.Equals(expanded, StringComparison.OrdinalIgnoreCase)) { found = true; break; }
+                }
+
+                if (!found)
+                {
+                    foreach (var s in sysEntries)
+                    {
+                        try
+                        {
+                            string sExpanded = Environment.ExpandEnvironmentVariables(s).TrimEnd('\\');
+                            if (sExpanded.Equals(expanded, StringComparison.OrdinalIgnoreCase)) { found = true; break; }
+                        }
+                        catch { }
+                    }
                 }
 
                 if (!found)

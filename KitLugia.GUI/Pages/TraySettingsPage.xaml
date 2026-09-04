@@ -301,17 +301,12 @@
                                Margin="0,0,0,10"/>
                     
                     <Grid Margin="0,5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="&#xCD;cone na Bandeja" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Mostrar &#xED;cone na bandeja" FontSize="11" Foreground="#888"/>
+                        <StackPanel>
+                            <TextBlock Text="&#x1F514; &#xCD;cone na bandeja — SEMPRE VIS&#xCD;VEL" FontWeight="SemiBold" FontSize="13" Foreground="#7CFC00"/>
+                            <TextBlock Text="Enquanto o Kit estiver rodando o &#xED;cone aparece (necess&#xE1;rio para controlar/abrir/fechar). Op&#xE7;&#xE3;o de ocultar removida de prop&#xF3;sito — evita processo fantasma no background." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
-                        <CheckBox x:Name="ChkEnableTray" Grid.Column="1" Style="{StaticResource TrayToggle}" IsChecked="True" Click="ChkEnableTray_Click"/>
                     </Grid>
-                    
+
                     <Grid Margin="0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -348,17 +343,12 @@
                                Margin="0,0,0,10"/>
                     
                     <Grid Margin="0,5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Rodar em segundo plano" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Minimiza ao clicar no X (mant&#xE9;m ativo)" FontSize="11" Foreground="#888"/>
+                        <StackPanel>
+                            <TextBlock Text="&#x1F4C1; Fechar (X) sempre minimiza para o tray" FontWeight="SemiBold" FontSize="13" Foreground="#7CFC00"/>
+                            <TextBlock Text="Para fechar o Kit por completo, use o menu do tray &#x2192; &#x201C;Sair Completamente&#x201D;. Op&#xE7;&#xE3;o de rodar em segundo plano removida — j&#xE1; &#xE9; sempre assim." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
-                        <CheckBox x:Name="ChkCloseToTray" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkBackgroundFeature_Click"/>
                     </Grid>
-                    
+
                     <Grid Margin="0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -371,17 +361,7 @@
                         <CheckBox x:Name="ChkAutoStart" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkAutoStart_Click"/>
                     </Grid>
                     
-                    <Grid Margin="0,5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Mostrar &#xED;cone na bandeja" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="&#xCD;cone na &#xE1;rea de notifica&#xE7;&#xE3;o" FontSize="11" Foreground="#888"/>
-                        </StackPanel>
-                        <CheckBox x:Name="ChkTrayIcon" Grid.Column="1" Style="{StaticResource TrayToggle}" Click="ChkBackgroundFeature_Click"/>
-                    </Grid>
+
                 </StackPanel>
             </Border>
             

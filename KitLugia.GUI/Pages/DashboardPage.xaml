@@ -533,9 +533,8 @@
                                 <TextBlock Text="TWEAKS QUE INICIAM JUNTO COM O PC" Foreground="#FFD54F" FontSize="11" FontWeight="Bold" Margin="0,0,0,3"/>
                                 <TextBlock Text="Melhorias mantidas em segundo plano ap&#xF3;s otimiza&#xE7;&#xE3;o inicial." Foreground="#AAA" FontSize="9" Margin="0,0,0,6" TextWrapping="Wrap"/>
                                 
-                                <CheckBox x:Name="ChkTrayIcon" Content="1. &#xCD;cone de bandeja (Monitor RAM e CPU)" Foreground="White" Margin="0,0,0,6"/>
-                                <CheckBox x:Name="ChkStartWithWindows" Content="2. Iniciar com o Windows (Silencioso)" Foreground="White" Margin="0,0,0,6"/>
-                                <CheckBox x:Name="ChkGameBoost" Content="3. GameBoost (Prioridade M&#xE1;xima para Jogos)" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkStartWithWindows" Content="1. Iniciar com o Windows (Silencioso)" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkGameBoost" Content="2. GameBoost (Prioridade M&#xE1;xima para Jogos)" Foreground="White" Margin="0,0,0,6"/>
                             </StackPanel>
                         </ScrollViewer>
 
@@ -699,17 +698,7 @@
                                     <CheckBox Grid.Column="1" x:Name="ChkCrGameBoost" Content="GameBoost Pro" Foreground="White" FontSize="12" Click="ChkCrGameBoost_Click"/>
                                 </Grid>
 
-                                <Grid Margin="0,0,0,3">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
-                                        <Button.ToolTip><ToolTip Content="Exibe o &#xED;cone do KitLugia na bandeja do sistema para monitorar RAM e CPU."/></Button.ToolTip>
-                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
-                                    </Button>
-                                    <CheckBox Grid.Column="1" x:Name="ChkCrTray" Content="&#xCD;cone na Bandeja / Mostrar &#xED;cone" Foreground="White" FontSize="12" Click="ChkCrTray_Click"/>
-                                </Grid>
+                                <TextBlock Text="&#x1F514; &#xCD;cone na bandeja: sempre vis&#xED;vel (sem op&#xE7;&#xE3;o de ocultar)" Foreground="#7CFC00" FontSize="12" Margin="0,0,0,3" TextWrapping="Wrap"/>
 
                                 <Grid Margin="0,0,0,3">
                                     <Grid.ColumnDefinitions>
@@ -776,11 +765,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Style="{StaticResource InfoButtonStyle}">
-                                        <Button.ToolTip><ToolTip Content="Minimiza o KitLugia para a bandeja ao fechar, mantendo as otimiza&#xE7;&#xF5;es em segundo plano."/></Button.ToolTip>
-                                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="11" Foreground="#FFB74D" Opacity="0.7"/>
-                                    </Button>
-                                    <CheckBox Grid.Column="1" x:Name="ChkCrBgRun" Content="Rodar em segundo plano" Foreground="White" FontSize="12" Click="ChkCrBgRun_Click"/>
+                                    <TextBlock Text="&#x1F4C1; Fechar (X) minimiza p/ o tray — sair por completo: tray &#x2192; Sair Completamente" Foreground="#7CFC00" FontSize="12" Margin="0,0,0,3" TextWrapping="Wrap"/>
                                 </Grid>
 
                                 <Grid Margin="0,0,0,8">

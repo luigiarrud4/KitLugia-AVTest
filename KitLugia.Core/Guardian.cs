@@ -2887,6 +2887,14 @@ new() {
                         }
 
                         Logger.Log($"[TOGGLE] BCD sucesso: {output}");
+
+                        // Invalida o cache do bcdedit /enum ANTES do CheckTweak pós-toggle:
+                        // senão a re-verificação lê o output antigo (TTL 15s) e o item
+                        // continua MODIFIED mesmo após corrigido — "FALHA: alteração não
+                        // aplicada" falso em todo comando BCD da IntegrityPage.
+                        _bcdEnumAttempted = false;
+                        _bcdEnumOutput = null;
+                        _bcdEnumError = null;
                         break;
 
                     case TweakType.PageFile:
@@ -3158,23 +3166,45 @@ new() {
                 // Para System PATH: verificar se faltam caminhos essenciais do Windows
                 if (pathType == "System")
                 {
-                    string sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows).ToLower().TrimEnd('\\');
+                    string sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows).TrimEnd('\\');
                     string expanded = pathValue.ToLower();
-                    bool hasSystem32 = expanded.Contains($"{sysRoot}\\system32");
-                    bool hasWbem = expanded.Contains("system32\\wbem");
-                    bool hasPowerShell = expanded.Contains("windowspowershell");
-                    bool hasOpenSSH = expanded.Contains("openssh");
 
-                    // Se faltar qualquer caminho essencial, marcar como MODIFIED
-                    return !hasSystem32 || !hasWbem || !hasPowerShell || !hasOpenSSH;
+                    // Essencial so e exigido se a pasta EXISTE no disco. Exigir OpenSSH
+                    // numa maquina sem o recurso opcional instalado (ou PowerShell 7 sem o
+                    // PS7 instalado) faz o item nunca sair de "modificado" — o reparo nao
+                    // pode (e nao deve) adicionar um caminho cuja pasta nao existe.
+                    string[] requiredDirs =
+                    {
+                        $@"{sysRoot}\system32",
+                        $@"{sysRoot}\system32\wbem",
+                        $@"{sysRoot}\system32\windowspowershell\v1.0",
+                        $@"{sysRoot}\system32\openssh"
+                    };
+
+                    foreach (var dir in requiredDirs)
+                    {
+                        if (Directory.Exists(dir) && !expanded.Contains(dir.ToLower()))
+                            return true; // instalado no disco mas ausente do PATH
+                    }
+                    return false;
                 }
                 // Para User PATH: verificar se faltam programas instalados
                 else
                 {
+                    // Programas instalados (winget/dotnet/git/node/...) so sao exigidos no
+                    // User PATH se a pasta EXISTE no disco E nao esta em NENHUM dos dois
+                    // paths (User OU System). Instalacoes de maquina vivem no System PATH:
+                    // exigir copia no User PATH e falso positivo eterno — e o reparo
+                    // (EnsureUserPathMinimum) ja nao duplica mais System -> User.
+                    var sysEntries = PathRepair.GetSystemPathValue()
+                        .Split(';', StringSplitOptions.RemoveEmptyEntries);
+
                     bool hasMissingPaths = false;
                     foreach (var kvp in installedPaths)
                     {
                         string expanded = Environment.ExpandEnvironmentVariables(kvp.Value).TrimEnd('\\');
+                        if (!Directory.Exists(expanded)) continue; // pasta nao existe -> nao exigir
+
                         bool found = false;
                         foreach (var entry in pathValue.Split(';', StringSplitOptions.RemoveEmptyEntries))
                         {
@@ -3185,6 +3215,24 @@ new() {
                                 break;
                             }
                         }
+
+                        if (!found)
+                        {
+                            foreach (var s in sysEntries)
+                            {
+                                try
+                                {
+                                    string sExpanded = Environment.ExpandEnvironmentVariables(s).TrimEnd('\\');
+                                    if (sExpanded.Equals(expanded, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+
                         if (!found)
                         {
                             hasMissingPaths = true;
@@ -3212,6 +3260,81 @@ new() {
         }
 
         #endregion
+
+        /// <summary>
+        /// Reparo consolidado de UMA vez: System PATH (duplicatas, pastas mortas,
+        /// essenciais ausentes) + User PATH (duplicatas, pastas mortas, PROGRAMAS
+        /// INSTALADOS fora do PATH — winget, git, node, dotnet, npm, 7z, cargo...).
+        /// E o que o botao unico "CORRIGIR PATH" do IntegrityPage executa (nao
+        /// precisa mais abrir o menu ➕ para adicionar cada caminho ausente).
+        /// </summary>
+        public static (bool Changed, string Summary) RepairAllPathsOnce()
+        {
+            var steps = new List<string>();
+
+            // Acoes "Mantido (WrongLocation)" e "Ignorado" sao informativas (nada mudou)
+            // - nao entram no resumo para o dialogo nao virar um muro de texto.
+            static string Meaningful(IEnumerable<string> actions) => string.Join("; ", actions.Where(a =>
+                !a.StartsWith("Mantido", StringComparison.OrdinalIgnoreCase) &&
+                !a.StartsWith("Ignorado", StringComparison.OrdinalIgnoreCase)));
+
+            // ---- System PATH ----
+            string sys = PathRepair.GetSystemPathValue();
+            if (!string.IsNullOrEmpty(sys))
+            {
+                var sysEntries = PathRepair.DiagnosePath(sys, "System");
+                var (sysRepaired, sysActions) = PathRepair.RepairPathEntries(sysEntries, "System");
+                sysRepaired = PathRepair.EnsureSystemPathMinimum(sysRepaired);
+                bool sysChanged = !sys.Equals(sysRepaired, StringComparison.OrdinalIgnoreCase);
+                if (sysChanged)
+                {
+                    if (PathRepair.SetSystemPathValue(sysRepaired))
+                    {
+                        string m = Meaningful(sysActions);
+                        if (string.IsNullOrEmpty(m)) m = "essenciais do sistema ajustados";
+                        steps.Add("[SISTEMA] " + m);
+                        Logger.Log($"[PATH REPAIR] System PATH reparado. Acoes: {string.Join("; ", sysActions)}");
+                    }
+                    else
+                    {
+                        steps.Add("[SISTEMA] FALHA ao gravar (requer admin).");
+                    }
+                }
+            }
+
+            // ---- User PATH ----
+            string usr = PathRepair.GetUserPathValue();
+            if (!string.IsNullOrEmpty(usr))
+            {
+                var usrEntries = PathRepair.DiagnosePath(usr, "User");
+                var (usrRepaired, usrActions) = PathRepair.RepairPathEntries(usrEntries, "User");
+                var installed = PathRepair.GetInstalledProgramPaths();
+                if (installed.Count == 0)
+                    installed = PathRepair.RecoverFromExecutableScan();
+                var (usrFinal, usrAdded) = PathRepair.EnsureUserPathMinimum(usrRepaired, installed);
+                bool userChanged = !usr.Equals(usrFinal, StringComparison.OrdinalIgnoreCase);
+                if (userChanged)
+                {
+                    var allUser = usrActions.Concat(usrAdded).ToList();
+                    if (PathRepair.SetUserPathValue(usrFinal))
+                    {
+                        string m = Meaningful(allUser);
+                        if (string.IsNullOrEmpty(m)) m = "programas instalados adicionados ao PATH";
+                        steps.Add("[USUARIO] " + m);
+                        Logger.Log($"[PATH REPAIR] User PATH reparado. Acoes: {string.Join("; ", allUser)}");
+                    }
+                    else
+                    {
+                        steps.Add("[USUARIO] FALHA ao gravar (requer admin).");
+                    }
+                }
+            }
+
+            bool changed = steps.Count > 0;
+            return (changed, changed
+                ? string.Join(Environment.NewLine, steps)
+                : "PATH do sistema e do usuario ja estao corretos (sem duplicatas, sem pastas mortas e todos os programas instalados no PATH).");
+        }
 
         #region Detecção de Problemas do Windows Explorer
 

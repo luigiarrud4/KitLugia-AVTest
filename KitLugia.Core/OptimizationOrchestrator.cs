@@ -82,8 +82,13 @@ namespace KitLugia.Core
                         }
                         else
                         {
-                            SystemTweaks.ApplyGpuVramTweak(settings.TargetGpuRegPath, settings.VramSizeMb);
-                            Report($"   - VRAM ajustada para {settings.VramSizeMb} MB.");
+                            // VramSizeMb <= 0 = "Automático/Padrão": aplica o recomendado
+                            // baseado na RAM (NUNCA apaga — antes 0 apagava a chave em vez
+                            // de aplicar, e a TweaksPage mostrava a VRAM como não aplicada).
+                            int recommended = SystemTweaks.GetRecommendedVramMb(SystemUtils.GetTotalSystemRamGB());
+                            int sizeMb = settings.VramSizeMb > 0 ? settings.VramSizeMb : recommended;
+                            SystemTweaks.ApplyGpuVramTweak(settings.TargetGpuRegPath, sizeMb);
+                            Report($"   - VRAM ajustada para {sizeMb} MB (recomendado: {recommended} MB).");
                         }
                     }
                     catch (Exception ex)

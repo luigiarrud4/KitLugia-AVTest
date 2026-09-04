@@ -68,6 +68,65 @@ namespace KitLugia.GUI.Helpers
         private static readonly Dictionary<string, DateTime> PathCacheAccess = new(200, StringComparer.OrdinalIgnoreCase);
         private static readonly object CacheLock = new();
 
+        // Cache PERSISTENTE em disco: na 1ª execução extrai do shell32 e grava PNG;
+        // nas seguintes carrega do disco (~1ms) sem tocar em shell32 — deixa os ícones
+        // do Task Manager praticamente instantâneos em cada abertura do app.
+        private static readonly string IconCacheDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KitLugia", "IconCache");
+        private static readonly object DiskCacheLock = new();
+
+        private static string DiskCachePath(string filePath, int? index)
+        {
+            long mtime = 0;
+            try { if (File.Exists(filePath)) mtime = File.GetLastWriteTimeUtc(filePath).Ticks; } catch { }
+            return Path.Combine(IconCacheDir, StableHash($"{filePath}|{index ?? -1}|{mtime}") + ".png");
+        }
+
+        private static string StableHash(string s)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            byte[] b = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(s));
+            return Convert.ToHexString(b).Substring(0, 20).ToLowerInvariant();
+        }
+
+        private static BitmapSource? LoadIconFromDisk(string filePath, int? index)
+        {
+            try
+            {
+                string p = DiskCachePath(filePath, index);
+                if (!File.Exists(p)) return null;
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.UriSource = new Uri(p);
+                bmp.DecodePixelWidth = 48;
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+            catch { return null; }
+        }
+
+        private static void SaveIconToDisk(string filePath, int? index, BitmapSource? icon)
+        {
+            if (icon == null) return;
+            try
+            {
+                string p = DiskCachePath(filePath, index);
+                if (File.Exists(p)) return;
+                Directory.CreateDirectory(IconCacheDir);
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(icon));
+                string tmp = p + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                lock (DiskCacheLock)
+                {
+                    using (var fs = File.Create(tmp)) enc.Save(fs);
+                    if (File.Exists(p)) { try { File.Delete(tmp); } catch { } return; }
+                    File.Move(tmp, p);
+                }
+            }
+            catch { }
+        }
+
         /// <summary>
         /// Obtém ícone de um arquivo tratando formato "caminho,indice"
         /// </summary>
@@ -147,6 +206,18 @@ namespace KitLugia.GUI.Helpers
         {
             if (string.IsNullOrEmpty(filePath)) return null;
 
+            // Separa "caminho,indice" (ex: "imageres.dll,3") ANTES de qualquer cache,
+            // para o cache em disco indexar pelo arquivo real + índice correto.
+            int iconIndex = overrideIndex ?? 0;
+            string cleanPath = filePath;
+            if (!overrideIndex.HasValue && cleanPath.Contains(','))
+            {
+                var parts = cleanPath.Split(',');
+                cleanPath = parts[0].Trim();
+                if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int idx))
+                    iconIndex = idx;
+            }
+
             // Verifica cache
             string cacheKey = $"{filePath}_{overrideIndex ?? -1}";
             lock (CacheLock)
@@ -158,22 +229,28 @@ namespace KitLugia.GUI.Helpers
                 }
             }
 
+            // Cache persistente em disco (evita shell32 a cada abertura do app)
+            if (File.Exists(cleanPath))
+            {
+                var fromDisk = LoadIconFromDisk(cleanPath, iconIndex);
+                if (fromDisk != null)
+                {
+                    lock (CacheLock)
+                    {
+                        if (!PathCache.ContainsKey(cacheKey))
+                        {
+                            PathCache[cacheKey] = fromDisk;
+                            PathCacheAccess[cacheKey] = DateTime.UtcNow;
+                        }
+                    }
+                    return fromDisk;
+                }
+            }
+
             BitmapSource? result = null;
 
             try
             {
-                int iconIndex = overrideIndex ?? 0;
-                string cleanPath = filePath;
-
-                // Separa "caminho,indice" (ex: "imageres.dll,3")
-                if (!overrideIndex.HasValue && cleanPath.Contains(','))
-                {
-                    var parts = cleanPath.Split(',');
-                    cleanPath = parts[0].Trim();
-                    if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int idx))
-                        iconIndex = idx;
-                }
-
                 // .ico direto
                 if (cleanPath.EndsWith(".ico", StringComparison.OrdinalIgnoreCase) && File.Exists(cleanPath))
                     result = LoadIcoFile(cleanPath);
@@ -262,6 +339,10 @@ namespace KitLugia.GUI.Helpers
                     PathCacheAccess[cacheKey] = DateTime.UtcNow;
                 }
             }
+
+            // Grava no disco só quando o arquivo realmente existe (não caceta genéricos de extensão)
+            if (result != null && File.Exists(cleanPath))
+                SaveIconToDisk(cleanPath, iconIndex, result);
             return result;
         }
 

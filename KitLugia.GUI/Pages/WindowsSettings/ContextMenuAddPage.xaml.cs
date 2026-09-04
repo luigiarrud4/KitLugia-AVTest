@@ -176,9 +176,17 @@ public partial class ContextMenuAddPage : Page
         try
         {
             if (item.IsAdded)
-                await Task.Run(item.Remove);
+                await Task.Run(() =>
+                {
+                    item.Remove();
+                    SystemTweaks.SaveContextMenuPref(item.Id, false);
+                });
             else
-                await Task.Run(item.Add);
+                await Task.Run(() =>
+                {
+                    item.Add();
+                    SystemTweaks.SaveContextMenuPref(item.Id, true);
+                });
 
             if (System.Windows.Application.Current.MainWindow is MainWindow mw)
                 mw.ShowInfo("SUPER COMANDOS",

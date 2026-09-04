@@ -360,6 +360,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
                 if (removed)
                 {
+                    SystemTweaks.ClearContextMenuPrefsForEntryName(entry.Name);
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowSuccess("ENTRADA REMOVIDA", $"'{entry.DisplayName}' foi removida do menu de contexto.");
                     await LoadAll();
@@ -655,6 +656,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
                     if (removed)
                     {
+                        SystemTweaks.ClearContextMenuPrefsForEntryName(entry.Name);
                         if (Application.Current.MainWindow is MainWindow mw)
                             mw.ShowSuccess("ENTRADA REMOVIDA", $"'{entry.DisplayName}' foi removida do menu de contexto.");
                         await LoadAll();
@@ -684,6 +686,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 {
                     if (targetActive) item.Add();
                     else item.Remove();
+                    // Persiste para o startup reaplicar com a config mais recente
+                    SystemTweaks.SaveContextMenuPref(item.Key, targetActive);
                 });
 
                 await LoadAll();

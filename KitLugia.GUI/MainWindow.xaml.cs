@@ -1472,7 +1472,9 @@ namespace KitLugia.GUI
         {
             try
             {
-                var w = new Windows.TaskManager.KitTaskManagerWindow { Owner = this };
+                // Singleton: reusa janela já aberta (evita N janelas × timers de 1s empilhados
+                // em máquinas fracas — causa de congelamento/crash que "levava o app junto").
+                var w = Windows.TaskManager.KitTaskManagerWindow.OpenOrActivate(this);
                 w.Show();
                 KitLugia.Core.Logger.Log("[KIT TASK MANAGER] Janela aberta via topbar (quadrado vermelho).");
             }
@@ -2594,6 +2596,7 @@ namespace KitLugia.GUI
             }
             _ = CheckForUpdateNotificationAsync();
             _ = CheckShrinkCompletionAsync();
+            _ = CheckForAvailableUpdateOnStartupAsync();
         }
 
         private async Task CheckShrinkCompletionAsync()
@@ -2633,6 +2636,107 @@ namespace KitLugia.GUI
             {
                 Logger.Log($"[SHRINK] Erro na verificação pós-reboot: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Verifica se há atualização disponível no GitHub ao iniciar o app.
+        /// Se houver: envia toast Windows (visível mesmo com app fechado) + banner in-app.
+        /// Usa flag de disco para não repetir a mesma versão.
+        /// </summary>
+        private async Task CheckForAvailableUpdateOnStartupAsync()
+        {
+            try
+            {
+                // Espera 8s para não competir com a intro animation e carregamento inicial
+                await Task.Delay(8000, _backgroundTasksCts.Token);
+
+                var release = await GitHubUpdater.GetLatestReleaseAsync();
+                if (release == null) return;
+
+                var latestVersion = ParseVersionSafe(release.TagName);
+                var currentVersion = GetCurrentVersionSafe();
+
+                if (latestVersion == null || currentVersion == null || latestVersion <= currentVersion)
+                    return;
+
+                // Verificar se já notificamos esta versão (flag de disco)
+                var flagDir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "KitLugia");
+                var flagFile = System.IO.Path.Combine(flagDir, $"update_notified_{release.TagName}.txt");
+
+                if (System.IO.File.Exists(flagFile))
+                {
+                    Logger.Log($"🔔 Update notification já enviada para {release.TagName} — pulando");
+                    return;
+                }
+
+                Logger.Log($"🔔 Nova versão disponível: {release.TagName} (atual: {currentVersion})");
+
+                // 1. Toast Windows nativo (Action Center) — aparece mesmo com app fechado
+                string toastTitle = "KitLugia - Atualização Disponível";
+                string toastMsg = $"Nova versão {release.TagName} disponível!";
+                if (!string.IsNullOrEmpty(release.Name))
+                    toastMsg += $" {release.Name}";
+                WindowsToastNotifier.Show(toastTitle, toastMsg);
+
+                // 2. Banner in-app (só aparece se o usuário estiver dentro do app)
+                string bannerTitle = "🚀 Atualização Disponível";
+                string bannerMsg = $"Nova versão {release.TagName}";
+                if (!string.IsNullOrEmpty(release.Name))
+                    bannerMsg += $" - {release.Name}";
+                bannerMsg += $"\n\nSua versão: {currentVersion}\nNova versão: {latestVersion}";
+                if (!string.IsNullOrEmpty(release.Body))
+                    bannerMsg += $"\n\n{release.Body}";
+
+                Dispatcher.Invoke(() =>
+                {
+                    ShowActionNotification(bannerTitle, bannerMsg, () =>
+                    {
+                        // Ao clicar: navegar para a aba de atualização
+                        MainFrame?.Navigate(new Uri("/Pages/UpdatePage.xaml", UriKind.Relative));
+                    });
+                });
+
+                // Salvar flag para não repetir
+                if (!System.IO.Directory.Exists(flagDir)) System.IO.Directory.CreateDirectory(flagDir);
+                System.IO.File.WriteAllText(flagFile, $"{DateTime.Now:O}");
+
+                // Limpar flags de versões anteriores (manter só as últimas 5)
+                try
+                {
+                    var oldFlags = System.IO.Directory.GetFiles(flagDir, "update_notified_v*.txt")
+                        .OrderByDescending(f => f)
+                        .Skip(5)
+                        .ToList();
+                    foreach (var old in oldFlags) System.IO.File.Delete(old);
+                }
+                catch { }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Logger.Log($"⚠️ Erro na verificação de update no startup: {ex.Message}");
+            }
+        }
+
+        private static Version? ParseVersionSafe(string tag)
+        {
+            try
+            {
+                var cleanTag = tag.StartsWith("v") ? tag[1..] : tag;
+                return Version.Parse(cleanTag);
+            }
+            catch { return null; }
+        }
+
+        private static Version? GetCurrentVersionSafe()
+        {
+            try
+            {
+                return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            }
+            catch { return null; }
         }
 
         private async Task CheckForUpdateNotificationAsync()

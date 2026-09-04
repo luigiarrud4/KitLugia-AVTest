@@ -86,6 +86,7 @@ namespace KitLugia.GUI.Pages
 
                 // Armazena todos os tweaks para filtragem
                 _allTweaks = tweaks;
+                UpdatePathCardState();
 
                 // Calcula score ignorando opcionais
                 var nonOptionalTweaks = _allTweaks.Where(t => !t.IsOptional).ToList();
@@ -147,7 +148,9 @@ namespace KitLugia.GUI.Pages
             if (tweaks == null) return new List<ScannableTweak>();
 
             var query = SearchBox?.Text?.Trim() ?? string.Empty;
-            var filtered = tweaks.AsEnumerable();
+            // Itens de PATH ficam consolidados no card unico acima da lista
+            // (nao poluem a lista com varios botoes "corrigir" separados).
+            var filtered = tweaks.Where(t => !t.IsPathItem).AsEnumerable();
 
             // Filtro por texto
             if (!string.IsNullOrEmpty(query))
@@ -353,8 +356,6 @@ namespace KitLugia.GUI.Pages
                     {
                         mainWindow.ShowError("FALHA", result.Message ?? "Erro ao processar a solicitação.");
                     }
-
-                    RefreshFromAllTweaks();
                 }
                 catch (Exception ex)
                 {
@@ -362,7 +363,10 @@ namespace KitLugia.GUI.Pages
                 }
                 finally
                 {
+                    // SEMPRE reconstruir a lista no fim — inclusive em falha — para o botão
+                    // da linha não ficar preso em "⏳" (desabilitado) até reentrar na página.
                     _isBusy = false;
+                    try { RefreshFromAllTweaks(); } catch { }
                 }
             }
         }
@@ -391,54 +395,71 @@ namespace KitLugia.GUI.Pages
                 int errorCount = 0;
                 var failedTweaks = new List<string>();
 
-                await Task.Run(async () =>
+                try
                 {
-                    var currentTweaks = Guardian.GetHarmfulTweaksWithStatus();
-                    var badTweaks = currentTweaks
-                        .Where(t => t.Status == TweakStatus.MODIFIED && !t.IsOptional)
-                        .ToList();
-
-                    foreach (var t in badTweaks)
+                    await Task.Run(async () =>
                     {
-                        try
+                        var currentTweaks = Guardian.GetHarmfulTweaksWithStatus();
+                        var badTweaks = currentTweaks
+                            .Where(t => t.Status == TweakStatus.MODIFIED && !t.IsOptional)
+                            .ToList();
+
+                        foreach (var t in badTweaks)
                         {
-                            var res = Guardian.ToggleTweak(t);
-                            if (res.Success) 
-                                fixedCount++;
-                            else 
+                            try
                             {
-                                errorCount++;
-                                failedTweaks.Add($"{t.Name}: {res.Message}");
+                                var res = Guardian.ToggleTweak(t);
+                                if (res.Success) 
+                                    fixedCount++;
+                                else 
+                                {
+                                    errorCount++;
+                                    failedTweaks.Add($"{t.Name}: {res.Message}");
+                                }
                             }
+                            catch (Exception ex) 
+                            { 
+                                errorCount++;
+                                failedTweaks.Add($"{t.Name}: {ex.Message}");
+                            }
+                            // Delay mínimo entre serviços (dependências) - sem os antigos 150ms+800ms
+                            await Task.Delay(25);
                         }
-                        catch (Exception ex) 
-                        { 
-                            errorCount++;
-                            failedTweaks.Add($"{t.Name}: {ex.Message}");
-                        }
-                        // Delay mínimo entre serviços (dependências) - sem os antigos 150ms+800ms
-                        await Task.Delay(25);
-                    }
-                });
+                    });
 
-                string resultMessage;
-                if (errorCount == 0)
-                    resultMessage = $"{fixedCount} itens corrigidos com sucesso";
-                else
-                    resultMessage = $"{fixedCount} corrigidos, {errorCount} falharam. Falhas: {string.Join("; ", failedTweaks)}";
+                    string resultMessage;
+                    if (errorCount == 0)
+                        resultMessage = $"{fixedCount} itens corrigidos com sucesso";
+                    else
+                        resultMessage = $"{fixedCount} corrigidos, {errorCount} falharam. Falhas: {string.Join("; ", failedTweaks)}";
 
-                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, errorCount == 0, resultMessage);
+                    Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, errorCount == 0, resultMessage);
 
-                if (errorCount == 0)
-                    mw.ShowSuccess("CONCLUÍDO", $"{fixedCount} itens foram corrigidos com sucesso.");
-                else
-                    mw.ShowInfo("FINALIZADO", $"{fixedCount} corrigidos. {errorCount} falharam.");
+                    if (errorCount == 0)
+                        mw.ShowSuccess("CONCLUÍDO", $"{fixedCount} itens foram corrigidos com sucesso.");
+                    else
+                        mw.ShowInfo("FINALIZADO", $"{fixedCount} corrigidos. {errorCount} falharam.");
 
-                _allTweaks = await Task.Run(() => Guardian.GetHarmfulTweaksWithStatus());
-                RefreshFromAllTweaks();
-
-                _isBusy = false;
-                ShowLoadingOverlay(false);
+                    _allTweaks = await Task.Run(() => Guardian.GetHarmfulTweaksWithStatus());
+                    RefreshFromAllTweaks();
+                }
+                catch (Exception ex)
+                {
+                    // NUNCA deixar a página congelada: mesmo se o re-scan final falhar,
+                    // tudo já foi corrigido — destrava a UI e mostra o erro (não trava).
+                    Logger.Log($"[INTEGRITY] FixAll: erro pós-correção: {ex}");
+                    try { Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, false, ex.Message); } catch { }
+                    try { mw.ShowError("FALHA NA RESTAURAÇÃO", ex.Message); } catch { }
+                }
+                finally
+                {
+                    // SEMPRE reabilita a lista/botões e restaura o texto do botão.
+                    // Antes: UpdateUiState(true) no início + só _isBusy=false no fim =
+                    // página congelada (IsEnabled=false) se qualquer passo final falhasse.
+                    _isBusy = false;
+                    UpdateUiState(isLoading: false);
+                    ShowLoadingOverlay(false);
+                }
             }
         }
 
@@ -520,7 +541,137 @@ namespace KitLugia.GUI.Pages
                 }
             }
 
+            UpdatePathCardState();
             ApplyFiltersAndUpdateList();
+        }
+
+        #endregion
+
+        #region PATH (card unico)
+
+        /// <summary>
+        /// Reflete o estado consolidado dos itens de PATH (IsPathItem) no card unico.
+        /// Quando OK o card fica CALMO (badge verde + botao neutro discreto); quando ha
+        /// pendencia o botao vira o destaque de acao (estilo CORRIGIR).
+        /// </summary>
+        private void UpdatePathCardState()
+        {
+            if (_allTweaks == null)
+            {
+                SetPathButtonNeutral();
+                return;
+            }
+            if (PathStatusBadge == null || TxtPathStatus == null || TxtPathDetail == null) return;
+
+            var modified = _allTweaks.Where(t => t.IsPathItem && t.Status == TweakStatus.MODIFIED).ToList();
+
+            if (modified.Count == 0)
+            {
+                PathStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x15, 0x4C, 0xAF, 0x50));
+                TxtPathStatus.Text = "✅ PATH OK";
+                TxtPathStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50));
+                TxtPathDetail.Text = "PATH do sistema e do usuário corretos. Pode clicar para re-aplicar ou adicionar programas instalados que estejam fora do PATH (winget, git, node, dotnet, npm, 7-Zip, cargo...).";
+                SetPathButtonNeutral();
+                return;
+            }
+
+            string ShortDesc(string name)
+            {
+                if (name.Contains("Incompleto")) return "caminhos essenciais ausentes";
+                if (name.Contains("Duplicadas")) return "entradas duplicadas";
+                if (name.Contains("Inexistentes")) return "pastas inexistentes";
+                if (name.Contains("Lixo")) return "lixo de desenvolvimento";
+                if (name.Contains("Vulnerável") || name.Contains("Hijacking")) return "ordem vulnerável";
+                if (name.Contains("Corrompida")) return "variável corrompida";
+                return name;
+            }
+
+            PathStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x25, 0xC4, 0x2B, 0x1C));
+            TxtPathStatus.Text = "⚠️ REQUER CORREÇÃO";
+            TxtPathStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6F, 0x61));
+            TxtPathDetail.Text = "Pendências: " + string.Join(" · ", modified.Select(t => ShortDesc(t.Name)))
+                + ". Um clique em CORRIGIR resolve tudo de uma vez (sem abrir o ➕).";
+            SetPathButtonAction();
+        }
+
+        private void SetPathButtonNeutral()
+        {
+            if (BtnPathRepairAll == null) return;
+            BtnPathRepairAll.Background = new SolidColorBrush(Color.FromRgb(0x1F, 0x1F, 0x1F));
+            BtnPathRepairAll.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A));
+            BtnPathRepairAll.Foreground = new SolidColorBrush(Color.FromRgb(0xB5, 0xB5, 0xB5));
+            BtnPathRepairAll.Content = "⟳ Reaplicar / Adicionar ausentes";
+        }
+
+        private void SetPathButtonAction()
+        {
+            if (BtnPathRepairAll == null) return;
+            var accent = AccentBrush();
+            BtnPathRepairAll.Background = accent;
+            BtnPathRepairAll.BorderBrush = accent;
+            BtnPathRepairAll.Foreground = new SolidColorBrush(Colors.Black);
+            BtnPathRepairAll.Content = "🛠️ CORRIGIR PATH (ADICIONA AUSENTES)";
+        }
+
+        private System.Windows.Media.Brush? _accentCache;
+        private System.Windows.Media.Brush AccentBrush()
+        {
+            if (_accentCache != null) return _accentCache;
+            try
+            {
+                if (Application.Current?.TryFindResource("AccentColor") is System.Windows.Media.Brush b)
+                {
+                    _accentCache = b;
+                    return b;
+                }
+            }
+            catch { }
+            _accentCache = new SolidColorBrush(Color.FromRgb(0xFF, 0xB3, 0x00));
+            return _accentCache;
+        }
+
+        private async void BtnPathRepairAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isBusy) return;
+            if (Application.Current.MainWindow is not MainWindow mw) return;
+
+            _isBusy = true;
+            if (BtnPathRepairAll != null)
+            {
+                BtnPathRepairAll.IsEnabled = false;
+                BtnPathRepairAll.Content = "⏳ CORRIGINDO PATH...";
+            }
+
+            try
+            {
+                var result = await Task.Run(() => Guardian.RepairAllPathsOnce());
+
+                // Re-verifica os status (sem scan completo de 2s+)
+                _allTweaks = await Task.Run(() => Guardian.GetHarmfulTweaksWithStatus());
+                RefreshFromAllTweaks();
+
+                if (result.Changed)
+                {
+                    string summary = result.Summary;
+                    if (summary.Length > 600) summary = summary.Substring(0, 600) + "...";
+                    mw.ShowSuccess("PATH CORRIGIDO", summary);
+                }
+                else
+                {
+                    mw.ShowInfo("PATH OK", result.Summary);
+                }
+            }
+            catch (Exception ex)
+            {
+                mw.ShowError("ERRO AO CORRIGIR PATH", ex.Message);
+            }
+            finally
+            {
+                if (BtnPathRepairAll != null) BtnPathRepairAll.IsEnabled = true;
+                _isBusy = false;
+                // Restaura o estado real do card (neutro se OK, acao se ainda houver pendencia)
+                if (_allTweaks != null) UpdatePathCardState();
+            }
         }
 
         #endregion

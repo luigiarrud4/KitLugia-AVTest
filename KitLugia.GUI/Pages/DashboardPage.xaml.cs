@@ -351,7 +351,7 @@ namespace KitLugia.GUI.Pages
                 var mw = Application.Current.MainWindow as MainWindow;
                 if (mw?.TrayService != null)
                 {
-                    ChkTrayIcon.IsChecked = mw.TrayService.IsTrayEnabled;
+                    // Ícone do tray é sempre visível — sem toggle
                     ChkGameBoost.IsChecked = mw.TrayService.GamePriorityEnabled;
                 }
 
@@ -492,12 +492,16 @@ namespace KitLugia.GUI.Pages
                 KitLugia.Core.Logger.Log($"🎮 Dashboard: Motor personalizado mantido ativo via Otimização Inteligente");
             }
 
-            // Detectar RegPath da GPU selecionada - Usa método seguro sem ManagementObject
+            // Detectar RegPath da GPU selecionada - MESMA resolução da TweaksPage
+            // (GetAllGpuInfo → PNP DeviceInstance/MatchingDeviceId). Antes usava
+            // FindGpuRegistryPathByDescription (DriverDesc fuzzy) que podia resolver uma
+            // chave diferente da lida pela TweaksPage → VRAM aplicada mas mostrada como
+            // "não aplicada" lá.
             int index = CmbGpu.SelectedIndex;
-            var gpuNames = SystemTweaks.GetAllGpuNames();
-            if (index >= 0 && index < gpuNames.Count)
+            var gpuInfos = SystemTweaks.GetAllGpuInfo();
+            if (index >= 0 && index < gpuInfos.Count)
             {
-                settings.TargetGpuRegPath = SystemTweaks.FindGpuRegistryPathByDescription(gpuNames[index])!;
+                settings.TargetGpuRegPath = gpuInfos[index].RegPath;
             }
 
             // Mapear VRAM
@@ -645,7 +649,7 @@ namespace KitLugia.GUI.Pages
                 var mw = Application.Current.MainWindow as MainWindow;
                 if (mw?.TrayService != null)
                 {
-                    mw.TrayService.SetTrayEnabled(ChkTrayIcon.IsChecked == true);
+                    // Ícone do tray é sempre visível — sem toggle
                     mw.TrayService.GamePriorityEnabled = ChkGameBoost.IsChecked == true;
                     mw.TrayService.SaveSettings();
 
@@ -1101,13 +1105,11 @@ namespace KitLugia.GUI.Pages
             if (ChkCrDiskTimeout.IsChecked != true) ChkCrDiskTimeout.IsChecked = true;
             if (ChkCrTurboShutdown.IsChecked != true) ChkCrTurboShutdown.IsChecked = true;
             if (ChkCrGameBoost.IsChecked != true) ChkCrGameBoost.IsChecked = true;
-            if (ChkCrTray.IsChecked != true) ChkCrTray.IsChecked = true;
             if (ChkCrNoReboot.IsChecked != true) ChkCrNoReboot.IsChecked = true;
             if (ChkCrAutoStart.IsChecked != true) ChkCrAutoStart.IsChecked = true;
             if (ChkCrExtremeLatency.IsChecked != true) ChkCrExtremeLatency.IsChecked = true;
             if (ChkCrFsutil.IsChecked != true) ChkCrFsutil.IsChecked = true;
             if (ChkCrGameMode.IsChecked != true) ChkCrGameMode.IsChecked = true;
-            if (ChkCrBgRun.IsChecked != true) ChkCrBgRun.IsChecked = true;
             if (ChkCrUnpark.IsChecked != true) ChkCrUnpark.IsChecked = true;
         }
 
@@ -1205,15 +1207,6 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void ChkCrTray_Click(object sender, RoutedEventArgs e)
-        {
-            var mw = Application.Current.MainWindow as MainWindow;
-            if (mw?.TrayService != null)
-            {
-                mw.TrayService.SetTrayEnabled(ChkCrTray.IsChecked == true);
-            }
-        }
-
         private void ChkCrNoReboot_Click(object sender, RoutedEventArgs e)
         {
             if (ChkCrNoReboot.IsChecked == true)
@@ -1249,16 +1242,6 @@ namespace KitLugia.GUI.Pages
                 SystemTweaks.ApplyGamingOptimizations();
             else
                 SystemTweaks.RevertGamingOptimizations();
-        }
-
-        private void ChkCrBgRun_Click(object sender, RoutedEventArgs e)
-        {
-            var mw = Application.Current.MainWindow as MainWindow;
-            if (mw?.TrayService != null)
-            {
-                mw.TrayService.CloseToTray = ChkCrBgRun.IsChecked == true;
-                mw.TrayService.SaveSettings();
-            }
         }
 
         private void ChkCrUnpark_Click(object sender, RoutedEventArgs e)

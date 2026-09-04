@@ -156,6 +156,11 @@ namespace KitLugia.GUI.Services
                 {
                     // Fallback headless (sem MainWindow): executa direto e mostra toast quando possível
                     bool isDir = Directory.Exists(path);
+                    if (!isDir)
+                    {
+                        FileTakeOwnership.ProbePath(path, out bool pExists, out bool pIsDir, out _);
+                        isDir = pExists ? pIsDir : false;
+                    }
                     string name = Path.GetFileName(path.TrimEnd('\\')) ?? path;
                     _ = Task.Run(() =>
                     {

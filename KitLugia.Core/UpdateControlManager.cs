@@ -89,7 +89,27 @@ namespace KitLugia.Core
                 case 2359302: return "KB nao encontrado ou desinstalacao nao suportada (pode exigir a remocao da LCU anterior primeiro).";
                 case 87: return "Parametro invalido.";
                 case -1: return "Operacao excedeu o tempo limite.";
-                default: return $"Falha (codigo {code}). Consulte C:\\Windows\\Logs\\CBS\\cbs.log.";
+                // HRESULT 0x800F081F: source files not found (DISM)
+                case unchecked((int)0x800F081F): return "Arquivos fonte nao encontrados. Verifique se o pacote e compativel com a versao do Windows.";
+                // HRESULT 0x800F0954: DISM does not support servicing Windows PE
+                case unchecked((int)0x800F0954): return "DISM nao suporta instalacao em Windows PE.";
+                // HRESULT 0x800B0109: certificate chain not trusted (CRYPT_E_CHAIN_TRUST)
+                case unchecked((int)0x800B0109): return "Falha na verificacao de assinatura digital do pacote. A cadeia de certificados nao e confiavel — o arquivo pode estar corrompido, alterado ou nao e um pacote Microsoft genuino.";
+                // HRESULT 0x80070005: access denied
+                case unchecked((int)0x80070005): return "Acesso negado. Execute o KitLugia como administrador.";
+                // HRESULT 0x80070002: file not found
+                case unchecked((int)0x80070002): return "Arquivo nao encontrado. Verifique se o caminho do pacote esta correto.";
+                // HRESULT 0x80073712: component store corrupted
+                case unchecked((int)0x80073712): return "O repositorio de componentes do Windows esta corrompido. Execute: DISM /Online /Cleanup-Image /RestoreHealth";
+                // HRESULT 0x8024001E: WU_E_UNEXPECTED (Windows Update general failure)
+                case unchecked((int)0x8024001E): return "Erro inesperado do Windows Update. Reinicie o PC e tente novamente.";
+                // Win32 error 1168: element not found
+                case 1168: return "Elemento nao encontrado. O pacote pode nao ser compativel com este sistema.";
+                default:
+                {
+                    var hex = $"0x{((uint)code):X8}";
+                    return $"Falha (codigo {code}, {hex}). Consulte C:\\Windows\\Logs\\CBS\\cbs.log.";
+                }
             }
         }
 

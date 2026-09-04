@@ -1336,7 +1336,14 @@ namespace KitLugia.Core
             using var primaryGpu = GetPrimaryGpu();
             if (primaryGpu == null) return;
 
-            string? regPath = FindGpuRegistryPath(primaryGpu);
+            // Resolução PNP-first (DeviceInstance/MatchingDeviceId) — a MESMA usada pela
+            // TweaksPage (GetAllGpuInfo). Antes usava só o nome/DriverDesc (fuzzy), que
+            // podia resolver uma chave diferente da lida pela página → tweak "aplicado"
+            // mas mostrado como não aplicado. Fallback mantido para descrição.
+            string? regPath = null;
+            try { regPath = FindGpuRegistryPathByPnpId(primaryGpu["PNPDeviceID"]?.ToString()); }
+            catch { /* fallback abaixo */ }
+            regPath ??= FindGpuRegistryPath(primaryGpu);
             if (string.IsNullOrEmpty(regPath)) return;
 
             double totalRamGB = SystemUtils.GetTotalSystemRamGB();
@@ -1909,12 +1916,15 @@ namespace KitLugia.Core
         // ============================================================
         // NVIDIA PowerMizer — Force Maximum Performance
         // ============================================================
+        // Prefixo completo (obrigatorio nas APIs estaticas Registry.GetValue) e usado
+        // direto nas leituras — sem hack de Substring. O Apply/Revert convertem para
+        // subpath relativo para a API de instancia (Registry.LocalMachine).
         private static readonly string[] NvidiaPowerMizerPaths = new[]
         {
-            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000",
-            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0001",
-            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0002",
-            @"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0003"
+            @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000",
+            @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0001",
+            @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0002",
+            @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0003"
         };
 
         public static bool IsNvidiaPowerMizerMaxPerformance()
@@ -1923,7 +1933,7 @@ namespace KitLugia.Core
             {
                 foreach (var path in NvidiaPowerMizerPaths)
                 {
-                    var val = Registry.GetValue($@"HKEY_LOCAL_MACHINE\{path.Substring(5)}", "PerfLevelSrc", -1);
+                    var val = Registry.GetValue(path, "PerfLevelSrc", -1);
                     if (val != null && Convert.ToInt32(val) == 0x2222) return true;
                 }
             }
@@ -1938,7 +1948,7 @@ namespace KitLugia.Core
                 int applied = 0;
                 foreach (var path in NvidiaPowerMizerPaths)
                 {
-                    string subPath = path.Replace("HKLM\\", "");
+                    string subPath = path.Replace("HKEY_LOCAL_MACHINE\\", "");
                     using var key = Registry.LocalMachine.OpenSubKey(subPath, true);
                     if (key == null) continue;
 
@@ -1969,7 +1979,7 @@ namespace KitLugia.Core
             {
                 foreach (var path in NvidiaPowerMizerPaths)
                 {
-                    string subPath = path.Replace("HKLM\\", "");
+                    string subPath = path.Replace("HKEY_LOCAL_MACHINE\\", "");
                     using var key = Registry.LocalMachine.OpenSubKey(subPath, true);
                     if (key == null) continue;
                     key?.DeleteValue("PerfLevelSrc", false);
@@ -1997,10 +2007,14 @@ namespace KitLugia.Core
         // ============================================================
         // NVMe Latency & Handoff Tweaks
         // ============================================================
+        // NOTA: prefixo completo HKEY_LOCAL_MACHINE (obrigatorio) — as APIs estaticas
+        // Registry.GetValue/SetValue NAO aceitam a forma curta "HKLM\" (ArgumentException
+        // "nome valido de chave base"). Antes o status de NVMe Latency SEMPRE dava false
+        // e logava "Exception suppressed" em toda execucao.
         private static readonly string[] NvMeServicePaths = new[]
         {
-            @"HKLM\SYSTEM\CurrentControlSet\Services\stornvme\Parameters",
-            @"HKLM\SYSTEM\CurrentControlSet\Services\nvme\Parameters"
+            @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\stornvme\Parameters",
+            @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\nvme\Parameters"
         };
 
         public static bool IsNvMeLatencyOptimized()
@@ -2027,7 +2041,7 @@ namespace KitLugia.Core
                 {
                     try
                     {
-                        string subPath = path.Replace("HKLM\\", "");
+                        string subPath = path.Replace(@"HKEY_LOCAL_MACHINE\", "");
                         using var key = Registry.LocalMachine.CreateSubKey(subPath, true);
                         key?.SetValue("D3Handoff", 1, RegistryValueKind.DWord);
                     }
@@ -2038,7 +2052,6 @@ namespace KitLugia.Core
                 // NVMe devices use the StorNVMe power management
                 try
                 {
-                    string nvmePowerPath = @"HKLM\SYSTEM\CurrentControlSet\Enum\PCI";
                     // Set AllowIdle1InD3 for NVMe devices (prevents deep sleep latency)
                     var pciKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum", true);
                     if (pciKey != null)
@@ -2072,7 +2085,7 @@ namespace KitLugia.Core
             {
                 foreach (var path in NvMeServicePaths)
                 {
-                    string subPath = path.Replace("HKLM\\", "");
+                    string subPath = path.Replace(@"HKEY_LOCAL_MACHINE\", "");
                     using var key = Registry.LocalMachine.OpenSubKey(subPath, true);
                     key?.DeleteValue("D3Handoff", false);
                 }
@@ -2099,7 +2112,7 @@ namespace KitLugia.Core
         {
             try
             {
-                var val = Registry.GetValue(@"HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl", "IRQ8Priority", 0);
+                var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\PriorityControl", "IRQ8Priority", 0);
                 return val != null && Convert.ToInt32(val) == 1;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
@@ -2316,7 +2329,7 @@ namespace KitLugia.Core
         {
             try
             {
-                var val = Registry.GetValue(@"HKLM\SOFTWARE\AMD\CN\GameFilters", "AntiLag", -1);
+                var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\AMD\CN\GameFilters", "AntiLag", -1);
                 return val != null && Convert.ToInt32(val) == 1;
             }
             catch { return false; }
@@ -2340,7 +2353,7 @@ namespace KitLugia.Core
         {
             try
             {
-                var val = Registry.GetValue(@"HKLM\SOFTWARE\Intel\Display\igfxcui\profiles\video\Global", "EnableDynamicTuning", -1);
+                var val = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Intel\Display\igfxcui\profiles\video\Global", "EnableDynamicTuning", -1);
                 return val != null && Convert.ToInt32(val) == 1;
             }
             catch { return false; }
@@ -7158,6 +7171,118 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
+        // ============================================================
+        // Turbo do Explorer — desliga o Auto Folder Type Discovery
+        // ============================================================
+        // Causa classica de "Explorer lento abrindo pastas" (Win11 24H2/25H2+/Insider):
+        // o Windows "fareja" o conteudo de cada pasta (Bags) para decidir o layout
+        // (Musica/Fotos/Videos) — em pastas grandes isso causa delay visivel e
+        // re-varreduras repetidas do mesmo diretorio. FolderType=NotSpecified em
+        // Bags\AllFolders\Shell forca o modo generico (abre instantaneo). Reversivel.
+        // Referencia: makeuseof.com "I fixed Windows 11 File Explorer lag by disabling
+        // this old service" (Jan/2026) + xda-developers (Jan/2026).
+        private const string ExplorerFolderTypeKey =
+            @"HKEY_CURRENT_USER\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell";
+
+        public static bool IsExplorerFolderDiscoveryDisabled()
+        {
+            try
+            {
+                var value = Registry.GetValue(ExplorerFolderTypeKey, "FolderType", null) as string;
+                return !string.IsNullOrEmpty(value) &&
+                       value.Equals("NotSpecified", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static void DisableExplorerFolderDiscovery()
+        {
+            try
+            {
+                int idx = ExplorerFolderTypeKey.IndexOf('\\');
+                string subPath = idx >= 0 ? ExplorerFolderTypeKey.Substring(idx + 1) : ExplorerFolderTypeKey;
+                using var key = Registry.CurrentUser.CreateSubKey(subPath, true);
+                key?.SetValue("FolderType", "NotSpecified", RegistryValueKind.String);
+                Logger.Log("Explorer: FolderType=NotSpecified aplicado (Turbo do Explorer)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao aplicar Turbo do Explorer: {ex.Message}");
+            }
+        }
+
+        public static void RestoreExplorerFolderDiscovery()
+        {
+            try
+            {
+                int idx = ExplorerFolderTypeKey.IndexOf('\\');
+                string subPath = idx >= 0 ? ExplorerFolderTypeKey.Substring(idx + 1) : ExplorerFolderTypeKey;
+                using var key = Registry.CurrentUser.OpenSubKey(subPath, true);
+                key?.DeleteValue("FolderType", false);
+                Logger.Log("Explorer: FolderType removido (detecção automática de tipo de pasta restaurada)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao restaurar detecção de tipo de pasta: {ex.Message}");
+            }
+        }
+
+        // ============================================================
+        // Ir direto ao arquivo — desliga miniaturas (IconsOnly=1)
+        // ============================================================
+        // Quando outra janela chama o Explorer apontando para um arquivo
+        // (ex.: navegador -> "Mostrar na pasta"), o Explorer precisa renderizar
+        // a pasta inteira — com miniaturas ativas (IconsOnly=0) ele gera previews
+        // de todo o conteudo antes de rolar/posicionar o item, e em pastas com
+        // milhares de arquivos (ex.: Downloads) o destaque demora muito.
+        // IconsOnly=1 (Sempre mostrar icones, nunca miniaturas) elimina essa
+        // geracao na aberta: o item selecionado chega na hora. Reversivel.
+        private const string ExplorerAdvancedKey =
+            @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+
+        public static bool IsExplorerThumbnailsDisabled()
+        {
+            try
+            {
+                var value = Registry.GetValue(ExplorerAdvancedKey, "IconsOnly", null);
+                if (value == null) return false;
+                return Convert.ToInt32(value) != 0;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        public static void DisableExplorerThumbnails()
+        {
+            try
+            {
+                int idx = ExplorerAdvancedKey.IndexOf('\\');
+                string subPath = idx >= 0 ? ExplorerAdvancedKey.Substring(idx + 1) : ExplorerAdvancedKey;
+                using var key = Registry.CurrentUser.CreateSubKey(subPath, true);
+                key?.SetValue("IconsOnly", 1, RegistryValueKind.DWord);
+                Logger.Log("Explorer: IconsOnly=1 aplicado (ir direto ao arquivo sem miniaturas)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao aplicar IconsOnly: {ex.Message}");
+            }
+        }
+
+        public static void RestoreExplorerThumbnails()
+        {
+            try
+            {
+                int idx = ExplorerAdvancedKey.IndexOf('\\');
+                string subPath = idx >= 0 ? ExplorerAdvancedKey.Substring(idx + 1) : ExplorerAdvancedKey;
+                using var key = Registry.CurrentUser.OpenSubKey(subPath, true);
+                key?.DeleteValue("IconsOnly", false);
+                Logger.Log("Explorer: IconsOnly removido (miniaturas restauradas)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao restaurar miniaturas: {ex.Message}");
+            }
+        }
+
         public static void DisableRecentFiles()
         {
             try
@@ -8992,6 +9117,87 @@ namespace KitLugia.Core
                 }
             }
             catch (Exception ex) { Logger.Log($"[CTX REFRESH] {ex.Message}"); }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // PERSISTÊNCIA DOS MENUS DE CONTEXTO (reapply no startup)
+        // HKCU\Software\KitLugia\ContextMenu — DWORD por item (1 = ativo).
+        // No startup o Kit recria os itens ativos com a configuração MAIS
+        // recente (path do exe, comandos, ícones) — mesmo se algo os removeu.
+        // ════════════════════════════════════════════════════════════════
+        private const string ContextMenuPrefsKey = @"Software\KitLugia\ContextMenu";
+
+        public static void SaveContextMenuPref(string id, bool enabled)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(ContextMenuPrefsKey);
+                if (enabled) key?.SetValue(id, 1, RegistryValueKind.DWord);
+                else key?.DeleteValue(id, false);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        /// <summary>Remove o pref de todos os IDs de menu conhecidos que casam com o nome
+        /// da chave de registro de uma entrada removida manualmente (grid/lista).</summary>
+        public static void ClearContextMenuPrefsForEntryName(string entryName)
+        {
+            if (string.IsNullOrEmpty(entryName)) return;
+            string n = entryName.Trim();
+            string[] ids = n.ToLowerInvariant() switch
+            {
+                "kittakeown" => new[] { "kittakeown" },
+                "kit_takeownership" => new[] { "takeownership" },
+                "runas" => new[] { "takeownership" },
+                "forcestopunlock" => new[] { "forcestopunlock" },
+                "forceclose" => new[] { "forceclose" },
+                "cmd_here" or "cmdhere" => new[] { "cmdhere" },
+                "kit_cmdhere" => new[] { "cmdhere" },
+                "powershell_here" => new[] { "pshere" },
+                "kit_pshere" => new[] { "pshere" },
+                "cmd_admin" => new[] { "cmdadmin" },
+                "powershell_admin" => new[] { "psadmin" },
+                "openwithnotepad" => new[] { "notepad" },
+                "kit_notepad" => new[] { "notepad" },
+                "copyaspath" => new[] { "copyaspath" },
+                "kit_copypath" => new[] { "copypath" },
+                "runascode" => new[] { "vscode" },
+                "kit_vscode" => new[] { "vscode" },
+                _ => Array.Empty<string>(),
+            };
+            foreach (var id in ids) SaveContextMenuPref(id, false);
+        }
+
+        /// <summary>
+        /// Reaplica no startup TODOS os itens de menu de contexto que o usuário ativou
+        /// (persistidos em HKCU\Software\KitLugia\ContextMenu). Idempotente: todos os
+        /// Add* removem as variantes antigas antes de recriar com a config atual.
+        /// </summary>
+        public static void ReapplyContextMenuPrefs()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(ContextMenuPrefsKey);
+                if (key == null) return;
+
+                int reapplied = 0;
+                foreach (var id in key.GetValueNames())
+                {
+                    if (key.GetValue(id, 0) is not int v || v != 1) continue;
+                    var add = ContextMenuQuickAdd.GetAddAction(id);
+                    if (add == null) continue;
+                    try
+                    {
+                        add();
+                        reapplied++;
+                        Logger.Log($"[CTX PREFS] Menu de contexto recriado com config atual: {id}");
+                    }
+                    catch (Exception ex) { Logger.Log($"[CTX PREFS] Falha ao reaplicar {id}: {ex.Message}"); }
+                }
+                if (reapplied > 0)
+                    Logger.Log($"[CTX PREFS] {reapplied} item(ns) de menu de contexto reaplicado(s) no startup.");
+            }
+            catch (Exception ex) { Logger.Log($"[CTX PREFS] Erro: {ex.Message}"); }
         }
 
         // --- Force Close (exefile) ---

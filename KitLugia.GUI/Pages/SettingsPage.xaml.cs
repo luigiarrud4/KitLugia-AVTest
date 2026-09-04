@@ -42,8 +42,6 @@ namespace KitLugia.GUI.Pages
         {
             SaveSettings();
             ToggleStartup.Click -= ToggleStartup_ClickHandler;
-            ToggleCloseToTray.Click -= ToggleCloseToTray_ClickHandler;
-            ToggleTray.Click -= ToggleTray_ClickHandler;
             ToggleNotifications.Click -= OnToggleNotifications;
             ToggleVerboseLogging.Click -= OnToggleVerboseLogging;
             ToggleRAMMonitor.Click -= OnToggleRAMMonitor;
@@ -72,8 +70,6 @@ namespace KitLugia.GUI.Pages
         {
             // Adicionar eventos para salvar automaticamente ao mudar
             ToggleStartup.Click += ToggleStartup_ClickHandler;
-            ToggleCloseToTray.Click += ToggleCloseToTray_ClickHandler;
-            ToggleTray.Click += ToggleTray_ClickHandler;
             ToggleNotifications.Click += OnToggleNotifications;
             ToggleVerboseLogging.Click += OnToggleVerboseLogging;
 
@@ -89,8 +85,6 @@ namespace KitLugia.GUI.Pages
         }
 
         private void ToggleStartup_ClickHandler(object s, RoutedEventArgs e) => ToggleStartup_Click(s, e);
-        private void ToggleCloseToTray_ClickHandler(object s, RoutedEventArgs e) => ToggleCloseToTray_Click(s, e);
-        private void ToggleTray_ClickHandler(object s, RoutedEventArgs e) => ToggleTray_Click();
         private void OnToggleNotifications(object s, RoutedEventArgs e) => SaveSettings();
         private void OnToggleVerboseLogging(object s, RoutedEventArgs e) => SaveSettings();
         private void OnToggleRAMMonitor(object s, RoutedEventArgs e) => SaveSettings();
@@ -113,26 +107,15 @@ namespace KitLugia.GUI.Pages
                 ToggleStartup.IsChecked = KitLugia.GUI.Services.TrayIconService.IsAutoStartEnabled();
 
                 // �� CARREGAR ESTADO DOS M�"MÓDULOS DO TRAYSERVICE
+                // (X da janela sempre minimiza p/ o tray — CloseToTray forçado no Core, sem toggle)
                 if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
                 {
-                    // Close to Tray
-                    if (mainWindow.TrayService != null)
-                    {
-                        ToggleCloseToTray.IsChecked = mainWindow.TrayService.CloseToTray;
-                    }
-                    else
-                    {
-                        // Fallback se não conseguir acessar
-                        ToggleCloseToTray.IsChecked = true;
-                    }
-
                     if (mainWindow.TrayService != null)
                     {
                         var tray = mainWindow.TrayService;
 
-                        // Carregar todos os módulos do TrayService
+                        // Carregar todos os módulos do TrayService (ícone do tray é sempre visível — sem toggle)
                         ToggleGameBoost.IsChecked = tray.GamePriorityEnabled;
-                        ToggleTray.IsChecked = tray.IsTrayEnabled;
                         ToggleTurboBoot.IsChecked = tray.TurboBootEnabled;
                         ToggleTurboShutdown.IsChecked = tray.TurboShutdownEnabled;
                         ToggleStandbyClean.IsChecked = tray.StandbyCleanEnabled;
@@ -153,9 +136,7 @@ namespace KitLugia.GUI.Pages
 
                 if (settings != null)
                 {
-                    if (System.Windows.Application.Current.MainWindow is MainWindow mw && mw.TrayService == null)
-                        ToggleCloseToTray.IsChecked = settings.CloseToTray;
-
+                    // X da janela sempre minimiza p/ o tray (CloseToTray forçado no Core)
                     ToggleNotifications.IsChecked = settings.ShowNotifications;
                     ToggleVerboseLogging.IsChecked = settings.VerboseLogging;
                     ToggleRAMMonitor.IsChecked = settings.RAMMonitorEnabled;
@@ -193,8 +174,8 @@ namespace KitLugia.GUI.Pages
                 var settings = new AppSettings
                 {
                     StartWithWindows = ToggleStartup.IsChecked ?? false,
-                    CloseToTray = ToggleCloseToTray.IsChecked ?? true,
-                    MinimizeToTray = ToggleTray.IsChecked ?? true,
+                    CloseToTray = true, // X sempre minimiza p/ o tray — opção removida
+                    MinimizeToTray = true, // ícone do tray é sempre visível; opção de ocultar removida
                     IntroAnimationEnabled = ToggleIntroAnimation.IsChecked ?? true,
                     IntroDuration = IntroDurationSlider.Value,
                     ShowNotifications = ToggleNotifications.IsChecked ?? true,
@@ -293,39 +274,6 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.LogError("ToggleStartup_Click", $"Erro: {ex.Message}");
-            }
-        }
-        
-        private void ToggleCloseToTray_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow && mainWindow.TrayService != null)
-                {
-                    mainWindow.TrayService.CloseToTray = ToggleCloseToTray.IsChecked == true;
-                    mainWindow.TrayService.SaveSettings();
-                    Logger.Log($"⚙️ Close to Tray: {(ToggleCloseToTray.IsChecked == true ? "ativado" : "desativado")}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("ToggleCloseToTray_Click", $"Erro: {ex.Message}");
-            }
-        }
-        
-        private void ToggleTray_Click()
-        {
-            try
-            {
-                if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow && mainWindow.TrayService != null)
-                {
-                    mainWindow.TrayService.SetTrayEnabled(ToggleTray.IsChecked == true);
-                    Logger.Log($"⚙️ Tray Icon: {(ToggleTray.IsChecked == true ? "ativado" : "desativado")}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("ToggleTray_Click", $"Erro: {ex.Message}");
             }
         }
         

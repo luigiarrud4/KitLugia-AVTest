@@ -13,8 +13,60 @@ namespace KitLugia.GUI
     {
         public bool StartMinimized { get; set; } = false;
 
+        // Flag idempotente: handlers globais são registrados uma ÚNICA vez, mesmo que
+        // OnStartup seja re-executado ou janelas registrem os mesmos eventos.
+        private static bool _globalHandlersRegistered;
+
+        /// <summary>
+        /// Crash-proofing GLOBAL: nenhuma exceção de UI (qualquer janela/página/timer)
+        /// pode derrubar o app inteiro. Um tick de timer que lança dentro do Kit
+        /// TaskManager (ou em qualquer outra janela) agora é LOGADO e contido — antes
+        /// ele terminava o processo WPF inteiro ("leva o app junto").
+        /// </summary>
+        private void RegisterGlobalExceptionHandlers()
+        {
+            if (_globalHandlersRegistered) return;
+            _globalHandlersRegistered = true;
+
+            // Exceções que escapam do dispatcher (UI thread) — event handlers, timer ticks,
+            // callbacks postados via BeginInvoke/InvokeAsync. Marcamos Handled para o WPF
+            // NÃO encerrar o processo; o app continua vivo e o erro fica no log.
+            DispatcherUnhandledException += (_, e) =>
+            {
+                try
+                {
+                    var site = e.Exception?.TargetSite?.DeclaringType?.FullName ?? "?";
+                    var msg = e.Exception?.GetBaseException()?.Message ?? e.Exception?.Message ?? "(sem mensagem)";
+                    KitLugia.Core.Logger.Log($"[APP] Exceção de UI contida ({site}): {msg}");
+                    KitLugia.Core.Logger.Log($"[APP] Detalhes: {e.Exception}");
+                    e.Handled = true; // app continua rodando
+                }
+                catch { /* nunca lançar do handler */ }
+            };
+
+            // Exceções em threads de background não capturadas (melhor esforço: loga antes do término).
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                try { KitLugia.Core.Logger.Log($"[APP] UnhandledException (background): {e.ExceptionObject}"); }
+                catch { }
+            };
+
+            // Tasks esquecidas (fire-and-forget) — observa e loga (não derruba o processo).
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                try
+                {
+                    KitLugia.Core.Logger.Log($"[APP] Task não observada: {e.Exception?.GetBaseException()?.Message}");
+                    e.SetObserved();
+                }
+                catch { }
+            };
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
+            RegisterGlobalExceptionHandlers();
+
             // Renderização padrão (DirectWrite/hardware) - necessário para suporte a emojis, acentos e Unicode
             RenderOptions.ProcessRenderMode = RenderMode.Default;
 
@@ -57,7 +109,11 @@ namespace KitLugia.GUI
                 base.OnStartup(e);
                 // IPC ainda precisa escutar mesmo no cold-start
                 KitLugia.GUI.Services.UnlockIpcServer.Start();
-                _ = Task.Run(() => KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded());
+                _ = Task.Run(() =>
+                {
+                    KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded();
+                    KitLugia.Core.SystemTweaks.ReapplyContextMenuPrefs();
+                });
                 // Cria MainWindow mas já navega pra aba correta antes de Show
                 var mwEarly = new MainWindow();
                 if (!StartMinimized) mwEarly.Show();
@@ -107,9 +163,19 @@ namespace KitLugia.GUI
                 catch { }
             });
 
-            // Always run startup method check in background so the window appears first
-            _ = Task.Run(() => KitLugia.Core.StartupManager.CheckAndFixStartupMethods());
-            _ = Task.Run(() => KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded());
+            // Sempre reconfigure o auto-start em TODOS os métodos (Registry Run + pasta
+            // Startup + Task Scheduler) com o executável atual — se o usuário já ativou
+            // uma vez. O CheckAndFixStartupMethods antigo só corrigia caminhos de entradas
+            // existentes; o EnsureAutoStartMethods recria o que faltar (funciona mesmo sem
+            // AppData/settings do kit na primeira execução).
+            _ = Task.Run(() => KitLugia.GUI.Services.TrayIconService.EnsureAutoStartMethods());
+            _ = Task.Run(() =>
+            {
+                KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded();
+                // Recria os itens de menu de contexto ativos com a configuração MAIS
+                // recente (path do exe, comandos, ícones) — "recoloca" os menus no startup
+                KitLugia.Core.SystemTweaks.ReapplyContextMenuPrefs();
+            });
 
             var mainWindow = new MainWindow();
             

@@ -252,10 +252,8 @@ namespace KitLugia.GUI.Pages
 
                 // IMPORTANTE: NfO usar padrões! Só ler do serviço.
                 bool gameBoostEnabled = false; // Começa com false
-                bool trayEnabled = false;
                 bool autoStartEnabled = false;
                 bool unparkCpuEnabled = false;
-                bool closeToTray = false;
                 bool proBalance = false;
                 bool foregroundBoost = true;
                 
@@ -263,9 +261,7 @@ namespace KitLugia.GUI.Pages
                 {
                     // Lê valores atuais do serviço (já carregados do Registry)
                     gameBoostEnabled = mw.TrayService.GamePriorityEnabled;
-                    trayEnabled = mw.TrayService.IsTrayEnabled;
                     autoStartEnabled = Services.TrayIconService.IsAutoStartEnabled();
-                    closeToTray = mw.TrayService.CloseToTray;
                     proBalance = mw.TrayService.ProBalance;
                     foregroundBoost = mw.TrayService.ForegroundBoostEnabled;
                 }
@@ -282,14 +278,10 @@ namespace KitLugia.GUI.Pages
 
                             if (settings.ContainsKey("gameBoostEnabled"))
                                 gameBoostEnabled = GetPropertyValue<bool>(settings["gameBoostEnabled"]);
-                            if (settings.ContainsKey("trayEnabled"))
-                                trayEnabled = GetPropertyValue<bool>(settings["trayEnabled"]);
                             if (settings.ContainsKey("autoStartEnabled"))
                                 autoStartEnabled = GetPropertyValue<bool>(settings["autoStartEnabled"]);
                             if (settings.ContainsKey("unparkCpuEnabled"))
                                 unparkCpuEnabled = GetPropertyValue<bool>(settings["unparkCpuEnabled"]);
-                            if (settings.ContainsKey("closeToTray"))
-                                closeToTray = GetPropertyValue<bool>(settings["closeToTray"]);
                             if (settings.ContainsKey("proBalance"))
                                 proBalance = GetPropertyValue<bool>(settings["proBalance"]);
                             if (settings.ContainsKey("foregroundBoost"))
@@ -307,8 +299,6 @@ namespace KitLugia.GUI.Pages
                 // Os valores do TrayService têm prioridade sobre o JSON
                 if (mw?.TrayService != null)
                 {
-                    trayEnabled = mw.TrayService.IsTrayEnabled;
-                    closeToTray = mw.TrayService.CloseToTray;
                     gameBoostEnabled = mw.TrayService.GamePriorityEnabled;
                     proBalance = mw.TrayService.ProBalance;
                     foregroundBoost = mw.TrayService.ForegroundBoostEnabled;
@@ -317,14 +307,14 @@ namespace KitLugia.GUI.Pages
 
                 autoStartEnabled = Services.TrayIconService.IsAutoStartEnabled();
 
-                // Aplica valores à UI
+                // Aplica valores à UI (ícone do tray é sempre visível — sem toggle)
                 if (TglGameBoost != null) TglGameBoost.IsChecked = gameBoostEnabled;
-                if (ChkTrayIcon != null) ChkTrayIcon.IsChecked = trayEnabled;
                 if (ChkStartWithWindows != null) ChkStartWithWindows.IsChecked = autoStartEnabled;
                 if (ChkUnparkCpu != null) ChkUnparkCpu.IsChecked = unparkCpuEnabled;
-                if (ChkCloseToTray != null) ChkCloseToTray.IsChecked = closeToTray;
+                // X da janela sempre minimiza p/ o tray (CloseToTray forçado no Core)
                 if (ChkProBalance != null) ChkProBalance.IsChecked = proBalance;
                 if (TglForegroundBoost != null) TglForegroundBoost.IsChecked = foregroundBoost;
+                if (ChkExplorerAutoTurbo != null) ChkExplorerAutoTurbo.IsChecked = mw?.TrayService?.ExplorerAutoTurbo == true;
 
 
                 string gameBarPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe");
@@ -449,9 +439,8 @@ namespace KitLugia.GUI.Pages
                 {
                     mw.TrayService.GamePriorityEnabled = TglGameBoost?.IsChecked == true;
                     mw.TrayService.ForegroundBoostEnabled = TglForegroundBoost?.IsChecked == true;
-                    mw.TrayService.SetTrayEnabled(ChkTrayIcon?.IsChecked == true);
-                    mw.TrayService.CloseToTray = ChkCloseToTray?.IsChecked == true;
                     mw.TrayService.ProBalance = ChkProBalance?.IsChecked == true;
+                    mw.TrayService.ExplorerAutoTurbo = ChkExplorerAutoTurbo?.IsChecked == true;
                     mw.TrayService.UnparkCpuEnabled = ChkUnparkCpu?.IsChecked == true;
                     mw.TrayService.GameBarPresenceWriterDisabled = ChkGameBarPresenceWriter?.IsChecked == true;
                     mw.TrayService.SmartScreenDisabled = TglSmartScreen?.IsChecked == true;
@@ -479,12 +468,13 @@ namespace KitLugia.GUI.Pages
                 var settings = new Dictionary<string, object>
                 {
                     { "gameBoostEnabled", TglGameBoost?.IsChecked == true },
-                    { "trayEnabled", ChkTrayIcon?.IsChecked == true },
+                    { "trayEnabled", true },
                     { "autoStartEnabled", ChkStartWithWindows?.IsChecked == true },
                     { "unparkCpuEnabled", ChkUnparkCpu?.IsChecked == true },
-                    { "closeToTray", ChkCloseToTray?.IsChecked == true },
+                    { "closeToTray", true },
                     { "proBalance", ChkProBalance?.IsChecked == true },
                     { "foregroundBoost", TglForegroundBoost?.IsChecked == true },
+                    { "explorerAutoTurbo", ChkExplorerAutoTurbo?.IsChecked == true },
                     { "smartScreenDisabled", TglSmartScreen?.IsChecked == true },
                     { "edgeUpdateDisabled", TglEdgeUpdate?.IsChecked == true },
                     { "compatTelRunnerDisabled", TglCompatTelRunner?.IsChecked == true },
@@ -501,31 +491,27 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        // NOVO: Handler do toggle TrayIcon (ToggleButton)
-        private void ChkTrayIcon_Click(object sender, RoutedEventArgs e)
+        private void ChkExplorerAutoTurbo_Click(object sender, RoutedEventArgs e)
         {
             if (_isLoadingSettings) return;
-
             try
             {
-                ChkTrayIcon.IsEnabled = false;
-                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
-
-                if (trayService != null)
+                bool enabled = ChkExplorerAutoTurbo?.IsChecked == true;
+                var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
+                if (tray != null)
                 {
-                    trayService.SetTrayEnabled(ChkTrayIcon.IsChecked == true);
-                    KitLugia.Core.Logger.Log($"🎮 Tray Icon: {(ChkTrayIcon.IsChecked == true ? "ativado" : "desativado")}");
+                    tray.ExplorerAutoTurbo = enabled;
+                    tray.SaveSettings();
                 }
-
-                SaveGameBoostSettings();
+                KitLugia.Core.Logger.Log($"⚡ Turbo Explorer automático: {(enabled ? "ATIVADO" : "desativado")} (GameBoostPro)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("EXPLORER", enabled
+                        ? "Turbo Explorer automático ATIVADO — quando o explorer.exe reiniciar (login/crash), o Kit aplica o F11 re-render sozinho na 1ª pasta aberta. 'Ir direto ao arquivo' continua instantâneo após reboot."
+                        : "Turbo Explorer automático DESATIVADO — o F11 só será aplicado manualmente (item ⚡ Turbo Explorer do tray ou Ctrl+F11).");
             }
             catch (Exception ex)
             {
-                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar Tray Icon: {ex.Message}");
-            }
-            finally
-            {
-                ChkTrayIcon.IsEnabled = true;
+                KitLugia.Core.Logger.LogError("ChkExplorerAutoTurbo", ex.Message);
             }
         }
 
@@ -624,33 +610,6 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        // NOVO: Handler do toggle CloseToTray (ToggleButton)
-        private void ChkCloseToTray_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isLoadingSettings) return;
-
-            try
-            {
-                ChkCloseToTray.IsEnabled = false;
-                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
-
-                if (trayService != null)
-                {
-                    trayService.CloseToTray = ChkCloseToTray.IsChecked == true;
-                    trayService.SaveSettings();
-                    KitLugia.Core.Logger.Log($"🎮 Close to Tray: {(ChkCloseToTray.IsChecked == true ? "ativado" : "desativado")}");
-                }
-            }
-            catch (Exception ex)
-            {
-                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar Close to Tray: {ex.Message}");
-            }
-            finally
-            {
-                ChkCloseToTray.IsEnabled = true;
-            }
-        }
-        
         private async void ChkProBalance_Click(object sender, RoutedEventArgs e)
         {
             if (_isLoadingSettings) return;

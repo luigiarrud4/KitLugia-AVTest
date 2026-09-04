@@ -2200,6 +2200,123 @@
                         <CheckBox x:Name="ChkPCA" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkPCA_Click" Margin="0,20,20,20"/>
                     </Grid>
 
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Turbo Explorer (Auto Folder Type Discovery OFF) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Acelera a abertura de janelas de pasta no Explorer. O Windows 'fareja' o conteudo de cada pasta para decidir o layout (Musica/Fotos/Videos) — em pastas grandes (Downloads, projetos, midia) isso causa delay visivel e re-escaneamentos repetidos. Este toggle grava FolderType=NotSpecified em Bags\AllFolders\Shell: todas as pastas abrem em modo generico instantaneo. Reversivel (apaga o valor). Dica: se uma pasta ja estava aberta com layout especial, feche e reabra. Nao mexe no Windows Search nem nos thumbs."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Turbo do Explorer (abrir pastas r&#xE1;pido)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desliga a analise automatica de tipo de pasta (FolderType=NotSpecified)." Foreground="#A0A0A0"/>
+                            <TextBlock Text="Pastas grandes abrem na hora, sem 'sniff' de conte&#xFA;do a cada visita." FontSize="11" Foreground="#9A9066" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusExplorerTurbo" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkExplorerTurbo" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkExplorerTurbo_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Destacar arquivo direto (sem thumbnails) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Acelera o 'pular direto ao arquivo' quando outra janela abre o Explorer apontando para um item (ex.: navegador -> 'Mostrar na pasta'). O Explorador demora porque gera miniaturas da pasta antes de conseguir rolar/posicionar o arquivo. Este toggle grava IconsOnly=1 (Sempre mostrar icones, nunca miniaturas) em Explorer\Advanced: o destaque chega na hora, mesmo em pastas com milhares de arquivos. Reversivel (apaga o valor). Nao mexe nos icones de programa, so nos previews de conteudo."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Ir direto ao arquivo (sem miniaturas)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Desliga a geracao de miniaturas (IconsOnly) - o destaque ao arquivo correto chega na hora." Foreground="#A0A0A0"/>
+                            <TextBlock Text="Pastas como Downloads (milhares de arquivos) nao marcam tempo antes de pular ao item." FontSize="11" Foreground="#9A9066" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusExplorerThumbs" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkExplorerThumbs" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkExplorerThumbs_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
+                    <Separator Background="#444444" Opacity="0.4" Margin="20,0"/>
+
+                    <!-- Turbo Explorer Automatico (watchdog F11) -->
+                    <Grid Margin="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="Quando o explorer.exe reinicia (login do Windows, crash ou restart do shell), o truque do F11 (entrar/sair de tela cheia, que forca o re-render da pasta) e perdido. Com este toggle ATIVADO o Kit vigia o processo e, na 1a pasta aberta apos cada reinicio do Explorer, reaplica o F11 sozinho — o 'ir direto ao arquivo' (navegador -> 'Mostrar na pasta') continua instantaneo sem voce apertar nada. A aplicacao acontece 1x por processo (a janela pisca em tela cheia por um instante). Desligue se preferir aplicar manualmente pelo item do tray 'Turbo Explorer (F11)' ou com Ctrl+F11."/>
+                            </Button.ToolTip>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Turbo Explorer autom&#xE1;tico (F11 ao reiniciar)" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Reaplica o F11 re-render sozinho quando o explorer.exe reiniciar (login/crash)." Foreground="#A0A0A0"/>
+                            <TextBlock Text="1x por processo — o 'ir direto ao arquivo' continua instant&#xE2;neo ap&#xF3;s reboot, sem Ctrl+F11." FontSize="11" Foreground="#9A9066" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A1810" BorderBrush="#A0781E" BorderThickness="1" Margin="0,0,15,0">
+                            <TextBlock x:Name="StatusExplorerAutoTurbo" Text="Verificando..." Foreground="#E8B84E" FontWeight="SemiBold" FontSize="12"/>
+                        </Border>
+                        <CheckBox x:Name="ChkExplorerAutoTurbo" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkExplorerAutoTurbo_Click" Margin="0,20,20,20"/>
+                    </Grid>
+
                 </StackPanel>
             </Border>
 

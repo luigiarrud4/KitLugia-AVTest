@@ -55,8 +55,13 @@ namespace KitLugia.Core
                         status.PauseDaysRemaining = Math.Max(0, remaining);
                     }
                 }
-                if (wu.GetValue("LastChecked") is string lastChecked)
-                    DateTime.TryParse(lastChecked, out _);
+                // ANTIGO: DateTime.TryParse(lastChecked, out _) descartava o valor —
+                // o campo LastCheckTime nunca era preenchido (bug silencioso no card).
+                if (wu.GetValue("LastChecked") is string lastChecked &&
+                    DateTime.TryParse(lastChecked, out var parsedLastCheck))
+                {
+                    status.LastCheckTime = parsedLastCheck;
+                }
             }
 
             using var policies = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate");
@@ -78,15 +83,12 @@ namespace KitLugia.Core
 
             try
             {
-                using var proc = Process.Start(new ProcessStartInfo("bcdedit", "/enum {current}")
-                { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true });
-                if (proc != null)
-                {
-                    var output = proc.StandardOutput.ReadToEnd();
-                    status.FlightSigningEnabled = System.Text.RegularExpressions.Regex.IsMatch(output,
-                        @"^flightsigning\s+Yes$", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    proc.WaitForExit();
-                }
+                // ANTIGO: ReadToEnd() antes de WaitForExit sem timeout — se o bcdedit
+                // pendurasse, GetStatus nunca retornava. ProcessRunner.Run tem timeout
+                // e lê output/error com encoding OEM (padrão do restante do Core).
+                var bcd = ProcessRunner.Run("bcdedit", "/enum {current}", 10000);
+                status.FlightSigningEnabled = System.Text.RegularExpressions.Regex.IsMatch(bcd.Output,
+                    @"^flightsigning\s+Yes$", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             }
             catch { }
 

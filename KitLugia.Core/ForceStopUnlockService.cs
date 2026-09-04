@@ -109,6 +109,79 @@ namespace KitLugia.Core
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void RmWriteStatusCallback(uint nPercentComplete);
 
+        // ─── SeDebugPrivilege (necessário p/ abrir/matar processos de outros usuários) ──
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool OpenProcessTokenDbg(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool LookupPrivilegeValueDbg(string? systemName, string name, out long luid);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool AdjustTokenPrivilegesDbg(IntPtr tokenHandle, bool disableAll,
+            ref TOKEN_PRIVILEGES_DBG newState, int bufferLength, IntPtr previousState, IntPtr returnLength);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct TOKEN_PRIVILEGES_DBG
+        {
+            public int PrivilegeCount;
+            public long Luid;
+            public int Attributes;
+        }
+
+        private const uint TOKEN_ADJUST_PRIVILEGES_DBG = 0x0020;
+        private const uint TOKEN_QUERY_DBG = 0x0008;
+        private const int SE_PRIVILEGE_ENABLED_DBG = 0x0002;
+
+        /// <summary>
+        /// Habilita SeDebugPrivilege no token do processo. Sem ele, OpenProcess/
+        /// DuplicateHandle falham (acesso negado) em processos de outros usuários e
+        /// o scan nativo não acha NENHUM handle — a causa clássica de "não acha nada".
+        /// Requer Administrador; retorna false sem admin.
+        /// </summary>
+        public static bool EnableDebugPrivilege()
+        {
+            try
+            {
+                if (!OpenProcessTokenDbg(GetCurrentProcessNative(), TOKEN_ADJUST_PRIVILEGES_DBG | TOKEN_QUERY_DBG, out var token))
+                {
+                    Logger.Log("[FORCE STOP] SeDebugPrivilege: OpenProcessToken falhou (sem admin?)");
+                    return false;
+                }
+                try
+                {
+                    if (!LookupPrivilegeValueDbg(null, "SeDebugPrivilege", out long luid))
+                        return false;
+                    var tp = new TOKEN_PRIVILEGES_DBG { PrivilegeCount = 1, Luid = luid, Attributes = SE_PRIVILEGE_ENABLED_DBG };
+                    return AdjustTokenPrivilegesDbg(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                }
+                finally { CloseHandleNative(token); }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[FORCE STOP] SeDebugPrivilege ERRO: {ex.Message}");
+                return false;
+            }
+        }
+
+        // ─── NtTerminateProcess (fallback de kill quando Process.Kill dá acesso negado) ──
+        [DllImport("ntdll.dll")]
+        private static extern int NtTerminateProcess(IntPtr hProcess, int exitStatus);
+
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(IntPtr hProcess, int ProcessInformationClass,
+            ref PROCESS_PROTECTION_INFORMATION ProcessInformation, uint ProcessInformationLength, out uint ReturnLength);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_PROTECTION_INFORMATION
+        {
+            public byte Protection;
+            public byte Flags;
+        }
+
+        private const int ProcessProtectionInformation = 61;
+        private const uint PROCESS_TERMINATE_NATIVE = 0x0001;
+        private const uint PROCESS_QUERY_LIMITED_INFORMATION_NATIVE = 0x1000;
+
         // ─── System process names that should never be killed ────────────
         private static readonly HashSet<string> SystemProcessNames = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -147,10 +220,27 @@ namespace KitLugia.Core
             bool isAdmin = SystemUtils.IsRunningAsAdministrator();
             Logger.Log($"[FORCE STOP] Executando como Administrador: {isAdmin}");
 
-            if (string.IsNullOrWhiteSpace(targetPath) || !File.Exists(targetPath) && !Directory.Exists(targetPath))
+            // SeDebugPrivilege ANTES do scan nativo — sem ele, OpenProcess/DuplicateHandle
+            // falham em processos de outros usuários ("não acha nada" mesmo com o arquivo travado).
+            EnableDebugPrivilege();
+
+            if (string.IsNullOrWhiteSpace(targetPath))
             {
-                Logger.Log($"[FORCE STOP] Caminho invalido ou nao existe: {targetPath}");
+                Logger.Log($"[FORCE STOP] Caminho vazio.");
                 return new List<BlockingProcessInfo>();
+            }
+
+            if (!File.Exists(targetPath) && !Directory.Exists(targetPath))
+            {
+                // .NET Exists retorna FALSE em caminhos com ACL negada (ex: Windows.old) —
+                // o probe nativo distingue "não existe" de "existe mas negado".
+                int probe = FileTakeOwnership.ProbePath(targetPath, out bool pExists, out bool pIsDir, out int errCode);
+                if (!pExists && probe != 5 && probe != 21)
+                {
+                    Logger.Log($"[FORCE STOP] Caminho invalido ou nao existe: {targetPath} (erro {probe})");
+                    return new List<BlockingProcessInfo>();
+                }
+                Logger.Log($"[FORCE STOP] Caminho existe mas ACL nega leitura (erro {errCode}) — continuando scan nativo.");
             }
 
             bool isDir = Directory.Exists(targetPath);
@@ -287,6 +377,9 @@ namespace KitLugia.Core
             var result = new UnlockResult();
             var targetList = targets.Where(t => t.IsSelected).ToList();
 
+            // SeDebugPrivilege antes de qualquer kill/close de handle
+            EnableDebugPrivilege();
+
             Logger.Log($"[FORCE STOP] Targets selecionados: {targetList.Count}");
             foreach (var t in targetList)
                 Logger.Log($"[FORCE STOP]   -> {t.DisplayLabel} | {t.DetailLabel}");
@@ -329,11 +422,12 @@ namespace KitLugia.Core
                             string exePath = proc.MainModule?.FileName ?? "";
                             if (!string.IsNullOrEmpty(exePath) &&
                                 exePath.StartsWith(targetDir, StringComparison.OrdinalIgnoreCase) &&
-                                !SystemProcessNames.Contains(proc.ProcessName))
+                                !SystemProcessNames.Contains(proc.ProcessName) &&
+                                proc.Id != Environment.ProcessId && !proc.HasExited)
                             {
                                 Logger.Log($"[FORCE STOP] Matando processo '{proc.ProcessName}' (PID {proc.Id}) da pasta alvo: {exePath}");
-                                proc.Kill(entireProcessTree: true);
-                                result.ProcessesKilled++;
+                                if (KillProcess(proc.Id))
+                                    result.ProcessesKilled++;
                             }
                         }
                         catch { }
@@ -492,6 +586,22 @@ namespace KitLugia.Core
             {
                 try
                 {
+                    // O Restart Manager (fase 1) JÁ pode ter encerrado o processo —
+                    // pular os encerrados evita erros fantasmas "processo não encontrado".
+                    bool alive;
+                    try
+                    {
+                        using var p = Process.GetProcessById(proc.Key);
+                        alive = !p.HasExited;
+                    }
+                    catch { alive = false; }
+                    if (!alive)
+                    {
+                        Logger.Log($"[FORCE STOP] PID {proc.Key} ({proc.First().ProcessName}) já encerrado (Restart Manager/fase anterior).");
+                        result.ProcessesKilled++;
+                        continue;
+                    }
+
                     bool killed = KillProcess(proc.Key);
                     if (killed)
                     {
@@ -799,6 +909,7 @@ namespace KitLugia.Core
 
         private static bool KillProcess(int pid)
         {
+            if (pid <= 0 || pid == Environment.ProcessId) return false;
             try
             {
                 using var proc = Process.GetProcessById(pid);
@@ -811,15 +922,79 @@ namespace KitLugia.Core
                     return false;
                 }
 
-                proc.Kill(entireProcessTree: true);
-                Logger.Log($"[FORCE STOP] Processo '{name}' (PID {pid}) finalizado.");
-                return true;
+                if (proc.HasExited) return true;
+
+                // 1º: Process.Kill padrão (árvore inteira)
+                try
+                {
+                    proc.Kill(entireProcessTree: true);
+                    proc.WaitForExit(3000);
+                }
+                catch { /* acesso negado/protegido — segue para fallback */ }
+
+                if (proc.HasExited)
+                {
+                    Logger.Log($"[FORCE STOP] Processo '{name}' (PID {pid}) finalizado.");
+                    return true;
+                }
+
+                // 2º: NtTerminateProcess nativo (contorna várias restrições do Process.Kill
+                // quando SeDebugPrivilege está habilitado)
+                if (TerminateProcessNative(pid))
+                {
+                    Logger.Log($"[FORCE STOP] Processo '{name}' (PID {pid}) finalizado via NtTerminateProcess.");
+                    return true;
+                }
+
+                // 3º: diagnóstico — processo protegido (PPL, anti-virus/EDR) não morre do user-mode
+                bool isProtected = GetProcessProtection(pid, out int sigLevel);
+                if (isProtected)
+                {
+                    Logger.Log($"[FORCE STOP] '{name}' (PID {pid}) é PROTEGIDO (PPL, signature level {sigLevel}) — anti-virus/EDR. Impossível encerrar do user-mode; desative a autoproteção do AV.");
+                }
+                else
+                {
+                    Logger.Log($"[FORCE STOP] Falha ao finalizar '{name}' (PID {pid}) mesmo com SeDebugPrivilege — acesso negado.");
+                }
+                return false;
             }
             catch (Exception ex)
             {
                 Logger.Log($"[FORCE STOP] Falha ao finalizar PID {pid}: {ex.Message}");
                 return false;
             }
+        }
+
+        private static bool TerminateProcessNative(int pid)
+        {
+            IntPtr h = OpenProcess(PROCESS_TERMINATE_NATIVE, false, pid);
+            if (h == IntPtr.Zero) return false;
+            try
+            {
+                return NtTerminateProcess(h, 1) == 0;
+            }
+            catch { return false; }
+            finally { CloseHandleNative(h); }
+        }
+
+        /// <summary>Detecta proteção PPL (Process Protection Light) — anti-virus/EDR.
+        /// Retorna true se o processo é protegido e expõe o signature level (0x08=PPL, 0x09=full, 0x0C=secure).</summary>
+        private static bool GetProcessProtection(int pid, out int signatureLevel)
+        {
+            signatureLevel = 0;
+            IntPtr h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION_NATIVE, false, pid);
+            if (h == IntPtr.Zero) return false;
+            try
+            {
+                var ppi = new PROCESS_PROTECTION_INFORMATION();
+                int status = NtQueryInformationProcess(h, ProcessProtectionInformation, ref ppi,
+                    (uint)Marshal.SizeOf<PROCESS_PROTECTION_INFORMATION>(), out _);
+                if (status != 0) return false;
+                signatureLevel = ppi.Protection & 0x0F;
+                return ppi.Protection != 0;
+            }
+            catch { return false; }
+            finally { CloseHandleNative(h); }
         }
 
         // ─── Helpers ─────────────────────────────────────────────────────
@@ -1101,7 +1276,7 @@ namespace KitLugia.Core
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool CloseHandleNative(IntPtr hObject);
 
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll", EntryPoint = "GetCurrentProcess")]
         private static extern IntPtr GetCurrentProcessNative();
 
         private const uint SystemHandleInformation = 16;

@@ -42,7 +42,6 @@ namespace KitLugia.GUI.Pages
             PopulateChannels();
             await RefreshSystemStatusAsync();
         }
-
         private void PopulateChannels()
         {
             try
@@ -233,9 +232,25 @@ namespace KitLugia.GUI.Pages
             return 7;
         }
 
-        private static void DisableMouseWheelSelection(System.Windows.Controls.ComboBox combo)
+        /// <summary>
+        /// Impede que o wheel do mouse troque a seleção de um ComboBox FECHADO e, em vez
+        /// de engolir o evento (o que travava o scroll da página com o cursor sobre o box),
+        /// repassa o delta ao ScrollViewer externo — padrão RouteWheel da StoreRemakePage.
+        /// Com o popup ABERTO o combo mantém o comportamento padrão (wheel rola a lista).
+        /// </summary>
+        private void DisableMouseWheelSelection(System.Windows.Controls.ComboBox combo)
         {
-            combo.PreviewMouseWheel += (s, e) => e.Handled = true;
+            combo.PreviewMouseWheel += (s, e) =>
+            {
+                // Popup aberto: quem recebe o wheel é a lista do popup — deixa o padrão.
+                if (combo.IsDropDownOpen) return;
+
+                // Bloqueia a troca de item sem clique mas não mata o scroll da página:
+                // marca Handled e repassa o delta ao ScrollViewer que envolve a página.
+                e.Handled = true;
+                if (MainScroll != null)
+                    MainScroll.ScrollToVerticalOffset(MainScroll.VerticalOffset - e.Delta / 3.0);
+            };
         }
 
         private async void BtnPause_Click(object sender, RoutedEventArgs e)
@@ -386,11 +401,17 @@ namespace KitLugia.GUI.Pages
             await RunWithLoadingAsync($"Removendo {kb} (wusa /uninstall)...", async () =>
             {
                 var result = await Task.Run(() => UpdateControlManager.UninstallUpdate(kb));
-                var msg = $"{kb}: {UpdateControlManager.DescribeExitCode(result.ExitCode)}";
+                var desc = UpdateControlManager.DescribeExitCode(result.ExitCode);
+                var msg = $"{kb}: {desc}";
                 if (result.ExitCode == 0 || result.ExitCode == 3010)
                     ShowInfo("Sucesso", msg);
                 else
-                    ShowError("Falha na remocao", msg);
+                {
+                    var detail = !string.IsNullOrWhiteSpace(result.Output)
+                        ? $"\n\nDetalhes:\n{result.Output.Trim()}"
+                        : "";
+                    ShowError("Falha na remocao", msg + detail);
+                }
             });
             await RefreshInstalledUpdatesAsync();
         }
@@ -428,7 +449,12 @@ namespace KitLugia.GUI.Pages
                 if (result.ExitCode == 0 || result.ExitCode == 3010)
                     ShowInfo("Sucesso", msg);
                 else
-                    ShowError("Falha na instalacao", msg);
+                {
+                    var detail = !string.IsNullOrWhiteSpace(result.Output)
+                        ? $"\n\nDetalhes:\n{result.Output.Trim()}"
+                        : "";
+                    ShowError("Falha na instalacao", msg + detail);
+                }
             });
             await RefreshInstalledUpdatesAsync();
         }

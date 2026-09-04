@@ -68,7 +68,7 @@
         </Style>
     </Page.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+    <ScrollViewer x:Name="MainScroll" VerticalScrollBarVisibility="Auto" Padding="20">
         <StackPanel Margin="30" MaxWidth="950">
 
             <!-- HEADER -->

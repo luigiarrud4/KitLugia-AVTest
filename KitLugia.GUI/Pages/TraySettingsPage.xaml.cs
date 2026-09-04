@@ -81,7 +81,6 @@ namespace KitLugia.GUI.Pages
                 // Will use defaults, values update when service is ready
             }
 
-            ChkEnableTray.IsChecked = tray.IsTrayEnabled;
             ChkAutoClean.IsChecked = tray.AutoCleanEnabled;
             SliderThreshold.Value = tray.AutoCleanThresholdPercent;
             SliderInterval.Value = tray.MonitorIntervalSeconds;
@@ -97,12 +96,11 @@ namespace KitLugia.GUI.Pages
                 case MemoryOptimizer.CleaningMode.Bruta: ModeBruta.IsChecked = true; break;
             }
 
-            // Background Features
+            // Background Features (ícone do tray é sempre visível — sem toggle)
+            // X da janela sempre minimiza p/ o tray (CloseToTray forçado true no Core)
             ChkStandbyClean.IsChecked = tray.StandbyCleanEnabled;
             ChkTurboBoot.IsChecked = tray.TurboBootEnabled;
             ChkTurboShutdown.IsChecked = tray.TurboShutdownEnabled;
-            ChkTrayIcon.IsChecked = tray.IsTrayEnabled;
-            ChkCloseToTray.IsChecked = tray.CloseToTray;
 
             // ISLC: mostrar threshold auto-calculado
             TxtIslcDescription.Text = $"Threshold: {tray.IslcThresholdMB} MB (auto). Reduz stuttering e freezes em jogos.";
@@ -288,16 +286,6 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void ChkEnableTray_Click(object sender, RoutedEventArgs e)
-        {
-            var tray = GetTrayService();
-            if (tray != null)
-            {
-                tray.SetTrayEnabled(ChkEnableTray.IsChecked == true);
-                tray.SaveSettings();
-            }
-        }
-
         private void ChkBackgroundFeature_Click(object sender, RoutedEventArgs e)
         {
             var tray = GetTrayService();
@@ -306,8 +294,6 @@ namespace KitLugia.GUI.Pages
             if (cb == ChkStandbyClean) tray.StandbyCleanEnabled = cb.IsChecked == true;
             else if (cb == ChkTurboBoot) tray.TurboBootEnabled = cb.IsChecked == true;
             else if (cb == ChkTurboShutdown) tray.TurboShutdownEnabled = cb.IsChecked == true;
-            else if (cb == ChkTrayIcon) tray.SetTrayEnabled(cb.IsChecked == true);
-            else if (cb == ChkCloseToTray) tray.CloseToTray = cb.IsChecked == true;
 
             tray.SaveSettings();
         }
@@ -378,7 +364,6 @@ namespace KitLugia.GUI.Pages
             // 🖱️ Abrir página de configurações avançada de limpeza automática via NavigateToPage
             if (Application.Current.MainWindow is MainWindow mw)
             {
-                var advancedPage = new AdvancedRamCleanSettingsPage();
                 mw.NavigateToPage("AdvancedRamCleanSettings");
             }
         }
