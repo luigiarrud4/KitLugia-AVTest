@@ -87,6 +87,20 @@ namespace KitLugia.GUI.Services
         public const int VK_F11 = 0x7A;
         public const string ExplorerWindowClass = "CabinetWClass";
 
+        // --- Invisibilidade temporária de janela (Turbo Explorer sem pular a tela) ---
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+        public const long WS_EX_LAYERED = 0x00080000;
+        public const uint LWA_ALPHA = 0x00000002;
+
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
@@ -562,12 +576,15 @@ namespace KitLugia.GUI.Services
         // === Turbo Explorer automático (watchdog do explorer.exe) ===
         private System.Threading.Timer? _explorerWatchTimer;
         private volatile int _explorerWatchPid;      // PID atual do explorer.exe da nossa sessão
-        private volatile bool _explorerTurboArmed;   // aguardando a 1ª janela de pasta p/ aplicar F11
+        private volatile bool _explorerTurboArmed;   // aguardando aplicar F11 (pasta do usuário ou própria)
 
         /// <summary>
-        /// Quando ligado (default), o Kit detecta o processo explorer.exe. Ao (re)iniciar
+        /// Quando ligado, o Kit detecta o processo explorer.exe. Ao (re)iniciar
         /// (login do Windows, crash/restart do shell) ele re-aplica o truque F11 (re-render)
-        /// na 1ª janela de pasta que abrir — 1x por processo, sem piscar janela a janela.
+        /// na 1ª janela de pasta que abrir — 1x por processo.
+        /// Default TRUE: a aplicação é INVISÍVEL (opacidade 0 durante o toggle, desde 06/09),
+        /// então instalação limpa já roda sozinho sem o usuário perceber; pode-se desligar
+        /// manualmente em TweaksPage / GameBoostPro.
         /// </summary>
         public bool ExplorerAutoTurbo { get; set; } = true;
 
@@ -1572,22 +1589,66 @@ namespace KitLugia.GUI.Services
         /// Truque F11 do Explorer: entrar e sair de tela cheia força o Explorer a re-renderizar
         /// a pasta, pulando a lógica bugada de rolagem/posicionamento — o "ir direto ao arquivo"
         /// (ex.: navegador → Mostrar na pasta) passa a acertar na hora.
+        ///
+        /// Para NÃO interromper o usuário, a janela é tornado INVISÍVEL (opacidade 0 via
+        /// layered window) durante o toggle — o re-render acontece, mas o pulo de tela cheia
+        /// nunca é exibido. Se a técnica de opacidade falhar, cai no comportamento antigo
+        /// (toggle visível) para nunca perder a função.
         /// </summary>
         private static void ApplyF11Render(IntPtr explorerWindow, int dwellMs, string source)
         {
+            bool hidingApplied = false;
+            bool wasLayered = false;
+            long originalExStyle = 0;
+
             try
             {
                 if (explorerWindow == IntPtr.Zero || !Win32Api.IsWindow(explorerWindow)) return;
+
+                // ── 1. Tenta esconder a janela (sem mover / sem roubar foco) ──
+                try
+                {
+                    originalExStyle = Win32Api.GetWindowLongPtr(explorerWindow, Win32Api.GWL_EXSTYLE).ToInt64();
+                    wasLayered = (originalExStyle & Win32Api.WS_EX_LAYERED) != 0;
+                    if (!wasLayered)
+                    {
+                        Win32Api.SetWindowLongPtr(explorerWindow, Win32Api.GWL_EXSTYLE,
+                            new IntPtr(originalExStyle | Win32Api.WS_EX_LAYERED));
+                    }
+                    hidingApplied = Win32Api.SetLayeredWindowAttributes(explorerWindow, 0, 0, Win32Api.LWA_ALPHA);
+                    if (hidingApplied) System.Threading.Thread.Sleep(60); // deixa o DWM aplicar
+                }
+                catch { hidingApplied = false; } // sem opacidade → segue visível (fallback)
+
+                // ── 2. Toggle F11 2x (entra e sai de tela cheia) ──
                 Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYDOWN, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
                 Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYUP, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
                 System.Threading.Thread.Sleep(Math.Max(150, dwellMs));
                 Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYDOWN, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
                 Win32Api.PostMessage(explorerWindow, Win32Api.WM_KEYUP, (IntPtr)Win32Api.VK_F11, IntPtr.Zero);
-                KitLugia.Core.Logger.Log($"⚡ Turbo Explorer: F11 2x aplicado (re-render) — origem: {source}.");
+
+                KitLugia.Core.Logger.Log($"⚡ Turbo Explorer: F11 2x aplicado (re-render) — origem: {source}{(hidingApplied ? " (invisível)" : "")}.");
             }
             catch (Exception ex)
             {
                 KitLugia.Core.Logger.LogError("ApplyF11Render", ex.Message);
+            }
+            finally
+            {
+                // ── 3. Restaura a visibilidade SEMPRE ──
+                try
+                {
+                    if (hidingApplied && Win32Api.IsWindow(explorerWindow))
+                    {
+                        Win32Api.SetLayeredWindowAttributes(explorerWindow, 0, 255, Win32Api.LWA_ALPHA);
+                        if (!wasLayered)
+                        {
+                            Win32Api.SetWindowLongPtr(explorerWindow, Win32Api.GWL_EXSTYLE,
+                                new IntPtr(originalExStyle));
+                        }
+                    }
+                }
+                catch { /* restauração é best-effort */ }
             }
         }
 
@@ -4326,7 +4387,7 @@ namespace KitLugia.GUI.Services
             {
                 Interval = TimeSpan.FromMilliseconds(_ramLimiterIntervalMs)
             };
-            _ramLimiterTimer.Tick += (s, e) => { ApplyProcessRamLimits(); ApplyProcessCpuLimits(); };
+            _ramLimiterTimer.Tick += (s, e) => { ApplyProcessRamLimits(); ApplyProcessCpuLimits(); ApplyProcessEngineLimits(); };
             _ramLimiterTimer.Start();
             KitLugia.Core.Logger.Log($"💾 RAM Limiter timer iniciado ({_ramLimiterIntervalMs}ms)");
         }
@@ -4546,6 +4607,8 @@ namespace KitLugia.GUI.Services
                 if (!limit.Enabled) continue;
                 var cfg = limit.EngineConfig;
                 if (cfg == null || !cfg.CpuLimitEnabled) continue;
+                // ProBalance modo HardCap gerencia o próprio job (evita conflito de nome)
+                if (cfg.ProBalance && cfg.ProBalanceMode == "HardCap") continue;
 
                 string key = limit.ProcessName.ToLowerInvariant().Replace(".exe", "");
                 int percent = Math.Clamp(cfg.CpuLimitPercent, 1, 99);
@@ -4559,60 +4622,272 @@ namespace KitLugia.GUI.Services
                         continue;
                     }
 
-                    if (_cpuJobObjects.TryGetValue(key, out var existingJob) && existingJob != IntPtr.Zero)
+                    EnsureCpuJob(key, processes, percent);
+                    foreach (var p in processes) p.Dispose();
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+        }
+
+        /// <summary>
+        /// Cria/atualiza o Job Object de hard cap de CPU do processo (percentual absoluto).
+        /// Nao faz dispose dos processos (quem chama é responsável).
+        /// </summary>
+        private void EnsureCpuJob(string key, Process[] processes, int percent)
+        {
+            if (_cpuJobObjects.TryGetValue(key, out var existingJob) && existingJob != IntPtr.Zero)
+            {
+                Win32Api.CloseHandle(existingJob);
+                _cpuJobObjects.Remove(key);
+            }
+
+            IntPtr hJob = Win32Api.CreateJobObject(IntPtr.Zero, $"KitLugia_CPULimit_{key}");
+            if (hJob == IntPtr.Zero) return;
+
+            var cpuInfo = new Win32Api.JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
+            {
+                ControlFlags = Win32Api.JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | Win32Api.JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
+                CpuRate = (uint)(percent * 100)
+            };
+
+            int size = System.Runtime.InteropServices.Marshal.SizeOf(cpuInfo);
+            IntPtr ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
+            bool setOk = false;
+            try
+            {
+                System.Runtime.InteropServices.Marshal.StructureToPtr(cpuInfo, ptr, false);
+                setOk = Win32Api.SetInformationJobObject(hJob, Win32Api.JobObjectCpuRateControlInformation, ptr, (uint)size);
+            }
+            finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(ptr); }
+
+            if (!setOk)
+            {
+                Win32Api.CloseHandle(hJob);
+                return;
+            }
+
+            int assigned = 0;
+            foreach (var proc in processes)
+            {
+                try
+                {
+                    if (Win32Api.AssignProcessToJobObject(hJob, proc.Handle))
+                        assigned++;
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+
+            if (assigned > 0)
+                _cpuJobObjects[key] = hJob;
+            else
+                Win32Api.CloseHandle(hJob);
+        }
+
+        /// <summary>
+        /// Remove o hard cap de CPU do processo (fecha o Job Object — o cap deixa de valer).
+        /// </summary>
+        private void ReleaseCpuJob(string key)
+        {
+            if (_cpuJobObjects.TryGetValue(key, out var hJob) && hJob != IntPtr.Zero)
+            {
+                Win32Api.CloseHandle(hJob);
+                _cpuJobObjects.Remove(key);
+            }
+        }
+
+        private static ProcessPriorityClass ParsePriorityClass(string? priority)
+        {
+            return priority?.ToLowerInvariant() switch
+            {
+                "idle" => ProcessPriorityClass.Idle,
+                "belownormal" => ProcessPriorityClass.BelowNormal,
+                "normal" => ProcessPriorityClass.Normal,
+                "abovenormal" => ProcessPriorityClass.AboveNormal,
+                "high" => ProcessPriorityClass.High,
+                "realtime" => ProcessPriorityClass.RealTime,
+                _ => ProcessPriorityClass.Normal
+            };
+        }
+
+        /// <summary>
+        /// Motor por processo (standalone): aplica prioridade/I-O/pagina/memoria/EcoQoS
+        /// estáticos do EngineConfig e roda o ProBalance dinâmico em 3 modos:
+        ///  - Classic: BelowNormal temporário após N amostras (estilo Process Lasso)
+        ///  - EcoQoS:  API oficial Win11 (SetProcessInformation PROCESS_POWER_THROTTLING)
+        ///  - HardCap: Job Object hard cap enquanto estiver acima do threshold
+        /// Nunca throttla o processo em primeiro plano (regra do ProBalance original).
+        /// </summary>
+        private void ApplyProcessEngineLimits()
+        {
+            if (_processRamLimits.IsEmpty) return;
+
+            IntPtr foregroundHwnd = Win32Api.GetForegroundWindow();
+            uint foregroundPid = 0;
+            if (foregroundHwnd != IntPtr.Zero)
+                Win32Api.GetWindowThreadProcessId(foregroundHwnd, out foregroundPid);
+            var now = DateTime.UtcNow;
+
+            foreach (var limit in _processRamLimits.Values)
+            {
+                var cfg = limit.EngineConfig;
+                string key = limit.ProcessName.ToLowerInvariant().Replace(".exe", "");
+
+                // Limite desligado/removido: garante restauração do que estava throttled
+                if (!limit.Enabled || cfg == null)
+                {
+                    if (limit.IsProBalanceThrottled)
                     {
-                        Win32Api.CloseHandle(existingJob);
+                        RestoreEngineProcess(key);
+                        limit.IsProBalanceThrottled = false;
+                        limit.ProBalanceSampleCount = 0;
+                    }
+                    continue;
+                }
+
+                Process[] processes;
+                try { processes = Process.GetProcessesByName(limit.ProcessName); }
+                catch { continue; }
+                if (processes.Length == 0) { foreach (var p in processes) p.Dispose(); continue; }
+
+                try
+                {
+                    bool anyForeground = false;
+                    foreach (var proc in processes)
+                    {
+                        try { if ((uint)proc.Id == foregroundPid) { anyForeground = true; break; } } catch { }
                     }
 
-                    IntPtr hJob = Win32Api.CreateJobObject(IntPtr.Zero, $"KitLugia_CPULimit_{key}");
-                    if (hJob == IntPtr.Zero)
-                    {
-                        foreach (var p in processes) p.Dispose();
-                        continue;
-                    }
+                    var targetPriority = ParsePriorityClass(cfg.CpuPriority);
 
-                    var cpuInfo = new Win32Api.JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
-                    {
-                        ControlFlags = Win32Api.JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | Win32Api.JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
-                        CpuRate = (uint)(percent * 100)
-                    };
-
-                    int size = System.Runtime.InteropServices.Marshal.SizeOf(cpuInfo);
-                    IntPtr ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
-                    bool setOk = false;
-                    try
-                    {
-                        System.Runtime.InteropServices.Marshal.StructureToPtr(cpuInfo, ptr, false);
-                        setOk = Win32Api.SetInformationJobObject(hJob, Win32Api.JobObjectCpuRateControlInformation, ptr, (uint)size);
-                    }
-                    finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(ptr); }
-
-                    if (!setOk)
-                    {
-                        Win32Api.CloseHandle(hJob);
-                        foreach (var p in processes) p.Dispose();
-                        continue;
-                    }
-
-                    int assigned = 0;
+                    // ── 1. Motor estático (idempotente): prioridade/I-O/página/memória/EcoQoS ──
                     foreach (var proc in processes)
                     {
                         try
                         {
-                            if (Win32Api.AssignProcessToJobObject(hJob, proc.Handle))
-                                assigned++;
+                            if (proc.HasExited) continue;
+
+                            // Prioridade: não sobrescreve o throttle ativo do ProBalance clássico
+                            if (!(cfg.ProBalance && limit.IsProBalanceThrottled))
+                            {
+                                try
+                                {
+                                    if (proc.PriorityClass != targetPriority && targetPriority != ProcessPriorityClass.RealTime)
+                                        proc.PriorityClass = targetPriority;
+                                }
+                                catch (System.ComponentModel.Win32Exception) { /* protegido (PPL/elevado) — ignora */ }
+                            }
+
+                            try { Win32Api.SetProcessIoPriority(proc.Handle, cfg.IoPriorityLevel == 0 ? 2 : cfg.IoPriorityLevel == 1 ? 4 : 3); } catch { }
+                            try { Win32Api.SetProcessPagePriority(proc.Handle, cfg.PagePriorityLevel == 0 ? 5 : cfg.PagePriorityLevel); } catch { }
+                            try { Win32Api.SetThreadMemoryPriority(proc.Handle, (uint)(cfg.ThreadMemoryPriority == 0 ? 5 : cfg.ThreadMemoryPriority)); } catch { }
+                            // EcoQoS estático só quando o modo ProBalance não controla ele (evita briga)
+                            if (cfg.ProBalanceMode != "EcoQoS")
+                                try { SetEcoQoS(proc.Handle, cfg.EcoQoSEnabled); } catch { }
+                            if (cfg.ThreadEfficiencyMode)
+                                try { Win32Api.SetThreadEfficiencyForAllThreads((uint)proc.Id, true); } catch { }
                         }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                        proc.Dispose();
+                        catch { }
                     }
 
-                    if (assigned > 0)
-                        _cpuJobObjects[key] = hJob;
-                    else
-                        Win32Api.CloseHandle(hJob);
+                    // ── 2. ProBalance dinâmico (standalone — quebra o tabu: funciona sem GameBoost) ──
+                    if (cfg.ProBalance)
+                    {
+                        double cpu = 0;
+                        foreach (var proc in processes)
+                        {
+                            try { cpu = Math.Max(cpu, GetProcessCpuUsage(proc)); } catch { }
+                        }
+
+                        bool over = cpu > cfg.ProBalanceCpuThreshold;
+
+                        switch (cfg.ProBalanceMode)
+                        {
+                            case "EcoQoS":
+                                foreach (var proc in processes)
+                                {
+                                    try { SetEcoQoS(proc.Handle, over && !anyForeground); } catch { }
+                                }
+                                limit.IsProBalanceThrottled = over && !anyForeground;
+                                break;
+
+                            case "HardCap":
+                                if (over && !anyForeground)
+                                {
+                                    EnsureCpuJob(key, processes, Math.Clamp(cfg.ProBalanceCpuThreshold, 1, 99));
+                                    limit.IsProBalanceThrottled = true;
+                                }
+                                else if (!over && limit.IsProBalanceThrottled)
+                                {
+                                    ReleaseCpuJob(key);
+                                    limit.IsProBalanceThrottled = false;
+                                }
+                                break;
+
+                            default: // Classic — estilo Process Lasso (BelowNormal temporário)
+                                if (over && !anyForeground && !limit.IsProBalanceThrottled)
+                                {
+                                    limit.ProBalanceSampleCount++;
+                                    if (limit.ProBalanceSampleCount >= ProBalanceSamplesRequired)
+                                    {
+                                        foreach (var proc in processes)
+                                        {
+                                            try { if (proc.PriorityClass >= ProcessPriorityClass.Normal) proc.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
+                                            try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_VERY_LOW); } catch { }
+                                        }
+                                        limit.IsProBalanceThrottled = true;
+                                        limit.ProBalanceCooldownUntil = now.AddSeconds(ProBalanceCooldownSec);
+                                        limit.ProBalanceSampleCount = 0;
+                                        KitLugia.Core.Logger.Log($"⚖️ ProBalance {cfg.ProBalanceMode}: {limit.ProcessName} throttled (CPU {cpu:F1}% > {cfg.ProBalanceCpuThreshold}%)");
+                                    }
+                                }
+                                else if (limit.IsProBalanceThrottled && (now >= limit.ProBalanceCooldownUntil || !over))
+                                {
+                                    RestoreEngineProcess(key);
+                                    limit.IsProBalanceThrottled = false;
+                                    limit.ProBalanceSampleCount = 0;
+                                    KitLugia.Core.Logger.Log($"🔼 ProBalance {cfg.ProBalanceMode}: {limit.ProcessName} restaurado para Normal");
+                                }
+                                else if (!over) limit.ProBalanceSampleCount = 0;
+                                break;
+                        }
+                    }
+                    else if (limit.IsProBalanceThrottled)
+                    {
+                        RestoreEngineProcess(key);
+                        if (cfg.ProBalanceMode == "HardCap") ReleaseCpuJob(key);
+                        limit.IsProBalanceThrottled = false;
+                        limit.ProBalanceSampleCount = 0;
+                    }
                 }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                catch (Exception ex) { ConditionalLog.LogOnce("ApplyProcessEngineLimits", ex); }
+                finally { foreach (var p in processes) try { p.Dispose(); } catch { } }
             }
+        }
+
+        /// <summary>
+        /// Restaura prioridade Normal + memória Normal de um processo que estava throttled
+        /// pelo ProBalance por processo (todos os processos com aquele nome).
+        /// </summary>
+        private void RestoreEngineProcess(string key)
+        {
+            try
+            {
+                foreach (var proc in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (proc.ProcessName.Equals(key, StringComparison.OrdinalIgnoreCase) ||
+                            proc.ProcessName.Equals(key + ".exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { if (proc.PriorityClass == ProcessPriorityClass.BelowNormal) proc.PriorityClass = ProcessPriorityClass.Normal; } catch { }
+                            try { Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL); } catch { }
+                        }
+                    }
+                    catch { }
+                    finally { try { proc.Dispose(); } catch { } }
+                }
+            }
+            catch { ConditionalLog.LogOnce("RestoreEngineProcess", null); }
         }
 
         /// <summary>
@@ -5363,6 +5638,11 @@ namespace KitLugia.GUI.Services
             public ProcessEngineConfig? EngineConfig { get; set; } = null;
             public bool SafeAutoRegulate { get; set; } = true; // Modo auto-regulavel (padrao: ativo)
 
+            // ── ProBalance por processo (standalone — roda no tick do RAM Limiter, sem GameBoost) ──
+            public int ProBalanceSampleCount { get; set; } = 0;          // amostras consecutivas acima do threshold
+            public DateTime ProBalanceCooldownUntil { get; set; } = DateTime.MinValue; // fim do cooldown (modo Clássico)
+            public bool IsProBalanceThrottled { get; set; } = false;     // throttled neste momento
+
             // ── Resting State Tracker ──
             // Aprende o "estado natural" do app ao longo do tempo.
             // O trim NUNCA vai abaixo do resting state (o mínimo que o app precisa para funcionar).
@@ -5433,6 +5713,8 @@ namespace KitLugia.GUI.Services
             public bool EcoQoSEnabled { get; set; } = false;
             public bool ProBalance { get; set; } = false;
             public int ProBalanceCpuThreshold { get; set; } = 5;
+            // Classic = BelowNormal temporário (estilo Process Lasso) | EcoQoS = API oficial Win11 | HardCap = Job Object hard cap
+            public string ProBalanceMode { get; set; } = "Classic";
             public bool CpuLimitEnabled { get; set; } = false;
             public int CpuLimitPercent { get; set; } = 50;
             public bool NetworkBoost { get; set; } = false;

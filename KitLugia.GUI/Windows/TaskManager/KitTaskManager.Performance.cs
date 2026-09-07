@@ -684,10 +684,6 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (_perfUsageLine?.Tag is System.Windows.Documents.Run r) r.Text = text;
         }
 
-        // ─── Métricas ao vivo por dispositivo (mesmas do Task Manager do Windows) ───
-        private TextBlock? _cpuLiveBlock;
-        private TextBlock? _diskLiveBlock;
-        private TextBlock? _memLiveBlock;
 
         private System.Windows.Documents.Run AddLiveLine(string label)
         {

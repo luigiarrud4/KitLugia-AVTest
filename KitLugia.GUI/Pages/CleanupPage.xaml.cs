@@ -1073,7 +1073,9 @@ namespace KitLugia.GUI.Pages
             _ => "#888"
         };
 
+        #pragma warning disable CS0067 // exigido por INotifyPropertyChanged; a classe é imutável (nunca dispara)
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        #pragma warning restore CS0067
 
         public MonitorChangeViewModel(InstallMonitorChange change)
         {

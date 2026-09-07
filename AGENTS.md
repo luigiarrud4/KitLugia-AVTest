@@ -4837,3 +4837,166 @@ OUTRAS PAGINAS:
   (Corrigir tudo)" com CheckState agregado + ExecuteAction=RepairAllPathsOnce.
 
 Build: 0 erros. App relancado (PID 36232).
+
+### Sessao 06/09 (16:40) - Turbo Explorer default OFF + ProBalance por processo (3 modos)
+
+1. **ExplorerAutoTurbo default FALSE** (TrayIconService): usuario pegou Windows limpo e o kit
+   ja vinha ativado movendo explorer p/ tela cheia. Propriedade + ReadBoolSetting agora
+   default false — instalacao limpa NUNCA liga sozinho; usuario marca manualmente em
+   TweaksPage/GameBoostPro. Maquina do usuario mantem 1 (pref salva vence).
+
+2. **ProBalance por processo (quebra o tabu)**: o EngineConfig do gear ⚙️ na pagina de
+   monitor RAM era SO salvo — unico campo aplicado era CpuLimitEnabled (Job Object);
+   ProBalance per-process era dead code e o global so rodava com GameBoost em foreground.
+   Agora `ApplyProcessEngineLimits()` roda no tick do RAM Limiter (standalone):
+   - Motor estatico: prioridade CPU (ParsePriorityClass), I/O (NtSetInformationProcess),
+     page priority, thread memory priority, EcoQoS, ThreadEfficiencyMode (E-cores).
+   - ProBalance dinamico com exclusao de foreground (regra Process Lasso) + 3 modos:
+     Classic (BelowNormal + mem muito baixa, 3 amostras + cooldown 30s, restaura sozinho),
+     EcoQoS (API oficial Win11 PROCESS_POWER_THROTTLING — mesmo mecanismo do Modo Eficiencia
+     do Task Manager), HardCap (Job Object hard cap enquanto acima do threshold, libera quando
+     normaliza). Restore garantido ao desligar/remover o limite.
+   - Job Object refatorado em EnsureCpuJob/ReleaseCpuJob; ApplyProcessCpuLimits pula
+     ProBalanceMode==HardCap (evita conflito de nome de job).
+
+3. **UI**: ProcessEngineConfigOverlay ganhou ComboBox "Modo do ProBalance"
+   (Classico/EcoQoS/HardCap) + caixa explicativa com os 3 mecanismos; linha do processo
+   (BuildLimitRow) mostra badges do motor (⚡ prioridade · ⚖️ ProBalance modo · 📉 cap %
+   · 🌱 EcoQoS · 🧵 E-cores · ⏱ Timer) + ⚡ Pico e 💾 Commit; LoadProcessLimits() chamado
+   apos salvar o gear (badges atualizam na hora).
+
+Pesquisa web (06/09): bitsum.com/how-probalance-works (BelowNormal temporario, marginal,
+so em background, ignora prioridades nao-Normal), learn.microsoft.com SetProcessInformation
+(EcoQoS = PROCESS_POWER_THROTTLING_EXECUTION_SPEED), JOBOBJECT_CPU_RATE_CONTROL HARD_CAP
+(CpuRate = %*100).
+
+Build: 0 erros / 154 warnings (nullable baseline). App no tray (PID 14364), boot limpo.
+
+### Sessao 06/09 (17:10) - InfoButton padronizado + overlay de processo usa o padrao
+
+1. **InfoButton = padrao canonico de icone de informacao** (Controls/InfoButton.xaml + .cs):
+   - Overlay de config de processo (ProcessEngineConfigOverlay) trocou o estilo local InfoIcon
+     (ⓘ cinza) pelo `controls:InfoButton` (ℹ dourado, opacidade 0.65 -> 1 no hover) - identico
+     aos cards do TweaksPage.
+   - Opacidade movida do TextBlock p/ o Button (opacidade NAO e herdada pelo trigger - hover
+     agora clareia de verdade).
+   - ToolTip enriquecido no code-behind: TextBlock com TextWrapping + MaxWidth 460 + fundo
+     escuro/arredondado (tooltips longos legiveis), InitialShowDelay 0 / ShowDuration 20s.
+   - Fix de ambiguidade: System.Drawing vs System.Windows.Media (Color/FontFamily) - qualificado.
+
+2. ProcessEngineConfigOverlay ampliado p/ 620px (max 700) com clamp por SystemParameters.WorkArea
+   (92% da tela, DPI-safe) + subtitulo explicativo + 15 icones InfoButton com texto de ajuda.
+
+Build: 0 erros. App no tray (PID 25428), boot limpo.
+
+### Sessao 06/09 (17:20) - FIX: tooltip InfoButton + rodape do overlay cobrindo conteudo
+
+1. **Tooltip do InfoButton parou de exibir**: a versao que funcionava (git HEAD) setava
+   `BtnInfo.ToolTip = string`. Troquei por Border solto como conteudo - WPF nao exibia de
+   forma confiavel. Fix: criar `System.Windows.Controls.ToolTip` real com Content=Border
+   (Placement=Mouse, HasDropShadow, StaysOpen=false). Ambiguidade ToolTip/PlacementMode
+   (System.Windows.Forms + Primitives) qualificada. InfoButton.xaml.cs agora compila.
+
+2. **Rodape do overlay cobria o ultimo item**: Border de Cancelar/Salvar tinha
+   Margin="-20,-12,-20,-20" - o -12 no topo invadia a area de rolagem (ScrollViewer) e
+   cobria o ultimo botao da pagina. Fix: Margin="-20,0,-20,-20" (topo 0, nao invade) +
+   espacador Height=6 no fim do conteudo.
+
+Build: 0 erros. App no tray (PID 25540).
+
+### Sessao 06/09 (17:24) - FIX 2 tooltip InfoButton: conteudo STRING (mesmo padrao dos botoes GPU/TweaksPage)
+
+Ainda nao mostrava nada. O padrao QUE FUNCIONA neste app (botoes de info do TweaksPage,
+GPU rows, criados em runtime) e `ToolTip = string` simples - WPF renderiza quebras de
+linha por &#x0a; no proprio string. Montar Border/ToolTip custom em codigo (duas tentativas)
+fazia o tooltip nao abrir. InfoButton.xaml.cs agora faz exatamente o git-HEAD:
+`BtnInfo.ToolTip = string.IsNullOrEmpty(text) ? null : text;` (ToolTipText DP).
+Build 0 erros. App no tray (PID 29936). AGUARDANDO confirmacao do hover.
+
+### Sessao 06/09 (17:35) - Turbo Explorer F11 INVISIVEL (nao interrompe o usuario)
+
+Pedido: o toggle F11 (entra/sai de tela cheia) fazia a janela do Explorer pular a tela e
+interrompia o usuario. Solucao: tornar a janela INVISIVEL durante o toggle.
+
+Win32Api (TrayIconService.cs): GetWindowLongPtr/SetWindowLongPtr (GWL_EXSTYLE ja existia),
+SetLayeredWindowAttributes, WS_EX_LAYERED, LWA_ALPHA.
+
+ApplyF11Render reescrito:
+1. Salva exstyle original; adiciona WS_EX_LAYERED se nao tinha; SetLayeredWindowAttributes
+   alpha 0 (janela some visualmente, mas continua processando mensagens/layout - sem roubar
+   foco, sem mover a janela).
+2. F11 down/up, Sleep(dwellMs), F11 down/up (igual antes).
+3. finally: restaura alpha 255 e remove WS_EX_LAYERED se tinha adicionado (SEMPRE roda).
+Fallback: se a opacidade falhar (hidingApplied=false), faz o toggle visivel antigo - nunca
+perde a funcao. Log marca "(invisível)" quando funcionou.
+
+TESTADO (17:32, host, PowerShell mesmo codigo P/Invoke): janela Explorer System32 -
+hidden=True, F11 2x, rect voltou EXATO (537,161,1071,729 antes/depois). A funcao do
+re-render preservada (mesmos PostMessage), sem pulo visual.
+
+Build: 0 erros. App no tray (PID 31696). A TESTAR pelo usuario: reiniciar explorer ->
+abrir pasta - conferir se NAO ve mais o pulo de tela cheia e o 'ir direto ao arquivo'
+continua funcionando.
+
+### Sessao 06/09 (17:40) - ExplorerAutoTurbo default TRUE + textos atualizados (F11 invisivel)
+
+Usuario confirmou que o F11 invisivel funciona ("janela fechou e abriu instantanea" =
+transparente durante o toggle). Fluxo desejado: kit abre -> ja roda o processo invisivel;
+se explorer reiniciar -> kit faz de novo rapido, sem o usuario ver.
+
+1. ExplorerAutoTurbo default voltou a TRUE (era FALSE desde que o usuario pediu default off
+   por causa do pulo VISIVEL em tela cheia; com o F11 invisivel esse problema sumiu).
+   Instalacao limpa ja roda sozinho; usuario pode desligar no TweaksPage/GameBoostPro.
+   ReadBoolSetting default tambem TRUE.
+
+2. ToolTip do TweaksPage atualizado: antes dizia "(a janela pisca em tela cheia por um
+   instante)" - agora diz que a aplicacao e INVISIVEL (janela oculta por fracoes de segundo,
+   nao pula, nao interrompe).
+
+TESTADO (17:38, host): log "explorer.exe ativo (PID 6448) — auto-turbo armado" + "F11 2x
+aplicado (re-render) — origem: auto (invisível)" ~3s apos o kit iniciar. Build: 0 erros.
+App no tray (PID 10516).
+
+### Sessao 06/09 (18:00) - Restaurar Visual Normal do Explorer (miniaturas + agrupamento por data)
+
+Sintoma do usuario: apos o F11 render fix, o visual do Explorer seguia quebrado —
+(1) fotos/videos aparecem so com o icone do app associado (sem previews) e
+(2) a separacao por dias/meses/anos sumiu do Downloads e de outras areas.
+
+Causa raiz: DOIS tweaks de contorno que o kit aplicou ANTES de descobrir que o
+"pular direto ao arquivo" lento era bug de RENDER (F11 2x invisivel), e que
+sacrificavam o visual normal:
+1. `IconsOnly=1` em `HKCU\...\Explorer\Advanced` (toggle "Ir direto ao arquivo")
+   = "Sempre mostrar icones, nunca miniaturas" -> Explorer nao gera previews.
+2. `FolderType=NotSpecified` em `HKCU\...\Shell\Bags\AllFolders\Shell`
+   (toggle "Turbo do Explorer") = desliga o Auto Folder Type Discovery -> pastas
+   abrem em template generico, sem o template padrao que agrupa por data.
+
+Correcao (KitLugia.Core\SystemTweaks.cs):
+- `IsExplorerVisualNormal()`: miniaturas ligadas E folder-type discovery ativo.
+- `ResetSavedFolderViews()`: apaga as views salvas POR PASTA (subchaves numericas
+  de Bags, preserva AllFolders) + BagMRU inteiro, nos 2 locais
+  (`HKCU\Software\Classes\Local Settings\...\Shell` e `HKCU\Software\Microsoft\Windows\Shell`),
+  equivale ao "Restaurar Padroes das Pastas" do Explorer. O Explorer recria os
+  templates padrao na proxima abertura -> agrupamento por data volta em Downloads.
+- `RestoreExplorerNormalVisuals()`: chama RestoreExplorerThumbnails +
+  RestoreExplorerFolderDiscovery + ResetSavedFolderViews. Requer reiniciar o
+  explorer.exe para o shell reconstruir as Bags.
+
+GUI (TweaksPage, card "Interface e Explorer", apos Turbo Explorer automatico):
+- Row nova "Restaurar visual padrao do Explorer" com controls:InfoButton
+  (explica os 2 tweaks obsoletos), texto e botao GoldButtonStyle
+  `BtnRestoreExplorerVisual` (Click `BtnRestoreExplorerVisual_Click`).
+- Handler: confirmacao (ShowConfirmationDialog) -> Task.Run de
+  RestoreExplorerNormalVisuals -> taskkill explorer + start -> sincroniza
+  ChkExplorerTurbo/ChkExplorerThumbs para OFF ("Padrao"/"Com miniaturas") ->
+  ShowSuccess. RecordTweak dos 2 nomes como false (nao reaplica no boot).
+
+APLICADO NA MAQUINA (18:00): IconsOnly removido, FolderType(AllFolders) removido,
+Bags numericas + BagMRU resetadas nos 2 locais, explorer reiniciado (shell
+reconstruiu as views; PID novo 18064 com auto-turbo re-armado). Build: 0 erros /
+154 warnings (baseline nullable pre-existentes).
+
+A TESTAR (host): abrir Downloads -> conferir separadores de data (hoje/ontem/
+mes/ano) de volta; abrir pasta de fotos/videos -> previews de volta; conferir que
+o "ir direto ao arquivo" continua instantaneo (watchdog reaplica F11 invisivel).

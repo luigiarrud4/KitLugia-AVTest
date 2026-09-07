@@ -60,7 +60,6 @@ namespace KitLugia.GUI.Pages
                 bool bingDisabled = SystemTweaks.IsBingDisabled();
                 bool memoryUsageEnabled = SystemTweaks.IsMemoryUsageEnabled();
                 bool timerOptimized = SystemTweaks.IsTimerResolutionOptimized();
-                bool shutdownOptimized = SystemTweaks.IsFastShutdownEnabled();
                 bool slideInput = SystemTweaks.IsInputLatencyOptimized();
                 bool slideUsb = SystemTweaks.IsUsbPowerSavingDisabled();
                 bool slideGaming = SystemTweaks.IsGamingLatencyOptimized();
@@ -159,9 +158,6 @@ namespace KitLugia.GUI.Pages
 
                     ChkTimer.IsChecked = timerOptimized;
                     UpdateLabel(StatusTimer, timerOptimized, "Latência Mínima", "Padrão");
-
-                    ChkShutdown.IsChecked = shutdownOptimized;
-                    UpdateLabel(StatusShutdown, shutdownOptimized, "⚡ Turbo Boot", "Padrão");
 
                     // SmartScreen
                     UpdateLabel(StatusSmartScreenSystem, smartScreenSystemDisabled, "Desativado", "Ativo");
@@ -340,7 +336,8 @@ namespace KitLugia.GUI.Pages
                     int explorerLaunchTo = SystemTweaks.GetExplorerLaunchToIndex();
                     bool iconCache = SystemTweaks.IsIconCacheIncreased();
                     bool pca = SystemTweaks.IsPCADisabled();
-                    bool explorerTurbo = SystemTweaks.IsExplorerFolderDiscoveryDisabled();
+                    bool explorerVisualDirty = SystemTweaks.IsExplorerFolderDiscoveryDisabled() || SystemTweaks.IsExplorerThumbnailsDisabled() || SystemTweaks.IsThumbnailCacheDisabled();
+                    bool explorerHealthDirty = explorerVisualDirty; // capturado na thread bg, aplicado na UI abaixo
 
                     ChkMenuDelay.IsChecked = menuDelay;
                     UpdateLabel(StatusMenuDelay, menuDelay, "0ms", "Padrão (400ms)");
@@ -361,12 +358,7 @@ namespace KitLugia.GUI.Pages
                     ChkPCA.IsChecked = pca;
                     UpdateLabel(StatusPCA, pca, "Desativado", "Ativo");
 
-                    ChkExplorerTurbo.IsChecked = explorerTurbo;
-                    UpdateLabel(StatusExplorerTurbo, explorerTurbo, "Turbo (Generic)", "Padrão");
 
-                    bool explorerThumbs = SystemTweaks.IsExplorerThumbnailsDisabled();
-                    ChkExplorerThumbs.IsChecked = explorerThumbs;
-                    UpdateLabel(StatusExplorerThumbs, explorerThumbs, "Sem miniaturas", "Com miniaturas");
 
                     bool explorerAutoTurbo = (Application.Current.MainWindow as MainWindow)?.TrayService?.ExplorerAutoTurbo == true;
                     ChkExplorerAutoTurbo.IsChecked = explorerAutoTurbo;
@@ -404,6 +396,8 @@ namespace KitLugia.GUI.Pages
                     UpdateLabel(StatusStorageSense, storageSense, "Desativado", "Ativo");
                     ChkReserveStorage.IsChecked = reservedStorage;
                     UpdateLabel(StatusReserveStorage, reservedStorage, "Liberado", "Reservado");
+
+                    UpdateExplorerHealth(explorerHealthDirty);
 
                     _isLoading = false;
                 });
@@ -683,19 +677,6 @@ namespace KitLugia.GUI.Pages
                 mw.ShowInfo("REINÍCIO NECESSÁRIO", $"{result.Message}\nO Windows precisa ser reiniciado para aplicar as mudanças de Timer.");
         }
 
-        private void ChkShutdown_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isLoading) return;
-            SystemTweaks.ToggleFastShutdown();
-
-            bool nowActive = ChkShutdown.IsChecked == true;
-            UpdateLabel(StatusShutdown, nowActive, "⚡ Turbo Boot", "Padrão");
-
-                RecordTweak("FastShutdown", nowActive);
-            // Update Tray if exists
-            var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
-            if (tray != null) { tray.TurboShutdownEnabled = nowActive; tray.SaveSettings(); }
-        }
 
         private void ChkBackgroundApps_Click(object sender, RoutedEventArgs e)
         {
@@ -2199,51 +2180,99 @@ namespace KitLugia.GUI.Pages
             finally { _isLoading = false; }
         }
 
-        private async void ChkExplorerTurbo_Click(object sender, RoutedEventArgs e)
+        // ── Switch 💀/✅ de saúde do Explorer ──
+        // ✅ direita (verde) = tudo no padrão. Detecção: page load + após cada ação.
+        private void UpdateExplorerHealth(bool dirty)
         {
-            if (_isLoading) return;
-            _isLoading = true;
-            try
+            if (dirty)
             {
-                bool targetActive = ChkExplorerTurbo.IsChecked == true;
-                await Task.Run(() =>
+                string causes = "";
+                try
                 {
-                    if (targetActive) SystemTweaks.DisableExplorerFolderDiscovery();
-                    else SystemTweaks.RestoreExplorerFolderDiscovery();
-                });
-                UpdateLabel(StatusExplorerTurbo, targetActive, "Turbo (Generic)", "Padrão");
-
-                RecordTweak("ExplorerTurbo", targetActive);
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.ShowInfo("EXPLORER", targetActive
-                        ? "Turbo do Explorer ativado — pastas abrem sem análise de tipo (FolderType=NotSpecified). Novas janelas já abrem mais rápido."
-                        : "Turbo do Explorer desativado — Explorer volta a detectar o tipo de pasta automaticamente.");
+                    if (SystemTweaks.IsExplorerThumbnailsDisabled()) causes += "miniaturas desligadas; ";
+                    if (SystemTweaks.IsThumbnailCacheDisabled()) causes += "cache de miniaturas desligado; ";
+                    if (SystemTweaks.IsExplorerFolderDiscoveryDisabled()) causes += "agrupamento por data desligado; ";
+                }
+                catch { }
+                TxtExplorerHealth.Text = $"💀 Explorer prejudicado ({causes.TrimEnd(';', ')').TrimEnd()}). Fotos mostram só o ícone do app e/ou pastas sem Hoje/Ontem. Use REPARAR EXPLORER abaixo.";
+                TxtExplorerHealth.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x6A, 0x5E));
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            finally { _isLoading = false; }
+            else
+            {
+                TxtExplorerHealth.Text = "✅ Tudo saudável: miniaturas e agrupamento por data funcionando no padrão do Windows.";
+                TxtExplorerHealth.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x7E, 0xD0, 0x7E));
+            }
         }
 
-        private async void ChkExplorerThumbs_Click(object sender, RoutedEventArgs e)
+        // ── Card "VISUAL DO EXPLORER": 1 botão de reparo COMPLETO ──
+        // Corrige 'fotos aparecem só com o ícone do app' nas 3 causas reais:
+        //   1. IconsOnly / DisableThumbnailCache (opções 'sempre mostrar ícones' e
+        //      'não usar cache de miniaturas' desmarcadas);
+        //   2. Views por pasta criadas COM os tweaks ligados (a pasta lembra
+        //      'icons only') — apagadas com segurança via ResetSavedFolderViews;
+        //   3. Cache de miniaturas corrompido (thumbcache_*.db) — apagado.
+        // ResetSavedFolderViews preserva o template global (AllFolders) e afeta views,
+        // NÃO dados: fotos/arquivos nunca são tocados. Ícones do desktop podem
+        // ser reordenados (posições também são views) — avisado no diálogo.
+        private async void BtnRestoreExplorerVisual_Click(object sender, RoutedEventArgs e)
         {
             if (_isLoading) return;
             _isLoading = true;
             try
             {
-                bool targetActive = ChkExplorerThumbs.IsChecked == true;
+                var mw = Application.Current.MainWindow as MainWindow;
+                if (mw == null) { _isLoading = false; return; }
+
+                if (!await mw.ShowConfirmationDialog(
+                    "REPARAR EXPLORER?\n\n" +
+                    "• Fotos e vídeos voltam a mostrar preview (miniatura).\n" +
+                    "• Agrupamento por data (Hoje/Ontem) volta nas pastas.\n" +
+                    "• Reconstrói o cache de miniaturas (corrige previews que não carregam).\n" +
+                    "• Nenhum arquivo é apagado — só caches e configurações de visual.\n" +
+                    "• ATENÇÃO: posições dos ícones da área de trabalho podem ser reordenadas.\n" +
+                    "• O explorer.exe será reiniciado ao final (desktop pisca 1x)."))
+                {
+                    _isLoading = false;
+                    return;
+                }
+
+                BtnRestoreExplorerVisual.IsEnabled = false;
+                BtnRestoreExplorerVisual.Content = "⏳ Reparando...";
+                TxtExplorerHealth.Text = "⏳ Reparando...";
+                TxtExplorerHealth.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE8, 0xB8, 0x4E));
+
                 await Task.Run(() =>
                 {
-                    if (targetActive) SystemTweaks.DisableExplorerThumbnails();
-                    else SystemTweaks.RestoreExplorerThumbnails();
+                    // 1. Registro: opções que desligam miniaturas/detecção de tipo
+                    SystemTweaks.RestoreExplorerThumbnails();      // IconsOnly + DisableThumbnailCache removidos
+                    SystemTweaks.RestoreExplorerFolderDiscovery(); // FolderType=NotSpecified removido
+                    // 2. Views por pasta criadas enquanto os tweaks estavam ligados
+                    //    (a pasta lembra 'icons only') — preserva o template global
+                    SystemTweaks.ResetSavedFolderViews();
                 });
-                UpdateLabel(StatusExplorerThumbs, targetActive, "Sem miniaturas", "Com miniaturas");
 
-                RecordTweak("ExplorerThumbs", targetActive);
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.ShowInfo("EXPLORER", targetActive
-                        ? "Ir direto ao arquivo ativado — Explorer não gera miniaturas na abertura (IconsOnly=1). O destaque ao arquivo correto chega na hora, mesmo em pastas com milhares de arquivos."
-                        : "Miniaturas restauradas — Explorer volta a gerar previews; o destaque ao arquivo pode demorar novamente em pastas grandes.");
+                // 3. Cache de miniaturas/ícones corrompido: explorer PRECISA estar
+                //    morto para os .db não estarem em uso.
+                SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                System.Threading.Thread.Sleep(800);
+                int cachesDeleted = SystemTweaks.ClearThumbnailAndIconCache();
+                System.Threading.Thread.Sleep(500);
+                SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+
+                System.Threading.Thread.Sleep(800);
+                SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                System.Threading.Thread.Sleep(1000);
+                SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+
+                bool dirty = SystemTweaks.IsExplorerFolderDiscoveryDisabled() || SystemTweaks.IsExplorerThumbnailsDisabled() || SystemTweaks.IsThumbnailCacheDisabled();
+                UpdateExplorerHealth(dirty);
+                BtnRestoreExplorerVisual.Content = "✔ REPARADO";
+
+                RecordTweak("ExplorerTurbo", false);
+                RecordTweak("ExplorerThumbs", false);
+                mw.ShowSuccess("EXPLORER", $"Explorer reparado! Miniaturas, agrupamento por data e cache reconstruídos ({cachesDeleted} arquivos de cache apagados). Nenhum arquivo foi apagado.");
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); BtnRestoreExplorerVisual.IsEnabled = true; BtnRestoreExplorerVisual.Content = "REPARAR EXPLORER"; }
             finally { _isLoading = false; }
         }
 
@@ -2275,6 +2304,15 @@ namespace KitLugia.GUI.Pages
             finally { _isLoading = false; }
         }
 
+        // ── Seção Privacidade & Telemetria (recolhível) ───────────────
+
+        private void TglPrivacySection_Click(object sender, RoutedEventArgs e)
+        {
+            bool expand = PanelPrivacySection.Visibility == Visibility.Collapsed;
+            PanelPrivacySection.Visibility = expand ? Visibility.Visible : Visibility.Collapsed;
+            if (FindName("PrivacyChevron") is System.Windows.Controls.TextBlock chevron)
+                chevron.Text = expand ? "▼" : "▶";
+        }
 
         // ── Top Achados 2025 ──────────────────────────────────────────
 

@@ -1287,6 +1287,266 @@ namespace KitLugia.Core
             });
 
 
+            // =================================================================
+            // NOVOS REPAROS — Menu Iniciar, shells, fontes, pastas do usuário,
+            // contadores de performance, malware policies, Win+X, Spotlight...
+            // Fontes: MS Learn (troubleshoot-start-menu-errors), ElevenForum,
+            // NinjaOne, TheWindowsClub (lodctr), comunidade 24H2/25H2.
+            // =================================================================
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Menu Iniciar (Re-registrar)",
+                Category = "Sistema",
+                Icon = "🧭",
+                Description = "Menu Iniciar não abre, abre e fecha na hora ou 'Todos os apps' sumiu (comum no 24H2/25H2). Re-registra o StartMenuExperienceHost e o reinicia.",
+                Execute = () => {
+                    Logger.Log("Re-registrando StartMenuExperienceHost...");
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Stop-Process -Name 'StartMenuExperienceHost' -Force -ErrorAction SilentlyContinue; Get-AppxPackage Microsoft.Windows.StartMenuExperienceHost | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register ($_.InstallLocation + '\\AppXManifest.xml')}\"", true);
+                    Logger.Log("[SUCESSO] Menu Iniciar re-registrado. Abra-o novamente para testar.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Central de Ações / Quick Settings",
+                Category = "Sistema",
+                Icon = "🎚️",
+                Description = "Painel de volume/Wi-Fi/brilho (Quick Settings) e notificações não abrem ou abrem em branco. Re-registra o ShellExperienceHost.",
+                Execute = () => {
+                    Logger.Log("Re-registrando ShellExperienceHost (Action Center)...");
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Stop-Process -Name 'ShellExperienceHost' -Force -ErrorAction SilentlyContinue; Get-AppxPackage Microsoft.Windows.ShellExperienceHost | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register ($_.InstallLocation + '\\AppXManifest.xml')}\"", true);
+                    Logger.Log("[SUCESSO] Central de Ações re-registrada.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reconstruir Cache de Fontes",
+                Category = "Sistema",
+                Icon = "🔤",
+                Description = "Fontes embaralhadas, quadrados/letras erradas ou apps com caracteres inválidos. Para o FontCache, apaga o cache e reinicia o serviço (Requer Admin).",
+                Execute = () => {
+                    Logger.Log("Reconstruindo cache de fontes...");
+                    SystemUtils.RunExternalProcess("cmd", "/c net stop FontCache & net stop FontCache3.0.0.0", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c del /f /q \"%WinDir%\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache\\*\" & del /f /q \"%WinDir%\\System32\\FNTCACHE.DAT\"", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c net start FontCache", true);
+                    Logger.Log("[SUCESSO] Cache de fontes limpo. Reinicie o PC para regenerar.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Restaurar Pastas do Usuário (Downloads/Desktop/etc)",
+                Category = "Sistema",
+                Icon = "📁",
+                Description = "Downloads/Desktop/Documentos/Imagens/Músicas/Vídeos sumiram do Explorer ou apontam para lugar errado (ex.: OneDrive mal removido). Repõe os caminhos padrão em %USERPROFILE%. NÃO move arquivos.",
+                Execute = () => {
+                    Logger.Log("Restaurando User Shell Folders para os padrões...");
+                    using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders");
+                    if (key != null)
+                    {
+                        key.SetValue("Desktop", "%USERPROFILE%\\Desktop", Microsoft.Win32.RegistryValueKind.ExpandString);
+                        key.SetValue("Personal", "%USERPROFILE%\\Documents", Microsoft.Win32.RegistryValueKind.ExpandString);
+                        key.SetValue("{374DE290-123F-4565-9164-39C4925E467B}", "%USERPROFILE%\\Downloads", Microsoft.Win32.RegistryValueKind.ExpandString);
+                        key.SetValue("My Pictures", "%USERPROFILE%\\Pictures", Microsoft.Win32.RegistryValueKind.ExpandString);
+                        key.SetValue("My Music", "%USERPROFILE%\\Music", Microsoft.Win32.RegistryValueKind.ExpandString);
+                        key.SetValue("My Video", "%USERPROFILE%\\Videos", Microsoft.Win32.RegistryValueKind.ExpandString);
+                    }
+                    SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+                    Logger.Log("[SUCESSO] Pastas do usuário restauradas para %USERPROFILE%. Reinicie o Explorer se necessário.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reconstruir Contadores de Performance",
+                Category = "Diagnóstico",
+                Icon = "📈",
+                Description = "Aba Desempenho do Gerenciador de Tarefas em branco ou erro 'contador inválido'. Reconstrói os contadores com lodctr /R + resyncperf (Requer Admin).",
+                Execute = () => {
+                    Logger.Log("Reconstruindo contadores de performance...");
+                    SystemUtils.RunExternalProcess("cmd", "/c lodctr /R", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c winmgmt /resyncperf", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c net stop winmgmt & net start winmgmt", true);
+                    Logger.Log("[SUCESSO] Contadores reconstruídos. Reabra o Gerenciador de Tarefas.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Resetar Layout da Barra de Tarefas",
+                Category = "Explorer/UI",
+                Icon = "📌",
+                Description = "Barra de tarefas corrompida, ícones fixados somem ou layout bugado. Reseta a chave Taskband (ATENÇÃO: ícones fixados voltam ao padrão).",
+                Execute = () => {
+                    Logger.Log("Resetando Taskband (layout da barra de tarefas)...");
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Taskband\" /f", true);
+                    SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                    System.Threading.Thread.Sleep(800);
+                    SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+                    Logger.Log("[SUCESSO] Barra de tarefas resetada. Refixe seus apps.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Restaurar Fonte Padrão (Segoe UI)",
+                Category = "Sistema",
+                Icon = "🅰️",
+                Description = "Aplicativos/tweaks de 'trocar fonte' deixaram o sistema com fonte estranha. Remove a sobrescrita da Segoe UI feita no usuário e reinicia o Explorer.",
+                Execute = () => {
+                    Logger.Log("Removendo sobrescrita de fonte do usuário...");
+                    using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion\Fonts", true);
+                    if (key != null)
+                    {
+                        foreach (var name in key.GetValueNames())
+                        {
+                            if (name.StartsWith("Segoe UI", StringComparison.OrdinalIgnoreCase))
+                            {
+                                key.DeleteValue(name, false);
+                                Logger.Log($"[FONTE] Removida sobrescrita: {name}");
+                            }
+                        }
+                    }
+                    SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                    System.Threading.Thread.Sleep(800);
+                    SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+                    Logger.Log("[SUCESSO] Segoe UI restaurada.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Windows Spotlight (Tela de Bloqueio)",
+                Category = "Sistema",
+                Icon = "🖼️",
+                Description = "Spotlight travado na mesma imagem ou não carrega novas fotos. Limpa os assets baixados e re-registra o ContentDeliveryManager.",
+                Execute = () => {
+                    Logger.Log("Reparando Windows Spotlight...");
+                    SystemUtils.RunExternalProcess("cmd", "/c del /f /q \"%LocalAppData%\\Packages\\Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy\\LocalState\\Assets\\*\"", true);
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Get-AppxPackage Microsoft.Windows.ContentDeliveryManager | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register ($_.InstallLocation + '\\AppXManifest.xml')}\"", true);
+                    Logger.Log("[SUCESSO] Spotlight resetado. Troque o plano de fundo para Spotlight e aguarde novas imagens.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Restaurar Bibliotecas do Explorer",
+                Category = "Explorer/UI",
+                Icon = "📚",
+                Description = "Bibliotecas (Documentos/Vídeos/Imagens agrupadas) sumiram da navegação. Recria o atalho no namespace do desktop.",
+                Execute = () => {
+                    Logger.Log("Restaurando Bibliotecas...");
+                    using var ns = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{031E4825-7B94-4dc3-B131-E946B44C8DD5}");
+                    ns?.SetValue("", "Libraries", Microsoft.Win32.RegistryValueKind.String);
+                    using var hide = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel");
+                    hide?.SetValue("{031E4825-7B94-4dc3-B131-E946B44C8DD5}", 0, Microsoft.Win32.RegistryValueKind.DWord);
+                    SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                    System.Threading.Thread.Sleep(800);
+                    SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+                    Logger.Log("[SUCESSO] Bibliotecas restauradas.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reativar Gerenciador de Tarefas",
+                Category = "Sistema",
+                Icon = "📊",
+                Description = "Gerenciador de Tarefas bloqueado pelo admin ('desabilitado pelo administrador') — típico resquício de malware ou tweak agressivo. Remove a política.",
+                Execute = () => {
+                    Logger.Log("Removendo política DisableTaskMgr...");
+                    using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\System");
+                    k?.DeleteValue("DisableTaskMgr", false);
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableTaskMgr /f", true); // admin best-effort
+                    Logger.Log("[SUCESSO] Gerenciador de Tarefas reativado.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Desbloquear CMD/Regedit (Malware)",
+                Category = "Sistema",
+                Icon = "🔓",
+                Description = "Prompt de Comando, Regedit ou Painel de Controle bloqueados ('desabilitado pelo administrador') — assinatura clássica de malware/tweak. Remove as políticas.",
+                Execute = () => {
+                    Logger.Log("Removendo políticas DisableCMD/DisableRegistryTools/NoControlPanel...");
+                    using var sys = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\System");
+                    sys?.DeleteValue("DisableCMD", false);
+                    sys?.DeleteValue("DisableRegistryTools", false);
+                    using var exp = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer");
+                    exp?.DeleteValue("NoControlPanel", false);
+                    // HKLM (malware costuma gravar nos dois — admin best-effort)
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableCMD /f", true);
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableRegistryTools /f", true);
+                    Logger.Log("[SUCESSO] CMD/Regedit/Painel desbloqueados. Rode um antivírus para garantir.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Menu Win+X (Power User)",
+                Category = "Explorer/UI",
+                Icon = "⚡",
+                Description = "Menu do botão direito no Iniciar (Win+X) vazio ou com entradas quebradas. Restaura os atalhos originais da instalação do Windows.",
+                Execute = () => {
+                    Logger.Log("Restaurando Win+X do perfil Default...");
+                    string src = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Users", "Default", "AppData", "Local", "Microsoft", "Windows", "WinX");
+                    string dst = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Windows", "WinX");
+                    if (Directory.Exists(src))
+                    {
+                        foreach (var dir in Directory.GetDirectories(dst))
+                            try { Directory.Delete(dir, true); } catch { }
+                        foreach (var dir in Directory.GetDirectories(src))
+                        {
+                            string target = Path.Combine(dst, Path.GetFileName(dir));
+                            Directory.CreateDirectory(target);
+                            foreach (var f in Directory.GetFiles(dir)) File.Copy(f, Path.Combine(target, Path.GetFileName(f)), true);
+                        }
+                        SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                        System.Threading.Thread.Sleep(800);
+                        SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+                        Logger.Log("[SUCESSO] Win+X restaurado.");
+                    }
+                    else Logger.Log("[AVISO] Pasta Default do Win+X não encontrada.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Esquecer Todas as Redes Wi-Fi",
+                Category = "Internet",
+                Icon = "📶",
+                Description = "Wi-Fi não conecta mais, perfil corrompido ou trocou de senha e não pede de novo. Apaga TODOS os perfis salvos (você vai redigitar as senhas).",
+                Execute = () => {
+                    Logger.Log("Apagando todos os perfis Wi-Fi salvos...");
+                    SystemUtils.RunExternalProcess("cmd", "/c netsh wlan delete profile name=* i=*", true);
+                    Logger.Log("[SUCESSO] Perfis Wi-Fi apagados. Reconecte e redigite as senhas.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Restaurar Associação de Imagens (Fotos)",
+                Category = "Explorer/UI",
+                Icon = "🖼️",
+                Description = "Imagens abrindo com app errado ou previews não carregam por associação quebrada. Remove a escolha travada de .png/.jpg/.jpeg/.bmp/.gif para o Windows voltar ao padrão (Fotos).",
+                Execute = () => {
+                    Logger.Log("Resetando UserChoice das associações de imagem...");
+                    foreach (var ext in new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif" })
+                    {
+                        try
+                        {
+                            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}", true);
+                            k?.DeleteSubKeyTree("UserChoice", false);
+                        }
+                        catch { }
+                    }
+                    Logger.Log("[SUCESSO] Associações de imagem redefinidas — o Windows voltará a perguntar/usar o padrão.");
+                }
+            });
+
             return repairs;
         }
     }

@@ -7275,12 +7275,156 @@ namespace KitLugia.Core
                 string subPath = idx >= 0 ? ExplorerAdvancedKey.Substring(idx + 1) : ExplorerAdvancedKey;
                 using var key = Registry.CurrentUser.OpenSubKey(subPath, true);
                 key?.DeleteValue("IconsOnly", false);
-                Logger.Log("Explorer: IconsOnly removido (miniaturas restauradas)");
+                // DisableThumbnailCache=1 impede o Explorer de USAR/GERAR o cache de
+                // miniaturas — mesmo com IconsOnly ausente, os previews não aparecem.
+                key?.DeleteValue("DisableThumbnailCache", false);
             }
             catch (Exception ex)
             {
                 Logger.Log($"Erro ao restaurar miniaturas: {ex.Message}");
             }
+
+            // Política 'DisableThumbnails' (GPO) — só ferramentas de tweak gravam isso;
+            // quando presente, ela SOBRESCREVE IconsOnly e mata os previews mesmo
+            // com tudo o mais correto.
+            try
+            {
+                using var pol = Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", true);
+                pol?.DeleteValue("DisableThumbnails", false);
+            }
+            catch { }
+            try
+            {
+                using var polM = Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", true);
+                polM?.DeleteValue("DisableThumbnails", false); // requer admin — best-effort
+            }
+            catch { }
+            Logger.Log("Explorer: IconsOnly + DisableThumbnailCache + política DisableThumbnails removidos (miniaturas restauradas)");
+        }
+
+        /// <summary>True se o cache de miniaturas estiver desativado (DisableThumbnailCache=1)</summary>
+        public static bool IsThumbnailCacheDisabled()
+        {
+            try
+            {
+                var value = Registry.GetValue(ExplorerAdvancedKey, "DisableThumbnailCache", null);
+                return value != null && Convert.ToInt32(value) != 0;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Apaga os arquivos de cache de miniaturas e de ícones do Explorer
+        /// (thumbcache_*.db / iconcache_*.db). Caches corrompidos são a causa nº 1 de
+        /// 'fotos mostram só o ícone do app'. Requer explorer.exe já finalizado — o
+        /// chamador deve matar o explorer antes e reiniciá-lo depois.</summary>
+        public static int ClearThumbnailAndIconCache()
+        {
+            int deleted = 0;
+            try
+            {
+                string explorerDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Microsoft", "Windows", "Explorer");
+                if (!Directory.Exists(explorerDir)) return 0;
+
+                foreach (var pattern in new[] { "thumbcache_*.db", "iconcache_*.db" })
+                {
+                    foreach (var file in Directory.GetFiles(explorerDir, pattern))
+                    {
+                        try { File.Delete(file); deleted++; }
+                        catch { /* em uso — ignora */ }
+                    }
+                }
+                Logger.Log($"Explorer: {deleted} arquivos de cache (thumbcache/iconcache) apagados.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erro ao limpar cache de miniaturas: {ex.Message}");
+            }
+            return deleted;
+        }
+
+        // ============================================================
+        // Restaurar Visual Normal do Explorer (miniaturas + templates)
+        // ============================================================
+        // Antes de descobrir que o "pular direto ao arquivo" lento era um bug de
+        // RENDER (corrigido pelo F11 2x invisivel), o Kit aplicava 2 tweaks de
+        // contorno que sacrificam o visual normal:
+        //   1. IconsOnly=1         -> Explorer nunca gera miniaturas -> fotos/videos
+        //                            aparecem so com o icone do app associado;
+        //   2. FolderType=NotSpecified (AllFolders) -> desliga o Auto Folder Type
+        //      Discovery -> pastas abrem em template generico -> Downloads e outras
+        //      areas perdem o agrupamento por data (hoje/ontem/mes/ano) padrao.
+        // Este conjunto desfaz os dois E zera as views salvas (Bags/BagMRU), para o
+        // Explorer reconstruir os templates padrao por tipo de pasta.
+        private const string ExplorerShellViewsRoot =
+            @"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell";
+        private const string ExplorerShellViewsMirror =
+            @"Software\Microsoft\Windows\Shell";
+
+        /// <summary>Estado "visual normal": miniaturas ligadas + folder-type discovery ativo.</summary>
+        public static bool IsExplorerVisualNormal()
+        {
+            try
+            {
+                return !IsExplorerThumbnailsDisabled() && !IsExplorerFolderDiscoveryDisabled();
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+        }
+
+        /// <summary>Apaga as views salvas POR PASTA (numericas) + BagMRU nos 2 locais,
+        /// mantendo o template global AllFolders — equivale ao "Restaurar Padroes das
+        /// Pastas" do Explorer. As pastas conhecidas (Downloads etc.) sao recriadas
+        /// com o template padrao (agrupamento por data volta sozinho).</summary>
+        public static int ResetSavedFolderViews()
+        {
+            int cleared = 0;
+            foreach (var root in new[] { ExplorerShellViewsRoot, ExplorerShellViewsMirror })
+            {
+                try
+                {
+                    using var shell = Registry.CurrentUser.OpenSubKey(root, true);
+                    if (shell == null) continue;
+
+                    // Bags: remove as views numericas por pasta, preserva AllFolders.
+                    try
+                    {
+                        using var bags = shell.OpenSubKey("Bags", true);
+                        if (bags != null)
+                        {
+                            foreach (var name in bags.GetSubKeyNames())
+                            {
+                                if (name.Equals("AllFolders", StringComparison.OrdinalIgnoreCase)) continue;
+                                try { bags.DeleteSubKeyTree(name, false); cleared++; }
+                                catch { /* em uso — segue */ }
+                            }
+                        }
+                    }
+                    catch (Exception ex) { Logger.Log($"Erro ao limpar Bags ({root}): {ex.Message}"); }
+
+                    // BagMRU: remove inteiro (associacao pasta->bag e recriada).
+                    try { shell.DeleteSubKeyTree("BagMRU", false); cleared++; }
+                    catch { /* ja nao existe — ok */ }
+
+                    Logger.Log($"Explorer: views por pasta resetadas em {root}");
+                }
+                catch (Exception ex) { Logger.Log($"Erro ao resetar views ({root}): {ex.Message}"); }
+            }
+            return cleared;
+        }
+
+        /// <summary>Restaura o visual padrao do Explorer de uma vez: miniaturas de
+        /// fotos/videos + deteccao de tipo de pasta + views por pasta no template
+        /// padrao (agrupamento por data volta em Downloads etc.). Requer reiniciar o
+        /// explorer.exe para o shell reconstruir as Bags.</summary>
+        public static void RestoreExplorerNormalVisuals()
+        {
+            RestoreExplorerThumbnails();        // IconsOnly removido
+            RestoreExplorerFolderDiscovery();   // FolderType=NotSpecified removido
+            int cleared = ResetSavedFolderViews();
+            Logger.Log($"Explorer: visual normal restaurado (miniaturas + template padrao; {cleared} chaves de view resetadas). Reinicie o explorer.");
         }
 
         public static void DisableRecentFiles()
