@@ -17,6 +17,12 @@ namespace KitLugia.GUI.Controls
             InitializeComponent();
             _processName = processName;
             _config = config;
+
+            // Respeita os limites da tela (com DPI): nunca maior que 92% da área de trabalho
+            var wa = SystemParameters.WorkArea;
+            MaxWidth = Math.Min(700, wa.Width * 0.92);
+            MaxHeight = Math.Min(780, wa.Height * 0.92);
+
             LoadConfig();
         }
 
@@ -52,7 +58,9 @@ namespace KitLugia.GUI.Controls
             ChkTimerBoost.IsChecked = _config.TimerBoost;
             ChkNetworkBoost.IsChecked = _config.NetworkBoost;
             ChkProBalance.IsChecked = _config.ProBalance;
+            CboProBalanceMode.SelectedIndex = _config.ProBalanceMode switch { "EcoQoS" => 1, "HardCap" => 2, _ => 0 };
             TxtProBalanceThreshold.Text = _config.ProBalanceCpuThreshold.ToString();
+            PanelProBalanceMode.IsEnabled = _config.ProBalance;
             PanelProBalanceThreshold.IsEnabled = _config.ProBalance;
             ChkCpuLimit.IsChecked = _config.CpuLimitEnabled;
             TxtCpuLimitPercent.Text = _config.CpuLimitPercent.ToString();
@@ -64,7 +72,22 @@ namespace KitLugia.GUI.Controls
 
         private void ChkProBalance_Checked(object sender, RoutedEventArgs e)
         {
-            PanelProBalanceThreshold.IsEnabled = ChkProBalance.IsChecked == true;
+            bool on = ChkProBalance.IsChecked == true;
+            PanelProBalanceMode.IsEnabled = on;
+            PanelProBalanceThreshold.IsEnabled = on;
+        }
+
+        private void CboProBalanceMode_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            // Durante InitializeComponent o XAML aplica SelectedIndex antes dos
+            // controles seguintes existirem — sem este guard o construtor quebra (NRE).
+            if (TxtProBalanceThreshold == null) return;
+
+            // Modo Hard Cap: o limite vira o teto REAL (Job Object) — dica visual
+            if (CboProBalanceMode.SelectedIndex == 2)
+                TxtProBalanceThreshold.ToolTip = "Teto máximo REAL de CPU via Job Object (o processo não passa disso)";
+            else
+                TxtProBalanceThreshold.ToolTip = "% de CPU que dispara o throttle temporário";
         }
 
         private void ChkCpuLimit_Checked(object sender, RoutedEventArgs e)
@@ -86,6 +109,7 @@ namespace KitLugia.GUI.Controls
             _config.TimerBoost = ChkTimerBoost.IsChecked == true;
             _config.NetworkBoost = ChkNetworkBoost.IsChecked == true;
             _config.ProBalance = ChkProBalance.IsChecked == true;
+            _config.ProBalanceMode = CboProBalanceMode.SelectedIndex switch { 1 => "EcoQoS", 2 => "HardCap", _ => "Classic" };
             if (int.TryParse(TxtProBalanceThreshold.Text, out int cpuThr) && cpuThr >= 1 && cpuThr <= 100)
                 _config.ProBalanceCpuThreshold = cpuThr;
             _config.CpuLimitEnabled = ChkCpuLimit.IsChecked == true;

@@ -234,7 +234,6 @@ namespace KitLugia.GUI.Pages
 
         private readonly System.Windows.Media.SolidColorBrush _greenBrush = new(System.Windows.Media.Color.FromRgb(0, 128, 0));
         private readonly System.Windows.Media.SolidColorBrush _grayBrush = new(System.Windows.Media.Color.FromRgb(128, 128, 128));
-        private bool _lastTrayEnabledState = false;
         
         private void UpdateModuleButtons()
         {
@@ -246,7 +245,6 @@ namespace KitLugia.GUI.Pages
             // Ícone do tray é sempre visível enquanto o Kit roda (opção de ocultar removida)
             BtnToggleTray.Content = "🌐 Tray Icon Service (SEMPRE ATIVO)";
             BtnToggleTray.Background = _greenBrush;
-            _lastTrayEnabledState = true;
         }
 
         //  StringBuilder reutilizável para evitar alocações de string

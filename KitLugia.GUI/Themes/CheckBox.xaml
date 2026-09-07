@@ -139,4 +139,73 @@
         </Setter>
     </Style>
 
+    <!-- Toggle vermelho (acoes destrutivas/aviso) — mesma geometria do ToggleSwitchStyle -->
+    <Style x:Key="RedToggleSwitchStyle" TargetType="{x:Type CheckBox}" BasedOn="{StaticResource ToggleSwitchStyle}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type CheckBox}">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ContentPresenter Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        <Border Grid.Column="1" x:Name="SwitchBorder" Width="44" Height="24" CornerRadius="12" Background="#2A2A2A" BorderBrush="#FFFFFF" BorderThickness="1.5">
+                            <Ellipse x:Name="SwitchKnob" Width="14" Height="14" Fill="#CCCCCC" HorizontalAlignment="Left" Margin="4,0">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect ShadowDepth="1" BlurRadius="2" Opacity="0.3"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="SwitchBorder" Property="BorderBrush" Value="#FF5545"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="SwitchBorder" Property="Background" Value="#E04438"/>
+                            <Setter TargetName="SwitchBorder" Property="BorderBrush" Value="#FF6A5E"/>
+                            <Setter TargetName="SwitchKnob" Property="Fill" Value="#1A0505"/>
+                            <Setter TargetName="SwitchKnob" Property="HorizontalAlignment" Value="Right"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Switch retangular de saude do Explorer: 💀 (esquerda = quebrado) <-> ✅ (direita = saudavel).
+         IsChecked = saudavel (knob a direita, verde). Nao e um toggle de acao — reflete o estado detectado. -->
+    <Style x:Key="SkullSwitchStyle" TargetType="{x:Type CheckBox}">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type CheckBox}">
+                    <Grid Background="Transparent">
+                        <Border x:Name="Track" Width="64" Height="28" CornerRadius="6" Background="#2A2A2A"
+                                BorderBrush="#E04438" BorderThickness="1.5">
+                            <Grid>
+                                <TextBlock Text="💀" FontSize="12" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0"/>
+                                <TextBlock Text="✅" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <Border x:Name="Knob" Width="30" Height="22" CornerRadius="4" Background="#3A1A16"
+                                        HorizontalAlignment="Left" Margin="2,0">
+                                    <TextBlock x:Name="KnobIcon" Text="💀" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="BorderBrush" Value="#3ECF6E"/>
+                            <Setter TargetName="Knob" Property="Background" Value="#12331E"/>
+                            <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0"/>
+                            <Setter TargetName="KnobIcon" Property="Text" Value="✅"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

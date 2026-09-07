@@ -530,6 +530,8 @@ namespace KitLugia.GUI.Pages
             string statusText = limit.LastKnownMB > 0
                 ? $"Atual: {limit.LastKnownMB} MB" +
                   $"{(exceeded ? " \u26A0\uFE0F excedido" : " \u2713")}" +
+                  $" \u26A1 Pico: {Math.Max(limit.PeakRamMB, limit.LastKnownMB)} MB" +
+                  (limit.CommitSizeMB > 0 ? $" \U0001F4BE Commit: {limit.CommitSizeMB} MB" : "") +
                   $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}"
                 : "Processo n\u00E3o est\u00E1 rodando";
 
@@ -548,18 +550,18 @@ namespace KitLugia.GUI.Pages
                 Margin = new Thickness(0, 2, 0, 0)
             });
 
-            // Linha 3: placeholder (floor/commit removed in revert)
-            var floorTb = new TextBlock
+            // Linha 3: badges do motor por processo (config do gear ⚙️)
+            var engineTb = new TextBlock
             {
-                Text = "",
+                Text = BuildEngineBadges(limit),
                 FontFamily = _emojiFont,
                 Foreground = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(102, 102, 102)),
+                    System.Windows.Media.Color.FromRgb(212, 175, 55)),
                 FontSize = 9,
                 Margin = new Thickness(0, 1, 0, 0),
-                Tag = "floorInfo"
+                Tag = "engineInfo"
             };
-            nameStack.Children.Add(floorTb);
+            nameStack.Children.Add(engineTb);
             Grid.SetColumn(nameStack, 0);
             grid.Children.Add(nameStack);
 
@@ -653,6 +655,44 @@ namespace KitLugia.GUI.Pages
 
             row.Child = grid;
             return row;
+        }
+
+        /// <summary>
+        /// Resumo do motor ativo do processo (prioridade, ProBalance, cap de CPU, EcoQoS, E-cores).
+        /// </summary>
+        private static string BuildEngineBadges(TrayIconService.ProcessRamLimit limit)
+        {
+            var cfg = limit.EngineConfig;
+            if (cfg == null) return "";
+
+            var parts = new System.Collections.Generic.List<string>
+            {
+                $"\u26A1 {cfg.CpuPriority}"
+            };
+
+            if (cfg.ProBalance)
+            {
+                parts.Add(cfg.ProBalanceMode switch
+                {
+                    "EcoQoS" => "\u2696\uFE0F ProBalance EcoQoS",
+                    "HardCap" => $"\u2696\uFE0F ProBalance HardCap {cfg.ProBalanceCpuThreshold}%",
+                    _ => $"\u2696\uFE0F ProBalance (>{cfg.ProBalanceCpuThreshold}%)"
+                });
+            }
+
+            if (cfg.CpuLimitEnabled || (cfg.ProBalance && cfg.ProBalanceMode == "HardCap"))
+                parts.Add($"\U0001F4C9 {cfg.CpuLimitPercent}% CPU");
+
+            if (cfg.EcoQoSEnabled && cfg.ProBalanceMode != "EcoQoS")
+                parts.Add("\U0001F331 EcoQoS");
+            if (cfg.ThreadEfficiencyMode)
+                parts.Add("\U0001F9E5 E-cores");
+            if (cfg.TimerBoost)
+                parts.Add("\u23F1 Timer 1ms");
+            if (cfg.ThreadMemoryPriority != 0)
+                parts.Add($"\U0001F9E0 MemPrio {cfg.ThreadMemoryPriority}");
+
+            return string.Join(" \u00B7 ", parts);
         }
 
         private void LimitBox_LostFocus(object sender, RoutedEventArgs e)
@@ -823,6 +863,7 @@ namespace KitLugia.GUI.Pages
             overlay.ConfigSaved += (savedConfig) =>
             {
                 tray.SetProcessEngineConfig(name, savedConfig);
+                LoadProcessLimits(); // recarrega as linhas p/ mostrar os badges do motor atualizados
                 mw.ShowSuccess("Configuração salva", $"Configurações de '{name}' atualizadas.");
             };
             overlayContainer.Children.Add(overlay);
