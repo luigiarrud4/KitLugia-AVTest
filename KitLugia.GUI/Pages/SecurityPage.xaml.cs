@@ -181,14 +181,27 @@ namespace KitLugia.GUI.Pages
             bool enable = ChkVBS.IsChecked == true;
             ChkVBS.IsEnabled = false;
 
-            await Task.Run(() =>
+            try
             {
-                var result = SystemTweaks.ToggleVbs();
-                Logger.Log($"VBS toggle: {result.Message}");
-            });
+                await Task.Run(() =>
+                {
+                    var result = SystemTweaks.ToggleVbs();
+                    Logger.Log($"VBS toggle: {result.Message}");
+                });
 
-            ChkVBS.IsEnabled = true;
-            ShowNotification("🔄 VBS Alterado", "Reinicie o computador para aplicar a mudança.");
+                ShowNotification("🔄 VBS Alterado", "Reinicie o computador para aplicar a mudança.");
+            }
+            catch (Exception ex)
+            {
+                // Reverte o checkbox para o estado real se o toggle falhar
+                ChkVBS.IsChecked = enable;
+                Logger.Log($"VBS toggle FALHOU: {ex.Message}");
+                ShowNotification("❌ VBS", $"Falha ao alterar VBS: {ex.Message}");
+            }
+            finally
+            {
+                ChkVBS.IsEnabled = true;
+            }
         }
 
         private async void ChkSmartScreen_Click(object sender, RoutedEventArgs e)

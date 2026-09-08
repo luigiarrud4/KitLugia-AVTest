@@ -159,6 +159,11 @@ namespace KitLugia.Core
                     {
                         foreach (var sub in key.GetSubKeyNames())
                         {
+                            // PRESERVA o bag do DESKTOP (subchave numerica contendo "Desktop"):
+                            // e onde ficam as posicoes dos icones da area de trabalho.
+                            // Deletar = icones desarrumados no proximo boot.
+                            if (path.EndsWith("\\Bags", StringComparison.OrdinalIgnoreCase) && IsDesktopBag(key, sub))
+                                continue;
                             try { key.DeleteSubKeyTree(sub); count++; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                         var names = key.GetValueNames();
@@ -168,6 +173,19 @@ namespace KitLugia.Core
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
             return count;
+        }
+
+        /// <summary>True se a subchave numerica de Bags for o bag do DESKTOP
+        /// (contem a subchave "Desktop" com as posicoes dos icones).</summary>
+        private static bool IsDesktopBag(RegistryKey bags, string name)
+        {
+            try
+            {
+                using var sub = bags.OpenSubKey(name);
+                return sub?.GetSubKeyNames()
+                    .Any(n => n.Equals("Desktop", StringComparison.OrdinalIgnoreCase)) == true;
+            }
+            catch { return false; }
         }
 
         public static int CleanJumpLists()

@@ -14,6 +14,11 @@
 
 3. Arquivos novos do projeto nascem com encoding correto (ver .editorconfig: UTF-8+BOM).
 
+4. **SEMPRE conversar em PORTUGUES (pt-BR)** — toda resposta, explicação, progresso,
+   resumo e pergunta ao usuario em portugues. Codigo, identificadores, comandos e
+   conteudo de arquivos seguem como estao (excecao natural). NAO mudar de idioma
+   entre sessoes/mensagens.
+
 ## Estado atual do projeto (29/07/2026)
 
 ### O que foi feito
@@ -5000,3 +5005,468 @@ reconstruiu as views; PID novo 18064 com auto-turbo re-armado). Build: 0 erros /
 A TESTAR (host): abrir Downloads -> conferir separadores de data (hoje/ontem/
 mes/ano) de volta; abrir pasta de fotos/videos -> previews de volta; conferir que
 o "ir direto ao arquivo" continua instantaneo (watchdog reaplica F11 invisivel).
+
+### Sessao 07/09 - Icones do desktop preservados (3 fontes de wipe corrigidas)
+
+Sintoma: usuario arruma os icones da area de trabalho e apos reboot estavam
+desarrumados de novo, toda hora. CAUSA: o Kit apagava o bag 1 (Bags\1\Desktop)
+- onde o Windows guarda as POSICOES dos icones - em 2 fluxos:
+
+1. CleanupPage BtnCleanEvidence_Click: chamava EvidenceCleaner.CleanAll()
+   SEMPRE, mesmo com 1 categoria marcada (o dialogo dizia "Limpar N categorias").
+   CleanBagMRU deletava TODAS as Bags nos 2 locais -> layout do desktop ia junto.
+2. TweaksPage REPARAR EXPLORER: ResetSavedFolderViews apagava as Bags
+   numericas (incluindo o bag 1) + BagMRU - o dialogo avisava "posicoes podem
+   ser reordenadas".
+3. GeneralRepairManager "Resetar Visualizacao de Pastas" deleta so BagMRU
+   (Local Settings): mapeamento e recriado, bag desktop sobrevive - sem mudanca.
+
+Correcoes:
+- SystemTweaks.ResetSavedFolderViews + EvidenceCleaner.CleanBagMRU: novo helper
+  IsDesktopBag (subchave numerica de Bags contendo "Desktop") preserva o bag do
+  desktop nos 2 locais; BagMRU inteiro continua removido (bag 1 nao depende dele).
+- CleanupPage.BtnCleanEvidence_Click: agora limpa SOMENTE as categorias
+  selecionadas (Dictionary nome->Clean*; nomes da UI mapeados 1:1).
+- TweaksPage: dialogo do REPARAR EXPLORER trocou o aviso "posicoes podem ser
+  reordenadas" por "posicoes sao preservadas"; comentario do card atualizado.
+
+Extras: cache_query.bat e cache_test.bat removidos da raiz (descartaveis do
+teste L2/L3).
+
+Build: codigo compila sem erros (Core+GUI, so warnings nullable pre-existentes);
+copia final bloqueada com o Kit rodando (MSB3021 PID 10832) - fechar o app antes
+de compilar.
+
+A TESTAR: REPARAR EXPLORER -> mover icones -> reboot -> posicoes mantidas;
+CleanupPage marcar so "Recent Documents" -> limpar -> reboot -> layout intacto.
+
+### Sessao 07/09 (cont.) - Layout do desktop SALVO + tool standalone de backup/restore
+
+Estado real da maquina do usuario (inspecao read-only): bag 1 Desktop com
+ItemPos=0 e Local Settings\...\Bags SEM bag Desktop - layout existia so na
+memoria do explorer (loop de perda: wipe do kit -> boot desarruma -> usuario
+arruma -> nunca era commitado). AutoEndTasks/HungAppTimeout/WaitToKillAppTimeout
+ausentes (padrao), IconsOnly/DisableThumbnailCache/FolderType ausentes
+(visual saudavel - REPARAR EXPLORER desnecessario no momento).
+
+- taskkill graceful do explorer (sem /f) NAO fecha o explorer no Win11
+  (mesmo PID apos 14s) - ABORTADO sem forcar, pois /f perderia o layout
+  da memoria (bag vazio).
+- NOVO: KitLugia.GUI\Tools\IconLayout\DesktopIconLayout.ps1 - le as posicoes
+  DIRETO do ListView do desktop (Progman/WorkerW > SHELLDLL_DefView >
+  SysListView32, LVM_* cross-process com VirtualAllocEx/ReadProcessMemory),
+  salva "x,y|nome" por icone. -RestoreFile restaura por NOME (sobrevive a
+  re-sort). Fix: nome cortado no PRIMEIRO NUL (buffer remoto guarda lixo de
+  nomes anteriores - TrimEnd nao bastava).
+- SALVO: C:\Users\Lugia\AppData\Local\KitLugia\IconLayoutBackup\
+  desktop_layout_2026-09-07_1330.json - 156 icones, posicoes da grade
+  (colunas ~532px, linhas ~101px). Restaurar:
+  powershell -File DesktopIconLayout.ps1 -RestoreFile <json>
+- Kit fechado (graceful foi pro tray pela CloseToTray; /f necessario),
+  rebuild 0 erros, Kit reaberto recompilado (PID novo).
+- Obs: o commit das posicoes no REGISTRO acontece no proximo logoff
+  normal (graceful) - evitar desligar no botao do gabinete ate la.
+- Proximo passo natural: card/pagina no Kit com SALVAR/RESTAURAR layout
+  (usar o mesmo metodo LVM_* ou rodar este ps1) + auto-backup no boot.
+
+### Sessao 07/09 (cont.) - RestaurarIconesDesktop.bat (2 cliques) + bug de parse do cmd
+
+- NOVO: KitLugia.GUI\Tools\IconLayout\RestaurarIconesDesktop.bat - duplo clique
+  restaura o layout; sem arg escolhe o desktop_layout_*.json mais recente
+  (pre_restore_* excluido do auto-pick), arg/drag-and-drop de .json restaura
+  esse. Antes de restaurar salva snapshot pre_restore_YYYYMMDD_HHMMSS.json do
+  estado atual (undo = arrastar esse snapshot sobre o .bat). Pausa no fim.
+- BUG DE PARSE do cmd (variante nova do de 03/08): o path do projeto contem
+  "(25)" - %TOOL% expandido SEM aspas dentro de bloco if (...) faz o ) de (25)
+  FECHAR o bloco no parse e o resto vira token ("- foi inesperado neste
+  momento"). Diagnostico por bisseccao (bloco de pick isolado = OK). FIX:
+  estrutura com goto/labels - nenhum caminho com parenteses expande dentro de
+  bloco. Bat regravado em ASCII puro sem BOM (Get-Content -Raw +
+  WriteAllText Encoding.ASCII) - cmd nao engole BOM UTF-8.
+- TESTADO: duplo-clique flow OK (snapshot + RESTAURADOS 156 de 156), drag-mode
+  com arg OK, verificacao final: captura pos-restore comparada ao backup com
+  Compare-Object = MATCH 156/156 (desktop identico, restore no-op visual).
+- Quirk: powershell -File NAO expande $env:VAR em argumentos (passar path
+  Windows literal); no bash, "$env:..." em aspas duplas e comido pelo bash.
+
+### Sessao 07/09 (cont.) - PrivacyPage: Presets Personalizados (estilo O&O ShutUp10)
+
+Pedido: escanear a PrivacyPage toda, atualizar os metodos, garantir feedback
+na UI e substituir os 3 botões de preset (RECOMENDADO/LIMITADO/MAXIMO) por UM
+botão "PRESETS PERSONALIZADOS" que abre seleção por nivel como o O&O ShutUp10.
+
+1. **XAML (PrivacyPage.xaml)**:
+   - Root virou <Grid> (ScrollViewer + OverlayPresets) para o overlay cobrir a
+     pagina toda (mesmo padrao do OverlayQuickMenu do DashboardPage).
+   - 3 cards de preset removidos; no lugar, 1 card dourado com botão
+     "PRESETS PERSONALIZADOS" (GoldButtonStyle) + descricao.
+   - OverlayPresets: header, selecao rapida (Apenas Seguros / Seguros +
+     Moderados / Marcar Tudo / Limpar Selecao), contador "X de Y selecionados",
+     3 secoes com borda colorida (verde #4CAF50 / laranja #FFA500 /
+     vermelho #C42B1C) e aviso de perigo na vermelha, cada item = CheckBox com
+     tooltip (registry/servico + valores + nivel), footer com status +
+     Cancelar + APLICAR SELECAO.
+
+2. **Code-behind (PrivacyPage.xaml.cs)**:
+   - PresetSafeItems/PresetModerateItems/PresetDangerItems (ObservableCollection)
+     + PresetItemViewModel (INotifyPropertyChanged, Tooltip com caminho e
+     aviso PERIGOSO). Default: so Recomendados marcados.
+   - BtnApplyPresets_Click: confirmacao (avisa N perigosas selecionadas),
+     desabilita botoes + status "Aplicando...", Core.ApplyCustomSelection em
+     Task.Run, BackgroundTaskTracker, ShowSuccess/ShowError com contagens,
+     overlay fecha e RefreshStatus() reconcilia checkboxes.
+   - Removidos: ApplyPreset helper + 3 handlers + stubs mortos
+     (BtnGenerateReport/BtnExportConfig/BtnSnapshot - nao existiam no XAML).
+
+3. **Core (OOShutUpManager.cs)** - metodos atualizados:
+   - IsPrivacySettingApplied (servicos): antes so reconhecia SafeValue=4
+     (Disabled); servico com SafeValue=3 (Manual) NUNCA aparecia protegido.
+     Agora mapeia 4=Disabled/3=Manual/2=Auto (WMI StartMode).
+   - RevertPrivacySetting (servicos): modeStr so mapeava 2=auto; UnsafeValue=4
+     caia em "demand" (errado). Agora switch 2/4=auto, resto demand +
+     `sc start` best-effort (servico parado pelo SafeValue=4 reativa).
+   - BackupRegistryValue: .reg backup agora grava dword/qword/hex corretos
+     (antes tudo virava dword ou sz - binarios corrompiam o .reg).
+   - NOVO ApplyCustomSelection(toApply, toRevert): aplica marcadas + reverte
+     desmarcadas (selecao = estado desejado, semantica O&O), retorna
+     (Applied, Reverted, Failed) para a UI.
+
+Inventario: 91 Recommended / 28 Limited / 41 NotRecommended = 160 settings,
+3 servicos. Build 0 erros. Kit relancado recompilado.
+
+A TESTAR: abrir PrivacyPage -> PRESETS PERSONALIZADOS -> marcar/desmarcar ->
+contador atualiza -> APLICAR SELECAO -> confirmacao mostra N perigosas ->
+aplica e status do card principal (% Protegido) reconcilia em ~5s; toggle
+individual de servico com SafeValue=3 agora aparece como protegido.
+
+### Sessao 07/09 (cont.) - PrivacyPage: botao RESETAR TUDO
+
+- Card dos presets agora tem 2 botoes: PRESETS PERSONALIZADOS (dourado) +
+  RESETAR TUDO (DeleteButtonStyle vermelho, x:Name BtnResetAll).
+- RESETAR TUDO = OOShutUpManager.RestoreDefaults() (reverte as 160 settings
+  para UnsafeValue/padrao Windows + reativa servicos de telemetria), com
+  confirmacao forte (lista o que acontece), status "Revertendo..." no score,
+  botoes desabilitados, BackgroundTaskTracker e resultado com contagens.
+- Substituiu o antigo "Restaurar Padrao Windows" da linha de acoes detalhadas
+  (duplicado sem feedback); SaveUserConfig/RestoreUserConfig/Expandir ficaram.
+- Build 0 erros; Kit relancado recompilado (GUI.exe 15:00, PID 15016).
+
+### Sessao 07/09 (cont.) - Presets Personalizados: overlay -> JANELA propria
+
+Sintoma (screenshot): o overlay de 880px NAO cabia na janela do kit (cortado
+nos 2 lados). Pedido: fazer como a IntegrityPage (PATH + abre janela propria).
+
+- NOVO KitLugia.GUI\Windows\PresetsPersonalizadosWindow.xaml(.cs): janela
+  1060x720 no padrao PathExplorerWindow (WindowChrome CaptionHeight=0, fechar
+  X proprio, borda dourada #E8B84E, MaxWidth/MaxHeight = WorkArea,
+  CenterOwner, ShowInTaskbar=False) + DragMove no header (PathExplorer nao
+  tem - adicionamos).
+- 3 secoes (SEGUROS/MODERADOS/PERIGOSOS) + selecao rapida + contador; cada
+  item mostra estado ao lado: "✅ SERA ATIVADO" (verde/laranja) ou
+  "— nao sera ativado" (cinza); perigoso selecionado = "⚠ SERA ATIVADO
+  (PERIGOSO)" vermelho. Row com trigger no IsSelected (fundo colorido).
+- Confirmacao DENTRO da janela (MessageBox com dono, conta perigosas);
+  DialogResult=true expoe ToApply/ToRevert; a pagina aplica (Task.Run +
+  ApplyCustomSelection), mostra "Aplicando N..." no score, toasts com
+  contagens e RefreshStatus reconcilia.
+- PrivacyPage: overlay XAML (126 linhas) e todo o codigo do overlay removidos
+  (PresetItemViewModel mudou para PresetItem dentro da janela). BtnOpenPresets
+  abre a janela com Owner. RESETAR TUDO inalterado.
+- Build 0 erros; Kit relancado (PID 16304).
+
+### Sessao 07/09 (cont.) - Janela de presets COMPACTA com abas de nivel
+
+Feedback (screenshot): 2 linhas por item consumia espaco demais (so ~12 itens
+visiveis) e faltavam os botoes principais dos presets no topo.
+
+- Janela redesenhada estilo O&O ShutUp10: ABAS DE NIVEL no topo (Todos/🟢
+  Seguros/🟡 Moderados/🔴 Perigosos, RadioButton com counts no conteudo,
+  IsChecked=dourado) filtrando UMA lista unica (master _allItems +
+  _displayItems reconstruida no filtro).
+- Lista COMPACTA: 1 linha por item (~26px) = checkbox + bolinha do nivel +
+  nome (semi-bold) + descricao cortada (ellipsis) + estado a direita
+  ("✅ SERA ATIVADO" / "— nao sera ativado" / "⚠ SERA ATIVADO (PERIGOSO)").
+  Estado/cores via propriedades do PresetItem (StateText/StateBrush/RowBrush/
+  LevelBrush) com PropertyChanged ao togglar - sem triggers complexos.
+  Clique na LINHA inteira toggle (ItemRow_MouseDown ignora clicks dentro de
+  CheckBox p/ nao dupliar).
+- Quirk C#: FrameworkElement e System.Windows (NAO System.Windows.Controls).
+- Build 0 erros; Kit relancado (PID 26416).
+
+### Sessao 07/09 (cont.) - Ajustes finais da PrivacyPage (feedback do usuario)
+
+1. **Card de status por nivel**: saiu o "20% Protegido / Protegidos 32 |
+   Vulneraveis 128". Agora 3 linhas com bolinha + label + "X / Y" + mini barra
+   (ProgressBar 6px): verdes (TxtProtSafe/PbSafe), amarelos (TxtProtModerate/
+   PbModerate), vermelhos (TxtProtDanger/PbDanger) - e linha de resultado
+   TxtPrivacyScore = "Resultado: N de 160 protecoes ativas (P%)" (mesmo x:Name
+   reutilizado como feedback "Aplicando.../Revertendo..." nos handlers).
+   RefreshStatus calcula counts por nivel e percentuais por barra.
+2. **Abas maiores** na janela de presets: LevelTab FontSize 14 Bold,
+   Padding 20,10.
+3. **Lista organizada**: RebuildDisplay ordena VERDES -> AMARELOS -> VERMELHOS
+   (OrderBy (int)Level + ThenBy indice original, ordem estavel).
+4. **Botoes de selecao rapida maiores** (feedback: "muito espremidos"):
+   WinButton Padding 16,8 / FontSize 12.5 SemiBold / MinHeight 34 - aplica aos
+   4 botoes de selecao rapida e ao CANCELAR da janela de presets.
+- Build 0 erros; Kit relancado (PID 22516 -> 29732).
+
+### Sessao 07/09 (cont.) - Dry-run READ-ONLY da PrivacyPage
+
+- NOVO tests/PrivacyDryRun (console net10.0-windows, ProjectReference Core):
+  valida as 160 settings SEM escrever no registro - estrutura (hive/ValueName/
+  SafeValue), leitura real (Registry.GetValue + IsPrivacySettingApplied),
+  servicos via WMI StartMode (existem?), amostra dos comandos reg add/sc config
+  que seriam emitidos, e simulacao dos 3 presets + ApplyCustomSelection.
+  Rodar: dotnet run --project tests/PrivacyDryRun
+- RESULTADO (07/09): 0 erros estruturais; 3 servicos existem (DiagTrack
+  Disabled, dmwappushservice Disabled, wuauserv Manual) -  wuauserv com
+  SafeValue=3 agora corretamente reportado protegido=True (fix validado!);
+  62/157 valores presentes, 30 protegidas; IsPrivacySettingApplied x160 em
+  151ms; presets simulados 91/119/160; registro intocado.
+
+### Sessao 07/09 (cont.) - IntegrityPage: 2 regras viraram OPCIONAIS
+
+Pedido do usuario: Smart App Control desativado e Fast Startup (HD) nao devem
+contar como modificados/perigosos no score.
+- Guardian.cs: "Smart App Control Desativado (VerifiedAndReputablePolicyState=0)"
+  e "Inicializacao Rapida (Fast Startup) Desativada para HD" (HiberbootEnabled
+  Harmful=0) ganharam IsOptional=true -> saem do score (nonOptionalTweaks) e do
+  filtro MODIFICADO, aparecem no filtro Opcional da IntegrityPage.
+- OBS: existe regra CONFLITANTE no Guardian (linha ~2434) sobre o MESMO valor
+  HiberbootEnabled com polaridade INVERTIDA (Harmful=1/Default=0, ja IsOptional)
+  - as duas regras nunca podem estar ativas ao mesmo tempo para o mesmo
+  estado; ambas opcionais hoje, sem impacto no score.
+- Build 0 erros; Kit relancado (PID 26552).
+
+### Sessao 07/09 (cont.) - AUDITORIA COMPLETA da IntegrityPage/Guardian (sem mudancas de codigo)
+
+Pedido: "procure qualquer erro/inconsistencia/metodos diferentes de mesmo resultado" +
+explicar por que o scan caiu de ~3 min para <3s.
+
+**Velocidade E LEGITIMA** (otimizacoes de sessoes anteriores, nenhum check foi removido):
+1. BCD: 28 processos bcdedit -> 1 UNICO `/enum` com cache TTL 15s (_bcdEnumOutput,
+   GetHarmfulTweaksWithStatus ~2594).
+2. 78 servicos via leitura do DWORD Start em HKLM\...\Services\<nome> (RegistryBatch,
+   cache de chaves) em vez de WMI/ServiceController por item (10-50x mais rapido).
+3. RegistryBatch (cache de chaves abertas por scan) + single-flight lock (_scanGate)
+   serializa scans concorrentes.
+4. Antigamente: spawn de processo por tweak BCD + WMI por servico + varredura de PATH
+   por item = minutos; hoje o scan inteiro roda em ~160ms+.
+
+**Consistencias verificadas (tudo OK, sem alteracao)**:
+- CheckTweak cobre TODOS os TweakType em uso (127 regras: 78 Service, 18 Registry,
+  28 Bcd, 1 Mouse, 2 PageFile) - nenhum tipo fica com status stale.
+- Servicos: StartDwordToMode (0=Boot/1=System/2=Auto/3=Manual/4=Disabled),
+  HarmfulStartMode (78x "Disabled"), KitIntentionalServiceStart (8x "Disabled") e
+  DefaultStartMode (Auto/Manual/Demand/Delayed-Auto) - todos casam por
+  OrdinalIgnoreCase; switch sc.exe mapeia Manual->demand, Delayed-Auto->delayed-auto,
+  Auto/"Demand" ja sao sintaxe valida.
+- FixAll (RESTAURAR TODOS): so toca MODIFIED && !IsOptional; delay 25ms entre
+  servicos; sempre reabre a UI no finally (nada congela).
+- Score: usa apenas nonOptionalTweaks (IsOptional sai do score E do filtro Modificado).
+- Revert de servico intencional (DiagTrack etc.) bloqueado no ToggleTweak com
+  mensagem "reative pelo toggle do Kit".
+- Prefixos de KeyPath: so HKEY_LOCAL_MACHINE/HKEY_CURRENT_USER/HKEY_CLASSES_ROOT
+  (43/305/5) + 1 HKLM (coberto) - gap latente de strip "HKCU\"/"HKCR\" no ToggleTweak
+  nunca e exercitado (nenhuma regra usa prefixo curto).
+- REG_EXPAND_SZ: Registry.GetValue e RegistryKey.GetValue expandem por padrao -
+  caminho batch e nao-batch comparam o mesmo valor (sem divergencia).
+
+Conclusao: nenhuma correcao necessaria; comportamento identico em qualquer PC
+(SecurityException/UnauthorizedAccess/Argument -> NOT_FOUND, nunca crash).
+
+### Sessao 07/09 (cont.) - Fix ToggleTweak HKCU/HKCR + AUDITORIA COMPLETA da NetworkPage
+
+**1. ToggleTweak (Guardian.cs)**: adicionados strips de "HKCU\\" e "HKCR\\" no path
++ deteccao StartsWith("HKCR") -> ClassesRoot. Gap dormente eliminado (nenhuma regra
+usa prefixo curto hoje, mas regras futuras agora funcionam nas duas formas).
+
+**2. NetworkPage (primeira revisao da pagina) - achados e correcoes**:
+- **BUG REAL (flags conflation)**: `_isLoading` era usado como guarda dos 7 toggles
+  (Chk*_Click) E como guarda do refresh de DNS (timer 10s setava _isLoading=true
+  durante o refresh) -> durante qualquer refresh DNS, TODOS os toggles clicados
+  morriam em silencio. Criado `_dnsRefreshing` separado; `_isLoading` so para a
+  carga inicial, setado false no fim de LoadAllDataAsync (antes nunca era resetado
+  pela carga inicial - so pelo finally do RefreshDnsStatus!).
+- **Timers duplicados**: StartRefreshTimers rodava a cada Loaded sem guarda ->
+  `_timersStarted` (timer 3s adaptador + timer 10s DNS nao empilham mais).
+- **XAML \uXXXX literal** (bug visual): "DNS R\u00e1pido", "DNS Prim\u00e1rio",
+  "Prim\u00e1rio (ex: 1.1.1.1)", "Secund\u00e1rio (opcional)" apareciam com o
+  escape cru na tela (XAML nao interpreta \\uXXXX - so &#xXXXX;). Corrigidos
+  para acentos reais.
+- **Catch blocks copy-paste**: 10 handlers nao relacionados (MAC, limpeza, reset,
+  custom DNS) escreviam "Erro: ..." no TxtBenchmarkStatus + mexiam no PgbBenchmark
+  (UI do benchmark de DNS). Removido o bloco em todos; benchmark mantem o seu
+  (+ ShowError dialog novo).
+- **BtnFlushDns_Click ignorava result.Success**: mostrava ShowSuccess mesmo com
+  falha. Corrigido.
+- **UpdateLabel(TextBlock,bool) dead overload** removido (so a versao 4-args
+  com textos customizados e usada).
+- **Consistencias verificadas sem mudanca**: GetActiveDnsInfo ("Cloudflare"/
+  "Google"/"Personalizado"/"Automatico (DHCP)") casa com UpdateDnsUi (contains
+  DHCP ok); SetDns/SetCustomDns via netsh; CleanNetworkSafe/Full so comandos
+  padrao; IsInterruptModerationDisabled/IsNagle (registro+netsh); MAC spoofing
+  com confirmacao dupla + workaround NetworkAddress + verificacao pos-restart;
+  RefreshAdapterStatus com single-flight (_refreshingAdapters) + preserva
+  selecao por ConnectionName.
+
+Build: 0 erros / 0 avisos. Kit relancado (PID 31096, exe 17:54).
+
+### Sessao 07/09 (cont.) - NetworkPage DNS Rápido: area reformada + comandos atualizados
+
+Pedido: "melhore toda essa area e refaça os comandos dessa pagina de rede".
+
+**DnsBenchmark.cs (reescrito)**:
+1. Best-of-3 pings por servidor (antes: 1 ping único — pico momentaneo punia o
+   provedor injustamente). Para cedo se best <= 5ms.
+2. Fallback TCP 443: se ICMP do primario falhar (bloqueado por firewall), tenta
+   secundario; se ICMP falhar nos 2, TcpConnect 443 (1500ms timeout) — varios
+   provedores dropam ICMP mas respondem TCP. Propriedade MeasuredVia (ICMP/TCP:443).
+3. Lista atualizada: REMOVIDOS mortos/obsoletos (Neustar 156.154.x descontinuado,
+   Comodo 8.26.x virou DNS Forge x.x.130.130, OpenNIC antigo, UncensoredDNS,
+   Yandex, Oracle Dyn, Alternate DNS); ADICIONADOS Control D (76.76.2.0),
+   NextDNS Anycast (45.90.28.0), AdGuard Sem Filtro (94.140.14.140), Mullvad
+   secundario corrigido (era 194.242.2.3 inexistente, agora 1.1.1.1), Hurricane
+   Electric corrigido (75.75.75.75 era da Comcast, real e 74.82.42.42), puntCAT
+   primario corrigido (185.121.177.177).
+4. IsCurrent (bool) + MarkCurrentProvider() + TooltipText (primario/secundario/
+   categoria/latencia com via).
+
+**NetworkManager.cs (Toolbox)**:
+5. SetDnsServers: validacao de IP ANTES de tocar interfaces (IPAddress.TryParse;
+   primario obrigatorio, secundario opcional); bug real: secundario vazio gravava
+   ('prim','') -> string vazia como servidor DNS no Windows. Agora passa so o
+   primario nesse caso.
+6. GetActiveDnsInfo: reconhece TODOS os provedores da lista (nome amigavel na UI)
+   em vez de so Cloudflare/Google.
+
+**NetworkPage.xaml**:
+7. Badge "EM USO" verde na linha do provedor ativo + fundo verde translucido
+   (BoolToBrushConverter local + BooleanToVisibilityConverter).
+8. Botao Aplicar maior (FontSize 10, Padding 6,3), botao renomeado
+   "↻ Testar Novamente", status com TextWrapping (nao corta mais).
+9. TextBox secundario sem texto-placeholder fixo (placeholder do primario
+   tratado como vazio no handler).
+
+**NetworkPage.xaml.cs**:
+10. Benchmark AUTOMATICO ao abrir a pagina (RunBenchmarkAsync no fim de
+    LoadAllDataAsync) — antes so rodava com clique.
+11. RunBenchmarkAsync com single-flight (_benchmarkRunning) — clique durante o
+    teste nao empilha; BtnBenchmarkDns_Click virou wrapper.
+12. UpdateDnsUi: nome amigavel do Core ("Cloudflare (1.1.1.1)") + marca
+    IsCurrent na lista + Items.Refresh.
+13. BtnApplyCustomDns_Click: validacao de IP na UI ANTES do Core (defesa em
+    profundidade), placeholders tratados como vazio, erro proprio em vez de
+    sumir no log.
+14. BtnResetNetwork_Click: catch com ShowError (antes so logava, usuario nao
+    via o erro).
+
+Build: 0 erros / 12 avisos (pre-existentes). Kit relancado (PID 30496, exe 19:55).
+
+### Sessao 07/09 (cont.) - DNS Rápido: visual refeito (pedido do usuario)
+
+"refaça o visual... botões de dns primario/secundario com placeholder cinza que
+some ao digitar... botão amarelo está frito demais, deixe preto com borda e
+texto amarelo".
+
+1. **Card refeito**: cabecalho com titulo + subtitulo e botao "↻ Testar Todos"
+   movido para o topo (direita); tabela de provedores dentro de Border #161616
+   com cantos arredondados; linhas com Padding/cornerRadius (hover visual);
+   cabecalhos de coluna em caps cinza; latencia agora VERDE (#4CAF50) em vez de
+   amarela (menos poluicao amarela); status do teste abaixo da tabela.
+2. **Botoes "Aplicar"**: todos preto (#1A1A1A) com BORDA amarela (#FFD700) e
+   texto amarelo (antes: fundo amarelo chapado). Mesmo estilo no Aplicar do DNS
+   customizado e no Testar Todos.
+3. **Placeholders REAIS nos TextBoxes**: novo estilo DnsPlaceholderTextBoxStyle
+   (ControlTemplate com TextBlock "ph" ligado ao Tag, Visibility ligado a
+   Trigger Text="" + borda dourada no foco). Textos: "DNS Primário (ex:
+   8.8.8.8 Google)" / "DNS Secundário (opcional, ex: 8.8.4.4)". Removido o hack
+   antigo de texto-fixo-como-placeholder no handler.
+4. TextBoxes com Height 32, cantos 6, CaretBrush dourado, fundo #161616.
+
+Build: 0 erros. Kit relancado (PID 15204).
+
+### Sessao 07/09 (cont.) - DNS Rápido: spinner individual por linha + lista expandida (estilo DNS Jumper)
+
+Pedido: "durante o teste coloque aquele negocio de carregando... um individual em
+todos os testes... ser tão bom quanto o DNS Jumper... pesquisar na web para os
+melhores resultados e adicionar mais animações".
+
+**Pesquisa web** (gist mutin-sa "List of Top Public Recursive Name Servers" +
+public-dns.info): validados IPs reais e descobertos provedores que faltavam.
+
+**DnsBenchmark.cs**:
+1. `DnsProvider` agora e `INotifyPropertyChanged` com `TestState` (enum:
+   Pending/Testing/Done/Failed) + `TestStateText` — a linha atualiza AO VIVO
+   durante o teste (spinner individual estilo "1 tarefa em execução" do Kit).
+2. `BenchmarkAsync` seta Testing no início de cada item, Done/Failed no fim.
+3. Lista EXPANDIDA (20 -> 26): ADICIONADOS Quad9 Sem Filtro (9.9.9.10), DNS.SB
+   (185.222.222.222), dns0.eu (193.110.81.0), Level 3 4.2.2.1, Dyn/Oracle
+   (216.146.35.35), Quad101 Taiwan (101.101.101.101), Freenom World (80.80.80.80);
+   CORRIGIDOS Gcore (95.85.95.85/2.56.220.2, os antigos 185.158.x eram
+   invalidos), Hurricane Electric secundario (216.218.221.6), puntCAT
+   (185.121.177.177 = OpenNIC real).
+
+**NetworkPage.xaml**:
+4. `RowSpinnerStyle`: Ellipse 13px com StrokeDashArray + RotateTransform animado
+   (storyboard 0.9s RepeatBehavior Forever, ativado por DataTrigger TestState=Testing,
+   StopStoryboard no exit) — spinner girando SO na linha que esta sendo testada.
+5. Converter `DnsTestStateToVisibilityConverter` (só Testing = Visible).
+6. Latencia "Falhou" em vermelho (#E53935) quando Failed.
+7. Quirk: `StrokeLineCap` nao existe em WPF Shape — `StrokeStartLineCap`/
+   `StrokeEndLineCap` (MC4005).
+
+**NetworkPage.xaml.cs**:
+8. Reordenacao da lista SO NO FIM do teste (ItemsSource null + reatribui) —
+   durante o teste as linhas ficam fixas com spinner girando individualmente;
+   status final inclui "· N sem resposta".
+
+Build: 0 erros. Kit relancado (PID 35524).
+
+### Sessao 07/09 (cont.) - ANALISE BINARIA do DNS Jumper v2.3 (IDA Pro) + RESOLUCAO DNS REAL no Kit
+
+Pedido: "use ida pro no dnsjumper so para ver se ele faz alguma coisa extra que
+nao vimos, os resultados dele parecem ser diferentes do que nos pegamos".
+
+**Binario**: DnsJumper.exe = PE32 i386, 912KB, compilado em AUTOIT (strings
+MouseClickDelay/STRINGTOBINARY/GUICTRLSENDTODUMMY confirmam; Aut2Exe). Analise
+por parsing estatico (imports PE, strings UTF-16, .asm do idat -B) — nao IDA
+decompile completo (AutoIt e interpretado em bytecode embutido).
+
+**ACHADOS (como o DNS Jumper testa)**:
+1. Imports: ICMP.DLL (IcmpCreateFile/IcmpSendEcho/IcmpCloseHandle) + WSOCK32
+   ordinals [151=WSAStartup, 52=gethostbyname, 111=WSAAsyncGetHostByName,
+   20/17=sendto/recvfrom, 115/116=WSAAsyncSelect, 23=htons...]. SEM dnsapi.dll,
+   SEM iphlpapi.dll, SEM ws2_32.dll (usa wsock32 legado).
+2. **O teste de LISTA do DNS Jumper e SO PING ICMP** (IcmpSendEcho com timeout
+   500ms padrao — INI ResolveWaitTime=500). A coluna "Resultado 1/2" = ICMP RTT.
+3. "Turbo Resolve" = resolver www.google.com via gethostbyname (usa o DNS DO
+   SISTEMA, nao o servidor selecionado — mede o resolver ATIVO, nao o candidato).
+4. INI confirma: ResolveDomainName=www.google.com, MixedDns=True (ordena
+   misturado), AutoSortDnsList=True.
+5. O gethostbyname/sendto/recvfrom do binario servem para o "Check DNS"
+   individual (janela de resolve time), nao para o teste de lista.
+
+**POR QUE OS RESULTADOS DIFEREM**: ICMP mede a rede ate o servidor; o tempo de
+RESOLUCAO real (processamento do resolver + cache miss) e outro numero. O Kit
+media ICMP (igual ao Jumper), mas o ranking ficava diferente porque o Jumper
+usa timeout 500ms (descarta lentos) e 1 ping so.
+
+**MELHORIA IMPLEMENTADA no Kit (supera o Jumper)**:
+6. `DnsQueryMsSync`: query DNS REAL (UDP porta 53, tipo A por www.google.com)
+   com EDNS0 OPT record — **DESCOBERTA CRITICA: Cloudflare/Quad9/1.0.0.1/
+   AdGuard/Mullvad DESCARTAM queries sem EDNS0** (testado: sem OPT so Google/
+   OpenDNS/Level3/SafeDNS respondem; com OPT TODOS os 26 respondem). Sem isso
+   o ranking ficaria cheio de "-- ms" falsos.
+7. Ranking agora pela RESOLUCAO REAL (mais fiel que ICMP); ICMP fica como
+   coluna secundaria. Coluna nova "RESOLUCAO" no XAML + latencia ICMP
+   rebaixada para cinza-dourado.
+8. Status final reporta "por resolução real" ou "por ICMP" (fallback).
+9. Timeout 1500ms (Jumper usa 500 — o nosso aceita redes lentas mas
+   diferenciadas).
+
+Artefatos: %TEMP%/opencode/dnsjumper/ (exe copiado, .asm 8.4MB, .i64 10.8MB),
+%TEMP%/opencode/dnstest/ (projeto de teste UDP/EDNS).
+
+Build: 0 erros. Kit relancado (PID 39312).

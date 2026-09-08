@@ -24,6 +24,7 @@ namespace KitLugia.GUI.Pages
     {
         public ObservableCollection<PrivacyCategoryViewModel> Categories { get; set; } = new ObservableCollection<PrivacyCategoryViewModel>();
         private ObservableCollection<PrivacyCategoryViewModel> _allCategories { get; set; } = new ObservableCollection<PrivacyCategoryViewModel>();
+
         private string _currentFilter = "All";
         private string _searchText = "";
         private DispatcherTimer? _refreshTimer;
@@ -161,13 +162,25 @@ namespace KitLugia.GUI.Pages
                 foreach (var cat in Categories)
                     cat.RefreshAllEnabled();
 
+                // Protecao POR NIVEL: verdes / amarelos / vermelhos, cada um separado
+                int safeTotal = allSettings.Count(s => s.Level == OOShutUpManager.PrivacyLevel.Recommended);
+                int modTotal = allSettings.Count(s => s.Level == OOShutUpManager.PrivacyLevel.Limited);
+                int dangerTotal = allSettings.Count(s => s.Level == OOShutUpManager.PrivacyLevel.NotRecommended);
+                int safeOn = allSettings.Count(s => s.Level == OOShutUpManager.PrivacyLevel.Recommended && s.IsEnabled);
+                int modOn = allSettings.Count(s => s.Level == OOShutUpManager.PrivacyLevel.Limited && s.IsEnabled);
+                int dangerOn = allSettings.Count(s => s.Level == OOShutUpManager.PrivacyLevel.NotRecommended && s.IsEnabled);
+
+                TxtProtSafe.Text = $"{safeOn} / {safeTotal}";
+                TxtProtModerate.Text = $"{modOn} / {modTotal}";
+                TxtProtDanger.Text = $"{dangerOn} / {dangerTotal}";
+                PbSafe.Value = safeTotal > 0 ? (double)safeOn / safeTotal * 100 : 0;
+                PbModerate.Value = modTotal > 0 ? (double)modOn / modTotal * 100 : 0;
+                PbDanger.Value = dangerTotal > 0 ? (double)dangerOn / dangerTotal * 100 : 0;
+
                 int secured = allSettings.Count(s => s.IsEnabled);
                 int total = allSettings.Count;
-
-                TxtSecureCount.Text = secured.ToString();
-                TxtVulnerableCount.Text = (total - secured).ToString();
                 int percent = total > 0 ? (int)((double)secured / total * 100) : 0;
-                TxtPrivacyScore.Text = $"{percent}% Protegido";
+                TxtPrivacyScore.Text = $"Resultado: {secured} de {total} proteções ativas ({percent}%)";
             }
             catch (Exception ex)
             {
@@ -190,84 +203,107 @@ namespace KitLugia.GUI.Pages
             LoadData();
         }
 
-        private async Task ApplyPreset(OOShutUpManager.PrivacyLevel level)
+        // --- "Presets Personalizados": janela própria (padrão PathExplorerWindow) ---
+        // A janela mostra o que SERÁ ativado e o que NÃO será em cada item.
+
+        private async void BtnOpenPresets_Click(object sender, RoutedEventArgs e)
         {
-            if (Application.Current.MainWindow is MainWindow mw)
+            if (_isPrivacyOperation) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            var win = new KitLugia.GUI.Windows.PresetsPersonalizadosWindow
+            {
+                Owner = Window.GetWindow(this)
+            };
+            if (win.ShowDialog() != true) return;
+
+            var toApply = win.ToApply;
+            var toRevert = win.ToRevert;
+            if (toApply.Count == 0 && toRevert.Count == 0) return;
+
+            _isPrivacyOperation = true;
+            BtnOpenPresets.IsEnabled = false;
+            BtnResetAll.IsEnabled = false;
+            string prevScore = TxtPrivacyScore.Text;
+            TxtPrivacyScore.Text = $"⏳ Aplicando {toApply.Count + toRevert.Count}...";
+
+            try
             {
                 string taskId = Guid.NewGuid().ToString();
-                BackgroundTaskTracker.Instance.RegisterTask(taskId, $"Preset {level}", "Privacy");
-                mw.ShowInfo("PRIVACIDADE", $"Aplicando preset {level}...");
-                await Task.Run(() => OOShutUpManager.ApplyPreset(level));
-                BackgroundTaskTracker.Instance.CompleteTask(taskId, true);
-                mw.ShowSuccess("SUCESSO", "Configurações aplicadas.");
+                BackgroundTaskTracker.Instance.RegisterTask(taskId, "Presets Personalizados", "Privacy");
+                var result = await Task.Run(() => OOShutUpManager.ApplyCustomSelection(toApply, toRevert));
+                BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Failed == 0);
+
+                if (result.Failed > 0)
+                    mw.ShowError("PRIVACIDADE", $"Concluído com falhas: {result.Applied} aplicadas, {result.Reverted} revertidas, {result.Failed} falharam. Veja o log.");
+                else
+                    mw.ShowSuccess("PRIVACIDADE", $"Concluído: {result.Applied} aplicadas, {result.Reverted} revertidas ao padrão.");
+
                 RefreshStatus();
             }
-        }
-
-        private async void BtnApplyRecommended_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isPrivacyOperation) return;
-            _isPrivacyOperation = true;
-            try
-            {
-                await ApplyPreset(OOShutUpManager.PrivacyLevel.Recommended);
-            }
             catch (Exception ex)
             {
-                Logger.LogError("BtnApplyRecommended_Click", ex.Message);
+                Logger.LogError("BtnOpenPresets_Click", ex.Message);
+                TxtPrivacyScore.Text = prevScore;
+                mw.ShowError("ERRO", "Falha ao aplicar: " + ex.Message);
             }
             finally
             {
                 _isPrivacyOperation = false;
+                BtnOpenPresets.IsEnabled = true;
+                BtnResetAll.IsEnabled = true;
             }
         }
 
-        private async void BtnApplyLimited_Click(object sender, RoutedEventArgs e)
+        // --- RESETAR TUDO: desliga TODAS as proteções e reverte ao padrão do Windows ---
+        // Substitui o antigo "Restaurar Padrão Windows" (mesma função RestoreDefaults,
+        // agora com botão vermelho em destaque no card de presets + feedback completo).
+        private async void BtnResetAll_Click(object sender, RoutedEventArgs e)
         {
             if (_isPrivacyOperation) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            if (!await mw.ShowConfirmationDialog(
+                "RESETAR TUDO?\n\n" +
+                "• Todas as proteções de privacidade serão DESLIGADAS.\n" +
+                "• Telemetria, diagnóstico e rastreamento voltam ao padrão do Windows.\n" +
+                "• Serviços de telemetria (DiagTrack etc.) serão reativados.\n\n" +
+                "Deseja continuar?"))
+                return;
+
             _isPrivacyOperation = true;
+            BtnResetAll.IsEnabled = false;
+            BtnOpenPresets.IsEnabled = false;
+            string prevScore = TxtPrivacyScore.Text;
+            TxtPrivacyScore.Text = "⏳ Revertendo...";
+
             try
             {
-                await ApplyPreset(OOShutUpManager.PrivacyLevel.Limited);
+                string taskId = Guid.NewGuid().ToString();
+                BackgroundTaskTracker.Instance.RegisterTask(taskId, "Resetar Privacidade", "Privacy");
+                var (success, message) = await Task.Run(() => OOShutUpManager.RestoreDefaults());
+                BackgroundTaskTracker.Instance.CompleteTask(taskId, success);
+
+                if (success)
+                    mw.ShowSuccess("RESETADO", message);
+                else
+                    mw.ShowError("ERRO", message);
+
+                RefreshStatus();
             }
             catch (Exception ex)
             {
-                Logger.LogError("BtnApplyLimited_Click", ex.Message);
+                Logger.LogError("BtnResetAll_Click", ex.Message);
+                TxtPrivacyScore.Text = prevScore;
+                mw.ShowError("ERRO", "Falha ao resetar: " + ex.Message);
             }
             finally
             {
                 _isPrivacyOperation = false;
-            }
-        }
-
-        private async void BtnApplyNotRecommended_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isPrivacyOperation) return;
-            _isPrivacyOperation = true;
-            try
-            {
-                await ApplyPreset(OOShutUpManager.PrivacyLevel.NotRecommended);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("BtnApplyNotRecommended_Click", ex.Message);
-            }
-            finally
-            {
-                _isPrivacyOperation = false;
-            }
-        }
-
-        private async void BtnRestoreDefault_Click(object sender, RoutedEventArgs e)
-        {
-            if (Application.Current.MainWindow is MainWindow mw)
-            {
-                if (await mw.ShowConfirmationDialog("Isso reativará toda a telemetria e coleta de dados padrão do Windows.\nDeseja continuar?"))
-                {
-                    await Task.Run(() => OOShutUpManager.RestoreDefaults());
-                    mw.ShowSuccess("RESTAURADO", "Padrões do Windows restaurados.");
-                    RefreshStatus();
-                }
+                BtnResetAll.IsEnabled = true;
+                BtnOpenPresets.IsEnabled = true;
             }
         }
 
@@ -326,10 +362,6 @@ namespace KitLugia.GUI.Pages
                 _isPrivacyOperation = false;
             }
         }
-
-        private void BtnGenerateReport_Click(object sender, RoutedEventArgs e) => MessageBox.Show("Funcionalidade em desenvolvimento.");
-        private void BtnExportConfig_Click(object sender, RoutedEventArgs e) => MessageBox.Show("Funcionalidade em desenvolvimento.");
-        private void BtnSnapshot_Click(object sender, RoutedEventArgs e) => MessageBox.Show("Funcionalidade em desenvolvimento.");
 
         private void CategoryCheckBox_Checked(object sender, RoutedEventArgs e)
         {

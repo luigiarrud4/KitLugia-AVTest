@@ -652,6 +652,17 @@ namespace KitLugia.Core
         /// </summary>
         private static (bool Success, string Message) SetDnsServers(string provider, string? primaryDns, string? secondaryDns)
         {
+            // Validação ANTES de tocar qualquer interface: evita aplicar IP inválido/ASPAS no PS.
+            if (provider != "DHCP")
+            {
+                if (string.IsNullOrWhiteSpace(primaryDns) || !System.Net.IPAddress.TryParse(primaryDns, out _))
+                    return (false, $"DNS primário inválido: '{primaryDns}'. Use um IPv4/IPv6 válido (ex: 1.1.1.1).");
+
+                bool hasSecondary = !string.IsNullOrWhiteSpace(secondaryDns);
+                if (hasSecondary && !System.Net.IPAddress.TryParse(secondaryDns, out _))
+                    return (false, $"DNS secundário inválido: '{secondaryDns}'. Deixe vazio ou use um IP válido.");
+            }
+
             try
             {
                 string psScript;
@@ -662,6 +673,11 @@ namespace KitLugia.Core
                 if (provider == "DHCP")
                 {
                     psScript = $"{findInterfacesPart} foreach ($if in $interfaces) {{ Set-DnsClientServerAddress -InterfaceIndex $if.InterfaceIndex -ResetServerAddresses -Confirm:$false }}";
+                }
+                else if (string.IsNullOrWhiteSpace(secondaryDns))
+                {
+                    // Sem secundário: passa SÓ o primário (o array antigo ('prim','') gravava string vazia como servidor).
+                    psScript = $"{findInterfacesPart} foreach ($if in $interfaces) {{ Set-DnsClientServerAddress -InterfaceIndex $if.InterfaceIndex -ServerAddresses ('{primaryDns}') -Confirm:$false }}";
                 }
                 else
                 {
@@ -729,8 +745,13 @@ namespace KitLugia.Core
                     if (dnsServers.Any())
                     {
                         string firstDns = dnsServers.First().ToString();
-                        if (firstDns == "1.1.1.1" || firstDns == "1.0.0.1") return ("Cloudflare", firstDns);
-                        if (firstDns == "8.8.8.8" || firstDns == "8.8.4.4") return ("Google", firstDns);
+                        // Reconhece TODOS os provedores da lista do benchmark (nome amigável na UI).
+                        foreach (var p in DnsBenchmark.GetDefaultProviders())
+                        {
+                            if (p.Primary.Equals(firstDns, StringComparison.OrdinalIgnoreCase) ||
+                                p.Secondary.Equals(firstDns, StringComparison.OrdinalIgnoreCase))
+                                return (p.Name, firstDns);
+                        }
                         return ("Personalizado", firstDns);
                     }
                 }
