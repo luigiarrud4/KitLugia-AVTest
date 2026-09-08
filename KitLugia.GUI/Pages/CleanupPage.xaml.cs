@@ -474,6 +474,8 @@ namespace KitLugia.GUI.Pages
             BtnCleanRegistry.IsEnabled = false;
             TxtLog.Text = "[Iniciando] Limpeza de registro...";
 
+            try
+            {
             var buf = new LogBuffer(AddLog);
             var result = await Task.Run(() =>
                 KitLugia.Core.RegistryCleaner.CleanSelectedIssues(selectedIssues, buf.OnNext));
@@ -487,6 +489,19 @@ namespace KitLugia.GUI.Pages
             _registryIssues = null;
             RegistryIssuesBorder.Visibility = Visibility.Collapsed;
             BtnCopyRegistryIssues.IsEnabled = false;
+            }
+            catch (Exception ex)
+            {
+                AddLog($"❌ Erro na limpeza do registro: {ex.Message}");
+                TxtRegistryScanResult.Text = "Erro na limpeza — veja o log.";
+                TxtRegistryScanResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 106, 94));
+                if (System.Windows.Application.Current.MainWindow is MainWindow mwe)
+                    mwe.ShowError("LIMPEZA DE REGISTRO", ex.Message);
+            }
+            finally
+            {
+                BtnCleanRegistry.IsEnabled = true;
+            }
         }
 
         private void BtnCopyRegistryIssues_Click(object sender, RoutedEventArgs e)
@@ -685,15 +700,33 @@ namespace KitLugia.GUI.Pages
 
                 await Task.Run(() =>
                 {
-                    var results = EvidenceCleaner.CleanAll();
-                    foreach (var (cat, items) in results)
+                    // Limpa APENAS as categorias selecionadas (antes rodava CleanAll()
+                    // sempre, apagando categorias nem marcadas — e junto, o layout do desktop).
+                    var cleaners = new Dictionary<string, Func<int>>
                     {
-                        var match = selected.FirstOrDefault(s => s.Name == cat);
-                        if (match != null)
+                        { "Recent Documents (MRU)", EvidenceCleaner.CleanRecentDocs },
+                        { "RunMRU (Executar)", EvidenceCleaner.CleanRunMRU },
+                        { "Typed URLs (IE/Edge)", EvidenceCleaner.CleanTypedURLs },
+                        { "UserAssist", EvidenceCleaner.CleanUserAssist },
+                        { "BagMRU (Pastas)", EvidenceCleaner.CleanBagMRU },
+                        { "Jump Lists", EvidenceCleaner.CleanJumpLists },
+                        { "Windows Timeline", EvidenceCleaner.CleanWindowsTimeline },
+                        { "Clipboard History", EvidenceCleaner.CleanClipboardHistory },
+                        { "Prefetch", EvidenceCleaner.CleanPrefetch },
+                        { "Office MRU", EvidenceCleaner.CleanOfficeMRU },
+                        { "Visual Studio MRU", EvidenceCleaner.CleanVisualStudioMRU }
+                    };
+
+                    foreach (var sel in selected)
+                    {
+                        if (!cleaners.TryGetValue(sel.Name, out var clean)) continue;
+                        try
                         {
-                            match.Status = $"{items} itens limpos";
+                            int items = clean();
+                            sel.Status = $"{items} itens limpos";
                             totalItems += items;
                         }
+                        catch (Exception ex) { Logger.LogError("CleanEvidence", $"{sel.Name}: {ex.Message}"); }
                     }
                 });
 

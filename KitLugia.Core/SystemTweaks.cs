@@ -7377,7 +7377,10 @@ namespace KitLugia.Core
         /// <summary>Apaga as views salvas POR PASTA (numericas) + BagMRU nos 2 locais,
         /// mantendo o template global AllFolders — equivale ao "Restaurar Padroes das
         /// Pastas" do Explorer. As pastas conhecidas (Downloads etc.) sao recriadas
-        /// com o template padrao (agrupamento por data volta sozinho).</summary>
+        /// com o template padrao (agrupamento por data volta sozinho).
+        /// PRESERVA o bag 1 ("Bags\1\Desktop") — e onde o Windows guarda as POSICOES
+        /// dos icones da area de trabalho. Deletar bag 1 = icones desarrumados no
+        /// proximo boot (bug historico do reparo/cleanup).</summary>
         public static int ResetSavedFolderViews()
         {
             int cleared = 0;
@@ -7388,7 +7391,8 @@ namespace KitLugia.Core
                     using var shell = Registry.CurrentUser.OpenSubKey(root, true);
                     if (shell == null) continue;
 
-                    // Bags: remove as views numericas por pasta, preserva AllFolders.
+                    // Bags: remove as views numericas por pasta, preserva AllFolders
+                    // e o bag 1 (desktop — posicoes dos icones).
                     try
                     {
                         using var bags = shell.OpenSubKey("Bags", true);
@@ -7397,6 +7401,7 @@ namespace KitLugia.Core
                             foreach (var name in bags.GetSubKeyNames())
                             {
                                 if (name.Equals("AllFolders", StringComparison.OrdinalIgnoreCase)) continue;
+                                if (IsDesktopBag(bags, name)) continue;
                                 try { bags.DeleteSubKeyTree(name, false); cleared++; }
                                 catch { /* em uso — segue */ }
                             }
@@ -7405,14 +7410,28 @@ namespace KitLugia.Core
                     catch (Exception ex) { Logger.Log($"Erro ao limpar Bags ({root}): {ex.Message}"); }
 
                     // BagMRU: remove inteiro (associacao pasta->bag e recriada).
+                    // O bag 1 do desktop nao depende do BagMRU (convencao fixa).
                     try { shell.DeleteSubKeyTree("BagMRU", false); cleared++; }
                     catch { /* ja nao existe — ok */ }
 
-                    Logger.Log($"Explorer: views por pasta resetadas em {root}");
+                    Logger.Log($"Explorer: views por pasta resetadas em {root} (bag desktop preservado)");
                 }
                 catch (Exception ex) { Logger.Log($"Erro ao resetar views ({root}): {ex.Message}"); }
             }
             return cleared;
+        }
+
+        /// <summary>True se a subchave numerica de Bags for o bag do DESKTOP
+        /// (contem a subchave "Desktop" com as posicoes dos icones).</summary>
+        private static bool IsDesktopBag(RegistryKey bags, string name)
+        {
+            try
+            {
+                using var sub = bags.OpenSubKey(name);
+                return sub?.GetSubKeyNames()
+                    .Any(n => n.Equals("Desktop", StringComparison.OrdinalIgnoreCase)) == true;
+            }
+            catch { return false; }
         }
 
         /// <summary>Restaura o visual padrao do Explorer de uma vez: miniaturas de

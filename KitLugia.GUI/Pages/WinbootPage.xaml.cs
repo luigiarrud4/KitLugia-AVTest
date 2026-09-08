@@ -410,7 +410,10 @@ namespace KitLugia.GUI.Pages
                             if (TxtQuickHint != null) TxtQuickHint.Text = $"ISO: {autoLang} — altere acima se quiser. Padrão pt-BR garante que não inicie em inglês.";
                         });
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        KitLugia.Core.Logger.Log($"[WINBOOT] Falha ao detectar idioma da ISO (padrão pt-BR mantido): {ex.Message}");
+                    }
                 });
             }
         }

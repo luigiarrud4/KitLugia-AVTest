@@ -1188,7 +1188,7 @@ new() {
         new() {
             Name = "Inicialização Rápida (Fast Startup) Desativada para HD",
             Description = "Fast Startup reduz tempo de boot usando hibernação híbrida. Desativar em HDDs aumenta o tempo de inicialização de 10 segundos para 1-2 minutos.",
-            Category = "Boot e Inicialização", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power", ValueName = "HiberbootEnabled", HarmfulValue = 0, DefaultValue = 1
+            Category = "Boot e Inicialização", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power", ValueName = "HiberbootEnabled", HarmfulValue = 0, DefaultValue = 1, IsOptional = true
         },
         new() {
             Name = "Tempo Limite de Boot (Baixo)",
@@ -2553,7 +2553,7 @@ new() {
         new() {
             Name = "Smart App Control Desativado (VerifiedAndReputablePolicyState=0)",
             Description = "O Smart App Control (Windows 11) bloqueia apps não assinados/não confiáveis. Desativá-lo deixa o PC vulnerável a malware disfarçado de programa legítimo.",
-            Category = "Defesa e Antivírus", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CI\Policy", ValueName = "VerifiedAndReputablePolicyState", HarmfulValue = 0, DefaultValue = 1
+            Category = "Defesa e Antivírus", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CI\Policy", ValueName = "VerifiedAndReputablePolicyState", HarmfulValue = 0, DefaultValue = 1, IsOptional = true
         },
         new() {
             Name = "Instalação de Drivers Restrita Desativada (PrintNightmare)",
@@ -2663,18 +2663,20 @@ new() {
                         if (string.IsNullOrEmpty(tweak.KeyPath))
                             return (false, "Configuração de registro inválida.");
 
-                        // Limpar o prefixo do hive do caminho
+                        // Limpar o prefixo do hive do caminho (longo e curto)
                         string path = tweak.KeyPath
                             .Replace(@"HKEY_LOCAL_MACHINE\", "")
                             .Replace(@"HKEY_CURRENT_USER\", "")
                             .Replace(@"HKEY_CLASSES_ROOT\", "")
-                            .Replace(@"HKLM\", "");
+                            .Replace(@"HKLM\", "")
+                            .Replace(@"HKCU\", "")
+                            .Replace(@"HKCR\", "");
 
                         // Determinar o hive correto
                         RegistryKey baseKey;
                         if (tweak.KeyPath.StartsWith("HKEY_LOCAL_MACHINE") || tweak.KeyPath.StartsWith("HKLM"))
                             baseKey = Registry.LocalMachine;
-                        else if (tweak.KeyPath.StartsWith("HKEY_CLASSES_ROOT"))
+                        else if (tweak.KeyPath.StartsWith("HKEY_CLASSES_ROOT") || tweak.KeyPath.StartsWith("HKCR"))
                             baseKey = Registry.ClassesRoot;
                         else
                             baseKey = Registry.CurrentUser;

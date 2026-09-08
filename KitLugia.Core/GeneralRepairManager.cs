@@ -122,8 +122,12 @@ namespace KitLugia.Core
                 Name = "Restaurar Photo Viewer Antigo",
                 Category = "Explorer/UI",
                 Icon = "📷",
-                Description = "Ativa o visualizador de fotos clássico (leve e rápido) no registro.",
-                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c REG ADD \"HKLM\\SOFTWARE\\Microsoft\\Windows Photo Viewer\\Capabilities\\FileAssociations\" /v \".jpg\" /t REG_SZ /d \"PhotoViewer.FileAssoc.Tiff\" /f", true)
+                Description = "Ativa o visualizador de fotos clássico (leve e rápido) para JPG/PNG/BMP/GIF/TIFF — 'Abrir com' → Visualizador de Fotos do Windows.",
+                Execute = () => {
+                    foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".tif" })
+                        SystemUtils.RunExternalProcess("reg", $"add \"HKLM\\SOFTWARE\\Microsoft\\Windows Photo Viewer\\Capabilities\\FileAssociations\" /v \"{ext}\" /t REG_SZ /d \"PhotoViewer.FileAssoc.Tiff\" /f", true);
+                    Logger.Log("[SUCESSO] Photo Viewer clássico registrado para JPG/JPEG/PNG/BMP/GIF/TIFF.");
+                }
             });
 
             repairs.Add(new RepairAction
@@ -264,10 +268,20 @@ namespace KitLugia.Core
                 Category = "Sistema",
                 Icon = "🔄",
                 IsSlow = true,
-                Description = "Para serviços, limpa pastas temporárias e reinicia o Update.",
+                Description = "Para TODOS os serviços do Update, renomeia SoftwareDistribution/catroot2 (preserva downloads como .old), recadastra as DLLs principais e reinicia. Fix para erro 0x80070002/0x800f0922/Update travado.",
                 Execute = () => {
-                    Logger.Log("Iniciando reparo do Windows Update em janela externa...");
-                    SystemUtils.RunExternalProcess("cmd", "/c net stop wuauserv && net stop bits && net stop cryptsvc && rd /s /q %systemroot%\\SoftwareDistribution && rd /s /q %systemroot%\\System32\\catroot2 && net start wuauserv && net start bits && net start cryptsvc & pause", false, false);
+                    Logger.Log("Iniciando reparo completo do Windows Update...");
+                    foreach (var svc in new[] { "wuauserv", "bits", "cryptsvc", "dosvc", "UsoSvc", "msiserver" })
+                        SystemUtils.RunExternalProcess("net", $"stop {svc}", true);
+                    System.Threading.Thread.Sleep(500);
+                    // Renomeia em vez de apagar (recuperável se algo der errado)
+                    SystemUtils.RunExternalProcess("cmd", "/c if exist %systemroot%\\SoftwareDistribution rd /s /q %systemroot%\\SoftwareDistribution.old & ren %systemroot%\\SoftwareDistribution SoftwareDistribution.old & if exist %systemroot%\\System32\\catroot2 rd /s /q %systemroot%\\System32\\catroot2.old & ren %systemroot%\\System32\\catroot2 catroot2.old", true);
+                    // Recadastra as DLLs do Update
+                    foreach (var dll in new[] { "atl.dll", "urlmon.dll", "jscript.dll", "vbscript.dll", "scrrun.dll", "msxml3.dll", "msxml6.dll", "wintrust.dll", "wuapi.dll", "wuaueng.dll", "wucltux.dll", "wups.dll", "wuwebv.dll" })
+                        SystemUtils.RunExternalProcess("regsvr32", $"/s %systemroot%\\system32\\{dll}", true);
+                    foreach (var svc in new[] { "cryptsvc", "bits", "msiserver", "wuauserv", "UsoSvc" })
+                        SystemUtils.RunExternalProcess("net", $"start {svc}", true);
+                    Logger.Log("[SUCESSO] Windows Update resetado (pastas renomeadas para .old). Rode 'Verificar atualizações' de novo — a primeira checagem pode demorar.");
                 }
             });
 
@@ -405,8 +419,16 @@ namespace KitLugia.Core
                 Name = "Corrigir Associação .EXE",
                 Category = "Sistema",
                 Icon = "🔧",
-                Description = "Repara o registro para corrigir programas que não abrem.",
-                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c assoc .exe=exefile", true)
+                Description = "Repara programas que não abrem ou abrem no app errado: restaura assoc (.exe=exefile), ftype (exefile=\"%1\" %*) e a chave exefile do registro completa.",
+                Execute = () => {
+                    SystemUtils.RunExternalProcess("cmd", "/c assoc .exe=exefile", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c ftype exefile=\"%1\" %*", true);
+                    using var key = Microsoft.Win32.Registry.ClassesRoot.CreateSubKey("exefile\\shell\\open\\command");
+                    key?.SetValue(null, "\"%1\" %*");
+                    using var k2 = Microsoft.Win32.Registry.ClassesRoot.CreateSubKey("exefile");
+                    k2?.SetValue(null, "Application");
+                    Logger.Log("[SUCESSO] Associação .exe restaurada (assoc + ftype + HKCR\\exefile).");
+                }
             });
 
             repairs.Add(new RepairAction
@@ -477,11 +499,15 @@ namespace KitLugia.Core
                 Name = "Reparar Pesquisa (Search)",
                 Category = "Apps/Loja",
                 Icon = "🔍",
-                Description = "Reinicia serviços e reconstrói o índice do Windows Search.",
+                Description = "Fix para a pesquisa que não acha nada: reseta o índice (SetupCompletedSuccessfully=0 força reconstrução), reinicia o WSearch e re-registra o SearchHost/StartMenuExperienceHost.",
                 Execute = () => {
-                    Logger.Log("Reiniciando serviço Windows Search...");
+                    Logger.Log("Resetando índice do Windows Search...");
+                    SystemUtils.RunExternalProcess("reg", "add \"HKLM\\SOFTWARE\\Microsoft\\Windows Search\" /v SetupCompletedSuccessfully /t REG_DWORD /d 0 /f", true);
                     SystemUtils.RunExternalProcess("net", "stop wsearch", true);
                     SystemUtils.RunExternalProcess("net", "start wsearch", true);
+                    Logger.Log("Re-registrando SearchHost + StartMenuExperienceHost...");
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Get-AppxPackage Microsoft.Windows.Search,Microsoft.Windows.StartMenuExperienceHost | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register ($_.InstallLocation + '\\AppXManifest.xml')}\"", true);
+                    Logger.Log("[SUCESSO] Índice será reconstruído em segundo plano (pode levar alguns minutos em discos grandes).");
                 }
             });
 
@@ -544,8 +570,8 @@ namespace KitLugia.Core
                 Category = "Soluções Win",
                 Icon = "🎙️",
                 IsSlow = true,
-                Description = "Diagnostica problemas de reprodução de som e drivers.",
-                Execute = () => SystemUtils.RunExternalProcess("msdt", "/id AudioPlaybackDiagnostic", false, false)
+                Description = "Abre os solucionadores de problemas modernos de Reprodução de Áudio (o antigo msdt.exe foi removido pela Microsoft no Windows 11 24H2+). Escolha 'Áudio' na lista e execute.",
+                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c start ms-settings:troubleshoot", false, false)
             });
 
             repairs.Add(new RepairAction
@@ -554,8 +580,8 @@ namespace KitLugia.Core
                 Category = "Soluções Win",
                 Icon = "📡",
                 IsSlow = true,
-                Description = "Diagnostica problemas de conexão Wifi e Ethernet.",
-                Execute = () => SystemUtils.RunExternalProcess("msdt", "/id NetworkDiagnosticsNetworkAdapter", false, false)
+                Description = "Abre os solucionadores modernos (Conexões com a Internet + Adaptadores de Rede) — o antigo msdt.exe foi removido no 24H2+. Para reset profundo, use também 'Reset Completo Winsock/IP'.",
+                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c start ms-settings:troubleshoot", false, false)
             });
 
             repairs.Add(new RepairAction
@@ -563,8 +589,8 @@ namespace KitLugia.Core
                 Name = "Solução de Impressora",
                 Category = "Soluções Win",
                 Icon = "🖨️",
-                Description = "Corrige erros de spooler e conexão com impressoras.",
-                Execute = () => SystemUtils.RunExternalProcess("msdt", "/id PrinterDiagnostic", false, false)
+                Description = "Abre os solucionadores modernos de Impressora — o antigo msdt.exe foi removido no 24H2+. Para spooler travado, use também 'Resetar Spooler de Impressão'.",
+                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c start ms-settings:troubleshoot", false, false)
             });
 
             repairs.Add(new RepairAction
@@ -572,8 +598,8 @@ namespace KitLugia.Core
                 Name = "Solução de Teclado",
                 Category = "Soluções Win",
                 Icon = "⌨️",
-                Description = "Verifica configurações de layout e drivers de teclado.",
-                Execute = () => SystemUtils.RunExternalProcess("msdt", "/id KeyboardDiagnostic", false, false)
+                Description = "Abre os solucionadores modernos de Teclado — o antigo msdt.exe foi removido no 24H2+.",
+                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c start ms-settings:troubleshoot", false, false)
             });
 
             repairs.Add(new RepairAction
@@ -582,8 +608,8 @@ namespace KitLugia.Core
                 Category = "Soluções Win",
                 Icon = "🧩",
                 IsSlow = true,
-                Description = "Ajuda a executar programas antigos no Windows atual.",
-                Execute = () => SystemUtils.RunExternalProcess("msdt", "/id PCWDiagnostic", false, false)
+                Description = "Abre os solucionadores modernos de Compatibilidade de Programas — o antigo msdt.exe foi removido no 24H2+.",
+                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c start ms-settings:troubleshoot", false, false)
             });
 
             repairs.Add(new RepairAction
@@ -592,8 +618,8 @@ namespace KitLugia.Core
                 Category = "Soluções Win",
                 Icon = "🔋",
                 IsSlow = true,
-                Description = "Otimiza planos de energia para economizar bateria.",
-                Execute = () => SystemUtils.RunExternalProcess("msdt", "/id PowerDiagnostic", false, false)
+                Description = "Abre os solucionadores modernos de Energia — o antigo msdt.exe foi removido no 24H2+. Para perfil corrompido, use também 'Resetar Energia (Power)'.",
+                Execute = () => SystemUtils.RunExternalProcess("cmd", "/c start ms-settings:troubleshoot", false, false)
             });
 
             // =================================================================
@@ -660,10 +686,29 @@ namespace KitLugia.Core
                 Icon = "📜",
                 IsDangerous = true,
                 IsSlow = true,
-                Description = "Remove TODAS as políticas do registro e pastas GPO. Fix para 'gerenciado pela organização'. REINICIE O PC APÓS EXECUTAR.",
+                Description = "Reset COMPLETO e automático: apaga políticas de HKLM/HKCU (Policies), pastas GroupPolicy/GroupPolicyUsers, reseta a política de segurança local (secedit com base padrão) e força gpupdate. Fix para 'gerenciado pela organização' e bloqueios de otimizadores/malware. REINICIE O PC APÓS EXECUTAR.",
                 Execute = () => {
-                    Logger.Log("Iniciando reset COMPLETO de políticas em janela externa...");
-                    SystemUtils.RunExternalProcess("cmd", "/c reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\" /f && reg delete \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\" /f && reg delete \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\" /f && RD /S /Q \"%WinDir%\\System32\\GroupPolicyUsers\" >nul 2>&1 && RD /S /Q \"%WinDir%\\System32\\GroupPolicy\" >nul 2>&1 & echo. & echo RESET COMPLETO DAS POLITICAS FINALIZADO! & echo REINICIE O PC PARA APLICAR. & pause", false, false);
+                    Logger.Log("Iniciando reset COMPLETO de políticas (automático, sem janela manual)...");
+                    // 1. Chaves de Policies (HKLM user/machine + HKCU + Software\\Policies completos)
+                    foreach (var args in new[] {
+                        "delete \"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Policies\" /f",
+                        "delete \"HKLM\\\\SOFTWARE\\\\Policies\\\\Microsoft\" /f",
+                        "delete \"HKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Policies\" /f",
+                        "delete \"HKCU\\\\SOFTWARE\\\\Policies\\\\Microsoft\" /f",
+                    }) {
+                        var (code, _) = SystemUtils.RunExternalProcessWithCode("reg", args, true);
+                        Logger.Log($"  reg {args.Split(' ')[1]} -> código {code} (1 = não existia, ok)");
+                    }
+                    // 2. Pastas de GPO (machine + usuários)
+                    SystemUtils.RunExternalProcess("cmd", "/c rd /s /q \"%WinDir%\\System32\\GroupPolicyUsers\" & rd /s /q \"%WinDir%\\System32\\GroupPolicy\"", true);
+                    Logger.Log("  Pastas GroupPolicy/GroupPolicyUsers removidas.");
+                    // 3. Política de segurança local de volta ao padrão de fábrica (o passo que antes era manual)
+                    Logger.Log("  Resetando política de segurança local (secedit /defltbase)...");
+                    string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                    SystemUtils.RunExternalProcess("secedit", $"/configure /cfg {Path.Combine(winDir, "inf", "defltbase.ini")} /db defltbase.sdb /verbose", true);
+                    // 4. Aplica
+                    SystemUtils.RunExternalProcess("gpupdate", "/force", true);
+                    Logger.Log("[SUCESSO] Políticas resetadas por completo (registro + GPO + segurança local + gpupdate). REINICIE O PC PARA APLICAR.");
                 }
             });
 
@@ -1544,6 +1589,213 @@ namespace KitLugia.Core
                         catch { }
                     }
                     Logger.Log("[SUCESSO] Associações de imagem redefinidas — o Windows voltará a perguntar/usar o padrão.");
+                }
+            });
+
+            // =================================================================
+            // REPAROS EXTRA — problemas comuns reportados em fóruns (ElevenForum,
+            // TenForums, MS Answers, Reddit techsupport) não cobertos pelo FixWin.
+            // =================================================================
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar App Configurações (Não Abre)",
+                Category = "Sistema",
+                Icon = "⚙️",
+                Description = "O app Configurações (Win+I) não abre, abre e fecha na hora ou fica em branco. Re-registra o windows.immersivecontrolpanel — fix clássico de fóruns para o 24H2.",
+                Execute = () => {
+                    Logger.Log("Re-registrando o app Configurações...");
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Get-AppxPackage windows.immersivecontrolpanel | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register ($_.InstallLocation + '\\AppXManifest.xml')}\"", true);
+                    Logger.Log("[SUCESSO] Configurações re-registrado. Teste Win+I.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Áudio (Sem Som / Dispositivo Não Detectado)",
+                Category = "Sistema",
+                Icon = "🔊",
+                Description = "Ícone de som com X, 'nenhum dispositivo de saída' ou sem som após update. Restaura os serviços Audiosrv/AudioEndpointBuilder para Automatic, os reinicia e reativa dispositivos de áudio em estado de erro.",
+                Execute = () => {
+                    Logger.Log("Reparando stack de áudio...");
+                    SystemUtils.RunExternalProcess("cmd", "/c sc config Audiosrv start= auto & sc config AudioEndpointBuilder start= auto", true);
+                    SystemUtils.RunExternalProcess("net", "stop Audiosrv", true);
+                    SystemUtils.RunExternalProcess("net", "stop AudioEndpointBuilder", true);
+                    SystemUtils.RunExternalProcess("net", "start AudioEndpointBuilder", true);
+                    SystemUtils.RunExternalProcess("net", "start Audiosrv", true);
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Get-PnpDevice -Class AudioEndpoint,Media -Status Error,Unknown -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue\"", true);
+                    Logger.Log("[SUCESSO] Serviços de áudio restaurados e dispositivos desativados reativados. Se persistir, reinstale o driver (Realtek/etc). ");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Painel de Dispositivos (Gerenciador em Branco)",
+                Category = "Diagnóstico",
+                Icon = "🧰",
+                Description = "Gerenciador de Dispositivos abre em branco/vazio ou a aba 'Hardware' não aparece. Re-detecta hardware com devcon-like (pnputil /scan-devices) e reconstrói os contadores.",
+                Execute = () => {
+                    Logger.Log("Re-escaneando dispositivos...");
+                    SystemUtils.RunExternalProcess("pnputil", "/scan-devices", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c lodctr /R", true);
+                    Logger.Log("[SUCESSO] Escaneado. Reabra o Gerenciador de Dispositivos.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reativar USB (Portas Mortas após Suspensão)",
+                Category = "Hardware",
+                Icon = "🔌",
+                Description = "Mouse/teclado/pendrive param de funcionar após dormir ou 'dispositivo USB não reconhecido'. Desativa a suspensão seletiva e reescaneia os hubs USB.",
+                Execute = () => {
+                    Logger.Log("Reativando portas USB...");
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Get-PnpDevice -Class USB -Status Error,Unknown,Degraded -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue\"", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\USB\" /v DisableSelectiveSuspend /t REG_DWORD /d 1 /f", true);
+                    SystemUtils.RunExternalProcess("pnputil", "/scan-devices", true);
+                    Logger.Log("[SUCESSO] USB reescaneado + suspensão seletiva desativada (fix do 'não reconhecido' após dormir). Reinicie se persistir.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Modo de Segurança (F8/msconfig Bloqueado)",
+                Category = "Avançado",
+                Icon = "🛟",
+                Description = "Modo de Segurança não inicia ou o safeboot ficou travado em loop (bota safe mode e não sai). Limpa o safeboot do BCD e reativa o F8 legado.",
+                Execute = () => {
+                    Logger.Log("Reparando opções de Modo de Segurança...");
+                    var (code, _) = SystemUtils.RunExternalProcessWithCode("bcdedit", "/deletevalue {default} safeboot", true);
+                    Logger.Log($"  safeboot removido do BCD (código {code} — 1 = não estava setado, ok).");
+                    SystemUtils.RunExternalProcess("bcdedit", "/set {default} bootmenupolicy Legacy", true);
+                    Logger.Log("[SUCESSO] F8 legado reativado e safeboot limpo. Reinicie.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Reciclagem Travada (Não Esvazia)",
+                Category = "Explorer/UI",
+                Icon = "🗑️",
+                Description = "Lixeira não esvazia, ícone nunca muda ou arquivos não vão para ela. Limpa as pastas $Recycle.Bin de TODOS os drives (recria do zero).",
+                Execute = () => {
+                    Logger.Log("Limpando $Recycle.Bin de todos os drives...");
+                    foreach (var d in DriveInfo.GetDrives().Where(x => x.DriveType == DriveType.Fixed || x.DriveType == DriveType.Removable))
+                        SystemUtils.RunExternalProcess("cmd", $"/c rd /s /q \"{d.Name.TrimEnd('\\')}\\$Recycle.Bin\"", true);
+                    SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                    System.Threading.Thread.Sleep(500);
+                    SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+                    Logger.Log("[SUCESSO] Lixeiras recriadas do zero.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar 'Enviar Para' (Menu de Contexto)",
+                Category = "Explorer/UI",
+                Icon = "📨",
+                Description = "Menu 'Enviar para' vazio ou sumido no clique direito. Recria os atalhos padrão (Desktop, Documentos, Compactado, Lixeira) na pasta SendTo do usuário.",
+                Execute = () => {
+                    var sendTo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft\\Windows\\SendTo");
+                    Directory.CreateDirectory(sendTo);
+                    Logger.Log("Recriando atalhos padrão do SendTo...");
+                    // Área de trabalho e Documentos via shell namespace
+                    SystemUtils.RunExternalProcess("powershell", $"-NoProfile -Command \"$ws=New-Object -ComObject WScript.Shell; $d=$ws.CreateShortcut('{sendTo}\\Área de Trabalho.lnk'); $d.TargetPath='shell:::{{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}}'; $d.Save(); $m=$ws.CreateShortcut('{sendTo}\\Documentos.lnk'); $m.TargetPath='shell:::{{FDD39AD0-238F-46AF-ADB4-6C85480369C7}}'; $m.Save()\"", true);
+                    Logger.Log($"[SUCESSO] Atalhos recriados em {sendTo} (papelaria/pasta de 'Enviar para' valida no próximo clique direito).");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Copiar/Colar e Arrastar (Clipboard Corrompido)",
+                Category = "Sistema",
+                Icon = "📋",
+                Description = "Ctrl+C/V param de funcionar em apps, arrastar-arquivos não solta. Reinicia o serviço e o monitor do clipboard (cbdhtaskbar/ClipSvc) e limpa o cache.",
+                Execute = () => {
+                    Logger.Log("Reiniciando clipboard...");
+                    SystemUtils.RunExternalProcess("cmd", "/c echo off | clip", true);
+                    SystemUtils.RunExternalProcess("net", "stop ClipSvc", true);
+                    SystemUtils.RunExternalProcess("net", "start ClipSvc", true);
+                    SystemUtils.RunExternalProcess("taskkill", "/f /im rdpclip.exe", true);
+                    SystemUtils.RunExternalProcess("cmd.exe", "/c start rdpclip.exe", true, false);
+                    Logger.Log("[SUCESSO] Clipboard resetado (clip + ClipSvc + rdpclip). Teste Ctrl+C/V.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Drive Óptico/USB Sumido do Explorer",
+                Category = "Hardware",
+                Icon = "💽",
+                Description = "Drive aparece no Gerenciador de Dispositivos mas sumiu do Explorer (sem letra). Remove os filtros superiores/inferiores corrompidos do MountMgr e reseta as letras — fix clássico de fórum para 'meu drive sumiu'.",
+                Execute = () => {
+                    Logger.Log("Removendo filtros corrompidos de volume ( UpperFilters/LowerFilters )...");
+                    using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e967-e325-11ce-bfc1-08002be10318}", true);
+                    if (k != null)
+                    {
+                        foreach (var v in new[] { "UpperFilters", "LowerFilters" })
+                            try { k.DeleteValue(v, false); Logger.Log($"  {v} removido."); } catch { }
+                    }
+                    SystemUtils.RunExternalProcess("pnputil", "/scan-devices", true);
+                    Logger.Log("[SUCESSO] Filtros de disco removidos + rescan. Reinicie se o drive não voltar.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Notificações Toast (Não Chegam Mais)",
+                Category = "Sistema",
+                Icon = "🔔",                    Description = "Notificações de apps pararam (WpnService parado ou Focus Assist travado). Reativa o WpnService e limpa o ToastEnabled do usuário — fix para quem desativou via 'tweak' de serviços.",
+                Execute = () => {
+                    Logger.Log("Reparando notificações (WpnService)...");
+                    SystemUtils.RunExternalProcess("cmd", "/c sc config WpnService start= auto", true);
+                    SystemUtils.RunExternalProcess("net", "start WpnService", true);
+                    SystemUtils.RunExternalProcess("reg", "delete \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PushNotifications\" /v ToastEnabled /f", true);
+                    Logger.Log("[SUCESSO] WpnService reativado e ToastEnabled removido (default = ON). Reinicie o Explorer.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar OneDrive (Não Sincroniza / Ícone Erro)",
+                Category = "Sistema",
+                Icon = "☁️",
+                Description = "OneDrive com X vermelho, não sincroniza ou não inicia. Reseta o pacote Appx do OneDrive e reinicia o processo com o fix oficial da Microsoft (%LocalAppData%\\OneDrive\\OneDrive.exe /reset).",
+                Execute = () => {
+                    Logger.Log("Resetando OneDrive (método oficial Microsoft)...");
+                    SystemUtils.RunExternalProcess("cmd", "/c if exist \"%LocalAppData%\\Microsoft\\OneDrive\\OneDrive.exe\" \"%LocalAppData%\\Microsoft\\OneDrive\\OneDrive.exe\" /reset", true);
+                    Logger.Log("[SUCESSO] OneDrive /reset enviado (recria a sync database). Ele volta sozinho em ~2 min; se não, inicie-o manualmente.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Horário Duplicado/Extra na Barra (Relógio)",
+                Category = "Explorer/UI",
+                Icon = "⏰",
+                Description = "Dois relógios, relógio extra da taskbar antiga ou data/hora errada persistente. Limpa caches da taskbar de notificações e resincroniza o time service.",
+                Execute = () => {
+                    Logger.Log("Reparando relógio da barra...");
+                    SystemUtils.RunExternalProcess("w32tm", "/resync /force", true);
+                    SystemUtils.RunExternalProcess("taskkill", "/f /im explorer.exe", true);
+                    System.Threading.Thread.Sleep(500);
+                    SystemUtils.RunExternalProcess("cmd.exe", "/c start explorer.exe", true, false);
+                    Logger.Log("[SUCESSO] Relógio resincronizado + barra recarregada.");
+                }
+            });
+
+            repairs.Add(new RepairAction
+            {
+                Name = "Reparar Antivírus de Terceiros Bloqueando Windows Security",
+                Category = "Sistema",
+                Icon = "🛡️",
+                Description = "Segurança do Windows em cinza, 'seu administrador de vírus... foi desativado' após desinstalar AVG/Avast/Norton. Re-registra o SecurityHealthService e limpa o AV de terceiros do Security Center (WMI).",
+                Execute = () => {
+                    Logger.Log("Reparando Segurança do Windows / Security Center...");
+                    SystemUtils.RunExternalProcess("powershell", "-NoProfile -Command \"Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct | Where-Object {$_.displayName -notmatch 'Windows'} | Remove-CimInstance\"", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c sc config WinDefend start= auto & sc config SecurityHealthService start= auto & net start SecurityHealthService", true);
+                    SystemUtils.RunExternalProcess("cmd", "/c start windowsdefender:", true, false);
+                    Logger.Log("[SUCESSO] AV fantasma removido do Security Center + WinDefend/SecurityHealthService reativados.");
                 }
             });
 

@@ -1395,8 +1395,16 @@ namespace KitLugia.Core
                 {
                     var startMode = SystemUtils.GetServiceStartMode(setting.ServiceName);
                     string safeValStr = setting.SafeValue?.ToString() ?? "4";
-                    if (safeValStr == "4") return startMode == "Disabled";
-                    return false; 
+                    // WMI Win32_Service.StartMode: Auto / Manual / Disabled.
+                    // Antes so SafeValue=4 (Disabled) era reconhecido - servicos com
+                    // SafeValue=3 (Manual) nunca apareciam como protegidos.
+                    return safeValStr switch
+                    {
+                        "4" => startMode == "Disabled",
+                        "3" => startMode == "Manual",
+                        "2" => startMode == "Auto",
+                        _ => false
+                    };
                 }
                 else
                 {
@@ -1432,8 +1440,13 @@ namespace KitLugia.Core
 
                 var hive = registryPath.StartsWith("HKEY_LOCAL_MACHINE") ? "HKLM" : "HKCU";
                 var subKey = registryPath.Substring(registryPath.IndexOf('\\') + 1);
-                var kind = val is int ? "dword" : "sz";
-                var data = val is int intVal ? $"dword:{intVal:X8}" : $"\"{val}\"";
+                var data = val switch
+                {
+                    int i => $"dword:{i:X8}",
+                    long l => $"qword:{l:X16}",
+                    byte[] bytes => "hex:" + string.Join(",", bytes.Select(b => b.ToString("x2"))),
+                    _ => $"\"{val}\""
+                };
                 var backup = $"Windows Registry Editor Version 5.00\r\n\r\n[{hive}\\\\{subKey}]\r\n\"{valueName}\"={data}\r\n";
 
                 var fileName = $"{subKey.Replace('\\', '_').Replace('/', '_')}_{valueName}.reg";
@@ -1502,8 +1515,11 @@ namespace KitLugia.Core
                 if (setting.IsService && !string.IsNullOrEmpty(setting.ServiceName))
                 {
                     int mode = Convert.ToInt32(setting.UnsafeValue);
-                    string modeStr = mode == 2 ? "auto" : "demand";
+                    string modeStr = mode switch { 2 => "auto", 4 => "auto", _ => "demand" };
                     SystemUtils.RunExternalProcess("sc", $"config \"{setting.ServiceName}\" start= {modeStr}", true);
+                    // Servico pode ter sido parado pelo SafeValue=4 - reativa (best-effort)
+                    if (mode != 4)
+                        SystemUtils.RunExternalProcess("sc", $"start \"{setting.ServiceName}\"", true);
                     return true;
                 }
                 else
@@ -1530,6 +1546,24 @@ namespace KitLugia.Core
                 Logger.LogError($"RevertPrivacy[{setting.Name}]", ex.Message);
                 return false;
             }
+        }
+
+        /// <summary>Aplica a selecao do usuario (Presets Personalizados): itens
+        /// marcados sao protegidos, itens desmarcados voltam ao padrao Windows.
+        /// Retorna contagens para feedback na UI.</summary>
+        public static (int Applied, int Reverted, int Failed) ApplyCustomSelection(List<PrivacySetting> toApply, List<PrivacySetting> toRevert)
+        {
+            int applied = 0, reverted = 0, failed = 0;
+            foreach (var s in toRevert)
+            {
+                if (RevertPrivacySetting(s)) reverted++; else failed++;
+            }
+            foreach (var s in toApply)
+            {
+                if (ApplyPrivacySetting(s)) applied++; else failed++;
+            }
+            Logger.Log($"Privacy: selecao personalizada aplicada ({applied} protegidas, {reverted} revertidas, {failed} falhas)");
+            return (applied, reverted, failed);
         }
 
         public static (bool Success, string Message) ApplyPreset(PrivacyLevel targetLevel)

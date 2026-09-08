@@ -1209,7 +1209,7 @@ exit
                     // O Studio é um expansor visual — a lógica real de ISO continua no fluxo nativo
                     TxtStatus.Text = "🧬 KIT ISO STUDIO aplicado — expansor integrado";
                 }
-                catch { }
+                catch (Exception ex) { KitLugia.Core.Logger.Log($"[ISO-STUDIO] Falha ao sincronizar painel: {ex.Message}"); }
                 OverlayConfig.Visibility = Visibility.Visible;
                 TxtConfigIsoInfo.Text = $"ISO: {Path.GetFileName(_isoPath)} — Estúdio aplicado";
                 UpdateModeHint();
@@ -1230,7 +1230,7 @@ exit
                 if (!string.IsNullOrWhiteSpace(TxtStudioReg?.Text) && TxtStudioReg.Text.Contains("[HKEY"))
                     ChkRemoveAI.IsChecked = true;
             }
-            catch { }
+            catch (Exception ex) { KitLugia.Core.Logger.Log($"[ISO-STUDIO] Falha ao aplicar studio: {ex.Message}"); }
             OverlayIsoStudio.Visibility = Visibility.Collapsed;
             OverlayConfig.Visibility = Visibility.Visible;
             TxtConfigIsoInfo.Text = $"ISO: {Path.GetFileName(_isoPath)} — Estúdio aplicado";

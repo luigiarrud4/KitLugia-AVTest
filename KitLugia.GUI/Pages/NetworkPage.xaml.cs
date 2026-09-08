@@ -23,7 +23,9 @@ namespace KitLugia.GUI.Pages
     public partial class NetworkPage : Page
     {
         private bool _isLoading = true;
+        private bool _dnsRefreshing;      // reentrância do refresh de DNS (timer 10s) - NÃO bloqueia os toggles
         private bool _refreshingAdapters; // guarda anti-reentrância: ListPhysicalAdapters (WMI) pode demorar > 3s
+        private bool _timersStarted;      // Loaded pode disparar mais de uma vez: não duplicar timers
         private readonly SolidColorBrush _colorActive = new SolidColorBrush(Color.FromRgb(108, 203, 95));
         private readonly SolidColorBrush _colorDefault = new SolidColorBrush(Color.FromRgb(150, 150, 150));
         private readonly SolidColorBrush _colorWarning = new SolidColorBrush(Color.FromRgb(244, 129, 32));
@@ -55,11 +57,78 @@ namespace KitLugia.GUI.Pages
             var dnsTask = LoadStatus();
             var settingsTask = LoadNetworkSettingsAsync();
             await Task.WhenAll(adapterTask, dnsTask, settingsTask);
+            _isLoading = false; // carga inicial concluída: libera os toggles
             SetRefreshIndicator("OK");
+
+            // Benchmark automático UMA vez ao abrir a página (sem esperar clique).
+            _ = RunBenchmarkAsync();
         }
+
+        /// <summary>Benchmark DNS compartilhado (load automático + botão "Testar Novamente").</summary>
+        private async Task RunBenchmarkAsync()
+        {
+            if (_benchmarkRunning) return; // single-flight: clique durante o teste não empilha
+            _benchmarkRunning = true;
+            try
+            {
+                BtnBenchmarkDns.IsEnabled = false;
+                PgbBenchmark.Visibility = Visibility.Visible;
+                TxtBenchmarkStatus.Text = "Testando provedores DNS (melhor de 3 pings)...";
+
+                var providers = DnsBenchmark.GetDefaultProviders();
+                DnsProviderList.ItemsSource = providers;
+
+                // SPINNER INDIVIDUAL: BenchmarkAsync atualiza TestState por item ao vivo
+                // (INotifyPropertyChanged). A lista NÃO é reordenada durante o teste —
+                // só ao final, quando os resultados são reatribuídos.
+                var results = await Task.Run(() => DnsBenchmark.BenchmarkAsync(providers));
+
+                // Marca o provedor atual ANTES de exibir (badge "EM USO" na linha).
+                var dnsInfo = await Task.Run(() => Toolbox.GetActiveDnsInfo());
+                DnsBenchmark.MarkCurrentProvider(results, dnsInfo.DnsIp);
+
+                // Reordena (verde -> vermelho) só AGORA, com fade suave.
+                DnsProviderList.ItemsSource = null;
+                DnsProviderList.ItemsSource = results;
+                PgbBenchmark.Visibility = Visibility.Collapsed;
+
+                // Ranking final usa RESOLUÇÃO REAL quando disponível, senão ICMP.
+                var fastest = results
+                    .OrderBy(p => p.ResolveMs >= 0 ? p.ResolveMs : (p.LatencyMs >= 0 ? p.LatencyMs : double.MaxValue))
+                    .FirstOrDefault(p => p.ResolveMs >= 0 || p.LatencyMs >= 0);
+                var failedCount = results.Count(p => p.LatencyMs < 0 && p.ResolveMs < 0);
+                if (fastest != null)
+                {
+                    double bestMs = fastest.ResolveMs >= 0 ? fastest.ResolveMs : fastest.LatencyMs;
+                    string kind = fastest.ResolveMs >= 0 ? "resolução real" : "ICMP";
+                    TxtBenchmarkStatus.Text = $"Teste conclu\u00eddo! Mais r\u00e1pido: {fastest.Name} ({bestMs:F0} ms, por {kind})" +
+                        (failedCount > 0 ? $" · {failedCount} sem resposta" : "");
+                }
+                else
+                    TxtBenchmarkStatus.Text = "Nenhum DNS respondeu ao teste (verifique a conex\u00e3o).";
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro no benchmark DNS: {ex.Message}");
+                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
+                if (Application.Current.MainWindow is MainWindow mwErr)
+                    mwErr.ShowError("BENCHMARK DNS", ex.Message);
+            }
+            finally
+            {
+                PgbBenchmark.Visibility = Visibility.Collapsed;
+                BtnBenchmarkDns.IsEnabled = true;
+                _benchmarkRunning = false;
+            }
+        }
+
+        private bool _benchmarkRunning;
 
         private void StartRefreshTimers()
         {
+            if (_timersStarted) return; // evita timers duplicados se Loaded disparar de novo
+            _timersStarted = true;
+
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             _refreshTimer.Tick += async (s, e) => { try { await RefreshAdapterStatus(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } };
             _refreshTimer.Start();
@@ -87,15 +156,15 @@ namespace KitLugia.GUI.Pages
 
         private async Task RefreshDnsStatus()
         {
-            if (_isLoading) return;
+            if (_dnsRefreshing) return; // tick anterior ainda rodando: não empilha
+            _dnsRefreshing = true;
             try
             {
-                _isLoading = true;
                 var dnsInfo = await Task.Run(() => Toolbox.GetActiveDnsInfo());
                 await Dispatcher.InvokeAsync(() => UpdateDnsUi(dnsInfo.Provider, dnsInfo.DnsIp));
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            finally { _isLoading = false; }
+            finally { _dnsRefreshing = false; }
         }
 
         private async Task LoadAdapterInfoAsync()
@@ -323,21 +392,26 @@ namespace KitLugia.GUI.Pages
             BtnGoogle.Tag = null;
             BtnDhcp.Tag = null;
 
-            TxtCurrentDnsIp.Text = string.IsNullOrEmpty(ip) || ip == "N/A" ? "Autom\u00e1tico / DHCP" : ip;
+            // Nome amigável direto do Core (reconhece TODOS os provedores do benchmark).
+            bool isDhcp = provider.StartsWith("Autom", StringComparison.OrdinalIgnoreCase) || ip == "N/A";
+            TxtCurrentDnsIp.Text = isDhcp ? "Automático / DHCP" : $"{provider} ({ip})";
             TxtCurrentDnsIp.Foreground = _colorDefault;
 
-            if (provider.ToUpper().Contains("CLOUDFLARE")) { BtnCloudflare.Tag = "Selected"; TxtCurrentDnsIp.Foreground = _colorActive; }
+            if (isDhcp) { BtnDhcp.Tag = "Selected"; TxtCurrentDnsIp.Foreground = _colorActive; }
+            else if (provider.ToUpper().Contains("CLOUDFLARE")) { BtnCloudflare.Tag = "Selected"; TxtCurrentDnsIp.Foreground = _colorActive; }
             else if (provider.ToUpper().Contains("GOOGLE")) { BtnGoogle.Tag = "Selected"; TxtCurrentDnsIp.Foreground = _colorActive; }
-            else if (provider.ToUpper().Contains("DHCP")) { BtnDhcp.Tag = "Selected"; TxtCurrentDnsIp.Foreground = _colorActive; }
-            else { TxtCurrentDnsIp.Text = $"{ip} (Custom)"; TxtCurrentDnsIp.Foreground = _colorWarning; }
+            else { TxtCurrentDnsIp.Foreground = _colorWarning; }
+
+            // Reflete o provedor em uso na lista do benchmark (badge "EM USO").
+            if (DnsProviderList?.ItemsSource is List<DnsProvider> list)
+            {
+                DnsBenchmark.MarkCurrentProvider(list, ip);
+                DnsProviderList.Items.Refresh();
+            }
         }
 
-        private void UpdateLabel(TextBlock label, bool isActive)
-        {
-            if (label == null) return;
-            label.Text = isActive ? "Otimizado" : "Padr\u00e3o";
-            label.Foreground = isActive ? _colorActive : _colorDefault;
-        }
+        // UpdateLabel(label, bool) genérico removido: só a versão com textos
+        // (label, isActive, activeText, defaultText) é usada — a antiga era dead code.
 
         // =========================================================
         // SEÇÃO: DNS
@@ -363,36 +437,7 @@ namespace KitLugia.GUI.Pages
         private void BtnDnsGoogle_Click(object sender, RoutedEventArgs e) => ApplyDns("Google");
         private void BtnDnsReset_Click(object sender, RoutedEventArgs e) => ApplyDns("DHCP");
 
-        private async void BtnBenchmarkDns_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                BtnBenchmarkDns.IsEnabled = false;
-                PgbBenchmark.Visibility = Visibility.Visible;
-                TxtBenchmarkStatus.Text = "Testando provedores DNS...";
-                var providers = DnsBenchmark.GetDefaultProviders();
-                DnsProviderList.ItemsSource = providers;
-
-                var results = await Task.Run(() => DnsBenchmark.BenchmarkAsync(providers));
-                DnsProviderList.ItemsSource = results;
-
-                PgbBenchmark.Visibility = Visibility.Collapsed;
-
-                var fastest = results.FirstOrDefault(p => p.LatencyMs >= 0);
-                if (fastest != null)
-                    TxtBenchmarkStatus.Text = $"Teste conclu\u00eddo! Mais r\u00e1pido: {fastest.Name} ({fastest.LatencyMs:F0} ms)";
-                else
-                    TxtBenchmarkStatus.Text = "Nenhum DNS respondeu ao teste.";
-                BtnBenchmarkDns.IsEnabled = true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[NETWORK] Erro em BtnBenchmarkDns_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
-            }
-        }
+        private void BtnBenchmarkDns_Click(object sender, RoutedEventArgs e) => _ = RunBenchmarkAsync();
 
         private async void BtnApplyDnsProvider_Click(object sender, RoutedEventArgs e)
         {
@@ -413,9 +458,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnApplyDnsProvider_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -424,16 +467,32 @@ namespace KitLugia.GUI.Pages
             try
             {
                 var primary = TxtCustomDnsPrimary.Text?.Trim();
+                var secondary = TxtCustomDnsSecondary.Text?.Trim();
+
                 if (string.IsNullOrEmpty(primary))
                 {
                     if (Application.Current.MainWindow is MainWindow m)
                         m.ShowError("DNS", "Digite o IP do DNS primário.");
                     return;
                 }
+                // Validação ANTES de chamar o Core (o Core valida de novo — defesa em profundidade).
+                if (!System.Net.IPAddress.TryParse(primary, out _))
+                {
+                    if (Application.Current.MainWindow is MainWindow m)
+                        m.ShowError("DNS", $"IP inválido: '{primary}'. Use um IPv4/IPv6 válido (ex: 1.1.1.1).");
+                    return;
+                }
+                if (!string.IsNullOrEmpty(secondary) && !System.Net.IPAddress.TryParse(secondary, out _))
+                {
+                    if (Application.Current.MainWindow is MainWindow m)
+                        m.ShowError("DNS", $"IP secundário inválido: '{secondary}'. Deixe vazio ou use um IP válido.");
+                    return;
+                }
+
                 if (!(Application.Current.MainWindow is MainWindow mw)) return;
                 string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("DNS Customizado", "Network");
                 mw.ShowInfo("DNS", $"Aplicando DNS customizado ({primary})...");
-                var result = await Task.Run(() => Toolbox.SetCustomDns(primary, TxtCustomDnsSecondary.Text?.Trim()));
+                var result = await Task.Run(() => Toolbox.SetCustomDns(primary, secondary));
                 Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
                 if (result.Success) mw.ShowSuccess("SUCESSO", result.Message);
                 else mw.ShowError("ERRO", result.Message);
@@ -442,9 +501,8 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnApplyCustomDns_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                if (Application.Current.MainWindow is MainWindow mwErr)
+                    mwErr.ShowError("DNS CUSTOMIZADO", ex.Message);
             }
         }
 
@@ -457,15 +515,15 @@ namespace KitLugia.GUI.Pages
                     string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Limpando Cache DNS", "Network");
                     var result = await Task.Run(() => Toolbox.FlushDnsCache());
                     Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Success, result.Message);
-                    mw.ShowSuccess("CACHE", result.Message);
+                    if (result.Success)
+                        mw.ShowSuccess("CACHE", result.Message);
+                    else
+                        mw.ShowError("CACHE", result.Message); // antes mostrava SUCESSO mesmo falhando
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnFlushDns_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -496,9 +554,6 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnCleanNetworkSafe_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -536,9 +591,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnCleanNetworkFull_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -575,9 +628,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnEnableAdapter_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -611,9 +662,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnDisableAdapter_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -647,9 +696,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnRestartAdapter_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -834,9 +881,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnApplyMac_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -895,9 +940,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnRestoreMac_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -955,9 +998,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnAutoDetectMac_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
             }
         }
 
@@ -1346,11 +1387,32 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 Logger.Log($"[NETWORK] Erro em BtnResetNetwork_Click: {ex.Message}");
-                TxtBenchmarkStatus.Text = $"Erro: {ex.Message}";
-                if (sender is System.Windows.Controls.Control c) c.IsEnabled = true;
-                PgbBenchmark.Visibility = Visibility.Collapsed;
+                if (Application.Current.MainWindow is MainWindow mwErr)
+                    mwErr.ShowError("RESETAR REDE", ex.Message);
             }
         }
 
+    }
+
+    /// <summary>
+    /// Fundo da linha da lista de DNS quando o provedor é o atualmente em uso.
+    /// </summary>
+    public class BoolToBrushConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            => value is true ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(0x28, 0x43, 0xA0, 0x47)) : System.Windows.Media.Brushes.Transparent;
+        public object ConvertBack(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+            throw new System.NotImplementedException();
+    }
+
+    /// <summary>
+    /// Mostra o spinner individual apenas quando TestState == Testing.
+    /// </summary>
+    public class DnsTestStateToVisibilityConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            => value is DnsTestState.Testing ? Visibility.Visible : Visibility.Collapsed;
+        public object ConvertBack(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+            throw new System.NotImplementedException();
     }
 }

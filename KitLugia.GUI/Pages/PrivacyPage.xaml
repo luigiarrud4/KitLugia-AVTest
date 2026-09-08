@@ -10,8 +10,9 @@
       Title="Privacy Manager"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="30,30,30,50" MaxWidth="1000">
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="30,30,30,50" MaxWidth="1000">
 
             <!-- Header -->
             <StackPanel Margin="0,0,0,30">
@@ -19,7 +20,7 @@
                 <TextBlock Text="Controle a telemetria, rastreamento e dados enviados para a Microsoft." Foreground="{StaticResource TextSecondary}"/>
             </StackPanel>
 
-            <!-- Status Geral -->
+            <!-- Status Geral: protecao POR NIVEL (verdes/amarelos/vermelhos) -->
             <Border Style="{StaticResource CardStyle}" Padding="20" Margin="0,0,0,25">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -28,60 +29,82 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="N&#xCD;VEL DE PROTE&#xC7;&#xC3;O ATUAL" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                        <TextBlock x:Name="TxtPrivacyScore" Text="Carregando..." FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                            <TextBlock Text="Protegidos: " Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock x:Name="TxtSecureCount" Text="0" Foreground="#4CAF50" FontWeight="Bold"/>
-                            <TextBlock Text="  |  Vulner&#xE1;veis: " Foreground="{StaticResource TextSecondary}" Margin="10,0,0,0"/>
-                            <TextBlock x:Name="TxtVulnerableCount" Text="0" Foreground="#C42B1C" FontWeight="Bold"/>
-                        </StackPanel>
+                        <TextBlock Text="PROTE&#xC7;&#xC3;O ATUAL" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+
+                        <!-- Verdes -->
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Width="9" Height="9" Fill="#4CAF50" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Seguros (Recomendado)" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" x:Name="TxtProtSafe" Text="0 / 0" FontSize="12" FontWeight="Bold" Foreground="#4CAF50" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                            <ProgressBar Grid.Column="3" x:Name="PbSafe" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#4CAF50" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Amarelos -->
+                        <Grid Margin="0,6,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Width="9" Height="9" Fill="#FFA500" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Moderados (Limitado)" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" x:Name="TxtProtModerate" Text="0 / 0" FontSize="12" FontWeight="Bold" Foreground="#FFA500" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                            <ProgressBar Grid.Column="3" x:Name="PbModerate" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#FFA500" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Vermelhos -->
+                        <Grid Margin="0,6,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Width="9" Height="9" Fill="#C42B1C" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Perigosos (Não Recomendado)" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" x:Name="TxtProtDanger" Text="0 / 0" FontSize="12" FontWeight="Bold" Foreground="#E57373" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                            <ProgressBar Grid.Column="3" x:Name="PbDanger" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#C42B1C" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Resultado -->
+                        <TextBlock x:Name="TxtPrivacyScore" Text="Carregando..." FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,12,0,0"/>
                     </StackPanel>
 
                     <Button Grid.Column="1" x:Name="BtnRefreshStatus" Content="&#x27F3; Atualizar" Click="BtnRefreshStatus_Click" 
-                            Style="{StaticResource SecondaryButtonStyle}" Width="120"/>
+                            Style="{StaticResource SecondaryButtonStyle}" Width="120" VerticalAlignment="Center"/>
                 </Grid>
             </Border>
 
-            <!-- A&#xE7;&#xF5;es R&#xE1;pidas (Presets) -->
-            <TextBlock Text="Presets Recomendados" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15"/>
-            
-            <Grid Margin="0,0,0,25">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="20"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="20"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <!-- Presets Personalizados (estilo O&O ShutUp10) -->
+            <Border Style="{StaticResource CardStyle}" Padding="20" Margin="0,0,0,25" BorderBrush="#E8B84E" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Recomendado -->
-                <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#4CAF50">
-                    <StackPanel>
-                        <TextBlock Text="&#x2705; RECOMENDADO" FontWeight="Bold" Foreground="#4CAF50" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Seguro. N&#xE3;o quebra funcionalidades do sistema." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
-                        <Button Content="Aplicar" Click="BtnApplyRecommended_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="PRESETS PERSONALIZADOS" FontSize="16" FontWeight="Bold" Foreground="#E8B84E"/>
+                        <TextBlock Text="Escolha item por item o que aplicar: seguros, moderados e perigosos — como no O&amp;O ShutUp10. Itens desmarcados voltam ao padrão do Windows." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,12,0"/>
                     </StackPanel>
-                </Border>
 
-                <!-- Limitado -->
-                <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#FFA500">
-                    <StackPanel>
-                        <TextBlock Text="&#x26A0;&#xFE0F; LIMITADO" FontWeight="Bold" Foreground="#FFA500" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Privacidade moderada. Pode desativar Cortana/Dicas." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
-                        <Button Content="Aplicar" Click="BtnApplyLimited_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Grid.Column="1" x:Name="BtnOpenPresets" Content="&#x1F39B; PRESETS PERSONALIZADOS" Click="BtnOpenPresets_Click"
+                                Style="{StaticResource GoldButtonStyle}" Width="220" Height="40" FontWeight="Bold" VerticalAlignment="Center"
+                                ToolTip="Abre a seleção por nível: Seguros, Moderados e Perigosos"/>
+                        <Button x:Name="BtnResetAll" Content="&#x27F2; RESETAR TUDO" Click="BtnResetAll_Click"
+                                Style="{StaticResource DeleteButtonStyle}" Width="180" Height="40" Margin="10,0,0,0" VerticalAlignment="Center"
+                                ToolTip="Desliga TODAS as proteções de privacidade e reverte tudo ao padrão do Windows (160 configurações + serviços)"/>
                     </StackPanel>
-                </Border>
-
-                <!-- M&#xE1;ximo -->
-                <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="#C42B1C">
-                    <StackPanel>
-                        <TextBlock Text="&#x26D4; M&#xC1;XIMO" FontWeight="Bold" Foreground="#C42B1C" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Extremo. Pode impedir updates e quebrar a Loja." FontSize="11" Foreground="#CCC" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,15"/>
-                        <Button Content="Aplicar" Click="BtnApplyNotRecommended_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                </Grid>
+            </Border>
 
             <!-- Lista Detalhada -->
             <StackPanel Margin="0,0,0,15">
@@ -90,7 +113,6 @@
 
                 <!-- Bot&#xF5;es de A&#xE7;&#xE3;o -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <Button Content="Restaurar Padr&#xE3;o Windows" Click="BtnRestoreDefault_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="180"/>
                     <Button Content="Salvar Configura&#xE7;&#xE3;o" Click="BtnSaveUserConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="150"/>
                     <Button Content="Restaurar Configura&#xE7;&#xE3;o" Click="BtnRestoreUserConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="160"/>
                     <Button x:Name="BtnExpandAll" Content="Expandir Tudo" Click="BtnExpandAll_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120"/>
@@ -251,6 +273,7 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-        </StackPanel>
-    </ScrollViewer>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </Page>

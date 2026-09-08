@@ -2211,9 +2211,9 @@ namespace KitLugia.GUI.Pages
         //   2. Views por pasta criadas COM os tweaks ligados (a pasta lembra
         //      'icons only') — apagadas com segurança via ResetSavedFolderViews;
         //   3. Cache de miniaturas corrompido (thumbcache_*.db) — apagado.
-        // ResetSavedFolderViews preserva o template global (AllFolders) e afeta views,
-        // NÃO dados: fotos/arquivos nunca são tocados. Ícones do desktop podem
-        // ser reordenados (posições também são views) — avisado no diálogo.
+        // ResetSavedFolderViews preserva o template global (AllFolders) E o bag 1
+        // (Bags\1\Desktop) — as POSIÇÕES dos ícones da área de trabalho ficam
+        // intactas (fix 06/09). Afeta views, NÃO dados: fotos/arquivos nunca são tocados.
         private async void BtnRestoreExplorerVisual_Click(object sender, RoutedEventArgs e)
         {
             if (_isLoading) return;
@@ -2229,7 +2229,7 @@ namespace KitLugia.GUI.Pages
                     "• Agrupamento por data (Hoje/Ontem) volta nas pastas.\n" +
                     "• Reconstrói o cache de miniaturas (corrige previews que não carregam).\n" +
                     "• Nenhum arquivo é apagado — só caches e configurações de visual.\n" +
-                    "• ATENÇÃO: posições dos ícones da área de trabalho podem ser reordenadas.\n" +
+                    "• As posições dos ícones da área de trabalho são preservadas.\n" +
                     "• O explorer.exe será reiniciado ao final (desktop pisca 1x)."))
                 {
                     _isLoading = false;
@@ -2267,10 +2267,17 @@ namespace KitLugia.GUI.Pages
                 bool dirty = SystemTweaks.IsExplorerFolderDiscoveryDisabled() || SystemTweaks.IsExplorerThumbnailsDisabled() || SystemTweaks.IsThumbnailCacheDisabled();
                 UpdateExplorerHealth(dirty);
                 BtnRestoreExplorerVisual.Content = "✔ REPARADO";
+                if (dirty) Logger.LogWarning("Explorer", "Reparo executado mas valores de tweak ainda detectados — outra ferramenta pode tê-los regravado.");
 
                 RecordTweak("ExplorerTurbo", false);
                 RecordTweak("ExplorerThumbs", false);
                 mw.ShowSuccess("EXPLORER", $"Explorer reparado! Miniaturas, agrupamento por data e cache reconstruídos ({cachesDeleted} arquivos de cache apagados). Nenhum arquivo foi apagado.");
+
+                // Reabilita o botão após alguns segundos (pode ser preciso reparar de novo
+                // se outra ferramenta regravar os valores)
+                await Task.Delay(4000);
+                BtnRestoreExplorerVisual.IsEnabled = true;
+                BtnRestoreExplorerVisual.Content = "REPARAR EXPLORER";
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); BtnRestoreExplorerVisual.IsEnabled = true; BtnRestoreExplorerVisual.Content = "REPARAR EXPLORER"; }
             finally { _isLoading = false; }
