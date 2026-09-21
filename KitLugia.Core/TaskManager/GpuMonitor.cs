@@ -1,15 +1,20 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace KitLugia.Core.TaskManager
 {
     /// <summary>
-    /// GPU utilization via PDH (Performance Data Helper) counters.
-    /// FIX: corrige wildcard, remove Thread.Sleep do lock e limpa handles.
+    /// GPU utilization via PDH (Performance Data Helper).
+    /// TECNICA TMOG (confirmada nos strings do binario + empiricamente):
+    /// UM unico contador curinga "\GPU Engine(*)\Utilization Percentage" adicionado via
+    /// PdhAddEnglishCounterW (resolve o nome localizado internamente) e lido COMPLETO com
+    /// PdhGetFormattedCounterArrayW — todas as instancias (pid_NNNN_luid_..._engtype_...) em
+    /// UMA chamada, sem 567 handles individuais e sem reexpand periodico (o curinga cobre
+    /// instancias criadas depois automaticamente).
+    /// O dict por PID inclui engines OCIOSOS (0,0%) — mesmo comportamento do Task Manager/
+    /// TMOG: engine presente = "0.0%", sem engine (exited) = "Unavail"/"—".
     /// </summary>
     public static class GpuMonitor
     {
@@ -19,34 +24,30 @@ namespace KitLugia.Core.TaskManager
         private static extern uint PdhAddEnglishCounter(IntPtr hQuery, string szFullCounterPath, uint dwUserData, out IntPtr phCounter);
         [DllImport("pdh.dll")]
         private static extern uint PdhCollectQueryData(IntPtr hQuery);
-        [DllImport("pdh.dll")]
-        private static extern uint PdhGetFormattedCounterValue(IntPtr phCounter, uint dwFormat, out IntPtr lpdwType, out PDH_FMT_COUNTERVALUE pdValue);
+        [DllImport("pdh.dll", CharSet = CharSet.Unicode)]
+        private static extern uint PdhGetFormattedCounterArrayW(IntPtr phCounter, uint dwFormat, ref uint pdwBufferSize, out uint lpdwBufferCount, IntPtr ItemBuffer);
         [DllImport("pdh.dll")]
         private static extern uint PdhCloseQuery(IntPtr hQuery);
         [DllImport("pdh.dll")]
         private static extern uint PdhRemoveCounter(IntPtr hCounter);
-        [DllImport("pdh.dll", CharSet = CharSet.Unicode)]
-        private static extern uint PdhExpandWildCardPath(string? szDataSource, string szWildCardPath, StringBuilder? mszExpandedPathList, ref uint pcchPathListLength, uint dwFlags);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct PDH_FMT_COUNTERVALUE { public uint CStatus; public double DoubleValue; }
 
         private const uint PDH_FMT_DOUBLE = 0x00000200;
-        private const uint PDH_NO_DATA = 0x800007D5;
+        private const uint PDH_MORE_DATA = 0x800007D2;
         private const uint PDH_CSTATUS_VALID_DATA = 0x00000000;
         private const uint PDH_CSTATUS_NEW_DATA = 0x00000001;
+
         private static IntPtr _queryHandle = IntPtr.Zero;
-        private static readonly List<IntPtr> _engineCounters = new();
-        private static readonly List<string> _enginePaths = new(); // paralelo a _engineCounters p/ mapear LUID por handle
-        private static HashSet<string> _activePaths = new(StringComparer.OrdinalIgnoreCase);
-        private static IntPtr _totalUtilCounter = IntPtr.Zero; // fallback single
+        private static IntPtr _wildcardCounter = IntPtr.Zero; // \GPU Engine(*)\Utilization Percentage
         private static bool _initialized = false;
         private static bool _gpuAvailable = true;
         private static volatile bool _initializing = false;
         private static DateTime _lastCollectTime = DateTime.MinValue;
         private static double _lastTotalValue = -1;
         private static readonly object _initLock = new();
-        // FIX: falha única na inicialização NÃO desabilita para sempre — re-tenta após cooldown.
+        // FIX: falha unica na inicializacao NAO desabilita para sempre — re-tenta apos cooldown.
         private static int _failedAttempts = 0;
         private static DateTime _nextRetryTime = DateTime.MinValue;
 
@@ -65,81 +66,44 @@ namespace KitLugia.Core.TaskManager
                     uint r = PdhOpenQuery(null, 0, out _queryHandle);
                     if (r != 0) { MarkUnavailableAndScheduleRetry(); _initializing = false; return; }
 
-                    // Expand wildcard to ALL engine instances (PDH requires expansion, wildcard alone fails)
-                    string wildcard = @"\GPU Engine(*)\Utilization Percentage";
-                    uint len = 0;
-                    // First call to get required length — may return PDH_MORE_DATA or success
-                    PdhExpandWildCardPath(null, wildcard, null, ref len, 0);
-                    List<string> paths = new();
-                    if (len > 1)
+                    // TECNICA TMOG: um unico contador curinga. O English path e resolvido
+                    // internamente pelo PDH (funciona em SO localizado — testado pt-BR).
+                    r = PdhAddEnglishCounter(_queryHandle, @"\GPU Engine(*)\Utilization Percentage", 0, out _wildcardCounter);
+                    if (r == 0 && _wildcardCounter != IntPtr.Zero)
                     {
-                        var sb = new StringBuilder((int)len);
-                        if (PdhExpandWildCardPath(null, wildcard, sb, ref len, 0) == 0)
-                        {
-                            string all = sb.ToString();
-                            // Double-null terminated multi-string
-                            foreach (var s in all.Split('\0'))
-                            {
-                                if (!string.IsNullOrWhiteSpace(s)) paths.Add(s);
-                            }
-                        }
-                    }
-                    // If expansion gave nothing, fallback to single path attempt
-                    if (paths.Count == 0) paths.Add(wildcard);
-
-                    int added = 0;
-                    foreach (var p in paths)
-                    {
-                        if (PdhAddEnglishCounter(_queryHandle, p, 0, out var h) == 0 && h != IntPtr.Zero)
-                        {
-                            _engineCounters.Add(h);
-                            added++;
-                        }
-                    }
-                    // If we managed to add at least one engine counter
-                    if (added > 0)
-                    {
-                        _totalUtilCounter = _engineCounters[0];
-                        _activePaths = new HashSet<string>(paths, StringComparer.OrdinalIgnoreCase);
                         PdhCollectQueryData(_queryHandle);
                         doWarmup = true;
                         _initialized = true;
-                        _lastExpandTime = DateTime.UtcNow;
                     }
                     else
                     {
-                        // No engine counters — try generic _Total or disable
                         MarkUnavailableAndScheduleRetry();
-                        foreach (var h in _engineCounters) try { PdhRemoveCounter(h); } catch { }
-                        _engineCounters.Clear();
-                        _activePaths.Clear();
-                        _totalUtilCounter = IntPtr.Zero;
+                        try { PdhRemoveCounter(_wildcardCounter); } catch { }
+                        _wildcardCounter = IntPtr.Zero;
                         if (_queryHandle != IntPtr.Zero) { try { PdhCloseQuery(_queryHandle); } catch { } _queryHandle = IntPtr.Zero; }
                     }
                 }
                 catch
                 {
                     MarkUnavailableAndScheduleRetry();
-                    foreach (var h in _engineCounters) try { PdhRemoveCounter(h); } catch { }
-                    _engineCounters.Clear();
-                    _activePaths.Clear();
-                    _totalUtilCounter = IntPtr.Zero;
+                    try { PdhRemoveCounter(_wildcardCounter); } catch { }
+                    _wildcardCounter = IntPtr.Zero;
                     if (_queryHandle != IntPtr.Zero) { try { PdhCloseQuery(_queryHandle); } catch { } _queryHandle = IntPtr.Zero; }
                 }
                 finally { _initializing = false; }
             }
-            // Warmup MUST be off the UI lock — protegido por lock evita colisão com Shutdown/Reexpand
+            // Warmup: segunda coleta ~150ms depois para o PDH ter delta entre amostras
             if (doWarmup)
             {
                 var captured = _queryHandle;
                 System.Threading.Tasks.Task.Run(async () =>
                 {
-                    try { await System.Threading.Tasks.Task.Delay(120); } catch { }
+                    try { await System.Threading.Tasks.Task.Delay(150); } catch { }
                     lock (_initLock)
                     {
                         try
                         {
-                            if (captured != IntPtr.Zero && _queryHandle == captured && _queryHandle != IntPtr.Zero)
+                            if (captured != IntPtr.Zero && _queryHandle == captured)
                                 PdhCollectQueryData(captured);
                         }
                         catch { }
@@ -148,100 +112,132 @@ namespace KitLugia.Core.TaskManager
             }
         }
 
-        private static DateTime _lastExpandTime = DateTime.MinValue;
-
-        private static void TryReexpandIfNeeded()
+        /// <summary>
+        /// Le o array completo do contador curinga (padrao 2 chamadas: probe de tamanho + leitura).
+        /// Retorna dict PID -> soma das engines e o maior engine individual (total estilo Task Manager).
+        /// A leitura e confinada ao buffer devolvido pela propria PDH (ponteiros de nome apontam
+        /// para dentro dele); todos os acessos sao validados contra os limites do buffer.
+        /// </summary>
+        private static Dictionary<uint, double> ReadEngineArray()
         {
-            // Re-expande a cada 30s para capturar engines criados após o boot (jogo iniciado depois)
-            if ((DateTime.UtcNow - _lastExpandTime).TotalSeconds < 30) return;
+            var result = new Dictionary<uint, double>();
+            IntPtr wc;
+            IntPtr query;
+            lock (_initLock) { wc = _wildcardCounter; query = _queryHandle; }
+            if (wc == IntPtr.Zero || query == IntPtr.Zero) return result;
+
+            var now = DateTime.UtcNow;
             lock (_initLock)
             {
-                if ((DateTime.UtcNow - _lastExpandTime).TotalSeconds < 30) return;
-                if (!_initialized || _queryHandle == IntPtr.Zero) return;
+                if ((now - _lastCollectTime).TotalMilliseconds > 700)
+                {
+                    PdhCollectQueryData(_queryHandle);
+                    _lastCollectTime = now;
+                }
+            }
+
+            try
+            {
+                uint size = 0;
+                // 1a chamada: PDH_MORE_DATA devolve o tamanho necessario
+                uint rc = PdhGetFormattedCounterArrayW(wc, PDH_FMT_DOUBLE, ref size, out _, IntPtr.Zero);
+                if (size == 0 || (rc != 0 && rc != PDH_MORE_DATA)) return result;
+
+                IntPtr buf = Marshal.AllocHGlobal((int)size);
                 try
                 {
-                    string wildcard = @"\GPU Engine(*)\Utilization Percentage";
-                    uint len = 0;
-                    PdhExpandWildCardPath(null, wildcard, null, ref len, 0);
-                    if (len <= 1) return;
-                    var sb = new StringBuilder((int)len);
-                    if (PdhExpandWildCardPath(null, wildcard, sb, ref len, 0) != 0) return;
-                    var freshPaths = new HashSet<string>(sb.ToString().Split('\0', StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase);
-                    if (_activePaths.SetEquals(freshPaths)) { _lastExpandTime = DateTime.UtcNow; return; }
-                    foreach (var h in _engineCounters) try { PdhRemoveCounter(h); } catch { }
-                    _engineCounters.Clear();
-                    _activePaths = freshPaths;
-                    foreach (var p in freshPaths)
+                    rc = PdhGetFormattedCounterArrayW(wc, PDH_FMT_DOUBLE, ref size, out uint count, buf);
+                    if (rc != 0) return result;
+
+                    double maxInstance = 0;
+                    // PDH_FMT_COUNTERVALUE_ITEM_W x64: LPWSTR szName @0, DWORD CStatus @8, pad, double @16, stride 24
+                    const int itemStride = 24;
+                    for (uint i = 0; i < count; i++)
                     {
-                        if (PdhAddEnglishCounter(_queryHandle, p, 0, out var h) == 0 && h != IntPtr.Zero) _engineCounters.Add(h);
+                        IntPtr item = buf + (int)(i * itemStride);
+                        if (item + itemStride > buf + size) break; // defesa: nunca passar do buffer
+                        IntPtr namePtr = Marshal.ReadIntPtr(item);
+                        if (namePtr < buf || namePtr >= buf + size) continue; // nome fora do buffer = lixo
+                        uint cstatus = (uint)Marshal.ReadInt32(item, 8);
+                        if (cstatus != PDH_CSTATUS_VALID_DATA && cstatus != PDH_CSTATUS_NEW_DATA) continue;
+                        double val = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(item, 16));
+                        if (val < 0) val = 0;
+                        if (val > maxInstance) maxInstance = val;
+
+                        string name = Marshal.PtrToStringUni(namePtr) ?? "";
+                        uint pid = ExtractPidFromEnginePath(name);
+                        if (pid == 0) continue;
+                        // SOMA por PID (multi-engine), clamp no final. Inclui 0,0 — engine presente.
+                        double acc = result.TryGetValue(pid, out var a) ? a : 0;
+                        result[pid] = acc + val;
                     }
-                    _totalUtilCounter = _engineCounters.Count > 0 ? _engineCounters[0] : IntPtr.Zero;
-                    _lastExpandTime = DateTime.UtcNow;
-                    try { PdhCollectQueryData(_queryHandle); } catch { }
+
+                    if (result.Count > 0)
+                    {
+                        foreach (var k in result.Keys.ToList())
+                        {
+                            if (result[k] > 100) result[k] = 100;
+                        }
+                        _lastTotalValue = Math.Clamp(maxInstance, 0, 100);
+                    }
                 }
-                catch { }
+                finally { Marshal.FreeHGlobal(buf); }
             }
+            catch { }
+            return result;
+        }
+
+        /// <summary>
+        /// GPU% por PID (tecnica TMOG): inclui TODOS os processos com engine GPU atribuido,
+        /// mesmo ociosos (0,0) — a UI mostra "0%" para eles e "—"/"Unavail" para exited.
+        /// Tambem atualiza o total interno (maior engine ativo, comportamento do Task Manager).
+        /// </summary>
+        public static Dictionary<uint, double> GetGpuUtilizationPerPid()
+        {
+            try
+            {
+                EnsureInitialized();
+                if (!_initialized) return new Dictionary<uint, double>();
+                return ReadEngineArray();
+            }
+            catch { return new Dictionary<uint, double>(); }
         }
 
         public static double GetTotalGpuUtilization()
         {
             if (!_gpuAvailable && DateTime.UtcNow < _nextRetryTime)
             {
-                // PDH indisponível no cooldown — tenta fallback NVIDIA antes de desistir
+                // PDH indisponivel no cooldown — tenta fallback NVIDIA antes de desistir
                 return GetNvidiaSmiUtilization();
             }
             EnsureInitialized();
             if (!_initialized) return -1;
-            lock (_initLock)
-            {
-                if (_queryHandle == IntPtr.Zero) return -1;
-            }
             try
             {
-                TryReexpandIfNeeded();
-                var now = DateTime.UtcNow;
-                lock (_initLock)
-                {
-                    if ((now - _lastCollectTime).TotalMilliseconds > 700)
-                    {
-                        PdhCollectQueryData(_queryHandle);
-                        _lastCollectTime = now;
-                    }
-                }
-                // Windows Task Manager mostra o maior engine ativo (não soma). Leitura atômica sob lock evita handle inválido após re-expand.
-                if (_engineCounters.Count > 1)
-                {
-                    double max = 0;
-                    bool anyValid = false;
-                    lock (_initLock)
-                    {
-                        foreach (var h in _engineCounters)
-                        {
-                            var rc = PdhGetFormattedCounterValue(h, PDH_FMT_DOUBLE, out _, out var v);
-                            if (rc == 0 && (v.CStatus == PDH_CSTATUS_VALID_DATA || v.CStatus == PDH_CSTATUS_NEW_DATA))
-                            {
-                                if (v.DoubleValue > max) max = v.DoubleValue;
-                                anyValid = true;
-                            }
-                        }
-                    }
-                    if (!anyValid) return _lastTotalValue >= 0 ? _lastTotalValue : -1;
-                    _lastTotalValue = Math.Clamp(max, 0, 100);
-                    return _lastTotalValue;
-                }
-                IntPtr single;
-                lock (_initLock) single = _totalUtilCounter;
-                if (single == IntPtr.Zero) return _lastTotalValue >= 0 ? _lastTotalValue : -1;
-                var fmtResult = PdhGetFormattedCounterValue(single, PDH_FMT_DOUBLE, out _, out var value);
-                if (fmtResult != 0) { _lastTotalValue = -1; return -1; }
-                if (value.CStatus != PDH_CSTATUS_VALID_DATA && value.CStatus != PDH_CSTATUS_NEW_DATA) return _lastTotalValue >= 0 ? _lastTotalValue : -1;
-                _lastTotalValue = Math.Clamp(value.DoubleValue, 0, 100);
+                // O array walk atualiza _lastTotalValue com o maior engine (estilo Task Manager)
+                var dict = ReadEngineArray();
+                if (dict.Count == 0) return _lastTotalValue >= 0 ? _lastTotalValue : -1;
                 return _lastTotalValue;
             }
-            catch { return -1; }
+            catch { return _lastTotalValue; }
         }
 
-        /// <summary>Marca indisponível mas agenda re-tentativa (backoff: 5s, 15s, 45s, máx 2min).</summary>
+        /// <summary>Extrai o PID do caminho "\GPU Engine(pid_1234_luid_...)".</summary>
+        private static uint ExtractPidFromEnginePath(string path)
+        {
+            try
+            {
+                int i = path.IndexOf("pid_", StringComparison.OrdinalIgnoreCase);
+                if (i < 0) return 0;
+                i += 4;
+                int j = i;
+                while (j < path.Length && char.IsDigit(path[j])) j++;
+                return j > i && uint.TryParse(path.Substring(i, j - i), out var pid) ? pid : 0u;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>Marca indisponivel mas agenda re-tentativa (backoff: 5s, 15s, 45s, max 2min).</summary>
         private static void MarkUnavailableAndScheduleRetry()
         {
             _gpuAvailable = false;
@@ -251,8 +247,8 @@ namespace KitLugia.Core.TaskManager
         }
 
         /// <summary>
-        /// Fallback NVIDIA: utilização via nvidia-smi (técnica do FreeToken).
-        /// Throttled a 1x/2s — o processo custa ~100ms. Retorna -1 se não houver NVIDIA.
+        /// Fallback NVIDIA: utilizacao via nvidia-smi (tecnica do FreeToken).
+        /// Throttled a 1x/2s — o processo custa ~100ms. Retorna -1 se nao houver NVIDIA.
         /// </summary>
         private static DateTime _lastSmiQuery = DateTime.MinValue;
         private static double _lastSmiValue = -1;
@@ -287,10 +283,7 @@ namespace KitLugia.Core.TaskManager
         {
             lock (_initLock)
             {
-                foreach (var h in _engineCounters) try { PdhRemoveCounter(h); } catch { }
-                _engineCounters.Clear();
-                _activePaths.Clear();
-                if (_totalUtilCounter != IntPtr.Zero) { try { PdhRemoveCounter(_totalUtilCounter); } catch { } _totalUtilCounter = IntPtr.Zero; }
+                if (_wildcardCounter != IntPtr.Zero) { try { PdhRemoveCounter(_wildcardCounter); } catch { } _wildcardCounter = IntPtr.Zero; }
                 if (_queryHandle != IntPtr.Zero) { try { PdhCloseQuery(_queryHandle); } catch { } _queryHandle = IntPtr.Zero; }
                 _initialized = false;
                 _initializing = false;

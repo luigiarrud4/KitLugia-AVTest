@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace KitLugia.Core.KitStore
@@ -254,6 +256,321 @@ namespace KitLugia.Core.KitStore
                 }
             }
             catch (Exception ex) { try { Logger.Log($"[STORE] winget search falhou: {ex.Message}"); } catch { } }
+            return list;
+        }
+
+        /// <summary>
+        /// Busca winget restrita a uma fonte (estilo UniGetUI: --source winget|msstore).
+        /// Para msstore usa o CLI real (o índice local não cobre a fonte Store).
+        /// </summary>
+        public static List<StoreApp> QueryWingetSearch(string? wingetPath, string query, string source)
+        {
+            if (string.IsNullOrWhiteSpace(wingetPath) || !File.Exists(wingetPath) || string.IsNullOrWhiteSpace(query)) return new List<StoreApp>();
+            if (string.Equals(source, "msstore", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var q = Regex.Replace(query.Replace("\"", "").Trim(), @"[^\w\s\.\-\+]", "");
+                    if (q.Length < 2) return new List<StoreApp>();
+                    var args = $"search --query \"{q}\" --source msstore --accept-source-agreements --disable-interactivity --count 25";
+                    var output = RunCapture($"\"{wingetPath}\"", args, 35000);
+                    var list = new List<StoreApp>();
+                    bool inData = false;
+                    foreach (var raw in output.Split('\n'))
+                    {
+                        var line = raw.TrimEnd('\r');
+                        if (!inData) { if (line.TrimStart().StartsWith("---") || line.Contains("----")) { inData = true; continue; } continue; }
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        if (line.StartsWith("No package", StringComparison.OrdinalIgnoreCase) || line.StartsWith("Nenhum pacote", StringComparison.OrdinalIgnoreCase)) break;
+                        var parts = Regex.Split(line.Trim(), @"\s{2,}");
+                        if (parts.Length >= 3)
+                        {
+                            var name = parts[0].Trim();
+                            var id = parts[1].Trim();
+                            var ver = parts[2].Trim();
+                            if (string.IsNullOrEmpty(id) || WingetHeaderTokensPtEn.Any(t => string.Equals(id, t, StringComparison.OrdinalIgnoreCase))) continue;
+                            var pub = parts.Length >= 4 ? parts[3].Trim() : "";
+                            // msstore reporta "Unknown" — normaliza para não aparecer na lista
+                            if (string.Equals(ver, "Unknown", StringComparison.OrdinalIgnoreCase)) ver = "";
+                            list.Add(new StoreApp { Name = name, Id = id, Version = ver, Publisher = pub, Source = "msstore" });
+                        }
+                        if (list.Count >= 25) break;
+                    }
+                    return list;
+                }
+                catch (Exception ex) { try { Logger.Log($"[STORE] winget search msstore falhou: {ex.Message}"); } catch { } }
+                return new List<StoreApp>();
+            }
+            // Fonte winget → mesma lógica da busca normal
+            return QueryWingetSearch(wingetPath, query);
+        }
+
+        /// <summary>Busca no Chocolatey (estilo UniGetUI: --limit-output, id|versão|título).</summary>
+        public static List<StoreApp> QueryChocoSearch(string? chocoPath, string query, int limit = 30)
+        {
+            var list = new List<StoreApp>();
+            if (string.IsNullOrWhiteSpace(chocoPath) || !File.Exists(chocoPath) || string.IsNullOrWhiteSpace(query)) return list;
+            try
+            {
+                var q = Regex.Replace(query.Replace("\"", "").Trim(), @"[^\w\s\.\-\+]", "");
+                if (q.Length < 2) return list;
+                var args = $"search \"{q}\" --limit-output --by-id-only --order-by-popularity --page 0 --page-size {limit}";
+                var output = RunCapture($"\"{chocoPath}\"", args, 25000);
+                foreach (var raw in output.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var line = raw.Trim();
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("Chocolatey", StringComparison.OrdinalIgnoreCase)) continue;
+                    var parts = line.Split('|');
+                    if (parts.Length >= 2)
+                    {
+                        var id = parts[0].Trim();
+                        var ver = parts.Length > 1 ? parts[1].Trim() : "";
+                        var title = parts.Length > 2 ? parts[2].Trim() : "";
+                        if (string.IsNullOrEmpty(id)) continue;
+                        list.Add(new StoreApp { Name = string.IsNullOrEmpty(title) ? id : title, Id = id, Version = ver, Source = "choco" });
+                    }
+                    if (list.Count >= limit) break;
+                }
+            }
+            catch (Exception ex) { try { Logger.Log($"[STORE] choco search falhou: {ex.Message}"); } catch { } }
+            return list;
+        }
+
+        // ---- Gerenciadores de dev (Pip/Npm/DotNet/Cargo) — mesmos comandos do UniGetUI ----
+
+        public static string? FindFirstOnPath(string fileName)
+        {
+            try
+            {
+                var found = RunCapture("where", fileName, 4000);
+                var first = found.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                                 .Select(s => s.Trim().Trim('"'))
+                                 .FirstOrDefault(s => s.EndsWith(fileName, StringComparison.OrdinalIgnoreCase) && File.Exists(s));
+                return first;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Localiza o pip como o UniGetUI: python do PATH + pastas de instalação do Python.
+        /// Retorna python.exe (rodamos `-m pip`) ou pip.exe direto quando existir.</summary>
+        public static string? FindPipPath()
+        {
+            try
+            {
+                // 1) pip.exe direto no PATH
+                var direct = FindFirstOnPath("pip.exe");
+                if (direct != null) return direct;
+                // 2) python.exe no PATH (igual UniGetUI FindCandidateExecutableFiles)
+                var python = FindFirstOnPath("python.exe");
+                if (python != null && !python.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase))
+                    return python;
+                // 3) Pastas de instalação conhecidas
+                var dirs = new List<string>();
+                var pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                var appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                if (Directory.Exists(pf)) dirs.Add(pf);
+                var userPy = Path.Combine(appdata, "Programs", "Python");
+                if (Directory.Exists(userPy)) dirs.Add(userPy);
+                foreach (var dir in dirs)
+                {
+                    try
+                    {
+                        var py = Path.Combine(dir, "python.exe");
+                        if (File.Exists(py)) return py;
+                        foreach (var sub in Directory.GetDirectories(dir, "Python*"))
+                        {
+                            var p2 = Path.Combine(sub, "python.exe");
+                            if (File.Exists(p2)) return p2;
+                        }
+                    }
+                    catch { }
+                }
+                // 4) Stub do WindowsApps como último recurso (funciona se o Python real estiver instalado)
+                return python;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Pip: `pip list --outdated` (tabela Package | Version | Available, igual UniGetUI).
+        /// pipPath pode ser o próprio pip.exe OU um python.exe (rodamos `python -m pip`).</summary>
+        public static List<StoreApp> QueryPipOutdated(string? pipPath)
+        {
+            var list = new List<StoreApp>();
+            if (string.IsNullOrWhiteSpace(pipPath) || !File.Exists(pipPath)) return list;
+            try
+            {
+                bool isPython = Path.GetFileName(pipPath).StartsWith("python", StringComparison.OrdinalIgnoreCase);
+                var args = isPython ? "-m pip list --outdated" : "list --outdated";
+                var output = RunCapture($"\"{pipPath}\"", args, 60000);
+                bool dashesPassed = false;
+                foreach (var raw in output.Split('\n'))
+                {
+                    var line = raw.TrimEnd('\r');
+                    if (!dashesPassed) { if (line.Contains("----")) dashesPassed = true; continue; }
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    // UniGetUI: split por espaço simples após colapsar — ids pip não têm espaços
+                    var elements = Regex.Replace(line.Trim(), " {2,}", " ").Split(' ');
+                    if (elements.Length < 3) continue;
+                    var id = elements[0].Trim();
+                    var cur = elements[1].Trim();
+                    var avail = elements[2].Trim();
+                    if (string.IsNullOrEmpty(id) || id.Equals("Package", StringComparison.OrdinalIgnoreCase)) continue;
+                    list.Add(new StoreApp { Name = id, Id = id, Version = cur, AvailableVersion = avail, Source = "pip" });
+                    if (list.Count >= 200) break;
+                }
+            }
+            catch (Exception ex) { try { Logger.Log($"[STORE] pip outdated falhou: {ex.Message}"); } catch { } }
+            return list;
+        }
+
+        /// <summary>Npm: `npm outdated --json` (local + global, igual UniGetUI; JSON {id:{current,latest}}).</summary>
+        public static List<StoreApp> QueryNpmOutdated(string? npmPath)
+        {
+            var list = new List<StoreApp>();
+            if (string.IsNullOrWhiteSpace(npmPath) || !File.Exists(npmPath)) return list;
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            foreach (var global in new[] { false, true })
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo(npmPath, "outdated --json" + (global ? " --global" : ""))
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        WorkingDirectory = home,
+                        StandardOutputEncoding = Encoding.UTF8
+                    };
+                    using var p = Process.Start(psi);
+                    if (p == null) continue;
+                    var output = p.StandardOutput.ReadToEnd();
+                    try { p.WaitForExit(30000); } catch { }
+                    if (string.IsNullOrWhiteSpace(output)) continue;
+                    using var doc = JsonDocument.Parse(output);
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    {
+                        try
+                        {
+                            string? cur = prop.Value.TryGetProperty("current", out var c) ? c.GetString() : null;
+                            string? latest = prop.Value.TryGetProperty("latest", out var l) ? l.GetString() : null;
+                            if (string.IsNullOrEmpty(cur) || string.IsNullOrEmpty(latest)) continue;
+                            var id = prop.Name;
+                            if (list.Any(x => x.Id == id)) continue; // local+global duplicado
+                            list.Add(new StoreApp
+                            {
+                                Name = id,
+                                Id = id,
+                                Version = cur,
+                                AvailableVersion = latest,
+                                Source = "npm",
+                                Category = global ? "global" : "local"
+                            });
+                            if (list.Count >= 200) break;
+                        }
+                        catch { }
+                    }
+                }
+                catch (Exception ex) { try { Logger.Log($"[STORE] npm outdated ({(global ? "global" : "local")}) falhou: {ex.Message}"); } catch { } }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// .NET Tools globais: `dotnet tool list --global` + consulta NuGet flatcontainer
+        /// (idem UniGetUI V3PackageType=DotnetTool, fonte nuget.org).
+        /// </summary>
+        public static List<StoreApp> QueryDotnetToolUpdates(string? dotnetPath)
+        {
+            var list = new List<StoreApp>();
+            if (string.IsNullOrWhiteSpace(dotnetPath) || !File.Exists(dotnetPath)) return list;
+            try
+            {
+                var output = RunCapture($"\"{dotnetPath}\"", "tool list --global", 20000);
+                bool dashesPassed = false;
+                var tools = new List<(string Id, string Version)>();
+                foreach (var raw in output.Split('\n'))
+                {
+                    var line = raw.TrimEnd('\r');
+                    if (!dashesPassed) { if (line.Contains("----")) dashesPassed = true; continue; }
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    var parts = Regex.Split(line.Trim(), @"\s{2,}");
+                    if (parts.Length < 2) continue;
+                    var id = parts[0].Trim();
+                    var ver = parts[1].Trim();
+                    if (string.IsNullOrEmpty(id) || id.Contains(' ') || id.Equals("Package", StringComparison.OrdinalIgnoreCase)) continue;
+                    tools.Add((id, ver));
+                }
+                if (tools.Count > 40) tools = tools.Take(40).ToList();
+                foreach (var (id, ver) in tools)
+                {
+                    try
+                    {
+                        var latest = NuGetLatestVersion(id);
+                        if (string.IsNullOrEmpty(latest)) continue;
+                        if (CompareVersions(latest, ver) > 0)
+                            list.Add(new StoreApp { Name = id, Id = id, Version = ver, AvailableVersion = latest, Source = "dotnet" });
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex) { try { Logger.Log($"[STORE] dotnet tool list falhou: {ex.Message}"); } catch { } }
+            return list;
+        }
+
+        private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(8) };
+
+        private static string? NuGetLatestVersion(string packageId)
+        {
+            try
+            {
+                var url = $"https://api.nuget.org/v3-flatcontainer/{Uri.EscapeDataString(packageId.ToLowerInvariant())}/index.json";
+                var json = _http.GetStringAsync(url).GetAwaiter().GetResult();
+                using var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("versions", out var versions)) return null;
+                string? best = null;
+                foreach (var v in versions.EnumerateArray())
+                {
+                    var s = v.GetString();
+                    if (string.IsNullOrEmpty(s)) continue;
+                    if (best == null || CompareVersions(s!, best) > 0) best = s;
+                }
+                return best;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Cargo: `cargo install-update -l` (cargo-update; linhas com "Needs update" = Yes).</summary>
+        public static List<StoreApp> QueryCargoUpdates(string? cargoPath)
+        {
+            var list = new List<StoreApp>();
+            if (string.IsNullOrWhiteSpace(cargoPath) || !File.Exists(cargoPath)) return list;
+            try
+            {
+                var output = RunCapture($"\"{cargoPath}\"", "install-update -l", 60000);
+                if (output.Contains("no such subcommand") || output.Contains("couldn't find"))
+                {
+                    try { Logger.Log("[STORE] cargo-update não instalado — updates do Cargo pulados (cargo install cargo-update)"); } catch { }
+                    return list;
+                }
+                bool dashesPassed = false;
+                foreach (var raw in output.Split('\n'))
+                {
+                    var line = raw.TrimEnd('\r');
+                    if (!dashesPassed) { if (line.Contains("----")) dashesPassed = true; continue; }
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    var parts = Regex.Split(line.Trim(), @"\s{2,}");
+                    if (parts.Length < 4) continue;
+                    var id = parts[0].Trim();
+                    var cur = parts[1].Trim().TrimStart('v');
+                    var latest = parts[2].Trim().TrimStart('v');
+                    var needs = parts[^1].Trim();
+                    if (!needs.StartsWith("Yes", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.IsNullOrEmpty(id)) continue;
+                    list.Add(new StoreApp { Name = id, Id = id, Version = cur, AvailableVersion = latest, Source = "cargo" });
+                }
+            }
+            catch (Exception ex) { try { Logger.Log($"[STORE] cargo install-update falhou: {ex.Message}"); } catch { } }
             return list;
         }
 

@@ -5470,3 +5470,1373 @@ Artefatos: %TEMP%/opencode/dnsjumper/ (exe copiado, .asm 8.4MB, .i64 10.8MB),
 %TEMP%/opencode/dnstest/ (projeto de teste UDP/EDNS).
 
 Build: 0 erros. Kit relancado (PID 39312).
+
+
+### Sessao 08/09 - Navegacao entre abas otimizada p/ CPU antiga + SSD lento (trava ao trocar de aba)
+
+Sintoma: em Ryzen 5 5500 com SSD ruim, o kit travava ao passar entre as abas.
+
+CAUSAS RAIZ (3, todas no caminho da troca de aba):
+1. EmptyWorkingSet SINCRONO na UI thread no meio da troca: 6 paginas chamavam
+   MemoryHelper.TrimWorkingSet() dentro do Cleanup() (Dashboard, GameBoost, Drivers,
+   Partitions, Services, Winboot), invocado via reflection de forma sincrona pelo
+   CleanupAndNavigate ANTES do Navigate — em SSD lento isso gera page-faults e congela.
+2. Animacao de escala 0.98->1.0 (MainFrame_Navigated, 250ms) concorrendo com a
+   construcao/layout da pagina nova (passe extra de layout + composicao GPU).
+3. GC.Collect + Trim IMEDIATO apos navegar (gate 90MB): despaginava a pagina que
+   acabou de abrir; cliques rapidos empilhavam GC + EmptyWorkingSet.
+
+CORRECOES:
+- NOVO KitLugia.GUI\UiPerformance.cs: NavigationAnimationEnabled=false (troca
+  instantanea por padrao), PostNavTrimDelayMs=4000, PostNavTrimThresholdMb=140.
+- MainWindow.NavigateToPage virou async: guarda single-flight (_isNavigating ignora
+  cliques durante a construcao), cursor de espera + await Dispatcher.Yield(Render)
+  (o clique pinta antes do trabalho pesado XAML/JIT).
+- MainFrame_Navigated: early-return sem animacao quando desabilitada (default);
+  animacao de escala mantida so se UiPerformance.NavigationAnimationEnabled=true.
+- CleanupAndNavigate: trim pos-nav ADIADO (4s) e CANCELAVEL (_navTrimCts — trocar de
+  aba de novo cancela o anterior; sem storm em cliques rapidos) + gate 140MB
+  (90MB pegava uso normal e despaginava a pagina nova). Dispose no Cleanup().
+- 6 Cleanups SEM TrimWorkingSet sincrono (Dashboard/GameBoost/Drivers/Partitions/
+  Services/Winboot) — trim agora e so o centralizado do MainWindow.
+
+Build: 0 erros / 132 avisos (baseline nullable). Sem cache de paginas (regra mantida).
+
+A TESTAR (PC fraco): clicar rapido entre abas pesadas (Services/Apps/Partitions/
+Winboot) — sem congelamento; cursor de espera visivel em vez de trava; RAM continua
+caindo sozinha ~4s apos parar de navegar (log "RAM devolvida apos navegacao").
+
+
+### Sessao 08/09 (cont.) - RAM + picos de CPU: 4 fixes reais no monitoramento continuo
+
+Sintoma: picos periodicos de CPU + RAM do processo crescendo. Auditoria dos timers
+sempre-ativos (tray + janela) e da coleta por processo.
+
+ACHADOS + CORRECOES (todos com consumidor verificado antes de cortar):
+1. **PerformanceCounter novo a CADA tick (2s)** - UpdateSystemStats criava
+   
+ew PerformanceCounter("Processor",...) + 1 NextValue() por tick: custo de
+   init PDH (registry + instancias) a cada 2s E valor sempre 0 (primeira leitura
+   sem baseline). Fix: _cpuTotalCounter reusado (delta real de 2s) + dispose
+   no DisposeCore. (TrayIconService.cs)
+2. **Tooltip do GoodbyeDPI a cada 2s** - o tick chamava GetGoodbyeDPIStatus()
+   direto (GetProcessesByName + StartTime + WorkingSet) mesmo no tray. Fix: tick
+   usa o getter cacheado (10s) + string detalhada cacheada
+   (_goodbyeDpiStatusText/_goodbyeDpiStatusTextTime, refresh max 10s). (MainWindow)
+3. **UpdateProcessCache coletava 5 campos sem consumidor** (VirtualMemoryMB,
+   StartTime, ThreadCount, HandleCount, MainWindowTitle = 1+ syscall por processo
+   por tick) + Responding (SendMessageTimeout, o mais caro) a cada 2s. Fix:
+   coleta so Id/Name/WS/Cpu; Responding amostrado a cada 5 ticks (~10s, alerta
+   tem cooldown de 5min); campos mortos nao coletados (props mantidas).
+4. **Caches sem poda** - _cpuTimeCache (keyed por PID) acumulava PIDs mortos
+   para sempre; behaviors de instaladores/temp ficavam. Fix: poda por PIDs vivos
+   ao fim da coleta + behaviors com LastSeen > 30min quando Count > 500.
+5. Bonus: GetDetailedMemoryReport com using var proc (handle vazado).
+
+Verificados e DEIXADOS como estao: MonitorTick 30s (ok), RAM limiter, ProBalance
+3s, foreground 250ms, MemoryDiagnostics/MemoryLeakProfiler (dead code, sem
+callers — nao rodam), prioridade High do processo (comportamento intencional).
+
+Build: 0 erros / 132 avisos (baseline nullable).
+
+A TESTAR: deixar o kit aberto e observar CPU no Gerenciador (picos de 2s devem
+sumir; leitura de CPU do monitor passa a mostrar valor real); RAM estavel em
+sessoes longas (sem crescimento do _cpuTimeCache).
+
+
+### Sessao 08/09 (cont. 2) - RAM sob controle: teto configuravel + 2 vazamentos estaticos
+
+Pedido: continuar procurando economias de RAM + dar um controle do uso de RAM do kit.
+
+AUDITORIA (caches estaticos do Core + GUI, buffers, GC):
+- Core: todos os caches estaticos ja sao limitados ou podados (NetworkTrafficMonitor
+  dispoe counters stale; Guardian/RegistryBatch por scan; SearchEngine/_database 1x;
+  DriverManager por carga; GpuMonitor/ProcessIoHelper transientes). Sem achado no Core.
+- Resources\ (9,7MB) sao ferramentas em disco (Explorer++/7z/wimlib/oscdimg), nao RAM.
+- GC: Workstation default (sem ServerGC), correto p/ app UI. Prioridade High do
+  processo mantida (intencional; GameBoost usa prioridades proprias por processo).
+
+CORRECOES:
+1. **Teto de RAM do kit CONFIGURAVEL** (era hardcoded 200MB no MainWindow):
+   TrayIconService.KitMemoryLimitMB (80..1024, default 200) persistido em
+   HKCU TraySettings\KitMemoryLimitMB (save/load + GetKitMemoryLimitStatic p/
+   o boot); setter aplica ao vivo via AggressiveMemoryCleaner.SetMemoryLimit.
+   MainWindow inicia o monitoramento com o valor persistido. UI: campo "Teto:"
+   + "MB" ao lado do "Intervalo:" na secao LIMITADOR DE RAM (TraySettingsPage
+   .xaml/.cs, mesmo padrao do TxtRamLimiterInterval_LostFocus).
+2. **GlobalSearchPage._statusCache sem teto** (static, 1 entrada por item ja
+   pesquisado, p/ sempre): Clear() ao passar de 2000 (seguro, recalcula).
+3. **ConsoleManager._pending sem teto**: flood de log enfileirava milhares de
+   strings + backlog no dispatcher (pico de RAM + UI lenta). Cap 3000 (descarta
+   as mais antigas + contador Interlocked); FlushBatch insere marcador
+   "... N linhas suprimidas (flood de log) ..."; Clear() zera o contador.
+
+Build: 0 erros / 132 avisos (baseline nullable).
+
+A TESTAR: TraySettings -> campo Teto (ex: 120MB) -> sobe o uso (scan verboso) ->
+limpeza automatica ao passar do teto; flood de log mostra o marcador de linhas
+suprimidas em vez de travar; busca global repetida nao cresce memoria.
+
+
+### Sessao 08/09 (cont. 3) - GlobalSearch refeita: indice normalizado + providers + popup live Top-8
+
+Pedido: refazer a GlobalSearchPage com os melhores metodos, suportando tudo do kit.
+
+PROBLEMAS DO DESENHO ANTIGO (todos provados no codigo):
+1. Cada tecla (debounce 300ms) NAVEGAVA p/ uma GlobalSearchPage NOVA (recriava a
+   pagina inteira por tecla) — o freeze ao digitar em PC fraco.
+2. Resultados SEM limite em ItemsControl+WrapPanel dentro de ScrollViewer (sem
+   virtualizacao: materializava 100+ cards).
+3. 1 scan Guardian COMPLETO por tecla (UpdateSearch) + 1 scan por Invoke de
+   CheckState (cada lambda de tweak fazia GetHarmfulTweaksWithStatus inteiro).
+4. Popup de busca (LstSearchResults) MORTO: nunca preenchido, so fechado.
+5. Sem tolerancia a acento (pt-BR: 'otimizacao' nao achava 'otimização').
+6. Cobertura: 7 paginas fora do indice (WinpeTools/ReinstallPreserve/
+   WindowsUpdate/Shrink/QuickInstall/ContextMenu/ForceStopUnlock/ExmTweaks/
+   StoreRemake) + 160 settings de privacidade + 108 tweaks do AllTweaks fora.
+
+REFEITA (Core/SearchEngine.cs reescrito):
+- Indice pre-normalizado (Fold: lowercase + FormD sem acento, 1x na indexacao;
+  zero ToLower/alocacao por tecla). Scoring AND por palavra + bonus por tipo.
+- Search(query, maxResults=60) + SearchTop(query, 8) p/ popup. FFI
+  NativeSearch por item REMOVIDO do caminho (500 transicoes FFI por tecla nao
+  batem um scan managed <1ms; classe mantida p/ uso futuro).
+- Providers: RegisterProvider() (Core sem depender da GUI) + RegisterStates().
+- Cache de estados com TTL 15s + guarda anti-reentrancia _refreshing:
+  1 scan Guardian + 1 passada de privacidade + resolvers, nunca 1 scan por
+  tecla/item. InvalidateStates() apos cada toggle.
+- BUG PEGO NO HARNESS: registrar o proprio check (que chama QueryState) como
+  resolver causava StackOverflow no refresh — AddToggle nao registra; so
+  providers registram explicitamente.
+- Cobertura nova: 10 AddNav + 160 privacidade (toggle aplica/reverte pelo estado
+  atual) + PATH consolidado com StateKey + extras com StateKey.
+
+GUI:
+- AllTweaksPage.DefineSystemTweaks virou public static (puro: sem estado de
+  instancia) + Pages/SearchProviders.cs (bootstrap idempotente) indexa os 108
+  como toggles com estados.
+- GlobalSearchPage: ListBox virtualizada (Recycling) + top 60 + badge TypeLabel
+  (PAGINA/TWEAK/ACAO) + 1 passada de estados via GetStates(); _statusCache
+  estatico removido.
+- MainWindow: popup live Top-8 funcional (debounce 300->150ms); digitar NAO
+  recria mais pagina; Enter executa selecionado/Top-1; na pagina de busca,
+  atualiza in-place. ExecuteGlobalSearchResultAsync rele estado via
+  Invalidate+QueryState (sem scan direto).
+
+VALIDADO (harness Release, host): init 31ms; buscas 0-10ms ('otimizacao' acha
+'Otimização de Entrega', 'menu contexto' acha a pagina); 627 estados em 225ms
+no 1o refresh, 0ms em cache. Build: 0 erros (avisos restantes pre-existentes).
+
+A TESTAR (app): digitar na busca (popup Top-8 instantaneo, sem freeze); Enter
+executa o Top-1; pagina de resultados com toggles mostrando estado real;
+buscar 'telemetria'/'recall' (privacidade) e 'core parking' (alltweaks).
+
+
+### Sessao 08/09 (cont. 4) - Busca: fora o mini-popup, resultado na pagina cheia (pedido do usuario)
+
+Feedback (screenshot): o popup Top-8 sob a caixa de busca ficava estreito,
+cortando texto por cima da sidebar — 'mini menu ruim'. Revertido p/ pagina
+cheia a direita, mantendo os fixes de performance:
+- PerformLiveSearch: query vazia limpa/atualiza; fora da pagina navega UMA vez
+  p/ 
+ew GlobalSearchPage(query) (Navigate e sincrono: o proximo debounce ja
+  enxerga a pagina e atualiza in-place, sem recriar por tecla); Enter igual.
+- Popup (LstSearchResults) nunca mais abre; badge TypeLabel do template mantido
+  (inofensivo). SearchTop mantido como API publica (sem chamador na GUI).
+- Motor inalterado: indice normalizado, providers, cache de estados TTL,
+  pagina virtualizada top 60.
+
+Build: 0 erros.
+
+### Sessao 09/09 - Store Remake reescrita no estilo UniGetUI (substitui o remake MS Store)
+
+Contexto: updates exclusivos da Microsoft Store nao dava p/ reimplementar —
+usuario mandou usar o UniGetUI (fonte: C:\Users\Lugia\Downloads\UniGetUI-main)
+como modelo. Interface e semantica de CLI do UniGetUI, gerenciadores do Kit
+(winget/choco via StoreEngine). KitStoreWindow/WindowsPage/--kitstore INTOCADOS
+(so troca o conteudo da pagina).
+
+1. **StoreRemakePage.xaml recriada** (870 -> ~420 linhas):
+   - Header UniGetUI: icone 44px + titulo 28pt + subtitulo que MUDA por aba
+     (Descobrir/Instalados/Atualizações) + status winget/choco.
+   - Toolbar row: botão principal contextual (Instalar/Reinstalar/Atualizar
+     selecionado ou Atualizar tudo) + MegaQuery box (underline focus) + chips
+     de fonte winget/choco/msstore (toggle; mudar filtro re-executa a busca).
+   - Abas Descobrir/Instalados/Atualizações com tooltips explicando cada uma.
+   - Lista virtualizada (ListView + Recycling) estilo DataGrid UniGetUI:
+     icone, nome+editor, id, versão, nova versão laranja, badge fonte + badge
+     verde "✓ instalado", botões por linha (Instalar/Atualizar/Force/…/Desinstalar).
+   - Status bar: log + contadores (N instalados · N updates · N pacotes Store).
+   - Mantidos: modal de detalhes (+ card verde "Já instalado neste PC"),
+     widget de progresso flutuante, monograma de ícone, cache disco/memória.
+
+2. **Code-behind reescrito** (1745 -> ~1100 linhas):
+   - BUG 1 (lista vazia): 1a carga já estava na aba Discover -> SwitchTab não
+     rodava -> ItemsSource nunca atribuído (contador dizia "21 resultados",
+     lista branca). Fix: RenderDiscover() na entrada do DoSearchAsync mesmo
+     já na aba + ItemsSource reatribuído INCONDICIONALMENTE no fim da busca.
+   - BUG 2 (semântica): Discover mostrava "Instalar" p/ app já instalado.
+     Fix: MarkInstalledFlags() cruza _results x _installed (chamado após
+     busca, sugestões e refresh) -> IsInstalled -> badge "✓ instalado" +
+     botão vira Reinstalar (ou Atualizar se tem versão nova). Modal mostra
+     card "Já instalado neste PC".
+   - Flags UniGetUI (WinGetPkgOperationHelper/ChocolateyPkgOperationHelper):
+     winget `--id X --exact --silent --accept-package-agreements
+     --accept-source-agreements --disable-interactivity`; upgrade com
+     `--include-unknown --force`; msstore fixado `--source msstore`;
+     choco `install/upgrade/uninstall "id" -y --no-progress`. NOVO:
+     Reinstalar roda `install` (nao `upgrade` — upgrade sem pendência falha).
+     Exit codes de sucesso: 0/3010/1641/1614/1605.
+   - Discover com query vazia: sugestões do índice SQLite local do winget
+     (monikers populares, instantâneo, sem rede).
+   - Removidos do remake: Home hero/carrossel, fantasmas Minecraft, wsreset,
+     reparar Store, pop-out de busca (mantidos no StoreEngine p/ reuso).
+
+3. **StoreEngine.cs (Core)**: QueryWingetSearch(path, query, source) novo
+   overload com `--source msstore` (busca real na fonte Store via CLI);
+   QueryChocoSearch novo (--limit-output --by-id-only --order-by-popularity).
+
+Build: 0 erros. A TESTAR: badge "✓ instalado" no Discover, Reinstalar via
+install, msstore search aceitando acordo da fonte, abas com dados cheios.
+
+### Sessao 09/09 (cont.) - Store Remake: detecca robusta de "ja instalado" (estilo AppsPage/BCU)
+
+Feedback (screenshot): WinRAR mostrava badge/reinstalar, mas qBittorrent e
+JDownloader (instalados fora do winget) apareciam como "Instalar".
+
+**MarkInstalledFlags reescrito (StoreRemakePage.xaml.cs)**:
+1. **Multi-fonte**: (a) indice winget/choco da lista _installed (id completo,
+   1o segmento do id, tail do id apos o publisher, id sem sufixo choco
+   install/portable/appx/package, nome); (b) indice do REGISTRO via
+   RegistryProgramFactory.GetInstalledPrograms (a MESMA engine do AppsPage:
+   HKLM+HKCU x 32+64-bit Uninstall keys) — DisplayNames + RegistryKeyNames,
+   cache 10 min.
+2. **Match**: exato em qualquer indice; fallback contencao (token >= 4 chars
+   contido em nome instalado, ex "firefox" in "mozillafirefoxx64enus").
+3. **Anti-falso-positivo**: tokens de vendor genericos (microsoft, google,
+   adobe, mozilla, video, app...) valem so p/ match EXATO, nunca contencao;
+   tokens < 3 descartados; normalizacao so [a-z0-9] ("7-Zip (x64)" ->
+   "7zipx64").
+4. Log do Discover/Busca agora mostra "· N ja instalado(s)" p/ validar.
+
+Build: 0 erros. A TESTAR: qBittorrent/JDownloader/Firefox com badge ✓
+instalado + Reinstalar na Descobrir; conferir que nao marcou demais
+(tudo com badge = contencao larga demais).
+
+### Sessao 09/09 (cont. 2) - Store Remake: abre em ATUALIZACOES + pipeline de update corrigido
+
+Pedidos: pagina padrao = Atualizacoes (usuario ja faz o que precisa) e
+"garanta que o codigo de atualizar os pacotes esteja correto".
+
+1. **_activeTab inicial = StoreTab.Updates**; OnLoaded chama SwitchTab
+   (header/toolbar/botoes certos no load). Discover so carrega sugestoes
+   na PRIMEIRA visita (BtnTabDiscover_Click), nao no load.
+2. **InstallOrUpgradeAsync(app, forceStop, refreshAfter=true)**: em lote
+   passa refreshAfter=false — antes o "Atualizar tudo" re-query winget+
+   choco (2x ~30s) DEPOIS DE CADA pacote (N x 30s de espera); agora
+   recarrega UMA vez no fim com force=true.
+3. **Fonte fixada no CLI**: winget/choco install/upgrade ganham
+   `--source winget` ou `--source msstore` quando conhecida — sem isso o
+   winget pode falhar/abrir prompt se o id existir em 2 fontes com
+   --disable-interactivity.
+4. **Atualizar tudo confirma antes** com preview (8 primeiros "nome (v ->
+   nova)") e conta em "pacote(s)" (nao app).
+
+Build: 0 erros. A TESTAR: abrir a Store -> cai em Atualizacoes direto;
+Atualizar tudo com N pacotes termina ~Nx30s mais rapido que antes;
+pacote de fonte dupla (ex id em winget+msstore) atualiza sem erro 0x8A15002B.
+
+### Sessao 09/09 (cont. 3) - Store Remake: auditoria propria (CLI validado + 3 fixes)
+
+TESTE REAL (host): winget upgrade 7zip.7zip via pagina -> exit 0, "Instalado
+com exito", refresh forcado derrubou updates 53 -> 52 (pipeline OK).
+CLI validados direto: `winget search spotify --source msstore` (tabela 3
+colunas Nome/ID/Versao, Versao "Unknown"); `choco outdated --limit-output`
+(exit 0).
+
+**Fixes da auditoria**:
+1. **FREEZE de UI**: RebuildInstalledIndex rodava o scan de registro
+   (RegistryProgramFactory, centenas de chaves) NA UI THREAD na 1a busca.
+   Extraido p/ RebuildRegistryIndexAsync (Task.Run interno, cache 10 min);
+   MarkInstalledFlags -> MarkInstalledFlagsAsync (await em todos os 3
+   chamadores).
+2. **msstore "Unknown"**: StoreEngine msstore search normaliza versao
+   "Unknown" -> "" (nao aparece "Unknown" feio na coluna).
+3. **Flash "Tudo atualizado!"**: RenderUpdates nao mostra mais o texto
+   enquanto _busy==1 (refresh inicial em curso) — spinner cobre.
+
+Verificado tambem: bindings XAML x VM todos existentes (build WPF falharia
+senao); VMs da aba Atualizacoes sao AS MESMAS instancias de _installed
+(icones carregados valem la tambem); fluxo Reinstalar (registry match,
+sem winget id) roda `install` corretamente.
+
+Build: 0 erros. PROXIMO (pedido do usuario): refazer AppsPage — "ainda nao
+100% confiavel".
+
+### Sessao 09/09 (cont. 4) - Store Remake: gerenciadores de DEV nas Atualizacoes (pip/npm/dotnet/cargo)
+
+Pedido: "UniGetUI mostra mais coisas p/ atualizar — diferentes de apps comuns,
+mas ainda sao atualizacoes" (print: 139 updates = winget + Pip + Npm + Cargo).
+
+**StoreEngine.cs (Core)** — comandos EXATOS extraidos do UniGetUI:
+- QueryPipOutdated: `pip list --outdated` (tabela Package|Version|Latest,
+  split pos "----", parse igual Pip.ParsePackages). FindPipPath() acha o
+  pip como o UniGetUI: pip.exe no PATH -> python.exe no PATH (excluindo
+  WindowsApps stub) -> Program Files/Python* e AppData\Programs\Python
+  (com python roda `-m pip`).
+- QueryNpmOutdated: `npm outdated --json` LOCAL + GLOBAL (WorkingDirectory
+  = UserProfile; JSON {id:{current,latest}}; dedup local/global via
+  Category="global"|"local").
+- QueryDotnetToolUpdates: `dotnet tool list --global` + versao mais nova
+  via NuGet flatcontainer API (api.nuget.org/v3-flatcontainer/{id}/index.json,
+  HttpClient 8s timeout, CompareVersions) — fontes nuget.org como o
+  UniGetUI (V3PackageType=DotnetTool). So reporta se latest > instalada.
+- QueryCargoUpdates: `cargo install-update -l` (cargo-update); so linhas
+  com "Needs update"=Yes; detecta cargo-update ausente e loga dica.
+- FindFirstOnPath via `where`.
+
+**StoreRemakePage.xaml.cs**:
+- EnsureDevManagersAsync (1x por pagina, where em Task.Run) +
+  QueryDevUpdatesAsync (4 queries em PARALELO dentro do Task.WhenAll do
+  refresh — nao soma latency).
+- Dev merges em _installed com flag DevOnly=true; NAO contam como
+  "instalados" (contadores e aba Instalados filtram DevOnly); so aparecem
+  em Atualizacoes (igual UniGetUI, que nao lista dev pkgs como apps).
+- Update CLI por fonte: pip `install --upgrade id --no-input --no-color
+  --no-cache` (python: `-m pip ...`); npm `install [-g] id` (UpdateVerb=install
+  no UniGetUI); dotnet `tool update --global id` (UpdateVerb=update);
+  cargo `install id`.
+
+**TESTADO NO HOST**: pip nao existe no PATH do usuario (so python.exe stub
+WindowsApps) -> FindPipPath acha e roda `-m pip`; tabela bate
+(aiohttp 3.13.4->3.14.3, anthropic, anyio...). npm global JSON OK
+(@deepseek-ai/dsh). dotnet tool list OK (ilspycmd). cargo install-update
+OK (cargo-binstall v1.22->v1.23 Yes).
+
+Build: 0 erros.
+
+### Sessao 09/09 (cont.) - UI Performance global: timers fora do ctor + virtualizacao
+
+Pedido: "aquele negocio que voce fez para otimizar a troca de abas do kit da para
+fazer em todas as paginas dele?" — auditoria completa de padroes que atrasam a
+navegacao (padrao ja estabelecido: ctor leve + timer inicia no Loaded + tick async
+com single-flight; paginas sao REcriadas a cada navegacao e a antiga leva Cleanup()
+via reflection no CleanupAndNavigate, entao o guard _timersStarted precisa resetar
+no Cleanup).
+
+**ACHADOS E CORRECOES** (padrao aplicado: `new DispatcherTimer` no ctor SEM Start()
++ handler `Loaded` com guard `_timersStarted` (return se ja started; reset=false no
+Cleanup) + `Loaded -=`/`Unloaded -=` no Cleanup):
+
+1. **DiagnosticPage**: timer .Start() no ctor + `RefreshDiagnostics()` sincrono no
+   ctor (GC.GetTotalMemory + contagem de timers/tasks). Agora: timer so Start no
+   Loaded; primeira refresh tambem no Loaded (pagina ja renderizada). Cleanup
+   reseta _timersStarted e remove Loaded.
+2. **TraySettingsPage**: StartRamRefresh() no ctor iniciava timer de 2s (tick:
+   RefreshRamDisplay + RefreshProcessLimitsStatus (Process.GetProcessesByName) +
+   UpdateIslcStatus). Agora: timer criado no ctor, Start + RefreshRamDisplay no
+   Loaded (guard _timersStarted). StartRamRefresh removido.
+3. **PartitionsPage**: _realTimeMonitorTimer.Start() no ctor (tick 10s:
+   RefreshUsage por particao + RenderPartitionBar + Items.Refresh). Agora Start no
+   Loaded com guard. Tick continua gated por ChkAutoRefresh/_isCriticalOperation/
+   _isUpdatingDisks (ja existia).
+4. **PrivacyPage**: InitializeTimer() fazia Start() no ctor (tick 5s ->
+   RefreshStatus async: leitura de registro de TODAS as settings em Task.Run).
+   Agora: criado no ctor, Start no Loaded com guard. Fix de edicao: comentarios
+   com U+FFFD (bytes corrompidos) na linha do Unloaded impediam str_replace por
+   matching exato — ancora limpa usada (`InitializeTimer();` + append Loaded).
+5. **WinbootPage**: `RefreshDisks()` sincrono no ctor (WinbootManager.GetDisks ->
+   IOCTL nativo rapido, mas primeira chamada pode cair no WMI ~340ms). Agora
+   `RefreshDisks()` = wrapper fire-and-forget para `RefreshDisksAsync()`
+   (Task.Run GetDisks + continuacao na UI thread — bindings seguros). Os outros
+   chamadores (BtnRefresh_Click, pos-RemoveWinboot) continuam chamando
+   RefreshDisks() sem mudanca; cache de 3s do GetDisks cobre re-entradas.
+6. **AllTweaksPage.xaml**: ItemsControl dentro de ScrollViewer = ZERO virtualizacao
+   (materializava TODOS os tweaks de uma vez, cada um com template pesado). Trocado
+   por ListBox com VirtualizingStackPanel + Recycling + CacheLength 1,2 +
+   ItemContainerStyle com ControlTemplate vazio (ContentPresenter puro, sem
+   selecao/hover — visual identico). Code-behind inalterado (ItemsSource igual).
+
+**JA CONFORMES** (verificados, sem mudanca): NetworkPage (timers no Loaded, ticks
+async single-flight), StutterPage (timer no Loaded), KitTaskManagerWindow (timers
+no Loaded), DashboardPage (timer local com using, escopo de metodo), AppsPage/
+BloatwarePage/ProgramsPage (Load* async fire-and-forget), PrivacyPage LoadData
+(GetPrivacyCategories = LINQ em memoria), ScreenPage LoadInfo (GetSystemMetrics),
+GameBoostPage (InitializeTimer vazio — monitor via TrayIconService), listas
+virtualizadas em AppsPage/BloatwarePage/ProgramsPage/ServicesPage/PartitionsPage/
+DriversPage/GlobalSearchPage/StoreRemakePage.
+
+Build: 0 erros / 134 warnings (baseline nullable pre-existentes).
+
+### Sessao 14/09 — TMOG (Task Manager do Dave Plummer): analise binaria IDA Pro
+
+Pedido do usuario: o TMOG (C:\Program Files\Task Manager TMOG) pega metricas COMPLETAS
+sem admin — usar o IDA Pro 9.0 para descobrir as tecnicas. Documentacao completa:
+**docs/TMOG_TASKMANAGER_ANALYSIS.md**.
+
+**Achados centrais** (TMOG e nativo x64, C++; analise em %TEMP%\opencode\tmog\
+decomp.txt 4.260 linhas, 9 funcoes decompiladas):
+1. **OpenProcess com direitos minimos**: 0x1010 (QUERY_LIMITED_INFORMATION|VM_READ)
+   com fallback 0x1000 — NUNCA 0x0400 (PROCESS_QUERY_INFORMATION). E' ISTO que faz
+   funcionar sem admin: QUERY_LIMITED da GetProcessTimes/GetProcessId/IOCounters/
+   MemoryInfo/FullProcessImageName para TODOS os processos. O kit usa
+   Process.GetProcesses() (.NET) que abre com direitos completos -> Access Denied
+   nos processos de sistema (KitTaskManagerWindow.xaml.cs:509).
+2. Enumeracao: CreateToolhelp32Snapshot + Process32FirstW/NextW com token de
+   cancelamento por iteracao e limite de 0x20000 entradas.
+3. Disco por processo: GetProcessIoCounters (nao PerformanceCounter por instancia).
+4. Memoria por processo: K32GetProcessMemoryInfo (cb=0x50).
+5. Memoria global: K32GetPerformanceInfo (cb=104) em vez de 6 PerformanceCounter.
+6. CPU total: GetSystemTimes; por nucleo: GetLogicalProcessorInformationEx.
+7. Frequencia: CallNtPowerInformation(ProcessorInformation) 24B/nucleo.
+8. % Processor Utility (metrica real do TM, normalizada por frequencia):
+   PDH PdhAddEnglishCounterW (sempre ingles, imune a pt-BR), query persistente.
+9. Rede: GetIfTable2/MIB_IF_ROW2 + FreeMibTable (sem instancias localizadas).
+10. GPU/temperatura: PDH \GPU Engine(*)\Utilization Percentage e \Thermal Zone
+    Information(*)\Temperature.
+11. Graceful degradation por processo com "overlay" de direitos (campo marca o que
+    veio de fonte limitada); SRUM/ESENT so para App History (NAO copiar).
+
+**Plano de adocao** (docs/TMOG_TASKMANAGER_ANALYSIS.md): novo
+KitTaskManager.NativeMetrics.cs (P/Invoke, padrao NativeDiskIo.cs):
+- Fase 1: Toolhelp + OpenProcess(0x1010->0x1000) + GetProcessTimes + K32GetProcessMemoryInfo
+  + GetProcessIoCounters -> substituir Process.GetProcesses() (maior impacto, sem admin).
+- Fase 2: GetSystemTimes + K32GetPerformanceInfo + GetIfTable2 (mata ~10 PerformanceCounter).
+- Fase 3: CallNtPowerInformation + PDH Utility/GPU.
+
+Artefatos: %TEMP%\opencode\tmog\ (TaskManager.exe.i64, decomp.txt, report.txt,
+tmog_analyze.py, tmog_decomp.py via idat.exe -S).
+
+### Sessao 14/09 (cont.) — Fase 1 TMOG implementada: NtQuerySystemInformation no KitTaskManager
+
+Pedido do usuario: validar os 3 pontos do Gemini sobre o plano TMOG e aplicar ao kit.
+Todos validos e implementados. Documentacao completa em
+**docs/TMOG_TASKMANAGER_ANALYSIS.md** (secao "Validacao dos pontos do Gemini").
+
+**Novos arquivos**:
+- `KitLugia.Core\TaskManager\NativeMetricsHelper.cs` (novo):
+  - `EnumerateProcesses()`: NtQuerySystemInformation(SystemProcessInformation) resolvida
+    DINAMICAMENTE via GetModuleHandleW+GetProcAddress (ponto Gemini #3; ANSI-only!),
+    fallback Toolhelp + OpenProcess(0x1010->0x1000) direitos minimos.
+  - `CpuDeltaTracker`: delta de CPU com memoria de estado por PID (ponto Gemini #1).
+  - `GetPidsWithVisibleWindows()`: EnumWindows 1 passada (substitui p.MainWindowHandle).
+  - Parse do SYSTEM_PROCESS_INFORMATION com bounds duros (AV do PtrToStringUni e
+    FATAL/nao-capturavel — validar ponteiro antes).
+- `ProcessIoHelper.SampleProcessIoFromTotals()`: IO rate a partir dos totais do
+  snapshot (elimina a 2a OpenProcess por PID).
+
+**GUI (KitTaskManagerWindow.RefreshAsync)**: caminho nativo primeiro (auto-desativa em
+falha -> fallback Process.GetProcesses inalterado), threads REAIS no lugar de "-",
+parentPid nativo, IO via totais do snapshot, CPU via tracker.
+
+**BUGS CORRIGIDOS na implementacao (armadilhas)**:
+1. NextEntryOffset e RELATIVO A ENTRADA ATUAL — baseAddr+next so funciona na entrada 0
+   e le lixo da 2a em diante (2 crashes AccessViolation/CLR fatal 0x80131506 antes do fix).
+2. UNICODE_STRING.Length e USHORT — lido como Int64 mistura MaximumLength e todos os
+   nomes saem vazios.
+3. GetProcAddress e ANSI-only — CharSet.Unicode retorna 0 silenciosamente.
+4. PtrToStringUni com ponteiro fora do snapshot = CLR fatal (0x80131506), try/catch NAO
+   pega — validar baseAddr<=buf && buf+len<=bufEnd antes.
+5. Layout do SYSTEM_PROCESS_INFORMATION (x64 26100): e o do winternl.h PUBLICADO
+   (hipotese SRCORE +48 estava ERRADA): nome@0x38 pid@0x50 ppid@0x58 handles@0x60(ULONG)
+   WS@0x90 Private@0xC8 IO@0xD0; stride NAO fixo (624-656 + threads*80) — usar next do
+   kernel; bound do walk = needed (bytes escritos), nao o alloc.
+
+**VALIDADO (runtime standalone %TEMP%\nttest + PowerShell cross-check)**: 330 processos
+em 6-8ms; WS/Private == Get-Process e IO == GetProcessIoCounters nos mesmos PIDs;
+Memory Compression (protegido, OpenProcess impossivel) com dados COMPLETOS — vantagem
+decisiva do caminho kernel; delta CPU OK. Build: 0 erros (Core+GUI).
+
+**A TESTAR (host, app real)**: abrir o gerenciador de tarefas do kit SEM admin ->
+processos de sistema devem mostrar CPU/RAM/Disco; coluna Threads com numeros; CPU%
+estabiliza apos o 2o refresh; comparar com o Task Manager do Windows.
+
+**Pendentes (Fase 2/3)**: GetSystemTimes + K32GetPerformanceInfo + GetIfTable2 (matar
+~10 PerformanceCounter); CallNtPowerInformation + PDH % Processor Utility/GPU.
+
+**Fix build (14/09)**: builds de verificacao com -p:OutputPath mal escapado no bash
+criaram pastas-junk "binDebugverify 2" DENTRO dos projetos com COPIAS dos fontes -> o
+glob do SDK compilava as copias (duplicando Program de FilterCommands.cs, que e script
+dev de codegen). Removidas as pastas; build real 0 erros. NAO usar -p:OutputPath em
+bash sem aspas corretas; para validar build sem tocar no binario rodando, preferir
+`dotnet build -p:OutputPath=...` citado ou compilar so o csproj do Core.
+
+### Sessao 14/09 (cont.) — TaskManager: paridade TMOG completa + fix dos icones
+
+1. **Icones sumiram**: caminho nativo setava `IconPath = path` incondicionalmente, mas o
+   loader incremental so processa `IconPath` VAZIO -> nenhuma linha nativa recebia icone.
+   Fix: `IconPath = iconNow != null ? path : ""` (marca resolvido) + linhas sem path mas
+   resolviveis pelo nome (System32) entram no lote do loader.
+2. **GPU por processo** (coluna mostrava "-"): `GpuMonitor.GetGpuUtilizationPerPid()` extrai
+   pid_NNNN das instancias `\GPU Engine(*)\Utilization Percentage` (soma clamp 100, igual TM);
+   wiring nos caminhos nativo e fallback (`GpuValue` tambem setado).
+3. **Header nativo TMOG** (KitTaskManager.Performance.cs): CPU = `% Processor Utility`
+   (PDH `\Processor Information(_Total)`, metrica real do TM, fallback GetSystemTimes),
+   RAM = K32GetPerformanceInfo + fallback GlobalMemoryStatusEx; NOVO no header XAML:
+   **Frequencia** (CallNtPowerInformation ProcessorInformation, media CurrentMhz) e
+   **Temperatura** (PDH Thermal Zone, K->C, "—" se sem sensor). Colunas Auto (5*+2 Auto).
+4. **BUG x64**: PERFORMANCE_INFORMATION com uint dava erro 24 (ERROR_BAD_LENGTH) — campos
+   sao SIZE_T (8B no x64, sizeof=104). Corrigido p/ UIntPtr. Quirk: GetProcAddress e
+   ANSI-only (CharSet.Unicode retorna 0 silenciosamente).
+5. **App History (SRUM/ESENT)**: decidido NAO implementar (lock de banco com o proprio
+   Windows; TMOG usa para App History, risco > beneficio).
+
+**Validado em runtime (host)**: utility 8-30% real, mem 42,8% == GMSE 43%, freq 3,50GHz,
+GPU por PID 17,9% com carga, 344 processos ~7ms. Build: 0 erros (Core+GUI).
+Docs: docs/TMOG_TASKMANAGER_ANALYSIS.md (secao Fase 2/3).
+
+### Sessao 14/09 (cont.) — TaskManager: auditoria anti-crash do caminho de abertura
+
+Relato do usuario: versoes antigas quebravam o KIT INTEIRO ao abrir o gerenciador
+(necessario force-stop do processo). Auditoria completa do caminho de abertura e fixes:
+
+1. **Classe fatal identificada**: excecoes nao-capturaveis — AccessViolationException/
+   CLR 0x80131506 em interop nativo (nem DispatcherUnhandledException pega) e excecao
+   dentro de callback nativo (EnumWindows = fail-fast). Handlers globais do App.xaml.cs
+   (UI contained / UnhandledException / UnobservedTaskException) so cobrem excecoes gerenciadas.
+
+2. **Parse NtQSI reescrito AV-PROOF** (NativeMetricsHelper): kernel buffer agora e COPIADO
+   para byte[] gerenciado (Marshal.Copy) e o parse roda 100% em array com helpers
+   Read*/EnsureRange bounds-checked — leitura fora dos limites lanca
+   IndexOutOfRangeException CAPTURAVEL (entry loop em try/catch, devolve o que parseou),
+   NUNCA AccessViolation fatal. Buffer nativo vive o minimo (freed no finally).
+   VALIDADO: 374 processos, 374 nomeados, 4-7ms, explorer 229MB, Memory Compression 1,5GB.
+
+3. **EnumWindows callback blindado**: corpo todo em try/catch (excecao em callback nativo
+   e fail-fast — agora o corpo nao tem como lancar).
+
+4. **Abertura defensiva (MainWindow BtnKitTaskManager_Click)**: try/catch externo +
+   `DiscardBrokenInstance()` (novo: limpa singleton zumbi para o proximo clique tentar
+   limpo) + ShowError — MainWindow SEMPRE sobrevive a falha de abertura.
+
+5. **OpenOrActivate**: falha de ctor loga e re-lanca (limpa instancia), sem singleton zumbi.
+
+6. **Closing 100% defensivo**: teardown inteiro em try/catch com sub-guards (excecao no
+   close deixava janela zumbi com timers rodando = congelamento/force-stop).
+
+7. **Ja conformes (auditado, sem mudanca)**: ticks de refresh/graph/search com try/catch
+   + single-flight gates; Kill/KillTree protegidos; icones com SEM_FAILCRITICALERRORS +
+   filtro UNC/drive ausente + SHGetFileInfo serializado; .Result so apos WhenAll; Loaded
+   fire-and-forget.
+
+Build: 0 erros (Core + GUI). Docs: docs/TMOG_TASKMANAGER_ANALYSIS.md.
+
+### Sessao 14/09 (cont.) — TaskManager: paridade TMOG das telas (screenshots do usuario)
+
+Referencia: 12 screenshots do TMOG (Processes colunas ricas, Users, CPU Power em W).
+Implementado no gerenciador do kit:
+
+1. **Novos campos no snapshot NtQSI** (ProcMetrics): PeakWorkingSetBytes (@0x88,
+   PeakWorkingSetSize) e PageFaults (@0x80, PageFaultCount) — zero custo extra, mesmos
+   dados ja lidos do kernel.
+
+2. **User name por processo**: WTSEnumerateProcessesW (wtsapi32) + SID ->
+   NTAccount (cache 15s). QUIRKS: struct WTS_PROCESS_INFOW tem SO 4 membros (nao 5) e
+   o param Version TEM que ser 1 (0 = erro 87). ShortenUserName (DOMINIO\user -> user);
+   GetActiveUserNames filtra SYSTEM/servicos (en+pt-BR), DWM-*/UMFD-*, SID puro e GUID
+   (validei: activeUsers=Lugia). Coluna "Usuario" no grid + fallback .NET reusa o cache.
+
+3. **CPU Power (W)** — paridade "CPU Power" do TMOG: provider RAPL do Windows expoe
+   ENERGIA CUMULATIVA em nJ ("Medidor de Energia(*)\Energia"; PKG+PP0 == _Total
+   confirmado). Watts = delta(energia)/delta(t). Pegadinhas: PdhAddEnglishCounterW NAO
+   casa nome localizado ("Medidor de Energia" no pt-BR) e wildcard nao expande em
+   ingles -> candidatos (pt-BR + en) + PdhExpandWildCardPathW + PdhAddCounterW no
+   caminho expandido (novo helper ExpandFirst). VALIDADO no host: 28,8-31,3 W idle
+   (TMOG: 55-73 W sob carga — mesma escala). Header ganhou coluna "Potencia"
+   (heat color 45/80 W). Fallback "—" em desktops sem RAPL.
+
+4. **Colunas novas no grid de processos** (todas ordenaveis): Usuario, Pico mem.,
+   Tempo CPU (hh:mm:ss de kernel+user), Page faults. Ordenacao via MetricOf(prop)
+   generico (case unico para PeakMemValue/CpuTimeSec/PageFaultsValue/Disk/Net/Gpu).
+
+5. **Aba USUARIOS** (BtnTabUsers/TabUsers): agregados por usuario (processos, memoria
+   somada do snapshot, CPU placeholder) — UserRow + LoadUsersSafeAsync (single-flight),
+   DgUsers com colunas Usuario/Status/CPU/Memoria/Processos.
+
+6. **Temperatura fixada no caminho**: Thermal Zone usava AddEnglish com caminho
+   expandido localizado -> nunca adicionava; agora PdhAddCounterW no caminho expandido
+   (mesma correcao do Power). No host segue null (sem sensor ACPI exposto) -> "—".
+
+Build: 0 erros (Core + GUI). Pendente de teste visual no app: colunas novas, aba
+Usuarios e Potencia no header.
+
+### Sessao 14/09 (cont.) - TaskManager: multi-selecao de processos (paridade TMOG "mass end")
+
+Pedido: "poder selecionar multiplos processos para realizar acoes" (print do TMOG Pro
+mostrando ctrl/shift-click com "End 6 Tasks" no menu).
+
+1. Grid `SelectionMode="Extended"` (ctrl/shift-click nativo WPF) — highlight de multi
+   ja coberto pelo trigger `IsSelected` do RowStyle.
+2. `SelectedRows` (helper): todas as linhas selecionadas EXCETO filhos (`IsChild`) —
+   pai cobre a arvore, kill em massa nao duplica. Fallback single `SelectedRow`.
+3. Acoes em massa via `SelectedRows`: Kill (com Force Stop fallback), KillTree,
+   Suspend/Resume (NtSuspend/NtResume em lote), EcoQoS (SetProcessInformation em lote,
+   antes era single), Prioridade (menu aplica direto via Process.PriorityClass em lote —
+   ANTES so setava o ComboBox do painel single, bug latente).
+4. Menu de contexto com headers dinamicos e contagem ("Finalizar 6 tarefas",
+   "Suspender 6", "Eficiencia EcoQoS (6)", "Prioridade para 6") via
+   `UpdateMultiSelectionUi` no SelectionChanged; itens multi colapsados quando N<=1.
+5. Preservacao da MULTI-selecao no refresh automatico (antes: so o primeiro PID):
+   captura PIDs + GroupKeys de TODOS os selecionados antes do diff, restaura todos por
+   PID ou GroupKey apos a reconstrucao. Sem selecao -> limpa painel de detalhes.
+6. Status bar com resultado agregado ("❌ 5/6 finalizados (1 com acesso negado)").
+
+Build: 0 erros / 146 warnings (baseline nullable pre-existente).
+
+### Sessao 14/09 (cont.) - TaskManager: GPU por processo REESCRITA (tecnica TMOG real)
+
+Sintoma: coluna GPU so mostrava "—" no kit; TMOG mostra "0.0%"/"0.3%"/"Unavail"
+(exited). IDA Pro (strings do binario TMOG) revelou a tecnica REAL:
+- "DXCore adapter enumeration with GPU Engine counters ... matched NVIDIA hardware
+  prefers NVML" + import de PdhGetFormattedCounterArrayW (API de ARRAY do PDH).
+
+Correcao (GpuMonitor.cs reescrito):
+1. UM contador curinga `\GPU Engine(*)\Utilization Percentage` via
+   PdhAddEnglishCounterW (resolve nome localizado internamente — pt-BR OK) e leitura
+   COMPLETA com PdhGetFormattedCounterArrayW: todas as 567 instancias em UMA chamada.
+   ANTES: 567 handles individuais (1 por engine) + reexpand de 30s + remocao/readd.
+   Depois de um reexpand, handles antigos ficavam sem dados = dict vazio = coluna "—".
+2. Array inclui engines OCIOSOS (0,0%) — dict por PID tem ~28 processos com engine
+   atribuido (nao so os ativos). UI mostra "0,3%" (1 decimal, como TMOG) para
+   <10% e "0,0%" para engine presente ocioso; "—" so para SEM engine (exited).
+3. Total = MAIOR engine individual (comportamento do Task Manager), nao soma.
+4. Validacao empirica (host, pt-BR): 567 instancias/1 chamada; pids=28, ativos 2-4
+   variando com carga, total 3,6->12,7% de pico; concorrente-safe; PIDs corretos.
+5. Quirks documentados: PDH_FMT_COUNTERVALUE_ITEM_W x64 = stride 24 (LPWSTR @0,
+   CStatus @8, double @16); probe retorna PDH_MORE_DATA (0x800007D2) com tamanho
+   86446; nomes apontam para dentro do proprio buffer (validar limites antes de
+   PtrToStringUni).
+Build: 0 erros (Core + GUI).
+
+### Sessao 17/09 - TaskManager: aba RESUMO (paridade Summary do TMOG) + CONEXOES + detalhes avancados
+
+Pedido: "melhore o gerenciador de tarefas do kit para ficar tao bom quanto o tmog"
+(user rodou o TMOG ao lado e mandou screenshots das 5 abas dele).
+
+**NOVO ARQUIVO `KitLugia.GUI\Windows\TaskManager\KitTaskManager.Summary.cs`** (partial):
+1. **Aba RESUMO = tela de ABERTURA** da janela (TabSummary Visibility=Visible no XAML,
+   Processos ficou Collapsed; sidebar ganhou BtnTabSummary). Layout 3 colunas:
+   - VITAIS (CPU/Clock/Temp/GPU/Potencia com barras) — alimenta do MESMO tick de 1s
+     dos graficos (UpdatePerformanceGraphs expoe _lastCpuPct/_lastMemPct/_lastDiskReadMBps/
+     _lastDiskWriteMBps/_lastFreqMhz/_lastTempC/_lastPowerW). RAZAO: PerformanceCounter
+     e DESTRUTIVO — NextValue() 2x no mesmo tick = 0 na segunda leitura, por isso o
+     Resumo le o CACHE do tick e nao re-amostra.
+   - Grafico CPU MULTI-SERIE (DrawMultiSeriesChart novo): uso (verde, com fill) +
+     kernel (vermelho) + temperatura (laranja, se sensor) no mesmo canvas + grade de
+     quartos. Barras por NUCLEO (paridade "CPU Expanded" do TMOG): NtQSI class 8
+     (SystemProcessorPerformanceInformation, stride 48B/nucleo, Idle/Kernel/User
+     acumulados) — 1 syscall para os 20 nucleos, sem PDH. Estado proprio _prevCore*
+     com guard dMs<200 (amostra duplicada mantem anterior).
+   - Memoria detalhada: K32GetPerformanceInfo -> Used/Available/Commit/Peak/Cached/
+     PoolPaged/PoolNonPaged/Handles/Threads/Processes.
+   - TOP processos por CPU (14 linhas, INPC TopProcRow, merge in-place sem piscar;
+     duplo clique abre o processo na aba Processos via ScrollIntoView).
+   - Faixa inferior: Rede/Disco/GPU/Energia com sparklines.
+   - Botao Copiar (resumo textual) + resmon + intervalo sincronizado com a aba Processos.
+2. **Aba CONEXOES** (BtnTabConnections/TabConnections): TCP v4+v6 + UDP v4+v6 por PID
+   (GetExtendedTcp/UdpTable OWNER_PID), filtro por processo/PID/endereco/porta,
+   "apenas conexoes ativas", "agrupar por processo" (CollectionViewSource grouping com
+   IsVirtualizingWhenGrouping=True). Refresh a cada 2 ticks (~2s) so quando visivel.
+3. **Detalhes avancados do processo** (painel direito, card "Detalhes avancados"):
+   Processo pai, Sessao (ProcessIdToSessionId), Arquitetura (IsWow64Process2, fallback
+   IsWow64Process), Prioridade base (GetPriorityClass aceita QUERY_LIMITED), Grupo,
+   Commit privado, Pico mem., Tempo kernel/usuario separados, E/S lida/escrita/ops
+   ACUMULADAS (IO_COUNTERS do NtQSI), Linha de comando (NtQueryInformationProcess
+   class 60 = ProcessCommandLineInformation, 2 chamadas; UNICODE_STRING.Length e USHORT,
+   validar ponteiro contra [buf, buf+used) ANTES de PtrToStringUni — ponteiro ruim e
+   CLR fatal 0x80131506). ProcessRow ganhou CommitMB/KernelTimeSec/UserTimeSec/
+   IoReadTotal/IoWriteTotal/IoOpsTotal (nativo + fallback .NET).
+
+**`KitLugia.Core\TaskManager\NativeMetricsHelper.cs` — novas APIs (todas sem admin)**:
+- GetPerCoreCpuPercent() (class 8), GetSystemKernelPercent() (GetSystemTimes com
+  ESTADO PROPRIO _sysK* — compartilhar o estado do CPU total fazia o 2o metodo do
+  tick receber dMs<200 e devolver valor obsoleto PARA SEMPRE), GetMemoryDetails()
+  (K32GetPerformanceInfo), GetProcessDetails(pid) (sessao/arch/cmdline/prio),
+  GetNetworkRates() (GetIfTable2).
+- **BUG 1 (PERFORMANCE_INFORMATION)**: a struct real tem PageSize ENTRE KernelNonPaged
+  e HandleCount, e HandleCount/ProcessCount/ThreadCount sao DWORD (nao SIZE_T).
+  Sem isso: handles=4096 (lia o pagesize) e processos=lixo; sizeof so fecha em 104
+  com PageSize + 3 DWORDs. Validei empiricamente: handles=223k, threads=8.4k, procs=400.
+- **BUG 2 (MIB_IF_ROW2)**: marshal de struct NAO bate com o layout C (ByValTStr/
+  ByValArray ganham padding proprio do CLR) — Mtu lia 6 e type 0 a partir da linha
+  17. SOLUCAO: leitura por OFFSETS BRUTOS validados com dump hex (Alias@28, Desc@542,
+  Mtu@1124, Type@1128, OperStatus@1156, LinkSpeed@1200, InOctets@1208, OutOctets@1280,
+  stride 1352, Table[] comeca em +8). Auto-validacao em runtime (type 1-300, mtu
+  500-65535 QUANDO != 0 — mtu=0 e legitimo em NOT_PRESENT, link 1kHz-1Tbps): qualquer
+  valor implausivel = struct deslocada => Valid=false (nunca numero inventado).
+  LastNetDiag expoe o motivo (suporte). Filtro anti-inflacao: camadas NDIS "QoS"/
+  "WFP" do MESMO hardware repetem os contadores do adaptador base (~3x inflava) —
+  sao excluidas da soma. Loopback e interface nao-UP tambem.
+- Rede validada no host: 39 interfaces (27 com MTU), 7 ativas pos-filtro,
+  "Intel(R) Ethernet Connection (22) I219-V" como primaria, taxa real ~10-16 KB/s.
+
+**`KitLugia.Core\NetworkTrafficMonitor.cs` — GetEndpoints()** (aba Conexoes):
+- GetExtendedUdpTable (UDP_TABLE_OWNER_PID=1) + structs MIB_UDPROW/UDP6ROW_OWNER_PID.
+- Porta vem em ordem de rede nos 16 bits baixos: PortOf = swap manual (BitConverter
+  dependeria de endianess). TCP state 2=LISTEN => Remote="" e Listening=true;
+  UDP sempre Listening ("*:*", estado "—"). TcpStateName em pt-BR (1-12).
+
+**XAML (KitTaskManagerWindow.xaml)**: 2 botoes novos na sidebar (Resumo com icone
+home, Conexoes com icone de troca), TabSummary (3 colunas + faixa inferior UniformGrid),
+TabConnections (DataGrid + GroupStyle + filtro), card "Detalhes avancados" no painel
+de processo (12 campos + linha de comando em bloco mono).
+
+Smoke test: app abriu (PID 2196, Responding=True), sem excecao no log; processo de
+teste encerrado depois (o kit resiste a taskkill externo — esperado, protecao propria).
+Build: 0 erros, 0 warnings novos nos arquivos tocados (146 baseline).
+
+**A TESTAR (visual, host)**: abrir gerenciador do kit -> Resumo como tela de abertura
+(nucleos animando, top CPU listando, rede/disco com taxa real) -> clicar Conexoes
+(318+ endpoints TCP/UDP com nomes de processo) -> selecionar processo e conferir
+Detalhes avancados (linha de comando de processos próprios, sessao=1, arch=x64).
+
+### Sessao 18/09 - TaskManager: aba LATENCIA (estilo LatencyMon, SEM driver) + detalhes do processo completos
+
+Pedido do usuario (lado a lado com o LatencyMon 7.31 instalado em
+"C:\Program Files\LatencyMon"): "faltam algumas informacoes e coloque mais um botao
+sobre as coisas que o LatencyMon faz... crie uma aba so vendo os travamentos do
+sistema, onde o kit escuta o que o sistema faz para reportar exatamente o que/como/
+quando travou o audio ou o sistema, de forma facil para o usuario e com logs para
+mandar para IAs".
+
+**Core - `KitLugia.Core\TaskManager\LatencyMonitor.cs` (novo, ~1040 linhas)**
+4 fontes nativas combinadas, sem driver proprio (ao contrario do LatencyMon, que
+carrega o `rspLLL64.sys`):
+1. **DPC/ISR por nucleo** - NtQSI classe 8 (1 syscall p/ os 20 nucleos). ATENCAO:
+   os valores sao QUANTIZADOS pelo tick do relogio do sistema (multiplos de 15,625 ms)
+   - e a mesma limitacao do LatencyMon; o tooltip da UI explica isso.
+2. **Sessao ETW do "NT Kernel Logger"** (EVENT_TRACE_FLAG_DPC|INTERRUPT, grupo
+   PerfInfo ce1dbfb4-...): cada evento traz o ENDERECO da rotina -> casamos com o
+   modulo do kernel (RTL_PROCESS_MODULES) e acumulamos por .sys. Exige admin; se
+   outro programa (LatencyMon) ja tem a sessao, NAO matamos a sessao alheia
+   (colisao e reportada como EtwStatus).
+3. **Hard page faults por processo** (classe 5, HardFaultsCount) com taxa/s;
+4. **Janelas travadas** (IsHungAppWindow: inicio/fim/duracao/titulo) + **jitter do
+   proprio loop** (pedimos ~1s de CPU; >2500ms = o sistema INTEIRO parou).
+- `DescribeDriver`: nome amigavel a mao para ~20 drivers conhecidos; para o resto,
+  FileDescription+Company do PROPRIO .sys em System32\drivers (FileVersionInfo),
+  cacheado e resolvido FORA do lock do ETW (I/O dentro do lock travava o callback).
+- `BuildConclusion()` (0=ok/1=atencao/2=critico, texto em pt-BR simples) e
+  `BuildAiReport()` (texto completo: conclusao + drivers + nucleos + processos + 60
+  eventos + metricas) para o botao "Copiar relatorio (IA)".
+- Snapshot ganhou `PerCore` (DPC/ISR/pico/totais por nucleo), `TopHardFaults`
+  (60 processos), `LastTickMs/MaxTickMs/JitterEvents`, `MaxDpcUsSession/MaxIsrUsSession`.
+
+**Core - `NativeMetricsHelper.GetProcessDetails`**: ganhou contadores lidos DIRETO do
+processo selecionado com o MESMO direito minimo (QUERY_LIMITED_INFORMATION):
+K32GetProcessMemoryInfo (PrivateUsage=commit, PeakWorkingSetSize, PageFaultCount),
+GetProcessTimes (kernel/usuario separados), GetProcessIoCounters (3 contagens + 3
+bytes), GetProcessHandleCount, GetGuiResources (GDI/USER) e TokenElevation (elevado).
+Motivo: os campos Commit/Pico/Tempo kernel/Tempo usuario/E-S vinham SO do snapshot da
+lista - quando o refresh caia no fallback .NET o painel ficava cheio de "—" (o print
+do usuario). Processo protegido (PID 4) devolve CountersKnown=false e a UI mantem "—".
+BONUS corrigido: IO_COUNTERS tem ordem interna ReadOps/WriteOps/OtherOps/ReadBytes/
+WriteBytes/OtherBytes - o codigo lia 0xE0 (OtherOps) como "E/S lida" e 0xE8 como
+"E/S escrita".
+
+**GUI** (`KitLugia.GUI\Windows\TaskManager\`):
+- `KitTaskManager.Latency.cs` (novo partial, ~500 linhas): timer de 1s, 4 colecoes
+  ObservableCollection com linhas INPC atualizadas in-place (sem piscar/selecao
+  perdida), 4 visoes (Eventos/Drivers/Nucleos/Processos), botoes INICIAR-PARAR,
+  Limpar, Copiar relatorio (IA) e "Admin" (relanca o Kit elevado via UAC - sem admin
+  o Windows nao entrega o nome do .sys).
+- `KitTaskManagerWindow.xaml`: botao "Latencia" na sidebar + TabLatency (faixa de
+  6 metricas, caixa de conclusao colorida, 4 DataGrids, coluna direita com medidores
+  de barra + explicacao didatica "O que o Kit esta escutando"/"Como ler") e o estilo
+  reutilizavel `TmGrid` (DataGrid escuro). Tabela vazia NUNCA fica muda: o
+  `LatEmptyHint` explica por que (ex.: "sem admin o Windows so entrega o nome do
+  driver para programas elevados").
+- `KitTaskManagerWindow.xaml.cs`: `SwitchTab` ganhou o case "Latency" (+ esconder/reset);
+  card "Detalhes avancados" ganhou 3 linhas novas (Falhas de pag., GDI / USER, Elevado)
+  e os 7 campos antigos agora sao refinados pelos contadores diretos ("…" -> valor,
+  ou "—" so quando realmente nao ha leitura). `FormatCpuTime` mostra "<n> ms" abaixo
+  de 1s ("00:00:00" parecia bug).
+
+**Decisoes/limites registrados**: sem driver de kernel o Kit NAO mede "interrupt to
+process latency" como o LatencyMon; o equivalente honesto e o jitter do proprio
+monitor ("SISTEMA TRAVOU"), rotulado como aproximacao no relatorio - nunca um numero
+inventado. DPC/ISR por driver so aparece com admin (ETW).
+
+**Verificacao (harness WPF temporario, ja removido)**: instanciou o
+KitTaskManagerWindow de verdade e chamou SwitchTab/BtnLatToggle/BtnLatClear por
+reflexao. Resultados reais: janela criada (XAML da aba parseado), TabLatency=Visible,
+MONITORANDO->PARADO, 20 nucleos (ex.: CPU1 dpc=3,12% pico 62,50ms isr=4,68% 3016
+interrupcoes), 60 processos (Memory Compression 317k falhas no disco, 2,0 GB WS),
+0 drivers (sem admin - esperado), eventos com explicacao, relatorio de 5.380
+caracteres/69 linhas/7 secoes, limpou tudo, e o painel de detalhes: commit=54,4 MB,
+pico=107,5 MB, E/S lida=1,1 MB, E/S escrita=3 KB, 8.029 ops, 36.794 falhas de pag.,
+GDI/USER=43/15, Elevado=Nao, sessao=1, arch=x64, prioridade=8 (Normal).
+Build: 0 erros, 0 warnings nos arquivos da sessao; Encoding UTF-8+BOM e CRLF em 100%
+das linhas dos 2 arquivos novos (regra #3 do AGENTS).
+
+**A TESTAR (visual, host)**: abrir o gerenciador -> aba Latencia -> INICIAR e deixar
+rodar; conferir a caixa de conclusao, os medidores, os 4 botoes de visao e o tooltip
+de uma linha. Depois rodar o Kit como admin (botao Admin) para a lista de Drivers
+encher e o nome do .sys aparecer em "Maior DPC". Por fim, "Copiar relatorio (IA)" e
+colar num chat.
+
+### Sessao 18/09 - Paridade visual com o TMOG 60fps + efeitos + RAM + Usuarios + Latencia honesta
+
+Pedido do usuario (comparando lado a lado com o "Task Manager TMOG"): 60 frames por
+segundo, verde que esmace em processo novo, vermelho em processo que fecha, icones
+nos apps, painel de uso de RAM, hover com atraso mostrando "o que causou quem causou
+e porque" nos picos, consertar a mensagem de admin na aba Drivers e consertar a aba
+de Usuarios.
+
+**1. MOTOR DE RENDER 60 fps (novo: `KitTaskManager.Render.cs`)**
+O gargalo real: a enumeracao nativa de ~400 processos custa ~100 ms (1x/s no maximo).
+O TMOG parece liso porque INTERPOLA. Entao:
+- `CompositionTarget.Rendering` = 1 chamada por quadro do monitor; o handler sai na
+  primeira linha quando a aba nao e Processos/Resumo (custo zero nas outras abas).
+- Easing exponencial `k = 1 - exp(-dt/0.09)` (~95% do caminho em 0,27 s): CPU, RAM,
+  Disco, Rede e GPU caminham ate o valor da ultima amostra em vez de pular.
+- `UpdateFrom` agora grava CpuTarget/RamTarget... em vez de sobrescrever o valor
+  exibido; texto e barra sao recalculados no quadro.
+- Rotulo `TxtRenderFps` no rodape da lista mostra os fps medidos.
+- Medido no harness: **95,8 fps** (segue a taxa da tela) e 15 valores distintos de
+  CpuValue em 600 ms (prova da interpolacao, ex.: 5,45 -> 5,38 -> 5,26 -> 5,17 ...).
+
+**2. EFEITOS verde (novo) / vermelho (fechou)**
+- Overlay `DGR_Highlight` no template do DataGridRow + badge ✖ para a linha fantasma.
+- **ARMADILHA RESOLVIDA**: `SolidColorBrush` e Freezable com afinidade de thread e as
+  linhas nascem numa thread de trabalho -> criar o brush no construtor dava
+  "E necessario criar DependencySource no mesmo thread que o DependencyObject"
+  (XamlParseException ao montar o template). O brush agora e LAZY
+  (`_highlightBrush ??= ...`), criado na thread da UI.
+- Fade animado mexendo em `brush.Opacity` (Freezable re-renderiza SOZINHO, sem
+  PropertyChanged por quadro) = centenas de linhas a 60 fps sem custo de binding.
+- Processo que fecha vira FANTASMA (IsGhost) no lugar, vermelho esmaecendo 2,5 s, e o
+  `ReapGhostRows` remove no fim do fade. Medido: 1 fantasma com opacidade 0,56 e
+  depois 0 (removido); verde maximo 0,54 ao aparecer processo novo.
+
+**3. ABA USUARIOS (estava quebrada: CPU sempre 0%)**
+- `CpuDeltaTracker` proprio (`_usersCpuTracker`) soma CPU real por processo (antes a
+  coluna ficava 0% porque so WorkingSet era usado).
+- `UserRow` ganhou `Processes` (lista de processos do usuario) + IsExpanded; o grid usa
+  RowDetails + `UserRowStyle` com `DetailsVisibility` ligado ao IsExpanded, setinha ▶/▼
+  e heatmap na celula de CPU.
+- Refresh a cada 1 s JUNTO com o refresh timer (so quando a aba esta visivel); o estado
+  expandido e preservado.
+- Medido: Outros 7,0% / 6,5 GB / 179 procs, Lugia 6,2% / 9,9 GB / 207 procs, SYSTEM
+  0,4% / 24 MB / 1 proc; expandir -> DetailsVisibility=Visible, icone=▼.
+
+**4. PAINEL DE RAM (Resumo) - paridade com o "Memory Utilization" do TMOG**
+- Grafico de 86 px, percentual grande (roxo), barra de composicao EM USO | EM CACHE |
+  LIVRE (GridLength com peso via `SetStarWidth`) e linhas Disponivel / Em cache / Swap /
+  Comprometida / Pools / handles-threads-processos.
+- **Swap medido DE VERDADE**: `NativeMetricsHelper.GetPageFileUsageNonBlocking()` usa WMI
+  `Win32_PageFileUsage` (CurrentUsage/AllocatedBaseSize/PeakUsage) cacheado 10 s e
+  consultado em BACKGROUND (a UI nunca espera). Motivo: a primeira versao ESTIMAVA por
+  subtracao (commit - RAM em uso) e mostrava 20,0 GB(!) de swap; o valor real e
+  ~3,0 GB. Se o WMI ainda nao respondeu, a linha mostra a medida honesta equivalente
+  ("Alem da RAM: X GB comprometidos (medindo o swap...)") em vez de inventar numero.
+- Tooltip do grafico mudou com o estado (tranquilo / alto / quase cheia) explicando o
+  que acontece com o disco quando a RAM aperta.
+
+**5. ICONES no TOP PROCESSOS POR CPU (Resumo)**
+- `TopProcRow.Icon` (ImageSource) + coluna "Nome" virou template com `Image` 16x16
+  (`IconVisibility` esconde quando o icone ainda nao carregou) e ToolTip com o nome
+  completo. Medido: 9 de 14 linhas com icone na primeira amostra (o resto chega depois,
+  pois o cache de icones carrega em background).
+
+**6. BALOES DE INFORMACAO na aba Latencia (hover com atraso)**
+- Estilo de ToolTip igual ao das paginas Tweaks/GameBoost (fundo #1A1A1A, borda dourada,
+  fonte 12, MaxWidth 520) + `InfoTipWrap` (ContentTemplate com TextWrapping) aplicado
+  como recurso da propria aba (nao afeta baloes de conteudo rico de outras telas).
+- `DataGridRow` implicito da TabLatency: `ToolTip="{Binding Tooltip}"`,
+  InitialShowDelay=900 ms, ShowDuration=60 s -> o balao so aparece se voce PARAR o mouse.
+- Conteudo reescrito com secoes: `QUEM / ONDE`, `O QUE ACONTECEU`, `O QUE FAZER`,
+  `DETALHE TECNICO (para copiar e mandar a uma IA)`. O "quem causou" sai do titulo do
+  evento (`EventCulprit`) e a recomendacao por tipo (`EventAdvice`: Memoria / DPC-ISR /
+  Janela / Sistema).
+- Os 6 indicadores de pico (TEMPO, DPC 1 min, MAIOR DPC, MAIOR ISR, PAGINACAO, SISTEMA
+  TRAVOU) ganharam balao DINAMICO via `SetLatTip` (valor atual + por que importa + o que
+  fazer), com atraso de 700 ms. Medido: balao de 312 chars no MAIOR DPC e evento com as
+  3 secoes corretas.
+
+**7. ABA DRIVERS: "ja sou admin e pede admin" - CAUSA RAIZ (bancada, 4 execucoes elevadas)**
+- Sessao certa: `EVENT_TRACE_SYSTEM_LOGGER_MODE` (evntrace.h: "Receive events from
+  SystemTraceProvider"), EnableFlags=0x60 (DPC|ISR), sessao criada com sucesso.
+- MAS `EnableTrace`/`EnableTraceEx2` no SystemTraceControlGuid devolvem
+  **ERROR_ACCESS_DENIED (0x5)** mesmo com o processo ELEVADO: habilitar
+  `SeSystemProfilePrivilege` (novo `EnableKernelTracePrivileges`) passou a reportar
+  `SeSystemProfilePrivilege=OK SeDebugPrivilege=OK` e o erro CONTINUOU 0x5, com
+  `buffers=40 livres=39 escritos=0` (o kernel nao gera um unico evento).
+- Conclusao: desde o Windows 8/10 os eventos de DPC/ISR do provedor de sistema so sao
+  entregues a uma sessao criada por um DRIVER de kernel. E exatamente para isso que o
+  LatencyMon instala o `rspLLL64.sys`. O Kit NAO instala driver de kernel (decisao de
+  seguranca) -> nao e falta de permissao, e limite do Windows.
+- Correcao (GUI): `Snapshot.EtwProviderDeniedByWindows` + `EtwPrivilegeStatus` no Core;
+  a aba Drivers agora explica o motivo real (com os privilegios que foram habilitados),
+  diz o que se perde (so o nome do .sys) e o que se mantem (DPC/ISR por nucleo, picos,
+  tempos maximos, paginacao por processo, janelas travadas). O rotulo do topo deixou de
+  dizer "sem admin". Nada de pedir admin de novo quando ja somos admin.
+
+**Arquivos**: `KitLugia.GUI/Windows/TaskManager/KitTaskManager.Render.cs` (novo),
+`KitTaskManagerWindow.xaml`/`.xaml.cs` (templates, Users, fps, tooltips, ghost/green),
+`KitTaskManager.Summary.cs` (RAM + icones + SetStarWidth + TopProcRow.Icon),
+`KitTaskManager.Latency.cs` (EventCulprit/EventAdvice/SetLatTip + mensagens),
+`KitLugia.Core/TaskManager/LatencyMonitor.cs` (privilegios + flag de negacao),
+`KitLugia.Core/TaskManager/NativeMetricsHelper.cs` (PageFileUsage).
+
+**Verificacao**: build `--no-incremental` 0 erros; harness WPF temporario (removido)
+instanciou a janela de verdade e mediu tudo acima com dados reais; UTF-8+BOM e CRLF em
+100% dos arquivos tocados; temporarios `.tmp-*` removidos.
+
+**A TESTAR (visual, host)**: FECHAR o app antes de compilar (DLL travada) -> abrir o
+Gerenciador -> Processos (ver as barras deslizando e o rotulo de fps), abrir/fechar um
+programa e ver o verde/vermelho, aba Usuarios (setinha dos processos), Resumo (painel de
+RAM + icones no TOP CPU) e Latencia (parar o mouse numa linha/indicador para ler o balao).
+
+### Sessao 18/09 (noite) - 3 bugs do relatorio do usuario: crash ToDictionary + max DPC absurdo + ETW orfa
+
+Relatorio do usuario trouxe stack trace real (3x `ArgumentException: smartscreen.exe|
+Processos do Windows`) e relatorio IA com "max 3265/3781ms" (fisicamente impossivel p/ 1
+rotina) e sessao ETW "ATIVA" que entregou 0 eventos PerfInfo em 9 minutos.
+
+1. **CRASH `ToDictionary` (linha 1548) - CAUSA RAIZ**: o fantasma (processo morto) fica
+   na lista com a MESMA GroupKey (`Name|Group`). O `smartscreen.exe` morre/renasce a cada
+   prompt UAC: morre -> vira fantasma -> renasce -> `UpdateFrom` nao aplica (guard
+   `!ex.IsGhost`) -> linha nova ADICIONADA com a mesma chave -> refresh seguinte
+   `_groupedLive.ToDictionary(r => r.GroupKey)` explode EM LOOP (exception repete a cada
+   segundo). CORRECAO:
+   - `ReviveGhost(ghost, fresh)` (KitTaskManager.Render.cs): fantasma volta a ser a linha
+     viva (IsGhost=false + UpdateFrom + brilho verde) - sem duplicar chave, exatamente o
+     comportamento do TMOG.
+   - `ToDictionary` -> `GroupBy(...).ToDictionary(g => g.Key, g => g.First())` (defesa).
+   - indexMap so adiciona a 1a ocorrencia; dedupe de seguranca remove duplicatas legadas
+     de sessoes anteriores a correcao (roda a cada refresh, ignora IsChild).
+2. **MAX DPC/ISR ABSURDO**: o delta da janela que ATRAVESSOU um stall (varredura AV, swap)
+   acumula o tempo de MUITAS rotinas (2906-3781ms) - nao e UMA execucao. CORRECAO: teto
+   fisico `CeilingUs = 250_000` (250ms) em LatencyMonitor.LoopAsync: deltas acima sao
+   DESCARTADOS do pico (marcam `CoreStats.StallFlag=true`); GUI mostra "n/a" ou
+   ">250 ms (janela c/ stall)" + nota no tooltip; relatorio IA idem. Validado em runtime:
+   pior pico real = 125ms (antes 3781ms).
+3. **SESSAO ETW ORFA**: `eventosPerdidos=11489469` IGUAL em relatorios com 8min de
+   diferenca + `livres=40/40` = sessao parada/orfa de uma execucao ANTERIOR do proprio Kit
+   (StartTrace OK + EnableTrace negado -> sessao viva sem provedor para sempre; "NT Kernel
+   Logger" e unico por boot). CORRECOES:
+   - Quando o EnableTrace falha apos o StartTrace, o Kit agora PARA a propria sessao na
+     hora (nao fabrica mais orfas que bloqueiam LatencyMon/xperf ate o reboot).
+   - WATCHDOG no LoopAsync: sessao ativa com 0 eventos PerfInfo apos 10s = orfa -> para a
+     sessao PELO NOME (ControlTraceW(0, nome, ..., STOP); handle local e 0 no caminho
+     "anexada") e recria (1 tentativa por Start). Em builds onde o provedor funciona, a
+     tabela Drivers enche de vez.
+   - GUI honesta: status "⚠ sessão sem eventos (órfã?) — recriando sozinho"; hint da aba
+     Drivers distingue "sessão ativa sem eventos >15s" (orfa) de "primeiros segundos";
+     relatorio IA avisa "sessão órfã ou criada sem flags" no topo e na tabela Drivers.
+
+**Arquivos**: `KitLugia.GUI/Windows/TaskManager/KitTaskManager.Render.cs` (ReviveGhost),
+`KitTaskManagerWindow.xaml.cs` (GroupBy-dedupe-indexMap), `KitTaskManager.Latency.cs`
+(teto + StallFlag + mensagens orfa), `KitLugia.Core/TaskManager/LatencyMonitor.cs`
+(CeilingUs + StallFlag em CoreStats + stop-na-negacao + watchdog + relatorio).
+
+**Verificacao**: build `--no-incremental` 0 erros (159 avisos = baseline nullable);
+harness WPF temporario (removido) reproduziu o cenario: janela real, 146 linhas,
+12x ApplyFilter sem excecao, nenhuma chave duplicada, aba Latencia com 20 nucleos,
+relatorio IA 5598 chars SEM max 2xxx/3xxx ms, pior pico 125ms. UTF-8+BOM + CRLF 100%.
+
+**A TESTAR (host)**: deixar o Kit aberto 30+ min (smartscreen.exe nasce/morre a cada UAC)
+e confirmar que nao ha exception no log; rodar Latencia 2x seguidas e ver a 2a sessao
+substituir a orfa; conferir que a coluna "Pico DPC (1s)" nunca mostra mais de 250ms.
+
+### Sessao 18/09 (noite 2) - TaskManager: startup rapido no clique + GDI/USER correto
+
+Pedido: painel de detalhes mostrava "GDI/USER 0/10" sem rotulo (e "0" GDI em app WPF e
+impossivel) e o clique no botao do gerenciador TRAVAVA o kit por ~1-2s.
+
+1. **GDI/USER (KitLugia.Core\TaskManager\NativeMetricsHelper.cs + Summary.cs)**:
+   - `GetGuiResources` retorna 0 tanto em falha quanto em valor real 0. Adicionado
+     `GuiObjectsKnown` (bool) em `ProcessDetail`: usa `Marshal.GetLastWin32Error()`
+     apos P/Invoke (SetLastError=true) para distinguir. Falha => GUI mostra "n/d"
+     em vez de "0" falso.
+   - Linha no painel agora rotulada: `GDI/USER  8.402 / 61 objetos` (antes: dois
+     numeros soltos que pareciam nota de prova).
+
+2. **Startup rapido (3 frentes, cause raiz medida por harness)**:
+   - COLD ctor medido: ~610-700 ms (InitializeComponent de 2330 linhas de XAML + JIT
+     de todas as partials em Debug). Era 100% pago no clique.
+   - **Fix A**: `GetUserNames()` (WTS + traducao de SID de ~400 processos) rodava NA
+     UI THREAD na linha 753 do primeiro refresh — movido para o worker existente
+     (Task.Run) com resultado aplicado via dispatcher.
+   - **Fix B**: prewarm da janela em idle — `KitTaskManagerWindow.Prewarm()` estatico:
+     cria a janela em background (IsVisible=false, render engine sai cedo), adotada
+     pelo singleton `OpenOrActivate`. Agendado no ctor do MainWindow (DispatcherTimer
+     30s apos startup, prioridade Idle). O clique paga so o Show.
+   - **Fix C**: tick de 1s da aba Performance fazia PDH/temperatura/potencia (queries
+     nativas centenas de ms) NA UI THREAD — separado: coleta em worker (Task.Run,
+     lock nos dicionarios de contadores) => render na UI so consome snapshot
+     (`PerfSample`). `UpdatePerformanceGraphsSafe` virou async.
+
+3. **Render engine 60fps: modelo TMOG real (custo < 30 ms/s medido)**:
+   - Instrumentacao provou que animar strings (`Cpu`/`RamMB`) por quadro OU mutar
+     brush de celula por quadro satura o WPF (~1000-2400 ms/s de UI).
+   - Modelo final: **texto e cor snap 1x/s** (`UpdateFrom` com PropertyChanged;
+     brushes de heatmap congelados `Freeze()`), motor de 60fps fica SO com os efeitos
+     de brilho verde (novo processo) / vermelho (fechamento) via `Opacity` — provado
+     barato (mesma tecnica do HighlightBrush).
+   - Probe de custo adicionado ao `EaseStep`: loga warning se o motor passar de
+     30 ms/s de trabalho por segundo (canario de regressao).
+
+**Verificacao**: harness temporario (removido) mediu COLD ctor 607ms => **CLIQUE
+pos-prewarm 59ms** (prewarm em idle custa 38ms fatiados); build `--no-incremental`
+0 erros (159 avisos baseline); UTF-8+BOM + CRLF 100%; A/B com KL_TM_NO_RENDER=1
+confirmou que stalls residuais ~1s sao carga externa da maquina (llama-server, AV,
+Devin), nao do kit.
+
+**A TESTAR (host)**: abrir o kit, esperar 30s, clicar no botao do gerenciador =>
+deve abrir praticamente instantaneo; painel de detalhes de um processo WPF (o
+proprio kit) deve mostrar GDI/USER com milhares de objetos (nao 0); UI deve ficar
+fluida com o gerenciador aberto.
+
+### Sessao 19/09 - Latencia: watchdog ETW de 2 estagios (prova: flags no StartTrace JÁ habilitam) + falso alarme de RAM
+
+Relatorio do usuario (17:28): "Sessao ETW kernel: INDISPONIVEL — provedor de kernel negado
+pelo Windows (erro 5, mesmo elevado)" + "PAGINACAO PESADA: 404/s — a RAM esta apertada"
+com 29% em uso + tabela Drivers dizia "sessao ETW inativa?" com sessao ativa.
+
+1. **CAUSA RAIZ do ETW "negado"**: o codigo criava a sessao com EnableFlags=0x60 (DPC|ISR)
+   no StartTrace e depois MATAVA a sessao porque o EnableTrace legado devolvia erro 5.
+   PROVA: a orfa achada no host (18/09) tinha EnableFlags=0x60 e "escritos=1236" com
+   11,5 MILHOES de eventos gerados — sessao criada com flags de kernel JA FLUI (para
+   system loggers, EnableFlags no StartTrace E a habilitacao do provedor; EnableTraceEx2
+   com SystemTraceControlGuid e redundante e o EnableTrace legado devolve erro 5 mesmo
+   com a sessao saudavel). Correcao: habilitacao explicita virou best-effort; falha NAO
+   mata mais a sessao — o watchdog decide por EVIDENCIA (eventos chegando ou nao).
+
+2. **Watchdog de 2 estagios (sem loop infinito)**: o antigo setava _etwRecoveryAttempted=true
+   e chamava EtwStartSession() — que RESETAVA a flag na linha 987 => recriacao da sessao
+   a cada ~12s PARA SEMPRE. Novo: estagio 1 (12s sem NENHUM evento — contador novo
+   _etwSessionTotalEvents conta TODOS os eventos, qualquer GUID): se a sessao era alheia
+   (anexada, handle=0), para e cria a NOSSA (system loggers adicionais sao legitimos via
+   EVENT_TRACE_SYSTEM_LOGGER_MODE) com EtwStartSessionCore(skipWatchdogReset: true);
+   estagio 2 (a nossa propria tambem 12s sem nada): ai sim _etwProviderDenied=true
+   ("provedor bloqueado para processos de usuario; so driver de kernel contorna").
+   Flag resetada agora no Start() (1x por ciclo Start->Stop); Stop() zera contadores.
+
+3. **Falso alarme de RAM**: pagina dura so e problema quando a RAM ACABOU. Com RAM
+   disponivel, e trafego de dados frios (standby), barato em NVMe. BuildConclusion usa
+   agora GlobalMemoryStatusEx (ullAvailPhys): <1GB disponivel = alerta real (nivel 1/2
+   pela taxa); RAM de sobra = "Paginacao frequente mas SAUDAVEL" (nivel 0). GUI: cor do
+   medidor calibrada igual (verde com RAM de sobra mesmo a 2000/s), barra 500->2000/s,
+   XAML "(0-2000 /s; verde se RAM de sobra)", dica de acao com MB disponiveis.
+   Novo helper publico NativeMetricsHelper.GetAvailableRamMb(); relatorio IA mostra
+   "RAM fisica: 42% em uso (18902 MB disponiveis)".
+
+4. **Textos honestos**: relatorio "Sessao ETW kernel: CONFIRMANDO — ..." nos primeiros
+   12s (EtwUnconfirmed novo no snapshot) e campo "eventos totais da sessao=N"; tabela
+   Drivers sem "inativa?"; status da GUI distingue "sessao fluindo, mas sem eventos de
+   DPC/ISR (provedor p/ processos comuns)" de "confirmando fluxo (~12s)" de "negado";
+   dica da aba Drivers reescrita (provou-se que o Kit cria sessao dedicada e mesmo
+   assim o Windows nao entrega — nao e permissao, e o design do Windows 8+).
+
+**Verificacao**: harness de console (Core, removido) rodou 2 ciclos Start/Stop: falha
+graciosa sem admin ("requer executar como administrador", nenhum loop), relatorio IA
+5649 chars com RAM disponivel, texto novo da tabela Drivers. A elevacao via UAC do
+ambiente nao chegou a executar o processo (wrapper retorna antes); o fluxo elevado
+(ETW de verdade, estagios do watchdog) sera exercitado pelo app do usuario — abrir
+gerenciador > Latencia > INICIAR e conferir: "CONFIRMANDO (~12s)" -> "ATIVA (flags de
+kernel na criacao)" com eventos PerfInfo > 0 (ou estagio 2 com mensagem honesta).
+Build `--no-incremental` 0 erros; UTF-8+BOM + CRLF 100%.
+
+### Sessao 19/09 (cont.) - TaskManager: colapso/expansao de grupos de processos (7 fixes visuais)
+
+Pedido: "ajeite os elementos visuais tipo o colapso de processo e quando expande ainda
+esta meio errado". Causas raiz encontradas (todas com fix):
+
+1. **Hover "congelado" em grupo expandido**: ordem dos triggers do DataGridRow colocava
+   IsExpanded (fundo fixo #2A2A30) DEPOIS de IsMouseOver => hover nunca aparecia em grupo
+   aberto. Reordenado: estado de grupo (expandido/filho) primeiro, hover/selecao/foco
+   por ultimo (trigger posterior vence). Hover de filho DEPOIS do hover generico.
+2. **Filhos como "pilulas soltas"**: linhas-filhas tinham Margin vertical do estilo
+   (2,1,2,1) => gaps entre elas. Fix: filho com Margin 2,0,2,0 + CornerRadius 0
+   (ControlTemplate.Triggers em DGR_Border/DGR_Highlight) = bloco continuo colado no pai.
+3. **Indentacao do filho errada**: NameMargin filho era 28px (nome do filho alem do texto
+   do pai). Agora 4px: seta oculta (14px) alinha o "-]" EXATAMENTE sob o inicio do nome
+   do pai (arvore classica TMOG/Win11). MinRowHeight 32->24 (o 32 travava a altura 28
+   do filho — MinRowHeight e piso, nao teto).
+4. **Filhos congelados no refresh**: o refresh recriava as linhas-filhas de graça
+   (RawChildren = src.RawChildren TROCAVA a lista de instancias) — a grid guardava a
+   instancia velha: valores paravam de atualizar e selecao pulava. Fix: UpdateFrom faz
+   MERGE por PID (keep.UpdateFrom(nc)), preservando instancia; re-insercao com dedupe
+   O(n) por PID (insertedPids).
+5. **ToggleExpand "engolia" filhos de outros grupos**: o loop de remocao exigia
+   GroupKey == key && IsChild — filho renascido (ReviveGhost) perde IsChild=false e o
+   loop parava no meio, deixando lixo visivel apos colapsar. Agora so GroupKey basta.
+6. **Grupo morto (fantasma) pendurava filhos obsoletos**: processo morreu com grupo
+   aberto => filhos ficavam visiveis ate o ReapGhostRows apagar. Fix: recolhe ANTES de
+   virar fantasma (_expandedGroups.Remove + IsExpanded=false + remove filhos).
+7. **Grupo que encolheu para 1 membro herdava fundo de "expandido"** sem seta nem
+   filhos. Fix: IsExpanded = count > 1 && _expandedGroups.Contains(gkey).
+
+Extras defensivos: re-expand remove instancia ja presente (IndexOf) recalculando a
+posicao do pai; UpdateFrom reseta IsChild quando a linha volta a ser pai; restauracao
+de selecao inclui filhos (removeu o skip IsChild).
+
+**Verificacao**: harness WPF (removido) abriu a janela REAL, ativou a aba Processos
+(SwitchTab + ApplyFilter direto — a grid so publica com a aba ativa) e validou com um
+grupo real de 52 filhos: expand => 52 filhos imediatamente apos o pai, nenhum duplicado,
+nenhum orfao; refresh de 1s com grupo aberto => filhos intactos na posicao; collapse =>
+zero filhos; re-expand => 52 de volta; indentacao left=4. OBS de harness: _groupedLive e
+ObservableCollection (cast IList, nao List) e DgProcesses.Items e o contador confiavel.
+Build `--no-incremental` 0 erros; UTF-8+BOM + CRLF 100%.
+
+**A TESTAR (host)**: abrir gerenciador > Processos > expandir um grupo grande (Chrome/
+Opera/discord) => bloco continuo, filhos com valores atualizando 1x/s, hover funcionando
+no grupo aberto; colapsar => nada sobra; processo do grupo morrer => grupo recolhe
+sozinho antes do fantasma vermelho.
+
+### Sessao 19/09 (cont. 2) - TaskManager: identidade visual PROPRIA (nao-kit) + docs do debug via UI
+
+Pedido: "faca reformas no taskmanager, documente como voce interage com a UI para
+debugar, ele nao precisa ter a mesma cara do kit".
+
+**NOVA IDENTIDADE VISUAL** (aplicada por troca de paleta 1:1 no XAML, estrutura intocada):
+- Conceito: "painel de instrumentos" — fundos azul-profundo (nao cinza-neutro), acento
+  CIANO #4FC3F7 no lugar do dourado #FFD700 (54 ocorrencias trocadas, 0 dourados restam).
+  Mapa: #151515->#0E141B, #1A1A1A->#111823 (chrome), #1E1E1E->#141C28 (cartoes),
+  #222222->#1A2432 (header tabela), #2A2A2A->#1F2A3A, #333333->#26334A (pressed), etc.
+  Estados semanticos (verde/laranja/vermelho) MANTIDOS — sao significado, nao decoracao.
+- Code-behind: _goldBrush -> _accentBrush (ciano); GPU do grafico de performance agora
+  ciano (antes dourado, colidia com amarelo do heatmap).
+- NAVEGACAO: indicador de aba ativa virou PILULA vertical com gradiente ciano->azul
+  (Height 26, CornerRadius 2, Margin 3) no lugar da barrinha 3px de canto a canto;
+  sidebar 52->58px; ActivateSidebarButton(BtnTabSummary) adicionado ao Loaded (a pílula
+  nova nao tem default visivel no XAML — sem isso a sidebar iniciava toda apagada).
+- VALIDADO com screenshots REAIS (harness + RenderTargetBitmap): resumo, processos,
+  processos expandido (bloco de filhos continuo e alinhado no novo tema), performance,
+  latencia, usuarios. As 6 telas confirmam: nada quebrou, identidade coerente.
+
+**DOCUMENTACAO do debug via UI: docs/TASKMANAGER_UI_DEBUG.md** — a receita completa:
+1. Projeto de console com UseWPF=true + ProjectReference do GUI cria a janela REAL
+   (new KitTaskManagerWindow()) numa thread STA propria + Dispatcher.Run().
+2. Ponte Invoke<T> via _win.Dispatcher.InvokeAsync (toda leitura/escrita de
+   DependencyObject NA thread da UI — IsLoaded fora dela = InvalidOperationException).
+3. Reflexao para estado interno: _groupedLive (cast IList — e ObservableCollection!),
+   ToggleExpand, SwitchTab (a grid so publica com a aba Processos ativa!), ApplyFilter("").
+   Contador confiavel: DgProcesses.Items.Count.
+4. Screenshot da janela viva: RenderTargetBitmap + PngBitmapEncoder (rendeu as 6 telas).
+5. Fluxo: estatico primeiro -> harness -> asserts comportamentais -> screenshots -> rm.
+6. Regras de ouro (Janela do harness = janela real; medir stall de worker thread, nao
+   DispatcherTimer; dormir 2,5-3,5s antes de fotografar; probe de custo DENTRO do
+   OnRendering; UTF-8+BOM/CRLF nos arquivos do Kit).
+
+Build `--no-incremental` 0 erros; UTF-8+BOM + CRLF 100% (doc novo com BOM corrigido);
+harness removido. A permissao de admin concedida pelo usuario elimina os prompts de
+elevacao para proximas validacoes de fluxo ETW elevado.
+
+**A TESTAR (host)**: abrir o gerenciador — visual novo (azul/ciano), pílula de aba
+ativa, sidebar 58px; expandir grupo (bloco continuo); conferir que o resto do kit segue
+com a identidade dourada (o TM agora e propositadamente diferente).
+
+### Sessao 21/09 - TMOG: aba "Diagnostico de Armazenamento" (quem esta saturando o disco)
+
+Pedido: "meu disco esta em 100%, descobrir O QUE esta causando, testar a hipotese de
+forma mensuravel e oferecer a intervencao adequada". Nao e um clone do Gerenciador de
+Tarefas: separa FATO -> HIPOTESE -> PROVA -> ACAO. Doc completa:
+`docs/STORAGE_DIAGNOSTICS.md`.
+
+**Core novo: `KitLugia.Core/TaskManager/StorageDiagnostics.cs`**
+- Amostragem dos discos fisicos (PerformanceCounter persistente: leitura/escrita, fila,
+  latencia, ops/s, atividade). Identidade (modelo/meio/barramento/saude) via
+  `MSFT_PhysicalDisk` — unica fonte confiavel do TIPO (`Win32_DiskDrive` diz "SCSI"
+  para NVMe). Meio: 3=HDD 4=SSD 5=SCM; barramento: 11=SATA 17=NVMe.
+- `GetServicesByPid()` (Win32_Service, cache 30s) -> reiniciar/parar SERVICO em vez de
+  matar processo (um PID pode hospedar varios).
+- `SuspendProcess`/`ResumeProcess`/`ResumeAll` (NtSuspendProcess, registro proprio).
+- `RunImpactTestAsync(pid, baseline, test)`: mede ANTES -> suspende -> mede DEPOIS ->
+  retoma SEMPRE (finally, inclusive cancelamento). Veredito FORTE/MODERADA/FRACA/
+  NENHUMA/INCONCLUSIVO + indice de correlacao.
+- `Investigate(...)`: dossie (identidade, empresa/versao, pai, E/S, acumulado, CPU/RAM,
+  threads/handles/modulos, servico, disco fisico do executavel, elevacao, respondendo).
+- Seguranca em DOIS niveis: CRITICO (bloqueio rigido: System/Registry/Memory
+  Compression/smss/csrss/wininit/winlogon/services/lsass/lsaiso/dwm/fontdrvhost/
+  audiodg/LogonUI) e RISCO (aviso + confirmacao: svchost/SearchIndexer/MsMpEng/
+  NisSrv/explorer/TrustedInstaller/spoolsv/SecurityHealthService/WmiPrvSE) — o 2o e
+  reversivel e e o caso de uso real (SearchIndexer).
+
+**BUG REAL encontrado e corrigido (atividade falsa)**: `% Idle Time` e
+PERF_100NSEC_TIMER_INV; quando o provedor de performance nao atualiza o valor (disco
+ocioso) o delta vira 0 e a formula devolve **100% de atividade FALSA** (reproduzido: HDD
+100% ocioso lendo "ativ=100,0% R=0 B/s fila=0,00"). Atividade agora = latencia x
+transferencias (o mesmo "% Active Time" do Windows), que degrada para 0 e nunca mente.
+Cross-check: 0,2ms x 16 ops/s = 0,32% vs 0,3% medido.
+
+**GUI novo: `KitTaskManager.Storage.cs` + aba `TabStorage` + botao `BtnTabStorage`**
+- Faixa: disco em foco (SEGUE o mais ocupado ate o usuario clicar num chip), atividade,
+  leitura, escrita, fila, latencia, ops/s; chips por disco fisico; 3 mini-graficos de
+  60s (atividade/fila/latencia) = o antes/depois visual das intervencoes.
+- Tabela ranqueada por E/S (icone, nome, badge SUSPENSO, badge SERVICO, leitura,
+  escrita, total colorido por intensidade, ops/s, servico). Tooltip com a explicacao
+  completa (900ms, igual LatencyPage).
+- Card de diagnostico em portugues: distingue "transferencia alta (trabalho legitimo)",
+  "dispositivo lento" (atividade alta + vazao baixa + latencia alta = HDD defeituoso/
+  driver) e "disco ocupado". Candidato separado de culpado, com o texto explicito de
+  que estar no topo NAO prova culpa; se o topo for o `System`, diz que a atividade e de
+  baixo nivel. Se a soma dos processos for <15% do disco, avisa que o I/O esta em
+  cache/kernel.
+- Acoes: Investigar, Testar impacto, VARRER SUSPEITOS (testa os 5 maiores em sequencia,
+  para no primeiro FORTE — "continua testando ate encontrar"), Suspender, Retomar,
+  Reiniciar/Parar/Iniciar SERVICO, Force Stop (ultimo recurso).
+- Ao fechar a janela: ResumeAll() — nunca fica processo suspenso para tras.
+- Relatorio IA com discos, diagnostico, tabela, antes/depois, dossie e METODOLOGIA.
+
+**Bugs de UI corrigidos no caminho**
+1. `ObservableCollection.Clear()` na reconciliacao de 1s matava a selecao (o DataGrid
+   limpa e dispara SelectionChanged(null)): a linha marcada "desmarcava", os botoes de
+   acao piscavam e a dica voltava para "marque um processo". Agora reconcilia por
+   Move/Insert/RemoveAt — nunca Clear().
+2. Botoes nao refletiam o estado suspenso/retomado que so aparece DEPOIS do tick
+   assincrono (Retomar ficava cinza) -> `UpdateStorageActionButtons()` quando o estado
+   muda no merge.
+3. Ops/s ficava 0 porque eu nao expunha ops/s por processo: `ProcessRow` ganhou
+   `DiskRead/WriteBytesPerSec` + `DiskOpsPerSec` (4 pontos: nativo, fallback .NET,
+   grupo, filhos, UpdateFrom).
+4. Faixa/diagnostico divergiam (faixa travada no disco do 1o render).
+
+**Validacao (nao foi so build)**
+- Harness de Core: discos, ranking, dossie, bloqueio de seguranca, teste de impacto
+  PONTA A PONTA contra um queimador real (155 MB/s -> suspenso -> 0,2%, correlacao 77%),
+  suspender/retomar manual e ResumeAll. 20 checks, ALL-PASS.
+- Harness de UI (janela REAL, tecnica do docs/TASKMANAGER_UI_DEBUG.md): 50 checks
+  ALL-PASS — abre a aba, metricas reais, selecao estavel entre refreshes, Investigar
+  por clique real, bloqueio de processo critico, Suspender/Retomar por clique (I/O
+  congelou e voltou), render do antes/depois com o cenario 100%/18MB/s/42ms/14,7,
+  conclusao "dispositivo lento", varredura (candidatos + ordenacao de veredito),
+  relatorio IA, e fechar a janela retomando tudo. Screenshots conferidos.
+- Build final da solucao: 0 erros. Arquivos novos em UTF-8+BOM/CRLF (o .xaml ficou em
+  LF porque o blob no HEAD ja e LF — so as linhas reais mudam no diff).
+
+**A TESTAR (host)**: abrir o gerenciador -> aba Disco -> confirmar que a faixa segue o
+disco realmente ocupado; selecionar um processo com E/S e clicar "Testar impacto" com o
+disco ocupado (deve dar FORTE/MODERADA quando for a causa e NENHUMA quando nao for);
+"Varrer suspeitos" com o problema acontecendo; investigar o SearchIndexer e reiniciar o
+servico Windows Search por ali.
+
+**Proximos passos possiveis**: usar os drivers identificados na aba Latencia como
+entrada do diagnostico (processo -> driver -> DPC/ISR); gravar historico de varreduras
+para comparar entre sessoes; expor "causa provavel" no Resumo do TM.
+
+### Sessao 19/09 (cont.) — Revisao final: stutters de audio + correcoes da revisao de 15 pontos
+
+Pedido: "ele identificar stutters de audio ai ele conseguiria investigar de forma mais
+precisa" + revisao de 15 pontos do ChatGPT (nao confundir atividade com culpa,
+multi-metrica no teste de impacto, PID reciclado, reversibilidade, nao prejudicar a
+propria medicao, HDD vs NVMe...).
+
+**AudioGlitchMonitor.cs (Core, novo)** — captura em LOOPBACK do dispositivo de saida
+padrao + `AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY` (API oficial de glitch, Win7+), 10 ms
+por leitura, sem gravar nada em disco:
+- Classificacao honesta: CONFIRMADO (flag do Windows + som audivel tocando) /
+  INDICIO (sem som, ou salto pequeno) / DESCARTAVEL (arranque/troca de stream).
+- **SelfStarvation**: se o proprio Kit estiver atrasado no instante do evento (gap do
+  proprio loop de leitura), o evento e rebaixado — o Kit nao acusa o audio de problema
+  dele. Fisica aprendida no harness: motor congelado = posicao do dispositivo PARA
+  (medir duracao pelo intervalo de entrega); recuperacao salta posicao = episodio de
+  leitura atrasada (sinal adaptativo `_lateEpisodeUntilMs`), nao glitch.
+- Cada evento carrega snapshot do instante: disco (atividade/fila/latencia/meio),
+  top E/S por processo (IoSnapshotProvider injetado pela GUI), quem tocava (PIDs),
+  CPU, DPC, paginacao. Tabela de decisao extraida para funcao pura (4 ramos, por assercao).
+- Ensaio do "pior caso": prioriza CONFIRMADOS; indice rotulado "maior indicio (sem
+  confirmacao do Windows)" (harness pegou indice de 1528 ms que o proprio Kit causou).
+
+**Correcoes da revisao (StorageDiagnostics.cs + StorageAssessment.cs, GUI)**:
+1. Teste de impacto MULTI-METRICA (atividade+MB/s+ops+fila+latencia ponderadas) +
+   corroboration: o I/O do PROPRIO processo tem de congelar durante a suspensao —
+   "100% -> 80%" sozinho nao e correlacao forte.
+2. Identidade de processo (PID + CreationTime via FILETIME) antes de suspender/testar —
+   cobre PID reciclado. BUG REAL pegado: conversao FILETIME->Ticks com sinal INVERTIDO
+   fazia a guarda falhar aberta (nunca protegia).
+3. Primeira amostra dos contadores = zero (priming do PDH) -> SampleWarm; o teste de
+   impacto travava o disco alvo justamente na amostra fria, medindo o disco ERRADO.
+4. Saturacao ciente do meio (MediaProfile: HDD mecanico x NVMe — limites diferentes) +
+   distribuicao multi-processo (top share) + caso System/kernel -> aba Latencia.
+5. Diario de intervencoes REVERSIVEL (processo suspenso/retomado, servico parado/
+   reiniciado com estado anterior) + desfazer tudo + recusa nao registra pendencia;
+   ResumeAll no Closing (nunca deixar processo suspenso para tras).
+6. Varredura de suspeitos registra candidato-por-candidato (testado / impacto).
+
+**GUI**: tabela de Eventos da aba Latencia com TextTrimming (texto longo invadia a
+coluna vizinha); auto-start da escuta de audio ao abrir aba Disco/Latencia (respeita
+se o usuario desligou: _audioUserStopped); **Stop() da escuta no Closing da janela**
+(thread zumbi a 100 Hz lendo o buffer com a janela fechada); card de audio na aba Disco.
+
+**Validacao**: Core audio harness 39 OK/0 FALHA (estalo REAL: audiodg congelado 400 ms ->
+flag lida, "motor parado por 414 ms" reportado); assess harness 41 OK/0 FALHA (queimador
+real, guarda de identidade, SampleWarm); UI harness 26 OK/0 FALHA (auto-start, toggle,
+estalo real na tabela, correlacao com disco "discos calmos -> provavelmente NAO foi o
+armazenamento", diario, desfazer, sem thread zumbi). Build 0 erros. UTF-8+BOM/CRLF ok.
+docs/STORAGE_DIAGNOSTICS.md: secao "Escuta de stutters de audio".
+
+### Proxima sessao
+- [ ] Campo arquivo/volume por E/S (ponto 6 da revisao) — arquitetura ja preparada
+- [ ] Testar a aba Disco com o problema REAL acontecendo (disco 100% de verdade)
+
+### Sessao 19/09 (cont.) — Recuperacao automatica de audio (o desligar/ligar que resolve)
+
+Pedido: o usuario PROVOU que desligar/ligar a saida de audio zera os estalos — o Kit
+deveria fazer isso sozinho "de uma forma que ele nem percebesse, so sincronizando de
+volta o som". + regra do ChatGPT: evento real ≠ evento provocado pelo teste.
+
+**AudioGlitchMonitor.cs (Core) — AutoRecover**:
+- `ShouldAutoRecover(...)` funcao PURA (tabela de decisao, 6 ramos por assercao):
+  gatilho = 2+ estalos CONFIRMADOS AUDIVEIS em 90s, cooldown 60s, max 3/hora, nunca
+  durante reset em andamento. Avaliada ~1x/s no loop do monitor (MaybeAutoRecover).
+- Execucao: NtSuspend/NtResume DIRETOS no audiodg por ~300 ms (SuspendProcess normal
+  bloqueia audiodg como critico — aqui e deliberado, e o mesmo reset que o usuario faz).
+  Identidade validada (GetIdentity/SameProcess); retomada pelo MESMO handle no finally
+  (imune a PID reciclado). Sem admin/recusa => mensagem clara, nada parcial.
+- **PROVOCADO**: o reset do proprio Kit cria descontinuidade real. Janela
+  `_provokedUntilMs` (SuspendMs + 1500) marca eventos como Kind=PROVOCADO +
+  ProvokedByKit=true. GlitchCount/AudibleConfirmedCount/gatilho EXCLUEM provocados
+  (sem isso: loop de auto-recuperacao infinito). Relatorio IA com secoes separadas
+  "EVENTOS REAIS" x "EVENTOS PROVOCADOS PELO TESTE/RECUPERACAO".
+- Sem loop de recuperacao: provocados nao re-gatilham (provado no harness).
+
+**GUI (KitTaskManager.Audio.cs + XAML)**:
+- Checkbox "Recuperar sozinho: sincronizar o motor de audio quando os estalos se
+  repetirem" no card de audio da aba Latencia (desligado por padrao; liga a escuta junto).
+- Linha de estado verde da ultima recuperacao (ou motivo de nao ter feito).
+- Tabela de Eventos: eventos do reset = gravidade "Recuperacao" VERDE (nunca Grave/
+  Indicio — screenshot pegou o usuario achando que audio ainda quebrado pos-conserto).
+- Stats do card mostram "recuperacoes: N".
+- AudioGlitchMonitor.Recoveries exposto (IReadOnlyList<DateTime>).
+- PROCESS_SUSPEND_RESUME do StorageDiagnostics virou public const (reuso).
+
+**Validacao**: Core harness 17 OK/0 FALHA (6 ramos da decisao + reset REAL com som
+tocando: 2 estalos semeados congelando o motor -> loop recuperou SOZINHO -> som voltou
+-> evento do reset PROVOCADO fora das estatisticas -> sem re-gatilho); UI harness
+7 OK/0 FALHA (checkbox, linha de estado, "Recuperacao" verde na tabela). Build 0 erros,
+0 avisos nos arquivos novos. docs/STORAGE_DIAGNOSTICS.md: secao "Recuperacao automatica".
+
+### Proxima sessao
+- [ ] Campo arquivo/volume por E/S (ponto 6 da revisao) — arquitetura ja preparada
+- [ ] Testar a aba Disco com o problema REAL acontecendo (disco 100% de verdade)
+- [ ] Testar a Recuperacao sozinho na maquina real (ligar checkbox, esperar estalos
+      naturais, conferir que o som volta sem o usuario mexer)
+
+### Sessao 21/09 (cont.) - Update terminado: build 0 erros + limpeza
+
+Pedido: "veja as ultimas alteracoes e termine o update". O update (sessoes 08/09-19/09:
+TaskManager TMOG/storage/audio/latencia, ServicesPage, StoreRemake, SearchEngine,
+UiPerformance, ServicePresetWindow, docs) estava com o build QUEBRADO e um harness
+esquecido na raiz.
+
+1. **Build quebrado (KitTaskManager.Fluid.cs, novo)**: o arquivo usa WPF
+   (System.Windows.Media/Point) mas o projeto tem usings globais com
+   System.Drawing — `Color` e `Point` ambíguos (CS0104, 3 + 8 ocorrencias).
+   Fix: aliases `using Color = System.Windows.Media.Color;` e
+   `using Point = System.Windows.Point;` (mesmo padrao do fix InfoButton de 06/09).
+2. **LineTo com 2 args (CS7036 x2)**: `StreamGeometryContext.LineTo` exige
+   `(Point, isStroked, isSmooth)` — as 2 chamadas do fill (cantos do poligono)
+   ganharam `, true, false` (igual as demais do arquivo).
+3. **Harness esquecido**: `Program.cs` na raiz (console de teste do NativeMetrics/
+   GpuMonitor) DELETADO — nao faz parte do kit.
+4. **Wiring conferido**: ServicePresetWindow (novo) ja usado pela ServicesPage
+   (linha 1311); partials Storage/StorageJournal/Audio/Latency/Render/Summary/Fluid
+   compilam; Core (AudioGlitchMonitor/LatencyMonitor/NativeMetricsHelper/
+   StorageAssessment/StorageDiagnostics) ok.
+5. **Build final**: 0 erros / 152 avisos (baseline nullable pre-existente).
+
+**A TESTAR (host)**: abrir o gerenciador (todas as abas: Resumo/Processos/Disco/
+Latencia/Usuarios/Conexoes), ServicesPage (presets), StoreRemake e busca global.

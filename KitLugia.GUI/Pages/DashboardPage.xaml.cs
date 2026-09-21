@@ -61,7 +61,8 @@ namespace KitLugia.GUI.Pages
 
 
 
-            MemoryHelper.TrimWorkingSet();
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
+            // Trim sincrono na troca de aba trava em SSD lento.
         }
 
         private void DashboardPage_Unloaded(object sender, RoutedEventArgs e)

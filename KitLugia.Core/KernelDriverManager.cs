@@ -289,5 +289,73 @@ namespace KitLugia.Core
                 list.Count(d => d.StartValue == 2)
             );
         }
+
+        // =========================================================
+        // LIGAR / DESLIGAR DRIVER (Start type via registro + sc.exe)
+        // =========================================================
+
+        /// <summary>
+        /// Drivers protegidos: nunca mexer (BSOD garantido ou quebra de boot).
+        /// </summary>
+        private static readonly HashSet<string> _protectedDrivers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            // Boot crítico do Windows
+            "acpi", "pci", "partmgr", "volmgr", "volsnap", "mountmgr", "disk", "classpnp", "fltmgr",
+            "ntfs", "fastfat", "exfat", "vmbus", "storahci", "stornvme", "storport", "atapi", "iaStorV",
+            "amdk8", "intelide", "pciide", "msahci", "KsecDD", "cng", "Wdf01000", "Wdfldr", "ksecdd",
+            // Kernel core / segurança
+            "msrpc", "kdc", "netlogon", "clfs", "cimfs", "wcifs", "bindflt", "mup", "rdbss", "csc",
+            "tcpip", "nsiproxy", "afd", "netbt", "wfplwfs", "mssmbios"
+        };
+
+        public static bool IsProtectedDriver(string name) => _protectedDrivers.Contains(name);
+
+        /// <summary>
+        /// Liga (Start 3=Demand) ou desliga (Start 4=Disabled) um driver kernel/filesystem.
+        /// Preserva o valor original para restauração posterior. NÃO toca em Boot(0)/System(1) —
+        /// esses precisam ficar no tipo original para não quebrar o boot.
+        /// </summary>
+        public static (bool Success, string Message) ToggleKernelDriverStart(string driverName, bool enable, int previousStart = -1)
+        {
+            try
+            {
+                if (IsProtectedDriver(driverName))
+                    return (false, $"'{driverName}' é crítico para o boot do Windows e está protegido.");
+
+                string keyPath = $@"SYSTEM\CurrentControlSet\Services\{driverName}";
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyPath, writable: true);
+                if (key == null) return (false, $"Driver '{driverName}' não encontrado no registro.");
+
+                object? typeObj = key.GetValue("Type");
+                if (typeObj == null || Convert.ToInt32(typeObj) is not (1 or 2))
+                    return (false, $"'{driverName}' não é um driver kernel/filesystem.");
+
+                int current = key.GetValue("Start") is object s ? Convert.ToInt32(s) : -1;
+
+                if (enable)
+                {
+                    // Restaurar: usa o valor anterior salvo se existir; senão Demand (3)
+                    int target = (previousStart is >= 0 and <= 3) ? previousStart : 3;
+                    key.SetValue("Start", target, Microsoft.Win32.RegistryValueKind.DWord);
+                    Logger.Log($"[DRIVER] '{driverName}' LIGADO (Start {current} -> {target}).");
+                    return (true, $"'{driverName}' habilitado (início {GetStartName(target)}). Reinicie para carregar.");
+                }
+                else
+                {
+                    if (current == 4) return (true, $"'{driverName}' já está desativado.");
+                    if (current <= 1)
+                        return (false, $"'{driverName}' carrega no BOOT do Windows (Start={current}). Desativá-lo pode impedir o sistema de iniciar. Não permitido pela segurança.");
+
+                    key.SetValue("Start", 4, Microsoft.Win32.RegistryValueKind.DWord);
+                    Logger.Log($"[DRIVER] '{driverName}' DESLIGADO (Start {current} -> 4).");
+                    return (true, $"'{driverName}' desativado. Reinicie para descarregar.");
+                }
+            }
+            catch (System.UnauthorizedAccessException)
+            {
+                return (false, $"Acesso negado ao registro de '{driverName}'. Execute o Kit como Administrador.");
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
     }
 }

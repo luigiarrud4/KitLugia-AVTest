@@ -27,21 +27,18 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             _pageLoadTime = DateTime.Now;
             
-            // Timer para atualizar diagnóstico a cada 2 segundos
+            // Timer criado aqui mas só inicia no Loaded (não disputa com o layout
+            // da navegação durante a construção da página)
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _refreshTimer.Tick += OnRefreshTimerTick;
-            _refreshTimer.Start();
-            
+
             // Log inicial
             LogActivity("🔬 Página de diagnóstico inicializada");
-            
-            // Primeira atualização
-            RefreshDiagnostics();
 
             // Monitorar mudanças de memória
             _lastMemoryUsage = GC.GetTotalMemory(false);
 
-
+            this.Loaded += DiagnosticPage_Loaded;
             this.Unloaded += DiagnosticPage_Unloaded;
         }
 
@@ -52,7 +49,9 @@ namespace KitLugia.GUI.Pages
                 _refreshTimer.Tick -= OnRefreshTimerTick;
             _refreshTimer?.Stop();
             _refreshTimer = null;
+            this.Loaded -= DiagnosticPage_Loaded;
             this.Unloaded -= DiagnosticPage_Unloaded;
+            _timersStarted = false;
 
 
             _activityLog.Clear();
@@ -64,6 +63,19 @@ namespace KitLugia.GUI.Pages
 
 
 
+        }
+
+        private bool _timersStarted;
+
+        private void DiagnosticPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_timersStarted) return; // evita timers duplicados se Loaded disparar de novo
+            _timersStarted = true;
+
+            _refreshTimer?.Start();
+
+            // Primeira atualização (fora do ctor: página já renderizada)
+            RefreshDiagnostics();
         }
 
         private void DiagnosticPage_Unloaded(object sender, RoutedEventArgs e)

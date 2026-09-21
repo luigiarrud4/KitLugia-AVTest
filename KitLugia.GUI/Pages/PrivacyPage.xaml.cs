@@ -36,6 +36,7 @@ namespace KitLugia.GUI.Pages
             DataContext = this;
             LoadData();
             InitializeTimer();
+            this.Loaded += PrivacyPage_Loaded;
 
             // �� LIMPEZA: Para timer ao sair da página
             this.Unloaded += PrivacyPage_Unloaded;
@@ -52,7 +53,9 @@ namespace KitLugia.GUI.Pages
                 _refreshTimer.Tick -= OnRefreshTimerTick;
             _refreshTimer?.Stop();
             _refreshTimer = null;
+            this.Loaded -= PrivacyPage_Loaded;
             this.Unloaded -= PrivacyPage_Unloaded;
+            _timersStarted = false;
 
             // �� LIMPEZA: Limpa DataContext e coleções
             Categories.Clear();
@@ -72,7 +75,16 @@ namespace KitLugia.GUI.Pages
         {
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
             _refreshTimer.Tick += OnRefreshTimerTick;
-            _refreshTimer.Start();
+            // só inicia no Loaded — não disputa com o layout da navegação
+        }
+
+        private bool _timersStarted;
+
+        private void PrivacyPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_timersStarted) return; // evita timers duplicados se Loaded disparar de novo
+            _timersStarted = true;
+            _refreshTimer?.Start();
         }
 
         private void OnRefreshTimerTick(object? s, EventArgs e) => RefreshStatus();

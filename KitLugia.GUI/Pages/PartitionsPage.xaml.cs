@@ -58,10 +58,20 @@ namespace KitLugia.GUI.Pages
                 Interval = TimeSpan.FromSeconds(10) // Aumentado de 3s para 10s (menos travamentos)
             };
             _realTimeMonitorTimer.Tick += RealTimeMonitorTimer_Tick;
-            _realTimeMonitorTimer.Start();
+            // Só inicia no Loaded — não disputa com o layout da navegação
+            this.Loaded += PartitionsPage_Loaded;
 
 
             this.Unloaded += PartitionsPage_Unloaded;
+        }
+
+        private bool _timersStarted;
+
+        private void PartitionsPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_timersStarted) return; // evita timers duplicados se Loaded disparar de novo
+            _timersStarted = true;
+            _realTimeMonitorTimer?.Start();
         }
 
 
@@ -79,7 +89,9 @@ namespace KitLugia.GUI.Pages
             _usageMonitorCts = null;
             _isMonitoringUsage = false;
 
+            this.Loaded -= PartitionsPage_Loaded;
             this.Unloaded -= PartitionsPage_Unloaded;
+            _timersStarted = false;
 
 
             _disks?.Clear();
@@ -89,8 +101,7 @@ namespace KitLugia.GUI.Pages
 
             this.DataContext = null;
 
-
-            MemoryHelper.TrimWorkingSet();
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
         }
 
         private void PartitionsPage_Unloaded(object sender, RoutedEventArgs e)

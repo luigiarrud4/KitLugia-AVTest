@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -17,11 +16,11 @@ namespace KitLugia.GUI.Pages
     {
         private string _currentQuery = "";
         private CancellationTokenSource? _cts;
-        private static ConcurrentDictionary<string, bool> _statusCache = new();
 
         public GlobalSearchPage(string query = "")
         {
             InitializeComponent();
+            SearchProviders.EnsureRegistered();
             UpdateSearch(query);
             this.Unloaded += GlobalSearchPage_Unloaded;
         }
@@ -49,6 +48,9 @@ namespace KitLugia.GUI.Pages
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
+            // Busca sincrona no indice em memoria (<2ms p/ ~700 itens), SEM teto:
+            // a lista e virtualizada (so materializa o visivel) e os estados vao
+            // pelo cache TTL. Sem recriar a pagina, sem scan por tecla.
             var results = SearchEngine.Search(query);
 
             ListResults.ItemsSource = null;
@@ -61,7 +63,8 @@ namespace KitLugia.GUI.Pages
 
             if (!hasResults) return;
 
-            // Batch: coleta todos os itens toggle e verifica em lote
+            // Batch: 1 passada de estados com TTL p/ todos os toggles (nunca 1 scan
+            // Guardian por item/tecla como antes).
             var toggleItems = results.Where(r => r.IsToggle).ToList();
             if (toggleItems.Count == 0) return;
 
@@ -69,15 +72,7 @@ namespace KitLugia.GUI.Pages
             {
                 try
                 {
-                    // Faz uma única scan para todos os Guardian tweaks
-                    var guardianStatuses = new Dictionary<string, bool>();
-                    try
-                    {
-                        var allTweaks = Guardian.GetHarmfulTweaksWithStatus();
-                        foreach (var t in allTweaks)
-                            guardianStatuses[t.Name] = t.Status == TweakStatus.MODIFIED;
-                    }
-                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    var states = SearchEngine.GetStates();
 
                     foreach (var item in toggleItems)
                     {
@@ -85,15 +80,10 @@ namespace KitLugia.GUI.Pages
 
                         try
                         {
-                            bool state = false;
-                            // Tenta cache Guardian primeiro
-                            if (guardianStatuses.TryGetValue(item.Title, out var cached))
-                                state = cached;
+                            if (!string.IsNullOrEmpty(item.StateKey) && states.TryGetValue(item.StateKey, out bool s))
+                                item.IsActive = s;
                             else if (item.CheckState != null)
-                                state = item.CheckState.Invoke();
-
-                            _statusCache[item.Title] = state;
-                            item.IsActive = state;
+                                item.IsActive = item.CheckState.Invoke();
                         }
                         catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }

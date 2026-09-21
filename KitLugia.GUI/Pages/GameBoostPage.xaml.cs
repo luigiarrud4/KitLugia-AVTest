@@ -124,10 +124,8 @@ namespace KitLugia.GUI.Pages
             // LIMPEZA: Limpa DataContext para liberar bindings
             this.DataContext = null;
 
-            // LIMPEZA: Força GC para liberar memória imediatamente
-
-            // LIMPEZA: Força Windows a liberar Working Set (reduz RAM no Task Manager)
-            MemoryHelper.TrimWorkingSet();
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
+            // Trim sincrono na troca de aba trava em SSD lento.
         }
 
         // NOVO: Helper para obter TrayIconService

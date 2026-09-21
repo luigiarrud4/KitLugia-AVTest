@@ -34,7 +34,28 @@ namespace KitLugia.GUI.Pages
             _initialTabIndex = tabIndex;
             Loaded += ServicesPage_Loaded;
 
+            // Carrega drivers da aba "Drivers (Ligar/Desligar)" sob demanda (só quando selecionada)
+            if (MainTabs != null)
+                MainTabs.SelectionChanged += MainTabs_SelectionChanged;
+
             Unloaded += ServicesPage_Unloaded;
+        }
+
+        private async void MainTabs_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            // Ignora trocas de aba internas de outros TabControls (ex.: nenhum hoje, mas defensivo)
+            if (e.OriginalSource != MainTabs) return;
+            if (MainTabs.SelectedItem is TabItem tab &&
+                tab.Header is string header && header.Contains("Drivers"))
+            {
+                // Carrega só na primeira vez que abrir a aba (lazy)
+                if (_allKernelDrivers.Count == 0 && !_isServiceOperation)
+                {
+                    _isServiceOperation = true;
+                    try { await LoadKernelDriversTab(); }
+                    finally { _isServiceOperation = false; }
+                }
+            }
         }
 
 
@@ -73,6 +94,16 @@ namespace KitLugia.GUI.Pages
                 GridBootItems.Items.Clear();
             }
 
+            if (GridKernelDrivers != null)
+            {
+                GridKernelDrivers.ItemsSource = null;
+                GridKernelDrivers.Items.Clear();
+            }
+            _allKernelDrivers?.Clear();
+
+            if (MainTabs != null)
+                MainTabs.SelectionChanged -= MainTabs_SelectionChanged;
+
             Loaded -= ServicesPage_Loaded;
             Unloaded -= ServicesPage_Unloaded;
 
@@ -80,7 +111,8 @@ namespace KitLugia.GUI.Pages
             this.DataContext = null;
 
 
-            MemoryHelper.TrimWorkingSet();
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
+            // Trim sincrono na troca de aba trava em SSD lento.
 
         }
 
@@ -1123,6 +1155,24 @@ namespace KitLugia.GUI.Pages
 
             GridServices.ItemsSource = filtered;
             if (TxtServiceCount != null) TxtServiceCount.Text = $"{filtered.Count} Serviços";
+
+            // Stats ao vivo (sempre sobre a lista COMPLETA, não filtrada)
+            UpdateServiceStats();
+        }
+
+        private void UpdateServiceStats()
+        {
+            try
+            {
+                if (TxtSvcTotal != null) TxtSvcTotal.Text = _allServices.Count.ToString();
+                if (TxtSvcRunning != null) TxtSvcRunning.Text = _allServices.Count(s => s.Status == "Executando").ToString();
+                if (TxtSvcStopped != null) TxtSvcStopped.Text = _allServices.Count(s => s.Status == "Parado").ToString();
+                if (TxtSvcDisabled != null) TxtSvcDisabled.Text = _allServices.Count(s => s.StartMode == "Desativado").ToString();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("UpdateServiceStats", ex.Message);
+            }
         }
 
         private void TxtSearchService_TextChanged(object sender, TextChangedEventArgs e) => ApplyServiceFilter();
@@ -1158,10 +1208,8 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void BtnSafeOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("Safe", "Seguro");
-        private void BtnGamerOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("Gamer", "Gamer");
-        private void BtnGamerPlusOpt_Click(object sender, RoutedEventArgs e) => RunServicePreset("GamerPlus", "Gamer+");
-        private void BtnRestoreServices_Click(object sender, RoutedEventArgs e) => RunServicePreset("Restore", "Padrão");
+        // (perfis antigos BtnSafeOpt/BtnGamerOpt/BtnGamerPlusOpt/BtnRestoreServices substituídos
+        // pela ComboBox CboServicePreset + BtnApplyPreset — mesma RunServicePreset por baixo)
 
         // Menu de Contexto
         private async Task ChangeServiceState(string mode)
@@ -1190,6 +1238,128 @@ namespace KitLugia.GUI.Pages
         private void MenuSvcManual_Click(object sender, RoutedEventArgs e) => ChangeServiceState("demand");
         private void MenuSvcDisabled_Click(object sender, RoutedEventArgs e) => ChangeServiceState("disabled");
         private void MenuSvcDefault_Click(object sender, RoutedEventArgs e) => ChangeServiceState("default");
+        private void MenuSvcDelayedAuto_Click(object sender, RoutedEventArgs e) => ChangeServiceState("delayed-auto");
+
+        // --- LIGAR / DESLIGAR SERVIÇO (Iniciar/Parar agora) ---
+        private async Task StartStopSelectedService(bool start)
+        {
+            if (_isServiceOperation) return;
+            _isServiceOperation = true;
+            try
+            {
+                if (GridServices.SelectedItem is ServiceInfo svc && Application.Current.MainWindow is MainWindow mw)
+                {
+                    // Serviço crítico sendo parado: confirmação dupla com aviso forte
+                    if (!start && BackgroundProcessManager.IsCriticalService(svc.Name))
+                    {
+                        if (!await mw.ShowConfirmationDialog($"PERIGO: '{svc.DisplayName}' é crítico para o Windows.\nParar agora pode desestabilizar o sistema. Continuar?"))
+                            return;
+                    }
+
+                    mw.ShowInfo("AGUARDE", $"{(start ? "Iniciando" : "Parando")} '{svc.DisplayName}'...");
+
+                    var result = start
+                        ? await Task.Run(() => BackgroundProcessManager.StartServiceNow(svc.Name))
+                        : await Task.Run(() => BackgroundProcessManager.StopServiceNow(svc.Name));
+
+                    if (result.Success) mw.ShowSuccess(start ? "LIGADO" : "DESLIGADO", result.Message);
+                    else mw.ShowError("ERRO", result.Message);
+
+                    await LoadServices();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(start ? "StartSelectedService" : "StopSelectedService", ex.Message);
+            }
+            finally
+            {
+                _isServiceOperation = false;
+            }
+        }
+
+        private void MenuSvcStart_Click(object sender, RoutedEventArgs e) => _ = StartStopSelectedService(start: true);
+        private void MenuSvcStop_Click(object sender, RoutedEventArgs e) => _ = StartStopSelectedService(start: false);
+        private async void BtnStartService_Click(object sender, RoutedEventArgs e) => await StartStopSelectedService(start: true);
+        private async void BtnStopService_Click(object sender, RoutedEventArgs e) => await StartStopSelectedService(start: false);
+        private async void BtnDelayedAuto_Click(object sender, RoutedEventArgs e) => await ChangeServiceState("delayed-auto");
+
+        // --- PERFIL DE OTIMIZAÇÃO (ComboBox) + services.msc ---
+        private void CboServicePreset_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (TxtPresetDescription == null) return; // ainda no InitializeComponent
+            TxtPresetDescription.Text = (CboServicePreset.SelectedItem as ComboBoxItem)?.Tag switch
+            {
+                "Safe" => "Desativa apenas serviços inúteis: Fax, RetailDemo, Spooler e PrintWorkflow (ideal se não usa impressora).",
+                "Gamer" => "Desativa telemetria, SysMain, WSearch (indexação), Xbox, Mapas e outros que consomem RAM e CPU.",
+                "GamerPlus" => "Gamer + desativa updaters de terceiros (Adobe, Google, Discord, Punkbuster...). Máximo de RAM livre.",
+                "Restore" => "Reverte a lista segura para Automático. Use se algo parar de funcionar.",
+                _ => "Selecione um perfil e clique em Aplicar."
+            };
+        }
+
+        private async void BtnApplyPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isServiceOperation) return;
+            _isServiceOperation = true;
+            try
+            {
+                string preset = (CboServicePreset.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Safe";
+
+                // Janela grande estilo PrivacyPage: lista os serviços do perfil com
+                // checkboxes e o 'i' de informação (tooltip) explicando cada um.
+                var win = new Windows.ServicePresetWindow(initialPreset: preset) { Owner = Application.Current.MainWindow };
+                if (win.ShowDialog() != true || win.ResultItems.Count == 0)
+                    return;
+
+                if (Application.Current.MainWindow is not MainWindow mw) return;
+
+                bool restore = win.IsRestore;
+                string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask(
+                    restore ? "Restaurando serviços" : "Aplicando perfil de serviços", "Services");
+
+                // Executa em background (cada serviço pode levar segundos — sc/registro/PS)
+                var result = await Task.Run(() => BackgroundProcessManager.ApplyCustomServicePreset(win.ResultItems, restore));
+
+                string failures = result.Failures.Count > 0
+                    ? $"\n\nFalharam ({result.Failures.Count}):\n" + string.Join("\n", result.Failures.Take(5)) + (result.Failures.Count > 5 ? "\n... veja o log para o resto." : "")
+                    : "";
+
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, result.Failures.Count == 0,
+                    $"{result.Success}/{result.Total} serviços processados");
+
+                mw.ShowSuccess(restore ? "RESTAURADO" : "PERFIL APLICADO",
+                    $"{result.Success}/{result.Total} serviços processados com sucesso.{failures}");
+
+                await LoadServices();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnApplyPreset_Click", ex.Message);
+                if (Application.Current.MainWindow is MainWindow mw2) mw2.ShowError("ERRO", ex.Message);
+            }
+            finally
+            {
+                _isServiceOperation = false;
+            }
+        }
+
+        private void BtnOpenServicesMsc_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "services.msc",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnOpenServicesMsc", ex.Message);
+                if (Application.Current.MainWindow is MainWindow mw) mw.ShowError("ERRO", $"Não foi possível abrir o services.msc: {ex.Message}");
+            }
+        }
         #endregion
 
         // =========================================================
@@ -1340,6 +1510,142 @@ namespace KitLugia.GUI.Pages
             _ = RunTaskPreset("RestoreAll",
                 "Restaurar TODAS as tarefas monitoradas ao estado ativo?",
                 "RESTAURADO");
+        }
+        #endregion
+
+        // =========================================================
+        // ABA 5: DRIVERS (LIGAR/DESLIGAR)
+        // =========================================================
+        #region Kernel Drivers Logic (ServicesPage)
+
+        private List<KernelDriverInfo> _allKernelDrivers = new();
+
+        private async Task LoadKernelDriversTab()
+        {
+            try
+            {
+                var token = _cts?.Token ?? CancellationToken.None;
+                var drivers = await Task.Run(() => KernelDriverManager.GetKernelDrivers(includeDisabled: true), token);
+                _allKernelDrivers = drivers;
+                ApplyDriverFilter();
+            }
+            catch (OperationCanceledException) { /* navegação rápida */ }
+            catch (Exception ex)
+            {
+                Logger.LogError("LoadKernelDriversTab", ex.Message);
+            }
+        }
+
+        private void ApplyDriverFilter()
+        {
+            try
+            {
+                if (GridKernelDrivers == null) return;
+                string filter = TxtDriverFilter?.Text?.ToLower().Trim() ?? "";
+                bool thirdOnly = ChkDriverThirdOnly?.IsChecked == true;
+                bool enabledOnly = ChkDriverEnabled?.IsChecked == true;
+
+                var filtered = _allKernelDrivers.Where(d =>
+                    (string.IsNullOrEmpty(filter) ||
+                     d.Name.ToLower().Contains(filter) ||
+                     (d.DisplayName ?? "").ToLower().Contains(filter) ||
+                     (d.ParentSoftware ?? "").ToLower().Contains(filter)) &&
+                    (!thirdOnly || d.IsThirdParty) &&
+                    (!enabledOnly || d.StartValue != 4))
+                    .ToList();
+
+                GridKernelDrivers.ItemsSource = filtered;
+                if (TxtDriverCount != null)
+                    TxtDriverCount.Text = $"{filtered.Count} driver{(filtered.Count == 1 ? "" : "s")}";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ApplyDriverFilter", ex.Message);
+            }
+        }
+
+        private void TxtDriverFilter_TextChanged(object sender, TextChangedEventArgs e) => ApplyDriverFilter();
+        private void ChkDriverThirdOnly_Click(object sender, RoutedEventArgs e) => ApplyDriverFilter();
+        private void ChkDriverEnabled_Click(object sender, RoutedEventArgs e) => ApplyDriverFilter();
+
+        private async void BtnReloadDrivers_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isServiceOperation) return;
+            _isServiceOperation = true;
+            try { await LoadKernelDriversTab(); }
+            finally { _isServiceOperation = false; }
+        }
+
+        private async Task ToggleSelectedDriver(bool enable)
+        {
+            if (_isServiceOperation) return;
+            _isServiceOperation = true;
+            try
+            {
+                if (GridKernelDrivers.SelectedItem is KernelDriverInfo drv && Application.Current.MainWindow is MainWindow mw)
+                {
+                    if (!enable && drv.StartValue <= 1)
+                    {
+                        mw.ShowError("PROTEGIDO", $"'{drv.Name}' carrega no BOOT do Windows (Start={drv.StartName}).\nDesativar impede o sistema de iniciar — operação bloqueada.");
+                        return;
+                    }
+
+                    string action = enable ? "LIGAR" : "DESLIGAR";
+                    if (!await mw.ShowConfirmationDialog($"{action} o driver '{drv.Name}'?\n\n{drv.DisplayName}\n{drv.ResolvedPath}\n\nO efeito vale após reiniciar o PC."))
+                        return;
+
+                    var result = await Task.Run(() => KernelDriverManager.ToggleKernelDriverStart(drv.Name, enable, previousStart: drv.StartValue));
+
+                    if (result.Success)
+                    {
+                        mw.ShowSuccess(enable ? "LIGADO" : "DESLIGADO", result.Message);
+                        await LoadKernelDriversTab();
+                    }
+                    else mw.ShowError("ERRO", result.Message);
+                }
+                else if (Application.Current.MainWindow is MainWindow mw2)
+                {
+                    mw2.ShowError("ERRO", "Selecione um driver na lista primeiro.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(enable ? "BtnDriverEnable" : "BtnDriverDisable", ex.Message);
+            }
+            finally
+            {
+                _isServiceOperation = false;
+            }
+        }
+
+        private void MenuDriverEnable_Click(object sender, RoutedEventArgs e) => _ = ToggleSelectedDriver(enable: true);
+        private void MenuDriverDisable_Click(object sender, RoutedEventArgs e) => _ = ToggleSelectedDriver(enable: false);
+        private async void BtnDriverEnable_Click(object sender, RoutedEventArgs e) => await ToggleSelectedDriver(enable: true);
+        private async void BtnDriverDisable_Click(object sender, RoutedEventArgs e) => await ToggleSelectedDriver(enable: false);
+
+        private void MenuDriverCopyName_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridKernelDrivers.SelectedItem is KernelDriverInfo d)
+                System.Windows.Clipboard.SetText(d.Name);
+        }
+
+        private void MenuDriverOpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (GridKernelDrivers.SelectedItem is not KernelDriverInfo d) return;
+                string path = !string.IsNullOrWhiteSpace(d.ResolvedPath) ? d.ResolvedPath : d.ImagePath;
+                if (string.IsNullOrWhiteSpace(path)) return;
+
+                string? folder = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(path)); // pasta pai do arquivo
+                string target = System.IO.File.Exists(path) ? path : (folder ?? path);
+
+                if (System.IO.File.Exists(target))
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{target}\"");
+                else if (System.IO.Directory.Exists(target))
+                    System.Diagnostics.Process.Start("explorer.exe", $"\"{target}\"");
+            }
+            catch (Exception ex) { Logger.LogError("MenuDriverOpenFolder", ex.Message); }
         }
         #endregion
 

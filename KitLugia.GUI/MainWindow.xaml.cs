@@ -165,6 +165,100 @@ namespace KitLugia.GUI
     {
         private const int MaxVisibleToasts = 6;
 
+        // =========================================================
+        // FIX: janela maximizada nao preenchia a tela (bordas visiveis).
+        // Causa: MaxWidth/MaxHeight presos a WorkArea no XAML. Com WindowChrome,
+        // o WPF maximiza em (-8,-8) com tamanho WorkArea+16 (borda de resize fora
+        // da tela) e o clamp cortava o overhang -> 8px de gap embaixo/direita e
+        // 8px cortados em cima/esquerda. Correcao: remover o clamp e tratar
+        // WM_GETMINMAXINFO para definir ptMaxSize/ptMaxPosition a partir da
+        // area de trabalho do monitor onde a janela esta.
+        // =========================================================
+        private const int WM_GETMINMAXINFO = 0x0024;
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct POINT { public int X; public int Y; }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct MINMAXINFO
+        {
+            public POINT ptReserved;
+            public POINT ptMaxSize;
+            public POINT ptMaxPosition;
+            public POINT ptMinTrackSize;
+            public POINT ptMaxTrackSize;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
+
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
+
+        /// <summary>
+        /// True quando a janela maximizada deve cobrir APENAS a area de trabalho
+        /// (nao cobrir a taskbar). Multi-monitor safe: usa o monitor onde a janela esta.
+        /// </summary>
+        public static bool MaximizeToWorkArea = true;
+
+        private IntPtr WndProcHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_GETMINMAXINFO)
+            {
+                var mmi = System.Runtime.InteropServices.Marshal.PtrToStructure<MINMAXINFO>(lParam);
+
+                // Tamanho maximo de arraste: limita a area de trabalho (nao deixa a janela
+                // ficar maior que a tela — substitui o antigo MaxWidth/MaxHeight do XAML)
+                mmi.ptMaxTrackSize.X = (int)SystemParameters.WorkArea.Width;
+                mmi.ptMaxTrackSize.Y = (int)SystemParameters.WorkArea.Height;
+
+                if (MaximizeToWorkArea)
+                {
+                    IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                    if (monitor != IntPtr.Zero)
+                    {
+                        var info = new MONITORINFO();
+                        info.cbSize = System.Runtime.InteropServices.Marshal.SizeOf(info);
+                        if (GetMonitorInfo(monitor, ref info))
+                        {
+                            // Maximizada = exatamente a area de trabalho do monitor atual
+                            // (posicao (0,0) do work area + tamanho do work area).
+                            mmi.ptMaxPosition.X = info.rcWork.Left;
+                            mmi.ptMaxPosition.Y = info.rcWork.Top;
+                            mmi.ptMaxSize.X = info.rcWork.Right - info.rcWork.Left;
+                            mmi.ptMaxSize.Y = info.rcWork.Bottom - info.rcWork.Top;
+                            handled = true;
+                        }
+                    }
+                }
+
+                System.Runtime.InteropServices.Marshal.StructureToPtr(mmi, lParam, true);
+            }
+            return IntPtr.Zero;
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            var source = (System.Windows.Interop.HwndSource?)System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            source?.AddHook(WndProcHook);
+        }
+
         // Típico: 1-6 toasts visíveis simultaneamente
         private Dictionary<string, LugiaToast> _activeToasts = new Dictionary<string, LugiaToast>(6, StringComparer.OrdinalIgnoreCase);
         // ⬇️ NOVO: Rastreia toasts de progresso que podem transicionar para Success/Error
@@ -209,6 +303,9 @@ namespace KitLugia.GUI
         // só precisa rodar a cada 10s quando inativo (elimina o pico periódico de CPU no tray)
         private DateTime _goodbyeDpiExternalScanTime = DateTime.MinValue;
         private bool _goodbyeDpiExternalScanResult = false;
+        // Detalhe caro (StartTime + WorkingSet + string): atualizado no maximo a cada 10s.
+        private string _goodbyeDpiStatusText = "Desativado";
+        private DateTime _goodbyeDpiStatusTextTime = DateTime.MinValue;
         public bool GoodbyeDPIActive
         {
             get
@@ -555,17 +652,29 @@ namespace KitLugia.GUI
             // Defer search engine init to Background so the splash screen renders first
             Dispatcher.BeginInvoke(new Action(() => SearchEngine.Initialize()), DispatcherPriority.Background);
 
-            _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
             _searchDebounceTimer.Tick += SearchDebounce_Tick;
 
             _goodbyeDpiStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _goodbyeDpiStatusTimer.Tick += (s, e) =>
             {
+                // Leitura barata (cache 10s); o detalhe caro (StartTime/WorkingSet)
+                // so e recalculado quando o cache do detalhe expira.
+                bool active = GoodbyeDPIActive;
                 OnPropertyChanged(nameof(GoodbyeDPIActive));
                 if (BtnGoodbyeDPI != null)
                 {
-                    string status = GoodbyeDPIActive ? $"Ativado - {GetGoodbyeDPIStatus()}" : "Desativado";
-                    BtnGoodbyeDPI.ToolTip = $"GoodbyeDPI - {status}";
+                    if (!active)
+                    {
+                        _goodbyeDpiStatusText = "Desativado";
+                        _goodbyeDpiStatusTextTime = DateTime.Now;
+                    }
+                    else if ((DateTime.Now - _goodbyeDpiStatusTextTime).TotalSeconds >= 10)
+                    {
+                        _goodbyeDpiStatusText = $"Ativado - {GetGoodbyeDPIStatus()}";
+                        _goodbyeDpiStatusTextTime = DateTime.Now;
+                    }
+                    BtnGoodbyeDPI.ToolTip = $"GoodbyeDPI - {_goodbyeDpiStatusText}";
                 }
             };
             // Se OnIntroFinished já foi executado (ex: StartMinimized), inicia o timer agora
@@ -597,6 +706,23 @@ namespace KitLugia.GUI
                 try { LoadGoodbyeDPIConfig(); }
                 catch (Exception ex) { Logger.Log($"⚠️ Erro GoodbyeDPI init: {ex.Message}"); }
             }), DispatcherPriority.Background);
+
+            // FIX "clicou e o kit travou": o gerenciador de tarefas custa 1-3s NA UI THREAD
+            // (InitializeComponent de XAML gigante + JIT de todas as partials) na PRIMEIRA
+            // abertura. Pré-aquecemos a janela oculta em idle (30s após o startup, quando o
+            // kit já terminou de carregar) — o clique vira Show()+Activate() instantâneo.
+            // Idempotente: se o usuário clicar antes, o Prewarm não faz nada.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    await Dispatcher.InvokeAsync(
+                        () => Windows.TaskManager.KitTaskManagerWindow.Prewarm(),
+                        DispatcherPriority.ApplicationIdle);
+                }
+                catch { }
+            });
 
             // Conecta o Logger do Core ao Console da GUI
             _logHandler = (msg) => ConsoleManager.WriteLine(msg);
@@ -735,8 +861,10 @@ namespace KitLugia.GUI
             }, _backgroundTasksCts.Token);
 
             // --- INTELLIGENT MEMORY CLEANER: Limpeza baseada em limite de memória ---
-            AggressiveMemoryCleaner.StartIntelligentMonitoring(30, 200); // Verifica a cada 30s, limpa quando o processo ultrapassa 200MB
-            Logger.Log("🧹 MemoryCleaner inteligente iniciado - Limite: 200MB, Verificação: 30s");
+            // Teto persistido (TraySettings\KitMemoryLimitMB, padrao 200MB) — ajustavel na
+            // pagina TraySettings ("Teto"). Sem ele, o limite era hardcoded.
+            AggressiveMemoryCleaner.StartIntelligentMonitoring(30, TrayIconService.GetKitMemoryLimitStatic()); // Verifica a cada 30s
+            Logger.Log("🧹 MemoryCleaner inteligente iniciado - Verificação: 30s");
 
             if (!StartMinimized)
             {
@@ -799,18 +927,28 @@ namespace KitLugia.GUI
 
         private void PerformLiveSearch(string query)
         {
+            // Resultados SEMPRE na pagina cheia (lado direito), nunca no mini-popup.
             if (string.IsNullOrWhiteSpace(query))
             {
                 if (SearchPopup != null) SearchPopup.IsOpen = false;
+                if (MainFrame.Content is GlobalSearchPage emptyPage)
+                    emptyPage.UpdateSearch(query);
                 return;
             }
 
+            // Ja na pagina de busca: atualiza in-place (sem recriar a pagina —
+            // esse era o freeze ao digitar).
             if (MainFrame.Content is GlobalSearchPage searchPage)
             {
+                if (SearchPopup != null) SearchPopup.IsOpen = false;
                 searchPage.UpdateSearch(query);
                 return;
             }
 
+            // Fora dela: navega UMA vez; as proximas teclas caem no ramo acima.
+            // O Navigate e sincrono, entao o proximo debounce ja enxerga a pagina.
+            if (SearchPopup != null) SearchPopup.IsOpen = false;
+            SearchProviders.EnsureRegistered();
             UncheckAllNavButtons();
             CleanupAndNavigate(new GlobalSearchPage(query));
         }
@@ -847,6 +985,7 @@ namespace KitLugia.GUI
                 searchPage.UpdateSearch(TxtGlobalSearch.Text);
             else
             {
+                SearchProviders.EnsureRegistered();
                 UncheckAllNavButtons();
                 CleanupAndNavigate(new GlobalSearchPage(TxtGlobalSearch.Text));
             }
@@ -1012,9 +1151,18 @@ namespace KitLugia.GUI
                     if (item.ExecuteAction != null)
                         result = item.ExecuteAction.Invoke();
 
-                    if (item.IsToggle && item.CheckState != null)
+                    if (item.IsToggle)
                     {
-                        try { item.IsActive = item.CheckState.Invoke(); }
+                        try
+                        {
+                            // Invalida o cache e rele pelo StateKey (1 passada TTL);
+                            // so cai no CheckState direto se o item nao tem chave.
+                            SearchEngine.InvalidateStates();
+                            if (!string.IsNullOrEmpty(item.StateKey))
+                                item.IsActive = SearchEngine.QueryState(item.StateKey);
+                            else if (item.CheckState != null)
+                                item.IsActive = item.CheckState.Invoke();
+                        }
                         catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
                 });
@@ -1036,6 +1184,12 @@ namespace KitLugia.GUI
         #region SISTEMA DE NAVEGAÇÃO
 
         public bool IsNavigationLocked { get; set; } = false;
+
+        // Guarda single-flight: cliques rapidos nao empilham construcoes pesadas de pagina
+        // (InitializeComponent + JIT) na UI thread — causa do "travou" em CPU antiga.
+        private bool _isNavigating = false;
+        // Trim pos-navegacao cancelavel: trocar de aba 2x rapido cancela o trim anterior.
+        private System.Threading.CancellationTokenSource? _navTrimCts;
 
         private static readonly Dictionary<string, PageType> NavTagMap = new()
         {
@@ -1078,18 +1232,19 @@ namespace KitLugia.GUI
             }
         }
 
-        // 📍 ANIMAÇÃO 5: Fade-in ao navegar entre páginas (0.25s) - MainWindow.xaml.cs linha ~403
+        // Troca de pagina instantanea em PC fraco: sem animacao de escala por padrao
+        // (UiPerformance.NavigationAnimationEnabled). A animacao concorria com a
+        // construcao/layout da pagina nova e gerava jank em CPU antiga + SSD lento.
         private void MainFrame_Navigated(object sender, NavigationEventArgs e)
         {
-            if (MainFrame.Content is Page page)
+            if (MainFrame.Content is not Page page)
+                return;
+
+            if (!UiPerformance.NavigationAnimationEnabled || !_introCompleted)
             {
-                // Durante o carregamento inicial (antes da intro terminar),
-                // não animar escala para não conflitar com a transição do splash.
-                if (!_introCompleted)
-                {
-                    page.RenderTransform = null;
-                    return;
-                }
+                page.RenderTransform = null;
+                return;
+            }
 
                 // Animação de fade-in com scale leve
                 page.RenderTransform = new ScaleTransform(0.98, 0.98, 0.5, 0.5);
@@ -1107,7 +1262,6 @@ namespace KitLugia.GUI
                     scaleTrans.BeginAnimation(ScaleTransform.ScaleXProperty, scaleIn);
                     scaleTrans.BeginAnimation(ScaleTransform.ScaleYProperty, scaleIn);
                 }
-            }
         }
 
         private void UpdateNavButtonsSelection()
@@ -1178,10 +1332,21 @@ namespace KitLugia.GUI
         }
 
         /// <summary>
-        /// Navegação usando PageType enum (sem dependência de emojis)
+        /// Navegação usando PageType enum (sem dependência de emojis).
+        /// Single-flight + cursor de espera + Yield antes de construir a pagina:
+        /// o clique pinta primeiro e a construcao pesada (XAML/JIT) nao empilha
+        /// em cliques rapidos — o que travava em CPU antiga + SSD lento.
         /// </summary>
-        public void NavigateToPage(PageType pageType, int tabIndex = 0, bool focusQuickAdd = false)
+        public async void NavigateToPage(PageType pageType, int tabIndex = 0, bool focusQuickAdd = false)
         {
+            if (_isNavigating)
+                return;
+            _isNavigating = true;
+            Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+            try
+            {
+                // Deixa a UI pintar o feedback do clique antes do trabalho pesado.
+                await Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Render);
             // Store sempre como janela separada igual TaskManager — não prende no Frame (pesquisei TaskManager: BtnKitTaskManager_Click faz new Window {Owner=this}.Show())
             if (pageType == PageType.StoreRemake)
             {
@@ -1241,18 +1406,24 @@ namespace KitLugia.GUI
             };
 
             if (newPage != null)
-            {
-                CleanupAndNavigate(newPage);
-
-                // A página de Add já mostra os super comandos em tela cheia — nada a rolar
-                if (focusQuickAdd && newPage is Pages.WindowsSettings.ContextMenuAddPage)
                 {
-                    // (página dedicada: os cards já estão visíveis no topo)
+                    CleanupAndNavigate(newPage);
+
+                    // A página de Add já mostra os super comandos em tela cheia — nada a rolar
+                    if (focusQuickAdd && newPage is Pages.WindowsSettings.ContextMenuAddPage)
+                    {
+                        // (página dedicada: os cards já estão visíveis no topo)
+                    }
+                }
+                else
+                {
+                    ShowInfo("EM BREVE", "Página em desenvolvimento.");
                 }
             }
-            else
+            finally
             {
-                ShowInfo("EM BREVE", "Página em desenvolvimento.");
+                Mouse.OverrideCursor = null;
+                _isNavigating = false;
             }
         }
 
@@ -1365,14 +1536,23 @@ namespace KitLugia.GUI
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }), System.Windows.Threading.DispatcherPriority.Background);
 
-                // Sem cache de páginas: devolve ao SO em background a RAM da página anterior.
-                // GC.Collect é pontual (só ao navegar, quando o WorkingSet está alto) - o usuário
-                // aprovou a coleta; o que não pode é CPU constante, resolvido pelos 3 fixes de idle.
-                System.Threading.Tasks.Task.Run(() =>
+                // Sem cache de paginas: devolve RAM ao SO de forma ADIADA e CANCELAVEL.
+                // Trim/GC imediato despaginava a pagina que acabou de abrir (page-faults
+                // em SSD lento = trava). Trocar de aba de novo dentro da janela cancela
+                // o trim anterior: cliques rapidos nunca empilham GC + EmptyWorkingSet.
+                _navTrimCts?.Cancel();
+                _navTrimCts?.Dispose();
+                _navTrimCts = new System.Threading.CancellationTokenSource();
+                var trimToken = _navTrimCts.Token;
+                _ = System.Threading.Tasks.Task.Run(async () =>
                 {
                     try
                     {
-                        if (Environment.WorkingSet < 90L * 1024 * 1024) return;
+                        await System.Threading.Tasks.Task.Delay(UiPerformance.PostNavTrimDelayMs, trimToken);
+                        if (trimToken.IsCancellationRequested)
+                            return;
+                        if (Environment.WorkingSet < UiPerformance.PostNavTrimThresholdMb * 1024L * 1024L)
+                            return;
                         long before = Environment.WorkingSet;
                         GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, true);
                         GC.WaitForPendingFinalizers();
@@ -1381,8 +1561,9 @@ namespace KitLugia.GUI
                         if (freedMb >= 10)
                             Logger.Log($"RAM devolvida apos navegacao: {freedMb} MB (pagina anterior liberada)");
                     }
+                    catch (OperationCanceledException) { }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                });
+                }, trimToken);
             }
             catch (Exception ex)
             {
@@ -1470,6 +1651,9 @@ namespace KitLugia.GUI
 
         private void BtnKitTaskManager_Click(object sender, RoutedEventArgs e)
         {
+            // Abertura DEFENSIVA: falha de inicialização do gerenciador NUNCA pode derrubar
+            // o kit (relato histórico: usuários de versões antigas precisavam force-stop do
+            // app inteiro). Se o ctor falhar, limpamos o singleton e mostramos erro — MainWindow segue viva.
             try
             {
                 // Singleton: reusa janela já aberta (evita N janelas × timers de 1s empilhados
@@ -1478,7 +1662,16 @@ namespace KitLugia.GUI
                 w.Show();
                 KitLugia.Core.Logger.Log("[KIT TASK MANAGER] Janela aberta via topbar (quadrado vermelho).");
             }
-            catch (Exception ex) { KitLugia.Core.Logger.Log($"[KIT TASK MANAGER] Erro: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                try
+                {
+                    Windows.TaskManager.KitTaskManagerWindow.DiscardBrokenInstance();
+                    KitLugia.Core.Logger.LogError("BtnKitTaskManager_Click", $"Falha ao abrir gerenciador: {ex}");
+                    ShowError("❌ Gerenciador de Tarefas", "Não foi possível abrir o gerenciador de tarefas. O restante do kit continua funcionando.\n\n" + ex.Message);
+                }
+                catch { }
+            }
         }
 
         private void BtnConsole_Click(object sender, RoutedEventArgs e)
@@ -2510,6 +2703,13 @@ namespace KitLugia.GUI
                     _backgroundTasksCts.Cancel();
                     _backgroundTasksCts.Dispose();
                     _backgroundTasksCts = null;
+                }
+
+                if (_navTrimCts != null)
+                {
+                    _navTrimCts.Cancel();
+                    _navTrimCts.Dispose();
+                    _navTrimCts = null;
                 }
 
 
