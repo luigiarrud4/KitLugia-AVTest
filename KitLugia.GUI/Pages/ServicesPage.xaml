@@ -406,43 +406,69 @@
                         <!-- A&#xE7;&#xF5;es -->
                     </Grid.RowDefinitions>
 
-                    <!-- PRESETS -->
-                    <Grid Grid.Row="0" Margin="0,0,0,25">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                    <!-- STATS AO VIVO + PERFIL DE OTIMIZACAO (substitui os 3 cards estaticos) -->
+                    <!-- Layout empilhado: stats na linha 1, perfil na linha 2 (largura total). Funciona em qualquer largura de janela. -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                        <!-- Linha 1: 4 mini-stats calculados da lista real -->
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#1A1A1A" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,8,0">
+                                <StackPanel>
+                                    <TextBlock Text="Total" Foreground="#888" FontSize="11" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtSvcTotal" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1A1A1A" BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,8,0">
+                                <StackPanel>
+                                    <TextBlock Text="Executando" Foreground="#4CAF50" FontSize="11" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtSvcRunning" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1A1A1A" BorderBrush="#777" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,8,0">
+                                <StackPanel>
+                                    <TextBlock Text="Parados" Foreground="#AAA" FontSize="11" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtSvcStopped" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1A1A1A" BorderBrush="#FF6F61" BorderThickness="1" CornerRadius="8" Padding="12,8">
+                                <StackPanel>
+                                    <TextBlock Text="Desativados" Foreground="#FF6F61" FontSize="11" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtSvcDisabled" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
 
-                        <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="15" BorderThickness="1" BorderBrush="{StaticResource CardBorder}" MinHeight="140">
-                            <StackPanel>
-                                <TextBlock Text="&#x1F6E1;&#xFE0F; Otimiza&#xE7;&#xE3;o Segura" Foreground="White" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
-                                <TextBlock Text="Desativa apenas servi&#xE7;os in&#xFA;teis como Fax, RetailDemo e Spooler (se n&#xE3;o usar impressora)." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
-                                <Button Content="Aplicar Seguro" Click="BtnSafeOpt_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Grid.Column="2" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="15" BorderThickness="1" BorderBrush="{StaticResource AccentColor}" MinHeight="140">
+                        <!-- Linha 2: Perfil de Otimizacao (largura total). Descricao com TRUNCACAO — nunca estica a linha
+                             (bug antigo: TextWrapping em coluna de largura 0 gerava altura infinita e empurrava a tabela pra fora) -->
+                        <Border Margin="0,10,0,0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="8" Padding="12,8">
                             <Border.Effect>
                                 <DropShadowEffect Color="#FFD700" BlurRadius="10" Opacity="0.1" ShadowDepth="0"/>
                             </Border.Effect>
-                            <StackPanel>
-                                <TextBlock Text="&#x1F3AE; Otimiza&#xE7;&#xE3;o Gamer" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
-                                <TextBlock Text="Desativa Telemetria, SysMain, Mapas, Geo-loc e outros recursos que consomem RAM e CPU." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
-                                <Button Content="Aplicar Gamer" Click="BtnGamerOpt_Click" Style="{StaticResource GoldButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
-                            </StackPanel>
-                        </Border>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="4" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="15" BorderThickness="1" BorderBrush="{StaticResource CardBorder}" MinHeight="140">
-                            <StackPanel>
-                                <TextBlock Text="&#x23EA; Restaurar" Foreground="White" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
-                                <TextBlock Text="Reverte todos os servi&#xE7;os para o padr&#xE3;o de f&#xE1;brica do Windows. Use se algo parar de funcionar." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
-                                <Button Content="Restaurar Tudo" Click="BtnRestoreServices_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
-                            </StackPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Perfil de Otimização de Serviços" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="13" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="TxtPresetDescription" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" FontSize="12"
+                                               Text="Selecione um perfil e clique em Aplicar. Perfis desativam apenas serviços conhecidos como seguros."/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                    <ComboBox x:Name="CboServicePreset" Width="200" Height="32" FontSize="12" SelectionChanged="CboServicePreset_SelectionChanged">
+                                        <ComboBoxItem Content="Seguro — Fax/Spooler/RetailDemo" Tag="Safe" IsSelected="True"/>
+                                        <ComboBoxItem Content="Gamer — Telemetria/SysMain/Xbox..." Tag="Gamer"/>
+                                        <ComboBoxItem Content="Gamer+ — Gamer + update de terceiros" Tag="GamerPlus"/>
+                                        <ComboBoxItem Content="Restaurar padrão (Safe list)" Tag="Restore"/>
+                                    </ComboBox>
+                                    <Button x:Name="BtnApplyPreset" Content="Aplicar" Click="BtnApplyPreset_Click" Style="{StaticResource GoldButtonStyle}" Height="32" Margin="8,0,0,0"/>
+                                    <Button Content="services.msc" Click="BtnOpenServicesMsc_Click" Style="{StaticResource SecondaryButtonStyle}" Height="32" Margin="8,0,0,0"
+                                            ToolTip="Abre o gerenciador nativo de serviços do Windows"/>
+                                </StackPanel>
+                            </Grid>
                         </Border>
-                    </Grid>
+                    </StackPanel>
 
                     <!-- BARRA DE FERRAMENTAS -->
                     <Grid Grid.Row="1" Margin="0,0,0,10">
@@ -549,8 +575,28 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
 
-                                <!-- Modo de In&#xED;cio -->
-                                <DataGridTextColumn Header="In&#xED;cio" Binding="{Binding StartMode}" Width="100" IsReadOnly="True" SortMemberPath="StartMode"/>
+                                <!-- Modo de Início (colorido: Desativado vermelho, Atrasado laranja) -->
+                                <DataGridTextColumn Header="Início" Binding="{Binding StartMode}" Width="130" IsReadOnly="True" SortMemberPath="StartMode">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="#AAA"/>
+                                            <Setter Property="FontSize" Value="12"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="Text" Value="Desativado">
+                                                    <Setter Property="Foreground" Value="#FF6F61"/>
+                                                    <Setter Property="FontWeight" Value="Bold"/>
+                                                </Trigger>
+                                                <Trigger Property="Text" Value="Automático (Atrasado)">
+                                                    <Setter Property="Foreground" Value="#FF9800"/>
+                                                </Trigger>
+                                                <Trigger Property="Text" Value="Automático">
+                                                    <Setter Property="Foreground" Value="#4CAF50"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
 
                                 <!-- N&#xED;vel de Seguran&#xE7;a (Badge Colorido) -->
                                 <DataGridTemplateColumn Header="Seguran&#xE7;a" Width="*" SortMemberPath="Safety">
@@ -594,16 +640,30 @@
                             <!-- Menu de Contexto (Bot&#xE3;o Direito) -->
                             <DataGrid.ContextMenu>
                                 <ContextMenu Style="{StaticResource ServiceContextMenu}">
+                                    <MenuItem Header="▶ Iniciar Agora (Ligar)" Click="MenuSvcStart_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#4CAF50" FontWeight="Bold"/>
+                                    <MenuItem Header="■ Parar Agora (Desligar)" Click="MenuSvcStop_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61" FontWeight="Bold"/>
+                                    <Separator Background="#333"/>
                                     <MenuItem Header="Configurar: AUTOM&#xC1;TICO" Click="MenuSvcAuto_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <MenuItem Header="Configurar: AUTOM&#xC1;TICO (ATRASADO)" Click="MenuSvcDelayedAuto_Click" Style="{StaticResource ServiceMenuItem}"/>
                                     <MenuItem Header="Configurar: MANUAL" Click="MenuSvcManual_Click" Style="{StaticResource ServiceMenuItem}"/>
                                     <MenuItem Header="Restaurar Padr&#xE3;o" Click="MenuSvcDefault_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
                                     <Separator Background="#333"/>
                                     <MenuItem Header="Configurar: DESATIVADO" Click="MenuSvcDisabled_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61"/>
+                                    <Separator Background="#333"/>
+                                    <MenuItem Header="Abrir services.msc" Click="BtnOpenServicesMsc_Click" Style="{StaticResource ServiceMenuItem}"/>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                         </DataGrid>
                     </Border>
-                    <Button Grid.Row="3" Content="Recarregar" Click="BtnRefreshServices_Click" HorizontalAlignment="Right" Width="120" Margin="0,10,0,0" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Grid Grid.Row="3" Margin="0,10,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button Content="▶ Iniciar Selecionado" Click="BtnStartService_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150" Margin="0,0,10,0" Foreground="#4CAF50"/>
+                            <Button Content="■ Parar Selecionado" Click="BtnStopService_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150" Margin="0,0,10,0" Foreground="#FF6F61"/>
+                            <Button Content="Início Atrasado" Click="BtnDelayedAuto_Click" Style="{StaticResource SecondaryButtonStyle}" Width="130" Margin="0,0,10,0"
+                                    ToolTip="Configura como Automático (Atrasado): inicia após o boot, acelerando a inicialização do Windows"/>
+                        </StackPanel>
+                        <Button Content="Recarregar" Click="BtnRefreshServices_Click" HorizontalAlignment="Right" Width="120" Style="{StaticResource SecondaryButtonStyle}"/>
+                    </Grid>
                 </Grid>
             </TabItem>
 
@@ -736,6 +796,153 @@
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ABA 5: DRIVERS (LIGAR/DESLIGAR) -->
+            <TabItem Header="Drivers (Ligar/Desligar)">
+                <Grid Margin="0,15,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- Info -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Filtros -->
+                        <RowDefinition Height="*"/>
+                        <!-- Tabela -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Ações -->
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#1A1A1A" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,10">
+                        <TextBlock Foreground="#AAA" FontSize="12" TextWrapping="Wrap"
+                                   Text="Drivers kernel (arquivos .sys) carregados pelo Windows. 'Desligar' grava Start=4 no registro — o driver não carrega mais no boot (efeito após reiniciar). Drivers de boot do Windows são protegidos e não podem ser desligados. Este painel é o mesmo conjunto de dados da aba Kernel da página Drivers."/>
+                    </Border>
+
+                    <!-- FILTROS -->
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#20FFFFFF" CornerRadius="4" Height="30" Width="240" Margin="0,0,10,0">
+                                <Grid>
+                                    <TextBlock Text="&#x1F50D; Filtrar drivers..." Foreground="#888" VerticalAlignment="Center" Margin="10,0" IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtDriverFilter}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBox x:Name="TxtDriverFilter" Background="Transparent" BorderThickness="0" Foreground="White" VerticalAlignment="Center" Margin="5,0" TextChanged="TxtDriverFilter_TextChanged"/>
+                                </Grid>
+                            </Border>
+                            <CheckBox x:Name="ChkDriverThirdOnly" Content="Só terceiros" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,10,0" Click="ChkDriverThirdOnly_Click"/>
+                            <CheckBox x:Name="ChkDriverEnabled" Content="Somente ligados" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,10,0" Click="ChkDriverEnabled_Click" IsChecked="True"
+                                      ToolTip="Esconde drivers já desligados (Start=4)"/>
+                            <TextBlock x:Name="TxtDriverCount" Text="" Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="Recarregar" Click="BtnReloadDrivers_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- TABELA DE DRIVERS -->
+                    <Border Grid.Row="2" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
+                        <DataGrid x:Name="GridKernelDrivers" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="170" IsReadOnly="True" SortMemberPath="Name">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="ToolTip" Value="{Binding DisplayName}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Descrição" Binding="{Binding DisplayName}" Width="*" IsReadOnly="True" SortMemberPath="DisplayName">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="#999"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Fabricante" Binding="{Binding Manufacturer}" Width="90" IsReadOnly="True" SortMemberPath="Manufacturer">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="#999"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Manufacturer}" Value="Microsoft">
+                                                    <Setter Property="Foreground" Value="#4CAF50"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Manufacturer}" Value="Terceiros">
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Início" Binding="{Binding StartName}" Width="80" IsReadOnly="True" SortMemberPath="StartValue">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StartValue}" Value="0">
+                                                    <Setter Property="Foreground" Value="#FF3333"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StartValue}" Value="1">
+                                                    <Setter Property="Foreground" Value="#FF6F00"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StartValue}" Value="2">
+                                                    <Setter Property="Foreground" Value="#FFD700"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StartValue}" Value="4">
+                                                    <Setter Property="Foreground" Value="#FF6F61"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Arquivo" Binding="{Binding ParentSoftware}" Width="150" IsReadOnly="True" SortMemberPath="ParentSoftware">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Foreground" Value="#AAA"/>
+                                            <Setter Property="ToolTip" Value="{Binding ResolvedPath}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+
+                            <DataGrid.ContextMenu>
+                                <ContextMenu Style="{StaticResource ServiceContextMenu}">
+                                    <MenuItem Header="&#x1F513; Ligar Driver (habilitar)" Click="MenuDriverEnable_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#4CAF50" FontWeight="Bold"/>
+                                    <MenuItem Header="&#x1F512; Desligar Driver (desabilitar)" Click="MenuDriverDisable_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61" FontWeight="Bold"/>
+                                    <Separator Background="#333"/>
+                                    <MenuItem Header="Copiar nome" Click="MenuDriverCopyName_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                    <MenuItem Header="Abrir pasta do arquivo" Click="MenuDriverOpenFolder_Click" Style="{StaticResource ServiceMenuItem}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                        </DataGrid>
+                    </Border>
+
+                    <Grid Grid.Row="3" Margin="0,10,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button Content="&#x1F513; Ligar Selecionado" Click="BtnDriverEnable_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150" Margin="0,0,10,0" Foreground="#4CAF50"/>
+                            <Button Content="&#x1F512; Desligar Selecionado" Click="BtnDriverDisable_Click" Style="{StaticResource SecondaryButtonStyle}" Width="170" Margin="0,0,10,0" Foreground="#FF6F61"/>
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </TabItem>

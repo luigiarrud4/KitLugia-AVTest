@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -20,77 +20,40 @@ using KitLugia.Core.KitStore;
 
 namespace KitLugia.GUI.Pages.WindowsSettings
 {
+    /// <summary>
+    /// Store Remake — interface no estilo UniGetUI (Discover/Installed/Updates):
+    /// busca unificada winget/choco/msstore com filtros de fonte, DataGrid virtualizado,
+    /// botão principal de ação e operações CLI com as flags corretas do UniGetUI
+    /// (--id --exact, --accept-*-agreements, --include-unknown, choco -y --no-progress).
+    /// Toda a lógica de parsing fica no StoreEngine (Core) — a GUI não duplica parsing.
+    /// </summary>
     public partial class StoreRemakePage : Page
     {
         private readonly ObservableCollection<StoreAppVM> _installed = new();
-        private readonly ObservableCollection<StoreAppVM> _searchResults = new();
-        private bool _showingInstalled = true;
+        private readonly ObservableCollection<StoreAppVM> _results = new();
         private string? _wingetPath;
         private string? _chocoPath;
-        private System.Windows.Threading.DispatcherTimer? _searchDebounce;
+        private string? _pipPath;
+        private string? _npmPath;
+        private string? _dotnetPath;
+        private string? _cargoPath;
+        private bool _devManagersLoaded;
 
-        public StoreRemakePage()
-        {
-            InitializeComponent();
-            Loaded += async (_, __) => await OnLoadedAsync();
-            Unloaded += StoreRemakePage_Unloaded;
-            TxtSearch.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) { e.Handled = true; _ = DoSearchAsync(); } };
-            // Busca ao vivo (igual MS Store): digitar já mostra apps, sem precisar clicar Buscar
-            TxtSearch.TextChanged += (s, e) => ScheduleLiveSearch();
-            _searchDebounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-            _searchDebounce.Tick += (s, e) => { _searchDebounce.Stop(); /* live search: dropdown so — busca full so via Enter/Buscar */ };
-            // Fechar dropdown ao pressionar Escape
-            TxtSearch.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Escape) { SearchPopup.IsOpen = false; e.Handled = true; } };
-            // Fechar dropdown ao clicar fora da area de busca
-            PreviewMouseDown += (s, e) =>
-            {
-                if (!SearchPopup.IsOpen) return;
-                var popupChild = SearchPopup.Child as System.Windows.FrameworkElement;
-                bool overPopup = popupChild != null && popupChild.IsMouseOver;
-                bool overTextBox = TxtSearch.IsMouseOver;
-                if (!overPopup && !overTextBox) SearchPopup.IsOpen = false;
-            };
-            // Hero cards: click handlers wired ONCE (Tag holds current app — set by PopulateHomeSections)
-            HeroCardMain.MouseLeftButtonDown += HeroCard_Click;
-            HeroSide1Card.MouseLeftButtonDown += HeroCard_Click;
-            HeroSide2Card.MouseLeftButtonDown += HeroCard_Click;
-        }
-        private void HeroCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (sender is FrameworkElement fe && fe.Tag is StoreAppVM app)
-                ShowAppDetail(app);
-        }
-
-        private void StoreRemakePage_Unloaded(object sender, RoutedEventArgs e)
-        {
-            try { _searchDebounce?.Stop(); } catch { }
-            try { _progressHideTimer?.Stop(); _progressHideTimer = null; } catch { }
-            try { _searchAnimTimer?.Stop(); _searchAnimTimer = null; } catch { }
-        }
-
-        private void ScheduleLiveSearch()
-        {
-            try
-            {
-                // Atualiza dropdown imediatamente (loco, sem debounce)
-                UpdateSearchDropdown(TxtSearch.Text ?? "");
-                if (_searchDebounce == null) return;
-                _searchDebounce.Stop();
-                _searchDebounce.Start(); // 400ms após parar de digitar dispara a busca
-            }
-            catch { }
-        }
+        private enum StoreTab { Discover, Installed, Updates }
+        // Página padrão: Atualizações — o usuário abre e já age no que precisa
+        private StoreTab _activeTab = StoreTab.Updates;
 
         private int _busy;
         private int _searchBusy;
-        private enum StoreTab { Home, Apps, Games, Library, Downloads }
-        private StoreTab _activeTab = StoreTab.Home;
+        private System.Windows.Threading.DispatcherTimer? _searchAnimTimer;
+        private System.Windows.Threading.DispatcherTimer? _progressHideTimer;
+        private double _lastPct = -1;
+
         private readonly Dictionary<string, ImageSource> _iconCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _iconLock = new();
-        // Cache de uninstall entries para resolver ícones sem varrer registry N vezes
         private Dictionary<string, UninstallInfo>? _uninstallCache;
         private DateTime _uninstallCacheTime = DateTime.MinValue;
-        // Ícone cache persistente em disco
+
         private static string IconCacheDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KitLugia", "IconCache");
         private static string GetIconCachePath(string appId)
         {
@@ -98,155 +61,339 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             return Path.Combine(IconCacheDir, safe + ".png");
         }
 
-        // ── Tab visibility: ONE method hides all, shows the target ──
-        private void ShowPanel(string tab)
+        // Sugestões do Discover (query vazia) — monikers/ids populares no índice local do winget
+        private static readonly string[] DiscoverSuggestions =
         {
-            _activeTab = Enum.Parse<StoreTab>(tab);
-            HighlightNav(_activeTab);
-            _showingInstalled = tab is "Library" or "Apps" or "Games";
-            // Show/hide the 4 main content areas
-            HomePanel.Visibility = tab == "Home" ? Visibility.Visible : Visibility.Collapsed;
-            StandardContent.Visibility = tab is "Home" or "Downloads" ? Visibility.Collapsed : Visibility.Visible;
-            DownloadsPanel.Visibility = tab == "Downloads" ? Visibility.Visible : Visibility.Collapsed;
-            SearchPopup.IsOpen = false;
-            // Inside StandardContent: show/hide children based on tab
-            bool showSearchInfo = tab is "Apps" or "Games" or "Library";
-            bool showList = tab == "Library";
-            bool showSearchGrid = tab is "Apps" or "Games";
-            SearchInfoGrid.Visibility = showSearchInfo ? Visibility.Visible : Visibility.Collapsed;
-            ListContainerBorder.Visibility = showList || showSearchGrid ? Visibility.Visible : Visibility.Collapsed;
-            LvApps.Visibility = showList ? Visibility.Visible : Visibility.Collapsed;
-            SearchGrid.Visibility = showSearchGrid ? Visibility.Visible : Visibility.Collapsed;
-            if (SearchScroll != null) SearchScroll.Visibility = showSearchGrid ? Visibility.Visible : Visibility.Collapsed;
-            LoadingSpinnerPanel.Visibility = tab == "Library" && _installed.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            TxtEmpty.Visibility = Visibility.Collapsed;
-            // Downloads inner panels
-            if (tab == "Downloads")
-            {
-                var ups = _installed.Where(a => a.HasUpdate).ToList();
-                LvDownloads.ItemsSource = ups;
-                DownloadsUpdatesTitle.Text = ups.Count > 0 ? $"Atualizações disponíveis ({ups.Count})" : "Nenhuma atualização pendente";
-                DownloadsUpdatesSection.Visibility = Visibility.Visible;
-                TxtDownloadsEmpty.Text = ups.Count == 0 ? "Tudo atualizado!" : "";
-                TxtDownloadsEmpty.Visibility = ups.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            }
+            "vscode", "googlechrome", "firefox", "7zip", "notepad++", "vlc", "steam",
+            "discord", "spotify", "obs", "git", "python", "nodejs", "powertoys", "terminal",
+            "winrar", "qbittorrent", "jdownloader"
+        };
+
+        public StoreRemakePage()
+        {
+            InitializeComponent();
+            Loaded += async (_, __) => await OnLoadedAsync();
+            Unloaded += StoreRemakePage_Unloaded;
+            LvPackages.SelectionChanged += (_, __) => UpdateMainToolbarState();
+        }
+
+        private void StoreRemakePage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try { _searchAnimTimer?.Stop(); _searchAnimTimer = null; } catch { }
+            try { _progressHideTimer?.Stop(); _progressHideTimer = null; } catch { }
         }
 
         private async Task OnLoadedAsync()
         {
-            Log("Detectando winget / choco / MS Store...");
+            Log("Detectando winget / choco...");
             _wingetPath = StoreEngine.FindWingetPath();
             _chocoPath = StoreEngine.FindChoco();
             TxtWingetStatus.Text = $"winget: {(_wingetPath != null ? "OK" : "não encontrado")}  ·  choco: {(_chocoPath != null ? "OK" : "não encontrado")}";
             TxtWingetStatus.Foreground = new SolidColorBrush(_wingetPath != null ? Color.FromRgb(0x4C, 0xC2, 0xFF) : Color.FromRgb(0xFF, 0x8C, 0x00));
+            if (_wingetPath == null && _chocoPath == null)
+                Log("Nenhum gerenciador encontrado — apenas dados em cache estarão disponíveis.");
+            // Header/tabs corretos já no load; a lista preenche quando o refresh termina
+            SwitchTab(StoreTab.Updates);
             await RefreshInstalledAsync(force: false);
         }
+
+        // ─────────────────────────── Abas (Discover / Installed / Updates) ───────────────────────────
+
+        private void SwitchTab(StoreTab tab)
+        {
+            _activeTab = tab;
+            // Header estilo UniGetUI: título 28pt + subtítulo por aba
+            (string title, string sub, string btnText, string btnIcon) = tab switch
+            {
+                StoreTab.Discover => ("Descobrir pacotes", "Busque no winget, Chocolatey e MS Store — instalar novos ou reinstalar existentes", "Instalar selecionado", "\uE896"),
+                StoreTab.Installed => ("Pacotes instalados", "Apps neste PC — desinstalar, reinstalar ou ver detalhes", "Desinstalar selecionado", "\uE74D"),
+                StoreTab.Updates => ("Atualizações", "Pacotes instalados com versão mais nova disponível — atualize um por um ou todos", "Atualizar tudo", "\uE895"),
+                _ => ("Pacotes", "", "Ação", "\uE896")
+            };
+            TxtPageTitle.Text = title;
+            TxtPageSubtitle.Text = sub;
+            MainToolbarText.Text = btnText;
+            MainToolbarIcon.Text = btnIcon;
+
+            var active = new SolidColorBrush(Color.FromRgb(0x2A, 0x34, 0x40));
+            var activeBorder = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4));
+            var idle = new SolidColorBrush(Color.FromRgb(0x32, 0x32, 0x32));
+            BtnTabDiscover.Background = tab == StoreTab.Discover ? active : idle;
+            BtnTabInstalled.Background = tab == StoreTab.Installed ? active : idle;
+            BtnTabUpdates.Background = tab == StoreTab.Updates ? active : idle;
+            BtnTabDiscover.BorderBrush = tab == StoreTab.Discover ? activeBorder : idle;
+            BtnTabInstalled.BorderBrush = tab == StoreTab.Installed ? activeBorder : idle;
+            BtnTabUpdates.BorderBrush = tab == StoreTab.Updates ? activeBorder : idle;
+
+            switch (tab)
+            {
+                case StoreTab.Discover: RenderDiscover(); break;
+                case StoreTab.Installed: RenderInstalled(); break;
+                case StoreTab.Updates: RenderUpdates(); break;
+            }
+            UpdateMainToolbarState();
+        }
+
+        private void BtnTabDiscover_Click(object sender, RoutedEventArgs e)
+        {
+            SwitchTab(StoreTab.Discover);
+            // Primeira visita ao Discover: carrega sugestões do índice local
+            if (_results.Count == 0 && _searchBusy == 0)
+                _ = DoSearchAsync();
+        }
+        private void BtnTabInstalled_Click(object sender, RoutedEventArgs e) => SwitchTab(StoreTab.Installed);
+        private void BtnTabUpdates_Click(object sender, RoutedEventArgs e) => SwitchTab(StoreTab.Updates);
+
+        private void RenderDiscover()
+        {
+            LvPackages.ItemsSource = _results;
+            TxtListInfo.Text = _results.Count > 0 ? $"{_results.Count} resultados" : "";
+            TxtEmpty.Visibility = _results.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (_results.Count == 0 && string.IsNullOrWhiteSpace(TxtSearch.Text))
+                TxtEmpty.Text = "Digite um termo para buscar ou aguarde as sugestões...";
+        }
+
+        private void RenderInstalled()
+        {
+            // Pacotes de dev (pip/npm/...) não são "apps" — aparecem só em Atualizações
+            var apps = _installed.Where(a => !a.DevOnly).ToList();
+            LvPackages.ItemsSource = new ObservableCollection<StoreAppVM>(apps);
+            TxtListInfo.Text = $"{apps.Count} apps · {apps.Count(a => a.HasUpdate)} com atualização";
+            TxtEmpty.Visibility = apps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            TxtEmpty.Text = "Nenhum app encontrado. Verifique se winget/choco estão instalados ou clique Atualizar.";
+        }
+
+        private void RenderUpdates()
+        {
+            var ups = _installed.Where(a => a.HasUpdate).ToList();
+            LvPackages.ItemsSource = new ObservableCollection<StoreAppVM>(ups);
+            int dev = ups.Count(a => a.DevOnly);
+            TxtListInfo.Text = ups.Count > 0 ? $"{ups.Count} atualização(ões) disponível(is)" + (dev > 0 ? $" · {dev} de dev (pip/npm/…)" : "") : "";
+            // Durante o refresh inicial não diz "Tudo atualizado!" — o spinner já sinaliza o carregamento
+            if (_busy == 1)
+            {
+                TxtEmpty.Visibility = Visibility.Collapsed;
+                return;
+            }
+            TxtEmpty.Visibility = ups.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            TxtEmpty.Text = "Tudo atualizado!";
+        }
+
+        // ─────────────────────────── Botão principal (toolbar) ───────────────────────────
+
+        private StoreAppVM? SelectedApp => LvPackages.SelectedItem as StoreAppVM;
+
+        private void UpdateMainToolbarState()
+        {
+            try
+            {
+                switch (_activeTab)
+                {
+                    case StoreTab.Discover:
+                        MainToolbarButton.IsEnabled = SelectedApp != null;
+                        MainToolbarText.Text = SelectedApp is { } d
+                            ? (d.HasUpdate ? "Atualizar selecionado" : d.IsInstalled ? "Reinstalar selecionado" : "Instalar selecionado")
+                            : "Instalar selecionado";
+                        MainToolbarButton.ToolTip = SelectedApp != null
+                            ? $"{MainToolbarText.Text}: {SelectedApp.Name}"
+                            : "Selecione um pacote na lista para habilitar a ação";
+                        break;
+                    case StoreTab.Installed:
+                        MainToolbarButton.IsEnabled = SelectedApp != null;
+                        break;
+                    case StoreTab.Updates:
+                        MainToolbarButton.IsEnabled = _installed.Count(a => a.HasUpdate) > 0;
+                        break;
+                }
+            }
+            catch { }
+        }
+
+        private async void MainToolbarButton_Click(object sender, RoutedEventArgs e)
+        {
+            switch (_activeTab)
+            {
+                case StoreTab.Discover:
+                    if (SelectedApp is { } app)
+                    {
+                        var verb = app.HasUpdate ? "Atualizar" : app.IsInstalled ? "Reinstalar" : "Instalar";
+                        if (MessageBox.Show($"{verb} {app.Name}?" + (app.IsInstalled && !app.HasUpdate ? "\n\nEste pacote já está instalado — será reinstalado por cima." : ""),
+                            "Store Remake", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+                            await InstallOrUpgradeAsync(app, false);
+                    }
+                    break;
+                case StoreTab.Installed:
+                    if (SelectedApp is { } inst)
+                    {
+                        if (MessageBox.Show($"Desinstalar {inst.Name}?", "Store Remake", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                            await UninstallAsync(inst);
+                    }
+                    break;
+                case StoreTab.Updates:
+                    await UpgradeAllAsync();
+                    break;
+            }
+        }
+
+        /// <summary>Desinstala da lista Atualizações (dev) — volta a aparecer se ainda desatualizado no refresh.</summary>
+        private void RemoveFromLists(StoreAppVM app)
+        {
+            try
+            {
+                _installed.Remove(app);
+                if (LvPackages.ItemsSource is ObservableCollection<StoreAppVM> oc) oc.Remove(app);
+            }
+            catch { }
+        }
+
+        // ─────────────────────── Gerenciadores de dev (pip/npm/dotnet/cargo) ───────────────────────
+
+        /// <summary>Detecção dos gerenciadores de dev — 1x por vida da página (where é barato mas não é grátis).</summary>
+        private async Task EnsureDevManagersAsync()
+        {
+            if (_devManagersLoaded) return;
+            _devManagersLoaded = true;
+            try
+            {
+                (_pipPath, _npmPath, _dotnetPath, _cargoPath) = await Task.Run(() =>
+                    (StoreEngine.FindPipPath(),
+                     StoreEngine.FindFirstOnPath("npm.cmd"),
+                     StoreEngine.FindFirstOnPath("dotnet.exe"),
+                     StoreEngine.FindFirstOnPath("cargo.exe")));
+                var found = new List<string>();
+                if (_pipPath != null) found.Add("pip");
+                if (_npmPath != null) found.Add("npm");
+                if (_dotnetPath != null) found.Add("dotnet");
+                if (_cargoPath != null) found.Add("cargo");
+                if (found.Count > 0)
+                    Log($"Gerenciadores de dev: {string.Join(", ", found)} (updates agregados na aba Atualizações)");
+            }
+            catch { }
+        }
+
+        /// <summary>Updates dos gerenciadores de dev — cada query já roda em Task.Run.</summary>
+        private async Task<List<KitLugia.Core.KitStore.StoreApp>> QueryDevUpdatesAsync()
+        {
+            await EnsureDevManagersAsync();
+            var t1 = Task.Run(() => StoreEngine.QueryPipOutdated(_pipPath));
+            var t2 = Task.Run(() => StoreEngine.QueryNpmOutdated(_npmPath));
+            var t3 = Task.Run(() => StoreEngine.QueryDotnetToolUpdates(_dotnetPath));
+            var t4 = Task.Run(() => StoreEngine.QueryCargoUpdates(_cargoPath));
+            await Task.WhenAll(t1, t2, t3, t4);
+            var all = new List<KitLugia.Core.KitStore.StoreApp>();
+            all.AddRange(t1.Result); all.AddRange(t2.Result); all.AddRange(t3.Result); all.AddRange(t4.Result);
+            return all;
+        }
+
+        // ─────────────────────────── Refresh (instalados + updates) ───────────────────────────
 
         private async Task RefreshInstalledAsync(bool force = false)
         {
             if (force) StoreEngine.InvalidateCache();
-            // delega para overload existente mantendo compatibilidade
-            await RefreshInstalledInternalAsync(force);
-        }
-
-        private async Task RefreshInstalledInternalAsync(bool force)
-        {
             if (System.Threading.Interlocked.Exchange(ref _busy, 1) == 1) { Log("Operação em andamento — ignorando novo refresh."); return; }
             try
             {
                 LoadingSpinnerPanel.Visibility = Visibility.Visible;
+                TxtLoadingMsg.Text = "Carregando pacotes instalados...";
                 TxtEmpty.Visibility = Visibility.Collapsed;
-                LvApps.Visibility = Visibility.Collapsed;
-                SearchGrid.Visibility = Visibility.Collapsed;
                 TxtListInfo.Text = "";
                 _installed.Clear();
 
                 try
                 {
-                    // Usa cache TTL 3 min — Store real re-query sempre, Kit é 10× mais rápido no re-open
-                    var installedTask = Task.Run(() => force ? StoreEngine.QueryWingetInstalled(_wingetPath) : StoreEngine.QueryWingetInstalledCached(_wingetPath, false));
+                    // Cache TTL 3 min no Engine — reabrir a página é ~10x mais rápido
+                    var installedTask = Task.Run(() => StoreEngine.QueryWingetInstalledCached(_wingetPath, force));
                     var upgradesTask = Task.Run(() => StoreEngine.QueryWingetUpgrades(_wingetPath));
                     var chocoTask = Task.Run(() => StoreEngine.QueryChocoOutdated(_chocoPath));
                     var appxTask = Task.Run(() => StoreEngine.QueryAppxPackages());
+                    var devTask = QueryDevUpdatesAsync();
 
-                    await Task.WhenAll(installedTask, upgradesTask, chocoTask, appxTask);
-
+                    await Task.WhenAll(installedTask, upgradesTask, chocoTask, appxTask, devTask);
                     var installed = installedTask.Result;
                     var upgrades = upgradesTask.Result;
                     var chocoUpgs = chocoTask.Result;
                     var appxList = appxTask.Result;
+                    var devUpgs = devTask.Result;
 
-                    // Merge por Id com comparação semântica de versão (não lexicográfica)
+                    // Merge por Id com comparação semântica de versão
                     var map = new Dictionary<string, StoreAppVM>(StringComparer.OrdinalIgnoreCase);
                     int dupCount = 0;
                     foreach (var a in installed)
                     {
                         var vm = ToVM(a);
-                        var key = (vm.Id ?? vm.Name ?? "").Trim().ToLowerInvariant();
-                        if (string.IsNullOrEmpty(key)) continue;
+                        vm.ShowInstall = false;
+                        vm.ShowUninstall = true;
+                        var key = Key(vm);
+                        if (key.Length == 0) continue;
                         if (!map.TryGetValue(key, out var existing))
                             map[key] = vm;
                         else
                         {
                             dupCount++;
-                            // Duplicata (ex: directx, WindowsAppRuntime multi-arch) — mantém maior versão sem spam de log
                             if (StoreEngine.CompareVersions(vm.Version, existing.Version) > 0)
                                 existing.Version = vm.Version;
                         }
                     }
                     if (dupCount > 0) Log($"Winget: {dupCount} duplicatas mescladas (multi-arch/fonte) — mantida maior versão");
-                    // Marca upgrades
+
                     foreach (var u in upgrades)
                     {
                         var key = (u.Id ?? "").Trim().ToLowerInvariant();
-                        if (string.IsNullOrEmpty(key)) continue;
+                        if (key.Length == 0) continue;
                         if (map.TryGetValue(key, out var ex))
                         {
                             ex.AvailableVersion = u.AvailableVersion ?? "";
                             if (!string.IsNullOrEmpty(u.Version)) ex.Version = u.Version;
                         }
-                        else
+                        else if (!map.ContainsKey(key))
                         {
                             var vm = ToVM(u);
-                            if (!map.ContainsKey(key)) map[key] = vm;
+                            vm.ShowInstall = false;
+                            vm.ShowUninstall = true;
+                            map[key] = vm;
                         }
                     }
+
                     foreach (var u in chocoUpgs)
                     {
                         var key = (u.Id ?? "").Trim().ToLowerInvariant();
-                        if (string.IsNullOrEmpty(key)) continue;
+                        if (key.Length == 0) continue;
                         if (map.TryGetValue(key, out var ex2))
                             ex2.AvailableVersion = u.AvailableVersion ?? "";
                         else
                         {
                             var vm = ToVM(u);
                             vm.Source = "choco";
-                            if (!map.ContainsKey(key)) map[key] = vm;
+                            vm.ShowInstall = false;
+                            vm.ShowUninstall = true;
+                            map[key + "|choco"] = vm;
                         }
                     }
-                    // Popula coleção ordenada (updates primeiro, depois alfabético)
+
+                    // Gerenciadores de dev (pip/npm/dotnet/cargo): update é o próprio gerenciador,
+                    // NÃO vão para "Instalados" — só aparecem como atualizações (igual UniGetUI)
+                    foreach (var d in devUpgs)
+                    {
+                        var key = ((d.Id ?? "") + "|" + d.Source).Trim().ToLowerInvariant();
+                        if (key.Length == 0 || map.ContainsKey(key)) continue;
+                        var vm = ToVM(d);
+                        vm.ShowInstall = false;
+                        vm.ShowUninstall = false;
+                        vm.DevOnly = true;
+                        map[key] = vm;
+                    }
+
                     foreach (var kv in map.Values
                         .OrderByDescending(v => v.HasUpdate)
                         .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
                         _installed.Add(kv);
 
-                    TxtStoreCount.Text = appxList.Count.ToString();
-                    TxtStoreStatus.Text = appxList.Count > 0 ? $"{appxList.Count} pacotes" : "0";
-                    TxtInstalledCount.Text = _installed.Count.ToString();
-                    TxtSourcesInfo.Text = $"winget:{installed.Count} choco:{chocoUpgs.Count} store:{appxList.Count}";
-                    var ups = _installed.Count(a => a.HasUpdate);
-                    TxtUpdatesCount.Text = ups.ToString();
-
-                    _ = Task.Run(() => LoadIconsForList(_installed.Take(40).ToList()));
-                    Log($"Instalados: {_installed.Count} | atualizações: {ups} | Store: {appxList.Count}");
-                    if (_installed.Count == 0)
-                        TxtEmpty.Text = "Nenhum app encontrado. Verifique se winget/choco estão instalados ou clique Buscar.";
-                    NavLibCount.Text = _installed.Count > 0 ? $"Biblioteca · {_installed.Count}" : "Biblioteca";
-                    // Mostra a aba correta (Home por padrão, Library se já estava lá)
-                    if (_activeTab == StoreTab.Home || _activeTab == (StoreTab)0)
-                        ShowHome();
-                    else
-                        ShowInstalled();
+                    int ups = _installed.Count(a => a.HasUpdate);
+                    int devUps = _installed.Count(a => a.DevOnly);
+                    TxtStatusCounts.Text = $"{_installed.Count - devUps} instalados · {ups} updates · {appxList.Count} pacotes Store" +
+                                           (devUps > 0 ? $" · {devUps} dev (pip/npm/…)" : "");
+                    _ = Task.Run(() => LoadIconsForList(_installed.Take(60).ToList()));
+                    Log($"Instalados: {_installed.Count - devUps} | atualizações: {ups - devUps} | dev: {devUps} | Store: {appxList.Count}");
                 }
                 catch (Exception ex)
                 {
@@ -258,10 +405,146 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             {
                 LoadingSpinnerPanel.Visibility = Visibility.Collapsed;
                 System.Threading.Interlocked.Exchange(ref _busy, 0);
+                UpdateMainToolbarState();
+            }
+
+            // Re-render da aba atual com os dados novos + atualiza badges "instalado" do Discover
+            await MarkInstalledFlagsAsync();
+            switch (_activeTab)
+            {
+                case StoreTab.Installed: RenderInstalled(); break;
+                case StoreTab.Updates: RenderUpdates(); break;
             }
         }
 
-        private StoreAppVM ToVM(KitLugia.Core.KitStore.StoreApp src)
+        private static string Key(StoreAppVM vm) => (string.IsNullOrEmpty(vm.Id) ? vm.Name : vm.Id).Trim().ToLowerInvariant();
+
+        // ─── Detecção de "já instalado" (multi-fonte, estilo AppsPage/BCU) ───
+        // 1) ids/nomes da lista winget+choco (StoreEngine)
+        // 2) TODOS os DisplayNames/RegistryKeyNames do registro (RegistryProgramFactory —
+        //    mesma engine do AppsPage: HKLM+HKCU, 32+64-bit) — pega apps instalados
+        //    fora do winget (installer próprio, portable com uninstall, etc.)
+        // Match: exato normalizado (só [a-z0-9]) ou contenção (token >= 4 chars).
+
+        private HashSet<string> _installedKeyIndex = new(StringComparer.Ordinal);
+        private HashSet<string> _registryKeyIndex = new(StringComparer.Ordinal);
+        private DateTime _registryIndexTime = DateTime.MinValue;
+        private int _lastInstalledMarked;
+
+        /// <summary>Normaliza p/ match: minúsculo, só letras e dígitos ("7-Zip (x64)" → "7zipx64").</summary>
+        private static string NormKey(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "";
+            var sb = new StringBuilder(s.Length);
+            foreach (var c in s.ToLowerInvariant())
+                if (char.IsLetterOrDigit(c)) sb.Append(c);
+            return sb.ToString();
+        }
+
+        // Sufixos de convenção choco que atrapalham o match ("notepadplusplus.install")
+        private static readonly string[] ChocoNoiseSuffixes = { "install", "portable", "appx", "package" };
+
+        // Tokens de vendor genéricos: válidos p/ match EXATO, mas NUNCA p/ contenção
+        // (evita "Microsoft.X" aparecer instalado só porque há N apps "Microsoft..." no registro)
+        private static readonly HashSet<string> GenericTokens = new(StringComparer.Ordinal)
+        { "microsoft", "google", "adobe", "apple", "mozilla", "video", "the", "app", "software" };
+
+        /// <summary>Tokens candidatos de um pacote: id completo, 1º segmento do id, id sem sufixo choco e nome.</summary>
+        private static List<string> CandidateKeys(StoreAppVM vm)
+        {
+            var list = new List<string>();
+            var id = vm.Id ?? "";
+            var nid = NormKey(id);
+            var nname = NormKey(vm.Name);
+            if (nid.Length > 0) list.Add(nid);
+            var dot = id.IndexOf('.');
+            if (dot > 0) { var first = NormKey(id.Substring(0, dot)); if (first.Length > 0) list.Add(first); }
+            foreach (var suf in ChocoNoiseSuffixes)
+            {
+                if (nid.Length > suf.Length + 2 && nid.EndsWith(suf, StringComparison.Ordinal))
+                { list.Add(nid.Substring(0, nid.Length - suf.Length)); break; }
+            }
+            if (nname.Length > 0) list.Add(nname);
+            return list.Distinct().Where(k => k.Length >= 3).ToList();
+        }
+
+        private void RebuildInstalledIndex()
+        {
+            _installedKeyIndex = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var i in _installed)
+            {
+                foreach (var k in CandidateKeys(i))
+                    _installedKeyIndex.Add(k);
+                // id sem parte do publisher também entra no índice exato
+                var dot = (i.Id ?? "").IndexOf('.');
+                if (dot > 0)
+                {
+                    var tail = NormKey(i.Id.Substring(dot + 1));
+                    if (tail.Length >= 3) _installedKeyIndex.Add(tail);
+                }
+            }
+        }
+
+        /// <summary>Parte lenta (registro, centenas de chaves) — SEMPRE fora da UI thread.</summary>
+        private async Task RebuildRegistryIndexAsync()
+        {
+            if (_registryKeyIndex.Count > 0 && (DateTime.UtcNow - _registryIndexTime).TotalMinutes < 10) return;
+            try
+            {
+                var progs = await Task.Run(() => KitLugia.Core.UninstallTools.RegistryProgramFactory.GetInstalledPrograms());
+                var set = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var p in progs)
+                {
+                    var a = NormKey(p.DisplayName);
+                    var b = NormKey(p.RegistryKeyName);
+                    if (a.Length >= 3) set.Add(a);
+                    if (b.Length >= 3) set.Add(b);
+                }
+                _registryKeyIndex = set;
+                _registryIndexTime = DateTime.UtcNow;
+            }
+            catch (Exception ex) { Log($"Índice de registro falhou: {ex.Message}"); }
+        }
+
+        private bool IsLikelyInstalled(StoreAppVM vm)
+        {
+            var keys = CandidateKeys(vm);
+            // 1) Exato (id/nome normalizados) em qualquer índice
+            foreach (var k in keys)
+            {
+                if (_installedKeyIndex.Contains(k) || _registryKeyIndex.Contains(k)) return true;
+            }
+            // 2) Contenção: nome/id instalado contém o token do resultado (token >= 4,
+            //    fora da stoplist de vendors) ex: "firefox" contido em "mozillafirefoxx64enus"
+            foreach (var k in keys)
+            {
+                if (k.Length < 4 || GenericTokens.Contains(k)) continue;
+                if (_installedKeyIndex.Any(x => x.Contains(k))) return true;
+                if (_registryKeyIndex.Any(x => x.Contains(k))) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Sincroniza IsInstalled dos resultados do Discover com a lista de instalados atual.</summary>
+        private async Task MarkInstalledFlagsAsync()
+        {
+            try
+            {
+                RebuildInstalledIndex(); // barato (memória)
+                await RebuildRegistryIndexAsync(); // lento — Task.Run interno
+                int marked = 0;
+                foreach (var r in _results)
+                {
+                    var inst = IsLikelyInstalled(r);
+                    if (inst) marked++;
+                    if (r.IsInstalled != inst) r.IsInstalled = inst;
+                }
+                _lastInstalledMarked = marked;
+            }
+            catch { }
+        }
+
+        private StoreAppVM ToVM(StoreApp src)
         {
             return new StoreAppVM
             {
@@ -272,173 +555,135 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 AvailableVersion = src.AvailableVersion ?? "",
                 Source = string.IsNullOrEmpty(src.Source) ? "winget" : src.Source,
                 Category = src.Category ?? "",
-                Description = src.Description ?? "",
-                Rating = src.Rating,
-                RatingCount = src.RatingCount
+                Description = src.Description ?? ""
             };
         }
 
-        private void ShowHome()
+        // ─────────────────────────── Busca (estilo UniGetUI Discover) ───────────────────────────
+
+        private List<string> GetSelectedSources()
         {
-            ShowPanel("Home");
-            PopulateHomeSections();
+            var srcs = new List<string>();
+            if (ChkSrcWinget.IsChecked == true) srcs.Add("winget");
+            if (ChkSrcChoco.IsChecked == true) srcs.Add("choco");
+            if (ChkSrcStore.IsChecked == true) srcs.Add("msstore");
+            return srcs;
         }
 
-        private void ShowInstalled()
+        private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            ShowPanel("Library");
-            if (_installed.Count == 0)
-            {
-                TxtEmpty.Text = "Nenhum app encontrado. Verifique se winget/choco estão instalados ou clique Buscar.";
-                TxtEmpty.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                LvApps.ItemsSource = _installed;
-                TxtListInfo.Text = $"{_installed.Count} apps · {_installed.Count(a => a.HasUpdate)} com atualização";
-            }
+            if (TxtSearchPlaceholder == null || BtnClearSearch == null) return;
+            var hasText = !string.IsNullOrEmpty(TxtSearch.Text);
+            TxtSearchPlaceholder.Visibility = hasText ? Visibility.Collapsed : Visibility.Visible;
+            BtnClearSearch.Visibility = hasText ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void BtnCategory_Click(object sender, RoutedEventArgs e)
+        private void TxtSearch_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
-            try
+            if (e.Key == System.Windows.Input.Key.Enter)
             {
-                var tag = (sender as Button)?.Tag as string ?? "Todos";
-                Log($"Filtro categoria: {tag}");
-                if (tag == "Todos" || string.IsNullOrEmpty(tag))
-                {
-                    ShowInstalled();
-                    return;
-                }
-                // Filtro simples por publisher/nome contendo o termo — evita varrer categoria inexistente no winget
-                var q = tag.ToLowerInvariant();
-                var filtered = _installed.Where(a => (a.Name + " " + a.Publisher + " " + a.Category).ToLowerInvariant().Contains(q)).ToList();
-                if (filtered.Count == 0)
-                {
-                    TxtEmpty.Text = $"Nenhum app em \"{tag}\". Tente Buscar.";
-                    TxtEmpty.Visibility = Visibility.Visible;
-                    LvApps.Visibility = Visibility.Collapsed;
-                    SearchGrid.Visibility = Visibility.Collapsed;
-                    TxtListInfo.Text = "0 resultados";
-                    return;
-                }
-                TxtEmpty.Visibility = Visibility.Collapsed;
-                LvApps.Visibility = Visibility.Visible;
-                SearchGrid.Visibility = Visibility.Collapsed;
-                LvApps.ItemsSource = new ObservableCollection<StoreAppVM>(filtered);
-                TxtListInfo.Text = $"{filtered.Count} em {tag}";
+                e.Handled = true;
+                _ = DoSearchAsync();
             }
-            catch (Exception ex) { Log($"Filtro erro: {ex.Message}"); }
-        }
-
-        private void ShowSearch()
-        {
-            var tab = _activeTab == StoreTab.Games ? "Games" : "Apps";
-            ShowPanel(tab);
-            if (_searchResults.Count == 0)
+            else if (e.Key == System.Windows.Input.Key.Escape)
             {
-                TxtEmpty.Text = "Nenhum resultado. Digite um termo e clique Buscar.";
-                TxtEmpty.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                SearchGrid.ItemsSource = _searchResults;
-                TxtListInfo.Text = $"{_searchResults.Count} resultados";
+                TxtSearch.Text = "";
             }
         }
 
-        // --- Delegam para StoreEngine (sem duplicar parsing) ---
-        private static string RunCapture(string exe, string args, int timeoutMs) => StoreEngine.RunCapture(exe, args, timeoutMs);
+        private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
+        {
+            TxtSearch.Text = "";
+            TxtSearch.Focus();
+        }
 
-        // --- Search ---
+        private async void BtnSearch_Click(object sender, RoutedEventArgs e) => await DoSearchAsync();
+
+        private void SourceFilter_Changed(object sender, RoutedEventArgs e)
+        {
+            // Reexecuta a busca com os filtros novos se já há termo digitado (estilo UniGetUI)
+            if (IsLoaded && !string.IsNullOrWhiteSpace(TxtSearch.Text) && _searchBusy == 0)
+                _ = DoSearchAsync();
+        }
+
         private async Task DoSearchAsync()
         {
-            SearchPopup.IsOpen = false;
             if (System.Threading.Interlocked.Exchange(ref _searchBusy, 1) == 1) { Log("Busca já em andamento — ignorando."); return; }
             try
             {
+                if (_activeTab != StoreTab.Discover) SwitchTab(StoreTab.Discover);
+                else { RenderDiscover(); UpdateMainToolbarState(); } // garante ItemsSource mesmo já estando na aba
                 var q = (TxtSearch.Text ?? "").Trim();
-                if (string.IsNullOrWhiteSpace(q) && _showingInstalled) return;
-                var src = (CmbSource.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Todos";
+                var srcs = GetSelectedSources();
+                if (srcs.Count == 0) { TxtSearchInfo.Text = "Selecione ao menos uma fonte (winget/choco/msstore)."; return; }
+
                 ShowSearchBar();
                 TxtSearchInfo.Text = "Buscando...";
-                _searchResults.Clear();
+                _results.Clear();
 
                 try
                 {
-                    if (string.IsNullOrWhiteSpace(q))
+                    if (q.Length < 2)
                     {
-                        var ups = await Task.Run(() => StoreEngine.QueryWingetUpgrades(_wingetPath));
-                        foreach (var a in ups) _searchResults.Add(ToVM(a));
-                        var chocos = await Task.Run(() => StoreEngine.QueryChocoOutdated(_chocoPath));
-                        foreach (var a in chocos) _searchResults.Add(ToVM(a));
-                        TxtSearchInfo.Text = (ups.Count + chocos.Count) == 0 ? "Nenhuma atualização disponível." : $"{ups.Count + chocos.Count} atualização(ões) disponível(is).";
-                        Log($"Busca vazia -> atualizações: {ups.Count} winget + {chocos.Count} choco");
-                    }
-                    else if (src.IndexOf("MS Store", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        var appx = await Task.Run(() => StoreEngine.QueryAppxPackages());
-                        var filtered = appx.Where(p => p.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0).Take(40)
-                                           .Select(p => new StoreAppVM { Name = p.Split('_')[0], Id = p, Version = "", Source = "msstore" });
-                        foreach (var a in filtered) _searchResults.Add(a);
-                        TxtSearchInfo.Text = $"{_searchResults.Count} pacote(s) Store com \"{q}\"";
-                    }
-                    else if (src.IndexOf("winget", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        var res = await Task.Run(() => StoreEngine.QueryWingetSearchLocal(_wingetPath, q));
-                        foreach (var a in res) _searchResults.Add(ToVM(a));
-                        TxtSearchInfo.Text = $"{res.Count} resultado(s) winget para \"{q}\"";
-                    }
-                    else if (src.IndexOf("chocolatey", StringComparison.OrdinalIgnoreCase) >= 0 || src.IndexOf("choco", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        if (string.IsNullOrEmpty(_chocoPath)) TxtSearchInfo.Text = "Chocolatey não encontrado.";
-                        else
-                        {
-                            var output = await Task.Run(() => RunCapture($"\"{_chocoPath}\"", $"search \"{q}\" --limit-output --by-id-only --order-by-popularity --page 0 --page-size 30", 25000));
-                            foreach (var raw in output.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
-                            {
-                                var line = raw.Trim();
-                                if (string.IsNullOrEmpty(line) || line.StartsWith("Chocolatey", StringComparison.OrdinalIgnoreCase)) continue;
-                                var parts = line.Split('|');
-                                var id = parts[0].Trim();
-                                var ver = parts.Length > 1 ? parts[1].Trim() : "";
-                                _searchResults.Add(new StoreAppVM { Name = id, Id = id, Version = ver, Source = "choco" });
-                            }
-                            TxtSearchInfo.Text = $"{_searchResults.Count} resultado(s) choco para \"{q}\"";
-                        }
-                    }
-                    else // Todos
-                    {
-                        var w = await Task.Run(() => StoreEngine.QueryWingetSearchLocal(_wingetPath, q));
-                        foreach (var a in w) _searchResults.Add(ToVM(a));
-                        if (_chocoPath != null)
-                        {
-                            var output = await Task.Run(() => RunCapture($"\"{_chocoPath}\"", $"search \"{q}\" --limit-output --page-size 10", 20000));
-                            foreach (var raw in output.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
-                            {
-                                var line = raw.Trim();
-                                if (string.IsNullOrEmpty(line) || line.StartsWith("Chocolatey", StringComparison.OrdinalIgnoreCase)) continue;
-                                var parts = line.Split('|');
-                                var id = parts[0].Trim();
-                                if (_searchResults.Any(x => string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase))) continue;
-                                var ver = parts.Length > 1 ? parts[1].Trim() : "";
-                                _searchResults.Add(new StoreAppVM { Name = id, Id = id, Version = ver, Source = "choco" });
-                            }
-                        }
-                        TxtSearchInfo.Text = $"{_searchResults.Count} resultado(s) para \"{q}\" (winget+choco)";
-                    }
-                    // Sempre mostra como grid de cards para fidelidade Store
-                    if (_searchResults.Count > 0)
-                    {
-                        ShowPanel("Apps");
-                        SearchGrid.ItemsSource = _searchResults;
-                        TxtListInfo.Text = $"{_searchResults.Count} resultados";
-                        _ = Task.Run(() => LoadIconsForList(_searchResults.Take(24).ToList()));
+                        // Query vazia → sugestões do Discover (índice local instantâneo)
+                        await LoadDiscoverSuggestions(srcs);
                     }
                     else
                     {
-                        ShowSearch();
+                        if (srcs.Contains("winget"))
+                        {
+                            var w = await Task.Run(() => StoreEngine.QueryWingetSearchLocal(_wingetPath, q));
+                            foreach (var a in w)
+                            {
+                                var vm = ToVM(a);
+                                vm.Source = string.IsNullOrEmpty(vm.Source) || vm.Source == "winget" ? "winget" : vm.Source;
+                                vm.ShowInstall = true;
+                                vm.ShowUninstall = false;
+                                AddUnique(vm);
+                            }
+                        }
+                        if (srcs.Contains("msstore"))
+                        {
+                            var ms = await Task.Run(() => StoreEngine.QueryWingetSearch(_wingetPath, q, "msstore"));
+                            foreach (var a in ms)
+                            {
+                                var vm = ToVM(a);
+                                vm.Source = "msstore";
+                                vm.ShowInstall = true;
+                                vm.ShowUninstall = false;
+                                AddUnique(vm);
+                            }
+                        }
+                        if (srcs.Contains("choco"))
+                        {
+                            if (string.IsNullOrEmpty(_chocoPath))
+                                Log("Chocolatey não encontrado — filtro choco ignorado.");
+                            else
+                            {
+                                var ch = await Task.Run(() => StoreEngine.QueryChocoSearch(_chocoPath, q));
+                                foreach (var a in ch)
+                                {
+                                    var vm = ToVM(a);
+                                    vm.Source = "choco";
+                                    vm.ShowInstall = true;
+                                    vm.ShowUninstall = false;
+                                    AddUnique(vm);
+                                }
+                            }
+                        }
+                        // Marca os que já estão instalados (badge verde ✓ instalado + botão Reinstalar)
+                        await MarkInstalledFlagsAsync();
+
+                        TxtSearchInfo.Text = $"{_results.Count} resultado(s) para \"{q}\"";
+                        Log($"Busca \"{q}\": {_results.Count} resultados ({string.Join("+", srcs)}) · {_lastInstalledMarked} já instalado(s)");
                     }
+
+                    TxtListInfo.Text = _results.Count > 0 ? $"{_results.Count} resultados" : "";
+                    TxtEmpty.Visibility = _results.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    if (_results.Count == 0 && q.Length >= 2) TxtEmpty.Text = "Nenhum resultado. Tente outro termo ou outra fonte.";
+                    // SEMPRE (re)atribui a fonte da lista — SwitchTab pode não ter rodado se já estávamos na aba Discover
+                    LvPackages.ItemsSource = _results;
+                    _ = Task.Run(() => LoadIconsForList(_results.Take(30).ToList()));
                 }
                 catch (Exception ex)
                 {
@@ -453,87 +698,141 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
         }
 
-        // --- Actions ---
-        private async Task UpgradeOneAsync(StoreAppVM app, bool forceStop)
+        private void AddUnique(StoreAppVM vm)
+        {
+            var key = Key(vm) + "|" + vm.Source;
+            if (_results.Any(x => (Key(x) + "|" + x.Source) == key)) return;
+            _results.Add(vm);
+        }
+
+        private async Task LoadDiscoverSuggestions(List<string> srcs)
+        {
+            // Puxa sugestões do índice local do winget (instantâneo, sem rede)
+            var added = 0;
+            if (srcs.Contains("winget"))
+            {
+                foreach (var term in DiscoverSuggestions)
+                {
+                    if (added >= 24) break;
+                    var res = await Task.Run(() => StoreEngine.QueryWingetSearchLocal(_wingetPath, term));
+                    var first = res.FirstOrDefault();
+                    if (first == null) continue;
+                    var vm = ToVM(first);
+                    vm.ShowInstall = true;
+                    vm.ShowUninstall = false;
+                    var before = _results.Count;
+                    AddUnique(vm);
+                    if (_results.Count > before) added++;
+                }
+            }
+            await MarkInstalledFlagsAsync();
+            if (srcs.Contains("choco") && !string.IsNullOrEmpty(_chocoPath) && added < 24)
+            {
+                foreach (var term in new[] { "vlc", "notepadplusplus", "firefox", "7zip", "greenshot" })
+                {
+                    if (added >= 24) break;
+                    var res = await Task.Run(() => StoreEngine.QueryChocoSearch(_chocoPath, term, 1));
+                    var first = res.FirstOrDefault();
+                    if (first == null) continue;
+                    var vm = ToVM(first);
+                    vm.Source = "choco";
+                    vm.ShowInstall = true;
+                    vm.ShowUninstall = false;
+                    var before = _results.Count;
+                    AddUnique(vm);
+                    if (_results.Count > before) added++;
+                }
+            }
+            TxtSearchInfo.Text = added > 0 ? $"{added} sugestões — digite para buscar em todas as fontes" : "Digite um termo para buscar.";
+            Log($"Discover: {added} sugestões carregadas do índice local · {_lastInstalledMarked} já instalado(s)");
+        }
+
+        // ─────────────────────────── Operações (flags do UniGetUI) ───────────────────────────
+
+        /// <param name="refreshAfter">false em lote (Atualizar tudo) — a lista é recarregada UMA vez no fim.</param>
+        private async Task InstallOrUpgradeAsync(StoreAppVM app, bool forceStop, bool refreshAfter = true)
         {
             if (app == null) return;
-            var verb = app.HasUpdate ? "Atualizando" : "Instalando";
+            bool isInstall = !_installed.Any(x => string.Equals(x.Id, app.Id, StringComparison.OrdinalIgnoreCase) && x.Source == app.Source)
+                             && !_installed.Any(x => string.Equals(x.Id, app.Id, StringComparison.OrdinalIgnoreCase));
+            var verb = app.HasUpdate ? "Atualizando" : isInstall ? "Instalando" : "Reinstalando";
             Log($"{verb} {app.Id} ({app.Source}) force={forceStop}...");
             try
             {
                 if (forceStop) ForceStopForApp(app);
 
                 string exe, args;
-                bool isInstall = string.IsNullOrEmpty(app.Version) || !_installed.Any(x => string.Equals(x.Id, app.Id, StringComparison.OrdinalIgnoreCase));
                 if (app.Source.Equals("choco", StringComparison.OrdinalIgnoreCase))
                 {
                     exe = _chocoPath ?? "choco";
-                    args = isInstall ? $"install \"{app.Id}\" -y --no-progress" : $"upgrade \"{app.Id}\" -y --no-progress";
+                    // UniGetUI ChocolateyPkgOperationHelper: id -y (+ --no-progress em install/upgrade)
+                    // Reinstalar/instalar = install; só upgrade real quando há versão nova
+                    args = app.HasUpdate ? $"upgrade \"{app.Id}\" -y --no-progress" : $"install \"{app.Id}\" -y --no-progress";
                 }
-                else if (app.Source.Equals("msstore", StringComparison.OrdinalIgnoreCase))
+                else if (app.Source.Equals("pip", StringComparison.OrdinalIgnoreCase))
                 {
-                    try { Process.Start(new ProcessStartInfo($"ms-windows-store://pdp/?ProductId={app.Id}") { UseShellExecute = true }); Log($"Abrindo Store para {app.Id}"); } catch (Exception ex) { Log($"Falha abrir Store: {ex.Message}"); }
-                    return;
+                    // UniGetUI PipPkgOperationHelper: install --upgrade id --no-input --no-color --no-cache
+                    exe = _pipPath ?? "pip";
+                    bool isPython = exe.EndsWith("python.exe", StringComparison.OrdinalIgnoreCase);
+                    args = (isPython ? "-m pip " : "") + $"install --upgrade {app.Id} --no-input --no-color --no-cache";
+                }
+                else if (app.Source.Equals("npm", StringComparison.OrdinalIgnoreCase))
+                {
+                    // UniGetUI Npm: UpdateVerb = install (install -g id atualiza)
+                    exe = _npmPath ?? "npm";
+                    args = app.Category == "global" ? $"install -g {app.Id}" : $"install {app.Id}";
+                }
+                else if (app.Source.Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+                {
+                    // UniGetUI DotNet: UpdateVerb = update (dotnet tool update -g id)
+                    exe = _dotnetPath ?? "dotnet";
+                    args = $"tool update --global {app.Id}";
+                }
+                else if (app.Source.Equals("cargo", StringComparison.OrdinalIgnoreCase))
+                {
+                    // cargo-update: instala a versão nova do crate
+                    exe = _cargoPath ?? "cargo";
+                    args = $"install {app.Id}";
                 }
                 else
                 {
                     exe = _wingetPath ?? "winget";
-                    if (isInstall)
-                        args = $"install --id \"{app.Id}\" --silent --accept-package-agreements --accept-source-agreements --disable-interactivity";
+                    // UniGetUI WinGetPkgOperationHelper: --id X --exact + agreements + --silent
+                    var baseArgs = $"--id \"{app.Id}\" --exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity";
+                    // Fixa a fonte quando conhecida — sem isso o winget pode falhar se o id
+                    // existir em mais de uma fonte (winget+msstore) com interatividade desativada
+                    if (app.Source.Equals("winget", StringComparison.OrdinalIgnoreCase))
+                        baseArgs += " --source winget";
+                    else if (app.Source.Equals("msstore", StringComparison.OrdinalIgnoreCase))
+                        baseArgs += " --source msstore";
+                    if (app.HasUpdate)
+                        // update: + --include-unknown --force (igual UniGetUI)
+                        args = $"upgrade {baseArgs} --include-unknown --force";
                     else
-                        args = $"upgrade --id \"{app.Id}\" --silent --accept-package-agreements --accept-source-agreements --disable-interactivity";
+                        // install novo ou reinstalar por cima (upgrade sem pendência falha no winget)
+                        args = $"install {baseArgs}";
                 }
 
-                // Mostra barra flutuante + toast de progresso
                 SetProgress(0, $"{verb} {app.Name}...", "Iniciando download/instalação...");
                 ShowToastProgress($"store_{app.Id}", verb, $"{app.Name} — preparando...");
 
-                var oem = KitLugia.Core.SystemUtils.GetOemEncoding();
-                var psi = new ProcessStartInfo(exe.Trim('"'), args)
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    StandardOutputEncoding = oem,
-                    StandardErrorEncoding = oem
-                };
-
-                using var proc = new Process { StartInfo = psi };
-                var sb = new StringBuilder();
-                // Stream ao vivo: atualiza log + barra conforme winget/choco emite linhas
-                proc.OutputDataReceived += (s, e) =>
-                {
-                    if (string.IsNullOrEmpty(e.Data)) return;
-                    sb.AppendLine(e.Data);
-                    OnInstallLine(app, e.Data);
-                };
-                proc.ErrorDataReceived += (s, e) =>
-                {
-                    if (string.IsNullOrEmpty(e.Data)) return;
-                    sb.AppendLine(e.Data);
-                    OnInstallLine(app, e.Data);
-                };
-                proc.Start();
-                proc.BeginOutputReadLine();
-                proc.BeginErrorReadLine();
-                await proc.WaitForExitAsync();
-
-                var output = sb.ToString();
-                Log($"[{app.Id}] exit {proc.ExitCode}\n{Trunc(output, 1000)}");
-                if (proc.ExitCode == 0)
+                var output = await RunProcessStreamingAsync(app, exe, args);
+                int exit = _lastExitCode;
+                Log($"[{app.Id}] exit {exit}\n{Trunc(output, 1000)}");
+                if (exit == 0 || exit == 3010 || exit == 1641 || exit == 1614 || exit == 1605)
                 {
                     SetProgress(100, $"{app.Name} concluído.", "");
                     CompleteToastProgress($"store_{app.Id}", true, $"{(isInstall ? "Instalação" : "Atualização")} de {app.Name} concluída com sucesso.");
                 }
                 else
                 {
-                    SetProgress(0, $"{app.Name}: falhou (exit {proc.ExitCode}).", "");
-                    CompleteToastProgress($"store_{app.Id}", false, $"{app.Name}: falhou (exit {proc.ExitCode}).");
+                    SetProgress(0, $"{app.Name}: falhou (exit {exit}).", "");
+                    CompleteToastProgress($"store_{app.Id}", false, $"{app.Name}: falhou (exit {exit}).");
                 }
 
                 HideProgressAfterDelay();
-                await RefreshInstalledAsync(force: true);
+                if (refreshAfter)
+                    await RefreshInstalledAsync(force: true);
             }
             catch (Exception ex)
             {
@@ -543,52 +842,93 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
         }
 
-        private double _lastPct = -1;
-        private System.Windows.Threading.DispatcherTimer? _progressHideTimer;
-        private System.Windows.Threading.DispatcherTimer? _searchAnimTimer;
-
-        // Processa cada linha de saída do winget/choco: atualiza barra (%) e log ao vivo.
-        private void OnInstallLine(StoreAppVM app, string line)
+        private async Task UninstallAsync(StoreAppVM app)
         {
-            var t = line.Trim();
-            if (t.Length == 0) return;
-            // Loga linhas significativas no painel de atividade (pula barras de progresso)
-            if (t.Length > 0 && t[0] != '\u2588' && t[0] != '\u2591' && t[0] != '\u2592' && t[0] != '\u2593')
+            if (app == null) return;
+            Log($"Desinstalando {app.Id} ({app.Source})...");
+            try
             {
-                try { Log($"[{app.Name}] {Trunc(t, 200)}"); } catch { }
+                string exe, args;
+                if (app.Source.Equals("choco", StringComparison.OrdinalIgnoreCase))
+                {
+                    exe = _chocoPath ?? "choco";
+                    args = $"uninstall \"{app.Id}\" -y --no-progress";
+                }
+                else
+                {
+                    exe = _wingetPath ?? "winget";
+                    args = $"uninstall --id \"{app.Id}\" --exact --silent --accept-source-agreements --disable-interactivity";
+                }
+
+                SetProgress(0, $"Desinstalando {app.Name}...", "Executando uninstall...");
+                ShowToastProgress($"store_un_{app.Id}", "Desinstalando", $"{app.Name} — preparando...");
+                var output = await RunProcessStreamingAsync(app, exe, args);
+                int exit = _lastExitCode;
+                Log($"[{app.Id}] uninstall exit {exit}\n{Trunc(output, 800)}");
+                CompleteToastProgress($"store_un_{app.Id}", exit == 0, exit == 0 ? $"{app.Name} desinstalado." : $"{app.Name}: falhou (exit {exit}).");
+                SetProgress(100, $"{app.Name} desinstalado.", "");
+                HideProgressAfterDelay();
+                await RefreshInstalledAsync(force: true);
             }
-            // Detecta fases do winget
-            var phase = DetectWingetPhase(t);
-            var result = TryParseProgress(t);
-            Dispatcher.BeginInvoke(new Action(() =>
+            catch (Exception ex)
+            {
+                Log($"Desinstalar erro: {ex.Message}");
+                CompleteToastProgress($"store_un_{app.Id}", false, $"Erro ao desinstalar {app.Name}: {ex.Message}");
+                HideProgressAfterDelay();
+            }
+        }
+
+        private async Task UpgradeAllAsync()
+        {
+            var ups = _installed.Where(a => a.HasUpdate).ToList();
+            if (ups.Count == 0) { ShowToastInfo("Nenhuma atualização pendente."); return; }
+            var preview = string.Join("\n", ups.Take(8).Select(a => $"• {a.Name} ({a.Version} → {a.AvailableVersion})"));
+            if (ups.Count > 8) preview += $"\n• +{ups.Count - 8} outro(s)";
+            if (MessageBox.Show($"Atualizar {ups.Count} pacote(s)?\n\n{preview}",
+                "Atualizar tudo", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+            ShowToastProgress("store_batch", "Atualizando tudo", $"{ups.Count} pacote(s) pendente(s)...");
+            int done = 0, failed = 0;
+            foreach (var app in ups)
             {
                 try
                 {
-                    if (result != null)
-                    {
-                        var p = Math.Max(0, Math.Min(100, result.Percentage));
-                        if (Math.Abs(p - _lastPct) >= 1 || p >= 100 || p <= 0)
-                        {
-                            _lastPct = p;
-                            var detail = result.Detail ?? (t.Length > 90 ? t.Substring(0, 90) + "…" : t);
-                            SetProgress(p, $"Atualizando {app.Name}...", detail);
-                        }
-                        else if (result.Detail != null)
-                        {
-                            SetProgressDetail(result.Detail);
-                        }
-                    }
-                    else if (phase != null)
-                    {
-                        SetProgress(_lastPct >= 0 ? _lastPct : 0, phase, t.Length > 90 ? t.Substring(0, 90) + "…" : t);
-                    }
-                    else
-                    {
-                        SetProgressDetail(t);
-                    }
+                    // refreshAfter=false: recarregar a lista N vezes custaria N x ~30s de re-query
+                    await InstallOrUpgradeAsync(app, forceStop: false, refreshAfter: false);
+                    done++;
                 }
-                catch { }
-            }), System.Windows.Threading.DispatcherPriority.Background);
+                catch { failed++; }
+                UpdateToastProgress("store_batch", $"{done} de {ups.Count} concluído(s) — {app.Name}");
+            }
+            CompleteToastProgress("store_batch", failed == 0, $"{done} pacote(s) atualizado(s){(failed > 0 ? $", {failed} falha(s)" : "")}.");
+            // UMA única recarga no fim (força invalida o cache)
+            await RefreshInstalledAsync(force: true);
+        }
+
+        private int _lastExitCode;
+
+        /// <summary>Roda o processo com OEM encoding, streaming ao vivo (log + progresso) e sem timeout rígido.</summary>
+        private async Task<string> RunProcessStreamingAsync(StoreAppVM app, string exe, string args)
+        {
+            var oem = KitLugia.Core.SystemUtils.GetOemEncoding();
+            var psi = new ProcessStartInfo(exe.Trim('"'), args)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = oem,
+                StandardErrorEncoding = oem
+            };
+            using var proc = new Process { StartInfo = psi };
+            var sb = new StringBuilder();
+            proc.OutputDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) { sb.AppendLine(e.Data); OnInstallLine(app, e.Data); } };
+            proc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) { sb.AppendLine(e.Data); OnInstallLine(app, e.Data); } };
+            proc.Start();
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+            await proc.WaitForExitAsync();
+            _lastExitCode = proc.ExitCode;
+            return sb.ToString();
         }
 
         // Detecta fases do winget: Downloading, Installing, Verifying
@@ -605,35 +945,24 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             return null;
         }
 
-        private class ProgressResult
-        {
-            public double Percentage;
-            public string? Detail;
-        }
+        private class ProgressResult { public double Percentage; public string? Detail; }
 
-        // Parse o progresso do winget/choco: "X MB / Y MB" / "XX%" / "XX %"
+        // Parse do progresso do winget/choco: "X MB / Y MB" / "XX%" / "Progress: 45%"
         private static ProgressResult? TryParseProgress(string line)
         {
             try
             {
-                // Padrão winget: "██████▎ 20.0 MB / 94.8 MB" ou "269 MB / 305 MB "
                 var mMB = System.Text.RegularExpressions.Regex.Match(line, @"(\d+[\.,]?\d*)\s*(MB|GB|KB)\s*/\s*(\d+[\.,]?\d*)\s*(MB|GB|KB)");
                 if (mMB.Success)
                 {
                     double current = ParseSize(mMB.Groups[1].Value, mMB.Groups[2].Value);
                     double total = ParseSize(mMB.Groups[3].Value, mMB.Groups[4].Value);
                     if (total > 0)
-                    {
-                        var pct = (current / total) * 100.0;
-                        var detail = $"{FormatSize(current)} / {FormatSize(total)}";
-                        return new ProgressResult { Percentage = pct, Detail = detail };
-                    }
+                        return new ProgressResult { Percentage = (current / total) * 100.0, Detail = $"{FormatSize(current)} / {FormatSize(total)}" };
                 }
-                // Padrão: "45%" ou "45 %"
                 var mPct = System.Text.RegularExpressions.Regex.Match(line, @"(\d{1,3})\s*%");
                 if (mPct.Success && double.TryParse(mPct.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var pct2))
                     return new ProgressResult { Percentage = pct2, Detail = null };
-                // Padrão choco: "Progress: 45%"
                 var mProg = System.Text.RegularExpressions.Regex.Match(line, @"(?:progress|Progress)[^\d]{0,10}(\d{1,3})");
                 if (mProg.Success && double.TryParse(mProg.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var p2))
                     return new ProgressResult { Percentage = p2, Detail = null };
@@ -667,20 +996,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             {
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    // Animação de entrada no primeiro show
                     if (InlineProgressPanel.Visibility != Visibility.Visible)
-                    {
-                        InlineProgressPanel.Opacity = 0;
-                        var tt = new System.Windows.Media.TranslateTransform(30, 0);
-                        InlineProgressPanel.RenderTransform = tt;
                         InlineProgressPanel.Visibility = Visibility.Visible;
-                        var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300));
-                        var slideIn = new System.Windows.Media.Animation.DoubleAnimation(30, 0, TimeSpan.FromMilliseconds(350));
-                        slideIn.EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
-                        InlineProgressPanel.BeginAnimation(System.Windows.UIElement.OpacityProperty, fadeIn);
-                        tt.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slideIn);
-                    }
-                    // Mede a largura real do track — fallback 600 se ainda não mediu
                     double w = InlineProgressTrack.ActualWidth > 10 ? InlineProgressTrack.ActualWidth : 600;
                     InlineProgressFill.Width = Math.Max(0, (pct / 100.0) * w);
                     TxtInlinePercent.Text = pct > 0 ? $"{pct:F0}%" : "";
@@ -690,10 +1007,12 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
             catch { }
         }
+
         private void SetProgressDetail(string detail)
         {
             try { Dispatcher.BeginInvoke(new Action(() => { TxtInlineDetail.Text = detail.Length > 100 ? detail.Substring(0, 100) + "…" : detail; }), System.Windows.Threading.DispatcherPriority.Background); } catch { }
         }
+
         private void HideProgressAfterDelay()
         {
             try
@@ -707,6 +1026,42 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 _progressHideTimer.Start();
             }
             catch { }
+        }
+
+        private void OnInstallLine(StoreAppVM app, string line)
+        {
+            var t = line.Trim();
+            if (t.Length == 0) return;
+            // Loga linhas significativas (pula barras de progresso █▓▒░)
+            if (t[0] != '\u2588' && t[0] != '\u2591' && t[0] != '\u2592' && t[0] != '\u2593')
+            {
+                try { Log($"[{app.Name}] {Trunc(t, 200)}"); } catch { }
+            }
+            var phase = DetectWingetPhase(t);
+            var result = TryParseProgress(t);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (result != null)
+                    {
+                        var p = Math.Max(0, Math.Min(100, result.Percentage));
+                        if (Math.Abs(p - _lastPct) >= 1 || p >= 100 || p <= 0)
+                        {
+                            _lastPct = p;
+                            var detail = result.Detail ?? (t.Length > 90 ? t.Substring(0, 90) + "…" : t);
+                            SetProgress(p, $"Processando {app.Name}...", detail);
+                        }
+                        else if (result.Detail != null)
+                            SetProgressDetail(result.Detail);
+                    }
+                    else if (phase != null)
+                        SetProgress(_lastPct >= 0 ? _lastPct : 0, phase, t.Length > 90 ? t.Substring(0, 90) + "…" : t);
+                    else
+                        SetProgressDetail(t);
+                }
+                catch { }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void ForceStopForApp(StoreAppVM app)
@@ -738,7 +1093,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     try { p.Dispose(); } catch { }
                 }
                 if (killed == 0)
-                    Log($"ForceStop: nenhum processo correspondente a {app.Id} (normal se app não estava em execução).");
+                    Log($"ForceStop: nenhum processo correspondente a {app.Id} (normal se o app não estava em execução).");
                 else
                     System.Threading.Thread.Sleep(700);
             }
@@ -755,36 +1110,45 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             return part.ToLowerInvariant();
         }
 
-        // --- Handlers ---
+        // ─────────────────────────── Handlers de linha (lista) ───────────────────────────
+
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e) => await RefreshInstalledAsync(force: true);
-        private void BtnNavHome_Click(object sender, RoutedEventArgs e) => SwitchTab(StoreTab.Home);
-        private async void HeroMainBtn_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is StoreAppVM app) await UpgradeOneAsync(app, false);
-        }
-        private void BtnTabInstalled_Click(object sender, RoutedEventArgs e) { _activeTab = StoreTab.Library; ShowInstalled(); HighlightNav(StoreTab.Library); }
-        private void HomeInstalledItem_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is StoreAppVM app)
-                ShowAppDetail(app);
-        }
-        private void BtnTabSearch_Click(object sender, RoutedEventArgs e) { _activeTab = StoreTab.Apps; ShowSearch(); HighlightNav(StoreTab.Apps); }
-        private async void BtnSearch_Click(object sender, RoutedEventArgs e) { System.Threading.Interlocked.Exchange(ref _searchBusy, 0); await DoSearchAsync(); }
-        private async void BtnUpdateOne_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is StoreAppVM app) await UpgradeOneAsync(app, false);
-        }
-        private async void BtnForceUpdateOne_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is StoreAppVM app) await UpgradeOneAsync(app, true);
-        }
-        private void BtnOpenApp_Click(object sender, RoutedEventArgs e)
+
+        private async void BtnInstallCard_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as Button)?.Tag is StoreAppVM app)
-                ShowAppDetail(app);
+            {
+                LvPackages.SelectedItem = app;
+                await InstallOrUpgradeAsync(app, false);
+            }
         }
 
-        // ── App detail modal ──
+        private async void BtnUpdateOne_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is StoreAppVM app) await InstallOrUpgradeAsync(app, false);
+        }
+
+        private async void BtnForceUpdateOne_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is StoreAppVM app) await InstallOrUpgradeAsync(app, true);
+        }
+
+        private async void BtnUninstallOne_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is StoreAppVM app)
+            {
+                if (MessageBox.Show($"Desinstalar {app.Name}?", "Store Remake", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    await UninstallAsync(app);
+            }
+        }
+
+        private void BtnDetails_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is StoreAppVM app) ShowAppDetail(app);
+        }
+
+        // ─────────────────────────── Detail modal ───────────────────────────
+
         private StoreAppVM? _detailApp;
         private void ShowAppDetail(StoreAppVM app)
         {
@@ -795,8 +1159,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             DetailId.Text = app.Id;
             DetailCategory.Text = string.IsNullOrEmpty(app.Category) ? "—" : app.Category;
             DetailVersion.Text = string.IsNullOrEmpty(app.Version) ? "" : $"Versão {app.Version}";
-            DetailDescription.Text = string.IsNullOrEmpty(app.Description) ? "Sem descrição disponível." : app.Description;
-            // Update info
             if (app.HasUpdate)
             {
                 DetailUpdateInfo.Visibility = Visibility.Visible;
@@ -808,13 +1170,19 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             else
             {
                 DetailUpdateInfo.Visibility = Visibility.Collapsed;
-                DetailActionBtn.Content = "Abrir";
+                DetailActionBtn.Content = app.IsInstalled ? "Reinstalar" : "Instalar";
                 DetailActionBtn.Visibility = Visibility.Visible;
                 DetailForceBtn.Visibility = Visibility.Collapsed;
             }
-            // Uninstall
-            DetailUninstallBtn.Visibility = Visibility.Visible;
-            // Load icon
+            // Badge "já instalado" no modal (só faz sentido fora da aba Instalados)
+            if (app.IsInstalled && !app.HasUpdate && app.ShowInstall)
+            {
+                DetailInstalledInfo.Visibility = Visibility.Visible;
+                DetailInstalledVersion.Text = string.IsNullOrEmpty(app.Version) ? "Versão instalada desconhecida" : $"Versão {app.Version} já presente — Reinstalar vai por cima";
+            }
+            else
+                DetailInstalledInfo.Visibility = Visibility.Collapsed;
+            DetailUninstallBtn.Visibility = app.ShowUninstall ? Visibility.Visible : Visibility.Collapsed;
             DetailIcon.Visibility = Visibility.Collapsed;
             DetailFallbackIcon.Visibility = Visibility.Visible;
             _ = Task.Run(() =>
@@ -832,109 +1200,50 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             });
             DetailOverlay.Visibility = Visibility.Visible;
         }
+
         private void DetailClose_Click(object sender, RoutedEventArgs e) => DetailOverlay.Visibility = Visibility.Collapsed;
         private void DetailOverlay_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            // Clicar fora do card fecha o modal
             if (sender is FrameworkElement fe && e.OriginalSource == fe)
                 DetailOverlay.Visibility = Visibility.Collapsed;
         }
+
         private async void DetailAction_Click(object sender, RoutedEventArgs e)
         {
             if (_detailApp == null) return;
+            var app = _detailApp;
             DetailOverlay.Visibility = Visibility.Collapsed;
-            if (_detailApp.HasUpdate)
-                await UpgradeOneAsync(_detailApp, false);
+            if (app.HasUpdate)
+                await InstallOrUpgradeAsync(app, false);
             else
-            {
-                if (_detailApp.Source.Equals("msstore", StringComparison.OrdinalIgnoreCase))
-                    try { Process.Start(new ProcessStartInfo($"ms-windows-store://pdp/?ProductId={_detailApp.Id}") { UseShellExecute = true }); } catch { }
-                else
-                    await UpgradeOneAsync(_detailApp, false);
-            }
+                await InstallOrUpgradeAsync(app, false);
         }
+
         private async void DetailForce_Click(object sender, RoutedEventArgs e)
         {
             if (_detailApp == null) return;
+            var app = _detailApp;
             DetailOverlay.Visibility = Visibility.Collapsed;
-            await UpgradeOneAsync(_detailApp, true);
+            await InstallOrUpgradeAsync(app, true);
         }
+
         private async void DetailUninstall_Click(object sender, RoutedEventArgs e)
         {
             if (_detailApp == null) return;
             var app = _detailApp;
             DetailOverlay.Visibility = Visibility.Collapsed;
             if (MessageBox.Show($"Desinstalar {app.Name}?", "Store Remake", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            Log($"Desinstalando {app.Id} ({app.Source})...");
-            try
-            {
-                string exe, args;
-                if (app.Source.Equals("choco", StringComparison.OrdinalIgnoreCase))
-                {
-                    exe = _chocoPath ?? "choco";
-                    args = $"uninstall \"{app.Id}\" -y --no-progress";
-                }
-                else
-                {
-                    exe = _wingetPath ?? "winget";
-                    args = $"uninstall --id \"{app.Id}\" --silent --accept-source-agreements --disable-interactivity";
-                }
-                var psi = new ProcessStartInfo(exe.Trim('"'), args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-                using var proc = new Process { StartInfo = psi };
-                proc.Start();
-                await proc.WaitForExitAsync();
-                Log($"[{app.Id}] uninstall exit {proc.ExitCode}");
-                await RefreshInstalledAsync(force: true);
-            }
-            catch (Exception ex) { Log($"Desinstalar erro: {ex.Message}"); }
+            await UninstallAsync(app);
         }
-        private async void BtnUpgradeAllForce_Click(object sender, RoutedEventArgs e)
-        {
-            var ups = _installed.Where(a => a.HasUpdate).ToList();
-            if (ups.Count == 0) { ShowToastInfo("Nenhuma atualização pendente."); return; }
-            if (MessageBox.Show($"Atualizar {ups.Count} app(s) com Force Stop (matará processos em uso)?", "Store Remake", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            ShowToastProgress("store_batch", "Atualizando tudo", $"{ups.Count} app(s) pendente(s)...");
-            int done = 0;
-            foreach (var app in ups)
-            {
-                await UpgradeOneAsync(app, true);
-                done++;
-                UpdateToastProgress("store_batch", $"{done} de {ups.Count} concluído(s) — {app.Name}");
-            }
-            CompleteToastProgress("store_batch", true, $"{ups.Count} app(s) atualizado(s) com Force Stop.");
-        }
-        private void BtnWsreset_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                Log("Executando wsreset.exe (limpa cache MS Store)...");
-                Process.Start(new ProcessStartInfo("wsreset.exe") { UseShellExecute = true });
-                Log("wsreset iniciado — aguarde a Store reabrir.");
-            }
-            catch (Exception ex) { Log($"wsreset erro: {ex.Message}"); MessageBox.Show(ex.Message, "wsreset"); }
-        }
-        private async void BtnRepairStore_Click(object sender, RoutedEventArgs e)
-        {
-            if (MessageBox.Show("Reparar MS Store? Isso vai re-registrar os pacotes da Store (Get-AppXPackage) e pode levar ~1 min. Continuar?", "Store Remake", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            ShowSearchBar();
-            Log("Reparando MS Store (re-registrando pacotes)...");
-            try
-            {
-                var ps = "powershell.exe";
-                var args = "-NoProfile -ExecutionPolicy Bypass -Command \"Get-AppXPackage -AllUsers | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"} \"";
-                var outp = await Task.Run(() => RunCapture(ps, args, 90000));
-                Log(Trunc(outp, 1500));
-                MessageBox.Show("Reparo da Store concluído. Reinicie o PC se a Store ainda falhar.", "Store Remake");
-            }
-            catch (Exception ex) { Log($"Reparo Store erro: {ex.Message}"); }
-            finally { HideSearchBar(); }
-        }
+
+        // ─────────────────────────── Navegação / janela ───────────────────────────
+
         private void BtnBack_Click(object sender, RoutedEventArgs e)
         {
             if (Application.Current.MainWindow is MainWindow mw && mw.IsVisible)
             { mw.NavigateToPage(PageType.Windows); return; }
             var w = Window.GetWindow(this);
-            if (w is Windows.KitStore.KitStoreWindow) w.Close(); else if (w != null) w.Close();
+            if (w != null) w.Close();
             if (Application.Current.MainWindow is MainWindow mw2) mw2.NavigateToPage(PageType.Windows);
         }
 
@@ -943,378 +1252,11 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             try
             {
                 KitLugia.GUI.Windows.KitStore.KitStoreWindow.ShowStandalone();
-                Log("KitStore aberta em janela separada (pasta dedicada KitStore, standalone).");
+                Log("KitStore aberta em janela separada.");
             }
             catch (Exception ex) { Log($"Pop-out erro: {ex.Message}"); MessageBox.Show(ex.Message, "KitStore"); }
         }
 
-        private async void BtnCheckPhantoms_Click(object sender, RoutedEventArgs e)
-        {
-            TxtPhantomSummary.Text = " — verificando...";
-            PhantomPanel.Visibility = Visibility.Visible;
-            TxtPhantomLog.Text = "Varrendo AppxAllUserStore, StateChange, PendingDeletions, ContentDeliveryManager e ScanForUpdates...\n";
-            ShowSearchBar();
-            try
-            {
-                var report = await Task.Run(() => StoreEngine.BuildPhantomReport());
-                TxtPhantomLog.Text = report;
-                var issues = report.Contains("FANTASMA") || report.Contains("CORROMPIDO") || report.Contains("PENDENTE") || report.Contains("fantasma") ? " — problemas encontrados" : " — nenhum fantasma";
-                TxtPhantomSummary.Text = issues;
-                TxtPhantomSummary.Foreground = issues.Contains("problemas") ? new SolidColorBrush(Color.FromRgb(0xFF, 0x60, 0x60)) : new SolidColorBrush(Color.FromRgb(0x7F, 0xBA, 0x00));
-                Log($"Verificação fantasmas concluída: {issues.Trim()}");
-            }
-            catch (Exception ex) { TxtPhantomLog.Text += $"\nErro: {ex.Message}"; Log($"Check phantoms erro: {ex.Message}"); }
-            finally { HideSearchBar(); }
-        }
-
-        private async void BtnBlockMinecraftPreview_Click(object sender, RoutedEventArgs e)
-        {
-            if (MessageBox.Show("Bloquear Minecraft Preview Demo que volta sozinho?\n\nIsso vai:\n• Deprovisionar o pacote (Remove-AppxProvisionedPackage)\n• Remover para todos usuários\n• Criar Deprovisioned no registry\n• Pin blocking no winget\n• Desativar SubscribedContent-310093 (ContentDeliveryManager)\n\nContinuar?", "Store Remake", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            ShowSearchBar();
-            Log("Bloqueando Minecraft Preview fantasma...");
-            try
-            {
-                var sb = new StringBuilder();
-                sb.AppendLine(RunCapture("powershell.exe", "-NoProfile -Command \"Get-AppxProvisionedPackage -Online | Where DisplayName -like '*MinecraftPreview*' | Remove-AppxProvisionedPackage -Online 2>&1 | Out-String\"", 30000));
-                sb.AppendLine(RunCapture("powershell.exe", "-NoProfile -Command \"Get-AppxPackage -AllUsers *MinecraftPreview* | Remove-AppxPackage -AllUsers 2>&1 | Out-String\"", 30000));
-                try
-                {
-                    using var k1 = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore\Deprovisioned\Microsoft.MinecraftPreview_8wekyb3d8bbwe");
-                    k1?.SetValue("Deprovisioned", 1, Microsoft.Win32.RegistryValueKind.DWord);
-                    sb.AppendLine("Deprovisioned: OK");
-                }
-                catch (Exception ex) { sb.AppendLine($"Deprovisioned registry falhou: {ex.Message} (rode como admin)"); }
-                try
-                {
-                    using var k2 = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager");
-                    k2?.SetValue("SubscribedContent-310093Enabled", 0, Microsoft.Win32.RegistryValueKind.DWord);
-                    k2?.SetValue("SilentInstalledAppsEnabled", 0, Microsoft.Win32.RegistryValueKind.DWord);
-                    sb.AppendLine("ContentDeliveryManager SubscribedContent-310093Enabled=0: OK");
-                }
-                catch (Exception ex) { sb.AppendLine($"ContentDeliveryManager falhou: {ex.Message}"); }
-                if (_wingetPath != null)
-                {
-                    var pinOut = await Task.Run(() => RunCapture($"\"{_wingetPath}\"", "pin add --id Microsoft.MinecraftPreview --blocking-pin --accept-source-agreements 2>&1", 15000));
-                    sb.AppendLine("winget pin: " + Trunc(pinOut, 400));
-                }
-                else sb.AppendLine("winget pin: winget não encontrado, pulei");
-                try
-                {
-                    using var k3 = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\WindowsStore");
-                    sb.AppendLine($"WindowsStore AutoDownload atual: {k3?.GetValue("AutoDownload") ?? "(não definido)"}");
-                }
-                catch { }
-                TxtPhantomLog.Text = sb.ToString();
-                PhantomPanel.Visibility = Visibility.Visible;
-                Log("Minecraft Preview bloqueado. Reinicie e verifique pendências novamente.");
-                MessageBox.Show("Minecraft Preview bloqueado. Reinicie o PC e clique em Verificar pendências para confirmar.", "Store Remake", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex) { Log($"Block Minecraft erro: {ex.Message}"); MessageBox.Show(ex.Message, "Store Remake"); }
-            finally { HideSearchBar(); }
-        }
-
-        // --- Abas ---
-        private void HighlightNav(StoreTab tab)
-        {
-            try
-            {
-                var on = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A));
-                var off = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0));
-                // Borda + fonte destacada
-                BtnNavHome.Background = tab == StoreTab.Home ? on : off;
-                BtnNavApps.Background = tab == StoreTab.Apps ? on : off;
-                BtnNavGames.Background = tab == StoreTab.Games ? on : off;
-                BtnNavLibrary.Background = tab == StoreTab.Library ? on : off;
-                try { BtnNavDownloads.Background = tab == StoreTab.Downloads ? on : off; } catch { }
-                BtnNavHome.Foreground = tab == StoreTab.Home ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x9A));
-                BtnNavApps.Foreground = tab == StoreTab.Apps ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x9A));
-                BtnNavGames.Foreground = tab == StoreTab.Games ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x9A));
-                BtnNavLibrary.Foreground = tab == StoreTab.Library ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x9A));
-                try { BtnNavDownloads.Foreground = tab == StoreTab.Downloads ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x9A)); } catch { }
-            }
-            catch { }
-        }
-        private void ShowDownloads() => ShowPanel("Downloads");
-
-        private void SwitchTab(StoreTab tab) => ShowPanel(tab.ToString());
-
-        private void BtnTabGames_Click(object sender, RoutedEventArgs e) => SwitchTab(StoreTab.Games);
-        private void BtnNavDownloads_Click(object sender, RoutedEventArgs e) => SwitchTab(StoreTab.Downloads);
-
-        // --- Home tab: popula as seções com dados reais ---
-        private void PopulateHomeSections()
-        {
-            try
-            {
-                // Stats
-                HomeStatLibrary.Text = _installed.Count.ToString();
-                HomeStatUpdates.Text = _installed.Count(a => a.HasUpdate).ToString();
-                HomeStatStore.Text = TxtStoreCount.Text;
-                HomeUpdatesCount.Text = $"({_installed.Count(a => a.HasUpdate)} disponível(is))";
-
-                // Hero: pega os3 apps com atualização (ou os3 maiores)
-                var featured = _installed.Where(a => a.HasUpdate).Take(3).ToList();
-                if (featured.Count < 3)
-                    featured.AddRange(_installed.Where(a => !featured.Contains(a)).Take(3 - featured.Count));
-                if (featured.Count > 0)
-                {
-                    var main = featured[0];
-                    HeroMainName.Text = main.Name;
-                    HeroMainPublisher.Text = main.Publisher;
-                    HeroMainVersion.Text = main.HasUpdate ? $"{main.Version} \u2192 {main.AvailableVersion}" : main.Version;
-                    HeroMainSource.Text = main.HasUpdate ? "ATUALIZAÇÃO DISPONÍVEL" : main.Source.ToUpperInvariant();
-                    HeroMainBtn.Tag = main;
-                    HeroMainBtn.Content = main.HasUpdate ? "Atualizar" : "Abrir";
-                    HeroCardMain.Tag = main;
-                    _ = Task.Run(() => { var ic = TryResolveIconPath(main); if (ic != null) Dispatcher.BeginInvoke(new Action(() => { HeroMainIcon.Visibility = Visibility.Collapsed; HeroMainImage.Visibility = Visibility.Visible; HeroMainImage.Source = Helpers.ProgramIconHelper.GetIconFromFile(ic); }), System.Windows.Threading.DispatcherPriority.Background); });
-                }
-                if (featured.Count > 1)
-                {
-                    var s1 = featured[1];
-                    HeroSide1Name.Text = s1.Name;
-                    HeroSide1Publisher.Text = s1.Publisher;
-                    HeroSide1Badge.Text = s1.HasUpdate ? $"{s1.Version} \u2192 {s1.AvailableVersion}" : s1.Source;
-                    HeroSide1Card.Cursor = System.Windows.Input.Cursors.Hand;
-                    HeroSide1Card.Tag = s1;
-                    _ = Task.Run(() => { var ic = TryResolveIconPath(s1); if (ic != null) Dispatcher.BeginInvoke(new Action(() => { HeroSide1Icon.Visibility = Visibility.Collapsed; HeroSide1Image.Visibility = Visibility.Visible; HeroSide1Image.Source = Helpers.ProgramIconHelper.GetIconFromFile(ic); }), System.Windows.Threading.DispatcherPriority.Background); });
-                }
-                if (featured.Count > 2)
-                {
-                    var s2 = featured[2];
-                    HeroSide2Name.Text = s2.Name;
-                    HeroSide2Publisher.Text = s2.Publisher;
-                    HeroSide2Badge.Text = s2.HasUpdate ? $"{s2.Version} \u2192 {s2.AvailableVersion}" : s2.Source;
-                    HeroSide2Card.Cursor = System.Windows.Input.Cursors.Hand;
-                    HeroSide2Card.Tag = s2;
-                    _ = Task.Run(() => { var ic = TryResolveIconPath(s2); if (ic != null) Dispatcher.BeginInvoke(new Action(() => { HeroSide2Icon.Visibility = Visibility.Collapsed; HeroSide2Image.Visibility = Visibility.Visible; HeroSide2Image.Source = Helpers.ProgramIconHelper.GetIconFromFile(ic); }), System.Windows.Threading.DispatcherPriority.Background); });
-                }
-
-                // Updates section: cards horizontais
-                HomeUpdatesPanel.Children.Clear();
-                foreach (var app in _installed.Where(a => a.HasUpdate).Take(12))
-                    HomeUpdatesPanel.Children.Add(MakeHomeAppCard(app, true));
-                if (HomeUpdatesPanel.Children.Count == 0)
-                    HomeUpdatesPanel.Children.Add(new TextBlock { Text = "Tudo atualizado!", Foreground = new SolidColorBrush(Color.FromRgb(0x6A, 0x6A, 0x6A)), FontSize = 12, Margin = new Thickness(0, 8, 0, 0) });
-
-                // Popular section: pega apps conhecidos
-                var popular = _installed.Where(a => IsPopularApp(a.Name)).Take(12).ToList();
-                if (popular.Count < 6)
-                    popular.AddRange(_installed.Where(a => !popular.Contains(a)).Take(12 - popular.Count));
-                HomePopularPanel.Children.Clear();
-                foreach (var app in popular)
-                    HomePopularPanel.Children.Add(MakeHomeAppCard(app, false));
-
-                // Installed grid: primeiros15
-                var recent = _installed.Take(15).ToList();
-                HomeInstalledGrid.ItemsSource = recent;
-                HomeInstalledSpinner.Visibility = Visibility.Collapsed;
-                HomeEmptyText.Visibility = recent.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                if (recent.Count == 0) HomeEmptyText.Text = "Nenhum app instalado.";
-                _ = Task.Run(() => LoadIconsForList(recent));
-            }
-            catch (Exception ex) { Log($"Home populate erro: {ex.Message}"); }
-        }
-
-        private static bool IsPopularApp(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return false;
-            var n = name.ToLowerInvariant();
-            return n.Contains("chrome") || n.Contains("firefox") || n.Contains("edge") || n.Contains("vscode") ||
-                   n.Contains("visual studio") || n.Contains("git") || n.Contains("python") || n.Contains("node") ||
-                   n.Contains("notepad") || n.Contains("7-zip") || n.Contains("winrar") || n.Contains("obs") ||
-                   n.Contains("steam") || n.Contains("discord") || n.Contains("spotify") || n.Contains("docker") ||
-                   n.Contains("postman") || n.Contains("slack") || n.Contains("telegram") || n.Contains("whatsapp") ||
-                   n.Contains("adobe") || n.Contains("java") || n.Contains("dotnet") || n.Contains("microsoft.");
-        }
-
-        private Border MakeHomeAppCard(StoreAppVM app, bool showUpdate)
-        {
-            var card = new Border
-            {
-                Width = 180, Height = 64, CornerRadius = new CornerRadius(8),
-                Background = new SolidColorBrush(Color.FromRgb(0x25, 0x25, 0x25)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(10),
-                Margin = new Thickness(0, 0, 8, 0),
-                Cursor = System.Windows.Input.Cursors.Hand
-            };
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var iconBorder = new Border
-            {
-                Width = 36, Height = 36, CornerRadius = new CornerRadius(8),
-                Background = new SolidColorBrush(Color.FromRgb(0x32, 0x32, 0x32))
-            };
-            var iconText = new TextBlock
-            {
-                Text = "\uE772", FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize = 14,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x9A)),
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
-            };
-            iconBorder.Child = iconText;
-            Grid.SetColumn(iconBorder, 0);
-            var info = new StackPanel { Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-            info.Children.Add(new TextBlock { Text = app.Name, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = System.Windows.Media.Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis });
-            if (showUpdate && app.HasUpdate)
-                info.Children.Add(new TextBlock { Text = $"{app.Version} \u2192 {app.AvailableVersion}", FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)), Margin = new Thickness(0, 2, 0, 0) });
-            else
-                info.Children.Add(new TextBlock { Text = app.Source, FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(0x6A, 0x6A, 0x6A)), Margin = new Thickness(0, 2, 0, 0) });
-            Grid.SetColumn(info, 1);
-            grid.Children.Add(iconBorder);
-            grid.Children.Add(info);
-            card.Child = grid;
-            card.MouseLeftButtonDown += (s, e) => _ = UpgradeOneAsync(app, false);
-            // Load real icon
-            _ = Task.Run(() => { var ic = TryResolveIconPath(app); if (ic != null) Dispatcher.BeginInvoke(new Action(() =>
-            {
-                try
-                {
-                    var bmp = Helpers.ProgramIconHelper.GetIconFromFile(ic);
-                    if (bmp != null)
-                    {
-                        iconBorder.Child = null;
-                        var img = new System.Windows.Controls.Image { Source = bmp, Width = 36, Height = 36, Stretch = System.Windows.Media.Stretch.Uniform };
-                        RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-                        iconBorder.Child = img;
-                    }
-                }
-                catch { }
-            }), System.Windows.Threading.DispatcherPriority.Background); });
-            return card;
-        }
-
-        // --- Search dropdown (live suggestions) ---
-        private void UpdateSearchDropdown(string query)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(query) || query.Length < 2) { SearchPopup.IsOpen = false; return; }
-                var matches = _installed.Where(a =>
-                    (a.Name != null && a.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (a.Id != null && a.Id.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
-                ).Take(8).ToList();
-                if (matches.Count == 0) { SearchPopup.IsOpen = false; return; }
-                SearchDropdownResults.Children.Clear();
-                foreach (var app in matches)
-                {
-                    var row = new Border { Padding = new Thickness(10, 8, 10, 8), Cursor = System.Windows.Input.Cursors.Hand, Background = System.Windows.Media.Brushes.Transparent };
-                    row.MouseEnter += (s, e) => row.Background = new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x30));
-                    row.MouseLeave += (s, e) => row.Background = System.Windows.Media.Brushes.Transparent;
-                    row.MouseLeftButtonDown += (s, e) => { TxtSearch.Text = app.Name; SearchPopup.IsOpen = false; System.Threading.Interlocked.Exchange(ref _searchBusy, 0); _ = DoSearchAsync(); };
-                    var rg = new Grid();
-                    rg.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
-                    rg.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                    var icon = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(6), Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)) };
-                    icon.Child = new TextBlock { Text = "\uE772", FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize = 14, Foreground = new SolidColorBrush(Color.FromRgb(0x7A, 0x7A, 0x7A)), HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-                    Grid.SetColumn(icon, 0);
-                    var txt = new StackPanel { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-                    txt.Children.Add(new TextBlock { Text = app.Name, FontSize = 13, Foreground = System.Windows.Media.Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis });
-                    txt.Children.Add(new TextBlock { Text = app.HasUpdate ? $"{app.Source} \u2022 atualização disponível" : app.Source, FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(0x7A, 0x7A, 0x7A)) });
-                    Grid.SetColumn(txt, 1);
-                    rg.Children.Add(icon);
-                    rg.Children.Add(txt);
-                    row.Child = rg;
-                    SearchDropdownResults.Children.Add(row);
-                }
-                SearchPopup.PlacementTarget = TxtSearch;
-                SearchPopup.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-                SearchPopup.IsOpen = true;
-            }
-            catch { }
-        }
-
-        private async void BtnFix73CFB_Click(object sender, RoutedEventArgs e)
-        {
-            var target = Microsoft.VisualBasic.Interaction.InputBox("Pacote travado (família ou nome completo). Ex: MinecraftUWP, Minecraft, Microsoft.MinecraftUWP\nDeixe vazio para varredura geral de 0x80073CFB:", "Corrigir 0x80073CFB — supera Store", "Minecraft");
-            if (target == null) return;
-            target = target.Trim();
-            // Se cancelar no InputBox retorna "" — tratamos como varredura geral se vazio
-            ShowSearchBar();
-            PhantomPanel.Visibility = Visibility.Visible;
-            TxtPhantomLog.Text = $"Varrendo pacotes travados 0x80073CFB{(string.IsNullOrEmpty(target) ? "" : $" com filtro '{target}'")}...\n";
-            try
-            {
-                var stuck = await Task.Run(() => StoreEngine.DetectStuckPackages(string.IsNullOrEmpty(target) ? null : target));
-                if (stuck.Count == 0)
-                {
-                    TxtPhantomLog.Text += "Nenhum pacote travado encontrado. Tente filtro vazio ou verifique AppXDeployment logs.\n";
-                    var rep = await Task.Run(() => StoreEngine.BuildPhantomReport());
-                    TxtPhantomLog.Text += "\n" + rep;
-                }
-                else
-                {
-                    TxtPhantomLog.Text += $"Encontrados {stuck.Count} travado(s):\n";
-                    foreach (var s in stuck.Take(10))
-                        TxtPhantomLog.Text += $" • {s.FullName} — {s.Reason}\n";
-                    TxtPhantomLog.Text += "\nCorrigindo (PackageStatus→0 + Remove -AllUsers + Deprovision + restart serviços)...\n";
-                    foreach (var s in stuck.Take(3))
-                    {
-                        var log = await Task.Run(() => StoreEngine.FixStuckPackage(s.Family.Length > 2 ? s.Family : s.FullName, true));
-                        TxtPhantomLog.Text += $"\n--- {s.Family} ---\n" + log + "\n";
-                        Log($"Fix {s.Family} concluído");
-                    }
-                    TxtPhantomLog.Text += "\nFix concluído. Reinicie e tente instalar novamente. Se o Minecraft ainda falhar, use 'Reparar Store' + reboot.";
-                    if (MessageBox.Show($"{stuck.Count} pacote(s) corrigido(s). Reiniciar agora para finalizar limpeza pendente?", "Corrigir 0x80073CFB", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                    {
-                        try { Process.Start(new ProcessStartInfo("shutdown", "/r /t 5") { UseShellExecute = true }); } catch { }
-                    }
-                }
-                TxtPhantomSummary.Text = stuck.Count == 0 ? " — nenhum travado" : $" — {stuck.Count} corrigido(s)";
-                TxtPhantomSummary.Foreground = stuck.Count == 0 ? new SolidColorBrush(Color.FromRgb(0x7F, 0xBA, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00));
-            }
-            catch (Exception ex) { TxtPhantomLog.Text += $"\nErro: {ex.Message}"; Log($"Fix 0x80073CFB erro: {ex.Message}"); }
-            finally { HideSearchBar(); }
-        }
-        private void LvApps_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
-        {
-            RouteWheel(e, MainScroll, LvApps);
-        }
-        private void MainScroll_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e) { }
-
-        private void LogScroll_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
-        {
-            RouteWheel(e, MainScroll, LogScroll);
-        }
-        private void SearchScroll_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
-        {
-            RouteWheel(e, MainScroll, SearchScroll);
-        }
-        private void LvDownloads_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
-        {
-            RouteWheel(e, MainScroll, LvDownloads);
-        }
-        // Rola o ScrollViewer interno quando puder; ao chegar no topo/fim, repassa o restante ao MainScroll.
-        // Isso destrava o scroll em QUALQUER ponto (meio da tela, sobre card/item/log) igual ao TaskManager.
-        private void RouteWheel(System.Windows.Input.MouseWheelEventArgs e, ScrollViewer outer, FrameworkElement innerOwner)
-        {
-            if (e.Handled) return;
-            var delta = e.Delta;
-            var sv = FindVisualChild<ScrollViewer>(innerOwner);
-            if (sv != null && sv.ExtentHeight > sv.ViewportHeight)
-            {
-                bool atTop = sv.VerticalOffset <= 0 && delta > 0;
-                bool atBottom = sv.VerticalOffset + sv.ViewportHeight >= sv.ExtentHeight - 0.5 && delta < 0;
-                if (atTop || atBottom)
-                {
-                    e.Handled = true;
-                    outer.ScrollToVerticalOffset(outer.VerticalOffset - delta / 3.0);
-                }
-                // senão deixa o ScrollViewer interno rolar normalmente (não marca Handled)
-            }
-            else if (sv != null)
-            {
-                // interno não tem conteúdo a rolar -> repassa tudo ao MainScroll
-                e.Handled = true;
-                outer.ScrollToVerticalOffset(outer.VerticalOffset - delta / 3.0);
-            }
-            else if (outer != null)
-            {
-                e.Handled = true;
-                outer.ScrollToVerticalOffset(outer.VerticalOffset - delta / 3.0);
-            }
-        }
         private void BtnCopyLog_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1322,30 +1264,13 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 string txt = TxtLog?.Text ?? "";
                 if (string.IsNullOrEmpty(txt)) return;
                 System.Windows.Clipboard.SetText(txt);
-                Log("Log copiado para área de transferência.");
-                try { KitLugia.Core.Logger.Log("[STORE] Log copiado (" + txt.Length + " chars)"); } catch { }
+                Log("Log copiado para a área de transferência.");
             }
             catch (Exception ex) { Log("Falha ao copiar: " + ex.Message); }
         }
-        private void BtnInstallCard_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is StoreAppVM app) _ = UpgradeOneAsync(app, false);
-        }
 
-        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            if (parent == null) return null;
-            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
-                if (child is T t) return t;
-                var r = FindVisualChild<T>(child);
-                if (r != null) return r;
-            }
-            return null;
-        }
+        // ─────────────────────────── Ícones (cache memória + disco) ───────────────────────────
 
-        // --- Ícones (cacheado, sem varrer registry N vezes) ---
         private class UninstallInfo
         {
             public string DisplayName = "";
@@ -1379,7 +1304,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                                 InstallLocation = sk?.GetValue("InstallLocation") as string ?? "",
                                 UninstallString = sk?.GetValue("UninstallString") as string ?? ""
                             };
-                            // index por subkey + displayname
                             if (!dict.ContainsKey(sub)) dict[sub] = info;
                             if (!dict.ContainsKey(dn)) dict[dn] = info;
                         }
@@ -1417,7 +1341,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             try { Directory.CreateDirectory(IconCacheDir); } catch { }
             var sem = new System.Threading.SemaphoreSlim(6, 6);
             var tasks = new List<Task>();
-            foreach (var app in apps.Take(40))
+            foreach (var app in apps.Take(60))
             {
                 if (app.IconSource != null) continue;
                 var a = app;
@@ -1426,7 +1350,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     await sem.WaitAsync();
                     try
                     {
-                        // 1) Memory cache
+                        // 1) Memória
                         lock (_iconLock)
                         {
                             if (_iconCache.TryGetValue(a.Id.ToLowerInvariant(), out var cached))
@@ -1436,7 +1360,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                                 return;
                             }
                         }
-                        // 2) Disk cache
+                        // 2) Disco
                         var cachePath = GetIconCachePath(a.Id);
                         if (File.Exists(cachePath))
                         {
@@ -1455,7 +1379,7 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                             }
                             catch { }
                         }
-                        // 3) Resolve from registry/filesystem
+                        // 3) Resolve do registro/filesystem
                         ImageSource? bmp = null;
                         var cand = TryResolveIconPath(a);
                         if (!string.IsNullOrEmpty(cand))
@@ -1471,12 +1395,10 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                         {
                             try { bmp = Helpers.AppIconHelper.GetAppIcon(a.Id, 32, null); } catch { }
                         }
-                        // Fallback: monograma
                         if (bmp == null) bmp = MakeMonogramIcon(a.Name, a.Id);
                         if (bmp != null)
                         {
                             lock (_iconLock) _iconCache[a.Id.ToLowerInvariant()] = bmp;
-                            // 4) Save to disk cache (PNG)
                             try
                             {
                                 if (bmp is BitmapSource bs)
@@ -1499,21 +1421,17 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             _ = Task.WhenAll(tasks);
         }
 
-        // Gera avatar-monograma (igual MS Store para apps sem logo): inicial do nome sobre cor estável por hash.
-        // Roda em background thread; o resultado é congelado (read-only) e seguro p/ usar na UI.
+        // Avatar-monograma (igual MS Store p/ apps sem logo): inicial sobre cor estável por hash FNV-1a.
         private static ImageSource? MakeMonogramIcon(string? appName, string? appId)
         {
             try
             {
                 var seed = (!string.IsNullOrEmpty(appName) ? appName : appId) ?? "?";
-                var letter = seed.Trim();
-                // pega a 1ª letra significativa do nome (ignora hífen/underscore/ponto no início)
                 char first = '?';
-                foreach (var c in letter)
+                foreach (var c in seed)
                 {
                     if (char.IsLetterOrDigit(c)) { first = char.ToUpperInvariant(c); break; }
                 }
-                // cor estável: palette do Windows (teal/azul/índigo/roxo/verde/coral/âmbar/laranja)
                 var palette = new[]
                 {
                     Color.FromRgb(0x55, 0x7C, 0x93), Color.FromRgb(0x00, 0x78, 0xD4), Color.FromRgb(0x4A, 0x6E, 0x8E),
@@ -1521,12 +1439,10 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     Color.FromRgb(0xCA, 0x50, 0x1A), Color.FromRgb(0x8B, 0x74, 0x52), Color.FromRgb(0x4E, 0x8E, 0x5A),
                     Color.FromRgb(0x5A, 0x6C, 0x9E)
                 };
-                // FNV-1a 32 (determinístico entre execuções — != de string.GetHashCode que é randomizado por processo)
                 uint hash = 2166136261;
                 foreach (char c in seed) { hash ^= c; hash *= 16777619; }
                 var bg = palette[hash % (uint)palette.Length];
 
-                // desenha via DrawingVisual + RenderTargetBitmap (funciona em thread de fundo)
                 const double S = 128;
                 var dv = new System.Windows.Media.DrawingVisual();
                 using (var dc = dv.RenderOpen())
@@ -1557,7 +1473,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     try { var bmp = Helpers.AppIconHelper.GetAppIcon(app.Id, 32, null); if (bmp != null) { app.IconSource = bmp; app.RaiseIcon(); return app.Id; } } catch { }
                 }
                 var cache = GetUninstallCache();
-                // Tenta match exato por Id, depois Name
                 if (!string.IsNullOrEmpty(app.Id) && cache.TryGetValue(app.Id, out var byId))
                 {
                     if (!string.IsNullOrEmpty(byId.DisplayIcon)) { var cand = byId.DisplayIcon.Split(',')[0].Trim('"', ' ', '\''); if (!string.IsNullOrEmpty(cand)) return cand; }
@@ -1570,7 +1485,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     if (!string.IsNullOrEmpty(byName.UninstallString)) { var c2 = ExtractPathFromUninstall(byName.UninstallString); if (!string.IsNullOrEmpty(c2)) return c2; }
                     if (!string.IsNullOrEmpty(byName.InstallLocation)) return byName.InstallLocation;
                 }
-                // Fallback: busca por DisplayName parcial (evita Kimi -> Opencode)
                 foreach (var kv in cache)
                 {
                     if (kv.Value.DisplayName.Equals(app.Name, StringComparison.OrdinalIgnoreCase) ||
@@ -1610,7 +1524,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             return null;
         }
 
-        // --- Helpers ---
+        // ─────────────────────────── Log / helpers ───────────────────────────
+
         private void Log(string msg)
         {
             try { KitLugia.Core.Logger.Log($"[STORE] {msg}"); } catch { }
@@ -1632,16 +1547,15 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
             catch { }
         }
+
         private static string Trunc(string s, int max) => s == null ? "" : (s.Length <= max ? s : s.Substring(0, max) + "...");
 
-        // --- Search bar animada (barra fina estilo MS Store) ---
+        // Barra de busca indeterminada (anima fill da esquerda p/ direita)
         private void ShowSearchBar()
         {
             try
             {
                 PbSearchBorder.Visibility = Visibility.Visible;
-                PbSearchFill.Width = 60;
-                // Animação de loading: translada a barra de 0 a 100% repetidamente
                 if (_searchAnimTimer == null)
                 {
                     _searchAnimTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
@@ -1651,8 +1565,8 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                         try
                         {
                             offset += 4;
-                            if (offset > 300) offset = -60;
-                            PbSearchFill.Margin = new Thickness(offset, 0, 0, 0);
+                            if (offset > 90) offset = -50;
+                            ((TranslateTransform)PbSearchFill.RenderTransform).X = offset;
                         }
                         catch { }
                     };
@@ -1661,53 +1575,34 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             }
             catch { }
         }
+
         private void HideSearchBar()
         {
             try
             {
                 _searchAnimTimer?.Stop();
                 PbSearchBorder.Visibility = Visibility.Collapsed;
-                PbSearchFill.Margin = new Thickness(0, 0, 0, 0);
+                ((TranslateTransform)PbSearchFill.RenderTransform).X = 0;
             }
             catch { }
         }
 
-        // --- Toast helpers (delega para MainWindow LugiaToast) ---
+        // Toast helpers (delega para MainWindow LugiaToast)
         private void ShowToastProgress(string taskId, string title, string message)
         {
-            try
-            {
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.ShowProgressToast(taskId, title, message);
-            }
-            catch { }
+            try { if (Application.Current.MainWindow is MainWindow mw) mw.ShowProgressToast(taskId, title, message); } catch { }
         }
         private void UpdateToastProgress(string taskId, string message)
         {
-            try
-            {
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.UpdateProgressToast(taskId, message);
-            }
-            catch { }
+            try { if (Application.Current.MainWindow is MainWindow mw) mw.UpdateProgressToast(taskId, message); } catch { }
         }
         private void CompleteToastProgress(string taskId, bool success, string message)
         {
-            try
-            {
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.CompleteProgressToast(taskId, success, message);
-            }
-            catch { }
+            try { if (Application.Current.MainWindow is MainWindow mw) mw.CompleteProgressToast(taskId, success, message); } catch { }
         }
         private void ShowToastInfo(string message)
         {
-            try
-            {
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.ShowInfo("STORE", message);
-            }
-            catch { }
+            try { if (Application.Current.MainWindow is MainWindow mw) mw.ShowInfo("STORE", message); } catch { }
         }
 
         public class StoreAppVM : INotifyPropertyChanged
@@ -1720,19 +1615,62 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             private string _source = "winget";
             private string _category = "";
             private string _description = "";
+            private bool _showInstall = true;
+            private bool _showUninstall = false;
+
             public string Name { get => _name; set { if (_name != value) { _name = value; OnChanged(nameof(Name)); } } }
             public string Id { get => _id; set { if (_id != value) { _id = value; OnChanged(nameof(Id)); } } }
             public string Publisher { get => _publisher; set { if (_publisher != value) { _publisher = value; OnChanged(nameof(Publisher)); } } }
-            public string Version { get => _version; set { if (_version != value) { _version = value; OnChanged(nameof(Version)); OnChanged(nameof(HasUpdate)); OnChanged(nameof(HasUpdateVisibility)); OnChanged(nameof(UpdateBadgeVisibility)); } } }
-            public string AvailableVersion { get => _available; set { if (_available != value) { _available = value; OnChanged(nameof(AvailableVersion)); OnChanged(nameof(HasUpdate)); OnChanged(nameof(HasUpdateVisibility)); OnChanged(nameof(UpdateBadgeVisibility)); } } }
+            public string Version { get => _version; set { if (_version != value) { _version = value; OnChanged(nameof(Version)); OnChanged(nameof(HasUpdate)); OnChanged(nameof(HasUpdateVisibility)); OnChanged(nameof(DisplayVersion)); } } }
+            public string AvailableVersion { get => _available; set { if (_available != value) { _available = value; OnChanged(nameof(AvailableVersion)); OnChanged(nameof(HasUpdate)); OnChanged(nameof(HasUpdateVisibility)); } } }
             public string Source { get => _source; set { if (_source != value) { _source = value; OnChanged(nameof(Source)); } } }
             public string Category { get => _category; set { if (_category != value) { _category = value; OnChanged(nameof(Category)); } } }
             public string Description { get => _description; set { if (_description != value) { _description = value; OnChanged(nameof(Description)); } } }
-            public double Rating { get; set; }
-            public int RatingCount { get; set; }
+
+            /// <summary>Mostra botão Instalar (resultados de busca/Discover).</summary>
+            public bool ShowInstall { get => _showInstall; set { if (_showInstall != value) { _showInstall = value; OnChanged(nameof(InstallBtnVisibility)); OnChanged(nameof(InstalledBadgeVisibility)); } } }
+            /// <summary>Mostra botão Desinstalar (instalados/updates).</summary>
+            public bool ShowUninstall { get => _showUninstall; set { if (_showUninstall != value) { _showUninstall = value; OnChanged(nameof(UninstallBtnVisibility)); } } }
+
+            private bool _isInstalled;
+            /// <summary>True se o pacote já consta na lista de instalados (badge + Reinstalar).</summary>
+            public bool IsInstalled
+            {
+                get => _isInstalled;
+                set
+                {
+                    if (_isInstalled != value)
+                    {
+                        _isInstalled = value;
+                        OnChanged(nameof(IsInstalled));
+                        OnChanged(nameof(InstalledBadgeVisibility));
+                        OnChanged(nameof(InstallButtonText));
+                        OnChanged(nameof(HasUpdate));
+                        OnChanged(nameof(HasUpdateVisibility));
+                        OnChanged(nameof(UpdateBtnVisibility));
+                    }
+                }
+            }
+
+            public Visibility InstalledBadgeVisibility => IsInstalled ? Visibility.Visible : Visibility.Collapsed;
+            /// <summary>Texto do botão primário: Atualizar (tem nova versão) / Reinstalar (já tem) / Instalar (novo).</summary>
+            public string InstallButtonText => HasUpdate ? "Atualizar" : IsInstalled ? "Reinstalar" : "Instalar";
+
+            private bool _devOnly;
+            /// <summary>True p/ pacotes de gerenciadores de dev (pip/npm/dotnet/cargo) — só aparecem em Atualizações.</summary>
+            public bool DevOnly
+            {
+                get => _devOnly;
+                set { if (_devOnly != value) { _devOnly = value; OnChanged(nameof(DevOnly)); } }
+            }
+
+            public string DisplayVersion => string.IsNullOrEmpty(Version) ? "—" : Version;
             public bool HasUpdate => !string.IsNullOrEmpty(AvailableVersion) && !string.Equals(AvailableVersion, Version, StringComparison.OrdinalIgnoreCase);
             public Visibility HasUpdateVisibility => HasUpdate ? Visibility.Visible : Visibility.Collapsed;
-            public Visibility UpdateBadgeVisibility => HasUpdate ? Visibility.Visible : Visibility.Collapsed;
+            public Visibility InstallBtnVisibility => ShowInstall ? Visibility.Visible : Visibility.Collapsed;
+            public Visibility UpdateBtnVisibility => HasUpdate ? Visibility.Visible : Visibility.Collapsed;
+            public Visibility UninstallBtnVisibility => ShowUninstall ? Visibility.Visible : Visibility.Collapsed;
+
             private ImageSource? _icon;
             public ImageSource? IconSource { get => _icon; set { _icon = value; OnChanged(nameof(IconSource)); OnChanged(nameof(IconVisibility)); OnChanged(nameof(FallbackIconVisibility)); } }
             public Visibility IconVisibility => _icon != null ? Visibility.Visible : Visibility.Collapsed;

@@ -115,5 +115,80 @@ namespace KitLugia.Core
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
+
+        /// <summary>
+        /// Inicia o serviço e devolve mensagem amigável em português (usado pela ServicesPage).
+        /// </summary>
+        public static (bool Success, string Message) TryStartServiceWithMessage(string serviceName, int timeoutMs = 15000)
+        {
+            try
+            {
+                using var sc = new ServiceController(serviceName);
+                sc.Refresh();
+                if (sc.Status == ServiceControllerStatus.Running)
+                    return (true, $"'{serviceName}' já está em execução.");
+
+                sc.Start();
+                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMilliseconds(timeoutMs));
+                return (true, $"'{serviceName}' iniciado com sucesso.");
+            }
+            catch (System.ComponentModel.Win32Exception w32)
+            {
+                // 5 = Access Denied
+                if (w32.NativeErrorCode == 5)
+                    return (false, $"Acesso negado ao iniciar '{serviceName}'. Execute o Kit como Administrador.");
+                return (false, $"Erro do Windows ao iniciar '{serviceName}': {w32.Message}");
+            }
+            catch (InvalidOperationException)
+            {
+                return (false, $"Serviço '{serviceName}' não encontrado ou desativado (há serviços desativados que não podem ser iniciados).");
+            }
+            catch (System.ServiceProcess.TimeoutException)
+            {
+                return (false, $"'{serviceName}' não respondeu em {timeoutMs / 1000}s (pode ainda ter iniciado — recarregue a lista).");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("TryStartServiceWithMessage", $"{serviceName}: {ex.Message}");
+                return (false, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Para o serviço e devolve mensagem amigável em português (usado pela ServicesPage).
+        /// </summary>
+        public static (bool Success, string Message) TryStopServiceWithMessage(string serviceName, int timeoutMs = 15000)
+        {
+            try
+            {
+                using var sc = new ServiceController(serviceName);
+                sc.Refresh();
+                if (sc.Status == ServiceControllerStatus.Stopped)
+                    return (true, $"'{serviceName}' já está parado.");
+
+                sc.Stop();
+                sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMilliseconds(timeoutMs));
+                return (true, $"'{serviceName}' parado com sucesso.");
+            }
+            catch (System.ComponentModel.Win32Exception w32)
+            {
+                if (w32.NativeErrorCode == 5)
+                    return (false, $"Acesso negado ao parar '{serviceName}'. Execute o Kit como Administrador.");
+                return (false, $"Erro do Windows ao parar '{serviceName}': {w32.Message}");
+            }
+            catch (InvalidOperationException)
+            {
+                return (false, $"'{serviceName}' não pode ser parado (serviço inexistente, desativado ou com dependências em execução).");
+            }
+            catch (System.ServiceProcess.TimeoutException)
+            {
+                return (false, $"'{serviceName}' não respondeu em {timeoutMs / 1000}s (pode ainda estar parando — recarregue a lista).");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("TryStopServiceWithMessage", $"{serviceName}: {ex.Message}");
+                return (false, ex.Message);
+            }
+        }
     }
 }

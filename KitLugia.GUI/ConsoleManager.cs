@@ -26,6 +26,11 @@ namespace KitLugia.GUI
         private static readonly ConcurrentQueue<string> _pending = new();
         private static bool _flushScheduled;
         private const int BatchSize = 50;
+        // Teto da fila pendente: num flood de log (scan verboso), milhares de linhas
+        // enfileiravam + backlog no dispatcher = pico de RAM + UI lenta. Passou do
+        // teto, descarta as mais antigas e registra quantas foram suprimidas.
+        private const int MaxPending = 3000;
+        private static int _droppedLines;
         // Teto do espelho em memória. O arquivo guarda tudo (LogStore) — "copiar tudo"
         // não depende deste teto. 20k linhas na memória = ~3 MB, sem estourar RAM.
         private const int MaxMirrorLines = LogStore.MaxInMemoryLines;
@@ -53,6 +58,10 @@ namespace KitLugia.GUI
             }
 
             if (batch.Count == 0) return;
+
+            int dropped = System.Threading.Interlocked.Exchange(ref _droppedLines, 0);
+            if (dropped > 0)
+                batch.Insert(0, $"[{DateTime.Now:HH:mm:ss}] ... {dropped} linhas suprimidas (flood de log) ...");
 
             foreach (var line in batch)
             {
@@ -83,12 +92,16 @@ namespace KitLugia.GUI
         public static void WriteLine(string message)
         {
             _pending.Enqueue($"[{DateTime.Now:HH:mm:ss}] {message}");
+            if (_pending.Count > MaxPending && _pending.TryDequeue(out _))
+                System.Threading.Interlocked.Increment(ref _droppedLines);
             ScheduleFlush();
         }
 
         public static void WriteError(string error)
         {
             _pending.Enqueue($"[{DateTime.Now:HH:mm:ss}] [ERRO] {error}");
+            if (_pending.Count > MaxPending && _pending.TryDequeue(out _))
+                System.Threading.Interlocked.Increment(ref _droppedLines);
             ScheduleFlush();
         }
 
@@ -99,6 +112,7 @@ namespace KitLugia.GUI
             {
                 Logs.Clear();
                 _pending.Clear();
+                System.Threading.Interlocked.Exchange(ref _droppedLines, 0);
                 LogStore.Clear();
             }));
         }

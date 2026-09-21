@@ -148,6 +148,182 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
+        // ═════════════════════════════════════════════════════════════════════
+        //  ABA CONEXÕES (paridade TMOG): lista de endpoints TCP/UDP por processo
+        //  com endereço local/remoto e estado — tudo via iphlpapi (OWNER_PID),
+        //  sem admin e sem netstat/spawn de processo.
+        // ═════════════════════════════════════════════════════════════════════
+
+        [DllImport("iphlpapi.dll", SetLastError = true)]
+        private static extern uint GetExtendedUdpTable(IntPtr pUdpTable, ref int pdwSize, bool bOrder, uint ulAf, uint tableClass, uint reserved);
+
+        private const uint UDP_TABLE_OWNER_PID = 1;
+
+        // MIB_UDPROW_OWNER_PID / MIB_UDP6ROW_OWNER_PID (mesmo layout das versões TCP)
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MIB_UDPROW_OWNER_PID
+        {
+            public uint LocalAddr;
+            public int LocalPort;
+            public uint OwningPid;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MIB_UDP6ROW_OWNER_PID
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+            public byte[] LocalAddr;
+            public uint LocalScopeId;
+            public int LocalPort;
+            public uint OwningPid;
+        }
+
+        /// <summary>Uma conexão/porta aberta atribuída a um PID.</summary>
+        public sealed class NetEndpoint
+        {
+            public uint Pid { get; set; }
+            public string ProcessName { get; set; } = "";
+            public string Protocol { get; set; } = "TCP";
+            public string Local { get; set; } = "";
+            public string Remote { get; set; } = "";
+            public string State { get; set; } = "";
+            public bool Listening { get; set; }
+        }
+
+        /// <summary>
+        /// Todos os endpoints TCP (v4+v6) e UDP (v4+v6) com o PID dono.
+        /// Ordem: TCP estabelecido primeiro, depois escuta, depois UDP.
+        /// </summary>
+        public static List<NetEndpoint> GetEndpoints()
+        {
+            var list = new List<NetEndpoint>(256);
+            try { CollectTcp(AF_INET, "TCP", list); } catch { }
+            try { CollectTcp(AF_INET6, "TCPv6", list); } catch { }
+            try { CollectUdp(AF_INET, "UDP", list); } catch { }
+            try { CollectUdp(AF_INET6, "UDPv6", list); } catch { }
+            return list;
+        }
+
+        private static void CollectTcp(uint addressFamily, string proto, List<NetEndpoint> list)
+        {
+            int bufferSize = 0;
+            uint ret = GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, addressFamily, TCP_TABLE_OWNER_PID_ALL, 0);
+            if (ret != 0 && bufferSize <= 0) return;
+
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                ret = GetExtendedTcpTable(buffer, ref bufferSize, false, addressFamily, TCP_TABLE_OWNER_PID_ALL, 0);
+                if (ret != 0) return;
+                int entryCount = Marshal.ReadInt32(buffer);
+                bool isIPv6 = addressFamily == AF_INET6;
+                int entrySize = isIPv6 ? Marshal.SizeOf<MIB_TCP6ROW_OWNER_PID>() : Marshal.SizeOf<MIB_TCPROW_OWNER_PID>();
+                IntPtr current = buffer + 4;
+
+                for (int i = 0; i < entryCount; i++)
+                {
+                    uint pid; uint state; string local; string remote;
+                    if (isIPv6)
+                    {
+                        var row = Marshal.PtrToStructure<MIB_TCP6ROW_OWNER_PID>(current);
+                        pid = row.OwningPid; state = row.State;
+                        local = FormatV6(row.LocalAddr, row.LocalScopeId, row.LocalPort);
+                        remote = FormatV6(row.RemoteAddr, row.RemoteScopeId, row.RemotePort);
+                    }
+                    else
+                    {
+                        var row = Marshal.PtrToStructure<MIB_TCPROW_OWNER_PID>(current);
+                        pid = row.OwningPid; state = row.State;
+                        local = FormatV4(row.LocalAddr, row.LocalPort);
+                        remote = FormatV4(row.RemoteAddr, row.RemotePort);
+                    }
+                    if (pid > 0)
+                    {
+                        list.Add(new NetEndpoint
+                        {
+                            Pid = pid, Protocol = proto, Local = local,
+                            Remote = state == 2 ? "" : remote,   // LISTEN não tem remoto
+                            State = TcpStateName(state),
+                            Listening = state == 2,
+                        });
+                    }
+                    current += entrySize;
+                }
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+
+        private static void CollectUdp(uint addressFamily, string proto, List<NetEndpoint> list)
+        {
+            int bufferSize = 0;
+            uint ret = GetExtendedUdpTable(IntPtr.Zero, ref bufferSize, false, addressFamily, UDP_TABLE_OWNER_PID, 0);
+            if (ret != 0 && bufferSize <= 0) return;
+
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                ret = GetExtendedUdpTable(buffer, ref bufferSize, false, addressFamily, UDP_TABLE_OWNER_PID, 0);
+                if (ret != 0) return;
+                int entryCount = Marshal.ReadInt32(buffer);
+                bool isIPv6 = addressFamily == AF_INET6;
+                int entrySize = isIPv6 ? Marshal.SizeOf<MIB_UDP6ROW_OWNER_PID>() : Marshal.SizeOf<MIB_UDPROW_OWNER_PID>();
+                IntPtr current = buffer + 4;
+
+                for (int i = 0; i < entryCount; i++)
+                {
+                    uint pid; string local;
+                    if (isIPv6)
+                    {
+                        var row = Marshal.PtrToStructure<MIB_UDP6ROW_OWNER_PID>(current);
+                        pid = row.OwningPid;
+                        local = FormatV6(row.LocalAddr, row.LocalScopeId, row.LocalPort);
+                    }
+                    else
+                    {
+                        var row = Marshal.PtrToStructure<MIB_UDPROW_OWNER_PID>(current);
+                        pid = row.OwningPid;
+                        local = FormatV4(row.LocalAddr, row.LocalPort);
+                    }
+                    if (pid > 0)
+                        list.Add(new NetEndpoint { Pid = pid, Protocol = proto, Local = local, Remote = "*:*", State = "—", Listening = true });
+                    current += entrySize;
+                }
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+
+        /// <summary>DWORD de porta da tabela vem em ordem de rede nos 16 bits baixos.</summary>
+        private static ushort PortOf(int rawPort) => (ushort)(((rawPort & 0xFF) << 8) | ((rawPort >> 8) & 0xFF));
+
+        private static string FormatV4(uint addr, int port)
+        {
+            // Bytes na memória já estão em ordem de rede; o uint lido é little-endian.
+            var ip = new System.Net.IPAddress(new[] { (byte)addr, (byte)(addr >> 8), (byte)(addr >> 16), (byte)(addr >> 24) });
+            return $"{ip}:{PortOf(port)}";
+        }
+
+        private static string FormatV6(byte[]? addr, uint scopeId, int port)
+        {
+            try
+            {
+                if (addr == null || addr.Length != 16) return $"—:{PortOf(port)}";
+                var ip = new System.Net.IPAddress(addr);
+                string s = ip.ToString();
+                if (scopeId != 0) s += "%" + scopeId;
+                return $"[{s}]:{PortOf(port)}";
+            }
+            catch { return $"—:{PortOf(port)}"; }
+        }
+
+        /// <summary>Estado TCP (MIB_TCP_STATE) em pt-BR — mesma nomenclatura do Task Manager.</summary>
+        public static string TcpStateName(uint state) => state switch
+        {
+            1 => "Fechado", 2 => "Escutando", 3 => "Enviando SYN", 4 => "Recebendo SYN",
+            5 => "Estabelecido", 6 => "FIN_WAIT1", 7 => "FIN_WAIT2", 8 => "CLOSE_WAIT",
+            9 => "Fechando", 10 => "LAST_ACK", 11 => "TIME_WAIT", 12 => "Excluído",
+            _ => "—",
+        };
+
         /// <summary>
         /// Mede tráfego de IO por processo usando Performance Counters + conexões TCP.
         /// Chamar em intervalos regulares (1-2s) para precisão.

@@ -51,33 +51,127 @@ namespace KitLugia.GUI.Windows.TaskManager
         private readonly Dictionary<string, (long totalBytes, DateTime time)> _netLastSample = new(StringComparer.OrdinalIgnoreCase);
         private bool _perfBuilt;
         private float _lastGpuPct = -1;
+        // Última amostra do tick de gráficos, consumida pela aba Resumo. Precisa ser
+        // cacheada: PerformanceCounter.NextValue() só entrega valor novo 1x por janela —
+        // ler o MESMO contador duas vezes no mesmo tick devolve 0 na segunda leitura.
+        private float _lastCpuPct, _lastMemPct, _lastDiskReadMBps, _lastDiskWriteMBps;
+        private double _lastFreqMhz = -1, _lastTempC = -1, _lastPowerW = -1;
         private TextBlock? _perfUsageLine;   // linha "Uso:" dos detalhes, atualizada a cada tick
 
         /// <summary>Taxa de um adaptador: usa perfmon se existir, senão delta de GetIPStatistics.</summary>
-        private float GetNetBytesPerSec(string key)
+        // FIX congelamento (medido: stalls de 90-930ms por tick): NextValue de PerformanceCounter
+        // e as queries nativas (CPU utility, temperatura, potência) custam dezenas-hundreds de ms
+        // CADA e bloqueavam a UI thread a cada tick de 1s. A coleta roda em WORKER (CollectSamplesAsync);
+        // a UI thread só renderiza o último snapshot (O(canvas), sub-ms).
+        private readonly object _counterLock = new();
+        private int _collectRunning;
+
+        /// <summary>Snapshot imutável de UMA coleta — nunca toca em elementos WPF.</summary>
+        private sealed class PerfSample
         {
-            if (_instanceCounters.TryGetValue(key, out var ctr))
+            public float Cpu;
+            public float Mem;
+            public float DiskReadMBps;
+            public float DiskWriteMBps;
+            public float NetMBps;
+            public float GpuPct = -1f;
+            public double FreqMhz;
+            public double TempC = -1;
+            public double PowerW = -1;
+            public float KernelPct;
+            public Dictionary<string, float>? PerDevice;
+        }
+
+        /// <summary>Coleta TODAS as métricas do tick de 1s fora da UI thread.</summary>
+        private async Task<PerfSample?> CollectSamplesAsync()
+        {
+            if (System.Threading.Interlocked.CompareExchange(ref _collectRunning, 1, 0) != 0) return null; // coleta anterior ainda rodando
+            try
             {
-                try { return ctr.NextValue(); } catch { return 0; }
-            }
-            if (_netStatsNics.TryGetValue(key, out var nic))
-            {
-                try
+                return await System.Threading.Tasks.Task.Run(() =>
                 {
-                    var stats = nic.GetIPStatistics();
-                    long total = stats.BytesSent + stats.BytesReceived;
-                    var now = DateTime.UtcNow;
-                    if (_netLastSample.TryGetValue(key, out var prev) && (now - prev.time).TotalMilliseconds > 200)
+                    var s = new PerfSample();
+                    try { double u = NativeMetricsHelper.GetCpuUtilityPercent(); if (u >= 0) s.Cpu = (float)u; } catch { }
+                    if (s.Cpu <= 0) { try { lock (_counterLock) { s.Cpu = _cpuCounter?.NextValue() ?? 0; } } catch { } }
+                    try { double m = NativeMetricsHelper.GetMemoryUsagePercent(); if (m >= 0) s.Mem = (float)m; } catch { }
+                    if (s.Mem <= 0)
                     {
-                        double bps = (total - prev.totalBytes) / (now - prev.time).TotalSeconds;
-                        _netLastSample[key] = (total, now);
-                        return Math.Max(0, (float)bps);
+                        try
+                        {
+                            float avail;
+                            lock (_counterLock) { avail = _memAvailable?.NextValue() ?? 0; }
+                            s.Mem = _totalMemBytes > 0 ? (float)((1f - avail / (_totalMemBytes / 1024.0 / 1024.0)) * 100.0) : 0f;
+                        }
+                        catch { }
                     }
-                    _netLastSample[key] = (total, now);
-                }
-                catch { }
+                    try
+                    {
+                        float readBytes, writeBytes;
+                        lock (_counterLock) { readBytes = _diskReadCounter?.NextValue() ?? 0; writeBytes = _diskWriteCounter?.NextValue() ?? 0; }
+                        s.DiskReadMBps = readBytes / (1024f * 1024f);
+                        s.DiskWriteMBps = writeBytes / (1024f * 1024f);
+                    }
+                    catch { }
+                    try { double f = NativeMetricsHelper.GetCpuFrequencyMhz(); s.FreqMhz = f; } catch { }
+                    try { double? t = NativeMetricsHelper.GetCpuTemperatureC(); s.TempC = t ?? -1; } catch { }
+                    try { double? w = NativeMetricsHelper.GetCpuPowerWatts(); s.PowerW = w ?? -1; } catch { }
+                    try { double k = NativeMetricsHelper.GetSystemKernelPercent(); s.KernelPct = k > 0 ? (float)k : 0f; } catch { }
+                    try { s.NetMBps = (float)(NetBytesPerSecNow() / (1024.0 * 1024.0)); } catch { }
+                    try { s.GpuPct = (float)GpuMonitor.GetTotalGpuUtilization(); } catch { }
+
+                    // Contadores por dispositivo (disk:% Disk Time, net:Bytes Total/sec)
+                    var perDev = new Dictionary<string, float>();
+                    List<string> missingNet;
+                    lock (_counterLock)
+                    {
+                        foreach (var kv in _instanceCounters)
+                        {
+                            try { perDev[kv.Key] = kv.Value.NextValue(); } catch { }
+                        }
+                        missingNet = _netStatsNics.Keys.Where(k => !_instanceCounters.ContainsKey(k)).ToList();
+                    }
+                    // Fallback NIC (sem contador perfmon): taxa via GetIPStatistics
+                    foreach (var key in missingNet)
+                    {
+                        try
+                        {
+                            var nic = _netStatsNics[key];
+                            var stats = nic.GetIPStatistics();
+                            long total = stats.BytesSent + stats.BytesReceived;
+                            var now = DateTime.UtcNow;
+                            lock (_counterLock)
+                            {
+                                if (_netLastSample.TryGetValue(key, out var prev) && (now - prev.time).TotalMilliseconds > 200)
+                                {
+                                    double bps = (total - prev.totalBytes) / (now - prev.time).TotalSeconds;
+                                    _netLastSample[key] = (total, now);
+                                    perDev[key] = Math.Max(0, (float)bps);
+                                }
+                                else _netLastSample[key] = (total, now);
+                            }
+                        }
+                        catch { }
+                    }
+                    s.PerDevice = perDev;
+                    return s;
+                });
             }
-            return 0;
+            finally { System.Threading.Interlocked.Exchange(ref _collectRunning, 0); }
+        }
+
+        /// <summary>Taxa total de rede (todos os dispositivos) — chamado DENTRO do worker.</summary>
+        private double NetBytesPerSecNow()
+        {
+            double total = 0;
+            lock (_counterLock)
+            {
+                foreach (var kv in _instanceCounters)
+                {
+                    if (!kv.Key.StartsWith("net:", StringComparison.OrdinalIgnoreCase)) continue;
+                    try { total += kv.Value.NextValue(); } catch { }
+                }
+            }
+            return total;
         }
 
         /// <summary>Formata MAC "AABBCCDDEEFF" → "AA-BB-CC-DD-EE-FF".</summary>
@@ -439,7 +533,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             foreach (var g in data.gpus)
             {
                 var gg = g; int idx = gi;
-                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = $"gpu:{idx}", Name = gg.model, ColorHex = "#FFD700" }));
+                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = $"gpu:{idx}", Name = gg.model, ColorHex = "#4FC3F7" }));
                 gi++;
             }
             if (gi == 0) await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = "gpu:-1", Name = "GPU (indisponível)", ColorHex = "#888888" }));
@@ -754,23 +848,23 @@ namespace KitLugia.GUI.Windows.TaskManager
             return bitsPerSecRaw;
         }
 
-        private void UpdatePerformanceGraphs()
+        /// <summary>Renderiza o snapshot coletado no worker — a UI thread faz SÓ desenho (sub-ms).
+        /// Antes este método rodava PDH/queries nativas NA UI a cada 1s (stalls medidos de 90-930ms).</summary>
+        private void RenderPerfSample(PerfSample s)
         {
-            // Valores-base
-            float cpuVal = 0;
-            try { cpuVal = _cpuCounter?.NextValue() ?? 0; } catch { }
-            float ramVal = 0;
-            try { float avail = _memAvailable?.NextValue() ?? 0; ramVal = _totalMemBytes > 0 ? (float)((1f - avail / (_totalMemBytes / 1024.0 / 1024.0)) * 100.0) : 0f; } catch { }
-            float diskMB = 0;
-            try
-            {
-                float readBytes = _diskReadCounter?.NextValue() ?? 0;
-                float writeBytes = _diskWriteCounter?.NextValue() ?? 0;
-                diskMB = (readBytes + writeBytes) / (1024f * 1024f);
-            }
-            catch { }
-            float netMB = 0;
-            try { lock (_lock) { netMB = (float)(_allRows.Sum(r => r.NetBytesPerSec) / (1024.0 * 1024.0)); } } catch { }
+            float cpuVal = s.Cpu;
+            float ramVal = s.Mem;
+            float diskMB = s.DiskReadMBps + s.DiskWriteMBps;
+            _lastDiskReadMBps = s.DiskReadMBps;
+            _lastDiskWriteMBps = s.DiskWriteMBps;
+            _lastCpuPct = cpuVal;
+            _lastMemPct = ramVal;
+            _lastGpuPct = s.GpuPct;
+            _lastFreqMhz = s.FreqMhz;
+            _lastTempC = s.TempC;
+            _lastPowerW = s.PowerW;
+            _lastKernelPct = s.KernelPct;
+            float netMB = s.NetMBps;
 
             // Resumo da barra superior da aba Processos — escrita ÚNICA aqui (1 tick de 1s).
             // Antes, RefreshAsync e este tick escreviam TxtDiskUsage/TxtNetUsage/TxtGpuUsage com
@@ -782,6 +876,10 @@ namespace KitLugia.GUI.Windows.TaskManager
             SetMetricText(TxtDiskUsage, FormatBytesSpeed(diskMB * 1024 * 1024), GetHeatColor(diskMB > 0 ? diskMB : 0f, 50, 200));
             SetMetricText(TxtNetUsage, FormatBytesSpeed(netMB * 1024 * 1024), netMB > 0 ? GetHeatColor(netMB, 5, 50) : _brushGray);
             SetMetricText(TxtGpuUsage, _lastGpuPct >= 0 ? $"{_lastGpuPct:F0}%" : "N/A", _lastGpuPct >= 0 ? GetHeatColor(_lastGpuPct, 70, 90) : _brushGray);
+            // TMOG: frequência/temperatura/potência agora vêm do snapshot coletado no worker
+            SetMetricText(TxtCpuFreq, s.FreqMhz > 0 ? $"{s.FreqMhz / 1000.0:F2} GHz" : "—", _brushGray);
+            SetMetricText(TxtCpuTemp, s.TempC >= 0 ? $"{s.TempC:F0} °C" : "—", s.TempC >= 0 ? GetHeatColor((float)s.TempC, 75, 90) : _brushGray);
+            SetMetricText(TxtCpuPower, s.PowerW >= 0 ? $"{s.PowerW:F1} W" : "—", s.PowerW >= 0 ? GetHeatColor((float)s.PowerW, 45, 80) : _brushGray);
             ChartNetText = FormatBytesSpeed(netMB * 1024 * 1024);
 
             // Atualiza cada dispositivo
@@ -793,10 +891,10 @@ namespace KitLugia.GUI.Windows.TaskManager
                     case "cpu": val = cpuVal; max = 100f; break;
                     case "mem": val = ramVal; max = 100f; break;
                     case var k when k.StartsWith("disk:"):
-                        try { val = Math.Min(100f, _instanceCounters.TryGetValue(k, out var c1) ? c1.NextValue() : 0); } catch { val = 0; }
+                        val = Math.Min(100f, s.PerDevice != null && s.PerDevice.TryGetValue(k, out var c1) ? c1 : 0f);
                         max = 100f; break;
                     case var k when k.StartsWith("net:"):
-                        try { val = GetNetBytesPerSec(k) / (1024f * 1024f); } catch { val = 0; }
+                        val = s.PerDevice != null && s.PerDevice.TryGetValue(k, out var c2) ? c2 / (1024f * 1024f) : 0f;
                         max = 0; break; // autoescala
                     case var k when k.StartsWith("gpu:"): val = Math.Max(0f, _lastGpuPct); max = 100f; break;
                     default: continue;
@@ -818,9 +916,14 @@ namespace KitLugia.GUI.Windows.TaskManager
                 // painel grande só do selecionado
                 if (dev == _selectedPerfDevice)
                 {
-                    PerfDeviceUtil.Text = dev.Key.StartsWith("net:") ? FormatBytesSpeed(val * 1024 * 1024) : $"{val:F0}%";
+                    if (dev.Key.StartsWith("net:"))
+                        PerfDeviceUtil.Text = FormatBytesSpeed(val * 1024 * 1024);
+                    else
+                        FluidSetText(PerfDeviceUtil, () => Math.Max(0f, val), "F0", "%");
                     PerfDeviceUtil.Foreground = GetHeatColor(val, 60, 90);
-                    DrawLineChart(PerfBigCanvas, q, FromHex(dev.ColorHex), max);
+                    // Motor fluido: linha rola a 60fps entre amostras (paridade TMOG)
+                    FluidRegisterChart(PerfBigCanvas, () => max, true,
+                        (() => _perfHistory.TryGetValue(dev.Key, out var hist) ? hist : null, FromHex(dev.ColorHex)));
                     SetUsageLine(PerfDeviceUtil.Text);
                 }
             }
@@ -828,14 +931,18 @@ namespace KitLugia.GUI.Windows.TaskManager
             // Mini previews na lista lateral — igual ao Gerenciador de Tarefas Win11
             DrawMiniPreviews();
 
-            // Mini CPU graph no painel de detalhes do processo (aba Processos)
+            // Mini CPU graph no painel de detalhes do processo (aba Processos) — fluido
             _miniCpuHistory.Enqueue(cpuVal);
             if (_miniCpuHistory.Count > 30) _miniCpuHistory.Dequeue();
-            DrawLineChart(MiniCpuCanvas, _miniCpuHistory, System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50), 100f);
+            FluidRegisterChart(MiniCpuCanvas, () => 100f, true,
+                (() => _miniCpuHistory, System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50)));
         }
 
         // Valor de rede compartilhado com o botão Copiar
         private string ChartNetText = "—";
+
+        /// <summary>Kernel% do último snapshot (coletado no worker; a UI só lê).</summary>
+        private float _lastKernelPct;
 
         /// <summary>
         /// Desenha o mini-preview do histórico em cada item visível da lista lateral
@@ -854,8 +961,11 @@ namespace KitLugia.GUI.Windows.TaskManager
                     var canvas = FindVisualChild<System.Windows.Controls.Canvas>(container);
                     if (canvas == null) continue;
                     if (LstPerfDevices.Items[i] is not PerfDeviceInfo dev) continue;
-                    var q = _perfHistory.TryGetValue(dev.Key, out var hist) ? hist : null;
-                    DrawLineChart(canvas, q ?? new Queue<float>(), FromHex(dev.ColorHex), dev.Key.StartsWith("net:") ? 0f : 100f);
+                    // Motor fluido: os sparklines também rolam a 60fps (re-registro barato 1x/s —
+                    // o mesmo canvas reciclado pela virtualização recebe o lambda novo no tick).
+                    bool isNet = dev.Key.StartsWith("net:");
+                    FluidRegisterChart(canvas, isNet ? () => 0f : () => 100f, false,
+                        (() => _perfHistory.TryGetValue(dev.Key, out var hist) ? hist : null, FromHex(dev.ColorHex)));
                 }
             }
             catch { }

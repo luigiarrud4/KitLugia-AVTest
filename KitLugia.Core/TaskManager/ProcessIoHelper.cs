@@ -117,6 +117,50 @@ namespace KitLugia.Core.TaskManager
             return dict;
         }
 
+        /// <summary>
+        /// Sobrecarga estilo TMOG: usa os totais de IO já coletados no snapshot nativo
+        /// (SystemProcessInformation/IO_COUNTERS), evitando uma segunda chamada a
+        /// OpenProcess por PID. A memória de estado (delta) continua aqui.
+        /// </summary>
+        public static ProcessIoRate SampleProcessIoFromTotals(
+            int pid, ulong readBytesTotal, ulong writeBytesTotal,
+            ulong readOpsTotal, ulong writeOpsTotal, DateTime nowUtc)
+        {
+            var result = new ProcessIoRate { Pid = pid };
+            try
+            {
+                result.TotalReadBytes = readBytesTotal;
+                result.TotalWriteBytes = writeBytesTotal;
+                result.TotalReadOps = readOpsTotal;
+                result.TotalWriteOps = writeOpsTotal;
+                if (_lastSnapshots.TryGetValue(pid, out var prev))
+                {
+                    double elapsed = (nowUtc - prev.Timestamp).TotalSeconds;
+                    if (elapsed > 0.05)
+                    {
+                        if (readBytesTotal >= prev.ReadBytes)
+                            result.ReadBytesPerSec = (readBytesTotal - prev.ReadBytes) / elapsed;
+                        if (writeBytesTotal >= prev.WriteBytes)
+                            result.WriteBytesPerSec = (writeBytesTotal - prev.WriteBytes) / elapsed;
+                        if (readOpsTotal >= prev.ReadOps)
+                            result.ReadOpsPerSec = (readOpsTotal - prev.ReadOps) / elapsed;
+                        if (writeOpsTotal >= prev.WriteOps)
+                            result.WriteOpsPerSec = (writeOpsTotal - prev.WriteOps) / elapsed;
+                    }
+                }
+                _lastSnapshots[pid] = new IoSnapshot
+                {
+                    Timestamp = nowUtc,
+                    ReadBytes = readBytesTotal,
+                    WriteBytes = writeBytesTotal,
+                    ReadOps = readOpsTotal,
+                    WriteOps = writeOpsTotal,
+                };
+            }
+            catch { }
+            return result;
+        }
+
         public static void CleanupStaleSnapshots(System.Collections.Generic.HashSet<int> alivePids)
         {
             foreach (var key in _lastSnapshots.Keys)

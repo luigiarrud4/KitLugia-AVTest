@@ -71,7 +71,7 @@ namespace KitLugia.GUI.Pages
 
             this.DataContext = null;
 
-            MemoryHelper.TrimWorkingSet();
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
 
         }
 

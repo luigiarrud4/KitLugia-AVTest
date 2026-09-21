@@ -275,7 +275,7 @@ namespace KitLugia.GUI.Services
         {
             try
             {
-                var proc = Process.GetCurrentProcess();
+                using var proc = Process.GetCurrentProcess();
                 proc.Refresh();
 
                 var gcMemory = GC.GetTotalMemory(false);

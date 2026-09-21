@@ -51,7 +51,9 @@ namespace KitLugia.GUI.Pages
             ApplyFilter();
         }
 
-        private List<TweakItem> DefineSystemTweaks()
+        // Estatico de proposito: so monta dados + lambdas (SystemTweaks/Registry),
+        // sem tocar em UI — a busca global indexa esse catalogo sem abrir a pagina.
+        public static List<TweakItem> DefineSystemTweaks()
         {
             return new List<TweakItem>
             {

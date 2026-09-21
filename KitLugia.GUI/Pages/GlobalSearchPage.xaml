@@ -19,70 +19,93 @@
             </StackPanel>
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl x:Name="ListResults">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+        <!-- Lista VIRTUALIZADA (Recycling): suporta os 60 resultados sem
+             materializar tudo — o ItemsControl+WrapPanel antigo congelava. -->
+        <ListBox x:Name="ListResults" Grid.Row="1"
+                 Background="Transparent" BorderThickness="0"
+                 VirtualizingStackPanel.IsVirtualizing="True"
+                 VirtualizingStackPanel.VirtualizationMode="Recycling"
+                 VirtualizingStackPanel.CacheLength="2,4"
+                 ScrollViewer.CanContentScroll="True"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 SelectionMode="Single">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0,0,0,8"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <ContentPresenter/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
 
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource CardStyle}"
-                                Width="320" Height="100" Margin="0,0,12,12" Padding="12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="40"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource CardStyle}" Padding="12,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="40"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                                <Border Background="#15FFD700" CornerRadius="8" Width="36" Height="36"
-                                        VerticalAlignment="Top" HorizontalAlignment="Left">
-                                    <TextBlock Text="{Binding Icon}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe UI Emoji"/>
-                                </Border>
+                            <Border Background="#15FFD700" CornerRadius="8" Width="36" Height="36"
+                                    VerticalAlignment="Top" HorizontalAlignment="Left">
+                                <TextBlock Text="{Binding Icon}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe UI Emoji"/>
+                            </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="8,0,5,0">
-                                    <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="Bold" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Description}" Foreground="#999" FontSize="10"
-                                               TextWrapping="Wrap" MaxHeight="28" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="8,0,5,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="Bold" FontSize="13" TextTrimming="CharacterEllipsis" MaxWidth="380"/>
+                                    <Border Background="#22FFD700" CornerRadius="4" Padding="6,1" Margin="8,1,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding TypeLabel}" Foreground="{StaticResource AccentColor}" FontSize="9" FontWeight="Bold"/>
+                                    </Border>
                                 </StackPanel>
+                                <TextBlock Text="{Binding Description}" Foreground="#999" FontSize="10"
+                                           TextWrapping="Wrap" MaxHeight="28" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                            </StackPanel>
 
-                                <Grid Grid.Column="2" VerticalAlignment="Center">
-                                    <Button Content="{Binding ButtonText}" Tag="{Binding}" Click="BtnExecute_Click"
-                                            Height="28" FontSize="10" FontWeight="Bold" Padding="10,0" Cursor="Hand" MinWidth="65">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsToggle}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
+                            <Grid Grid.Column="2" VerticalAlignment="Center">
+                                <Button Content="{Binding ButtonText}" Tag="{Binding}" Click="BtnExecute_Click"
+                                        Height="28" FontSize="10" FontWeight="Bold" Padding="10,0" Cursor="Hand" MinWidth="65">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsToggle}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
 
-                                    <CheckBox IsChecked="{Binding IsActive, Mode=OneWay}"
-                                              Tag="{Binding}" Click="BtnExecute_Click" Cursor="Hand">
-                                        <CheckBox.Style>
-                                            <Style TargetType="CheckBox" BasedOn="{StaticResource ToggleSwitchStyle}">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsToggle}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </CheckBox.Style>
-                                    </CheckBox>
-                                </Grid>
+                                <CheckBox IsChecked="{Binding IsActive, Mode=OneWay}"
+                                          Tag="{Binding}" Click="BtnExecute_Click" Cursor="Hand">
+                                    <CheckBox.Style>
+                                        <Style TargetType="CheckBox" BasedOn="{StaticResource ToggleSwitchStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsToggle}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
                             </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
         <StackPanel x:Name="PanelNoResults" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
             <TextBlock Text="🔍" FontSize="50" HorizontalAlignment="Center" Opacity="0.3" Foreground="White"/>

@@ -38,10 +38,25 @@ namespace KitLugia.GUI.Pages
             LoadSettings();
             LoadProcessLimits();
             _isLoading = false;
-            StartRamRefresh();
 
+            // Timer criado aqui mas só inicia no Loaded (não disputa com o layout
+            // da navegação durante a construção da página)
+            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _refreshTimer.Tick += OnRefreshTimerTick;
 
+            this.Loaded += TraySettingsPage_Loaded;
             this.Unloaded += TraySettingsPage_Unloaded;
+        }
+
+        private bool _timersStarted;
+
+        private void TraySettingsPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_timersStarted) return; // evita timers duplicados se Loaded disparar de novo
+            _timersStarted = true;
+
+            _refreshTimer?.Start();
+            RefreshRamDisplay();
         }
 
 
@@ -54,7 +69,9 @@ namespace KitLugia.GUI.Pages
                 _refreshTimer.Stop();
             }
             _refreshTimer = null;
+            this.Loaded -= TraySettingsPage_Loaded;
             this.Unloaded -= TraySettingsPage_Unloaded;
+            _timersStarted = false;
 
 
             this.DataContext = null;
@@ -122,14 +139,6 @@ namespace KitLugia.GUI.Pages
             RefreshRamDisplay();
             RefreshProcessLimitsStatus();
             UpdateIslcStatus();
-        }
-
-        private void StartRamRefresh()
-        {
-            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            _refreshTimer.Tick += OnRefreshTimerTick;
-            _refreshTimer.Start();
-            RefreshRamDisplay();
         }
 
         /// <summary>
@@ -436,6 +445,10 @@ namespace KitLugia.GUI.Pages
             if (TxtRamLimiterInterval != null)
                 TxtRamLimiterInterval.Text = tray.RamLimiterIntervalMs.ToString();
 
+            // Teto de RAM do proprio Kit (limpeza automatica)
+            if (TxtKitMemoryLimit != null)
+                TxtKitMemoryLimit.Text = tray.KitMemoryLimitMB.ToString();
+
             var limits = tray.GetProcessRamLimits().ToList();
 
             ProcessLimitsPanel.Children.Clear();
@@ -490,6 +503,24 @@ namespace KitLugia.GUI.Pages
                 // Valor inválido — restaura o atual
                 TxtRamLimiterInterval.Text = tray.RamLimiterIntervalMs.ToString();
                 ShowNotification("⚠️ Valor inválido", "Digite entre 500 e 30000 ms");
+            }
+        }
+
+        private void TxtKitMemoryLimit_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            if (long.TryParse(TxtKitMemoryLimit.Text?.Trim(), out long mb) && mb >= 80 && mb <= 1024)
+            {
+                tray.KitMemoryLimitMB = mb; // setter aplica ao vivo + clamp
+                tray.SaveSettings();
+                ShowNotification("✅ Teto atualizado", $"Kit vai se limpar ao passar de {tray.KitMemoryLimitMB}MB");
+            }
+            else
+            {
+                TxtKitMemoryLimit.Text = tray.KitMemoryLimitMB.ToString();
+                ShowNotification("⚠️ Valor inválido", "Digite entre 80 e 1024 MB");
             }
         }
 

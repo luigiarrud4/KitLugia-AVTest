@@ -12,8 +12,6 @@
         Background="{DynamicResource WindowBackground}" Foreground="White"
         WindowStyle="None"
         ResizeMode="CanResize"
-        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
-        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
         Loaded="Window_Loaded"
         Closing="Window_Closing"
         PreviewKeyDown="Window_PreviewKeyDown">
@@ -833,12 +831,17 @@
                                             </Style>
                                         </ListBox.ItemContainerStyle>
                                         <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource AccentColor}"/>
-                                                    <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#AAA" TextTrimming="CharacterEllipsis"/>
+                                                    <Border Background="#22FFD700" CornerRadius="4" Padding="5,0" Margin="6,1,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding TypeLabel}" Foreground="#FFD700" FontSize="9" FontWeight="Bold"/>
+                                                    </Border>
                                                 </StackPanel>
-                                            </DataTemplate>
+                                                <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#AAA" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
                                 </Border>

@@ -156,7 +156,25 @@ namespace KitLugia.Core
                         string manufacturer = DetectManufacturer(name, pathName);
 
                         string uiStatus = state == "Running" ? "Executando" : "Parado";
-                        string uiStart = startMode == "Auto" ? "Automático" : (startMode == "Manual" ? "Manual" : "Desativado");
+
+                        // Detecta delayed-auto via registro (WMI StartMode não distingue)
+                        bool isDelayed = false;
+                        try
+                        {
+                            using var regKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{name}");
+                            isDelayed = regKey?.GetValue("DelayedAutostart") is int d && d == 1;
+                        }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                        string uiStart = startMode switch
+                        {
+                            "Auto" => isDelayed ? "Automático (Atrasado)" : "Automático",
+                            "Manual" => "Manual",
+                            "Disabled" => "Desativado",
+                            "Boot" => "Boot",
+                            "System" => "System",
+                            _ => startMode
+                        };
 
                         services.Add(new ServiceInfo(name, display, desc, uiStatus, uiStart, safety) { Manufacturer = manufacturer });
                     }
@@ -171,38 +189,64 @@ namespace KitLugia.Core
         {
             try
             {
+                // -------- MÉTODO 1: sc.exe config (padrão da Microsoft) --------
                 string cmd = $"config \"{serviceName}\" start= {newMode}";
                 string result = SystemUtils.RunExternalProcess("sc.exe", cmd, true);
 
                 if (result.Contains("sucesso", StringComparison.OrdinalIgnoreCase) || result.Contains("SUCCESS", StringComparison.OrdinalIgnoreCase))
                 {
                     if (newMode == "disabled") SystemUtils.RunExternalProcess("sc.exe", $"stop \"{serviceName}\"", true);
-                    if (newMode == "auto") SystemUtils.RunExternalProcess("sc.exe", $"start \"{serviceName}\"", true);
+                    if (newMode == "auto" || newMode == "delayed-auto") SystemUtils.RunExternalProcess("sc.exe", $"start \"{serviceName}\"", true);
 
                     Logger.Log($"[SERVIÇO] '{serviceName}' definido como {newMode.ToUpper()}.");
                     return (true, $"Serviço configurado com sucesso.");
                 }
-                else
-                {
-                    // Fallback para Registro (Ignora bloqueios de permissão severos do sc.exe)
-                    try
-                    {
-                        int startValue = newMode switch { "disabled" => 4, "auto" => 2, "demand" => 3, _ => 2 };
-                        using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{serviceName}", true);
-                        if (key != null)
-                        {
-                            key.SetValue("Start", startValue, Microsoft.Win32.RegistryValueKind.DWord);
-                            if (newMode == "disabled") SystemUtils.RunExternalProcess("sc.exe", $"stop \"{serviceName}\"", true);
-                            if (newMode == "auto") SystemUtils.RunExternalProcess("sc.exe", $"start \"{serviceName}\"", true);
-                            
-                            Logger.Log($"[SERVIÇO] '{serviceName}' definido como {newMode.ToUpper()} via Registro (Bypass forcado).");
-                            return (true, "Forçado via Registro com sucesso.");
-                        }
-                    }
-                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-                    return (false, $"Erro ao configurar: {result}");
+                // -------- MÉTODO 2: Registro direto (bypassa bloqueio de permissão do sc.exe) --------
+                try
+                {
+                    int startValue = newMode switch { "disabled" => 4, "auto" => 2, "delayed-auto" => 2, "demand" => 3, _ => 2 };
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{serviceName}", true);
+                    if (key != null)
+                    {
+                        key.SetValue("Start", startValue, Microsoft.Win32.RegistryValueKind.DWord);
+                        if (newMode == "delayed-auto")
+                            key.SetValue("DelayedAutostart", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                        else
+                        {
+                            try { key.DeleteValue("DelayedAutostart", throwOnMissingValue: false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        }
+                        if (newMode == "disabled") SystemUtils.RunExternalProcess("sc.exe", $"stop \"{serviceName}\"", true);
+                        if (newMode == "auto" || newMode == "delayed-auto") SystemUtils.RunExternalProcess("sc.exe", $"start \"{serviceName}\"", true);
+
+                        Logger.Log($"[SERVIÇO] '{serviceName}' definido como {newMode.ToUpper()} via Registro (Bypass forcado).");
+                        return (true, "Forçado via Registro com sucesso.");
+                    }
                 }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                // -------- MÉTODO 3: PowerShell Set-Service/CIM (último recurso; funciona
+                // quando o SCM trava o serviço protegido mas o CIM aceita) --------
+                try
+                {
+                    string psMode = newMode switch { "disabled" => "Disabled", "auto" => "Automatic", "delayed-auto" => "Automatic", _ => "Manual" };
+                    string psScript = newMode == "delayed-auto"
+                        ? $"try {{ Set-Service -Name '{serviceName}' -StartupType {psMode} -ErrorAction Stop; $s=Get-CimInstance Win32_Service -Filter \"Name='{serviceName}'\"; if ($s) {{ Set-CimInstance -InputObject $s -Property @{{DelayedAutoStart=$true}} -ErrorAction Stop }}; exit 0 }} catch {{ exit 1 }}"
+                        : $"try {{ Set-Service -Name '{serviceName}' -StartupType {psMode} -ErrorAction Stop; exit 0 }} catch {{ exit 1 }}";
+
+                    var (exitCode, _) = SystemUtils.RunExternalProcessWithCode("powershell", $"-NoProfile -ExecutionPolicy Bypass -Command \"{psScript}\"", hidden: true);
+                    if (exitCode == 0)
+                    {
+                        if (newMode == "disabled") SystemUtils.RunExternalProcess("sc.exe", $"stop \"{serviceName}\"", true);
+                        if (newMode == "auto" || newMode == "delayed-auto") SystemUtils.RunExternalProcess("sc.exe", $"start \"{serviceName}\"", true);
+
+                        Logger.Log($"[SERVIÇO] '{serviceName}' definido como {newMode.ToUpper()} via PowerShell (3º método).");
+                        return (true, "Configurado via PowerShell (CIM) com sucesso.");
+                    }
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                return (false, $"Erro ao configurar '{serviceName}': todos os 3 métodos falharam (sc.exe: {result.Trim()}).");
             }
             catch (Exception ex) { return (false, ex.Message); }
         }
@@ -217,6 +261,153 @@ namespace KitLugia.Core
             }
             return ToggleServiceState(serviceName, mode);
         }
+
+        /// <summary>
+        /// Inicia (liga) um serviço com cascata de métodos:
+        /// ServiceController -> sc.exe start -> net start -> PowerShell Start-Service.
+        /// Serviços desativados são reconfigurados para Manual antes do start.
+        /// </summary>
+        public static (bool Success, string Message) StartServiceNow(string serviceName)
+        {
+            // Método 0: se o serviço está DESATIVADO, reconfigura para Manual primeiro
+            // (serviço desativado nunca inicia — erro 1058).
+            try
+            {
+                string mode = ServiceHelper.GetServiceStartMode(serviceName) ?? "";
+                if (mode == "Disabled")
+                {
+                    ToggleServiceState(serviceName, "demand");
+                    Logger.Log($"[SERVIÇO] '{serviceName}' estava DESATIVADO — reconfigurado para Manual antes do start.");
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            // Método 1: ServiceController (API nativa .NET)
+            var r1 = ServiceHelper.TryStartServiceWithMessage(serviceName);
+            if (r1.Success) return r1;
+
+            // Método 2: sc.exe start (resolve quando o SCM trava a API .NET)
+            var (code2, out2) = SystemUtils.RunExternalProcessWithCode("sc.exe", $"start \"{serviceName}\"", true);
+            string outTrim = out2.Trim();
+            if (code2 == 0 || outTrim.Contains("FAILED", StringComparison.OrdinalIgnoreCase) == false &&
+                (outTrim.Contains("START_PENDING", StringComparison.OrdinalIgnoreCase) ||
+                 outTrim.Contains("RUNNING", StringComparison.OrdinalIgnoreCase)))
+            {
+                Logger.Log($"[SERVIÇO] Start '{serviceName}' OK via sc.exe (exit={code2}).");
+                return (true, $"'{serviceName}' iniciado via sc.exe.");
+            }
+
+            // Método 3: net start (caminho legado que às vezes passa onde sc trava)
+            var (code3, out3) = SystemUtils.RunExternalProcessWithCode("net.exe", $"start \"{serviceName}\"", true);
+            if (code3 == 0 || out3.Contains("já foi iniciado", StringComparison.OrdinalIgnoreCase) || out3.Contains("already been started", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Log($"[SERVIÇO] Start '{serviceName}' OK via net start (exit={code3}).");
+                return (true, $"'{serviceName}' iniciado via net start.");
+            }
+
+            // Método 4: PowerShell Start-Service (último recurso)
+            var (code4, _) = SystemUtils.RunExternalProcessWithCode("powershell",
+                $"-NoProfile -ExecutionPolicy Bypass -Command \"try {{ Start-Service -Name '{serviceName}' -ErrorAction Stop; exit 0 }} catch {{ exit 1 }}\"", true);
+            if (code4 == 0)
+            {
+                Logger.Log($"[SERVIÇO] Start '{serviceName}' OK via PowerShell (4º método).");
+                return (true, $"'{serviceName}' iniciado via PowerShell.");
+            }
+
+            Logger.LogError("StartServiceNow", $"'{serviceName}': todos os métodos falharam. Último erro: {outTrim}");
+            return (false, $"Não foi possível iniciar '{serviceName}' (4 métodos tentados).\nÚltima resposta: {outTrim}");
+        }
+
+        /// <summary>
+        /// Para (desliga) um serviço com cascata de métodos:
+        /// ServiceController -> taskkill nos processos hospedeiros -> sc.exe stop -> net stop -> PowerShell Stop-Service.
+        /// Força encerrando os processos svchost que hospedam o serviço (kill suave do PID).
+        /// </summary>
+        public static (bool Success, string Message) StopServiceNow(string serviceName)
+        {
+            // Método 1: ServiceController (graceful — permite cleanup do serviço)
+            var r1 = ServiceHelper.TryStopServiceWithMessage(serviceName);
+            if (r1.Success) return r1;
+
+            // Método 2: sc.exe stop
+            var (code2, out2) = SystemUtils.RunExternalProcessWithCode("sc.exe", $"stop \"{serviceName}\"", true);
+            string outTrim = out2.Trim();
+            if (code2 == 0 || outTrim.Contains("1051", StringComparison.OrdinalIgnoreCase)) // 1051 = já parado
+            {
+                Logger.Log($"[SERVIÇO] Stop '{serviceName}' OK via sc.exe (exit={code2}).");
+                return (true, $"'{serviceName}' parado via sc.exe.");
+            }
+
+            // Método 3: matar os processos que hospedam o serviço (svchost -k ...
+            // e processos com SDDL do serviço). Força quando o serviço ignora o stop.
+            try
+            {
+                int killed = KillServiceHostProcesses(serviceName);
+                if (killed > 0)
+                {
+                    Logger.Log($"[SERVIÇO] Stop '{serviceName}': {killed} processo(s) hospedeiro(s) finalizado(s) (taskkill).");
+                    return (true, $"'{serviceName}' parado forçadamente ({killed} processo(s) finalizado(s)).");
+                }
+            }
+            catch (Exception ex) { Logger.LogWarning("StopServiceNow.KillHost", ex.Message); }
+
+            // Método 4: net stop
+            var (code4, out4) = SystemUtils.RunExternalProcessWithCode("net.exe", $"stop \"{serviceName}\"", true);
+            if (code4 == 0 || out4.Contains("não foi iniciado", StringComparison.OrdinalIgnoreCase) || out4.Contains("not started", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Log($"[SERVIÇO] Stop '{serviceName}' OK via net stop (exit={code4}).");
+                return (true, $"'{serviceName}' parado via net stop.");
+            }
+
+            // Método 5: PowerShell Stop-Service -Force
+            var (code5, _) = SystemUtils.RunExternalProcessWithCode("powershell",
+                $"-NoProfile -ExecutionPolicy Bypass -Command \"try {{ Stop-Service -Name '{serviceName}' -Force -ErrorAction Stop; exit 0 }} catch {{ exit 1 }}\"", true);
+            if (code5 == 0)
+            {
+                Logger.Log($"[SERVIÇO] Stop '{serviceName}' OK via PowerShell -Force (5º método).");
+                return (true, $"'{serviceName}' parado via PowerShell.");
+            }
+
+            Logger.LogError("StopServiceNow", $"'{serviceName}': todos os métodos falharam. Último erro: {outTrim}");
+            return (false, $"Não foi possível parar '{serviceName}' (5 métodos tentados).\nÚltima resposta: {outTrim}");
+        }
+
+        /// <summary>
+        /// Finaliza os processos que hospedam um serviço (svchost -k grupo, ou processo
+        /// próprio via taskkill /PID). Retorna quantos processos foram finalizados.
+        /// </summary>
+        private static int KillServiceHostProcesses(string serviceName)
+        {
+            int killed = 0;
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(
+                    $"SELECT ProcessId, Name, ProcessId FROM Win32_Service WHERE Name='{serviceName.Replace("'", "''")}'");
+                foreach (var obj in searcher.Get().Cast<ManagementObject>().ToList())
+                {
+                    try
+                    {
+                        int pid = Convert.ToInt32(obj["ProcessId"]);
+                        string procName = obj["Name"]?.ToString() ?? "";
+                        if (pid > 0)
+                        {
+                            // taskkill sem /F primeiro (graceful); se falhar, força
+                            var (code, _) = SystemUtils.RunExternalProcessWithCode("taskkill", $"/PID {pid}", true);
+                            if (code != 0)
+                                SystemUtils.RunExternalProcessWithCode("taskkill", $"/F /PID {pid}", true);
+                            killed++;
+                            Logger.Log($"[SERVIÇO] taskkill PID {pid} ({procName}) do serviço '{serviceName}'.");
+                        }
+                    }
+                    catch { continue; }
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            return killed;
+        }
+
+        /// <summary>Indica se o serviço está na lista de críticos do sistema (stop = risco de instabilidade).</summary>
+        public static bool IsCriticalService(string serviceName) => _criticalServices.Contains(serviceName);
 
         public static (bool Success, string Message) ApplyServicePreset(string presetName)
         {
@@ -242,6 +433,197 @@ namespace KitLugia.Core
                 if (ToggleServiceState(svc, currentMode).Success) successCount++;
             }
             return (true, $"{successCount}/{totalTargets} serviços processados.");
+        }
+
+        // =========================================================
+        // PERFIS COM METADADOS (explicação por serviço p/ a janela grande)
+        // =========================================================
+
+        /// <summary>Item de perfil de serviços com explicação didática por serviço.</summary>
+        public class ServicePresetItem
+        {
+            public string ServiceName { get; set; } = "";
+            public string DisplayName { get; set; } = "";
+            /// <summary>Por que desativar este serviço faz bem (ou que risco tem).</summary>
+            public string Reason { get; set; } = "";
+            /// <summary>Impacto se o usuário realmente usa a função (aviso do 'i').</summary>
+            public string Warning { get; set; } = "";
+            /// <summary>Safe = sem risco aparente; Caution = requer atenção; Dangerous = crítico.</summary>
+            public ServiceSafetyLevel Safety { get; set; } = ServiceSafetyLevel.Caution;
+            public string Manufacturer { get; set; } = "";
+            /// <summary>Está marcado para desativar? (checkbox da janela)</summary>
+            public bool IsDisabled { get; set; }
+        }
+
+        // Explicações por serviço (chave = nome técnico; fallback genérico para o resto)
+        private static readonly Dictionary<string, (string Reason, string Warning)> _serviceReasons = new(StringComparer.OrdinalIgnoreCase)
+        {
+            // ---- Telemetria / diagnóstico (Gamer) ----
+            { "DiagTrack", ("Telemetria completa do Windows (Connected User Experiences). Envia dados de uso para a Microsoft 24/7.", "Nenhum impacto perceptível para o usuário final.") },
+            { "dmwappushservice", ("Roteia mensagens WAP push e coleta telemetria de dispositivos.", "Nenhum impacto para desktops.") },
+            { "SysMain", ("Superfetch: pré-carrega apps na RAM com base em uso. Em máquinas com SSD e >=8GB, desperdiça RAM e causa I/O em background.", "Se você usa HDD (não SSD), manter ativado ajuda a abrir apps.") },
+            { "WSearch", ("Indexação de arquivos (busca do Explorer/Menu Iniciar). Indexar consome CPU/HD constantemente em background.", "A busca de arquivos fica lenta/partial. A busca de APPS no menu Iniciar continua funcionando.") },
+            { "MapsBroker", ("Baixa e atualiza mapas do Windows (baixados pelo app Mapas).", "App Mapas fica sem atualização. Ninguém usa.") },
+            { "lfsvc", ("Serviço de geolocalização do Windows.", "Apps que usam localização param de funcionar (raro em desktop).") },
+            { "WerSvc", ("Envia relatórios de erro de aplicativos para a Microsoft.", "Nenhum impacto — erros deixam de ser reportados.") },
+            { "PcaSvc", ("Assistente de Compatibilidade de Programas: coleta dados de apps que falharam.", "Nenhum impacto para o usuário.") },
+            { "DPS", ("Serviço de Políticas de Diagnóstico: resolve problemas reportados pelo troubleshooter.", "Troubleshooters (solucionadores de problemas) param de funcionar.") },
+            { "WdiServiceHost", ("Hospeda diagnósticos funcionais (Service Diagnostic etc.).", "Troubleshooters específicos param.") },
+            { "WdiSystemHost", ("Hospeda diagnósticos de sistema (Performance etc.).", "Troubleshooters de performance param.") },
+            // ---- Xbox (Gamer) ----
+            { "XblGameSave", ("Sincroniza saves de jogos Xbox Live com a nuvem.", "Se você joga pela Xbox/Microsoft Store, saves param de sincronizar.") },
+            { "XboxNetApiSvc", ("API de rede do Xbox Live (multiplayer da Microsoft Store).", "Jogos UWP/Xbox da Store perdem multiplayer.") },
+            { "XboxGipSvc", ("Gerencia acessórios do Xbox (controles via protocolo Xbox).", "Controles Xbox (via dongle) podem perder funcionalidades.") },
+            { "XblAuthManager", ("Autenticação Xbox Live.", "Jogos UWP da Store não logam no Xbox Live.") },
+            // ---- Fax / impressão (Safe) ----
+            { "Fax", ("Serviço de fax do Windows. Ninguém mais usa fax.", "Se você usa fax via modem (raro), ele para.") },
+            { "RetailDemo", ("Modo demonstração para aparelhos em loja (Brightness/vitrine).", "Nenhum — é para lojistas.") },
+            { "Spooler", ("Fila de impressão. Carrega e mantém processos de impressão em RAM.", "IMPRIMIR para de funcionar. Só desative se não tem impressora.") },
+            { "PrintWorkflow", ("Suporte a fluxo de impressão universal do Windows.", "Apps UWP de impressão param.") },
+            // ---- Outros (Gamer) ----
+            { "W32Time", ("Sincronização de horário via NTP (só sincroniza periodicamente).", "O relógio pode atrasar; o Windows ajusta ao logar de novo.") },
+            { "RemoteRegistry", ("Permite que usuários REMOTOS editem seu registro (servidor).", "Nenhum para desktop doméstico — é um vetor de ataque inútil e perigoso.") },
+            { "WalletService", ("Carteira digital do Windows (descontinuada).", "Nenhum — a feature foi abandonada.") },
+            { "NcdAutoSetup", ("Configuração automática de dispositivos de rede (NCD).", "Compartilhamento de rede discovery pode atrasar.") },
+            { "SharedAccess", ("Internet Connection Sharing (hotspot mobile do Windows).", "Se você usa hotspot do PC, ele para.") },
+            { "TouchKeyboard", ("Teclado touch para telas de toque.", "Em desktop sem touchscreen: nenhum.") },
+            { "TabletInputService", ("Serviço de caneta/escrita à mão para tablets.", "Sem tablet/caneta: nenhum. Com caneta: para de funcionar.") },
+            // ---- Terceiros (Gamer+) ----
+            { "PnkBstrA", ("PunkBuster A: anticheat legado de jogos antigos (BF4, CoD MW2).", "Jogos com PunkBuster não iniciam multiplayer.") },
+            { "PnkBstrB", ("PunkBuster B: par do A, mesmo papel.", "Mesmo acima.") },
+            { "AdobeUpdateService", ("Atualizador automático do Adobe (verifica updates em background).", "Você precisará atualizar o Adobe manualmente.") },
+            { "AdobeARMservice", ("Adobe Reader Update Manager.", "Reader não auto-atualiza.") },
+            { "AGMService", ("Adobe Genuine Monitoring: verifica pirataria em background.", "Nenhum para o usuário (só a Adobe perde telemetria).") },
+            { "AGSService", ("Adobe Genuine Software Integrity.", "Mesmo acima.") },
+            { "Steam Client Service", ("Serviço de suporte do Steam (patching, comprovantes).", "Steam recria o serviço ao abrir; games instalam normalmente.") },
+            { "DiscordUpdater", ("Atualizador do Discord em background.", "Discord não auto-atualiza ao abrir.") },
+            { "GoogleUpdate", ("Atualizador do Chrome/Google em background (gasta banda e RAM).", "Chrome não auto-atualiza — atualize manualmente.") },
+            { "MozillaMaintenance", ("Manutenção/atualização silenciosa do Firefox.", "Firefox não auto-atualiza.") },
+            { "Apple Mobile Device Service", ("Suporte a iPhone/iPad via cabo.", "Sem iPhone: nenhum.") },
+            { "iPod Service", ("Suporte a iPod clássico.", "Nenhum hoje em dia.") },
+            { "iTunesHelper", ("Detecção de iDevice conectado.", "Sem iDevice: nenhum.") },
+            { "Everything", ("Serviço de indexação NTFS do Everything (busca instantânea).", "A busca do Everything fica sem atualização em tempo real.") },
+            { "Parsec", ("Streaming remoto de jogos (Parsec).", "Parsec não funciona como host.") },
+            { "ZeroTier", ("VPN mesh ZeroTier.", "Redes ZeroTier param de conectar.") },
+            { "ZeroTierOne", ("VPN mesh ZeroTier (variante).", "Mesmo acima.") },
+            { "Windhawk", ("Mod loader de apps (customização do Windows).", "Mods do Windhawk param.") },
+            { "Sandboxie", ("Sandboxie (isolamento de apps).", "Sandboxes param.") },
+            { "reWASD", ("Remapeamento de controles (reWASD).", "Remaps param.") },
+            { "BEService", ("BattlEye anticheat.", "Jogos com BattlEye (DayZ, R6) NÃO iniciam.") },
+            { "BEDaisy", ("BattlEye driver anticheat.", "Mesmo acima.") },
+            { "EpicOnlineServices", ("Serviços online da Epic (EOS SDK).", "Jogos com EOS podem não logar.") },
+            { "OriginClientService", ("EA Origin/EA App.", "EA App não funciona.") },
+            { "GOGGalaxyService", ("GOG Galaxy.", "Galaxy não funciona.") },
+            { "Creative Cloud", ("Adobe Creative Cloud.", "Apps Adobe CC podem não logar.") },
+            { "CCLibrary", ("Biblioteca CC da Adobe.", "Painel CC perde funcionalidades.") },
+            { "CoreSync", ("Sync de arquivos Adobe CC.", "Sync para.") },
+            { "AdobeGCInvoker", ("Adobe Genuinemonitor.", "Nenhum.") }
+        };
+
+        private static string GetServiceReason(string name, out string warning)
+        {
+            if (_serviceReasons.TryGetValue(name, out var rw)) { warning = rw.Warning; return rw.Reason; }
+            warning = "Funções específicas deste serviço param até que seja reativado.";
+            return $"Serviço identificado como não essencial (lista curada KitLugia). Desativar libera RAM e CPU usados em background.";
+        }
+
+        /// <summary>
+        /// Monta os itens de um perfil (para a janela "Perfil de Otimização"):
+        /// lista o que será desativado, com explicação e warning por serviço.
+        /// presetName: Safe | Gamer | GamerPlus | Restore
+        /// </summary>
+        public static List<ServicePresetItem> GetServicePresetItems(string presetName)
+        {
+            var result = new List<ServicePresetItem>();
+            try
+            {
+                // Busca nomes amigáveis + fabricante do WMI numa unica passada
+                var wmiInfo = new Dictionary<string, (string Display, string Manufacturer)>(StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    using var searcher = new ManagementObjectSearcher("SELECT Name, DisplayName FROM Win32_Service");
+                    foreach (var obj in searcher.Get().Cast<ManagementObject>().ToList())
+                    {
+                        string n = obj["Name"]?.ToString() ?? "";
+                        wmiInfo[n] = (obj["DisplayName"]?.ToString() ?? n, DetectManufacturer(n, obj["PathName"]?.ToString() ?? ""));
+                    }
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                List<string> targets;
+                string mode;
+                switch (presetName)
+                {
+                    case "Safe": targets = new List<string> { "Fax", "RetailDemo", "Spooler", "PrintWorkflow" }; mode = "disabled"; break;
+                    case "Gamer": targets = _safeToDisable.ToList(); mode = "disabled"; break;
+                    case "GamerPlus": targets = _safeToDisable.Concat(_thirdPartySafeToDisable).ToList(); mode = "disabled"; break;
+                    case "Restore": targets = _safeToDisable.ToList(); mode = "auto"; break;
+                    default: return result;
+                }
+
+                foreach (var name in targets.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    string reason = GetServiceReason(name, out string warning);
+                    string display = wmiInfo.TryGetValue(name, out var wi) && !string.IsNullOrWhiteSpace(wi.Display) ? wi.Display : name;
+                    string manufacturer = wmiInfo.TryGetValue(name, out var wi2) ? wi2.Manufacturer : "Desconhecido";
+
+                    ServiceSafetyLevel safety = _criticalServices.Contains(name) ? ServiceSafetyLevel.Dangerous
+                        : _serviceReasons.ContainsKey(name) ? ServiceSafetyLevel.Safe
+                        : ServiceSafetyLevel.Caution;
+
+                    result.Add(new ServicePresetItem
+                    {
+                        ServiceName = name,
+                        DisplayName = display,
+                        Reason = reason,
+                        Warning = warning,
+                        Safety = safety,
+                        Manufacturer = manufacturer,
+                        // No Restore, o default é DESMARCADO (não restaurar); nos outros, marcado
+                        IsDisabled = presetName != "Restore"
+                    });
+                }
+
+                // Ordena: Safe primeiro, Caution, Dangerous por último (estilo PrivacyPage)
+                result = result.OrderBy(i => (int)i.Safety).ThenBy(i => i.DisplayName).ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("GetServicePresetItems", ex.Message);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Aplica uma lista customizada da janela de perfil: itens marcados vão para 'disabled'
+        /// (ou 'auto' quando restore=true), desmarcados vão para o padrão do Windows.
+        /// Retorna (sucessos, total, mensagens de falha).
+        /// </summary>
+        public static (int Success, int Total, List<string> Failures) ApplyCustomServicePreset(List<ServicePresetItem> items, bool restore)
+        {
+            int success = 0;
+            var failures = new List<string>();
+            int total = items?.Count ?? 0;
+            foreach (var item in items ?? new List<ServicePresetItem>())
+            {
+                // Marcado = aplica a ação do perfil; desmarcado = volta ao padrão
+                string mode = item.IsDisabled ? (restore ? "auto" : "disabled") : GetWindowsDefaultStartMode(item.ServiceName);
+                var r = ToggleServiceState(item.ServiceName, mode);
+                if (r.Success) success++;
+                else failures.Add($"{item.ServiceName}: {r.Message}");
+            }
+            return (success, total, failures);
+        }
+
+        /// <summary>Modo de início padrão de fábrica do Windows (aproximação BlackViper).</summary>
+        public static string GetWindowsDefaultStartMode(string serviceName)
+        {
+            return serviceName switch
+            {
+                "Fax" or "RetailDemo" or "RemoteRegistry" or "WalletService" => "disabled",
+                "XblGameSave" or "WerSvc" or "MapsBroker" or "lfsvc" => "demand",
+                _ => "auto"
+            };
         }
 
         // =========================================================

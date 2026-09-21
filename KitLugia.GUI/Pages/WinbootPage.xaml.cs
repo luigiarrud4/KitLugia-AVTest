@@ -67,7 +67,7 @@ namespace KitLugia.GUI.Pages
             }
 
 
-            MemoryHelper.TrimWorkingSet();
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
         }
 
         private void WinbootPage_Unloaded(object sender, RoutedEventArgs e)
@@ -338,10 +338,14 @@ namespace KitLugia.GUI.Pages
             TxtLogViewer.ScrollToEnd();
         }
 
-        private void RefreshDisks()
+        private void RefreshDisks() => _ = RefreshDisksAsync();
+
+        private async Task RefreshDisksAsync()
         {
             WinbootManager.Log("Atualizando lista de discos...");
-            _disks = WinbootManager.GetDisks(true);
+            // Enumeração de discos (IOCTL/WMI) fora da UI thread — não trava a navegação
+            var disks = await Task.Run(() => WinbootManager.GetDisks(true));
+            _disks = disks;
             ComboDisks.ItemsSource = _disks;
             if (_disks.Count > 0)
             {

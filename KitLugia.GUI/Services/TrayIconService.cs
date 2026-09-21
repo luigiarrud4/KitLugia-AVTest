@@ -603,6 +603,13 @@ namespace KitLugia.GUI.Services
         private double _currentCpuUsage = 0;
         private int _activeProcessCount = 0;
         private DateTime _lastSystemStatsUpdate = DateTime.MinValue;
+        // Contador de CPU do sistema REUSADO entre ticks: criar um PerformanceCounter
+        // novo a cada tick custa init PDH (registry + instancias) e o primeiro
+        // NextValue() de um contador novo sempre retorna 0 (sem baseline).
+        private System.Diagnostics.PerformanceCounter? _cpuTotalCounter;
+        // Tick do cache de processos: Responding (SendMessageTimeout por processo GUI)
+        // e o syscall mais caro da coleta — amostrado a cada 5 ticks (~10s).
+        private int _processCacheTick = 0;
         
 
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ProcessAlert> _processAlerts = new();
@@ -639,6 +646,32 @@ namespace KitLugia.GUI.Services
                     _ramLimiterTimer.Interval = TimeSpan.FromMilliseconds(_ramLimiterIntervalMs);
                 }
             }
+        }
+
+        // Teto de RAM do proprio Kit (MB): o AggressiveMemoryCleaner limpa quando
+        // o GC heap passa disso. Persistido em HKCU TraySettings\KitMemoryLimitMB.
+        private long _kitMemoryLimitMB = 200;
+        public long KitMemoryLimitMB
+        {
+            get => _kitMemoryLimitMB;
+            set
+            {
+                _kitMemoryLimitMB = Math.Min(1024, Math.Max(80, value)); // 80..1024 MB
+                try { AggressiveMemoryCleaner.SetMemoryLimit(_kitMemoryLimitMB); }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+        }
+
+        public static long GetKitMemoryLimitStatic()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\TraySettings");
+                if (key == null) return 200;
+                long v = ReadLongSetting(key, "KitMemoryLimitMB", 200);
+                return Math.Min(1024, Math.Max(80, v));
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 200; }
         }
         
 
@@ -1726,6 +1759,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("HighCpuThresholdPercent", HighCpuThresholdPercent);
                 key.SetValue("AdvancedMonitorIntervalMs", AdvancedMonitorIntervalMs);
                 key.SetValue("RamLimiterIntervalMs", RamLimiterIntervalMs);
+                key.SetValue("KitMemoryLimitMB", KitMemoryLimitMB);
                 key.SetValue("GameBarPresenceWriterDisabled", GameBarPresenceWriterDisabled ? 1 : 0);
                 key.SetValue("SmartScreenDisabled", SmartScreenDisabled ? 1 : 0);
                 key.SetValue("EdgeUpdateDisabled", EdgeUpdateDisabled ? 1 : 0);
@@ -2024,6 +2058,7 @@ namespace KitLugia.GUI.Services
                 HighCpuThresholdPercent = ReadDoubleSetting(key, "HighCpuThresholdPercent", 80.0);
                 AdvancedMonitorIntervalMs = ReadIntSetting(key, "AdvancedMonitorIntervalMs", 2000);
                 RamLimiterIntervalMs = ReadIntSetting(key, "RamLimiterIntervalMs", 1000);
+                KitMemoryLimitMB = ReadLongSetting(key, "KitMemoryLimitMB", 200);
                 GameBarPresenceWriterDisabled = ReadBoolSetting(key, "GameBarPresenceWriterDisabled", false);
                 SmartScreenDisabled = ReadBoolSetting(key, "SmartScreenDisabled", false);
                 EdgeUpdateDisabled = ReadBoolSetting(key, "EdgeUpdateDisabled", false);
@@ -4108,6 +4143,9 @@ namespace KitLugia.GUI.Services
 
             StopAdvancedMonitor();
 
+            try { _cpuTotalCounter?.Dispose(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            _cpuTotalCounter = null;
+
             ClearProcessCache();
 
             _processCache.Clear();
@@ -4980,9 +5018,18 @@ namespace KitLugia.GUI.Services
                 _totalSystemRamMB = (long)(memStatus.ullTotalPhys / (1024 * 1024));
                 _availableRamMB = (long)(memStatus.ullAvailPhys / (1024 * 1024));
                 
-                // CPU usage (Performance Counter)
-                using var cpuCounter = new System.Diagnostics.PerformanceCounter("Processor", "% Processor Time", "_Total");
-                _currentCpuUsage = cpuCounter.NextValue();
+                // CPU usage (Performance Counter REUSADO: delta real desde a ultima
+                // leitura, sem custo de init PDH por tick e sem o "primeiro NextValue()=0").
+                try
+                {
+                    _cpuTotalCounter ??= new System.Diagnostics.PerformanceCounter("Processor", "% Processor Time", "_Total");
+                    _currentCpuUsage = _cpuTotalCounter.NextValue();
+                }
+                catch
+                {
+                    // PDH indisponivel (ex: contador corrompido): zera em vez de falhar o tick.
+                    _currentCpuUsage = 0;
+                }
                 
                 _lastSystemStatsUpdate = DateTime.Now;
             }
@@ -4999,31 +5046,47 @@ namespace KitLugia.GUI.Services
         {
             try
             {
+                // Coleta ENXUTA: so o que os consumidores usam (WorkingSet/Cpu p/
+                // behavior+alerts; Responding p/ alerta "Nao Responsivo", amostrado
+                // a cada 5 ticks pois custa SendMessageTimeout por processo GUI).
+                // StartTime/VirtualMemory/Threads/HandleCount/Title nao tinham
+                // consumidor e custavam 1+ syscall por processo por tick.
+                _processCacheTick = unchecked(_processCacheTick + 1);
+                bool sampleResponding = (_processCacheTick % 5) == 0;
+
                 var processes = Process.GetProcesses();
                 _activeProcessCount = 0;
-                
+                var livePids = new System.Collections.Generic.HashSet<int>();
+
                 foreach (var proc in processes)
                 {
                     try
                     {
                         if (string.IsNullOrEmpty(proc.ProcessName)) continue;
-                        
+
+                        string name = proc.ProcessName.ToLowerInvariant();
+                        bool isResponding = true;
+                        if (sampleResponding)
+                        {
+                            isResponding = proc.Responding;
+                        }
+                        else if (_processCache.TryGetValue(name, out var prevInfo))
+                        {
+                            isResponding = prevInfo.IsResponding;
+                        }
+
                         var processInfo = new ProcessInfo
                         {
                             ProcessId = proc.Id,
-                            ProcessName = proc.ProcessName.ToLowerInvariant(),
+                            ProcessName = name,
                             WorkingSetMB = proc.WorkingSet64 / (1024 * 1024),
-                            VirtualMemoryMB = proc.VirtualMemorySize64 / (1024 * 1024),
-                            StartTime = proc.StartTime,
-                            IsResponding = proc.Responding,
-                            MainWindowTitle = GetMainWindowTitle(proc.Id),
-                            CpuUsage = GetProcessCpuUsage(proc),
-                            ThreadCount = proc.Threads.Count,
-                            HandleCount = proc.HandleCount
+                            IsResponding = isResponding,
+                            CpuUsage = GetProcessCpuUsage(proc)
                         };
-                        
+
                         _processCache.AddOrUpdate(processInfo.ProcessName, processInfo, (_, _) => processInfo);
                         _activeProcessCount++;
+                        livePids.Add(proc.Id);
                     }
                     catch
                     {
@@ -5032,6 +5095,26 @@ namespace KitLugia.GUI.Services
                     finally
                     {
                         proc.Dispose();
+                    }
+                }
+
+                // Poda do _cpuTimeCache (keyed por PID: sem poda, PIDs mortos
+                // acumulam para sempre). Barato: remove quem nao esta vivo.
+                foreach (var pid in _cpuTimeCache.Keys)
+                {
+                    if (!livePids.Contains(pid))
+                        _cpuTimeCache.TryRemove(pid, out _);
+                }
+
+                // Poda conservadora dos behaviors (keyed por nome): nomes de
+                // instaladores/temp somem, mas a entrada ficava para sempre.
+                if (_processBehaviors.Count > 500)
+                {
+                    var cutoff = DateTime.Now - TimeSpan.FromMinutes(30);
+                    foreach (var kvp in _processBehaviors)
+                    {
+                        if (kvp.Value.LastSeen < cutoff)
+                            _processBehaviors.TryRemove(kvp.Key, out _);
                     }
                 }
             }
