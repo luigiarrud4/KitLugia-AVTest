@@ -691,49 +691,80 @@ namespace KitLugia.GUI.Pages
 
         private async void LoadPrograms()
         {
+            // Pode ser chamado fora de uma operação do dispatcher (página criada antes do loop
+            // de mensagens / chamada vinda de background). Aí SynchronizationContext é null, todo
+            // `await` continua na ThreadPool e a escrita na UI estoura "O thread de chamada não
+            // pode acessar este objeto". Nesses casos despacha a chamada inteira para a UI thread.
+            if (!Dispatcher.CheckAccess())
+            {
+                await Dispatcher.InvokeAsync(LoadPrograms);
+                return;
+            }
+
             ShowProgramsLoading();
             if (ProgramsList != null) ProgramsList.ItemsSource = null;
 
             try
             {
                 _programsCts?.Cancel();
-                _programsCts = new CancellationTokenSource();
+                var cts = new CancellationTokenSource();
+                _programsCts = cts;
 
-                var programs = await Task.Run(() => RegistryProgramFactory.GetInstalledPrograms());
+                // Token capturado em LOCAL. Depois de qualquer `await` o campo pode ter sido
+                // descartado pelo Cleanup (pagina desanexada): reler `_programsCts.Token`
+                // dava NullReferenceException ou "The CancellationTokenSource has been
+                // disposed" no dialogo do usuario.
+                var token = cts.Token;
 
-                ProgramsCollection = new ObservableCollection<ProgramViewModel>(
-                    programs.Select(p => new ProgramViewModel(p)));
+                var programs = await Task.Run(() => RegistryProgramFactory.GetInstalledPrograms(), token);
+                token.ThrowIfCancellationRequested();
 
-                if (ProgramsIconProgressText != null)
-                    ProgramsIconProgressText.Text = $"Ícones carregados: 0/{ProgramsCollection.Count}";
+                // Pós-await SEMPRE via dispatcher: não depende do SynchronizationContext ambiental.
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    ProgramsCollection = new ObservableCollection<ProgramViewModel>(
+                        programs.Select(p => new ProgramViewModel(p)));
 
-                // Mostra a lista
-                FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(ProgramsCollection);
-                if (ProgramsList != null) ProgramsList.ItemsSource = FilteredProgramsCollection;
+                    if (ProgramsIconProgressText != null)
+                        ProgramsIconProgressText.Text = $"Ícones carregados: 0/{ProgramsCollection.Count}";
+
+                    // Mostra a lista
+                    FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(ProgramsCollection);
+                    if (ProgramsList != null) ProgramsList.ItemsSource = FilteredProgramsCollection;
+                });
 
                 // Carrega ícones em paralelo após delay para lista aparecer rápido
-                await Task.Delay(100);
-                await LoadProgramsIconsAsync(_programsCts.Token);
+                await Task.Delay(100, token);
+                await LoadProgramsIconsAsync(token);
             }
+            // Sair da pagina (Cleanup cancela/descarta o CTS) e fluxo NORMAL: sem dialogo.
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
+                // Stack completo no log do kit: sem isso o diálogo só mostra a mensagem e não
+                // é possível saber qual linha cruzou as threads.
+                Logger.LogError("AppsPage.LoadPrograms", ex.ToString());
                 MessageBox.Show($"Erro ao carregar programas: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
-                HideProgramsLoading();
+                if (Dispatcher.CheckAccess()) HideProgramsLoading();
+                else await Dispatcher.InvokeAsync(HideProgramsLoading);
             }
         }
 
         private async Task LoadProgramsIconsAsync(CancellationToken cancellationToken)
         {
-            if (ProgramsCollection == null) return;
+            // Snapshot em LOCAL: o Cleanup zera este campo concorrentemente.
+            var collection = ProgramsCollection;
+            if (collection == null) return;
 
             var dispatcher = Dispatcher;
             var semaphore = new SemaphoreSlim(5, 5); // Limite de 5 ícones simultâneos (mais responsivo)
-            var tasks = new List<Task>(200);
+            var tasks = new List<Task>(collection.Count);
 
-            foreach (var program in ProgramsCollection)
+            foreach (var program in collection)
             {
                 if (cancellationToken.IsCancellationRequested) break;
 
@@ -770,13 +801,10 @@ namespace KitLugia.GUI.Pages
                             {
                                 program.Icon = icon;
 
-                                if (ProgramsCollection != null)
+                                int loadedCount = collection.Count(p => p.Icon != null);
+                                if (ProgramsIconProgressText != null)
                                 {
-                                    int loadedCount = ProgramsCollection.Count(p => p.Icon != null);
-                                    if (ProgramsIconProgressText != null)
-                                    {
-                                        ProgramsIconProgressText.Text = $"Ícones carregados: {loadedCount}/{ProgramsCollection.Count}";
-                                    }
+                                    ProgramsIconProgressText.Text = $"Ícones carregados: {loadedCount}/{collection.Count}";
                                 }
                             }, System.Windows.Threading.DispatcherPriority.Background);
                         }
@@ -788,7 +816,10 @@ namespace KitLugia.GUI.Pages
                 }, cancellationToken));
             }
 
-            await Task.WhenAll(tasks);
+            // WhenAll pode estourar se o token for cancelado/descartado no meio.
+            try { await Task.WhenAll(tasks); }
+            catch (OperationCanceledException) { return; }
+            catch (ObjectDisposedException) { return; }
 
             await dispatcher.InvokeAsync(() =>
             {

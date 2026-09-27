@@ -60,29 +60,52 @@ namespace KitLugia.GUI
             // fluxo normal (IPC para a instância existente), que pelo menos abre a página.
             if (needsFileOp && !SystemUtils.IsRunningAsAdministrator())
             {
+                bool launched = false;
                 try
                 {
                     string argLine = string.Join(" ", args.Select(a => a.Contains(' ') || a.Contains('\t') ? $"\"{a}\"" : a));
                     Logger.Log($"[ELEV] Relançando elevado (UAC) com: {argLine}");
-                    Process.Start(new ProcessStartInfo(Environment.ProcessPath ?? typeof(Program).Assembly.Location)
+                    var elevated = Process.Start(new ProcessStartInfo(Environment.ProcessPath ?? typeof(Program).Assembly.Location)
                     {
                         UseShellExecute = true,
                         Verb = "runas",
                         Arguments = argLine
                     });
+                    launched = elevated != null;
                 }
                 catch (Exception ex)
                 {
-                    // UAC negado — continua sem admin (IPC/UI normal)
                     Logger.Log($"[ELEV] Falha ao relançar elevado (UAC negado?): {ex.Message}");
+                    launched = false;
                 }
-                return;
+
+                // ANTES era "return" incondicional: com o UAC NEGADO o app saía sem fazer
+                // NADA e sem avisar — o clique no menu de contexto parecia morto. Agora só
+                // encerra se a instância elevada realmente subiu.
+                if (launched) return;
+                try
+                {
+                    WindowsToastNotifier.Show("KitLugia", "Sem permissão de administrador — abrindo a página sem elevação (itens protegidos podem falhar).");
+                }
+                catch { }
             }
 
             // ★ OTIMIZAÇÃO: boost self priority to High so the tray icon + watchdog load faster.
             // Padrão é Normal — fica atrás de outros apps de boot na disputa por CPU.
             try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High; }
             catch { /* pode falhar sem admin — não é crítico */ }
+
+            // ★ SEM THREAD POOL STARVATION: o startup dispara muitos Task.Run (auto-start, menu de
+            // contexto, updater, watchdogs, checks de runtime). Com os mínimos padrão (nº de
+            // núcleos), o pool injeta 1-2 threads por segundo — na máquina carregada a fila cresce e
+            // a UI fica esperando trabalho que "nunca" foi agendado (parece app travado).
+            // Mínimo 8 workers (ou nº de núcleos, se maior) já sobe isso de forma conservadora.
+            try
+            {
+                int minThreads = Math.Max(Environment.ProcessorCount, 8);
+                ThreadPool.SetMinThreads(minThreads, minThreads);
+            }
+            catch { /* best-effort */ }
 
             // --- SINGLE INSTANCE CHECK ---
             // Se já existe uma instância, traz a janela dela para frente e sai
@@ -113,13 +136,28 @@ namespace KitLugia.GUI
                 }
 
                 // Se --unlock/--takeown foram passados, envia via IPC para a instância existente
+                bool sent = false;
                 if (!string.IsNullOrEmpty(unlockPath))
                 {
-                    Services.UnlockIpcServer.SendUnlockCommand(unlockPath);
+                    sent |= Services.UnlockIpcServer.SendUnlockCommand(unlockPath);
                 }
                 if (!string.IsNullOrEmpty(takeOwnPath))
                 {
-                    Services.UnlockIpcServer.SendTakeOwnershipCommand(takeOwnPath);
+                    sent |= Services.UnlockIpcServer.SendTakeOwnershipCommand(takeOwnPath);
+                }
+
+                // PROVA-DE-TUDO: se o IPC falhar (instância ocupada mas sem servidor de pipe —
+                // ex.: subiu em modo reduzido), executa AQUI em vez de não fazer nada. Antes o
+                // comando era perdido silenciosamente. Elevado, vira worker headless + toast.
+                if (!sent && needsFileOp)
+                {
+                    Logger.Log("[IPC] Envio falhou — executando a operação neste processo (headless).");
+                    if (SystemUtils.IsRunningAsAdministrator())
+                    {
+                        RunHeadlessFileOperation(takeOwnPath ?? unlockPath!, isTakeOwn: takeOwnPath != null);
+                        return;
+                    }
+                    try { WindowsToastNotifier.Show("KitLugia", "Não foi possível falar com o Kit em execução — reabra o app e tente de novo."); } catch { }
                 }
                 BringExistingToFront();
                 return;

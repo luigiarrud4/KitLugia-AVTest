@@ -322,6 +322,21 @@ namespace KitLugia.GUI.Pages
             NavigationHelper.NavigateTo(PageType.QuickInstall);
         private void BtnGoToRufus_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Rufus);
         private void BtnGoToRepairs_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Repairs);
+
+        // A Central de Diagnóstico vive no Gerenciador de Tarefas (junto de Latência/Armazenamento/Áudio,
+        // onde o diagnóstico já mora). O card abre a janela já na aba certa e ela começa a coletar sozinha:
+        // quem clica aqui quer resposta, não uma tela pedindo outro clique.
+        private void BtnGoToDiagnosticCenter_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                KitLugia.GUI.Windows.TaskManager.KitTaskManagerWindow.OpenOnTab(Application.Current.MainWindow, "Diagnostic");
+            }
+            catch (Exception ex)
+            {
+                (Application.Current.MainWindow as MainWindow)?.ShowError("ERRO", $"Falha ao abrir o Gerenciador de Tarefas: {ex.Message}");
+            }
+        }
         private void BtnGoToDrivers_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Drivers);
         private void BtnGoToScreen_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Screen);
         private void BtnGoToAllTweaks_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.AllTweaks);

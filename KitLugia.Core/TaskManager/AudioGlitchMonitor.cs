@@ -96,6 +96,19 @@ namespace KitLugia.Core.TaskManager
         private long _provokedUntilMs;                       // até aqui, eventos = PROVOCADO
         private readonly List<DateTime> _recoveries = new(); // uma entrada por reset executado
         private string _lastRecoveryText = "";               // linha pronta para o card
+        private string _recoveryLine = "";                   // a recuperação executada, SEM o veredito da observação
+
+        /// <summary>
+        /// Janela de observação pós-recuperação, em segundos (igual à janela do gatilho).
+        /// Depois do reset, o Kit NÃO declara o problema resolvido: ele observa uma janela
+        /// e só então registra "eficaz" (nenhum estalo real novo) ou "sem efeito"
+        /// (estalos reais novos) — item 4 da revisão de robustez.
+        /// </summary>
+        public const int RecoveryAssessSeconds = 90;
+
+        // Observação em andamento: _assessFrom marca o fim da janela de "provocado" (só daí
+        // em diante um estalo volta a ser real) e _assessAfter, o fim da observação.
+        private DateTime _assessFrom, _assessAfter;
 
         /// <summary>Disparado após cada recuperação executada (a GUI atualiza o card).</summary>
         public event Action<string>? RecoveryPerformed;
@@ -362,8 +375,13 @@ namespace KitLugia.Core.TaskManager
                         _provokedUntilMs = until;
                         _recoveries.Add(DateTime.Now);
                         if (_recoveries.Count > 20) _recoveries.RemoveAt(0);
-                        _lastRecoveryText = $"{DateTime.Now:HH:mm:ss} — motor de áudio sincronizado de volta " +
-                                            $"(motivo: {reason}). O estalo que vier agora foi o PRÓPRIO reset, não é problema novo.";
+                        _recoveryLine = $"{DateTime.Now:HH:mm:ss} — motor de áudio sincronizado de volta " +
+                                        $"(motivo: {reason}). O estalo que vier agora foi o PRÓPRIO reset, não é problema novo.";
+                        // Reinicia a observação: a janela começa quando o reset deixa de ser "provocado".
+                        _assessFrom = DateTime.Now.AddMilliseconds(RecoverySuspendMs + 1500);
+                        _assessAfter = _assessFrom.AddSeconds(RecoveryAssessSeconds);
+                        _lastRecoveryText = _recoveryLine +
+                                            $" Observando os próximos {RecoveryAssessSeconds} s para ver se estabilizou.";
                     }
                     StorageDiagnostics.RecordIntervention("recuperar", "audiodg",
                         $"reset de ~{RecoverySuspendMs} ms para sincronizar o áudio (auto)", pid, reverted: true);
@@ -375,6 +393,33 @@ namespace KitLugia.Core.TaskManager
             {
                 lock (_lock) _lastRecoveryText = "Falha na recuperação: " + ex.Message;
             }
+        }
+
+        /// <summary>
+        /// Fecha a observação da última recuperação quando a janela vence e registra o veredito:
+        /// EFICAZ (nenhum estalo REAL novo) ou SEM EFEITO (estalos reais novos — a causa continua).
+        /// Só relata: não decide nada, não liga/desliga a recuperação e não conta eventos provocados.
+        /// Chamado ~1x/s pelo loop, independente do AutoRecover (se o usuário desligar a recuperação
+        /// no meio, a observação já em curso ainda é concluída em vez de ficar mentindo "observando").
+        /// </summary>
+        private void AssessLastRecovery()
+        {
+            DateTime from, after;
+            lock (_lock) { from = _assessFrom; after = _assessAfter; }
+            if (after == DateTime.MinValue || DateTime.Now < after) return;
+
+            string verdict;
+            lock (_lock)
+            {
+                int novos = _glitches.Count(g => !g.ProvokedByKit && g.Kind == "CONFIRMADO" && g.At >= from);
+                _assessAfter = DateTime.MinValue;   // observação concluída (não repete)
+                verdict = novos == 0
+                    ? $" Avaliação {RecoveryAssessSeconds} s depois: nenhum estalo novo — a recuperação foi EFICAZ."
+                    : $" Avaliação {RecoveryAssessSeconds} s depois: {novos} estalo(s) novo(s) — a recuperação NÃO " +
+                      "resolveu a causa, que continua agindo (o limite por hora evita resetar em vão).";
+                _lastRecoveryText = _recoveryLine + verdict;
+            }
+            try { RecoveryPerformed?.Invoke(_lastRecoveryText); } catch { }
         }
 
         /// <summary>Glitches que o usuário provavelmente OUVIU (motor sinalizou + som tocando + sem confusão do Kit).</summary>
@@ -416,6 +461,14 @@ namespace KitLugia.Core.TaskManager
             _lastPacketTicks = 0;
             lock (_lock)
             {
+                // Limpar a lista no meio da observação apagaria justamente os estalos que provariam
+                // "sem efeito" — então a observação é CANCELADA com transparência, nunca declarada eficaz.
+                if (_assessAfter != DateTime.MinValue)
+                {
+                    _assessAfter = DateTime.MinValue;
+                    _lastRecoveryText = _recoveryLine +
+                        " Avaliação cancelada: a lista de eventos foi limpa antes da janela de observação terminar.";
+                }
                 _glitches.Clear();
                 _packets = 0;
                 _polls = 0;
@@ -484,6 +537,7 @@ namespace KitLugia.Core.TaskManager
                     if (++_recoveryCheckTicks >= 100)
                     {
                         _recoveryCheckTicks = 0;
+                        AssessLastRecovery();   // fecha a observação da última recuperação, se a janela venceu
                         MaybeAutoRecover();
                     }
 
@@ -1179,6 +1233,36 @@ namespace KitLugia.Core.TaskManager
                     sb.AppendLine();
                 }
             }
+
+            sb.AppendLine("--- RECUPERAÇÃO AUTOMÁTICA DO ÁUDIO ---");
+            {
+                DateTime lastRec; string lastLine; bool ligada;
+                int naHora; bool pendente;
+                lock (_lock)
+                {
+                    lastRec = _recoveries.Count > 0 ? _recoveries[^1] : default;
+                    lastLine = _lastRecoveryText;
+                    ligada = AutoRecover;
+                    naHora = _recoveries.Count(t => (DateTime.Now - t).TotalHours < 1);
+                    pendente = _assessAfter != DateTime.MinValue;
+                }
+                // Estado "agora" pela MESMA tabela de decisão que o motor usa — é o que explica,
+                // em texto, por que a recuperação está pausada quando o limite é atingido.
+                var (should, why) = ShouldAutoRecover(
+                    glitches.Where(g => g.Kind == "CONFIRMADO" && !g.ProvokedByKit).Select(g => g.At).ToList(),
+                    DateTime.Now, lastRec, naHora, pendente ? 1 : 0);
+
+                sb.AppendLine($"  Ligada pelo usuário: {ligada}   resets executados nesta sessão: {RecoveryCount}   na última hora: {naHora}");
+                sb.AppendLine("  Gatilho: 2 estalos CONFIRMADOS (audíveis) em 90 s · cooldown de 60 s · máximo de 3 resets por hora.");
+                sb.AppendLine($"  Estado agora: {(should ? "critério fechado — o próximo ciclo faz o reset" : "sem reset: " + why)}");
+                if (lastLine.Length > 0) sb.AppendLine("  Última recuperação: " + lastLine);
+                sb.AppendLine("  Um reset é sempre registrado como intervenção reversível (diário da aba Disco).");
+                sb.AppendLine("  Eventos PROVOCADOS pelo próprio reset nunca contam como estalo real, nunca alteram a");
+                sb.AppendLine("    conclusão sobre a estabilidade e nunca disparam outro reset (a janela de provocado fecha o laço).");
+                sb.AppendLine("  Ao atingir o limite por hora a recuperação fica PAUSADA e o Kit continua diagnosticando —");
+                sb.AppendLine("    resetar de novo não resolve causa persistente, então ele para de tentar em vez de insistir.");
+            }
+            sb.AppendLine();
 
             sb.AppendLine("--- METODOLOGIA (para a IA entender os números) ---");
             sb.AppendLine("  Glitch CONFIRMADO = o próprio motor de áudio do Windows levantou");

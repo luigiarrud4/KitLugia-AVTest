@@ -35,9 +35,21 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="24"/>
                                 <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="CheckMark" Text="&#x2713;" Foreground="#FFD700" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
                             <ContentPresenter x:Name="HeaderHost" ContentSource="Header" VerticalAlignment="Center" Grid.Column="1" Margin="8,0,0,0" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                            <!-- SETA + POPUP do submenu: sem os dois o item com filhos aparecia como um
+                                 comando comum e clicar nele NAO abria nada (o submenu ficava inacessivel). -->
+                            <TextBlock x:Name="SubmenuArrow" Grid.Column="2" Text="&#x25B6;" FontSize="9" Foreground="#888"
+                                       VerticalAlignment="Center" Margin="14,0,2,0" Visibility="Collapsed"/>
+                            <Popup x:Name="SubmenuHost" Placement="Right" VerticalOffset="-3" HorizontalOffset="-4"
+                                   IsOpen="{TemplateBinding IsSubmenuOpen}" AllowsTransparency="True" Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Border Background="#0F0F0F" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="4" Padding="2">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                </Border>
+                            </Popup>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -47,6 +59,15 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="#33FFD700"/>
                             <Setter Property="Foreground" Value="#FFFFFF"/>
+                        </Trigger>
+                        <Trigger Property="HasItems" Value="True">
+                            <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsSubmenuOpen" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="#33FFD700"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="#555555"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -91,13 +112,33 @@
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
                     <Border x:Name="Border" Background="{TemplateBinding Background}" CornerRadius="4" Margin="2,1">
-                        <ContentPresenter ContentSource="Header" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            <TextBlock x:Name="SubmenuArrow" Grid.Column="1" Text="&#x25B6;" FontSize="9" Foreground="#888"
+                                       VerticalAlignment="Center" Margin="10,0,4,0" Visibility="Collapsed"/>
+                            <Popup x:Name="SubmenuHost" Grid.Column="0" Placement="Right" VerticalOffset="-3" HorizontalOffset="-4"
+                                   IsOpen="{TemplateBinding IsSubmenuOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+                                <Border Background="#0F0F0F" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="4" Padding="2">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="#33FFD700"/>
                             <Setter Property="Foreground" Value="White"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Trigger>
+                        <Trigger Property="HasItems" Value="True">
+                            <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsSubmenuOpen" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="#33FFD700"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

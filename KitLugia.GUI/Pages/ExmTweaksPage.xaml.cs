@@ -18,6 +18,7 @@ namespace KitLugia.GUI.Pages
     public partial class ExmTweaksPage : Page
     {
         private bool _isLoading = true;
+        private bool _loadedOnce;
 
         private static int _sfcProgress;
         private static string _sfcStatus = "";
@@ -36,8 +37,17 @@ namespace KitLugia.GUI.Pages
         public ExmTweaksPage()
         {
             InitializeComponent();
-            _ = LoadCurrentStatus();
+            this.Loaded += ExmTweaksPage_Loaded;
             this.Unloaded += ExmTweaksPage_Unloaded;
+        }
+
+        // Carregamento movido do construtor para o Loaded (convencao: nada de trabalho
+        // pesado no ctor — a pagina pode ser criada fora de uma operacao do dispatcher).
+        private void ExmTweaksPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_loadedOnce) return;
+            _loadedOnce = true;
+            _ = LoadCurrentStatus();
         }
 
         private void ExmTweaksPage_Unloaded(object sender, RoutedEventArgs e)
@@ -53,6 +63,8 @@ namespace KitLugia.GUI.Pages
             _dismCts?.Cancel();
             _dismCts?.Dispose();
             _dismCts = null;
+            this.Loaded -= ExmTweaksPage_Loaded;
+            this.Unloaded -= ExmTweaksPage_Unloaded;
             this.DataContext = null;
         }
 

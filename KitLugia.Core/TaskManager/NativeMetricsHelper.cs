@@ -422,18 +422,29 @@ namespace KitLugia.Core.TaskManager
                     _thermalTried = true;
                     if (PdhOpenQueryW(null, 0, out _thermalQuery) == 0)
                     {
-                        string wildcard = @"\Thermal Zone Information(*)\Temperature";
-                        uint len = 0;
-                        PdhExpandWildCardPathW(null, wildcard, null, ref len, 0);
-                        if (len > 1)
+                        // O nome do objeto/contador é LOCALIZADO no banco do PDH — o caminho
+                        // em inglês puro falha no pt-BR (typeperf: "nenhum contador válido").
+                        // 1º candidato = mapeado via Perflib (vale p/ qualquer idioma).
+                        string obj = LocalizePerfName("Thermal Zone Information");
+                        string ctr = LocalizePerfName("Temperature");
+                        string[] wildcards =
                         {
+                            $@"\{obj}(*)\{ctr}",                            // locale atual (Perflib)
+                            @"\Thermal Zone Information(*)\Temperature",    // inglês direto
+                            @"\Informações de Zona Termal(*)\Temperatura",  // pt-BR conhecido
+                        };
+                        foreach (var wildcard in wildcards)
+                        {
+                            uint len = 0;
+                            PdhExpandWildCardPathW(null, wildcard, null, ref len, 0);
+                            if (len <= 1) continue;
                             var sb = new System.Text.StringBuilder((int)len);
-                            if (PdhExpandWildCardPathW(null, wildcard, sb, ref len, 0) == 0)
-                            {
-                                var first = sb.ToString().Split('\0', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                                if (!string.IsNullOrEmpty(first))
-                                    PdhAddCounterW(_thermalQuery, first, 0, out _thermalCounter); // caminho expandido é localizado
-                            }
+                            if (PdhExpandWildCardPathW(null, wildcard, sb, ref len, 0) != 0) continue;
+                            var first = sb.ToString().Split('\0', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                            if (string.IsNullOrEmpty(first)) continue;
+                            if (PdhAddCounterW(_thermalQuery, first, 0, out _thermalCounter) == 0 && _thermalCounter != IntPtr.Zero)
+                                break; // caminho expandido já é localizado
+                            _thermalCounter = IntPtr.Zero;
                         }
                     }
                     if (_thermalCounter != IntPtr.Zero) PdhCollectQueryData(_thermalQuery);
@@ -561,6 +572,50 @@ namespace KitLugia.Core.TaskManager
             }
             catch { }
             return names;
+        }
+
+        private static readonly Dictionary<string, string> _perfNameCache = new();
+
+        /// <summary>Mapeia um nome de objeto/contador PDH em inglês para o nome localizado
+        /// via ÍNDICE do banco Perflib (009 = inglês; a chave do locale atual é o LCID em
+        /// hex, ex.: 0416 = pt-BR). Sem isso o ExpandWildCard só casa no próprio locale e
+        /// o sensor "some" — foi exatamente o caso do Thermal Zone no pt-BR (o TMOG lê
+        /// 28 °C na mesma máquina onde o Kit mostrava "—"). Cache por nome.</summary>
+        private static string LocalizePerfName(string english)
+        {
+            try
+            {
+                lock (_perfNameCache)
+                {
+                    if (_perfNameCache.TryGetValue(english, out var hit)) return hit;
+                }
+                string result = english;
+                int lcid = System.Globalization.CultureInfo.CurrentUICulture.LCID;
+                using var kEn = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\009");
+                using var kLoc = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\" + lcid.ToString("X4"));
+                var en = kEn?.GetValue("Counter") as string[];
+                var loc = kLoc?.GetValue("Counter") as string[];
+                if (en != null && loc != null)
+                {
+                    var locById = new Dictionary<string, string>(StringComparer.Ordinal);
+                    for (int j = 1; j < loc.Length; j += 2)
+                    {
+                        if (!string.IsNullOrEmpty(loc[j]) && !locById.ContainsKey(loc[j - 1]))
+                            locById[loc[j - 1]] = loc[j];
+                    }
+                    // Um nome em inglês pode ter VÁRIOS ids (ex.: "Temperature" = 5504 e
+                    // 3702, de providers diferentes); usa o 1º id que existir no locale.
+                    for (int i = 1; i < en.Length; i += 2) // [id, nome, id, nome...]
+                    {
+                        if (!string.Equals(en[i], english, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (locById.TryGetValue(en[i - 1], out var mapped) && !string.IsNullOrEmpty(mapped))
+                        { result = mapped; break; }
+                    }
+                }
+                lock (_perfNameCache) _perfNameCache[english] = result;
+                return result;
+            }
+            catch { return english; }
         }
 
         /// <summary>Expande um caminho PDH wildcard e devolve o 1º caminho válido (ou null).</summary>

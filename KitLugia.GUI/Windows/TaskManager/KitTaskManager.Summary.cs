@@ -19,6 +19,8 @@ using Color = System.Windows.Media.Color;
 using Point = System.Windows.Point;
 using ComboBox = System.Windows.Controls.ComboBox;
 using Orientation = System.Windows.Controls.Orientation;
+using Rectangle = System.Windows.Shapes.Rectangle;
+using Line = System.Windows.Shapes.Line;
 
 namespace KitLugia.GUI.Windows.TaskManager
 {
@@ -38,6 +40,7 @@ namespace KitLugia.GUI.Windows.TaskManager
         private readonly Queue<float> _sumKernelHist = new(61);
         private readonly Queue<float> _sumTempHist = new(61);
         private readonly Queue<float> _sumMemHist = new(61);
+        private readonly Queue<float> _sumMemBytesHist = new(61); // GB em uso (min/max do gráfico, paridade TMOG)
         private readonly Queue<float> _sumNetHist = new(61);
         private readonly Queue<float> _sumDiskHist = new(61);
         private readonly Queue<float> _sumGpuHist = new(61);
@@ -58,12 +61,22 @@ namespace KitLugia.GUI.Windows.TaskManager
         /// <summary>Linha do grid "Top processos por CPU" — INPC para atualizar no lugar (sem piscar).</summary>
         private sealed class TopProcRow : INotifyPropertyChanged
         {
-            private string _name = "", _cpu = "", _ram = "";
+            private string _name = "", _cpu = "", _ram = "", _gpu = "—";
             private ImageSource? _icon;
             public int Pid { get; set; }
             public string Name { get => _name; set { _name = value; Raise(nameof(Name)); } }
             public string Cpu { get => _cpu; set { _cpu = value; Raise(nameof(Cpu)); } }
             public string RamMB { get => _ram; set { _ram = value; Raise(nameof(RamMB)); } }
+            public string Gpu { get => _gpu; set { _gpu = value; Raise(nameof(Gpu)); } }
+
+            // Valores NUMÉRICOS (o histórico e o pin precisam da métrica, não do texto).
+            public double CpuValue { get; set; }
+            public double RamValue { get; set; }
+
+            private bool _pinned;
+            /// <summary>"Congelado" na lista pelo usuário: continua no topo mesmo caindo do Top 14.</summary>
+            public bool Pinned { get => _pinned; set { if (_pinned == value) return; _pinned = value; Raise(nameof(Pinned)); Raise(nameof(PinIcon)); } }
+            public string PinIcon => Pinned ? "📌" : "";
 
             /// <summary>Ícone real do executável (mesmo cache usado na aba Processos).</summary>
             public ImageSource? Icon
@@ -168,15 +181,17 @@ namespace KitLugia.GUI.Windows.TaskManager
             while (q.Count > max) q.Dequeue();
         }
 
-        private void SetVital(TextBlock txt, Border bar, string text, double fraction, System.Windows.Media.Brush color)
+        private static void SetVital(TextBlock txt, Border bar, string text, double fraction, System.Windows.Media.Brush color)
         {
             try
             {
-                txt.Text = text;
-                txt.Foreground = color;
-                // Largura agora é EASADA pelo motor fluido (60fps) — o tick só registra o alvo.
-                FluidSetBar(bar, fraction, vertical: false);
-                bar.Background = color;
+                // Guardas anti-pisca: reescrever o mesmo texto/largura a cada tick
+                // força re-render do WPF mesmo com o dado parado.
+                if (!string.Equals(txt.Text, text, StringComparison.Ordinal)) txt.Text = text;
+                if (!Equals(txt.Foreground, color)) txt.Foreground = color;
+                double w = Math.Max(0, Math.Min(1, fraction)) * BarMaxWidth;
+                if (Math.Abs(bar.Width - w) > 0.5) bar.Width = w;
+                if (!Equals(bar.Background, color)) bar.Background = color;
             }
             catch { }
         }
@@ -207,24 +222,23 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (power >= 0) Enqueue(_sumPowerHist, power);
 
             // ── Gráfico da CPU: 3 séries no mesmo canvas (a leitura do TMOG) ──
-            // Motor fluido: a linha rola continuamente entre amostras de 1s (60fps).
-            var cpuSeries = new List<(Func<Queue<float>?> data, Color color)>
+            // Redesenho por amostra: o canvas é redesenhado no tick (~1s), como era antes.
+            var cpuSeries = new List<(Queue<float> data, Color color)>
             {
-                (() => _sumCpuHist, Color.FromRgb(0x4C, 0xAF, 0x50)),
-                (() => _sumKernelHist, Color.FromRgb(0xF4, 0x43, 0x36)),
+                (_sumCpuHist, Color.FromRgb(0x4C, 0xAF, 0x50)),
+                (_sumKernelHist, Color.FromRgb(0xF4, 0x43, 0x36)),
             };
-            if (_sumTempHist.Count > 1) cpuSeries.Add((() => _sumTempHist, Color.FromRgb(0xFF, 0x98, 0x00)));
-            FluidRegisterChart(SumCpuCanvas, () => 100f, true, cpuSeries.ToArray());
+            if (_sumTempHist.Count > 1) cpuSeries.Add((_sumTempHist, Color.FromRgb(0xFF, 0x98, 0x00)));
+            DrawMultiSeriesChart(SumCpuCanvas, 100f, true, cpuSeries);
 
-            // Número grande com easing (~30Hz) — o valor sobe/desce suave entre amostras.
-            FluidSetText(TxtSumCpuBig, () => cpu, "F0", "%");
-            TxtSumCpuBig.Foreground = GetHeatColor(cpu, 80, 95);
-            TxtSumCpuSub.Text = kernelF > 0 ? $"Kernel {kernelF:F0}%" : "";
+            SetText(TxtSumCpuBig, $"{cpu:F0}%", GetHeatColor(cpu, 80, 95));
+            SetText(TxtSumCpuSub, kernelF > 0 ? $"Kernel {kernelF:F0}%" : "");
             var uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
-            TxtSumCpuFooter.Text =
+            // Uptime em minutos: sem isso o rodapé mudava a cada segundo e piscava.
+            SetText(TxtSumCpuFooter,
                 $"Frequência {(freq > 0 ? (freq / 1000.0).ToString("F2") + " GHz" : "—")} · " +
-                $"{Environment.ProcessorCount} núcleos · uptime do sistema {(int)uptime.TotalDays}d {uptime.Hours:00}h {uptime.Minutes:00}m";
-            TxtSumSubtitle.Text = $"Atualizando a cada {_refreshSeconds}s · métricas nativas (sem admin)";
+                $"{Environment.ProcessorCount} núcleos · uptime do sistema {(int)uptime.TotalDays}d {uptime.Hours:00}h {uptime.Minutes:00}m");
+            SetText(TxtSumSubtitle, $"Atualizando a cada {_refreshSeconds}s · métricas nativas (sem admin)");
 
             // ── Vitais ──
             SetVital(TxtSumCpu, BarSumCpu, $"{cpu:F0}%", cpu / 100.0, GetHeatColor(cpu, 80, 95));
@@ -244,17 +258,17 @@ namespace KitLugia.GUI.Windows.TaskManager
                 if (cores.Length > 0)
                 {
                     BuildCoreBars(cores.Length);
-                    TxtSumCoresInfo.Text = $"{cores.Length} processadores lógicos";
+                    SetText(TxtSumCoresInfo, $"{cores.Length} processadores lógicos");
                     for (int i = 0; i < _coreBars.Count && i < cores.Length; i++)
                     {
                         float pct = (float)cores[i];
                         var bar = _coreBars[i];
-                        // Altura/cor: altura é EASADA pelo motor fluido; cor/texto ficam no tick 1s.
-                        FluidSetBar(bar.Fill, Math.Min(1, pct / 100.0), vertical: true, bar.TrackHeight);
+                        // Altura/cor/texto só quando mudam (tick ~1s sem re-render à toa).
                         var brush = GetHeatColor(pct, 60, 85);
-                        bar.Fill.Background = brush;
-                        bar.Pct.Text = pct >= 100 ? "100" : pct.ToString("F0");
-                        bar.Pct.Foreground = brush;
+                        double wantH = Math.Max(1, bar.TrackHeight * Math.Min(1, pct / 100.0));
+                        if (Math.Abs(bar.Fill.Height - wantH) > 0.5) bar.Fill.Height = wantH;
+                        if (!Equals(bar.Fill.Background, brush)) bar.Fill.Background = brush;
+                        SetText(bar.Pct, pct >= 100 ? "100" : pct.ToString("F0"), brush);
                     }
                 }
             }
@@ -274,20 +288,22 @@ namespace KitLugia.GUI.Windows.TaskManager
                     ulong beyondRam = md.CommitTotalBytes > physInUse ? md.CommitTotalBytes - physInUse : 0;
                     var pf = NativeMetricsHelper.GetPageFileUsageNonBlocking();
 
-                    FluidSetText(TxtSumMemPctBig, () => md.LoadPercent, "F1", "%");
-                    TxtSumMemUsed.Text = $"Em uso: {Gb(md.UsedBytes)} GB de {Gb(md.TotalBytes)} GB ({md.LoadPercent:F0}%)";
-                    TxtSumMemAvail.Text = $"Disponível: {Gb(md.AvailableBytes)} GB";
-                    TxtSumMemCache.Text = $"Em cache: {Gb(md.CachedBytes)} GB";
-                    TxtSumMemSwap.Text = pf != null && pf.Valid
+                    SetText(TxtSumMemPctBig, $"{md.LoadPercent:F1}%");
+                    Enqueue(_sumMemBytesHist, (float)(md.UsedBytes / 1073741824.0));
+                    try { SetText(TxtSumMemMax, $"{_sumMemBytesHist.Max():F1} GB"); SetText(TxtSumMemMin, $"{_sumMemBytesHist.Min():F1} GB"); } catch { }
+                    SetText(TxtSumMemUsed, $"Em uso: {Gb(md.UsedBytes)} GB de {Gb(md.TotalBytes)} GB ({md.LoadPercent:F0}%)");
+                    SetText(TxtSumMemAvail, $"Disponível: {Gb(md.AvailableBytes)} GB");
+                    SetText(TxtSumMemCache, $"Em cache: {Gb(md.CachedBytes)} GB");
+                    SetText(TxtSumMemSwap, pf != null && pf.Valid
                         ? $"Swap (arquivo de paginação em uso): {Gb((ulong)(pf.CurrentUsageMB * 1048576))} GB de {Gb((ulong)(pf.AllocatedMB * 1048576))} GB alocados"
-                        : $"Além da RAM: {Gb(beyondRam)} GB comprometidos (medindo o swap…)";
-                    TxtSumMemCommit.Text = $"Comprometida: {Gb(md.CommitTotalBytes)} / {Gb(md.CommitLimitBytes)} GB";
-                    TxtSumMemPools.Text = md.Native
+                        : $"Além da RAM: {Gb(beyondRam)} GB comprometidos (medindo o swap…)");
+                    SetText(TxtSumMemCommit, $"Comprometida: {Gb(md.CommitTotalBytes)} / {Gb(md.CommitLimitBytes)} GB");
+                    SetText(TxtSumMemPools, md.Native
                         ? $"Pool paginado: {Mb(md.PagedPoolBytes)} MB · não paginado: {Mb(md.NonPagedPoolBytes)} MB"
-                        : "Pool: indisponível neste sistema";
-                    TxtSumMemMeta.Text = md.Native
+                        : "Pool: indisponível neste sistema");
+                    SetText(TxtSumMemMeta, md.Native
                         ? $"{md.HandleCount:N0} handles · {md.ThreadCount:N0} threads · {md.ProcessCount:N0} processos"
-                        : "";
+                        : "");
 
                     // Barra de composição: EM USO (roxo) | EM CACHE (azul) | LIVRE
                     try
@@ -301,16 +317,16 @@ namespace KitLugia.GUI.Windows.TaskManager
                     catch { }
 
                     double memTotalGb = md.TotalBytes / 1073741824.0;
-                    TxtSumMemTip.Text =
+                    SetText(TxtSumMemTip,
                         $"Agora: {md.LoadPercent:F1}% usado · {Gb(md.UsedBytes)} GB em uso · {Gb(md.AvailableBytes)} GB disponível · " +
                         $"pico desta sessão: {Gb(md.CommitPeakBytes)} GB comprometidos." + Environment.NewLine +
                         (md.LoadPercent >= 85
                             ? "ESTADO: RAM quase cheia. É aqui que o Windows começa a buscar no DISCO (paginação) e tudo engasga — veja a aba Latência."
                             : md.LoadPercent >= 70
                                 ? "ESTADO: uso alto, mas ainda dentro do normal para muitas abas/jogos abertos. Observe se o disco começa a trabalhar sozinho."
-                                : "ESTADO: tranquilo. Há RAM de sobra para o que está rodando agora.");
+                                : "ESTADO: tranquilo. Há RAM de sobra para o que está rodando agora."));
                 }
-                FluidRegisterChart(SumMemCanvas, () => 100f, true, (() => _sumMemHist, Color.FromRgb(0xB3, 0x6A, 0xE2)));
+                DrawMultiSeriesChart(SumMemCanvas, 100f, true, new List<(Queue<float>, Color)> { (_sumMemHist, Color.FromRgb(0xB3, 0x6A, 0xE2)) });
             }
             catch { }
 
@@ -322,16 +338,16 @@ namespace KitLugia.GUI.Windows.TaskManager
                 Enqueue(_sumNetHist, (float)(netTotal / 1048576.0));
                 if (net.Valid)
                 {
-                    TxtSumNet.Text = FormatBytesSpeed(netTotal);
-                    TxtSumNetDetail.Text = $"↓ {FormatBytesSpeed(net.InBytesPerSec)} · ↑ {FormatBytesSpeed(net.OutBytesPerSec)}";
-                    TxtSumNet.ToolTip = net.PrimaryName;
+                    SetText(TxtSumNet, FormatBytesSpeed(netTotal));
+                    SetText(TxtSumNetDetail, $"↓ {FormatBytesSpeed(net.InBytesPerSec)} · ↑ {FormatBytesSpeed(net.OutBytesPerSec)}");
+                    if (!Equals(TxtSumNet.ToolTip, net.PrimaryName)) TxtSumNet.ToolTip = net.PrimaryName;
                 }
                 else
                 {
-                    TxtSumNet.Text = "—";
-                    TxtSumNetDetail.Text = $"lendo {net.Interfaces} interfaces…";
+                    SetText(TxtSumNet, "—");
+                    SetText(TxtSumNetDetail, $"lendo {net.Interfaces} interfaces…");
                 }
-                FluidRegisterChart(SumNetCanvas, () => 0f, true, (() => _sumNetHist, Color.FromRgb(0x9C, 0x27, 0xB0)));
+                DrawMultiSeriesChart(SumNetCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumNetHist, Color.FromRgb(0x9C, 0x27, 0xB0)) });
             }
             catch { }
 
@@ -339,30 +355,41 @@ namespace KitLugia.GUI.Windows.TaskManager
             {
                 float diskMB = _lastDiskReadMBps + _lastDiskWriteMBps;
                 Enqueue(_sumDiskHist, diskMB);
-                TxtSumDisk.Text = FormatBytesSpeed(diskMB * 1048576.0);
-                TxtSumDiskDetail.Text = $"R {FormatBytesSpeed(_lastDiskReadMBps * 1048576.0)} · W {FormatBytesSpeed(_lastDiskWriteMBps * 1048576.0)}";
-                FluidRegisterChart(SumDiskCanvas, () => 0f, true, (() => _sumDiskHist, Color.FromRgb(0xFF, 0x98, 0x00)));
+                SetText(TxtSumDisk, FormatBytesSpeed(diskMB * 1048576.0));
+                SetText(TxtSumDiskDetail, $"R {FormatBytesSpeed(_lastDiskReadMBps * 1048576.0)} · W {FormatBytesSpeed(_lastDiskWriteMBps * 1048576.0)}");
+                DrawMultiSeriesChart(SumDiskCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumDiskHist, Color.FromRgb(0xFF, 0x98, 0x00)) });
             }
             catch { }
 
             try
             {
-                TxtSumGpuTile.Text = gpu >= 0 ? $"{gpu:F0}%" : "N/A";
+                SetText(TxtSumGpuTile, gpu >= 0 ? $"{gpu:F0}%" : "N/A");
                 string topGpu;
                 lock (_lock) topGpu = _allRows.Where(r => r.GpuValue > 0).OrderByDescending(r => r.GpuValue).FirstOrDefault()?.Name ?? "";
-                TxtSumGpuDetail.Text = topGpu.Length > 0 ? $"maior: {topGpu}" : "sem uso de GPU";
-                FluidRegisterChart(SumGpuCanvas, () => 100f, true, (() => _sumGpuHist, Color.FromRgb(0x21, 0x96, 0xF3)));
+                SetText(TxtSumGpuDetail, topGpu.Length > 0 ? $"maior: {topGpu}" : "sem uso de GPU");
+                DrawMultiSeriesChart(SumGpuCanvas, 100f, true, new List<(Queue<float>, Color)> { (_sumGpuHist, Color.FromRgb(0x21, 0x96, 0xF3)) });
             }
             catch { }
 
             try
             {
-                TxtSumPowerTile.Text = power >= 0 ? $"{power:F1} W" : "—";
-                TxtSumPowerDetail.Text = power >= 0 ? "pacote da CPU (PDH)" : "sensor indisponível";
-                FluidRegisterChart(SumPowerCanvas, () => 0f, true, (() => _sumPowerHist, Color.FromRgb(0xF4, 0x43, 0x36)));
+                SetText(TxtSumPowerTile, power >= 0 ? $"{power:F1} W" : "—");
+                SetText(TxtSumPowerDetail, power >= 0 ? "pacote da CPU (PDH)" : "sensor indisponível");
+                DrawMultiSeriesChart(SumPowerCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumPowerHist, Color.FromRgb(0xF4, 0x43, 0x36)) });
             }
             catch { }
+
+            // Histórico: 1 amostra por tick (com QUEM estava usando a CPU) e, se o painel
+            // estiver aberto, ele acompanha ao vivo.
+            double memGb = _sumMemBytesHist.Count > 0 ? _sumMemBytesHist.Last() : 0;
+            RecordHistorySample(cpu, kernelF, memGb);
+            if (_histOpen) DrawHistory();
         }
+
+        /// <summary>PIDs fixados pelo usuário ("congelar na lista"), na ordem em que foram fixados.</summary>
+        private readonly List<int> _sumPinned = new();
+        /// <summary>Menu de contexto aberto: a lista NÃO é reordenada/atualizada embaixo do mouse.</summary>
+        private bool _sumMenuOpen;
 
         /// <summary>Lista "Top processos por CPU" (merge in-place para não perder a seleção).</summary>
         private void UpdateSummaryTopCpu()
@@ -370,32 +397,73 @@ namespace KitLugia.GUI.Windows.TaskManager
             try
             {
                 if (TabSummary.Visibility != Visibility.Visible) return;
+                // O menu de contexto está aberto: CONGELA a lista. Sem isto o refresh de 1s
+                // reordenava/removia a linha em que o usuário ia clicar (era o pedido:
+                // "congelar o processo na lista para ele não sumir e poder modificar dali").
+                if (_sumMenuOpen) return;
                 List<ProcessRow> rows;
                 lock (_lock) rows = _allRows;
                 if (rows == null || rows.Count == 0) return;
 
-                var top = rows.OrderByDescending(r => r.CpuValue).ThenByDescending(r => r.RamValue).Take(14).ToList();
-                EnsureSummaryBuilt();
-                for (int i = 0; i < top.Count; i++)
+                var vivos = rows.OrderByDescending(r => r.CpuValue).ThenByDescending(r => r.RamValue).ToList();
+                var top = new List<ProcessRow>(14);
+                // 1) FIXADOS primeiro (mesmo que tenham saído do Top 14).
+                foreach (int pid in _sumPinned.ToList())
                 {
-                    var src = top[i];
-                    if (i < _topProcRows.Count && _topProcRows[i].Pid == src.Pid)
+                    var pin = vivos.FirstOrDefault(r => r.Pid == pid);
+                    if (pin == null) continue;              // processo morreu: libera o pin
+                    if (!top.Contains(pin)) top.Add(pin);
+                }
+                // 2) Completa com o Top ao vivo (sem duplicar quem já está fixado).
+                foreach (var r in vivos)
+                {
+                    if (top.Count >= 14) break;
+                    if (!top.Contains(r)) top.Add(r);
+                }
+                // Faxina: PID fixado que sumiu do sistema sai da lista de pins.
+                for (int i = _sumPinned.Count - 1; i >= 0; i--)
+                    if (vivos.All(r => r.Pid != _sumPinned[i])) _sumPinned.RemoveAt(i);
+
+                EnsureSummaryBuilt();
+                // Anti-pisca: _topProcRows[i] = novo dispara Replace (recria a linha e o
+                // template pisca). Se a ordem de PIDs é a mesma, atualiza os CAMPOS no
+                // lugar (INPC atualiza só o texto); só reconstrói quando entrou/saiu PID.
+                bool sameOrder = _topProcRows.Count == top.Count;
+                if (sameOrder)
+                {
+                    for (int i = 0; i < top.Count; i++)
+                        if (_topProcRows[i].Pid != top[i].Pid) { sameOrder = false; break; }
+                }
+                if (sameOrder)
+                {
+                    for (int i = 0; i < top.Count; i++)
                     {
                         var dst = _topProcRows[i];
+                        var src = top[i];
                         dst.Name = src.Name;
                         dst.Cpu = src.Cpu;
+                        dst.CpuValue = src.CpuValue;
                         dst.RamMB = src.RamMB;
+                        dst.RamValue = src.RamValue;
+                        dst.Gpu = src.Gpu;
+                        dst.Pinned = _sumPinned.Contains(src.Pid);
                         // Ícone chega depois (carregado em background) — não perde a chance
                         if (dst.Icon == null && src.ProcessIcon != null) dst.Icon = src.ProcessIcon;
                     }
-                    else
-                    {
-                        var novo = new TopProcRow { Pid = src.Pid, Name = src.Name, Cpu = src.Cpu, RamMB = src.RamMB, Icon = src.ProcessIcon };
-                        if (i < _topProcRows.Count) _topProcRows[i] = novo;
-                        else _topProcRows.Add(novo);
-                    }
                 }
-                while (_topProcRows.Count > top.Count) _topProcRows.RemoveAt(_topProcRows.Count - 1);
+                else
+                {
+                    _topProcRows.Clear();
+                    foreach (var src in top)
+                        _topProcRows.Add(new TopProcRow
+                        {
+                            Pid = src.Pid, Name = src.Name, Cpu = src.Cpu, CpuValue = src.CpuValue,
+                            RamMB = src.RamMB, RamValue = src.RamValue, Gpu = src.Gpu,
+                            Icon = src.ProcessIcon, Pinned = _sumPinned.Contains(src.Pid)
+                        });
+                }
+                SetText(TxtSumStatus, $"{rows.Count} processos · top {top.Count} por CPU" +
+                    (_sumPinned.Count > 0 ? $" · {_sumPinned.Count} fixado(s) 📌" : ""));
             }
             catch { }
         }
@@ -418,6 +486,351 @@ namespace KitLugia.GUI.Windows.TaskManager
             catch { }
         }
 
+        // ────────────────────────────────────────────────────────────────────
+        //  MENU DE CONTEXTO do TOP (congela a lista + age no processo escolhido)
+        // ────────────────────────────────────────────────────────────────────
+
+        private static DataGridRow? RowUnderMouse(object? src)
+        {
+            var d = src as DependencyObject;
+            while (d != null && d is not DataGridRow) d = VisualTreeHelper.GetParent(d);
+            return d as DataGridRow;
+        }
+
+        private void DgSumTopCpu_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            try
+            {
+                // O botão direito NÃO seleciona a linha no WPF: sem isto o menu agia no
+                // processo que estava selecionado antes, e não no que o usuário clicou.
+                if (RowUnderMouse(e.OriginalSource) is DataGridRow rw && rw.Item is TopProcRow alvo)
+                    DgSumTopCpu.SelectedItem = alvo;
+
+                _sumMenuOpen = true;   // congela a lista enquanto o menu estiver aberto
+
+                if (MenuSumPin != null && DgSumTopCpu.SelectedItem is TopProcRow sel)
+                    MenuSumPin.Header = _sumPinned.Contains(sel.Pid)
+                        ? "Liberar da lista (desafixar)"
+                        : "Congelar na lista (fixar)";
+            }
+            catch { }
+        }
+
+        private void DgSumTopCpuMenu_Closed(object sender, RoutedEventArgs e)
+        {
+            _sumMenuOpen = false;
+            UpdateSummaryTopCpu();   // descongela já com o estado atual
+        }
+
+        /// <summary>Acha a linha correspondente na aba Processos (mesma fonte de dados).</summary>
+        private ProcessRow? SumRowByPid(int pid)
+        {
+            lock (_lock) return _allRows.FirstOrDefault(r => r.Pid == pid);
+        }
+
+        /// <summary>Seleciona a linha na aba Processos e devolve o ProcessRow (reuso das ações já existentes).</summary>
+        private ProcessRow? SumPrepareAction()
+        {
+            if (DgSumTopCpu.SelectedItem is not TopProcRow t) return null;
+            var row = SumRowByPid(t.Pid);
+            if (row == null)
+            {
+                TxtStatus.Text = $"{t.Name} (PID {t.Pid}) não está mais em execução.";
+                return null;
+            }
+            try { DgProcesses.SelectedItem = row; DgProcesses.ScrollIntoView(row); } catch { }
+            return row;
+        }
+
+        private void MenuSumOpen_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (SumPrepareAction() is not ProcessRow row) return;
+                SwitchTab(BtnTabProcesses, new RoutedEventArgs());
+                DgProcesses.SelectedItem = row;
+                DgProcesses.ScrollIntoView(row);
+                DgProcesses.Focus();
+            }
+            catch { }
+        }
+
+        private void MenuSumPin_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (DgSumTopCpu.SelectedItem is not TopProcRow t) return;
+                if (_sumPinned.Contains(t.Pid)) _sumPinned.Remove(t.Pid);
+                else _sumPinned.Add(t.Pid);
+                TxtStatus.Text = _sumPinned.Contains(t.Pid)
+                    ? $"📌 {t.Name} fixado: continua na lista mesmo caindo do Top 14."
+                    : $"📌 {t.Name} liberado da lista fixa.";
+                UpdateSummaryTopCpu();
+            }
+            catch { }
+        }
+
+        private void MenuSumKill_Click(object sender, RoutedEventArgs e)
+        {
+            if (SumPrepareAction() != null) Kill(false);
+        }
+
+        private void MenuSumSuspend_Click(object sender, RoutedEventArgs e)
+        {
+            if (SumPrepareAction() != null) SuspendResume(true);
+        }
+
+        private void MenuSumResume_Click(object sender, RoutedEventArgs e)
+        {
+            if (SumPrepareAction() != null) SuspendResume(false);
+        }
+
+        private void MenuSumPriority_Click(object sender, RoutedEventArgs e)
+        {
+            if (SumPrepareAction() != null) MenuPriority_Click(sender, e);
+        }
+
+        private void MenuSumClearMem_Click(object sender, RoutedEventArgs e)
+        {
+            if (SumPrepareAction() != null) BtnClearMemory_Click(sender, e);
+        }
+
+        private void MenuSumCopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var row = SumPrepareAction();
+                if (row == null) return;
+                if (string.IsNullOrEmpty(row.Path)) { TxtStatus.Text = "Sem caminho para copiar (processo do sistema)."; return; }
+                Clipboard.SetText(row.Path);
+                TxtStatus.Text = $"📋 Caminho copiado: {row.Path}";
+            }
+            catch { }
+        }
+
+        private void MenuSumCopyPid_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (DgSumTopCpu.SelectedItem is not TopProcRow t) return;
+                Clipboard.SetText(t.Pid.ToString());
+                TxtStatus.Text = $"📋 PID copiado: {t.Pid}";
+            }
+            catch { }
+        }
+
+        // ────────────────────────────────────────────────────────────────────
+        //  HISTÓRICO ("Click for History" do TMOG): linha do tempo da CPU com
+        //  QUEM estava usando em cada instante.
+        // ────────────────────────────────────────────────────────────────────
+
+        private sealed class HistorySample
+        {
+            public DateTime Time;
+            public float Cpu, Kernel;
+            public double MemGb;
+            public List<(int Pid, string Name, float Cpu, double RamMb)> Top = new();
+        }
+
+        private const int HistoryMax = 600;                       // 10 min a 1 amostra/s
+        private readonly List<HistorySample> _history = new(HistoryMax + 1);
+        private int _histSel = -1;                                // índice selecionado (-1 = ao vivo)
+        private bool _histOpen;
+
+        /// <summary>1 amostra por tick: CPU/kernel/RAM + os processos que estavam consumindo CPU.</summary>
+        private void RecordHistorySample(float cpu, float kernel, double memGb)
+        {
+            try
+            {
+                var s = new HistorySample { Time = DateTime.Now, Cpu = cpu, Kernel = kernel, MemGb = memGb };
+                List<ProcessRow> rows;
+                lock (_lock) rows = _allRows;
+                if (rows != null && rows.Count > 0)
+                {
+                    foreach (var r in rows.OrderByDescending(x => x.CpuValue).Take(6))
+                    {
+                        if (r.CpuValue <= 0.05) break;   // ninguém consumindo: não inventa linha
+                        s.Top.Add((r.Pid, r.Name, (float)r.CpuValue, r.RamValue));
+                    }
+                }
+                _history.Add(s);
+                bool removeu = false;
+                if (_history.Count > HistoryMax) { _history.RemoveAt(0); removeu = true; }
+                // A amostra selecionada "anda" junto com o ring buffer.
+                if (_histSel >= 0 && removeu) _histSel = Math.Max(0, _histSel - 1);
+            }
+            catch { }
+        }
+
+        private void SumCpuCanvas_Click(object sender, MouseButtonEventArgs e)
+        {
+            _histOpen = true;
+            _histSel = -1;
+            if (PnlCpuHistory != null) PnlCpuHistory.Visibility = Visibility.Visible;
+            // O painel ocupa a area do grafico: o numero grande ao vivo tem de sair de cena,
+            // senao fica CORTADO atras da borda (aparecia so um pedaco do "5%").
+            if (TxtSumCpuBig != null) TxtSumCpuBig.Visibility = Visibility.Collapsed;
+            if (TxtSumCpuSub != null) TxtSumCpuSub.Visibility = Visibility.Collapsed;
+            DrawHistory();
+        }
+
+        private void BtnHistClose_Click(object sender, RoutedEventArgs e)
+        {
+            _histOpen = false;
+            _histSel = -1;
+            if (PnlCpuHistory != null) PnlCpuHistory.Visibility = Visibility.Collapsed;
+            if (TxtSumCpuBig != null) TxtSumCpuBig.Visibility = Visibility.Visible;
+            if (TxtSumCpuSub != null) TxtSumCpuSub.Visibility = Visibility.Visible;
+        }
+
+        private void BtnHistNow_Click(object sender, RoutedEventArgs e)
+        {
+            _histSel = -1;
+            DrawHistory();
+        }
+
+        private void BtnHistClear_Click(object sender, RoutedEventArgs e)
+        {
+            _history.Clear();
+            _histSel = -1;
+            DrawHistory();
+            TxtStatus.Text = "🧹 Histórico zerado.";
+        }
+
+        private void HistCpuCanvas_Click(object sender, MouseButtonEventArgs e)
+        {
+            SelecionarAmostraPeloX(e.GetPosition(HistCpuCanvas).X);
+        }
+
+        private void HistCpuCanvas_Move(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed) SelecionarAmostraPeloX(e.GetPosition(HistCpuCanvas).X);
+        }
+
+        private void SelecionarAmostraPeloX(double x)
+        {
+            try
+            {
+                if (_history.Count == 0 || HistCpuCanvas == null) return;
+                double w = HistCpuCanvas.ActualWidth > 1 ? HistCpuCanvas.ActualWidth : HistCpuCanvas.Width;
+                if (w <= 1) return;
+                double barW = Math.Max(1.0, w / HistoryMax);
+                double x0 = Math.Max(0, w - _history.Count * barW);   // amostras alinhadas à direita
+                int idx = (int)Math.Floor((x - x0) / barW);
+                if (idx < 0) idx = 0;
+                if (idx >= _history.Count) idx = _history.Count - 1;
+                _histSel = idx;
+                DrawHistory();
+            }
+            catch { }
+        }
+
+        /// <summary>Desenha a linha do tempo (barras = CPU por amostra, linha = kernel) e o "quem" do instante.</summary>
+        private void DrawHistory()
+        {
+            try
+            {
+                if (HistCpuCanvas == null) return;
+                var cv = HistCpuCanvas;
+                cv.Children.Clear();
+                double w = cv.ActualWidth > 1 ? cv.ActualWidth : 400;
+                double h = cv.ActualHeight > 1 ? cv.ActualHeight : 58;
+
+                if (_history.Count == 0)
+                {
+                    SetText(TxtHistSel, "sem amostras");
+                    SetText(TxtHistWhat, "Deixe o Resumo aberto alguns segundos — cada segundo vira uma barra aqui.");
+                    PnlHistTop?.Children.Clear();
+                    return;
+                }
+
+                double barW = Math.Max(1.0, w / HistoryMax);
+                double x0 = Math.Max(0, w - _history.Count * barW);
+                double baseY = h - 1;
+                var kernelPoints = new PointCollection();
+
+                for (int i = 0; i < _history.Count; i++)
+                {
+                    var s = _history[i];
+                    double px = x0 + i * barW;
+                    double frac = Math.Max(0, Math.Min(1, s.Cpu / 100.0));
+                    double bh = Math.Max(1, (h - 6) * frac);
+                    var bar = new Rectangle
+                    {
+                        Width = Math.Max(1, barW - 1),
+                        Height = bh,
+                        Fill = GetHeatColor(s.Cpu, 80, 95),
+                        Opacity = i == (_histSel >= 0 ? _histSel : _history.Count - 1) ? 1.0 : 0.75
+                    };
+                    Canvas.SetLeft(bar, px);
+                    Canvas.SetTop(bar, baseY - bh);
+                    cv.Children.Add(bar);
+
+                    double kf = Math.Max(0, Math.Min(1, s.Kernel / 100.0));
+                    kernelPoints.Add(new Point(px + barW / 2, baseY - (h - 6) * kf));
+                }
+
+                if (kernelPoints.Count > 1)
+                {
+                    var poly = new System.Windows.Shapes.Polyline
+                    {
+                        Points = kernelPoints,
+                        Stroke = new SolidColorBrush(Color.FromRgb(0xF4, 0x43, 0x36)),
+                        StrokeThickness = 1.2,
+                        Opacity = 0.9
+                    };
+                    cv.Children.Add(poly);
+                }
+
+                int sel = _histSel >= 0 && _histSel < _history.Count ? _histSel : _history.Count - 1;
+                var smp = _history[sel];
+
+                // Marcador do instante selecionado.
+                var marker = new Line
+                {
+                    X1 = x0 + sel * barW + barW / 2, X2 = x0 + sel * barW + barW / 2,
+                    Y1 = 0, Y2 = baseY,
+                    Stroke = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)),
+                    StrokeThickness = 1,
+                    Opacity = 0.9
+                };
+                cv.Children.Add(marker);
+
+                SetText(TxtHistSel, (_histSel >= 0 ? smp.Time.ToString("HH:mm:ss") : "ao vivo (mais recente)") +
+                    $" · {_history.Count} amostra(s) de {HistoryMax / 60} min");
+
+                SetText(TxtHistWhat, smp.Top.Count == 0
+                    ? $"CPU {smp.Cpu:F0}% (kernel {smp.Kernel:F0}%) · RAM {smp.MemGb:F1} GB em uso — nenhum processo consumindo CPU neste instante."
+                    : $"CPU {smp.Cpu:F0}% (kernel {smp.Kernel:F0}%) · RAM {smp.MemGb:F1} GB em uso — quem estava usando a CPU:");
+
+                if (PnlHistTop == null) return;
+                PnlHistTop.Children.Clear();
+                foreach (var t in smp.Top.Take(6))
+                {
+                    var g = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+                    g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+                    var nome = new TextBlock
+                    {
+                        Text = t.Name, FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis,
+                        Foreground = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE)),
+                        ToolTip = $"{t.Name} (PID {t.Pid}) · {t.RamMb:F0} MB de RAM"
+                    };
+                    var pct = new TextBlock
+                    {
+                        Text = $"{t.Cpu:F0}%", FontSize = 11, FontWeight = FontWeights.SemiBold,
+                        HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+                        Foreground = GetHeatColor(t.Cpu, 80, 95), Margin = new Thickness(8, 0, 0, 0)
+                    };
+                    Grid.SetColumn(pct, 1);
+                    g.Children.Add(nome);
+                    g.Children.Add(pct);
+                    PnlHistTop.Children.Add(g);
+                }
+            }
+            catch { }
+        }
+
         private void CmbSummaryInterval_Changed(object sender, SelectionChangedEventArgs e)
         {
             try
@@ -426,6 +839,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 if (!int.TryParse(txt.Replace("s", ""), out int sec) || sec <= 0) return;
                 _refreshSeconds = sec;
                 if (_refreshTimer != null) _refreshTimer.Interval = TimeSpan.FromSeconds(sec);
+                if (_graphTimer != null) _graphTimer.Interval = TimeSpan.FromSeconds(sec);
                 // Mantém o combo da aba Processos em sincronia
                 if (CmbRefreshInterval != null)
                 {

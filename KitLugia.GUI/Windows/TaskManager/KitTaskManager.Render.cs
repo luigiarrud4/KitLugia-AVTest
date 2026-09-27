@@ -47,37 +47,92 @@ namespace KitLugia.GUI.Windows.TaskManager
         /// <summary>Tempo do fade do brilho de processo novo/morto (segundos).</summary>
         private const double HighlightFadeSeconds = 2.5;
 
-        private void HookFrameEngine()
+        /// <summary>O motor pode ser ligado (o KL_TM_NO_RENDER desliga; harness de stalls).</summary>
+        private bool _frameEngineAvailable;
+
+        /// <summary>
+        /// Prepara o motor de animação das linhas — mas NÃO o liga.
+        ///
+        /// ANTES: assinava CompositionTarget.Rendering no construtor e ficava 60x/s para
+        /// sempre, inclusive no Resumo (aba que abre, e que não tem linha nenhuma para
+        /// animar) e com as linhas todas em repouso. O laço por quadro varria centenas de
+        /// linhas só para checar "não tenho nada a fazer" — trabalho puro de UI thread em
+        /// cima de um app que já é pesado.
+        ///
+        /// AGORA: liga quando uma linha começa a esmaecer (RequestFrameAnimation) e DESLIGA
+        /// sozinho quando não sobrou nada a animar (ReleaseFrameAnimation). Em repouso o
+        /// custo é exatamente zero — sem hook, sem laço, sem medição de FPS.
+        /// </summary>
+        private void InitFrameEngine()
         {
-            if (_frameHooked) return;
-            // Harness/profiling: desliga o motor por variável de ambiente (diagnóstico de stalls)
-            try { if (Environment.GetEnvironmentVariable("KL_TM_NO_RENDER") == "1") { _frameHooked = true; return; } } catch { }
+            try { if (Environment.GetEnvironmentVariable("KL_TM_NO_RENDER") == "1") return; } catch { }
+            _frameEngineAvailable = true;
+            // Segurança: se a janela fechar com o motor ligado, desassina.
+            Closed += (_, __) => ReleaseFrameAnimation();
+        }
+
+        /// <summary>Liga o motor de quadros (idempotente). Chamado quando algo começa a esmaecer.</summary>
+        private void RequestFrameAnimation()
+        {
+            if (!_frameEngineAvailable || _frameHooked || _isClosed) return;
+            // Fora da aba Processos não existe linha visível: não liga agora (o retorno à aba
+            // religa pelo ResumeFrameAnimationsIfNeeded). Sem isso, cada processo nascendo/morrendo
+            // com outra aba aberta assinava e desassinava o hook em quadros alternados —
+            // exatamente o vaivém que a abertura instantânea não quer pagar.
+            if (!CurrentTabAnimates()) return;
             _frameHooked = true;
             _lastFrameUtc = DateTime.UtcNow;
             _fpsWindowStartUtc = _lastFrameUtc;
+            _framesThisSecond = 0;
             CompositionTarget.Rendering += OnCompositionFrame;
-            Closed += (_, __) =>
-            {
-                try { CompositionTarget.Rendering -= OnCompositionFrame; } catch { }
-                _frameHooked = false;
-            };
         }
 
-        /// <summary>A aba atual tem lista/gráfico vivo?</summary>
+        /// <summary>Desliga o motor de quadros e limpa o rótulo de FPS (que senão fica congelado mentindo).</summary>
+        private void ReleaseFrameAnimation()
+        {
+            if (!_frameHooked) return;
+            try { CompositionTarget.Rendering -= OnCompositionFrame; } catch { }
+            _frameHooked = false;
+            _renderFps = 0;
+            UpdateRenderFpsLabel();
+        }
+
+        /// <summary>
+        /// A aba Processos foi aberta e pode ter esmaecimentos que ficaram congelados enquanto
+        /// o motor esteve desligado (trocar de aba não apaga o brilho de uma linha). Se ainda
+        /// houver algo a animar — ou fantasma esperando o reap — religa o motor.
+        /// </summary>
+        private void ResumeFrameAnimationsIfNeeded()
+        {
+            try
+            {
+                if (!CurrentTabAnimates()) return;
+                for (int i = 0; i < _groupedLive.Count; i++)
+                {
+                    var r = _groupedLive[i];
+                    if (r.HighlightLevel > 0 || r.IsGhost) { RequestFrameAnimation(); return; }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// A aba atual tem linha viva para animar? Só a aba PROCESSOS tem linhas de processo
+        /// (o Resumo mostra cartões e gráficos alimentados pelo tick de 1s) — antes o Resumo
+        /// entrava aqui e pagava o motor de quadros inteiro para não animar nada.
+        /// </summary>
         private bool CurrentTabAnimates()
         {
             if (_isClosed || !IsVisible) return false;
-            return TabProcesses.Visibility == Visibility.Visible
-                || TabSummary.Visibility == Visibility.Visible;
+            return TabProcesses.Visibility == Visibility.Visible;
         }
 
         private void OnCompositionFrame(object? sender, EventArgs e)
         {
+            // Fora da aba Processos não há o que esmaecer: desassina em vez de rodar à toa.
             if (!CurrentTabAnimates())
             {
-                // Aba parada: nada de cálculo. Também reinicia o relógio para o
-                // primeiro quadro ao voltar não aplicar um dt gigante.
-                _lastFrameUtc = DateTime.UtcNow;
+                ReleaseFrameAnimation();
                 return;
             }
 
@@ -96,8 +151,11 @@ namespace KitLugia.GUI.Windows.TaskManager
                 UpdateRenderFpsLabel();
             }
 
-            EaseStep(dt);
-            ReapGhostRows();
+            bool easing = EaseStep(dt);
+            bool stillFading = ReapGhostRows();
+
+            // Acabou o esmaecimento e não sobra fantasma: desliga. O próximo esmaecer religa.
+            if (!easing && !stillFading) ReleaseFrameAnimation();
         }
 
         private void UpdateRenderFpsLabel()
@@ -118,10 +176,11 @@ namespace KitLugia.GUI.Windows.TaskManager
         /// </summary>
         private static double EaseK(double dt) => 1.0 - Math.Exp(-dt / 0.09);
 
-        private void EaseStep(double dt)
+        /// <summary>Retorna true se ANIMOU alguma linha neste quadro (o motor ainda é necessário).</summary>
+        private bool EaseStep(double dt)
         {
             var rows = _groupedLive;
-            if (rows == null || rows.Count == 0) return;
+            if (rows == null || rows.Count == 0) return false;
 
             // MEDIDO (instrumentação do próprio motor): animar TEXTO ou COR de brush
             // por quadro consome 1000-2400 ms/s de UI (100% da thread) — o WPF empurra
@@ -131,36 +190,46 @@ namespace KitLugia.GUI.Windows.TaskManager
             // mutação comprovadamente barata) e o reap das fantasmas.
             double fadeStep = dt / HighlightFadeSeconds;
 
+            bool animated = false;
             for (int i = 0; i < rows.Count; i++)
             {
                 var r = rows[i];
                 if (r.HighlightLevel > 0)
+                {
                     r.SetHighlightLevel(Math.Max(0, r.HighlightLevel - fadeStep));
+                    animated = true;
+                }
             }
+            return animated;
         }
 
         /// <summary>
         /// Remove as linhas fantasma (processo encerrado) quando o vermelho já sumiu.
         /// Elas ficam no lugar onde o processo estava, como no TMOG.
         /// </summary>
-        private void ReapGhostRows()
+        /// <summary>Remove fantasmas já apagados. Retorna true se AINDA resta fantasma esperando o reap.</summary>
+        private bool ReapGhostRows()
         {
+            bool remaining = false;
             try
             {
                 for (int i = _groupedLive.Count - 1; i >= 0; i--)
                 {
                     var r = _groupedLive[i];
-                    if (r.IsGhost && r.HighlightLevel <= 0) _groupedLive.RemoveAt(i);
+                    if (!r.IsGhost) continue;
+                    if (r.HighlightLevel <= 0) _groupedLive.RemoveAt(i);
+                    else remaining = true;
                 }
             }
             catch { }
+            return remaining;
         }
 
         /// <summary>
         /// Converte a linha de um processo que desapareceu em FANTASMA vermelha:
         /// mantém nome/PID/memória onde estavam, zera o que era "vivo" e inicia o fade.
         /// </summary>
-        private static void MakeGhost(ProcessRow r)
+        private void MakeGhost(ProcessRow r)
         {
             if (r.IsGhost) return;
             r.IsGhost = true;
@@ -171,6 +240,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             r.GpuTarget = 0;
             r.SetHighlightColor(ColorRowDead);
             r.SetHighlightLevel(0.60);
+            RequestFrameAnimation();   // o esmaecimento do vermelho precisa do motor ligado
         }
 
         /// <summary>
@@ -179,20 +249,22 @@ namespace KitLugia.GUI.Windows.TaskManager
         /// a GroupKey e fazia o ToDictionary do refresh seguinte explodir — o FANTASMA
         /// (que já está na posição certa, esmaecendo) volta a ser a linha viva.
         /// </summary>
-        private static void ReviveGhost(ProcessRow ghost, ProcessRow fresh)
+        private void ReviveGhost(ProcessRow ghost, ProcessRow fresh)
         {
             ghost.IsGhost = false;
             ghost.UpdateFrom(fresh);
             ghost.SetHighlightColor(ColorRowNew);
             ghost.SetHighlightLevel(0.60);
+            RequestFrameAnimation();
         }
 
         /// <summary>Marca um processo recém-nascido: fundo verde que esmaece.</summary>
-        private static void MarkRowNew(ProcessRow r)
+        private void MarkRowNew(ProcessRow r)
         {
             if (r.IsGhost) return;
             r.SetHighlightColor(ColorRowNew);
             r.SetHighlightLevel(0.60);
+            RequestFrameAnimation();
         }
     }
 }

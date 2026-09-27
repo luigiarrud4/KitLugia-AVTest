@@ -27,18 +27,31 @@ namespace KitLugia.GUI.Pages
         private List<KernelDriverInfo> _allKernelDrivers = new();
         private CancellationTokenSource? _cts;
         private bool _isDriverOperation;
+        private int _initialTabIndex;
+        private bool _loadedOnce;
 
         public DriversPage(int tabIndex = 0)
         {
             InitializeComponent();
+            _initialTabIndex = tabIndex;
             _cts = new CancellationTokenSource();
-            // Carrega drivers em background para não travar a UI
-            _ = Task.Run(() => LoadDrivers());
-            _ = Task.Run(() => LoadKernelDrivers());
-            CheckVerifierStatus(); // Inicia a checagem da aba Diagnóstico
 
-            Loaded += (s, e) => { if (MainTabs != null) MainTabs.SelectedIndex = tabIndex; };
+            // Trabalho pesado saiu do construtor (convencao _CONVENTIONS.md): so roda no
+            // Loaded, quando a pagina aparece. Antes, construir a pagina ja disparava duas
+            // varreduras de drivers antes mesmo de ela ser exibida.
+            this.Loaded += DriversPage_Loaded;
             this.Unloaded += DriversPage_Unloaded;
+        }
+
+        private void DriversPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (MainTabs != null) MainTabs.SelectedIndex = _initialTabIndex;
+
+            if (_loadedOnce) return;
+            _loadedOnce = true;
+            _ = LoadDrivers();
+            _ = LoadKernelDrivers();
+            CheckVerifierStatus(); // checagem da aba Diagnostico
         }
 
 
@@ -66,6 +79,7 @@ namespace KitLugia.GUI.Pages
                 GridKernel.Items.Clear();
             }
 
+            this.Loaded -= DriversPage_Loaded;
             this.Unloaded -= DriversPage_Unloaded;
 
 

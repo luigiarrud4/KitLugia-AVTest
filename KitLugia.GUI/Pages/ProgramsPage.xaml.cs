@@ -41,6 +41,15 @@ namespace KitLugia.GUI.Pages
 
         private async void LoadPrograms()
         {
+            // Construtor chama isto — se rodar fora de uma operação do dispatcher,
+            // SynchronizationContext é null e o `await` abaixo continuaria na ThreadPool,
+            // estourando "O thread de chamada não pode acessar este objeto" na UI.
+            if (!Dispatcher.CheckAccess())
+            {
+                await Dispatcher.InvokeAsync(LoadPrograms);
+                return;
+            }
+
             if (LoadingPanel != null) LoadingPanel.Visibility = Visibility.Visible;
             if (ProgramsList != null) ProgramsList.ItemsSource = null;
 
@@ -48,44 +57,60 @@ namespace KitLugia.GUI.Pages
             {
                 // Cancela carregamento anterior se existir
                 _iconLoadCts?.Cancel();
-                _iconLoadCts = new CancellationTokenSource();
+                var cts = new CancellationTokenSource();
+                _iconLoadCts = cts;
+
+                // Token em LOCAL: o Cleanup descarta este campo durante os awaits (era a origem
+                // do dialogo "The CancellationTokenSource has been disposed").
+                var token = cts.Token;
 
                 // Carrega programas do Registry
-                var programs = await Task.Run(() => RegistryProgramFactory.GetInstalledPrograms());
-                
-                // Converte para ViewModel
-                ProgramsCollection = new ObservableCollection<ProgramViewModel>(
-                    programs.Select(p => new ProgramViewModel(p)));
-                
-                // Atualiza contador
-                if (ProgramCountText != null)
-                    ProgramCountText.Text = $"Programas: {ProgramsCollection.Count}";
+                var programs = await Task.Run(() => RegistryProgramFactory.GetInstalledPrograms(), token);
+                token.ThrowIfCancellationRequested();
 
-                // Mostra a lista
-                FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(ProgramsCollection);
-                if (ProgramsList != null) ProgramsList.ItemsSource = FilteredProgramsCollection;
+                // Pós-await SEMPRE via dispatcher (não depende do contexto ambiental)
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    // Converte para ViewModel
+                    ProgramsCollection = new ObservableCollection<ProgramViewModel>(
+                        programs.Select(p => new ProgramViewModel(p)));
+
+                    // Atualiza contador
+                    if (ProgramCountText != null)
+                        ProgramCountText.Text = $"Programas: {ProgramsCollection.Count}";
+
+                    // Mostra a lista
+                    FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(ProgramsCollection);
+                    if (ProgramsList != null) ProgramsList.ItemsSource = FilteredProgramsCollection;
+                });
 
                 // Carrega ícones em paralelo
-                await LoadIconsAsync(_iconLoadCts.Token);
+                await LoadIconsAsync(token);
             }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
+                Logger.LogError("ProgramsPage.LoadPrograms", ex.ToString());
                 MessageBox.Show($"Erro ao carregar programas: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
-                if (LoadingPanel != null) LoadingPanel.Visibility = Visibility.Collapsed;
+                if (Dispatcher.CheckAccess()) { if (LoadingPanel != null) LoadingPanel.Visibility = Visibility.Collapsed; }
+                else await Dispatcher.InvokeAsync(() => { if (LoadingPanel != null) LoadingPanel.Visibility = Visibility.Collapsed; });
             }
         }
 
         private async Task LoadIconsAsync(CancellationToken cancellationToken)
         {
-            if (ProgramsCollection == null) return;
+            // Snapshot em LOCAL: o Cleanup zera este campo concorrentemente.
+            var collection = ProgramsCollection;
+            if (collection == null) return;
 
             string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Carregando Ícones de Programas", "Programs");
 
             var dispatcher = Dispatcher;
-            var tasks = ProgramsCollection.Select(async program =>
+            var tasks = collection.Select(async program =>
             {
                 if (cancellationToken.IsCancellationRequested) return;
 
@@ -119,7 +144,9 @@ namespace KitLugia.GUI.Pages
                 }
             });
 
-            await Task.WhenAll(tasks);
+            try { await Task.WhenAll(tasks); }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
 
             Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Ícones de programas carregados");
         }

@@ -2232,7 +2232,45 @@ namespace KitLugia.GUI.Services
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
+        // Guarda de overlap: sob carga um ciclo pode durar mais que o intervalo (0 = livre, 1 = em andamento).
+        private int _monitorTickBusy;
+
+        // Ultimo percentual de RAM pintado no icone — evita recriar bitmap/GDI e notificar o shell sem mudanca.
+        private int _lastTrayPercent = -1;
+
+        /// <summary>Trabalho de UI do tray, sem bloquear o chamador (usado pelos ciclos em background).</summary>
+        private static void PostTrayUi(System.Action action)
+        {
+            var app = Application.Current;
+            if (app?.Dispatcher == null || app.Dispatcher.HasShutdownFinished) return;
+            try { app.Dispatcher.BeginInvoke(DispatcherPriority.Background, action); } catch { }
+        }
+
+        /// <summary>
+        /// Dispara o ciclo de monitoramento FORA da thread de UI.
+        ///
+        /// POR QUE: sob pressao (RAM cheia / CPU saturada) o tick sincrono rodava na thread
+        /// de UI: Process.GetProcesses() em 350+ processos, PerformanceCounter de IO por
+        /// processo (perflib do "Process"), trims de working set e append em CSV. Em maquina
+        /// ociosa isso custa ~200 ms; com o sistema carregado infla para SEGUNDOS e o Windows
+        /// mostra "(Nao Respondendo)" — exatamente quando o usuario clica no kit.
+        /// Agora o calculo roda no thread pool e a thread de UI so pinta o icone.
+        /// </summary>
         private void MonitorTick(object? sender, EventArgs e)
+        {
+            // Ciclo anterior ainda rodando: pula (nao empilha trabalho sob carga)
+            if (System.Threading.Interlocked.CompareExchange(ref _monitorTickBusy, 1, 0) != 0) return;
+
+            _ = System.Threading.Tasks.Task.Run(() =>
+            {
+                try { RunMonitorCycle(); }
+                catch { /* monitoramento nunca derruba o kit */ }
+                finally { System.Threading.Interlocked.Exchange(ref _monitorTickBusy, 0); }
+            });
+        }
+
+        /// <summary>Corpo do ciclo do monitor — RODA NO THREAD POOL (nao tocar em UI daqui).</summary>
+        private void RunMonitorCycle()
         {
             try
             {
@@ -2284,12 +2322,15 @@ namespace KitLugia.GUI.Services
                 }
 
                 // 1. Refresh System Stats
+                //    (unico trecho que pertence a thread de UI: o NotifyIcon)
                 var stats = MemoryOptimizer.GetMemoryStats();
                 int usedPercent = stats.Percent;
-                UpdateTrayIcon(usedPercent);
-
-                if (_trayIcon != null)
-                    _trayIcon.Text = $"KitLugia - RAM: {usedPercent}% em uso";
+                PostTrayUi(() =>
+                {
+                    UpdateTrayIcon(usedPercent);
+                    if (_trayIcon != null)
+                        _trayIcon.Text = $"KitLugia - RAM: {usedPercent}% em uso";
+                });
 
                 // 2. Auto-clean logic (Manual/Threshold)
                 if (AutoCleanEnabled && usedPercent >= AutoCleanThresholdPercent)
@@ -3925,8 +3966,9 @@ namespace KitLugia.GUI.Services
                             ? $"RAM liberada! {before}% → {after}% ({freed}% liberado) [{_lastCleanDurationMs}ms]"
                             : $"Limpeza concluída. RAM: {after}%";
 
-                        if (Application.Current?.Dispatcher == null || Application.Current.Dispatcher.HasShutdownFinished) return;
-                        Application.Current.Dispatcher.Invoke(() =>
+                        // BeginInvoke (nao Invoke): a thread do pool nao fica presa esperando a UI,
+                        // que sob carga pode demorar segundos — era um dos focos de starvation.
+                        PostTrayUi(() =>
                         {
                             UpdateTrayIcon(after);
 
@@ -3961,6 +4003,9 @@ namespace KitLugia.GUI.Services
             {
                 if (_trayIcon == null) return;
 
+                // Sem mudanca: nao recria bitmap/GDI nem chama Shell_NotifyIcon de novo.
+                if (percent == _lastTrayPercent) return;
+
                 // Determine color based on usage
                 Color bgColor;
                 if (percent >= 90) bgColor = Color.FromArgb(220, 53, 69);      // Red
@@ -3987,6 +4032,7 @@ namespace KitLugia.GUI.Services
 
                 var newIcon = System.Drawing.Icon.FromHandle(bmp.GetHicon());
                 var oldIcon = _currentIcon;
+                _lastTrayPercent = percent;
                 _trayIcon.Icon = newIcon;
                 _currentIcon = newIcon;
 
