@@ -69,6 +69,7 @@ namespace KitLugia.GUI.Pages
             if (!_isLoaded)
             {
                 _isLoaded = true;
+                _updateTimer?.Start();
                 _ = RefreshProcessesAsync();
             }
         }
@@ -83,7 +84,8 @@ namespace KitLugia.GUI.Pages
                 Interval = TimeSpan.FromSeconds(3)
             };
             _updateTimer.Tick += UpdateTimer_Tick;
-            _updateTimer.Start();
+            // NAO iniciar aqui: o timer comeca no Loaded, quando a pagina realmente aparece
+            // (convencao). No ctor ele ficaria bombardeando refresh de uma pagina invisivel.
 
             this.Unloaded += ProcessMonitorPage_Unloaded;
         }

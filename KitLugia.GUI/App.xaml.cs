@@ -67,6 +67,10 @@ namespace KitLugia.GUI
         {
             RegisterGlobalExceptionHandlers();
 
+            // Watchdog de responsividade: mede/loga travamentos da thread de UI
+            // ("app não está respondendo" sob carga). Custo: 1 probe a cada 500 ms.
+            KitLugia.GUI.Services.UiFreezeWatchdog.Start();
+
             // Renderização padrão (DirectWrite/hardware) - necessário para suporte a emojis, acentos e Unicode
             RenderOptions.ProcessRenderMode = RenderMode.Default;
 

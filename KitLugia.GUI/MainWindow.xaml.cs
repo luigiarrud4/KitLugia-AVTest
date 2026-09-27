@@ -709,14 +709,18 @@ namespace KitLugia.GUI
 
             // FIX "clicou e o kit travou": o gerenciador de tarefas custa 1-3s NA UI THREAD
             // (InitializeComponent de XAML gigante + JIT de todas as partials) na PRIMEIRA
-            // abertura. Pré-aquecemos a janela oculta em idle (30s após o startup, quando o
-            // kit já terminou de carregar) — o clique vira Show()+Activate() instantâneo.
+            // abertura. Pré-aquecemos a janela oculta em idle — o clique vira Show()+Activate().
+            //
+            // O delay era de 30 SEGUNDOS fixos: quem clicava antes disso (o caso comum logo
+            // depois de abrir o kit) pegava cold-start e a otimização não valia de nada.
+            // Agora o piso é curto e quem manda é a prioridade: ApplicationIdle só roda quando
+            // o dispatcher está vazio, então isto NUNCA atrasa o carregamento do kit.
             // Idempotente: se o usuário clicar antes, o Prewarm não faz nada.
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    await Task.Delay(TimeSpan.FromSeconds(4));
                     await Dispatcher.InvokeAsync(
                         () => Windows.TaskManager.KitTaskManagerWindow.Prewarm(),
                         DispatcherPriority.ApplicationIdle);

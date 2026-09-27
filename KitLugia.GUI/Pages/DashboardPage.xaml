@@ -376,6 +376,11 @@
                     ToolTip="Ferramentas de reparo do Windows"
                     Click="BtnGoToRepairs_Click"/>
 
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F9ED;" 
+                    Content="Central de Diagn&#xF3;stico"
+                    ToolTip="Abre o Gerenciador de Tarefas na aba Diagn&#xF3;stico: um bot&#xE3;o s&#xF3; coleta tudo, mostra o que realmente importa, permite copiar e tentar resolver cada problema"
+                    Click="BtnGoToDiagnosticCenter_Click"/>
+
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4BE;" 
                     Content="Drivers do Sistema"
                     ToolTip="Gerenciamento e atualiza&#xE7;&#xE3;o de drivers"

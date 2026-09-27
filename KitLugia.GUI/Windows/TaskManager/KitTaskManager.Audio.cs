@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
+using KitLugia.Core.Diagnostics;
 using KitLugia.Core.TaskManager;
 using Clipboard = System.Windows.Clipboard;
 
@@ -401,13 +402,31 @@ namespace KitLugia.GUI.Windows.TaskManager
         private string BuildCombinedLatencyReport()
         {
             string lat = _lat.BuildAiReport();
+            string audio = "";
             try
             {
                 var mon = AudioGlitchMonitor.Instance;
-                if (mon.GlitchCount == 0 && !mon.IsRunning) return lat;
-                return lat + Environment.NewLine + Environment.NewLine + mon.BuildAiReport();
+                if (mon.GlitchCount > 0 || mon.IsRunning)
+                    audio = Environment.NewLine + Environment.NewLine + mon.BuildAiReport();
             }
-            catch { return lat; }
+            catch { }
+
+            // O PORQUÊ: a escuta do Kit prova que o áudio travou e mede quanto se perdeu,
+            // mas não diz a causa interna. O canal GlitchDetection registra exatamente isso
+            // (fim de glitch do endpoint, pacote faltando, sobreleitura do servidor de saída).
+            // Vem junto no relatório copiado para quem for analisar (humano ou IA) ter o dado,
+            // sem precisar abrir o Visualizador de Eventos.
+            string causa = "";
+            try
+            {
+                var read = AudioGlitchChannel.ReadRecent(TimeSpan.FromMinutes(30));
+                causa = Environment.NewLine + Environment.NewLine +
+                        "=== CAUSA REPORTADA PELO WINDOWS (" + AudioGlitchChannel.ChannelName + ") ===" +
+                        Environment.NewLine + AudioGlitchChannel.BuildEvidenceBody(read);
+            }
+            catch { }
+
+            return lat + audio + causa;
         }
     }
 }

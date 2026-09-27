@@ -70,7 +70,24 @@ namespace KitLugia.GUI.Services
                         path = path[(sep + 1)..];
                     }
 
-                    if (!string.IsNullOrEmpty(path) && (File.Exists(path) || Directory.Exists(path)))
+                    // PROVA-DE-TUDO: File.Exists/Directory.Exists retornam FALSE para caminhos
+                    // que EXISTEM mas cuja ACL nega a leitura (C:\Windows.old, TrustedInstaller)
+                    // — exatamente o alvo do menu de contexto. Sem o probe nativo o comando era
+                    // descartado em SILÊNCIO ("cliquei e nada aconteceu").
+                    bool pathOk = false;
+                    try
+                    {
+                        pathOk = !string.IsNullOrEmpty(path) && (File.Exists(path) || Directory.Exists(path));
+                        if (!pathOk && !string.IsNullOrEmpty(path))
+                        {
+                            FileTakeOwnership.ProbePath(path.TrimEnd('\\', '/'), out bool exists, out _, out int err);
+                            pathOk = exists;
+                            if (exists) Logger.Log($"[IPC] Alvo existe mas ACL nega leitura (erro {err}) — seguindo: {path}");
+                        }
+                    }
+                    catch { pathOk = false; }
+
+                    if (pathOk)
                     {
                         Logger.Log($"[IPC] Comando recebido: {cmd} → {path}");
 

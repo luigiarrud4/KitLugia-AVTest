@@ -482,6 +482,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             int di = 0;
             foreach (var d in data.disks.OrderBy(x => x))
             {
+                if (d.Equals("_Total", StringComparison.OrdinalIgnoreCase)) continue; // pseudo-instância agregada — não é disco
                 string key = $"disk:{d}";
                 try
                 {
@@ -581,7 +582,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 var val = new System.Windows.Documents.Run("…") { Foreground = System.Windows.Media.Brushes.White, FontWeight = FontWeights.SemiBold };
                 tb.Inlines.Add(val);
                 PnlPerfDetails.Children.Add(tb);
-                valueBlock = new TextBlock(); // placeholder não usado
+                valueBlock = tb; // o próprio TextBlock (Tag guarda o Run do valor)
                 // guardamos o Run para atualização
                 tb.Tag = val;
             }
@@ -636,7 +637,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     PerfDeviceTitle.Text = $"Disco ({letters})";
                     StaticRow("Instância:", inst);
                 }
-                try { StaticRow("Tempo ligado:", (DateTime.Now - System.Diagnostics.Process.GetCurrentProcess().StartTime).ToString(@"d\.hh\:mm\:ss")); } catch { }
+                try { StaticRow("Tempo de atividade:", TimeSpan.FromMilliseconds(Environment.TickCount64).ToString(@"d\.hh\:mm\:ss")); } catch { }
                 FillDiskLive(inst);
             }
             else if (pid.StartsWith("net:"))
@@ -678,6 +679,23 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             var sRun = AddLiveLine("Envio:");
             var rRun = AddLiveLine("Recebimento:");
+            // Totais desde o boot (paridade TMOG: Total sent/received) — GetIPStatistics é absoluto.
+            System.Net.NetworkInformation.NetworkInterface? nicTot = null;
+            try { nicTot = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(x => x.Description.Equals(instance, StringComparison.OrdinalIgnoreCase)); } catch { }
+            var totUpRun = AddLiveLine("Total enviado:");
+            var totDownRun = AddLiveLine("Total recebido:");
+            void RefreshNetTotals()
+            {
+                try
+                {
+                    if (nicTot == null) { totUpRun.Text = "—"; totDownRun.Text = "—"; return; }
+                    var ts = nicTot.GetIPStatistics();
+                    totUpRun.Text = FormatTotalBytes((ulong)Math.Max(0, ts.BytesSent));
+                    totDownRun.Text = FormatTotalBytes((ulong)Math.Max(0, ts.BytesReceived));
+                }
+                catch { totUpRun.Text = "—"; totDownRun.Text = "—"; }
+            }
+            RefreshNetTotals();
             // Caminho A: contadores perfmon (adaptadores físicos)
             try
             {
@@ -687,7 +705,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 var dt = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
                 dt.Tick += (_, __) =>
                 {
-                    try { sRun.Text = FormatBytesSpeed(sent.NextValue()); rRun.Text = FormatBytesSpeed(recv.NextValue()); } catch { }
+                    try { sRun.Text = FormatBytesSpeed(sent.NextValue()); rRun.Text = FormatBytesSpeed(recv.NextValue()); RefreshNetTotals(); } catch { }
                     if (_selectedPerfDevice?.Key?.StartsWith("net:") != true) dt.Stop();
                 };
                 dt.Start();
@@ -718,6 +736,8 @@ namespace KitLugia.GUI.Windows.TaskManager
                             double down = Math.Max(0, (st.BytesReceived - lastRecv) / sec);
                             sRun.Text = FormatBytesSpeed(up);
                             rRun.Text = FormatBytesSpeed(down);
+                            totUpRun.Text = FormatTotalBytes((ulong)Math.Max(0, st.BytesSent));
+                            totDownRun.Text = FormatTotalBytes((ulong)Math.Max(0, st.BytesReceived));
                             lastSent = st.BytesSent; lastRecv = st.BytesReceived; lastT = now;
                         }
                     }
@@ -766,7 +786,8 @@ namespace KitLugia.GUI.Windows.TaskManager
                         handles = _allRows.Sum(r => int.TryParse(r.Handles, out var h) ? h : 0);
                     }
                     run.Text = $"{procs}   {threads:N0}   {handles:N0}";
-                    try { upRun.Text = (DateTime.Now - System.Diagnostics.Process.GetCurrentProcess().StartTime).ToString(@"d\.hh\:mm\:ss"); } catch { }
+                    try { upRun.Text = TimeSpan.FromMilliseconds(Environment.TickCount64).ToString(@"d\.hh\:mm\:ss"); } catch { }
+                    SetUsageLine($"{_lastCpuPct:F0}%");
                 }
                 catch { }
             };
@@ -882,6 +903,13 @@ namespace KitLugia.GUI.Windows.TaskManager
             SetMetricText(TxtCpuPower, s.PowerW >= 0 ? $"{s.PowerW:F1} W" : "—", s.PowerW >= 0 ? GetHeatColor((float)s.PowerW, 45, 80) : _brushGray);
             ChartNetText = FormatBytesSpeed(netMB * 1024 * 1024);
 
+            // Anti-pisca/custo: canvases de abas ocultas não são redesenhados. Redesenhar
+            // o PerfBigCanvas + sparklines + MiniCpu a cada segundo sem ninguém ver era
+            // trabalho jogado fora — e o Children.Clear() com a aba oculta fazia a volta
+            // à aba "piscar" (primeiro quadro vazio, depois o desenho).
+            bool perfVisible = TabPerformance != null && TabPerformance.Visibility == Visibility.Visible;
+            bool procVisible = TabProcesses != null && TabProcesses.Visibility == Visibility.Visible;
+
             // Atualiza cada dispositivo
             foreach (var dev in _perfDevices)
             {
@@ -913,29 +941,30 @@ namespace KitLugia.GUI.Windows.TaskManager
                     _ => $"{val:F0}% ativo"
                 };
 
-                // painel grande só do selecionado
-                if (dev == _selectedPerfDevice)
+                // painel grande só do selecionado (e só com a aba aberta)
+                if (perfVisible && dev == _selectedPerfDevice)
                 {
                     if (dev.Key.StartsWith("net:"))
                         PerfDeviceUtil.Text = FormatBytesSpeed(val * 1024 * 1024);
                     else
-                        FluidSetText(PerfDeviceUtil, () => Math.Max(0f, val), "F0", "%");
+                        PerfDeviceUtil.Text = $"{Math.Max(0f, val):F0}%";
                     PerfDeviceUtil.Foreground = GetHeatColor(val, 60, 90);
-                    // Motor fluido: linha rola a 60fps entre amostras (paridade TMOG)
-                    FluidRegisterChart(PerfBigCanvas, () => max, true,
-                        (() => _perfHistory.TryGetValue(dev.Key, out var hist) ? hist : null, FromHex(dev.ColorHex)));
+                    // Desenho direto no tick (~1s) — o gráfico é redesenhado por amostra.
+                    DrawLineChart(PerfBigCanvas, q, FromHex(dev.ColorHex), max);
                     SetUsageLine(PerfDeviceUtil.Text);
                 }
             }
 
             // Mini previews na lista lateral — igual ao Gerenciador de Tarefas Win11
-            DrawMiniPreviews();
+            if (perfVisible) DrawMiniPreviews();
 
-            // Mini CPU graph no painel de detalhes do processo (aba Processos) — fluido
-            _miniCpuHistory.Enqueue(cpuVal);
-            if (_miniCpuHistory.Count > 30) _miniCpuHistory.Dequeue();
-            FluidRegisterChart(MiniCpuCanvas, () => 100f, true,
-                (() => _miniCpuHistory, System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50)));
+            // Mini CPU graph no painel de detalhes do processo (aba Processos)
+            if (procVisible)
+            {
+                _miniCpuHistory.Enqueue(cpuVal);
+                if (_miniCpuHistory.Count > 30) _miniCpuHistory.Dequeue();
+                DrawLineChart(MiniCpuCanvas, _miniCpuHistory, System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50), 100f);
+            }
         }
 
         // Valor de rede compartilhado com o botão Copiar
@@ -961,11 +990,12 @@ namespace KitLugia.GUI.Windows.TaskManager
                     var canvas = FindVisualChild<System.Windows.Controls.Canvas>(container);
                     if (canvas == null) continue;
                     if (LstPerfDevices.Items[i] is not PerfDeviceInfo dev) continue;
-                    // Motor fluido: os sparklines também rolam a 60fps (re-registro barato 1x/s —
-                    // o mesmo canvas reciclado pela virtualização recebe o lambda novo no tick).
+                    // Sparkline redesenhada no tick (~1s). O canvas é reciclado pela
+                    // virtualização — o DrawLineChart faz Children.Clear() e redesenha,
+                    // então o container reaproveitado nunca fica com desenho velho.
                     bool isNet = dev.Key.StartsWith("net:");
-                    FluidRegisterChart(canvas, isNet ? () => 0f : () => 100f, false,
-                        (() => _perfHistory.TryGetValue(dev.Key, out var hist) ? hist : null, FromHex(dev.ColorHex)));
+                    _perfHistory.TryGetValue(dev.Key, out var hist);
+                    DrawLineChart(canvas, hist ?? new Queue<float>(), FromHex(dev.ColorHex), isNet ? 0f : 100f);
                 }
             }
             catch { }

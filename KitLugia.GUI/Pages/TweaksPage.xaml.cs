@@ -25,15 +25,23 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
 
-            this.Loaded += (s, e) => { _isPageLoaded = true; _ = LoadCurrentStatus(); };
+            this.Loaded += TweaksPage_Loaded;
             this.Unloaded += TweaksPage_Unloaded;
         }
 
         private bool _isPageLoaded;
 
+        // Nomeado (e nao lambda): a convencao exige poder remover o handler no Cleanup.
+        private void TweaksPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            _isPageLoaded = true;
+            _ = LoadCurrentStatus();
+        }
+
 
         public void Cleanup()
         {
+            this.Loaded -= TweaksPage_Loaded;
             this.Unloaded -= TweaksPage_Unloaded;
 
 

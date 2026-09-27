@@ -43,6 +43,13 @@ namespace KitLugia.GUI.Windows.TaskManager
         private bool _useNativeProcPath = true; // auto-desativa se o caminho nativo falhar
         private readonly object _lock = new();
         private bool _isClosed; // FIX crash em máquinas lentas: async continuations pós-Close
+
+        /// <summary>
+        /// A janela já ficou oculta (minimizada para a bandeja / escondida pelo dono). Serve
+        /// para distinguir a PRIMEIRA exibição (que não precisa de refresh extra — o Loaded
+        /// cuida dela) do retorno da bandeja (que precisa, senão a tela mostra dado velho).
+        /// </summary>
+        private bool _windowWasHidden;
         private readonly SemaphoreSlim _refreshGate = new(1, 1);
         private CancellationTokenSource? _refreshCts;
 
@@ -54,6 +61,15 @@ namespace KitLugia.GUI.Windows.TaskManager
         private readonly Dictionary<string, BitmapSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _iconLock = new();
         private static BitmapSource? _genericIcon;
+
+        /// <summary>
+        /// Ícone genérico do shell (imageres.dll), criado SOB DEMANDA.
+        /// Estava no construtor: SHGetFileInfo + leitura do imageres.dll NA THREAD DA UI em
+        /// toda abertura, mesmo quando nenhuma linha precisava dele (quase todo processo tem
+        /// ícone próprio e ele nem era usado no Resumo — a aba que abre por padrão).
+        /// O helper já devolve o BitmapSource CONGELADO, então criar num worker é seguro.
+        /// </summary>
+        private static BitmapSource? GenericIcon => _genericIcon ??= ProgramIconHelper.GetGenericIcon();
 
         // Search
         private DispatcherTimer? _searchDebounce;
@@ -97,6 +113,24 @@ namespace KitLugia.GUI.Windows.TaskManager
         [DllImport("kernel32.dll")]
         private static extern void GetPhysicallyInstalledSystemMemory(out long totalMemoryInKb);
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+        /// <summary>Milissegundos desde o último input do usuário (teclado/mouse). uint.MaxValue = não mediu.</summary>
+        private static uint MillisecondsSinceLastInput()
+        {
+            try
+            {
+                var lii = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+                if (GetLastInputInfo(ref lii)) return unchecked((uint)Environment.TickCount) - lii.dwTime;
+            }
+            catch { }
+            return uint.MaxValue;
+        }
+
         // ══════════════════════════════════════════════
         //  SINGLETON + ABERTURA ÚNICA (compatibilidade multi-sistema)
         //  Cada nova instância criava OUTRO conjunto de timers de 1s + contadores
@@ -118,6 +152,11 @@ namespace KitLugia.GUI.Windows.TaskManager
                         if (existing.WindowState == WindowState.Minimized) existing.WindowState = WindowState.Normal;
                         existing.Show();
                         existing.Activate();
+                        // Janela pré-aquecida nasce SEM dono (o Prewarm roda em idle, sem owner).
+                        // Sem isto, a instância adotada ficaria fora do ciclo de vida da janela
+                        // principal — o caminho frio sempre cria com Owner.
+                        if (existing.Owner == null && owner != null && !ReferenceEquals(owner, existing))
+                            existing.Owner = owner;
                     }
                     catch { }
                     return existing;
@@ -135,9 +174,56 @@ namespace KitLugia.GUI.Windows.TaskManager
                     throw;
                 }
                 _sharedInstance = w;
-                w.Closed += (_, __) => { lock (_instanceLock) { if (ReferenceEquals(_sharedInstance, w)) _sharedInstance = null; } };
+                w.Closed += (_, __) =>
+                {
+                    lock (_instanceLock)
+                    {
+                        if (ReferenceEquals(_sharedInstance, w)) _sharedInstance = null;
+                        // Libera o próximo prewarm: quem fecha e reabre o gerenciador era
+                        // premiado com um cold-start (o XAML é reprocessado a cada construção).
+                        _prewarmed = false;
+                    }
+                    ScheduleReprewarm(w.Dispatcher);
+                };
                 return w;
             }
+        }
+
+        /// <summary>
+        /// Reconstrói a janela oculta em idle DEPOIS que a anterior fechou, para a próxima
+        /// abertura voltar a ser Show()+Activate(). O piso de 15 s existe de propósito: quem
+        /// fechou pode estar justamente querendo a memória de volta — esperamos um tempo
+        /// humano antes de reconstruir, e se o usuário abrir antes disso o Prewarm não faz nada.
+        /// </summary>
+        private static void ScheduleReprewarm(System.Windows.Threading.Dispatcher dispatcher)
+            => ScheduleReprewarm(dispatcher, 15);
+
+        private static void ScheduleReprewarm(System.Windows.Threading.Dispatcher dispatcher, int seconds)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(seconds));
+                    await dispatcher.InvokeAsync(Prewarm, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                }
+                catch { }
+            });
+        }
+
+        /// <summary>
+        /// Abre (ou traz para frente) o gerenciador já numa aba específica. Usado pelo
+        /// atalho "Central de Diagnóstico" do painel inicial.
+        /// </summary>
+        public static void OpenOnTab(System.Windows.Window? owner, string tabTag)
+        {
+            var w = OpenOrActivate(owner);
+            w.Show();
+            // Depois do layout: a troca de aba mexe em visibilidade e constrói conteúdo.
+            w.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { w.SwitchTabByTag(tabTag); } catch { }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         /// <summary>Descarta a instância quebrada (após falha de abertura) para permitir nova tentativa limpa.</summary>
@@ -166,6 +252,20 @@ namespace KitLugia.GUI.Windows.TaskManager
         /// </summary>
         public static void Prewarm()
         {
+            // NÃO construir a janela com o usuário digitando/clicando AGORA: o custo é todo na
+            // UI thread e apareceria como engasgo no meio de uma clique. Adia e re-tenta quando
+            // houver 3 s de ociosidade — o pior caso é um cold-start (o que já acontecia antes).
+            try
+            {
+                if (MillisecondsSinceLastInput() < 3000)
+                {
+                    var d = System.Windows.Application.Current?.Dispatcher;
+                    if (d != null) ScheduleReprewarm(d, 8);
+                    return;
+                }
+            }
+            catch { }
+
             lock (_instanceLock)
             {
                 if (_prewarmed) return;
@@ -214,8 +314,10 @@ namespace KitLugia.GUI.Windows.TaskManager
             // foram movidos para App.RegisterGlobalExceptionHandlers — registrados UMA vez no
             // startup. Aqui NÃO registramos mais por instância (vazava handlers a cada open).
 
-            HookFrameEngine();   // motor de render 60 fps (easing + efeitos novo/fechado)
-            HookFluidEngine();   // motor fluido TMOG-style: gráficos que rolam + barras/números com easing
+            InitFrameEngine();   // animação das linhas (esmaecer verde/vermelho) — ligada SOB DEMANDA
+            // Nota: o motor fluido de apresentação (hook de CompositionTarget.Rendering que
+            // animava gráficos/barras/números entre amostras) foi removido — os gráficos
+            // voltaram a ser redesenhados por amostra, no tick fixo de ~1s.
 
             _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _searchDebounce.Tick += SearchDebounce_Tick;
@@ -225,6 +327,11 @@ namespace KitLugia.GUI.Windows.TaskManager
             // app inteiro. Try/catch extra garante que um tick falho nunca sai daqui sem log.
             _refreshTimer.Tick += async (_, __) =>
             {
+                // Janela oculta (kit minimizado para a bandeja com o gerenciador aberto):
+                // NENHUMA aba está na tela. Enumerar ~400 processos por segundo para ninguém
+                // ver era o maior consumo contínuo do kit — e é o que fazia o app "pesar".
+                // O IsVisibleChanged religa com um refresh imediato ao reaparecer.
+                if (!IsVisible) return;
                 try { await RefreshAsync(); }
                 catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Refresh tick: {ex.Message}"); } catch { } }
                 // Aba Usuários aberta: mantém CPU/memória por usuário vivos no mesmo ritmo
@@ -232,9 +339,28 @@ namespace KitLugia.GUI.Windows.TaskManager
             };
 
             _graphTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _graphTimer.Tick += (_, __) => UpdatePerformanceGraphsSafe();
+            // Mesmo gate do refresh: escondida, a coleta de PDX/nativo + o desenho dos gráficos
+            // (o trabalho mais caro do tick) não tem quem olhe.
+            _graphTimer.Tick += (_, __) => { if (IsVisible) UpdatePerformanceGraphsSafe(); };
 
-            _genericIcon = ProgramIconHelper.GetGenericIcon();
+            // Voltou a aparecer (kit restaurado da bandeja, TM reexibido): não esperar o próximo
+            // tick — o dado na tela é de quando a janela foi escondida.
+            IsVisibleChanged += (_, __) =>
+            {
+                try
+                {
+                    if (!IsVisible) { _windowWasHidden = true; return; }
+                    // 1ª exibição não conta: o Loaded já dispara o refresh inicial.
+                    if (!_windowWasHidden) return;
+                    _windowWasHidden = false;
+                    _ = RefreshAsync();
+                    UpdatePerformanceGraphsSafe();
+                }
+                catch { }
+            };
+
+            // (o ícone genérico do shell passou a ser criado sob demanda — ver GenericIcon:
+            //  era I/O de shell na thread da UI em TODA abertura, para nada.)
 
             Loaded += (_, __) =>
             {
@@ -263,13 +389,13 @@ namespace KitLugia.GUI.Windows.TaskManager
                     _ = RefreshAsync();
                     _refreshTimer.Start();
                     _graphTimer.Start();
-            // Pesos pesados rodam em background SEM segurar a UI:
-            _ = Task.Run(async () =>
-            {
-                try { await BuildPerfDevicesAsync(); } catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] PerfDevices: {ex.Message}"); } catch { } }
-            });
-            _ = LoadServicesWhenNeededSafeAsync();
-            _ = LoadStartupWhenNeededSafeAsync();
+
+                    // FIX abertura lenta: aqui rodavam TRÊS varreduras pesadas para abas que o
+                    // usuário talvez nunca abra — Win32_Service (Serviços), registro + tarefas
+                    // agendadas (Inicialização) e PerformanceCounterCategory + DXGI + CIM
+                    // (Dispositivos de desempenho). A aba Resumo (a que abre) não usa NENHUMA
+                    // delas. Agora cada uma só roda quando a aba dela é aberta — o próprio
+                    // SwitchTabByTag já as dispara, então não se perde nada.
                 }
                 catch (Exception ex)
                 {
@@ -297,6 +423,9 @@ namespace KitLugia.GUI.Windows.TaskManager
                     try { _refreshGate.Dispose(); } catch { }
                     try { _refreshCts?.Dispose(); } catch { }
                     try { GpuMonitor.Shutdown(); } catch { }
+                    // Motor de animação: sai do CompositionTarget.Rendering ao fechar (antes
+                    // ficava assinado até o Closed, animando uma janela que já não existe).
+                    ReleaseFrameAnimation();
                 }
                 catch (Exception closeEx)
                 {
@@ -381,28 +510,58 @@ namespace KitLugia.GUI.Windows.TaskManager
         //  ABA USUÁRIOS — paridade TMOG: cada usuário com CPU%, memória,
         //  nº de processos e a LISTA dos processos dele (expansível), como no TMOG.
         // ======================================================
-        public sealed class UserProcRow
+        public sealed class UserProcRow : INotifyPropertyChanged
         {
-            public string Name { get; set; } = "";
+            private string _name = "", _cpu = "0%", _memMB = "";
+            private double _cpuValue, _memValue;
+
             public int Pid { get; set; }
-            public string Cpu { get; set; } = "0%";
-            public string MemMB { get; set; } = "";
+
+            // Notifica: o detalhe do usuário ABERTO atualiza os valores em LUGAR
+            // (sem re-bind da lista inteira a cada segundo).
+            public string Name { get => _name; set { if (_name == value) return; _name = value; Raise(nameof(Name)); } }
+            public string Cpu { get => _cpu; set { if (_cpu == value) return; _cpu = value; Raise(nameof(Cpu)); } }
+            public double CpuValue { get => _cpuValue; set { if (_cpuValue == value) return; _cpuValue = value; Raise(nameof(CpuValue)); } }
+            public string MemMB { get => _memMB; set { if (_memMB == value) return; _memMB = value; Raise(nameof(MemMB)); } }
+            public double MemValue { get => _memValue; set { if (_memValue == value) return; _memValue = value; Raise(nameof(MemValue)); } }
+
+            public event PropertyChangedEventHandler? PropertyChanged;
+            private void Raise(string n) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
         }
 
         public sealed class UserRow : INotifyPropertyChanged
         {
             private bool _isExpanded;
 
+            private string _status = "ativa", _cpu = "0%", _memMB = "";
+            private double _cpuValue, _memValue;
+            private int _processCount;
+            private List<UserProcRow> _processes = new();
+
             public string UserName { get; set; } = "";
-            public string Status { get; set; } = "ativa";
-            public string Cpu { get; set; } = "0%";
-            public double CpuValue { get; set; }
-            public string MemMB { get; set; } = "";
-            public double MemValue { get; set; }
-            public int ProcessCount { get; set; }
-            public List<UserProcRow> Processes { get; set; } = new();
+
+            // Propriedades NOTIFICAM: sem isso o refresh por segundo so conseguia atualizar os
+            // numeros TROCANDO a linha inteira (o que derrubava selecao e expansao).
+            public string Status { get => _status; set { if (_status == value) return; _status = value; Raise(nameof(Status)); } }
+            public string Cpu { get => _cpu; set { if (_cpu == value) return; _cpu = value; Raise(nameof(Cpu)); } }
+            public double CpuValue { get => _cpuValue; set { if (_cpuValue == value) return; _cpuValue = value; Raise(nameof(CpuValue)); Raise(nameof(CpuCellBackground)); } }
+            public string MemMB { get => _memMB; set { if (_memMB == value) return; _memMB = value; Raise(nameof(MemMB)); } }
+            public double MemValue { get => _memValue; set { if (_memValue == value) return; _memValue = value; Raise(nameof(MemValue)); } }
+            public int ProcessCount { get => _processCount; set { if (_processCount == value) return; _processCount = value; Raise(nameof(ProcessCount)); } }
+
+            public List<UserProcRow> Processes
+            {
+                get => _processes;
+                set
+                {
+                    _processes = value ?? new();
+                    Raise(nameof(Processes));
+                    Raise(nameof(ExpandIcon));
+                }
+            }
 
             public event PropertyChangedEventHandler? PropertyChanged;
+            private void Raise(string n) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 
             /// <summary>Processos do usuário aparecem/somem ao clicar na setinha (RowDetails).</summary>
             public bool IsExpanded
@@ -421,6 +580,39 @@ namespace KitLugia.GUI.Windows.TaskManager
             public Visibility DetailsVisibility => _isExpanded ? Visibility.Visible : Visibility.Collapsed;
             public string ExpandIcon => Processes.Count > 1 ? (IsExpanded ? "▼" : "▶") : "";
 
+            /// <summary>
+            /// Atualiza a lista de processos do usuário SEM trocar a instância a cada
+            /// segundo: os PIDs que continuam vivos têm os valores atualizados em lugar
+            /// (as linhas notificam) e só quando o CONJUNTO/ordem muda é que a lista é
+            /// reatribuída — antes, 182 processos eram recriados 1x/s dentro do detalhe.
+            /// </summary>
+            public void MergeProcesses(List<UserProcRow> src)
+            {
+                var byPid = new Dictionary<int, UserProcRow>(_processes.Count);
+                foreach (var p in _processes) byPid[p.Pid] = p;
+
+                var merged = new List<UserProcRow>(src.Count);
+                foreach (var s in src)
+                {
+                    if (byPid.TryGetValue(s.Pid, out var keep))
+                    {
+                        keep.Name = s.Name;
+                        keep.Cpu = s.Cpu; keep.CpuValue = s.CpuValue;
+                        keep.MemMB = s.MemMB; keep.MemValue = s.MemValue;
+                        merged.Add(keep);
+                    }
+                    else merged.Add(s);
+                }
+
+                bool sameShape = merged.Count == _processes.Count;
+                if (sameShape)
+                    for (int i = 0; i < merged.Count; i++)
+                        if (!ReferenceEquals(merged[i], _processes[i])) { sameShape = false; break; }
+                if (sameShape) return; // só os valores mudaram — já notificaram sozinhos
+
+                Processes = merged;
+            }
+
             /// <summary>Heatmap da célula de CPU (mesmas faixas da aba Processos).</summary>
             public SolidColorBrush CpuCellBackground =>
                 CpuValue >= 60 ? FreezeCellBrush(new SolidColorBrush(Color.FromArgb(40, 0xE8, 0x11, 0x23)))
@@ -432,13 +624,65 @@ namespace KitLugia.GUI.Windows.TaskManager
         private static SolidColorBrush FreezeCellBrush(SolidColorBrush b) { if (!b.IsFrozen) b.Freeze(); return b; }
 
         private int _usersLoadRunning;
+        private bool _didInitialSelect; // auto-seleciona a 1ª linha 1x (painel de detalhes não abre vazio)
         private readonly KitLugia.Core.TaskManager.NativeMetricsHelper.CpuDeltaTracker _usersCpuTracker = new();
+
+        // Ordenação da aba Usuários (antes o clique no cabeçalho ia para o sort default
+        // do DataGrid, que o refresh de 1 s desfazia — parecia "não funciona").
+        private string _usersSortColumn = "CpuValue";
+        private ListSortDirection _usersSortDirection = ListSortDirection.Descending;
 
         private void BtnUserExpand_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                if ((sender as FrameworkElement)?.DataContext is UserRow r) r.IsExpanded = !r.IsExpanded;
+                if ((sender as FrameworkElement)?.DataContext is not UserRow r) return;
+                r.IsExpanded = !r.IsExpanded;
+                // A lista de processos só é preenchida para quem está ABERTO — sem este
+                // empurrão o detalhe abria VAZIO por até 1 s (seta ▼ sem nada listado).
+                if (r.IsExpanded && r.Processes.Count == 0) _ = LoadUsersSafeAsync();
+            }
+            catch { }
+        }
+
+        private void DgUsers_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            e.Handled = true;
+            string prop = e.Column?.SortMemberPath ?? "";
+            if (string.IsNullOrEmpty(prop)) return;
+            if (_usersSortColumn == prop)
+                _usersSortDirection = _usersSortDirection == ListSortDirection.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
+            else
+            {
+                _usersSortColumn = prop;
+                _usersSortDirection = prop == "UserName" ? ListSortDirection.Ascending : ListSortDirection.Descending;
+            }
+            ApplyUsersSort();
+        }
+
+        /// <summary>Ordena a coleção VIVA da aba Usuários pelo critério escolhido (fica aplicado no refresh).</summary>
+        private void ApplyUsersSort()
+        {
+            try
+            {
+                if (DgUsers.ItemsSource is not ObservableCollection<UserRow> live || live.Count == 0) return;
+                bool asc = _usersSortDirection == ListSortDirection.Ascending;
+                Func<UserRow, IComparable> key = _usersSortColumn switch
+                {
+                    "UserName" => r => r.UserName,
+                    "ProcessCount" => r => r.ProcessCount,
+                    "MemValue" => r => r.MemValue,
+                    _ => r => r.CpuValue,
+                };
+                var sorted = (asc ? live.OrderBy(key) : live.OrderByDescending(key)).ToList();
+                for (int i = 0; i < sorted.Count; i++)
+                {
+                    int cur = live.IndexOf(sorted[i]);
+                    if (cur >= 0 && cur != i) live.Move(cur, i);
+                }
+                foreach (var c in DgUsers.Columns) c.SortDirection = null;
+                var active = DgUsers.Columns.FirstOrDefault(c => c.SortMemberPath == _usersSortColumn);
+                if (active != null) active.SortDirection = _usersSortDirection;
             }
             catch { }
         }
@@ -472,7 +716,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                         alive.Add(p.Pid);
                         string acct = users.TryGetValue(p.Pid, out var a) ? a : "";
                         string shortName = KitLugia.Core.TaskManager.NativeMetricsHelper.ShortenUserName(acct);
-                        if (string.IsNullOrEmpty(shortName)) shortName = p.Pid < 100 ? "SYSTEM" : "Outros";
+                        if (string.IsNullOrEmpty(shortName)) shortName = "SYSTEM"; // sem SID = pseudo-processo do kernel (System, Registry, Memory Compression...) — sempre SYSTEM
 
                         if (!agg.TryGetValue(shortName, out var row))
                             agg[shortName] = row = new UserRow { UserName = shortName };
@@ -487,7 +731,9 @@ namespace KitLugia.GUI.Windows.TaskManager
                         {
                             Name = p.Name,
                             Pid = p.Pid,
+                            CpuValue = cpu,
                             Cpu = cpu > 0.05 ? $"{cpu:F1}%" : "0%",
+                            MemValue = memMb,
                             MemMB = memMb >= 1024 ? $"{memMb / 1024.0:F1} GB" : $"{memMb:F0} MB",
                         });
                     }
@@ -499,9 +745,12 @@ namespace KitLugia.GUI.Windows.TaskManager
                         row.Cpu = row.CpuValue > 0.05 ? $"{row.CpuValue:F1}%" : "0%";
                         row.MemMB = row.MemValue >= 1024 ? $"{row.MemValue / 1024.0:F1} GB" : $"{row.MemValue:F0} MB";
                         row.Status = row.Processes.Count > 0 ? "ativa" : "inativa";
-                        // Processos mais "pesados" primeiro, como o TMOG
-                        row.Processes = row.Processes.OrderByDescending(x => x.Cpu.StartsWith("0%") ? 0 : 1)
-                                                     .ThenByDescending(x => x.MemMB.Length).ToList();
+                        // Processos mais "pesados" primeiro, como o TMOG. Ordena pelos
+                        // VALORES numéricos — antes usava x.MemMB.Length, ou seja, o
+                        // COMPRIMENTO DO TEXTO ("9 MB" e "1,2 GB" como strings!).
+                        row.Processes = row.Processes.OrderByDescending(x => x.CpuValue)
+                                                     .ThenByDescending(x => x.MemValue)
+                                                     .ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
                     }
                     return agg.Values.OrderByDescending(r => r.CpuValue).ThenByDescending(r => r.MemValue).ToList();
                 });
@@ -515,7 +764,49 @@ namespace KitLugia.GUI.Windows.TaskManager
                     if (_isClosed) return;
                     int totalProcs = rows.Sum(r => r.ProcessCount);
                     TxtUserCount.Text = $"- {rows.Count} usuários · {totalProcs} processos";
-                    DgUsers.ItemsSource = rows;
+
+                    // MERGE por usuario em vez de trocar o ItemsSource: reatribuir a lista a cada
+                    // segundo RECRIAVA as linhas e derrubava selecao/expansao — a causa de
+                    // "cliquei na seta e o processo sumiu". Agora as instancias sao reaproveitadas.
+                    if (DgUsers.ItemsSource is not ObservableCollection<UserRow> live)
+                    {
+                        live = new ObservableCollection<UserRow>();
+                        DgUsers.ItemsSource = live;
+                    }
+
+                    var porNome = new Dictionary<string, UserRow>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var r in live) porNome[r.UserName] = r;
+
+                    var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    for (int i = 0; i < rows.Count; i++)
+                    {
+                        var src = rows[i];
+                        vistos.Add(src.UserName);
+
+                        if (porNome.TryGetValue(src.UserName, out var dst))
+                        {
+                            dst.Status = src.Status;
+                            dst.Cpu = src.Cpu;
+                            dst.CpuValue = src.CpuValue;
+                            dst.MemMB = src.MemMB;
+                            dst.MemValue = src.MemValue;
+                            dst.ProcessCount = src.ProcessCount;
+                            // Lista de processos: merge por PID de quem esta ABERTO (mantem a
+                            // lista pronta para quem esta fechado — abrir nunca mostra vazio).
+                            if (expanded.Contains(src.UserName)) dst.MergeProcesses(src.Processes);
+                        }
+                        else
+                        {
+                            live.Insert(Math.Min(i, live.Count), src);
+                            porNome[src.UserName] = src;
+                        }
+                    }
+                    for (int i = live.Count - 1; i >= 0; i--)
+                        if (!vistos.Contains(live[i].UserName)) live.RemoveAt(i);
+
+                    // Mantem a ordenacao escolhida pelo usuario (a colecao e reordenada
+                    // por CPU ao ser montada; sem isto o refresh desfazia o clique).
+                    ApplyUsersSort();
                 });
             }
             catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Users: {ex.Message}"); } catch { } }
@@ -582,7 +873,16 @@ namespace KitLugia.GUI.Windows.TaskManager
         private void SwitchTab(object sender, RoutedEventArgs e)
         {
             if (sender is not Button btn || btn.Tag is not string tag) return;
+            SwitchTabByTag(tag);
+        }
 
+        /// <summary>
+        /// Troca de aba pela tag. Público porque a janela pode abrir JÁ numa aba
+        /// (o atalho da Central de Diagnóstico no painel inicial usa isso) — antes o
+        /// clique e a abertura programada eram caminhos separados.
+        /// </summary>
+        public void SwitchTabByTag(string tag)
+        {
             // Hide all tabs
             TabSummary.Visibility = Visibility.Collapsed;
             TabProcesses.Visibility = Visibility.Collapsed;
@@ -593,6 +893,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             TabConnections.Visibility = Visibility.Collapsed;
             TabLatency.Visibility = Visibility.Collapsed;
             TabStorage.Visibility = Visibility.Collapsed;
+            TabDiagnostic.Visibility = Visibility.Collapsed;
 
             // Reset all sidebar buttons to inactive
             ResetSidebarButton(BtnTabSummary);
@@ -604,6 +905,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             ResetSidebarButton(BtnTabConnections);
             ResetSidebarButton(BtnTabLatency);
             ResetSidebarButton(BtnTabStorage);
+            ResetSidebarButton(BtnTabDiagnostic);
 
             // Activate selected tab + sidebar button
             switch (tag)
@@ -652,7 +954,16 @@ namespace KitLugia.GUI.Windows.TaskManager
                     ActivateSidebarButton(BtnTabStorage);
                     EnsureStorageBuilt();
                     break;
+                case "Diagnostic":
+                    TabDiagnostic.Visibility = Visibility.Visible;
+                    ActivateSidebarButton(BtnTabDiagnostic);
+                    EnsureDiagnosticBuilt();
+                    break;
             }
+
+            // A aba Processos pode ter esmaecimentos congelados (o motor se desliga fora dela):
+            // ao voltar, ele é religado se ainda houver algo a esmaecer.
+            ResumeFrameAnimationsIfNeeded();
         }
 
         private static readonly SolidColorBrush _accentBrush = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4F, 0xC3, 0xF7))); // ciano — identidade própria do TM
@@ -741,6 +1052,16 @@ namespace KitLugia.GUI.Windows.TaskManager
                     _refreshSeconds = sec;
                     if (_refreshTimer != null)
                         _refreshTimer.Interval = TimeSpan.FromSeconds(sec);
+                    // Gráficos na MESMA cadência da lista: com 5s na lista e 1s no gráfico,
+                    // os números das duas áreas andavam dessincronizados (pisca-pisca cruzado).
+                    if (_graphTimer != null)
+                        _graphTimer.Interval = TimeSpan.FromSeconds(sec);
+                    // Mantém o combo do Resumo em sincronia
+                    if (CmbSummaryInterval != null)
+                    {
+                        foreach (ComboBoxItem ci in CmbSummaryInterval.Items)
+                            if (ci.Content as string == text) { CmbSummaryInterval.SelectedItem = ci; break; }
+                    }
                 }
             }
         }
@@ -801,7 +1122,10 @@ namespace KitLugia.GUI.Windows.TaskManager
                     catch { return (object?)Array.Empty<Process>(); }
                 }, token);
 
-                await Task.WhenAll(netTask, gpuTask, snapTask);
+                // gpuPerPid ENTRA no WhenAll: ele enumera \GPU Engine(*) do PDH (a coleta mais
+                // lenta do pipeline). Fora do WhenAll, o .Result logo abaixo bloqueava a UI
+                // thread até ele terminar — micro-travamento no 1º refresh de cada abertura.
+                await Task.WhenAll(netTask, gpuTask, gpuPerPidTask, snapTask);
                 if (token.IsCancellationRequested) return;
                 var netConnections = netTask.Result;
                 float gpuTotal = gpuTask.Result;
@@ -887,7 +1211,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                                 if (gpuPct < 0) gpuPct = 0;
 
                                 // Paridade TMOG: User name / Peak memory / CPU time / Page faults
-                                string user = userNames.TryGetValue(pid, out var un) ? un : "";
+                                string user = userNames.TryGetValue(pid, out var un) ? KitLugia.Core.TaskManager.NativeMetricsHelper.ShortenUserName(un) : "";
                                 double peakMb = nm.PeakWorkingSetBytes / 1048576.0;
                                 string peakCell = peakMb > 0.5 ? FormatBytesSpeed(nm.PeakWorkingSetBytes).Replace("/s", "").Trim() : "—";
                                 TimeSpan cpuSpan = TimeSpan.FromTicks((nm.KernelTime100ns + nm.UserTime100ns) * 10);
@@ -1100,7 +1424,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                                 NetBytesPerSec = netBytesPerSec,
                                 Gpu = gpu,
                                 GpuValue = gpuPctFb,
-                                UserName = userFb,
+                                UserName = KitLugia.Core.TaskManager.NativeMetricsHelper.ShortenUserName(userFb),
                                 Path = path,
                                 ParentPid = parentPid,
                                 CommitMB = commitMbFb,
@@ -1170,9 +1494,9 @@ namespace KitLugia.GUI.Windows.TaskManager
                 lock (_iconLock)
                 {
                     if (!string.IsNullOrEmpty(path) && _iconCache.TryGetValue(path, out var byPath))
-                        return byPath ?? _genericIcon;
+                        return byPath ?? GenericIcon;
                     if (_iconCache.TryGetValue(name, out var byName))
-                        return byName ?? _genericIcon;
+                        return byName ?? GenericIcon;
                 }
                 // Fallback System32 conhecido (dwm, conhost, etc.) já em cache?
                 if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(path))
@@ -1181,7 +1505,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     string cand = Path.Combine(sys, name + ".exe");
                     lock (_iconLock)
                     {
-                        if (_iconCache.TryGetValue(cand, out var bySys)) return bySys ?? _genericIcon;
+                        if (_iconCache.TryGetValue(cand, out var bySys)) return bySys ?? GenericIcon;
                     }
                 }
             }
@@ -1240,14 +1564,14 @@ namespace KitLugia.GUI.Windows.TaskManager
                                     }
                                 }
                                 catch { }
-                                Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = _genericIcon; row.IconPath = ""; }), DispatcherPriority.Background);
+                                Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = GenericIcon; row.IconPath = ""; }), DispatcherPriority.Background);
                                 continue;
                             }
                             lock (_iconLock)
                             {
                                 if (_iconCache.ContainsKey(row.Path))
                                 {
-                                    var cached = _iconCache[row.Path] ?? _genericIcon;
+                                    var cached = _iconCache[row.Path] ?? GenericIcon;
                                     Dispatcher.BeginInvoke(new Action(() => { row.ProcessIcon = cached; row.IconPath = row.Path; }), DispatcherPriority.Background);
                                     continue;
                                 }
@@ -1276,7 +1600,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                             }
                             Dispatcher.BeginInvoke(new Action(() =>
                             {
-                                row.ProcessIcon = icon ?? _genericIcon;
+                                row.ProcessIcon = icon ?? GenericIcon;
                                 row.IconPath = row.Path;
                             }), DispatcherPriority.Background);
                         }
@@ -1358,6 +1682,113 @@ namespace KitLugia.GUI.Windows.TaskManager
             foreach (var c in DgProcesses.Columns) c.SortDirection = null;
             col.SortDirection = _currentSortDirection;
             ApplySorting();
+            SyncSortUi();
+            // Aplica JA. Antes so as setas eram atualizadas e a ordem real mudava no proximo
+            // tick (1s depois) — dava a impressao de que ordenar "nao funcionava".
+            _ = RefreshAsync();
+        }
+
+        private bool _syncingSortUi;
+
+        /// <summary>
+        /// Mantem em sincronia o combo de ordenacao, a seta de sentido e o cabecalho.
+        /// Sem isso o usuario clica no cabecalho, a lista reordena e o combo continua dizendo
+        /// outro criterio — exatamente a confusao de "nao sei como esta ordenado".
+        /// </summary>
+        private void SyncSortUi()
+        {
+            if (_syncingSortUi) return;
+            try
+            {
+                _syncingSortUi = true;
+                string tag = $"{_currentSortColumn}|{(_currentSortDirection == ListSortDirection.Ascending ? "Ascending" : "Descending")}";
+                if (CmbSortProcesses != null)
+                {
+                    bool found = false;
+                    foreach (var o in CmbSortProcesses.Items)
+                    {
+                        if (o is ComboBoxItem ci && string.Equals(ci.Tag as string, tag, StringComparison.Ordinal))
+                        {
+                            if (!ReferenceEquals(CmbSortProcesses.SelectedItem, ci)) CmbSortProcesses.SelectedItem = ci;
+                            found = true;
+                            break;
+                        }
+                    }
+                    // Coluna ordenada por clique no cabecalho que nao tem item no combo:
+                    // marca o combo com o criterio real (senao ele continua exibindo outro
+                    // — o usuario jura que esta ordenado por algo que nao esta).
+                    if (!found)
+                    {
+                        var custom = CmbSortProcesses.Items.OfType<ComboBoxItem>()
+                                                   .FirstOrDefault(i => (i.Tag as string ?? "").StartsWith("__custom__", StringComparison.Ordinal));
+                        if (custom == null)
+                        {
+                            custom = new ComboBoxItem { Tag = "__custom__" };
+                            CmbSortProcesses.Items.Add(custom);
+                        }
+                        custom.Content = $"{SortColumnLabel(_currentSortColumn)} ({(_currentSortDirection == ListSortDirection.Ascending ? "menor primeiro" : "maior primeiro")})";
+                        if (!ReferenceEquals(CmbSortProcesses.SelectedItem, custom)) CmbSortProcesses.SelectedItem = custom;
+                    }
+                }
+                if (BtnSortDirection != null)
+                    BtnSortDirection.Content = _currentSortDirection == ListSortDirection.Ascending ? "▲" : "▼";
+            }
+            catch { }
+            finally { _syncingSortUi = false; }
+        }
+
+        /// <summary>Nome amigavel da coluna de ordenacao (para o combo quando o criterio vem do cabecalho).</summary>
+        private static string SortColumnLabel(string prop) => prop switch
+        {
+            "CpuValue" => "CPU",
+            "RamValue" => "Memória",
+            "DiskBytesPerSec" => "Disco",
+            "NetBytesPerSec" => "Rede",
+            "GpuValue" => "GPU",
+            "PeakMemValue" => "Pico de memória",
+            "CpuTimeSec" => "Tempo de CPU",
+            "PageFaultsValue" => "Page faults",
+            "DisplayName" or "Name" => "Nome",
+            "UserName" => "Usuário",
+            "ProcessCount" => "Processos",
+            "Status" => "Status",
+            "Threads" => "Threads",
+            "Pid" => "PID",
+            "CommitMB" => "Commit",
+            _ => string.IsNullOrEmpty(prop) ? "CPU" : prop,
+        };
+
+        /// <summary>Criterio escolhido explicitamente no combo de ordenacao.</summary>
+        private void CmbSortProcesses_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_syncingSortUi) return;
+            try
+            {
+                if ((sender as System.Windows.Controls.ComboBox)?.SelectedItem is not ComboBoxItem item) return;
+                var parts = (item.Tag as string ?? "").Split('|');
+                if (parts.Length != 2) return;
+
+                _currentSortColumn = parts[0];
+                _currentSortDirection = parts[1] == "Ascending" ? ListSortDirection.Ascending : ListSortDirection.Descending;
+
+                ApplySorting();
+                SyncSortUi();
+                _ = RefreshAsync();
+            }
+            catch { }
+        }
+
+        /// <summary>Seta clicavel ao lado do combo: inverte o sentido (▼/▲) e reaplica na hora.</summary>
+        private void BtnSortDirection_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _currentSortDirection = _currentSortDirection == ListSortDirection.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
+                ApplySorting();
+                SyncSortUi();
+                _ = RefreshAsync();
+            }
+            catch { }
         }
 
         /// <summary>Métrica numérica pelo nome da coluna (ordenar colunas novas sem duplicar cases).</summary>
@@ -1366,13 +1797,59 @@ namespace KitLugia.GUI.Windows.TaskManager
             "CpuValue" => r.CpuValue,
             "RamValue" => r.RamValue,
             "DiskBytesPerSec" => r.DiskBytesPerSec,
+            "DiskReadBytesPerSec" => r.DiskReadBytesPerSec,
+            "DiskWriteBytesPerSec" => r.DiskWriteBytesPerSec,
+            "DiskOpsPerSec" => r.DiskOpsPerSec,
             "NetBytesPerSec" => r.NetBytesPerSec,
             "GpuValue" => r.GpuValue,
             "PeakMemValue" => r.PeakMemValue,
             "CpuTimeSec" => r.CpuTimeSec,
             "PageFaultsValue" => r.PageFaultsValue,
-            _ => double.NaN,
+            "Pid" => r.Pid,
+            "Threads" => double.TryParse(r.Threads, out double t) ? t : 0,
+            "CommitMB" => r.CommitMB,
+            _ => 0,
         };
+
+        /// <summary>
+        /// Ordena a lista de processos pelo criterio atual. O rank do grupo vem SEMPRE
+        /// primeiro (Aplicativos → 2º plano → Windows, paridade TMOG) e o desempate usa a
+        /// posicao ANTERIOR (anti-pisca) e o nome.
+        ///
+        /// Cobre QUALQUER SortMemberPath: numericas via MetricOf, texto por string e as
+        /// colunas Status/Usuario/Threads/PID. Antes, quem nao tinha um case caia no
+        /// default (ordem por CPU) — clicar nessas colunas "nao fazia nada".
+        /// </summary>
+        private List<ProcessRow> OrderRows(IEnumerable<ProcessRow> src, Func<string, int> rank, Func<ProcessRow, int> tieBreaker)
+        {
+            bool asc = _currentSortDirection == ListSortDirection.Ascending;
+            string col = string.IsNullOrEmpty(_currentSortColumn) ? "CpuValue" : _currentSortColumn;
+
+            IOrderedEnumerable<ProcessRow> q = src.OrderBy(r => rank(r.Group));
+            switch (col)
+            {
+                case "DisplayName":
+                case "Name":
+                    q = asc ? q.ThenBy(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                            : q.ThenByDescending(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase);
+                    break;
+                case "Status":
+                    q = asc ? q.ThenBy(r => r.Status, StringComparer.CurrentCultureIgnoreCase)
+                            : q.ThenByDescending(r => r.Status, StringComparer.CurrentCultureIgnoreCase);
+                    break;
+                case "UserName":
+                    q = asc ? q.ThenBy(r => r.UserName, StringComparer.CurrentCultureIgnoreCase)
+                            : q.ThenByDescending(r => r.UserName, StringComparer.CurrentCultureIgnoreCase);
+                    break;
+                default:
+                    // Arredonda em 1 casa: a metrica oscila decimos a cada segundo e cada
+                    // micro-troca de ordem movia linhas na tela (a "piscada" da lista).
+                    q = asc ? q.ThenBy(r => Math.Round(MetricOf(r, col), 1))
+                            : q.ThenByDescending(r => Math.Round(MetricOf(r, col), 1));
+                    break;
+            }
+            return q.ThenBy(tieBreaker).ThenBy(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
 
         private void ApplySorting()
         {
@@ -1449,6 +1926,139 @@ namespace KitLugia.GUI.Windows.TaskManager
             }
         }
 
+        /// <summary>Número em cultura invariante: aceita "1.5" e "1,5" em qualquer idioma do Windows.</summary>
+        private static bool ParseDoubleInv(string s, out double v)
+        {
+            v = 0;
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            string norm = s.Trim().Replace(',', '.');
+            return double.TryParse(norm, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v);
+        }
+
+        private static bool ParseIntInv(string s, out int v)
+        {
+            v = 0;
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            return int.TryParse(s.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out v);
+        }
+
+        private static int ParseIntLoose(string s)
+        {
+            if (int.TryParse(s?.Trim(), out int v)) return v;
+            return 0;
+        }
+
+        /// <summary>
+        /// Um token "campo:expressão" aplicado sobre as linhas. Operadores &gt;, &lt;, &gt;=,
+        /// &lt;=, = ou : (contém/igual). Retorna false quando o campo é desconhecido ou o
+        /// número não parseia — o chamador cai no texto livre em vez de zerar a lista.
+        /// </summary>
+        private static bool MatchAdvancedToken(List<ProcessRow> rows, string field, string expr, out List<ProcessRow> filtered)
+        {
+            filtered = rows;
+            string op = ":";
+            string val = expr ?? "";
+            foreach (var cand in new[] { ">=", "<=", ">", "<", "=" })
+            {
+                if (val.StartsWith(cand, StringComparison.Ordinal))
+                {
+                    op = cand; val = val.Substring(cand.Length);
+                    break;
+                }
+            }
+            bool CmpD(double metric, double threshold) => op switch
+            {
+                ">" => metric > threshold,
+                "<" => metric < threshold,
+                ">=" => metric >= threshold,
+                "<=" => metric <= threshold,
+                "=" => Math.Abs(metric - threshold) < 0.0001,
+                _ => Math.Abs(metric - threshold) < 0.0001,
+            };
+            bool CmpI(double metric, double threshold) => op switch
+            {
+                ">" => metric > threshold,
+                "<" => metric < threshold,
+                ">=" => metric >= threshold,
+                "<=" => metric <= threshold,
+                _ => Math.Abs(metric - threshold) < 0.5,
+            };
+            switch (field)
+            {
+                case "name":
+                case "nome":
+                    filtered = rows.Where(r => r.Name.Contains(val, StringComparison.OrdinalIgnoreCase)).ToList();
+                    return true;
+                case "pid":
+                    if (op == ":")
+                    {
+                        if (ParseIntInv(val, out int pidEq)) { filtered = rows.Where(r => r.Pid == pidEq).ToList(); return true; }
+                        filtered = rows.Where(r => r.Pid.ToString().Contains(val)).ToList();
+                        return true;
+                    }
+                    if (!ParseIntInv(val, out int pid)) return false;
+                    filtered = rows.Where(r => CmpI(r.Pid, pid)).ToList();
+                    return true;
+                case "cpu":
+                    if (!ParseDoubleInv(val, out double cpu)) return false;
+                    filtered = rows.Where(r => CmpD(r.CpuValue, cpu)).ToList();
+                    return true;
+                case "ram":
+                case "mem":
+                case "memoria":
+                    if (!ParseDoubleInv(val, out double ram)) return false;
+                    filtered = rows.Where(r => CmpD(r.RamValue, ram)).ToList();
+                    return true;
+                case "threads":
+                    if (!ParseDoubleInv(val, out double th)) return false;
+                    filtered = rows.Where(r => CmpI(ParseIntLoose(r.Threads), th)).ToList();
+                    return true;
+                case "handles":
+                    if (!ParseDoubleInv(val, out double ha)) return false;
+                    filtered = rows.Where(r => CmpI(ParseIntLoose(r.Handles), ha)).ToList();
+                    return true;
+                case "disco":
+                case "disk":
+                case "d":
+                    if (!ParseDoubleInv(val, out double dk)) return false;
+                    filtered = rows.Where(r => CmpD(r.DiskBytesPerSec / 1048576.0, dk)).ToList();
+                    return true;
+                case "rede":
+                case "net":
+                case "network":
+                    if (!ParseDoubleInv(val, out double nt)) return false;
+                    filtered = rows.Where(r => CmpD(r.NetBytesPerSec / 1048576.0, nt)).ToList();
+                    return true;
+                case "gpu":
+                    if (!ParseDoubleInv(val, out double gpu)) return false;
+                    filtered = rows.Where(r => CmpD(r.GpuValue, gpu)).ToList();
+                    return true;
+                case "pico":
+                case "peak":
+                    if (!ParseDoubleInv(val, out double pk)) return false;
+                    filtered = rows.Where(r => CmpD(r.PeakMemValue, pk)).ToList();
+                    return true;
+                case "tempocpu":
+                case "cputime":
+                    if (!ParseDoubleInv(val, out double ct)) return false;
+                    filtered = rows.Where(r => CmpD(r.CpuTimeSec, ct)).ToList();
+                    return true;
+                case "usuario":
+                case "user":
+                    filtered = rows.Where(r => (r.UserName ?? "").Contains(val, StringComparison.OrdinalIgnoreCase)).ToList();
+                    return true;
+                case "status":
+                    filtered = rows.Where(r => (r.Status ?? "").Contains(val, StringComparison.OrdinalIgnoreCase)).ToList();
+                    return true;
+                case "path":
+                case "caminho":
+                    filtered = rows.Where(r => (r.Path ?? "").Contains(val, StringComparison.OrdinalIgnoreCase)).ToList();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
 private void ApplyFilter(string query)
         {
             List<ProcessRow> rows;
@@ -1461,25 +2071,28 @@ private void ApplyFilter(string query)
             {
                 if (!string.IsNullOrEmpty(query))
                 {
-                    var advancedMatch = Regex.Match(query, @"^(\w+):(.+)$");
-                    if (advancedMatch.Success)
+                    // Multi-termos com AND: "cpu:>10 ram:>500 chrome" filtra quem passa em TODOS.
+                    // Campos: name/nome, pid, cpu, ram/mem/memoria, threads, handles,
+                    // disco/disk/d, rede/net/network, gpu, pico/peak, tempocpu/cputime,
+                    // usuario/user, status, path/caminho. Operadores: >, <, >=, <=, = ou :.
+                    // Números em cultura invariante ("1.5" e "1,5" valem o mesmo); ram/pico
+                    // em MB, disco/rede em MB/s, tempocpu em segundos, cpu/gpu em %.
+                    foreach (var token in query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
                     {
-                        string field = advancedMatch.Groups[1].Value.ToLowerInvariant();
-                        string value = advancedMatch.Groups[2].Value;
-                        rows = field switch
+                        var m = Regex.Match(token, @"^(\w+):(.+)$");
+                        if (!m.Success)
                         {
-                            "name" => rows.Where(r => r.Name.Contains(value, StringComparison.OrdinalIgnoreCase)).ToList(),
-                            "pid" when int.TryParse(value, out int pid) => rows.Where(r => r.Pid == pid).ToList(),
-                            "cpu" when value.StartsWith(">") && double.TryParse(value[1..], out double cpuGt) => rows.Where(r => r.CpuValue > cpuGt).ToList(),
-                            "cpu" when value.StartsWith("<") && double.TryParse(value[1..], out double cpuLt) => rows.Where(r => r.CpuValue < cpuLt).ToList(),
-                            "ram" when value.StartsWith(">") && double.TryParse(value[1..], out double ramGt) => rows.Where(r => r.RamValue > ramGt).ToList(),
-                            "ram" when value.StartsWith("<") && double.TryParse(value[1..], out double ramLt) => rows.Where(r => r.RamValue < ramLt).ToList(),
-                            _ => rows.Where(r => r.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || r.Pid.ToString().Contains(query) || (r.Path?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)).ToList()
-                        };
-                    }
-                    else
-                    {
-                        rows = rows.Where(r => r.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || r.Pid.ToString().Contains(query) || (r.Path?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+                            string t = token;
+                            rows = rows.Where(r => r.Name.Contains(t, StringComparison.OrdinalIgnoreCase) || r.Pid.ToString().Contains(t) || (r.Path?.Contains(t, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+                        }
+                        else if (!MatchAdvancedToken(rows, m.Groups[1].Value.ToLowerInvariant(), m.Groups[2].Value, out var filtered))
+                        {
+                            // Campo desconhecido ou número inválido: cai no texto livre do token.
+                            string t = token;
+                            rows = rows.Where(r => r.Name.Contains(t, StringComparison.OrdinalIgnoreCase) || r.Pid.ToString().Contains(t) || (r.Path?.Contains(t, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+                        }
+                        else rows = filtered;
+                        if (rows.Count == 0) break;
                     }
                 }
 
@@ -1495,6 +2108,8 @@ private void ApplyFilter(string query)
                     // Ícone do grupo: primeiro membro que já tenha ícone resolvido
                     // (evita grupo sem ícone quando o 1º processo ainda não carregou).
                     var groupIcon = first.ProcessIcon ?? members.Select(m => m.ProcessIcon).FirstOrDefault(i => i != null);
+                    // Usuário do grupo = o dominante entre os membros (paridade TMOG: toda linha mostra usuário)
+                    var domUser = members.Where(m => !string.IsNullOrEmpty(m.UserName)).GroupBy(m => m.UserName).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? "";
                     var row = new ProcessRow
                     {
                         Name = first.Name,
@@ -1507,6 +2122,7 @@ private void ApplyFilter(string query)
                         Handles = first.Handles,
                         Threads = first.Threads,
                         Group = first.Group,
+                        UserName = domUser,
                         Status = first.Status,
                         Disk = first.Disk,
                         DiskBytesPerSec = first.DiskBytesPerSec,
@@ -1543,6 +2159,20 @@ private void ApplyFilter(string query)
                             Handles = m.Handles,
                             Threads = m.Threads,
                             Group = m.Group,
+                            UserName = m.UserName,
+                            GpuValue = m.GpuValue,
+                            PeakMemMB = m.PeakMemMB,
+                            PeakMemValue = m.PeakMemValue,
+                            CpuTime = m.CpuTime,
+                            CpuTimeSec = m.CpuTimeSec,
+                            PageFaults = m.PageFaults,
+                            PageFaultsValue = m.PageFaultsValue,
+                            CommitMB = m.CommitMB,
+                            KernelTimeSec = m.KernelTimeSec,
+                            UserTimeSec = m.UserTimeSec,
+                            IoReadTotal = m.IoReadTotal,
+                            IoWriteTotal = m.IoWriteTotal,
+                            IoOpsTotal = m.IoOpsTotal,
                             Status = m.Status,
                             Disk = m.Disk,
                             DiskBytesPerSec = m.DiskBytesPerSec,
@@ -1599,23 +2229,11 @@ private void ApplyFilter(string query)
                         if (isFirstLoad)
                         {
                             int Rank0(string g) => g == "Aplicativos" ? 0 : g == "Processos em segundo plano" ? 1 : 2;
-                            grouped = (_currentSortColumn switch
-                            {
-                                "CpuValue" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.CpuValue).ThenBy(r => r.DisplayName) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.CpuValue).ThenBy(r => r.DisplayName),
-                                "RamValue" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.RamValue) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.RamValue),
-                                "DisplayName" or "Name" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.DisplayName) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.DisplayName),
-                                "Status" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => r.Status) : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.Status),
-                                // colunas numéricas novas (Peak/CpuTime/PageFaults/Disk/Net/Gpu) via MetricOf
-                                string p when new[] { "PeakMemValue", "CpuTimeSec", "PageFaultsValue", "DiskBytesPerSec", "NetBytesPerSec", "GpuValue" }.Contains(p) =>
-                                    _currentSortDirection == ListSortDirection.Ascending
-                                        ? grouped.OrderBy(r => Rank0(r.Group)).ThenBy(r => MetricOf(r, p)).ThenBy(r => r.DisplayName)
-                                        : grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => MetricOf(r, p)).ThenBy(r => r.DisplayName),
-                                _ => grouped.OrderBy(r => Rank0(r.Group)).ThenByDescending(r => r.CpuValue)
-                            }).ToList();
+                            grouped = OrderRows(grouped, Rank0, _ => 0);
                             _filteredRows = grouped;
                             _groupedLive.Clear();
                             foreach (var g in grouped) _groupedLive.Add(g);
-                            TxtProcessCount.Text = $"— {total} processos ({apps} apps, {bg} segundo plano, {win} Windows)";
+                            SetText(TxtProcessCount, $"— {total} processos ({apps} apps, {bg} segundo plano, {win} Windows)");
                             foreach (var col in DgProcesses.Columns) col.SortDirection = null;
                             var activeCol0 = DgProcesses.Columns.FirstOrDefault(c => c.SortMemberPath == _currentSortColumn);
                             if (activeCol0 != null) activeCol0.SortDirection = _currentSortDirection;
@@ -1625,19 +2243,17 @@ private void ApplyFilter(string query)
                         var childs = _groupedLive.Where(r => r.IsChild).ToList();
                         foreach (var ch in childs) _groupedLive.Remove(ch);
                         int Rank(string g) => g == "Aplicativos" ? 0 : g == "Processos em segundo plano" ? 1 : 2;
-                        grouped = (_currentSortColumn switch
+                        // Anti-pisca: a métrica oscila décimos a cada segundo e cada micro-troca
+                        // de ordem movia linhas na tela. Arredonda em 1 casa e desempatas pela
+                        // posição ANTERIOR: só troca de lugar quem realmente passou à frente.
+                        var prevPos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                        for (int pi = 0; pi < _groupedLive.Count; pi++)
                         {
-                            "CpuValue" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank(r.Group)).ThenBy(r => r.CpuValue).ThenBy(r => r.DisplayName) : grouped.OrderBy(r => Rank(r.Group)).ThenByDescending(r => r.CpuValue).ThenBy(r => r.DisplayName),
-                            "RamValue" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank(r.Group)).ThenBy(r => r.RamValue) : grouped.OrderBy(r => Rank(r.Group)).ThenByDescending(r => r.RamValue),
-                            "DisplayName" or "Name" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank(r.Group)).ThenBy(r => r.DisplayName) : grouped.OrderBy(r => Rank(r.Group)).ThenByDescending(r => r.DisplayName),
-                            "Status" => _currentSortDirection == ListSortDirection.Ascending ? grouped.OrderBy(r => Rank(r.Group)).ThenBy(r => r.Status) : grouped.OrderBy(r => Rank(r.Group)).ThenByDescending(r => r.Status),
-                            // colunas numéricas novas (Peak/CpuTime/PageFaults/Disk/Net/Gpu) via MetricOf
-                            string p when new[] { "PeakMemValue", "CpuTimeSec", "PageFaultsValue", "DiskBytesPerSec", "NetBytesPerSec", "GpuValue" }.Contains(p) =>
-                                _currentSortDirection == ListSortDirection.Ascending
-                                    ? grouped.OrderBy(r => Rank(r.Group)).ThenBy(r => MetricOf(r, p)).ThenBy(r => r.DisplayName)
-                                    : grouped.OrderBy(r => Rank(r.Group)).ThenByDescending(r => MetricOf(r, p)).ThenBy(r => r.DisplayName),
-                            _ => grouped.OrderBy(r => Rank(r.Group)).ThenByDescending(r => r.CpuValue)
-                        }).ToList();
+                            var k = _groupedLive[pi].GroupKey;
+                            if (!prevPos.ContainsKey(k)) prevPos[k] = pi;
+                        }
+                        int PrevPos(ProcessRow r) => prevPos.TryGetValue(r.GroupKey, out int p) ? p : int.MaxValue;
+                        grouped = OrderRows(grouped, Rank, PrevPos);
                         _filteredRows = grouped;
                         var existingDict = _groupedLive.GroupBy(r => r.GroupKey).ToDictionary(g => g.Key, g => g.First());
                         var freshDict = grouped.GroupBy(r => r.GroupKey).ToDictionary(g => g.Key, g => g.First());
@@ -1718,18 +2334,37 @@ private void ApplyFilter(string query)
                         }
                         var needIcons = expanded.SelectMany(pr => pr.RawChildren).Where(c => c.ProcessIcon == null).ToList();
                         if (needIcons.Count > 0) _ = LoadIconsIncrementalAsync(needIcons);
-                        TxtProcessCount.Text = $"— {total} processos ({apps} apps, {bg} segundo plano, {win} Windows)";
+                        SetText(TxtProcessCount, $"— {total} processos ({apps} apps, {bg} segundo plano, {win} Windows)");
+                        if (!_didInitialSelect && DgProcesses.SelectedItem == null && _groupedLive.Count > 0)
+                        {
+                            _didInitialSelect = true;
+                            try { DgProcesses.SelectedItem = _groupedLive[0]; } catch { }
+                        }
                         if (selectedPids.Count > 0)
                         {
-                            // Multi-seleção: restaura TODAS as linhas (por PID ou GroupKey) em vez de só a primeira
+                            // Multi-seleção: restaura TODAS as linhas (por PID ou GroupKey) em vez de só a primeira.
+                            // Anti-pisca: Clear()+Add a cada segundo redisparava SelectionChanged e o
+                            // painel de detalhes era reescrito (com fetch em background) sem necessidade.
+                            // Só toca na seleção quando o conjunto desejado difere do atual.
                             try
                             {
-                                DgProcesses.SelectedItems.Clear();
+                                var wanted = new List<ProcessRow>();
                                 foreach (var row in _groupedLive)
                                 {
                                     if (selectedPids.Contains(row.Pid) ||
                                         (!string.IsNullOrEmpty(row.GroupKey) && selectedKeys.Contains(row.GroupKey)))
-                                        DgProcesses.SelectedItems.Add(row);
+                                        wanted.Add(row);
+                                }
+                                bool same = DgProcesses.SelectedItems.Count == wanted.Count;
+                                if (same)
+                                {
+                                    var cur = new HashSet<ProcessRow>(DgProcesses.SelectedItems.OfType<ProcessRow>());
+                                    foreach (var w in wanted) { if (!cur.Contains(w)) { same = false; break; } }
+                                }
+                                if (!same)
+                                {
+                                    DgProcesses.SelectedItems.Clear();
+                                    foreach (var w in wanted) DgProcesses.SelectedItems.Add(w);
                                 }
                             }
                             catch { }
@@ -1752,6 +2387,11 @@ private void ApplyFilter(string query)
                         DgProcesses.ItemsSource = cvs.View;
                         TxtProcessCount.Text = $"— {total} processos ({apps} apps, {bg} segundo plano, {win} Windows)";
                     }
+
+                    // Painel de detalhes AO VIVO (CPU/RAM/Handles/Threads/Disco/Rede/Uptime):
+                    // sem isto ele só era escrito no SelectionChanged e ficava congelado no
+                    // processo selecionado — o "as informações não atualizam" do painel.
+                    RefreshLiveDetail();
                 }, DispatcherPriority.DataBind);
             });
         }
@@ -1878,8 +2518,8 @@ private void ApplyFilter(string query)
             {
                 if (_iconCache.TryGetValue(row.Path ?? "", out var icon) && icon != null)
                     DetailIcon.Source = icon;
-                else if (_genericIcon != null)
-                    DetailIcon.Source = _genericIcon;
+                else if (GenericIcon != null)
+                    DetailIcon.Source = GenericIcon;
             }
 
             DetailName.Text = row.Name;
@@ -1932,6 +2572,8 @@ private void ApplyFilter(string query)
                             var st = proc.StartTime;
                             start = st.ToString("dd/MM/yyyy HH:mm");
                             uptime = (DateTime.Now - st).ToString(@"d\.hh\:mm\:ss");
+                            // Guardado para o uptime andar de verdade (ver RefreshLiveDetail).
+                            _detailStartTime = st; _detailStartPid = pid;
                         }
                         catch { }
                         try
@@ -1955,7 +2597,7 @@ private void ApplyFilter(string query)
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (SelectedRow?.Pid != pid) return; // seleção mudou
-                    DetailUser.Text = user;
+                    DetailUser.Text = KitLugia.Core.TaskManager.NativeMetricsHelper.ShortenUserName(user);
                     DetailStartTime.Text = start;
                     DetailUptime.Text = uptime;
                     foreach (ComboBoxItem item in CmbPriority.Items)
@@ -1965,6 +2607,54 @@ private void ApplyFilter(string query)
                     CmbPriority.SelectedIndex = 3;
                 }), DispatcherPriority.Background);
             }, ct);
+        }
+
+        // StartTime do processo em exibição — permite o Uptime ANDAR sem refazer o fetch.
+        private DateTime? _detailStartTime;
+        private int _detailStartPid = -1;
+
+        /// <summary>
+        /// Reaplica no painel de detalhes os campos que MUDAM com o tempo, sempre que a
+        /// lista é atualizada. Antes o painel só era escrito no SelectionChanged: com um
+        /// processo vivo selecionado, CPU/RAM/Handles/Threads/Disco/Rede/Uptime ficavam
+        /// CONGELADOS na tela — a queixa "as informações não atualizam".
+        /// O que vem do fetch nativo (sessão, arquitetura, linha de comando, Elevated) só
+        /// é recarregado ao trocar de seleção: isso praticamente não muda.
+        /// </summary>
+        private void RefreshLiveDetail()
+        {
+            try
+            {
+                if (DetailPanel.Visibility != Visibility.Visible) return;
+                if (DgProcesses.SelectedItem is not ProcessRow row) return;
+
+                DetailName.Text = row.Name;
+                DetailPid.Text = $"PID: {row.Pid}";
+                DetailPidValue.Text = row.Pid.ToString();
+                DetailStatus.Text = row.Status;
+                DetailCpu.Text = row.Cpu;
+                DetailCpu.Foreground = GetHeatColor((float)row.CpuValue, 50, 80);
+                DetailRam.Text = row.RamMB;
+                DetailRam.Foreground = GetHeatColor((float)row.RamValue, 2048, 8192);
+                DetailHandles.Text = row.Handles;
+                DetailThreads.Text = row.Threads;
+                DetailDisk.Text = row.Disk;
+                DetailNet.Text = row.Network;
+                if (!string.IsNullOrWhiteSpace(row.UserName)) DetailUser.Text = row.UserName;
+
+                // Métricas que crescem em tempo real (mesmos formatos do load nativo).
+                DetailCommit.Text = row.CommitMB > 0 ? FormatTotalBytes((ulong)(row.CommitMB * 1048576.0)) : DetailCommit.Text;
+                if (!string.IsNullOrEmpty(row.PeakMemMB)) DetailPeak.Text = row.PeakMemMB;
+                if (row.KernelTimeSec > 0) DetailKernelTime.Text = FormatCpuTime(row.KernelTimeSec);
+                if (row.UserTimeSec > 0) DetailUserTime.Text = FormatCpuTime(row.UserTimeSec);
+                if (row.IoReadTotal > 0) DetailIoRead.Text = FormatTotalBytes(row.IoReadTotal);
+                if (row.IoWriteTotal > 0) DetailIoWrite.Text = FormatTotalBytes(row.IoWriteTotal);
+                if (row.IoOpsTotal > 0) DetailIoOps.Text = row.IoOpsTotal.ToString("N0");
+
+                if (_detailStartPid == row.Pid && _detailStartTime.HasValue)
+                    DetailUptime.Text = (DateTime.Now - _detailStartTime.Value).ToString(@"d\.hh\:mm\:ss");
+            }
+            catch { }
         }
 
         private static string GetProcessUser(Process proc)
@@ -2461,12 +3151,28 @@ private void ApplyFilter(string query)
                 tb.Text = text;
                 if (brush != null) tb.Foreground = brush;
             }
+            else if (brush != null && !Equals(tb.Foreground, brush)) tb.Foreground = brush;
+        }
+
+        /// <summary>
+        /// Escreve texto SOMENTE quando mudou (foreground opcional). Mesma ideia do
+        /// SetMetricText, para os ~20 textos do Resumo/Desempenho que eram reescritos a
+        /// cada tick e forçavam re-render — causa do "pisca-pisca" com dado parado.
+        /// </summary>
+        private static void SetText(System.Windows.Controls.TextBlock tb, string text, SolidColorBrush? brush = null)
+        {
+            if (tb == null) return;
+            if (!string.Equals(tb.Text, text, StringComparison.Ordinal)) tb.Text = text;
+            if (brush != null && !Equals(tb.Foreground, brush)) tb.Foreground = brush;
         }
 
         // Frozen brush cache — created once, shared across all calls (thread-safe, zero GC)
         private static readonly SolidColorBrush _brushRed = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE8, 0x11, 0x23)));
         private static readonly SolidColorBrush _brushOrange = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x98, 0x00)));
-        private static readonly SolidColorBrush _brushYellow = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00)));
+        // Ambar do TM (era #FFD700 = o DOURADO do tema global do Kit, que destoava do azul
+        // do Gerenciador de Tarefas em todo valor em atencao: CPU/RAM ~50-60%, temperatura,
+        // potencia. Mesmo tom do icone de "fixado" no Resumo.)
+        private static readonly SolidColorBrush _brushYellow = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD5, 0x4F)));
         private static readonly SolidColorBrush _brushGreen = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50)));
         private static readonly SolidColorBrush _brushGray = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)));
         private static readonly SolidColorBrush _brushTransparent = FreezeBrush(Brushes.Transparent);
@@ -2743,5 +3449,16 @@ private void ApplyFilter(string query)
             }
 
         }
+    }
+
+    /// <summary>Largura da barra inline de CPU (paridade TMOG): fração de 57px.</summary>
+    public sealed class CpuBarWidthConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            try { double v = System.Convert.ToDouble(value); return Math.Max(0, Math.Min(1, v / 100.0)) * 57.0; }
+            catch { return 0.0; }
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) => System.Windows.Data.Binding.DoNothing;
     }
 }

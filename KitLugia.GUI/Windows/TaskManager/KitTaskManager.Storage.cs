@@ -51,6 +51,10 @@ namespace KitLugia.GUI.Windows.TaskManager
         private StorageDiagnostics.StorageSnapshot? _stSnap;
         private StorageDiagnostics.ImpactTest? _stLastImpact;
         private string _stSelInstance = "";
+        private string _stSessInst = ""; // disco dos totais acumulados (trocar de foco zera a sessão)
+        private double _stSessRead;      // bytes acumulados nesta sessão (totais da faixa)
+        private double _stSessWrite;
+        private DateTime _stSessLast;
         // Enquanto o usuário não clicar num chip de disco, a faixa SEGUE o disco mais
         // ocupado — "meu disco está em 100%" é sobre o disco que está sofrendo, e travar
         // no primeiro render (que pega um instante qualquer) mostraria o disco errado.
@@ -477,13 +481,28 @@ namespace KitLugia.GUI.Windows.TaskManager
 
             StActivity.Text = $"{focus.ActivityPct:F0}%";
             StActivity.Foreground = StorageActivityColor(focus);
-            FluidSetText(StActivity, () => focus.ActivityPct, "F0", "%");   // número grande com easing
             StActivityHint.Text = focus.ActivityPct >= 90
                 ? "disco saturado"
                 : focus.ActivityPct >= 50 ? "ocupado" : "tempo ocupado";
 
             StRead.Text = RunKitTaskManagerFormat(focus.ReadBps);
             StWrite.Text = RunKitTaskManagerFormat(focus.WriteBps);
+            // Totais acumulados do disco em foco (paridade TMOG: Total read/written) —
+            // "nesta sessão": desde que o foco parou neste disco; trocar de disco zera.
+            if (!_stSessInst.Equals(focus.Instance, StringComparison.OrdinalIgnoreCase))
+            {
+                _stSessInst = focus.Instance;
+                _stSessRead = 0; _stSessWrite = 0; _stSessLast = default;
+            }
+            var nowSess = DateTime.UtcNow;
+            if (_stSessLast != default)
+            {
+                double dtSess = (nowSess - _stSessLast).TotalSeconds;
+                if (dtSess > 0 && dtSess < 10) { _stSessRead += focus.ReadBps * dtSess; _stSessWrite += focus.WriteBps * dtSess; }
+            }
+            _stSessLast = nowSess;
+            StReadHint.Text = $"do disco · {FormatSessionBytes(_stSessRead)} na sessão";
+            StWriteHint.Text = $"para o disco · {FormatSessionBytes(_stSessWrite)} na sessão";
             StQueue.Text = focus.Queue.ToString("F2");
             StQueue.Foreground = focus.Queue >= 4 ? StBad : focus.Queue >= 1.5 ? StWarn : StOk;
             StQueueHint.Text = focus.Queue >= 1.5 ? "operações esperando" : "sem acúmulo";
@@ -492,20 +511,25 @@ namespace KitLugia.GUI.Windows.TaskManager
             StTransfers.Text = $"{focus.TransfersPerSec:N0} operações/s";
 
             // Histórico curto (60 s) do disco em foco — é o "antes/depois" visual.
-            // Motor fluido: as 3 linhas rolam a 60fps entre amostras de 1s.
+            // Redesenho por amostra no tick (~1s), como era antes.
             EnqueueFloat(_stActHist, (float)focus.ActivityPct);
             EnqueueFloat(_stQueueHist, (float)focus.Queue);
             EnqueueFloat(_stLatHist, (float)focus.LatencyMs);
-            FluidRegisterChart(StChartActivity, () => 100f, true,
-                (() => _stActHist, Color.FromRgb(0x4F, 0xC3, 0xF7)));
-            FluidRegisterChart(StChartQueue,
-                () => Math.Max(6f, _stQueueHist.Count > 0 ? _stQueueHist.Max() : 6f), true,
-                (() => _stQueueHist, Color.FromRgb(0xFF, 0xB7, 0x4D)));
-            FluidRegisterChart(StChartLatency,
-                () => Math.Max(40f, _stLatHist.Count > 0 ? _stLatHist.Max() : 40f), true,
-                (() => _stLatHist, Color.FromRgb(0xE5, 0x73, 0x73)));
+            DrawLineChart(StChartActivity, _stActHist, Color.FromRgb(0x4F, 0xC3, 0xF7), 100f);
+            DrawLineChart(StChartQueue, _stQueueHist, Color.FromRgb(0xFF, 0xB7, 0x4D),
+                Math.Max(6f, _stQueueHist.Count > 0 ? _stQueueHist.Max() : 6f));
+            DrawLineChart(StChartLatency, _stLatHist, Color.FromRgb(0xE5, 0x73, 0x73),
+                Math.Max(40f, _stLatHist.Count > 0 ? _stLatHist.Max() : 40f));
 
             BuildStorageDiagnosis(snap, focus);
+        }
+
+        private static string FormatSessionBytes(double bytes)
+        {
+            if (bytes >= 1073741824) return $"{bytes / 1073741824:F1} GB";
+            if (bytes >= 1048576) return $"{bytes / 1048576:F0} MB";
+            if (bytes >= 1024) return $"{bytes / 1024:F0} KB";
+            return $"{bytes:F0} B";
         }
 
         private static void EnqueueFloat(Queue<float> q, float v)

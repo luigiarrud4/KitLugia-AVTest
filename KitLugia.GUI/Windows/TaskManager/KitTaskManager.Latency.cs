@@ -495,8 +495,8 @@ namespace KitLugia.GUI.Windows.TaskManager
         private void SetLatBar(System.Windows.Controls.Border fill, System.Windows.Controls.TextBlock label, double value, double scaleMax, string unit)
         {
             double frac = scaleMax <= 0 ? 0 : Math.Max(0, Math.Min(1.0, value / scaleMax));
-            // Largura EASADA pelo motor fluido (pílula 3..258px); cor/rotulo continuam no tick 1s.
-            FluidSetBar(fill, frac, vertical: false, minPx: 3, maxPx: 258);
+            // Largura escrita direto no tick (~1s), como era antes (pílula 3..258px).
+            fill.Width = 3 + frac * 255;
             fill.Background = frac >= 0.7 ? LatBad : frac >= 0.4 ? LatWarn : LatOk;
             label.Text = value <= 0 ? "—" : $"{value:F2} {unit}";
         }
