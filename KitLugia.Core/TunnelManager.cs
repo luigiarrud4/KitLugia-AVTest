@@ -391,7 +391,7 @@ public sealed class TunnelManager : IDisposable
     {
         // Portas comuns para tunnels
         var commonPorts = new[] { 8080, 8081, 8082, 8083, 8084, 8085, 9000, 9001, 9002 };
-        var random = new Random();
+        var random = Random.Shared; // thread-safe e sem a seed do relógio
         
         for (int i = 0; i < 10; i++)
         {

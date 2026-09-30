@@ -17,6 +17,20 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             this.Unloaded += WinTunePage_Unloaded;
             this.Loaded += WinTunePage_Loaded;
+
+            // Os botoezinhos "i" (InfoButtonStyle) mostram o texto no tooltip ao passar o mouse.
+            // Aqui o clique neles abre o mesmo texto numa janela legivel (o conteudo da aba
+            // so e materializado quando a aba e aberta, entao o gancho e por evento roteado).
+            AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent,
+                       new RoutedEventHandler(WinTunePage_InfoButtonClick), true);
+        }
+
+        /// <summary>Redireciona o clique nos botoezinhos "i" para o dialogo de informacao.</summary>
+        private void WinTunePage_InfoButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (e.OriginalSource is not System.Windows.Controls.Button btn) return;
+            if (TryFindResource("InfoButtonStyle") is not Style infoStyle || !ReferenceEquals(btn.Style, infoStyle)) return;
+            InfoButton_Click(btn, e);
         }
 
         private async void WinTunePage_Loaded(object sender, RoutedEventArgs e)

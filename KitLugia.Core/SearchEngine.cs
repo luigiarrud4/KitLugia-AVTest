@@ -197,7 +197,11 @@ namespace KitLugia.Core
             AddNav("Armazenamento", "Limpeza de disco e arquivos temporários.", "💿", "Storage");
             AddNav("Gerenciar Discos", "Particionamento e formatação.", "💽", "Partitions");
             AddNav("Rede / DNS", "Configurações de latência e DNS.", "🌐", "Network");
-            AddNav("Jogos", "Otimizações gaming e GameBoost.", "🎮", "Games");
+            // Era "Games" — tag que nao existe em PageType nem no NavTagMap: a busca
+            // respondia "EM BREVE" (pagina em desenvolvimento) para uma pagina real.
+            // O GameBoost ja tem entrada propria ("GameBoost Pro"), e a WindowsPage
+            // estava sem entrada alguma na busca.
+            AddNav("Windows", "Ajustes, reparos e utilitários do Windows.", "🪟", "Windows");
             AddNav("Drivers", "Atualização e backup de drivers.", "💾", "Drivers");
             AddNav("Serviços", "Gerenciador de serviços e startup.", "🛡️", "Services");
             AddNav("Reparos AIO", "Ferramentas de reparo do sistema.", "🔧", "Repairs");

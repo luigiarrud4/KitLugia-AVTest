@@ -4867,7 +4867,9 @@ namespace KitLugia.Core
             try
             {
                 if (!Directory.Exists(dirPath)) return true;
-                if (Directory.GetFiles(dirPath).Length > 0) return false;
+                // EnumerateFiles().Any() para na primeira ocorrencia (GetFiles().Length
+                // materializa o array inteiro da pasta so para saber se ha 1 arquivo)
+                if (Directory.EnumerateFiles(dirPath).Any()) return false;
                 foreach (var sub in Directory.GetDirectories(dirPath))
                 {
                     if (!IsEmptyDirectory(sub)) return false;

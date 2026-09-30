@@ -175,7 +175,7 @@
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="5,0,0,0">
                                             <TextBlock Text="Usuário rápido:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
-                                            <TextBox x:Name="TxtQuickUser" Text="Usuario" Style="{StaticResource DarkTextBoxStyle}" Height="32" VerticalContentAlignment="Center"/>
+                                            <TextBox x:Name="TxtQuickUser" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="32" VerticalContentAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
                                     <TextBlock Text="Funções rápidas:" Foreground="{StaticResource TextMuted}" FontSize="9" Margin="0,0,0,4"/>
@@ -334,7 +334,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Margin="0,0,5,0">
                                             <TextBlock Text="Nome:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
-                                            <TextBox x:Name="TxtUserName" Text="Usuario" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
+                                            <TextBox x:Name="TxtUserName" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="5,0,0,0">
                                             <TextBlock Text="Senha:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
@@ -595,7 +595,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,5,0">
                                     <TextBlock Text="Nome do usuário:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
-                                    <TextBox x:Name="TxtAuUserName" Text="Usuario" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
+                                    <TextBox x:Name="TxtAuUserName" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
                                     <TextBlock Text="Senha (opcional):" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>

@@ -333,9 +333,9 @@
                     ToolTip="Teclado, mouse, acessibilidade, energia e painéis nativos do Windows"
                     Click="BtnGoToGames_Click"/>
 
-                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4CB;" 
-                    Content="Ferramentas de Sistema"
-                    ToolTip="SFC, DISM, limpeza de caches, rede, BCDedit, servi&#xE7;os e manuten&#xE7;&#xE3;o"
+                <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F9EA;" 
+                    Content="Tweaks Avan&#xE7;ados (EXM)"
+                    ToolTip="Rede/TCP-IP, BCDedit, servi&#xE7;os adicionais, boot, limpeza, mem&#xF3;ria, privacidade e perif&#xE9;ricos"
                     Click="BtnGoToExmTweaks_Click"/>
 
                 <!-- SISTEMA E REPAROS -->

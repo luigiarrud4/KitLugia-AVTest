@@ -49,6 +49,7 @@ namespace KitLugia.GUI.Pages
             ToggleTurboBoot.Click -= OnToggleTurboBoot;
             ToggleTurboShutdown.Click -= OnToggleTurboShutdown;
             ToggleStandbyClean.Click -= OnToggleStandbyClean;
+            ToggleAudioAntiStutter.Click -= OnToggleAudioAntiStutter;
             ToggleIntroAnimation.Click -= OnToggleIntroAnimation;
             IntroDurationSlider.ValueChanged -= OnIntroDurationSlider_ValueChanged;
             this.Unloaded -= SettingsPage_Unloaded;
@@ -78,6 +79,7 @@ namespace KitLugia.GUI.Pages
             ToggleTurboBoot.Click += OnToggleTurboBoot;
             ToggleTurboShutdown.Click += OnToggleTurboShutdown;
             ToggleStandbyClean.Click += OnToggleStandbyClean;
+            ToggleAudioAntiStutter.Click += OnToggleAudioAntiStutter;
 
             // Intro Animation
             ToggleIntroAnimation.Click += OnToggleIntroAnimation;
@@ -92,6 +94,7 @@ namespace KitLugia.GUI.Pages
         private void OnToggleTurboBoot(object s, RoutedEventArgs e) => ToggleTurboBoot_Click();
         private void OnToggleTurboShutdown(object s, RoutedEventArgs e) => ToggleTurboShutdown_Click();
         private void OnToggleStandbyClean(object s, RoutedEventArgs e) => ToggleStandbyClean_Click();
+        private void OnToggleAudioAntiStutter(object s, RoutedEventArgs e) => ToggleAudioAntiStutter_Click();
         private void OnToggleIntroAnimation(object s, RoutedEventArgs e) => SaveSettings();
         private void OnIntroDurationSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e)
         {
@@ -121,6 +124,12 @@ namespace KitLugia.GUI.Pages
                         ToggleStandbyClean.IsChecked = tray.StandbyCleanEnabled;
                     }
                 }
+
+                // ANTI-STUTTER DE ÁUDIO: fonte única é o próprio monitor (o TrayIconService
+                // aplica o valor salvo no startup), então ler daqui mostra o estado REAL —
+                // inclusive quando o checkbox do Gerenciador de Tarefas foi quem mexeu.
+                ToggleAudioAntiStutter.IsChecked = KitLugia.Core.TaskManager.AudioGlitchMonitor.Instance.AutoRecover;
+                UpdateAudioStutterStatus();
 
                 // Carregar configurações do arquivo em background
                 AppSettings? settings = null;
@@ -214,7 +223,11 @@ namespace KitLugia.GUI.Pages
             // Aplicar modo desenvolvedor
             DeveloperModeManager.IsDeveloperMode = settings.DeveloperMode;
             
-            // TODO: Aplicar configuração de log detalhado quando implementado no Logger
+            // Log detalhado: o Logger e usado pelo Guardian/verificacoes para logar cada passo
+            Logger.VerboseCheckLogs = settings.VerboseLogging;
+
+            // Notificacoes do kit (toasts) — lido pelo MainWindow.ShowNotification
+            AppSettingsHelper.ShowNotifications = settings.ShowNotifications;
             
             // Notificar a MainWindow para atualizar visibilidade do menu de debug
             if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
@@ -328,6 +341,62 @@ namespace KitLugia.GUI.Pages
             }
         }
         
+        /// <summary>
+        /// Anti-stutter de áudio (recuperação automática do motor de áudio).
+        /// Liga/desliga pelo serviço de bandeja para que a preferência valha ENTRE sessões
+        /// e mantenha tudo em sincronia com o checkbox da aba Latência do Gerenciador de
+        /// Tarefas — mesma chave de registro (TraySettings\AudioAntiStutter).
+        /// </summary>
+        private void ToggleAudioAntiStutter_Click()
+        {
+            try
+            {
+                bool ligado = ToggleAudioAntiStutter.IsChecked == true;
+                var tray = (System.Windows.Application.Current?.MainWindow as MainWindow)?.TrayService;
+
+                if (tray != null)
+                {
+                    tray.SetAudioAntiStutter(ligado);
+                }
+                else
+                {
+                    // Sem o serviço de bandeja (navegação isolada/teste): aplica só no monitor.
+                    var mon = KitLugia.Core.TaskManager.AudioGlitchMonitor.Instance;
+                    mon.AutoRecover = ligado;
+                    if (ligado) { if (!mon.IsRunning) mon.Start(); }
+                    else if (mon.IsRunning) mon.Stop();
+                }
+
+                UpdateAudioStutterStatus();
+                Logger.Log($"⚙️ Anti-stutter de áudio: {(ligado ? "ativado" : "desativado")}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ToggleAudioAntiStutter_Click", $"Erro: {ex.Message}");
+            }
+        }
+
+        /// <summary>Linha de estado honesta: diz se a escuta está mesmo rodando agora.</summary>
+        private void UpdateAudioStutterStatus()
+        {
+            try
+            {
+                bool ligado = ToggleAudioAntiStutter.IsChecked == true;
+                var mon = KitLugia.Core.TaskManager.AudioGlitchMonitor.Instance;
+
+                string texto =
+                    !ligado ? "Desligado: o Kit não toca no motor de áudio."
+                    : mon.IsRunning ? "Ativo: escutando o áudio em segundo plano — se dois estalos confirmados ocorrerem em 90s, o motor é ressincronizado sozinho."
+                    : "Ativo (salvo): a escuta não subiu agora — o Kit tenta de novo na próxima abertura.";
+
+                TxtAudioStutterStatus.Text = texto;
+                TxtAudioStutterStatus.Foreground = ligado
+                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x7C, 0xFC, 0x00))
+                    : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88));
+            }
+            catch { }
+        }
+
         private void ToggleStandbyClean_Click()
         {
             try
@@ -402,6 +471,18 @@ namespace KitLugia.GUI.Pages
         private static readonly string ConfigPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KitLugia", "settings.json");
+
+        private static bool? _showNotifications;
+
+        /// <summary>
+        /// Preferencia "Mostrar notificacoes" com cache: le do disco na 1a consulta
+        /// (sem I/O no construtor do MainWindow) e e atualizada pelo SettingsPage.
+        /// </summary>
+        public static bool ShowNotifications
+        {
+            get => _showNotifications ??= Load().ShowNotifications;
+            set => _showNotifications = value;
+        }
 
         public static AppSettings Load()
         {

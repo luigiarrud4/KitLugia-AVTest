@@ -214,8 +214,7 @@ namespace KitLugia.Core
                 if (needDownload)
                 {
                     ReportProgressReplace(0, $"Baixando WinPE base de {WINPE_BASE_URL}...");
-                    using var httpClient = new HttpClient();
-                    httpClient.Timeout = TimeSpan.FromMinutes(10);
+                    using var httpClient = KitHttp.CreateClient(TimeSpan.FromMinutes(10));
                     using var resp = await httpClient.GetAsync(WINPE_BASE_URL, HttpCompletionOption.ResponseHeadersRead);
                     if (!resp.IsSuccessStatusCode)
                         return (false, $"GitHub Release não disponível (HTTP {resp.StatusCode}). Verifique a conexão ou use a opção WinRE local.", null);

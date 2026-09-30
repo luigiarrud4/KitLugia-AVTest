@@ -17,7 +17,7 @@ namespace KitLugia.Core
 
         [DllImport("advapi32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool LookupPrivilegeValue([Optional] string? lpSystemName, string lpName, out long lpLuid);
+        private static extern bool LookupPrivilegeValue([Optional] string? lpSystemName, string lpName, out LUID lpLuid);
 
         [DllImport("advapi32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -36,10 +36,19 @@ namespace KitLugia.Core
         private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
         private const int SE_PRIVILEGE_ENABLED = 0x2;
 
+        // LUID = { DWORD LowPart; LONG HighPart; } (alinhamento 4). A struct sem PrivilegeCount
+        // fazia o Windows ler o contador dos 4 primeiros bytes do LUID -> AdjustTokenPrivileges
+        // devolvia TRUE + ERROR_NOT_ALL_ASSIGNED (1300) e SeTakeOwnershipPrivilege NUNCA
+        // era habilitado (a tomada de posse no registro vivia de sorte/fallback).
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LUID { public uint LowPart; public int HighPart; }
+
+        [StructLayout(LayoutKind.Sequential)]
         private struct TOKEN_PRIVILEGES
         {
-            public long Luid;
-            public int Attributes;
+            public uint PrivilegeCount;
+            public LUID Luid;
+            public uint Attributes;
         }
 
         /// <summary>
@@ -257,18 +266,25 @@ namespace KitLugia.Core
                     return false;
                 }
 
-                if (!LookupPrivilegeValue(null, "SeTakeOwnershipPrivilege", out long luid))
+                if (!LookupPrivilegeValue(null, "SeTakeOwnershipPrivilege", out LUID luid))
                 {
                     return false;
                 }
 
                 var tp = new TOKEN_PRIVILEGES
                 {
+                    PrivilegeCount = 1,
                     Luid = luid,
                     Attributes = SE_PRIVILEGE_ENABLED
                 };
 
-                return AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                bool ok = AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                int err = Marshal.GetLastWin32Error();
+                if (!ok || err != 0)
+                    Logger.Log($"[OWNERSHIP] SeTakeOwnershipPrivilege NAO habilitado (ok={ok}, erro={err}) — sem admin.");
+                // Mantém o retorno anterior (TRUE mesmo com 1300): quem chama continua tentando
+                // a escrita, como sempre fez; agora o privilégio de fato entra quando há admin.
+                return ok;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
             finally

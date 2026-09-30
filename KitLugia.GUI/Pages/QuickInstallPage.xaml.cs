@@ -22,6 +22,10 @@ namespace KitLugia.GUI.Pages
             {
                 InitializeComponent();
                 Loaded += QuickInstallPage_Loaded;
+                // Rede de seguranca: garante o Cleanup (unsubscribe + remocao da pasta
+                // temporaria de extracao) mesmo quando a navegacao nao passa pelo
+                // MainWindow.CleanupAndNavigate.
+                Unloaded += QuickInstallPage_Unloaded;
             }
             catch (Exception ex)
             {
@@ -34,9 +38,16 @@ namespace KitLugia.GUI.Pages
             await RefreshDrives();
         }
 
+        private void QuickInstallPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
+
         public void Cleanup()
         {
             this.Loaded -= QuickInstallPage_Loaded;
+            this.Unloaded -= QuickInstallPage_Unloaded;
+            this.DataContext = null;
             if (_extractPath != null && Directory.Exists(_extractPath))
                 try { Directory.Delete(_extractPath, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }

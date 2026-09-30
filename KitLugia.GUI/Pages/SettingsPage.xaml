@@ -162,6 +162,34 @@
                 </StackPanel>
             </Border>
             
+            <!-- Se&#xE7;&#xE3;o: &#xC1;udio (anti-stutter — recupera&#xE7;&#xE3;o autom&#xE1;tica do motor de &#xE1;udio) -->
+            <Border Style="{StaticResource SettingsCard}">
+                <StackPanel>
+                    <TextBlock Text="&#xC1;UDIO"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource AccentColor}"
+                               Margin="0,0,0,15"/>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Anti-Stutter de &#xC1;udio" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Escuta os estalos do sistema em segundo plano e ressincroniza o motor de &#xE1;udio sozinho quando eles se repetem (2 estalos confirmados pelo Windows em 90s). Nada &#xE9; gravado &#x2014; s&#xF3; leitura do buffer de sa&#xED;da."
+                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleAudioAntiStutter" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <TextBlock x:Name="TxtAudioStutterStatus" Text="" FontSize="11" Foreground="#888888"
+                               TextWrapping="Wrap" Margin="0,9,0,0"/>
+                </StackPanel>
+            </Border>
+
             <!-- Se&#xE7;&#xE3;o: Sistema -->
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
@@ -178,7 +206,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Notifica&#xE7;&#xF5;es" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Mostrar notifica&#xE7;&#xF5;es do sistema" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Mostrar avisos e toasts do kit (erros e progresso sempre aparecem)" FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleNotifications" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>

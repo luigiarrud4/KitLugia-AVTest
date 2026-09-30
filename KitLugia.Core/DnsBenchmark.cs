@@ -215,7 +215,8 @@ namespace KitLugia.Core
         private static async Task<double> DnsQueryMsAsync(string ip, int timeoutMs = 1500)
             => await Task.Run(() => DnsQueryMsSync(ip, timeoutMs));
 
-        private static readonly Random _queryIdRng = new Random();
+        // Random.Shared: thread-safe (instancia propria de Random NAO e, e BuildDnsQuery roda em paralelo)
+        private static readonly System.Random _queryIdRng = System.Random.Shared;
 
         private static byte[] BuildDnsQuery(string domain)
         {

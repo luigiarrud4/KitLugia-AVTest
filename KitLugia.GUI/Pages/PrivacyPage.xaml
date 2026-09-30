@@ -115,7 +115,6 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <Button Content="Salvar Configura&#xE7;&#xE3;o" Click="BtnSaveUserConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="150"/>
                     <Button Content="Restaurar Configura&#xE7;&#xE3;o" Click="BtnRestoreUserConfig_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0" Width="160"/>
-                    <Button x:Name="BtnExpandAll" Content="Expandir Tudo" Click="BtnExpandAll_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120"/>
                 </StackPanel>
 
                 <!-- Pesquisa e Filtros -->

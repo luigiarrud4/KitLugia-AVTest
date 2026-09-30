@@ -118,8 +118,7 @@ namespace KitLugia.Core
             {
                 // ?? Verificar conectividade primeiro
                 Logger.Log("?? Verificando conectividade com GitHub...");
-                using var testClient = new HttpClient();
-                testClient.Timeout = TimeSpan.FromSeconds(10);
+                using var testClient = KitHttp.CreateClient(TimeSpan.FromSeconds(10));
                 testClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
                 try

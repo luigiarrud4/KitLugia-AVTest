@@ -128,8 +128,7 @@ public sealed class PlayitTunnelAdapter : IDisposable
             }
 
             // Baixar usando HttpClient com verificação
-            using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromMinutes(5); // 5 minutos timeout
+            using var client = KitHttp.CreateClient(TimeSpan.FromMinutes(5)); // 5 minutos timeout
             
             OnLogMessage?.Invoke($"📥 Baixando de: {downloadUrl}");
             var response = await client.GetAsync(downloadUrl);

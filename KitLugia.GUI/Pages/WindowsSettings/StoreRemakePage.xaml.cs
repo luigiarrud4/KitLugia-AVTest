@@ -77,10 +77,18 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             LvPackages.SelectionChanged += (_, __) => UpdateMainToolbarState();
         }
 
-        private void StoreRemakePage_Unloaded(object sender, RoutedEventArgs e)
+        private void StoreRemakePage_Unloaded(object sender, RoutedEventArgs e) => Cleanup();
+
+        /// <summary>
+        /// Encerra os timers da pagina. Publico para seguir o padrao do projeto
+        /// (o MainWindow invoca Cleanup() por reflection quando a pagina vive no MainFrame;
+        /// aqui ela vive no Frame da KitStoreWindow, mas mantem o mesmo contrato).
+        /// </summary>
+        public void Cleanup()
         {
             try { _searchAnimTimer?.Stop(); _searchAnimTimer = null; } catch { }
             try { _progressHideTimer?.Stop(); _progressHideTimer = null; } catch { }
+            this.DataContext = null;
         }
 
         private async Task OnLoadedAsync()

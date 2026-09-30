@@ -421,7 +421,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <controls:InfoButton Grid.Column="0" ToolTipText="ISLC (Intelligent Standby List Cleaner) - WagnardSoft. Limpa a Standby List (cache do Windows) quando ela fica grande demais. Threshold automatico: TotalRAM/8 (8GB=1024MB, 16GB=2048MB, 32GB=4096MB). Em jogos, a Standby List fica cheia de dados de niveis antigos. Quando o jogo precisa carregar mapa novo, o Windows precisa decidir QUEM remover - isso causa micro-stuttering e freezes. O ISLC limpa isso ANTES de acontecer. Nao fecha nenhum processo. Jogos: GTA V, RDR2, Cyberpunk 2077, Tarkov, Star Citizen, CoD"/>
+                    <controls:InfoButton Grid.Column="0" ToolTipText="ISLC (Intelligent Standby List Cleaner) - WagnardSoft. Limpa a Standby List (cache do Windows) quando ela fica grande demais. Threshold automático: TotalRAM/8 (8GB=1024MB, 16GB=2048MB, 32GB=4096MB). Em jogos, a Standby List fica cheia de dados de niveis antigos. Quando o jogo precisa carregar mapa novo, o Windows precisa decidir QUEM remover - isso causa micro-stuttering e freezes. O ISLC limpa isso ANTES de acontecer. Não fecha nenhum processo. Jogos: GTA V, RDR2, Cyberpunk 2077, Tarkov, Star Citizen, CoD"/>
 
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="Limpeza Inteligente de Standby (ISLC)" FontSize="15" Foreground="White"/>
@@ -483,7 +483,7 @@
                                      Background="#252525" Foreground="White"
                                      BorderBrush="#444" BorderThickness="1"
                                      Padding="5,4" FontSize="11" VerticalAlignment="Center"
-                                     ToolTip="Teto de RAM do proprio Kit em MB (80-1024). Passou disso, limpeza automatica a cada 30s."
+                                     ToolTip="Teto de RAM do próprio Kit em MB (80-1024). Passou disso, limpeza automática a cada 30s."
                                      LostFocus="TxtKitMemoryLimit_LostFocus"/>
                             <TextBlock Text="MB" FontSize="11" Foreground="#555"
                                        VerticalAlignment="Center" Margin="4,0,0,0"/>

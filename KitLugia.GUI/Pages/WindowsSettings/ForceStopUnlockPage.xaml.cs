@@ -33,11 +33,15 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 UpdateTopToggle();
                 await RefreshStatus();
             };
-            this.Unloaded += (s, e) => Cleanup();
+            this.Unloaded += ForceStopUnlockPage_Unloaded;
         }
+
+        // Handler nomeado (e nao lambda): permite desinscrever no Cleanup.
+        private void ForceStopUnlockPage_Unloaded(object sender, RoutedEventArgs e) => Cleanup();
 
         public void Cleanup()
         {
+            this.Unloaded -= ForceStopUnlockPage_Unloaded;
             this.DataContext = null;
         }
 
@@ -47,39 +51,30 @@ namespace KitLugia.GUI.Pages.WindowsSettings
         /// operação (--takeown/--unlock) e não executa aqui (a instância elevada resolve).
         /// Retorna true se deve prosseguir nesta instância.
         /// </summary>
-        private bool EnsureElevatedForFileOp(string path, bool isTakeOwn)
+        /// <summary>
+        /// Executa a operação pelo pipeline garantido e espelha cada passo na UI.
+        ///
+        /// NÃO PARA mais para perguntar: antigamente, sem elevação, a página perguntava
+        /// "relançar elevado?" e — mesmo com SIM — encerrava o clique (a outra instância
+        /// fazia a operação em outro lugar, sem resultado na tela); com NÃO, a operação
+        /// rodava sem privilégio e falhava em item protegido.
+        ///
+        /// Agora: já elevado → roda aqui com progresso ao vivo; sem elevação → o runner sobe
+        /// o worker elevado (UM UAC) e o progresso continua chegando nesta página; se o UAC
+        /// for cancelado, segue no melhor esforço local e o resultado diz o que exigia admin.
+        /// </summary>
+        private async Task<KitLugia.Core.GuaranteeResult> RunGuaranteedAsync(
+            string path, KitLugia.Core.GuaranteedAction action, bool recursive, bool grantFullControl,
+            Action<string> onProgress)
         {
-            if (SystemUtils.IsRunningAsAdministrator()) return true;
+            var (result, ranElevated) = await KitLugia.GUI.Services.ElevatedFileOpRunner.RunGuaranteedAsync(
+                path, action, recursive, grantFullControl,
+                step => { try { Dispatcher.Invoke(() => onProgress?.Invoke(step.Message)); } catch { } });
 
-            var ask = MessageBox.Show(
-                "O KitLugia está rodando SEM privilégios de administrador.\n\n" +
-                "Take Ownership / Force Stop podem falhar em arquivos protegidos " +
-                "(ex: Windows.old, TrustedInstaller, processos de outros usuários).\n\n" +
-                "Relançar o KitLugia elevado (UAC) para executar agora?",
-                "KitLugia — Privilégios de Administrador",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (ask != MessageBoxResult.Yes) return false;
-
-            try
-            {
-                string args = (isTakeOwn ? "--takeown " : "--unlock ") + $"\"{path}\"";
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                    Environment.ProcessPath ?? typeof(Program).Assembly.Location)
-                {
-                    UseShellExecute = true,
-                    Verb = "runas",
-                    Arguments = args
-                });
-                Logger.Log($"[FILE OPS] Relançado elevado: {args}");
-                return false; // instância elevada fará a operação
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[FILE OPS] Falha ao relançar elevado: {ex.Message}");
-                MessageBox.Show($"Não foi possível relançar elevado: {ex.Message}",
-                    "KitLugia", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return true; // tenta mesmo assim (mostrará os erros reais)
-            }
+            Logger.Log($"[FILE OPS] {action} em {path}: Ok={result.Ok} elevado={ranElevated} " +
+                       $"agendadoReboot={result.ScheduledForReboot} precisaAdmin={result.NeedsAdmin} " +
+                       $"matou={result.ProcessesKilled} handles={result.HandlesClosed}");
+            return result;
         }
 
         private void UpdateTopToggle()
@@ -313,8 +308,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 return;
             }
 
-            if (!EnsureElevatedForFileOp(path, isTakeOwn: true)) return;
-
             bool recursive = ChkRecursive?.IsChecked == true;
             bool grantFullControl = ChkTakeOwnFullControl?.IsChecked == true;
             bool isDir = Directory.Exists(path);
@@ -340,44 +333,36 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
             try
             {
-                var result = await Task.Run(() => FileTakeOwnership.TakeOwn(path, recursive, (done, total, cur) =>
-                {
-                    // throttling: Dispatcher a cada 10 ou nos 3 primeiros
-                    Dispatcher.Invoke(() =>
+                // Pipeline garantido: privilégios → ownership (com fallback takeown/icacls) →
+                // verificação de acesso. Se o Kit não estiver elevado, roda num worker elevado.
+                var result = await RunGuaranteedAsync(path, KitLugia.Core.GuaranteedAction.TakeOwnership,
+                    recursive, grantFullControl, msg =>
                     {
-                        TakeOwnProgress.IsIndeterminate = false;
-                        TakeOwnProgress.Maximum = Math.Max(1, total);
-                        TakeOwnProgress.Value = done;
-                        TxtTakeOwnProgress.Text = $"{done} / {total}  ({done * 100 / Math.Max(1, total)}%)";
-                        if (!string.IsNullOrEmpty(cur))
-                        {
-                            TxtTakeOwnCurrentFile.Visibility = Visibility.Visible;
-                            TxtTakeOwnCurrentFile.Text = "→ " + Path.GetFileName(cur);
-                        }
+                        TakeOwnProgress.IsIndeterminate = true;
+                        TxtTakeOwnProgress.Text = msg;
+                        TxtTakeOwnCurrentFile.Visibility = Visibility.Visible;
+                        TxtTakeOwnCurrentFile.Text = "→ " + msg;
                     });
-                }, grantFullControl));
                 TakeOwnProgress.Visibility = Visibility.Collapsed;
 
                 if (result.Ok)
                 {
-                    TxtTakeOwnResult.Text = $"✅ {result.Success}/{result.Total} item(ns) agora são seus!";
+                    TxtTakeOwnResult.Text = $"✅ {result.ItemsOwned} item(ns) agora são seus!";
                     TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(100, 220, 100));
                     TxtTakeOwnDetail.Text = isDir && recursive ? "Recursivo — incluiu todas as subpastas e arquivos." : "Pronto para editar/deletar.";
-                    if (result.FallbackUsed)
-                        TxtTakeOwnDetail.Text += "\n" + result.FallbackMessage;
                     TxtTakeOwnProgress.Visibility = Visibility.Collapsed;
                     TxtTakeOwnCurrentFile.Visibility = Visibility.Collapsed;
 
                     if (Application.Current.MainWindow is MainWindow mw)
-                        mw.ShowSuccess("TAKE OWNERSHIP", $"✅ {Path.GetFileName(path)}: {result.Success} item(ns) assumidos.");
+                        mw.ShowSuccess("TAKE OWNERSHIP", $"✅ {Path.GetFileName(path)}: {result.ItemsOwned} item(ns) assumidos.");
                 }
                 else
                 {
-                    TxtTakeOwnResult.Text = $"⚠️ {result.Success}/{result.Total} ok, {result.Failed} falha(s)";
+                    TxtTakeOwnResult.Text = $"⚠️ {result.ItemsOwned} item(ns) ok, {result.Failed} falha(s)";
                     TxtTakeOwnResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 200, 100));
-                    TxtTakeOwnDetail.Text = string.Join("\n", result.Errors.Take(5));
-                    if (result.FallbackUsed)
-                        TxtTakeOwnDetail.Text += "\n" + result.FallbackMessage;
+                    TxtTakeOwnDetail.Text = (result.NeedsAdmin
+                        ? "⚠️ Precisa de administrador para itens protegidos (TrustedInstaller/System).\n"
+                        : "") + string.Join("\n", result.Errors.Take(5));
                     TxtTakeOwnProgress.Visibility = Visibility.Collapsed;
                     TxtTakeOwnCurrentFile.Visibility = Visibility.Collapsed;
 
@@ -539,8 +524,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             Logger.Log($"[FORCE STOP UI] === Tentar Deletar clicado para: {path}");
             Logger.Log($"[FORCE STOP UI] Admin: {SystemUtils.IsRunningAsAdministrator()}");
 
-            if (!EnsureElevatedForFileOp(path, isTakeOwn: false)) return;
-
             string folderContents = ListFolderContents(path);
             Logger.Log($"[FORCE STOP UI] Conteudo do caminho:\n{folderContents}");
 
@@ -573,7 +556,28 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
             try
             {
-                Logger.Log($"[FORCE STOP UI] Executando ForceDeleteViaCmd...");
+                // Pipeline garantido primeiro: assume propriedade quando a ACL nega, libera
+                // bloqueadores e tenta os 6 métodos de deleção. Se nada conseguir agora, o
+                // próprio pipeline agenda a remoção para o próximo boot — o usuário nunca
+                // fica sem saída. Sem elevação, tudo roda num worker elevado (1 UAC).
+                Logger.Log($"[FORCE STOP UI] Executando pipeline garantido de deleção...");
+                var gDel = await RunGuaranteedAsync(path, KitLugia.Core.GuaranteedAction.Delete,
+                    recursive: true, grantFullControl: false, msg => TxtQuickDetail.Text = msg);
+                if (gDel.Ok)
+                {
+                    TxtQuickResult.Text = gDel.ScheduledForReboot
+                        ? "🗑 Ainda em uso — remoção agendada para o próximo boot."
+                        : "✅ Arquivo/pasta deletado com sucesso!";
+                    TxtQuickResult.Foreground = new SolidColorBrush(gDel.ScheduledForReboot
+                        ? Color.FromRgb(255, 200, 100)
+                        : Color.FromRgb(100, 220, 100));
+                    TxtQuickDetail.Text = gDel.Summary;
+                    QuickProcessList.ItemsSource = null;
+                    BtnQuickRelease.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                Logger.Log($"[FORCE STOP UI] Pipeline garantido não removeu — caindo no fluxo de bloqueadores.");
                 var (deleted, errorMsg) = await Task.Run(() => ForceDeleteViaCmd(path));
                 Logger.Log($"[FORCE STOP UI] Resultado do delete: Success={deleted}, Error={errorMsg}");
 
@@ -807,8 +811,6 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                 return;
             }
 
-            if (!EnsureElevatedForFileOp(path, isTakeOwn: false)) return;
-
             Logger.Log($"[FORCE STOP UI] === Liberar Selecionados para: {path}");
             foreach (var s in selected)
                 Logger.Log($"[FORCE STOP UI] Selecionado: {s.DisplayLabel} | {s.DetailLabel}");
@@ -819,16 +821,22 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
             try
             {
-                var result = await Task.Run(() => ForceStopUnlockService.Unlock(path, selected));
+                // Pipeline garantido: privilégios → ownership quando a ACL nega → fecha
+                // handles/mata processos/descarrega driver → confere. Se ainda houver handle
+                // ativo (processo/driver de sistema que não pode ser finalizado), reporta que
+                // continua travado — e NÃO agenda remoção (Liberar não pode apagar nada).
+                // Sem elevação, tudo isso roda num worker elevado (1 UAC).
+                var result = await RunGuaranteedAsync(path, KitLugia.Core.GuaranteedAction.ForceStop,
+                    recursive: true, grantFullControl: false, msg => TxtQuickDetail.Text = msg);
 
-                if (result.Success)
+                if (result.Ok)
                 {
-                    TxtQuickResult.Text = $"✅ {result.Message}";
+                    TxtQuickResult.Text = $"✅ {result.Summary}";
                     TxtQuickResult.Foreground = new SolidColorBrush(Color.FromRgb(100, 220, 100));
                 }
                 else
                 {
-                    TxtQuickResult.Text = $"⚠️ {result.Message}";
+                    TxtQuickResult.Text = $"⚠️ {result.Summary}";
                     TxtQuickResult.Foreground = new SolidColorBrush(Color.FromRgb(255, 200, 100));
                 }
 

@@ -204,7 +204,7 @@
                                 </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="3. LOGS DO WINPE" FontSize="13" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Resultados da ultima execucao do shrink via WinPE." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                                <TextBlock Text="Resultados da última execução do shrink via WinPE." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <Button x:Name="BtnCopyLog" Content="COPIAR LOG" Click="BtnCopyLog_Click" Style="{StaticResource GoldButtonStyle}" Height="32" FontSize="10" FontWeight="Bold" Width="100" Margin="0,0,6,0"/>
@@ -278,8 +278,8 @@
                         <Separator Background="#222" Margin="0,0,0,8"/>
                         <TextBlock Text="Dicas" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" FontSize="11" Margin="0,0,0,6"/>
                         <TextBlock Foreground="{StaticResource TextMuted}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,4">
-                            WinPE + config em C:\Program Files\KitLugia\WinPE\
-                            Logs em C:\KitLugia_WinPE_Log.txt
+                            WinPE (staging C:\KL_WINPE) + config na pasta WinPE do KitLugia
+                            Logs na raiz do volume alvo (KitLugia_WinPE_Log.txt)
 
                         </TextBlock>
                         <Border Background="#22332200" BorderBrush="#88FFAA44" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,0,0,4">
@@ -343,7 +343,7 @@
 
                     <!-- Warning -->
                     <Border Background="#22FF3D00" BorderBrush="#88FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,8,0,0" Visibility="Visible">
-                        <TextBlock Text="ACAO CRITICA: NAO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
+                        <TextBlock Text="AÇÃO CRÍTICA: NÃO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
                     </Border>
 
                     <!-- Cancel button (visivel durante a operacao) -->
@@ -364,7 +364,7 @@
                     Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25">
                 <StackPanel>
                     <TextBlock x:Name="TxtShrinkTitle" Text="EXECUTAR SHRINK AVANCADO NO WINPE" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8"/>
-                    <TextBlock x:Name="TxtShrinkDesc" Text="O WinPE sera acionado para executar o shrink sem limitacoes." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <TextBlock x:Name="TxtShrinkDesc" Text="O WinPE será acionado para executar o shrink sem limitações." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                     <Border Background="#112222" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="10" Margin="0,0,0,12">
                         <StackPanel>
@@ -385,13 +385,13 @@
                     <Border Background="#112222" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="10" Margin="0,0,0,8">
                         <StackPanel>
                             <TextBlock Text="SISTEMA PARA EXECUTAR O SHRINK:" FontSize="10" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="WinPE Padrao" FontWeight="Bold" Foreground="White" FontSize="12" Margin="0,4,0,0"/>
+                            <TextBlock Text="WinPE Padrão" FontWeight="Bold" Foreground="White" FontSize="12" Margin="0,4,0,0"/>
                         </StackPanel>
                     </Border>
                     <!-- Secure Boot warning -->
                     <Border Background="#22332200" BorderBrush="#88FF8800" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,8">
                         <TextBlock FontSize="9" Foreground="#FFAA44" TextWrapping="Wrap">
-                            <Run Text="ATENCAO: " FontWeight="Bold"/>
+                            <Run Text="ATENÇÃO: " FontWeight="Bold"/>
                             <Run Text="Se travar na tela preta ao reiniciar, desligue o Secure Boot no BIOS (Secure Boot &gt; Disabled) e tente novamente."/>
                         </TextBlock>
                     </Border>

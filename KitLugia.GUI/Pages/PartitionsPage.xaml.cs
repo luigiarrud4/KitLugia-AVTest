@@ -50,9 +50,8 @@ namespace KitLugia.GUI.Pages
         public PartitionsPage()
         {
             InitializeComponent();
-            // Carrega discos em background para não travar a UI
-            _ = Task.Run(() => LoadDisks());
-
+            // A enumeracao de discos saiu do construtor: ela compete com o layout da
+            // navegacao (anti-pattern 8). Agora roda uma vez no Loaded.
             _realTimeMonitorTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(10) // Aumentado de 3s para 10s (menos travamentos)
@@ -72,6 +71,9 @@ namespace KitLugia.GUI.Pages
             if (_timersStarted) return; // evita timers duplicados se Loaded disparar de novo
             _timersStarted = true;
             _realTimeMonitorTimer?.Start();
+
+            // Enumera discos no background DEPOIS do primeiro layout da pagina.
+            _ = Task.Run(() => LoadDisks());
         }
 
 
@@ -79,11 +81,6 @@ namespace KitLugia.GUI.Pages
         {
             _realTimeMonitorTimer?.Stop();
             _realTimeMonitorTimer = null;
-            _usageMonitorCts?.Cancel();
-            _usageMonitorCts?.Dispose();
-            _usageMonitorCts = null;
-
-
             _usageMonitorCts?.Cancel();
             _usageMonitorCts?.Dispose();
             _usageMonitorCts = null;

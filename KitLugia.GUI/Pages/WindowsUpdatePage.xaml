@@ -73,7 +73,7 @@
 
             <!-- HEADER -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,25">
-                <TextBlock Text="X" FontSize="32" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                <TextBlock Text="&#x1F504;" FontSize="32" Margin="0,0,15,0" VerticalAlignment="Center"/>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Windows Update (Insider)" FontSize="24" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
                     <TextBlock x:Name="TxtSubtitle" Text="OfflineInsiderEnroll e Controle de Updates" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
@@ -89,7 +89,7 @@
                                    Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
                         <Button x:Name="BtnRefreshStatus" Content="Atualizar" Style="{StaticResource SecondaryButtonStyle}"
                                 HorizontalAlignment="Right" Height="30" Width="100"
-                                ToolTip="Atualiza as informacoes de build, versao, servicos e status Insider exibidas no diagnostico."
+                                ToolTip="Atualiza as informações de build, versão, serviços e status Insider exibidas no diagnostico."
                                 Click="BtnRefreshStatus_Click"/>
                     </Grid>
 
@@ -103,7 +103,7 @@
                                 <TextBlock Text="Build do Windows" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                                 <TextBlock x:Name="TxtBuild" Text="-" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,2,0,10"/>
 
-                                <TextBlock Text="Versao Atual" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="Versão Atual" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                                 <TextBlock x:Name="TxtVersion" Text="-" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="Windows Update (wuauserv)" FontSize="11" Foreground="{StaticResource TextMuted}"/>
@@ -169,7 +169,7 @@
                         <TextBlock Grid.Column="0" Text="Pausar updates por:" FontSize="13" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White"/>
                         <ComboBox Grid.Column="1" x:Name="CmbPauseDays" Style="{StaticResource DarkComboBoxStyle}"
                                   ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}" Width="120" HorizontalAlignment="Left" SelectedIndex="0"
-                                  ToolTip="Selecione por quantos dias pausar. O scroll do mouse nao troca os itens sem clique.">
+                                  ToolTip="Selecione por quantos dias pausar. O scroll do mouse não troca os itens sem clique.">
                             <ComboBoxItem Content="7 dias" Tag="7"/>
                             <ComboBoxItem Content="14 dias" Tag="14"/>
                             <ComboBoxItem Content="30 dias" Tag="30"/>
@@ -177,18 +177,18 @@
                         </ComboBox>
                         <Button Grid.Column="2" Content="Pausar" Style="{StaticResource SecondaryButtonStyle}"
                                 Width="100" Height="36" Margin="10,0,0,0"
-                                ToolTip="Para os servicos wuauserv/usosvc, grava as datas de pausa no registro e reinicia os servicos. Efeito imediato."
+                                ToolTip="Para os serviços wuauserv/usosvc, grava as datas de pausa no registro e reinicia os serviços. Efeito imediato."
                                 Click="BtnPause_Click"/>
                     </Grid>
 
                     <WrapPanel Margin="0,0,0,5">
                         <Button Content="Retomar Updates" Style="{StaticResource SecondaryButtonStyle}"
                                 Width="160" Height="40" Margin="0,0,10,10"
-                                ToolTip="Cancela a pausa do Windows Update: remove as datas de pausa do registro e reinicia os servicos. Volta a receber updates normalmente."
+                                ToolTip="Cancela a pausa do Windows Update: remove as datas de pausa do registro e reinicia os serviços. Volta a receber updates normalmente."
                                 Click="BtnResume_Click"/>
                         <Button Content="Refresh Scan" Style="{StaticResource SecondaryButtonStyle}"
                                 Width="160" Height="40" Margin="0,0,10,10"
-                                ToolTip="Roda UsoClient StartScan + RefreshSettings: limpa o cache de scan e dispara uma nova verificacao de updates no Windows Update."
+                                ToolTip="Roda UsoClient StartScan + RefreshSettings: limpa o cache de scan e dispara uma nova verificação de updates no Windows Update."
                                 Click="BtnRefreshScan_Click"/>
                     </WrapPanel>
 
@@ -206,13 +206,13 @@
                                  Padding="8,5" Height="34" VerticalContentAlignment="Center"/>
                         <Button Grid.Column="2" Content="Definir" Style="{StaticResource SecondaryButtonStyle}"
                                 Width="100" Height="36" Margin="10,0,0,0"
-                                ToolTip="Define uma versao alvo (ex: 23H2, 24H2, 10.0.22621.1) para o Windows Update oferecer apenas updates ate essa versao — evita upgrade de feature para versoes mais novas."
+                                ToolTip="Define uma versão alvo (ex: 23H2, 24H2, 10.0.22621.1) para o Windows Update oferecer apenas updates até essa versão — evita upgrade de feature para versões mais novas."
                                 Click="BtnSetTarget_Click"/>
                     </Grid>
                     <TextBlock Text="Ex: 23H2, 24H2, 10.0.22621.1 — deixa em branco e clica em Limpar para remover" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                     <Button Content="Limpar Target Version" Style="{StaticResource SecondaryButtonStyle}"
                             Width="180" Height="36"
-                            ToolTip="Remove a politica de versao alvo do registro. O Windows Update volta a oferecer qualquer versao disponivel."
+                            ToolTip="Remove a política de versão alvo do registro. O Windows Update volta a oferecer qualquer versão disponível."
                             Click="BtnClearTarget_Click"/>
                 </StackPanel>
             </Border>
@@ -223,14 +223,14 @@
                 <StackPanel>
                     <TextBlock Text="Canais Windows Insider" FontSize="18" FontWeight="Bold"
                                Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
-                    <TextBlock Text="Selecione um canal e inscreva o dispositivo. Nao precisa de conta Microsoft. A inscricao e feita via registro offline. A versao alvo de cada canal e calculada conforme o build deste PC."
+                    <TextBlock Text="Selecione um canal e inscreva o dispositivo. Não precisa de conta Microsoft. A inscrição e feita via registro offline. A versão alvo de cada canal e calculada conforme o build deste PC."
                                Foreground="{StaticResource TextSecondary}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,15"/>
 
                     <ComboBox x:Name="CmbChannel" Style="{StaticResource DarkComboBoxStyle}"
                               ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
                               Width="320" HorizontalAlignment="Left" Margin="0,0,0,10"
                               SelectionChanged="CmbChannel_SelectionChanged"
-                              ToolTip="Canal do programa Windows Insider. Itens desabilitados nao funcionam neste build do seu PC. O scroll do mouse em cima do box NAO troca o item sem clique."/>
+                              ToolTip="Canal do programa Windows Insider. Itens desabilitados não funcionam neste build do seu PC. O scroll do mouse em cima do box NÃO troca o item sem clique."/>
 
                     <Border Background="#1A1A1A" CornerRadius="6" Padding="12" Margin="0,0,0,12">
                         <StackPanel>
@@ -246,7 +246,7 @@
                     <Button Content="Inscrever no Canal Selecionado"
                             Style="{StaticResource GoldButtonStyle}"
                             Height="50" FontSize="16" FontWeight="Bold"
-                            ToolTip="Inscreve o dispositivo no canal selecionado via registro offline (WindowsSelfHost) e ativa o flight signing no BCD. Apos reiniciar, o Windows Update oferecera o build do canal."
+                            ToolTip="Inscreve o dispositivo no canal selecionado via registro offline (WindowsSelfHost) e ativa o flight signing no BCD. Após reiniciar, o Windows Update oferecerá o build do canal."
                             Click="BtnEnroll_Click"/>
 
                     <Separator Background="#444" Margin="0,15"/>
@@ -254,15 +254,15 @@
                     <WrapPanel>
                         <Button Content="Resetar Config Insider" Style="{StaticResource SecondaryButtonStyle}"
                                 Width="200" Height="40" Margin="0,0,10,10"
-                                ToolTip="Apaga toda a configuracao Insider do registro (WindowsSelfHost, politicas, labels) sem desativar o flight signing."
+                                ToolTip="Apaga toda a configuração Insider do registro (WindowsSelfHost, políticas, labels) sem desativar o flight signing."
                                 Click="BtnResetInsider_Click"/>
                         <Button Content="Desinscrever (limpeza total)" Style="{StaticResource SecondaryButtonStyle}"
                                 Width="200" Height="40" Margin="0,0,10,10"
-                                ToolTip="Remove a inscricao Insider por completo: apaga as configuracoes e desativa o flight signing no BCD. Volta ao canal estavel publico."
+                                ToolTip="Remove a inscrição Insider por completo: apaga as configurações e desativa o flight signing no BCD. Volta ao canal estavel publico."
                                 Click="BtnUnenroll_Click"/>
                         <Button Content="Refresh WU Scan + Cache" Style="{StaticResource SecondaryButtonStyle}"
                                 Width="200" Height="40" Margin="0,0,10,10"
-                                ToolTip="Para wisvc/usosvc/wuauserv, limpa o cache do Update Store e os logs, reinicia os servicos e roda UsoClient RefreshSettings. Use apos inscrever para forcara busca do build."
+                                ToolTip="Para wisvc/usosvc/wuauserv, limpa o cache do Update Store e os logs, reinicia os serviços e roda UsoClient RefreshSettings. Use após inscrever para forçar a busca do build."
                                 Click="BtnRefreshWu_Click"/>
                     </WrapPanel>
                 </StackPanel>
@@ -272,9 +272,9 @@
             <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="25"
                     BorderBrush="{StaticResource CardBorder}" BorderThickness="1" Margin="0,0,0,25" Style="{StaticResource CardStyle}">
                 <StackPanel>
-                    <TextBlock Text="Controle de Updates (nao-Insider)" FontSize="18" FontWeight="Bold"
+                    <TextBlock Text="Controle de Updates (não-Insider)" FontSize="18" FontWeight="Bold"
                                Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
-                    <TextBlock Text="Updates normais do Windows (KBs de qualidade, servico e drivers). Coloque um update manualmente ou tire um instalado — remover um KB desfaz o patch e volta os binarios a versao anterior (downgrade)."
+                    <TextBlock Text="Updates normais do Windows (KBs de qualidade, serviço e drivers). Coloque um update manualmente ou tire um instalado — remover um KB desfaz o patch e volta os binarios a versão anterior (downgrade)."
                                Foreground="{StaticResource TextSecondary}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,15"/>
 
                     <Grid Margin="0,0,0,15">
@@ -327,7 +327,7 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                        <TextBlock Text="Atencao: remover um KB de qualidade tambem remove os KBs dependentes mais novos que vieram depois dele."
+                        <TextBlock Text="Atenção: remover um KB de qualidade também remove os KBs dependentes mais novos que vieram depois dele."
                                    FontSize="11" Foreground="#FFA500" TextWrapping="Wrap" Margin="0,6,0,0"/>
                     </StackPanel>
                 </StackPanel>

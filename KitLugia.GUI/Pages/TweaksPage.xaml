@@ -20,7 +20,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <controls:InfoButton Grid.Column="0" ToolTipText="Quando ativado, o KitLugia verifica todos os tweaks desta pagina a cada inicializacao e reaplica automaticamente qualquer um que o Windows Update ou outro processo tenha revertido. A verificacao e executada em background e nao atrasa a inicializacao do app."/>
+                    <controls:InfoButton Grid.Column="0" ToolTipText="Quando ativado, o KitLugia verifica todos os tweaks desta pagina a cada inicializacao e reaplica automaticamente qualquer um que o Windows Update ou outro processo tenha revertido. A verificação e executada em background e não atrasa a inicializacao do app."/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
                         <TextBlock Text="&#x1F6E1;&#xFE0F; Manter Tweaks Ativos Ap&#xF3;s Reboot" FontSize="15" FontWeight="SemiBold" Foreground="White"/>
                         <TextBlock Text="Verifica e reaplica tweaks revertidos pelo Windows a cada inicializa&#xE7;&#xE3;o." FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
@@ -430,7 +430,7 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
                             <Button.ToolTip>
-                                <ToolTip Content="O DiagTrack coleta telemetria de uso do sistema e apps e envia para a Microsoft. Desativar reduz uso de CPU/RAM/rede. O Windows Update pode reativa-lo apos grandes atualizacoes - o Kit reaplica automaticamente no boot se a preferencia estiver salva."/>
+                                <ToolTip Content="O DiagTrack coleta telemetria de uso do sistema e apps e envia para a Microsoft. Desativar reduz uso de CPU/RAM/rede. O Windows Update pode reativa-lo após grandes atualizacoes - o Kit reaplica automaticamente no boot se a preferencia estiver salva."/>
                             </Button.ToolTip>
                             <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                             <Button.Template>
@@ -468,7 +468,7 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
                             <Button.ToolTip>
-                                <ToolTip Content="Servico de roteamento de mensagens WAP Push (notificacoes de apps da Loja e do sistema). Sem ele, push notifications podem nao chegar; nao afeta o funcionamento normal do Windows."/>
+                                <ToolTip Content="Servico de roteamento de mensagens WAP Push (notificações de apps da Loja e do sistema). Sem ele, push notifications podem não chegar; não afeta o funcionamento normal do Windows."/>
                             </Button.ToolTip>
                             <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                             <Button.Template>
@@ -506,7 +506,7 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
                             <Button.ToolTip>
-                                <ToolTip Content="Coleta e envia relatorios de erro do Windows para a Microsoft. Desativar nao impede que erros sejam registrados nem corrigidos localmente - so impede o envio."/>
+                                <ToolTip Content="Coleta e envia relatórios de erro do Windows para a Microsoft. Desativar não impede que erros sejam registrados nem corrigidos localmente - so impede o envio."/>
                             </Button.ToolTip>
                             <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                             <Button.Template>
@@ -524,7 +524,7 @@
                         </Button>
                         <StackPanel Grid.Column="1" Margin="0,16,15,12">
                             <TextBlock Text="Desativar Relatorio de Erros (WerSvc)" FontSize="15" Foreground="White"/>
-                            <TextBlock Text="Impede o Windows de enviar relatorios de erro para a Microsoft." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Impede o Windows de enviar relatórios de erro para a Microsoft." FontSize="12" Foreground="#A0A0A0" Margin="0,2,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#103050" BorderBrush="#306080" BorderThickness="1" Margin="0,0,15,0">
                             <TextBlock x:Name="StatusWerSvc" Text="Verificando..." Foreground="#8AB4F8" FontWeight="SemiBold" FontSize="12"/>
@@ -582,7 +582,7 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="20,18,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
                             <Button.ToolTip>
-                                <ToolTip Content="Desativa todas as tarefas do Agendador nas pastas Application Experience (PcaPatchDbTask, DiskDiagnostic, ProgramDataUpdater, AitAgent...) e Customer Experience Improvement Program (CEIP). Tarefas protegidas podem nao mudar - o Kit avisa se sobrar alguma ativa."/>
+                                <ToolTip Content="Desativa todas as tarefas do Agendador nas pastas Application Experience (PcaPatchDbTask, DiskDiagnostic, ProgramDataUpdater, AitAgent...) e Customer Experience Improvement Program (CEIP). Tarefas protegidas podem não mudar - o Kit avisa se sobrar alguma ativa."/>
                             </Button.ToolTip>
                             <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                             <Button.Template>
@@ -1636,7 +1636,7 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
                             <Button.ToolTip>
-                                <ToolTip Content="RmCacheLoc e um valor do Resource Manager do driver NVIDIA (lido por nvlddmkm/RM.dll). Guias de otimizacao o configuram com o numero de nucleos LOGICOS da CPU. E aplicado na Class\{4d36e968...}\00xx e em todos os Video\{GUID}\0000 NVIDIA (requer admin). So tem efeito com GPU NVIDIA - AMD/Intel ignoram o valor."/>
+                                <ToolTip Content="RmCacheLoc e um valor do Resource Manager do driver NVIDIA (lido por nvlddmkm/RM.dll). Guias de otimização o configuram com o numero de nucleos LOGICOS da CPU. E aplicado na Class\{4d36e968...}\00xx e em todos os Video\{GUID}\0000 NVIDIA (requer admin). So tem efeito com GPU NVIDIA - AMD/Intel ignoram o valor."/>
                             </Button.ToolTip>
                             <TextBlock Text="&#x2139;&#xFE0F;" FontSize="14" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                             <Button.Template>
@@ -2228,7 +2228,7 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top">
                             <Button.ToolTip>
-                                <ToolTip Content="Quando o explorer.exe reinicia (login do Windows, crash ou restart do shell), o truque do F11 (entrar/sair de tela cheia, que forca o re-render da pasta) e perdido. Com este toggle ATIVADO o Kit vigia o processo e, na 1a pasta aberta apos cada reinicio do Explorer, reaplica o F11 sozinho — o 'ir direto ao arquivo' (navegador -> 'Mostrar na pasta') continua instantaneo sem voce apertar nada. A aplicacao e INVISIVEL: a janela fica oculta por fracoes de segundo durante o toggle (nao pula em tela cheia, nao interrompe o que voce esta fazendo). Desligue se preferir aplicar manualmente pelo item do tray 'Turbo Explorer (F11)' ou com Ctrl+F11."/>
+                                <ToolTip Content="Quando o explorer.exe reinicia (login do Windows, crash ou restart do shell), o truque do F11 (entrar/sair de tela cheia, que força o re-render da pasta) e perdido. Com este toggle ATIVADO o Kit vigia o processo e, na 1ª pasta aberta após cada reinício do Explorer, reaplica o F11 sozinho — o 'ir direto ao arquivo' (navegador -> 'Mostrar na pasta') continua instantaneo sem você apertar nada. A aplicação é INVISÍVEL: a janela fica oculta por frações de segundo durante o toggle (não pula em tela cheia, não interrompe o que você está fazendo). Desligue se preferir aplicar manualmente pelo item do tray 'Turbo Explorer (F11)' ou com Ctrl+F11."/>
                             </Button.ToolTip>
                             <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#E8B84E" Opacity="0.6"/>
                             <Button.Template>

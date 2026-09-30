@@ -114,8 +114,9 @@ public sealed class KitTunnelManager : IDisposable
             
             if (init.Success)
             {
-                // Usar porta aleatória alta para relay
-                var random = new Random();
+                // Usar porta aleatória alta para relay (Random.Shared: chamadas em sequência
+                // no mesmo tick não repetem a mesma porta)
+                var random = Random.Shared;
                 int relayPort = random.Next(20000, 65000);
                 
                 var portResult = await networkExposure.ExposePortAsync(
@@ -355,8 +356,7 @@ public sealed class KitTunnelManager : IDisposable
     {
         try
         {
-            using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(5);
+            using var client = KitHttp.CreateClient(TimeSpan.FromSeconds(5));
             
             var services = new[]
             {

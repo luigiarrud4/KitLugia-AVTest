@@ -218,10 +218,10 @@ Detalhes que **não** podem regredir:
 
 ```
 dotnet run --project tests/TmVisualBench -- overlap   # 10 abas, nenhum texto sobreposto
-dotnet run --project tests/TmVisualBench -- flicker   # % da tela repintada (Resumo 3,7 %, Storage 12,6 %, Diagnostic 25,0 %)
+dotnet run --project tests/TmVisualBench -- flicker   # % da tela repintada (Resumo 3,1 %, Storage 12,1 %, Diagnostic 25,0 %)
 dotnet run --project tests/TmVisualBench -- sort      # ordenação, detalhe, submenu, fixar, histórico
 dotnet run --project tests/TmVisualBench -- gold      # procura #FFD700 renderizado (deve dar 0 em 10/10)
-dotnet run --project tests/TmVisualBench -- sort      # inclui um print do painel de histórico ABERTO
+dotnet run --project tests/TmVisualBench -- load      # 1ª carga: véu, 1ª lista, 1º valor do Resumo + prints
 ```
 
 `gold` é o detector de **vazamento do tema global**: percorre a árvore visual, acha todo
@@ -230,7 +230,26 @@ estilos: qualquer linha "• TextBlock.Foreground #FFD700 ..." é um vazamento.
 
 ---
 
-## 9. Histórico
+## 9. Véu de carregamento (1ª carga)
+
+`LoadOverlay` (rodapé do `KitTaskManagerWindow.xaml`) usa **apenas tokens existentes** —
+nenhum hex novo entrou no TM:
+
+| Elemento | Token / cor |
+|---|---|
+| Fundo translúcido | `#8C070B11` (véu sobre `TmBgDeep`) |
+| Cartão | `#141C28` (`TmCard`) + borda `#243040` (`TmBorder`), raio 10 |
+| Spinner (elipse tracejada) | `#4FC3F7` (`TmAccent`), `StrokeDashArray="3 5"` |
+| Título / etapa / tempo | `White` / `#8FA6BF` / `#5B6B7C` |
+| Barrinhas de etapa | acesa `#4FC3F7` (`TmAccent`), apagada `#243040` (`TmBorder`) |
+
+Regras de estilo do véu: **sem dourado**, `IsHitTestVisible=False` (não bloqueia clique) e
+teto de 15 s. O modo `load` do bench mede a linha do tempo e checa sobreposição de texto
+dentro do cartão em 1680x1000 e 1180x740. Detalhes e números: `docs/TM_FIRST_LOAD.md`.
+
+---
+
+## 10. Histórico
 
 - **27/09/2026** — mapa criado; paleta/tokens + estilos base no `Window.Resources`;
   neutralização dos implícitos dourados (Button/CheckBox/Separator/DataGrid*);
@@ -242,3 +261,16 @@ estilos: qualquer linha "• TextBlock.Foreground #FFD700 ..." é um vazamento.
   em janela pequena, número grande ao vivo escondido enquanto o painel está aberto (acabou o "5%"
   cortado na fresta do eixo de temperatura) e a lista de processos virou tabela com moldura,
   cabeçalho e `FontSize 11`.
+
+- **28/09/2026** — **véu de carregamento da 1ª carga** (`LoadOverlay` + `KitTaskManager.Loading.cs`)
+  e **coletores auxiliares fora do caminho crítico** (GPU/TCP/usuários deixaram de segurar a
+  primeira pintura; ver `docs/TM_FIRST_LOAD.md`). Medido no bench novo: véu em `t+28 ms`, lista em
+  `t+435 ms`, Resumo com valor em `t+1007 ms`, véu sai em `t+1235 ms` — sem texto sobreposto no
+  cartão e sem dourado, em 1680x1000 e 1180x740.
+
+- **28/09/2026 (cont.)** — o modo `sort` passou a contar **empates até 0,1** como empate (e não
+  como "ordem errada"): a ordenação do TM arredonda em 1 casa por anti-pisca, então 10 dos 128
+  pares vinham sendo reportados como falha por diferença de **0,1 MB**. Agora a checagem separa
+  "empate proposital" de "linha realmente fora de lugar" (Δ mínimo reportado: 0,1; não há mais
+  nenhuma violação real). Resultado: `sort` → **TUDO OK** (9 critérios de ordenação, detalhe ao
+  vivo, submenu, fixar, histórico).

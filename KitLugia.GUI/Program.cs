@@ -31,6 +31,19 @@ namespace KitLugia.GUI
             string? unlockPath = null;
             string? takeOwnPath = null;
 
+            // ── Modo WORKER (--worker): executa UMA operação de arquivo e sai ──────────
+            // Usado pelo ElevatedFileOpRunner: a instância principal (que pode estar SEM
+            // elevação) dispara este processo elevado com UM UAC e recebe progresso +
+            // resultado de volta — assim a página nunca "para" esperando o usuário
+            // relançar o app inteiro.
+            bool worker = false;
+            string workerAction = "";
+            string workerPath = "";
+            bool workerRecursive = false;
+            bool workerFullControl = false;
+            string? workerResult = null;
+            string? workerProgress = null;
+
             for (int i = 0; i < args.Length; i++)
             {
                 string lower = args[i].ToLower();
@@ -46,6 +59,43 @@ namespace KitLugia.GUI
                 {
                     takeOwnPath = args[++i];
                 }
+                else if (lower == "--worker")
+                {
+                    worker = true;
+                }
+                else if (lower == "--action" && i + 1 < args.Length)
+                {
+                    workerAction = args[++i];
+                }
+                else if (lower == "--path" && i + 1 < args.Length)
+                {
+                    workerPath = args[++i];
+                }
+                else if (lower == "--recursive")
+                {
+                    workerRecursive = true;
+                }
+                else if (lower == "--full-control")
+                {
+                    workerFullControl = true;
+                }
+                else if (lower == "--result" && i + 1 < args.Length)
+                {
+                    workerResult = args[++i];
+                }
+                else if (lower == "--progress" && i + 1 < args.Length)
+                {
+                    workerProgress = args[++i];
+                }
+            }
+
+            // O worker roda ANTES de qualquer coisa: sem UI, sem mutex, sem relançamento.
+            if (worker)
+            {
+                int code = RunWorker(workerAction, workerPath, workerRecursive, workerFullControl,
+                    workerResult, workerProgress);
+                Environment.Exit(code);
+                return;
             }
 
             UnlockPath = unlockPath;
@@ -53,42 +103,24 @@ namespace KitLugia.GUI
 
             bool needsFileOp = !string.IsNullOrEmpty(unlockPath) || !string.IsNullOrEmpty(takeOwnPath);
 
-            // ★ PROVA-DE-TUDO (03/09): --unlock/--takeown SEM privilégio de administrador
-            // falham em arquivos protegidos (Windows.old, TrustedInstaller, processos de
-            // outros usuários). O menu de contexto lança o Kit sem runas — aqui relançamos
-            // a MESMA linha de comando elevada (UAC). Se o usuário cancelar o UAC, cai no
-            // fluxo normal (IPC para a instância existente), que pelo menos abre a página.
-            if (needsFileOp && !SystemUtils.IsRunningAsAdministrator())
-            {
-                bool launched = false;
-                try
-                {
-                    string argLine = string.Join(" ", args.Select(a => a.Contains(' ') || a.Contains('\t') ? $"\"{a}\"" : a));
-                    Logger.Log($"[ELEV] Relançando elevado (UAC) com: {argLine}");
-                    var elevated = Process.Start(new ProcessStartInfo(Environment.ProcessPath ?? typeof(Program).Assembly.Location)
-                    {
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        Arguments = argLine
-                    });
-                    launched = elevated != null;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"[ELEV] Falha ao relançar elevado (UAC negado?): {ex.Message}");
-                    launched = false;
-                }
-
-                // ANTES era "return" incondicional: com o UAC NEGADO o app saía sem fazer
-                // NADA e sem avisar — o clique no menu de contexto parecia morto. Agora só
-                // encerra se a instância elevada realmente subiu.
-                if (launched) return;
-                try
-                {
-                    WindowsToastNotifier.Show("KitLugia", "Sem permissão de administrador — abrindo a página sem elevação (itens protegidos podem falhar).");
-                }
-                catch { }
-            }
+            // ★ MENU DE CONTEXTO ABRE O KIT (29/09): o clique em "Take Ownership (KitLugia)"
+            // ou "Force Stop Unlock (KitLugia)" deve SEMPRE abrir a janela do Kit na página
+            // certa, com o caminho pré-preenchido e a análise/ação começando na hora —
+            // exatamente o que o fluxo antigo fazia.
+            //
+            // A elevação NÃO é mais feita aqui: quem pede o UAC é a própria página
+            // (ForceStopUnlockPage → RunGuaranteedAsync → ElevatedFileOpRunner), UMA vez,
+            // com progresso visível, e só quando o alvo realmente exigir admin.
+            //
+            // O bootstrap anterior fazia:
+            //   1) relançar o exe elevado (Verb=runas) e ENCERRAR esta instância;
+            //   2) a instância elevada, ao encontrar o Kit já aberto (mutex ocupado),
+            //      rodava um worker HEADLESS e saía — nenhuma janela, só um toast que
+            //      podia falhar silenciosamente.
+            // Com o Kit na bandeja (caso comum) o resultado era "cliquei e nada acontece".
+            // Agora o comando segue para a instância que já existe (IPC, que mostra a
+            // janela da bandeja) ou, se não houver nenhuma, esta mesma abre a UI com
+            // --unlock/--takeown (tratado em App.OnStartup).
 
             // ★ OTIMIZAÇÃO: boost self priority to High so the tray icon + watchdog load faster.
             // Padrão é Normal — fica atrás de outros apps de boot na disputa por CPU.
@@ -124,18 +156,10 @@ namespace KitLugia.GUI
             }
             if (!acquired)
             {
-                // Já existe uma instância rodando.
-                // PROVA-DE-TUDO (03/09): se ESTA instância está elevada e veio de --unlock/--takeown,
-                // executa a operação DIRETO (headless worker) em vez de enviar via IPC para a
-                // instância principal — que pode estar SEM admin e falharia em arquivos protegidos.
-                if (SystemUtils.IsRunningAsAdministrator() && needsFileOp)
-                {
-                    Logger.Log("[ELEV] Instância elevada + mutex ocupado → worker headless.");
-                    RunHeadlessFileOperation(takeOwnPath ?? unlockPath!, isTakeOwn: takeOwnPath != null);
-                    return;
-                }
-
-                // Se --unlock/--takeown foram passados, envia via IPC para a instância existente
+                // Já existe uma instância rodando: entrega o comando via IPC. A instância
+                // principal MOSTRA a janela (mesmo que esteja minimizada para a bandeja —
+                // ver MainWindow.ShowAndActivateFromTray) e navega para a página certa com
+                // o caminho pré-preenchido, disparando a análise/ação.
                 bool sent = false;
                 if (!string.IsNullOrEmpty(unlockPath))
                 {
@@ -146,19 +170,13 @@ namespace KitLugia.GUI
                     sent |= Services.UnlockIpcServer.SendTakeOwnershipCommand(takeOwnPath);
                 }
 
-                // PROVA-DE-TUDO: se o IPC falhar (instância ocupada mas sem servidor de pipe —
-                // ex.: subiu em modo reduzido), executa AQUI em vez de não fazer nada. Antes o
-                // comando era perdido silenciosamente. Elevado, vira worker headless + toast.
-                if (!sent && needsFileOp)
+                if (needsFileOp)
                 {
-                    Logger.Log("[IPC] Envio falhou — executando a operação neste processo (headless).");
-                    if (SystemUtils.IsRunningAsAdministrator())
-                    {
-                        RunHeadlessFileOperation(takeOwnPath ?? unlockPath!, isTakeOwn: takeOwnPath != null);
-                        return;
-                    }
-                    try { WindowsToastNotifier.Show("KitLugia", "Não foi possível falar com o Kit em execução — reabra o app e tente de novo."); } catch { }
+                    Logger.Log(sent
+                        ? $"[IPC] Comando do menu de contexto entregue à instância existente: {(takeOwnPath ?? unlockPath)}"
+                        : "[IPC] Instância existente sem servidor de pipe — trazendo a janela para frente.");
                 }
+
                 BringExistingToFront();
                 return;
             }
@@ -185,45 +203,56 @@ namespace KitLugia.GUI
         }
 
         /// <summary>
-        /// Worker headless elevado: executa o take ownership / force stop direto no processo
-        /// elevado e avisa via toast do Windows. Usado quando o mutex está ocupado pela
-        /// instância principal (que pode não estar elevada).
+        /// Worker de operação de arquivo (--worker). Roda o pipeline garantido
+        /// (<see cref="KitLugia.Core.FileOpGuarantee"/>) e publica o progresso num arquivo
+        /// texto (uma linha por passo) para a UI mostrar ao vivo. Nunca abre janela.
+        /// Retorna 0 quando o objetivo foi atingido (agora ou agendado para o boot).
         /// </summary>
-        private static void RunHeadlessFileOperation(string path, bool isTakeOwn)
+        private static int RunWorker(string action, string path, bool recursive, bool fullControl,
+            string? resultFile, string? progressFile)
         {
             try
             {
-                string name = Path.GetFileName(path.TrimEnd('\\', '/'));
-                if (string.IsNullOrEmpty(name)) name = path;
+                var kind = action.ToLowerInvariant() switch
+                {
+                    "takeown" or "takeownership" => KitLugia.Core.GuaranteedAction.TakeOwnership,
+                    "delete" => KitLugia.Core.GuaranteedAction.Delete,
+                    _ => KitLugia.Core.GuaranteedAction.ForceStop,
+                };
 
-                if (isTakeOwn)
+                void Progress(string line)
                 {
-                    var result = KitLugia.Core.FileTakeOwnership.TakeOwn(path, recursive: true, (d, t, c) => { }, grantFullControlOnDirs: false);
-                    string msg = result.Ok
-                        ? $"✅ {name}: {result.Success} item(ns) agora são seus."
-                        : $"⚠️ {name}: {result.Failed} falha(s) de {result.Total}." + (result.Errors.Count > 0 ? " " + string.Join(" | ", result.Errors.Take(2)) : "");
-                    if (result.FallbackUsed) msg += " (fallback clássico takeown/icacls usado)";
-                    KitLugia.Core.WindowsToastNotifier.Show("KitLugia — Take Ownership", msg);
+                    try { Console.Out.WriteLine(line); Console.Out.Flush(); } catch { }
+                    if (string.IsNullOrEmpty(progressFile)) return;
+                    try { File.AppendAllText(progressFile, line + Environment.NewLine); } catch { }
                 }
-                else
+
+                Progress($"worker: {kind} em {path}");
+                Progress($"admin: {KitLugia.Core.SystemUtils.IsRunningAsAdministrator()}");
+
+                var result = KitLugia.Core.FileOpGuarantee.Run(path, kind, recursive, fullControl,
+                    step => Progress(step.Message));
+
+                if (!string.IsNullOrEmpty(resultFile))
                 {
-                    var blocking = KitLugia.Core.ForceStopUnlockService.FindBlockingProcesses(path);
-                    if (blocking.Count == 0)
-                    {
-                        KitLugia.Core.WindowsToastNotifier.Show("KitLugia — Force Stop", $"✅ {name}: nenhum processo bloqueador encontrado.");
-                        return;
-                    }
-                    var res = KitLugia.Core.ForceStopUnlockService.Unlock(path, blocking, deleteTarget: false);
-                    string msg2 = res.Success
-                        ? $"✅ {name}: {res.Message}"
-                        : $"⚠️ {name}: {res.Message}" + (res.Errors.Count > 0 ? " " + string.Join(" | ", res.Errors.Take(2)) : "");
-                    KitLugia.Core.WindowsToastNotifier.Show("KitLugia — Force Stop", msg2);
+                    try { File.WriteAllLines(resultFile, result.ToWire()); } catch { }
                 }
+                return result.Ok ? 0 : 1;
             }
             catch (Exception ex)
             {
-                KitLugia.Core.Logger.Log($"[ELEV] Worker headless falhou: {ex}");
-                try { KitLugia.Core.WindowsToastNotifier.Show("KitLugia", $"Erro: {ex.Message}"); } catch { }
+                KitLugia.Core.Logger.Log($"[WORKER] Falhou: {ex}");
+                if (!string.IsNullOrEmpty(resultFile))
+                {
+                    try
+                    {
+                        var r = new KitLugia.Core.GuaranteeResult { Summary = "Erro no worker: " + ex.Message, Failed = 1 };
+                        r.Errors.Add(ex.Message);
+                        File.WriteAllLines(resultFile, r.ToWire());
+                    }
+                    catch { }
+                }
+                return 2;
             }
         }
 

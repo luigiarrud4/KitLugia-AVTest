@@ -26,15 +26,20 @@ public partial class ContextMenuManagerPage : Page
                 await LoadAsync();
             }
         };
-        Unloaded += (_, _) => Cleanup();
+        Unloaded += ContextMenuManagerPage_Unloaded;
     }
+
+    // Handler nomeado (e nao lambda): permite desinscrever no Cleanup.
+    private void ContextMenuManagerPage_Unloaded(object sender, RoutedEventArgs e) => Cleanup();
 
     public void Cleanup()
     {
+        Unloaded -= ContextMenuManagerPage_Unloaded;
         ItemsList.ItemsSource = null;
         _all.Clear();
         _selected = null;
         _loaded = false;
+        DataContext = null;
     }
 
     private async Task LoadAsync()

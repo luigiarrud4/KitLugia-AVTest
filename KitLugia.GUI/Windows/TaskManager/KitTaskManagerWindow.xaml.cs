@@ -382,13 +382,20 @@ namespace KitLugia.GUI.Windows.TaskManager
                     // Marca a aba inicial (Resumo) na sidebar: o Indicator novo é uma pílula
                     // sem default visível no XAML — sem isso a sidebar inicia toda apagada.
                     ActivateSidebarButton(BtnTabSummary);
-                    TxtStatus.Text = "Carregando processos...";
+                    // Véu da 1ª carga: a janela já está na tela e os dados ainda vêm —
+                    // mostra spinner + etapa + tempo decorrido em vez da casca vazia.
+                    BeginLoadingOverlay();
+                    TxtStatus.Text = "Primeira coleta em andamento: enumerando processos e contadores do sistema.";
                     // Contadores são lentos (PerformanceCounter cria registry + NtQuery) — off UI
                     _ = Task.Run(() => InitCountersSafe());
                     // Primeiro refresh sem bloquear UI; timers já iniciam para não perder tick
                     _ = RefreshAsync();
                     _refreshTimer.Start();
                     _graphTimer.Start();
+                    // Primeiro tick de desempenho JÁ (antes só acontecia 1 s depois, e o Resumo
+                    // — a aba que abre — ficava sem número nenhum nesse segundo inteiro; em
+                    // máquina fraca a coleta ainda somava mais alguns segundos em cima disso).
+                    UpdatePerformanceGraphsSafe();
 
                     // FIX abertura lenta: aqui rodavam TRÊS varreduras pesadas para abas que o
                     // usuário talvez nunca abra — Win32_Service (Serviços), registro + tarefas
@@ -418,6 +425,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     // thread ficaria lendo o buffer em loopback para sempre (100 Hz) mesmo
                     // com a janela fechada — overhead medindo um problema que não está mais na tela.
                     try { if (AudioGlitchMonitor.Instance.IsRunning) AudioGlitchMonitor.Instance.Stop(); } catch { }
+                    StopLoadingOverlay();
                     DisposeCounters();
                     try { ProcessIoHelper.ResetAll(); } catch { }
                     try { _refreshGate.Dispose(); } catch { }
@@ -451,6 +459,8 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             try { InitCounters(); }
             catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] InitCounters: {ex.Message}"); } catch { } }
+            // Sucesso ou falha, esta etapa terminou: o véu não pode depender dela para sair.
+            try { Dispatcher.BeginInvoke(new Action(NotifyLoadCountersReady), DispatcherPriority.Background); } catch { }
         }
 
         /// <summary>
@@ -471,6 +481,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 RenderPerfSample(sample);
                 try { UpdateSummaryTick(); }
                 catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Summary: {ex.Message}"); } catch { } }
+                NotifyLoadGraphicsRendered();
             }
             catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Graphs: {ex.Message}"); } catch { } }
             finally { Interlocked.Exchange(ref _graphTickRunning, 0); }
@@ -1069,6 +1080,46 @@ namespace KitLugia.GUI.Windows.TaskManager
         // ══════════════════════════════════════════════
         //  PROCESS REFRESH — zero-freeze pipeline (native batch + single-flight + off-UI)
         // ══════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════
+        //  COLETA AUXILIAR EM BACKGROUND (GPU por processo, TCP por PID, usuários)
+        // ══════════════════════════════════════════════
+        // São os coletores MAIS LENTOS do pipeline: na 1ª chamada o perflib está frio
+        // (PerformanceCounter/PDH) e a leitura do \GPU Engine(*) pode levar segundos em
+        // máquina fraca; WTS + tradução de SID somam mais algumas centenas de ms.
+        //
+        // Eles rodam DESACOPLADOS do desenho: cada coleta publica um OBJETO NOVO
+        // (nunca altera o dicionário que a UI está lendo), e o refresh só usa o ÚLTIMO
+        // valor publicado. Se a coleta ainda não terminou, a tela mostra o valor anterior
+        // — em vez de esperar parada por um coletor que não é essencial para a lista.
+        private volatile Dictionary<uint, int> _auxNetConnections = new();
+        private volatile Dictionary<uint, double> _auxGpuPerPid = new();
+        private volatile Dictionary<int, string> _auxUserNames = new();
+        private float _auxGpuTotal = -1f;
+        private int _auxCollecting;      // 1 = uma coleta auxiliar em andamento (sem sobreposição)
+        private int _firstPaintWaited;   // 1 = a janela curta da 1ª pintura já foi consumida
+
+        /// <summary>
+        /// Dispara a coleta auxiliar se não houver nenhuma em andamento. Devolve a Task
+        /// (para o primeiro refresh dar uma janela curta a ela) ou null quando uma coleta
+        /// anterior ainda está rodando — nesse caso o valor anterior segue valendo.
+        /// </summary>
+        private Task? KickAuxCollectors()
+        {
+            if (Interlocked.CompareExchange(ref _auxCollecting, 1, 0) != 0) return null;
+            return Task.Run(() =>
+            {
+                try
+                {
+                    try { _auxNetConnections = NetworkTrafficMonitor.GetActiveTcpConnectionsPerPid(); } catch { }
+                    try { _auxGpuTotal = (float)GpuMonitor.GetTotalGpuUtilization(); } catch { }
+                    try { _auxGpuPerPid = GpuMonitor.GetGpuUtilizationPerPid(); } catch { }
+                    try { _auxUserNames = KitLugia.Core.TaskManager.NativeMetricsHelper.GetUserNames(); } catch { }
+                }
+                finally { Interlocked.Exchange(ref _auxCollecting, 0); }
+            });
+        }
+
         private async Task RefreshAsync()
         {
             // Single-flight gate: evita sobreposição de refreshes quando UI dispara rápido
@@ -1087,23 +1138,10 @@ namespace KitLugia.GUI.Windows.TaskManager
             var token = cts.Token;
             try
             {
-                // Pipeline paralelo: net + gpu + snapshot de PIDs rodam juntos (primeiro paint ~40% mais rápido)
-                var netTask = Task.Run(() =>
-                {
-                    try { return NetworkTrafficMonitor.GetActiveTcpConnectionsPerPid(); }
-                    catch { return new Dictionary<uint, int>(); }
-                }, token);
-                var gpuTask = Task.Run(() =>
-                {
-                    try { return (float)GpuMonitor.GetTotalGpuUtilization(); }
-                    catch { return -1f; }
-                }, token);
-                // TMOG: GPU% por processo — as instâncias \GPU Engine(*) contêm pid_NNNN no nome
-                var gpuPerPidTask = Task.Run(() =>
-                {
-                    try { return GpuMonitor.GetGpuUtilizationPerPid(); }
-                    catch { return new Dictionary<uint, double>(); }
-                }, token);
+                // Auxiliares (GPU/TCP/usuários) saem em paralelo, mas FORA do caminho
+                // crítico: o desenho não espera por eles (ver KickAuxCollectors).
+                var auxTask = KickAuxCollectors();
+
                 var snapTask = Task.Run<object?>(() =>
                 {
                     try
@@ -1122,27 +1160,29 @@ namespace KitLugia.GUI.Windows.TaskManager
                     catch { return (object?)Array.Empty<Process>(); }
                 }, token);
 
-                // gpuPerPid ENTRA no WhenAll: ele enumera \GPU Engine(*) do PDH (a coleta mais
-                // lenta do pipeline). Fora do WhenAll, o .Result logo abaixo bloqueava a UI
-                // thread até ele terminar — micro-travamento no 1º refresh de cada abertura.
-                await Task.WhenAll(netTask, gpuTask, gpuPerPidTask, snapTask);
+                // ── ESSENCIAL: o snapshot nativo dos processos é o que enche a lista ──
+                // Só ele é aguardado; tudo o mais que atrasar não segura a primeira pintura.
+                var snapProcesses = await snapTask;
                 if (token.IsCancellationRequested) return;
-                var netConnections = netTask.Result;
-                float gpuTotal = gpuTask.Result;
-                var gpuPerPid = gpuPerPidTask.Result;
-                var snapProcesses = snapTask.Result;
                 var nativeSnap = snapProcesses as List<KitLugia.Core.TaskManager.NativeMetricsHelper.ProcMetrics>;
-                // FIX travamento ao abrir: WTS + tradução SID de ~400 processos levava ~300ms
-                // e rodava NA UI THREAD (continuação de await). Com cache frio (1º refresh da
-                // janela) o app congelava perceptivelmente no clique. Depois da 1ª chamada o
-                // cache de 15s do Core torna isto barato, mas nunca volta para a UI thread.
-                var userNamesNat = await Task.Run(() =>
+
+                // Primeira pintura: dá uma janela CURTA aos auxiliares para que a 1ª tela já
+                // saia com GPU/Rede preenchidos em máquina boa. Da 2ª em diante não espera
+                // nada: uma coluna desatualizada por no máximo 1 s é melhor que lista atrasada.
+                if (auxTask != null && Interlocked.CompareExchange(ref _firstPaintWaited, 1, 0) == 0)
                 {
-                    try { return KitLugia.Core.TaskManager.NativeMetricsHelper.GetUserNames(); }
-                    catch { return new Dictionary<int, string>(); }
-                });
+                    try { await Task.WhenAny(auxTask, Task.Delay(300, token)); } catch { }
+                    if (token.IsCancellationRequested) return;
+                }
+
+                var netConnections = _auxNetConnections;
+                float gpuTotal = _auxGpuTotal;
+                var gpuPerPid = _auxGpuPerPid;
+                var userNamesNat = _auxUserNames;
                 _networkConnections = netConnections;
-                _lastGpuPct = gpuTotal;
+                // Só sobrescreve com valor REAL: o coletor de desempenho pode ter medido a GPU
+                // antes desta coleta auxiliar terminar (evita apagar um número bom com -1).
+                if (gpuTotal >= 0) _lastGpuPct = gpuTotal;
                 var nowUtc = DateTime.UtcNow;
 
                 var swEnum = Stopwatch.StartNew();
@@ -1463,6 +1503,9 @@ namespace KitLugia.GUI.Windows.TaskManager
                 ApplyFilter(_lastSearchQuery);
                 UpdateSummaryTopCpu();
                 MaybeRefreshConnections();
+
+                // Primeira lista na tela: uma das duas condições para o véu de carga sair.
+                NotifyLoadRowsPainted();
 
                 sw.Stop();
                 if (!_isClosed) _ = Dispatcher.BeginInvoke(new Action(() =>
