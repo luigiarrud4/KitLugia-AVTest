@@ -25,14 +25,14 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Card 1: Force Stop Unlock -->
-                    <Button Grid.Column="0" Click="BtnForceStopUnlock_Click" Padding="0" HorizontalAlignment="Stretch" Height="Auto" Cursor="Hand" ToolTip="Libere arquivos bloqueados por processos no Windows">
+                    <Button Grid.Column="0" Click="BtnForceStopUnlock_Click" Padding="0" HorizontalAlignment="Stretch" Height="Auto" Cursor="Hand" ToolTip="Force Stop, Take Ownership e exclusão garantidos: elevação automática (1 UAC), handles/drivers/ACL e, no pior caso, remoção agendada para o próximo boot">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="BgBorder" CornerRadius="8" Background="#2A1A3A" BorderBrush="#AA44CC" BorderThickness="1" SnapsToDevicePixels="True">
                                     <StackPanel Margin="14,14">
                                         <TextBlock Text="&#x1F513;" FontSize="26"/>
                                         <TextBlock Text="Force Stop Unlock" FontSize="15" FontWeight="SemiBold" Foreground="#DD88CC" Margin="0,8,0,3"/>
-                                        <TextBlock Text="Desbloqueie arquivos travados por processos — direto no botão direito" FontSize="11" Foreground="#AA55AA" TextWrapping="Wrap"/>
+                                        <TextBlock Text="Libera, assume a posse e deleta de verdade — elevação automática, sem parar no meio" FontSize="11" Foreground="#AA55AA" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                                 <ControlTemplate.Triggers>
@@ -242,7 +242,7 @@
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F50B;"
                         Content="Energia e Suspensao (Windows)"
-                        ToolTip="Configuracoes nativas de bateria e energia"
+                        ToolTip="Configurações nativas de bateria e energia"
                         Click="BtnPowerSleep_Click"/>
 
                 <!-- ================================================================== -->
@@ -261,13 +261,13 @@
                         Click="BtnNotifications_Click"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4E6;"
-                        Content="Apps Padrao e Inicializacao"
-                        ToolTip="Programas padrao por tipo de arquivo e apps de inicializacao"
+                        Content="Apps Padrão e Inicialização"
+                        ToolTip="Programas padrão por tipo de arquivo e apps de inicialização"
                         Click="BtnDefaultApps_Click"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F916;"
                         Content="Sobre o Windows"
-                        ToolTip="Versao, especificacoes, nome do PC e ativacao"
+                        ToolTip="Versão, especificações, nome do PC e ativação"
                         Click="BtnAbout_Click"/>
 
             </StackPanel>

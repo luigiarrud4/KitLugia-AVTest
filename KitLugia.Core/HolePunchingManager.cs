@@ -200,8 +200,9 @@ public sealed class HolePunchingManager : IDisposable
         message[6] = 0xA4;
         message[7] = 0x42;
         
-        // Transaction ID (12 bytes aleatórios)
-        var random = new Random();
+        // Transaction ID (12 bytes aleatórios) — Random.Shared: dois pacotes no mesmo
+        // milissegundo não podem sair com o MESMO transaction ID (seed do relógio).
+        var random = Random.Shared;
         for (int i = 8; i < 20; i++)
         {
             message[i] = (byte)random.Next(256);
@@ -356,7 +357,8 @@ public sealed class HolePunchingManager : IDisposable
     private string GenerateRoomCode()
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Sem I, O, 0, 1 para evitar confusão
-        var random = new Random();
+        // Random.Shared: dois códigos de sala gerados no mesmo tick não podem colidir
+        var random = Random.Shared;
         var code = new char[6];
         for (int i = 0; i < 6; i++)
         {

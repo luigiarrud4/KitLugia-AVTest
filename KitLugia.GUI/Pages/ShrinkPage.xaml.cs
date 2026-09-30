@@ -17,6 +17,9 @@ namespace KitLugia.GUI.Pages
         {
             InitializeComponent();
             Loaded += ShrinkPage_Loaded;
+            // Rede de seguranca: garante Cleanup() (cancela o CTS de operacoes longas)
+            // mesmo quando a navegacao nao passa pelo MainWindow.CleanupAndNavigate.
+            Unloaded += ShrinkPage_Unloaded;
         }
 
         public void Cleanup()
@@ -25,8 +28,11 @@ namespace KitLugia.GUI.Pages
             _cts?.Dispose();
             _cts = null;
             this.Loaded -= ShrinkPage_Loaded;
+            this.Unloaded -= ShrinkPage_Unloaded;
             this.DataContext = null;
         }
+
+        private void ShrinkPage_Unloaded(object sender, RoutedEventArgs e) => Cleanup();
 
         private async void ShrinkPage_Loaded(object sender, RoutedEventArgs e)
         {

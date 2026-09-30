@@ -327,6 +327,76 @@
                 </StackPanel>
             </Border>
 
+            <!-- Card: A&#xE7;&#xF5;es R&#xE1;pidas -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+                    BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,16,0,0" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="&#x26A1;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <StackPanel>
+                            <TextBlock Text="A&#xE7;&#xF5;es R&#xE1;pidas" FontSize="16" FontWeight="Bold" 
+                                       Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock Text="Perfis prontos que aplicam v&#xE1;rias prote&#xE7;&#xF5;es de uma vez." 
+                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- M&#xE1;xima Seguran&#xE7;a -->
+                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="M&#xE1;xima Seguran&#xE7;a" FontSize="13" FontWeight="SemiBold" 
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Liga Defender, Firewall, SmartScreen, VBS e UAC m&#xE1;ximo; desliga telemetria, RDP e Registro Remoto." 
+                                           FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="&#x1F6E1;&#xFE0F; ATIVAR" Click="BtnMaxSecurity_Click" 
+                                    Style="{StaticResource GoldButtonStyle}" Width="120" Height="32" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Modo Gaming -->
+                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Modo Gaming" FontSize="13" FontWeight="SemiBold" 
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Desliga VBS e telemetria e o ID de publicidade para ganho de desempenho." 
+                                           FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="&#x1F3AE; ATIVAR" Click="BtnGamingMode_Click" 
+                                    Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="32" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Restaurar Padr&#xF5;es -->
+                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Restaurar Padr&#xF5;es do Windows" FontSize="13" FontWeight="SemiBold" 
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Reverte todas as configura&#xE7;&#xF5;es desta p&#xE1;gina para o padr&#xE3;o do Windows." 
+                                           FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="&#x21A9;&#xFE0F; RESTAURAR" Click="BtnRestoreDefaults_Click" 
+                                    Style="{StaticResource DeleteButtonStyle}" Width="120" Height="32" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </Page>

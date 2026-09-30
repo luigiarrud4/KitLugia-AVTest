@@ -350,7 +350,10 @@ namespace KitLugia.GUI.Services
         public const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
         public const uint SE_PRIVILEGE_ENABLED = 0x00000002;
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        // ★ CORREÇÃO 28/09: LUID tem alinhamento 4 — com Pack=1 o campo caía no offset 1 e o
+        // Windows lia um LUID inválido (AdjustTokenPrivileges = TRUE + erro 1300), então o
+        // privilégio nunca era habilitado de fato. Pack = 4 reproduz o layout nativo (16 bytes).
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct TOKEN_PRIVILEGES { public uint PrivilegeCount; public long Luid; public uint Attributes; }
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -760,6 +763,28 @@ namespace KitLugia.GUI.Services
 
         // Background Features
         public bool GamePriorityEnabled { get; set; } = false;
+
+        /// <summary>
+        /// ANTI-STUTTER DE ÁUDIO (recuperação automática do motor de áudio).
+        ///
+        /// O Kit abre uma captura em LOOPBACK do dispositivo de saída padrão e pergunta ao
+        /// Windows, pacote por pacote, se ele precisou pular quadros (DATA_DISCONTINUITY —
+        /// a API oficial de detecção de glitch). Quando DOIS estalos CONFIRMADOS acontecem
+        /// dentro de 90 s, o Kit congela o audiodg por ~300 ms e retoma no MESMO handle —
+        /// o mesmo "desligar/ligar" que o usuário já fazia na mão para destravar o som.
+        ///
+        /// Fica nas configurações do Kit (engrenagem) porque é serviço de segundo plano:
+        /// precisa valer ANTES de o problema aparecer, sem abrir o Gerenciador de Tarefas.
+        /// Estado real = o do monitor (fonte única), lido/exposto para a UI.
+        /// </summary>
+        public bool AudioAntiStutterEnabled
+        {
+            get
+            {
+                try { return KitLugia.Core.TaskManager.AudioGlitchMonitor.Instance.AutoRecover; }
+                catch { return false; }
+            }
+        }
         public bool ForegroundBoostEnabled { get; set; } = true;
         public bool StandbyCleanEnabled { get; set; } = false;
         public long IslcThresholdMB { get; set; } = SuggestIslcThresholdMB(); // ISLC: auto-calculado baseado na RAM do sistema
@@ -1300,6 +1325,8 @@ namespace KitLugia.GUI.Services
 
         public void Initialize()
         {
+            // LoadSettings já APLICA o anti-stutter de áudio salvo (o setter liga/desliga
+            // o monitor e a recuperação automática) — nada a fazer depois daqui.
             LoadSettings();
 
             System.Threading.Tasks.Task.Run(() => AutoFixGameBarPresenceWriter());
@@ -1760,6 +1787,7 @@ namespace KitLugia.GUI.Services
                 key.SetValue("AdvancedMonitorIntervalMs", AdvancedMonitorIntervalMs);
                 key.SetValue("RamLimiterIntervalMs", RamLimiterIntervalMs);
                 key.SetValue("KitMemoryLimitMB", KitMemoryLimitMB);
+                key.SetValue("AudioAntiStutter", AudioAntiStutterEnabled ? 1 : 0);
                 key.SetValue("GameBarPresenceWriterDisabled", GameBarPresenceWriterDisabled ? 1 : 0);
                 key.SetValue("SmartScreenDisabled", SmartScreenDisabled ? 1 : 0);
                 key.SetValue("EdgeUpdateDisabled", EdgeUpdateDisabled ? 1 : 0);
@@ -1991,6 +2019,53 @@ namespace KitLugia.GUI.Services
             if (TelemetryTasksDisabled) SystemTweaks.ApplyTelemetryScheduledTasks(true);
         }
 
+        /// <summary>
+        /// Liga/desliga o anti-stutter de áudio e (por padrão) persiste a escolha.
+        /// Ligar também garante a ESCUTA ligada: sem medição não existe gatilho — a
+        /// recuperação só dispara com estalos CONFIRMADOS pelo próprio Windows.
+        /// </summary>
+        public void SetAudioAntiStutter(bool enabled, bool persist = true)
+        {
+            try
+            {
+                var mon = KitLugia.Core.TaskManager.AudioGlitchMonitor.Instance;
+                mon.AutoRecover = enabled;
+
+                if (enabled)
+                {
+                    if (!mon.IsRunning) mon.Start();
+                    KitLugia.Core.Logger.Log("🩹 Anti-stutter de áudio LIGADO: o Kit escuta os estalos e ressincroniza o motor de áudio sozinho se eles se repetirem (2 confirmados em 90 s).");
+                }
+                else
+                {
+                    // Sem escuta não há gatilho: desligar de verdade libera a thread de
+                    // loopback (nada de medir um problema que não vai mais ser tratado).
+                    try { if (mon.IsRunning) mon.Stop(); } catch { }
+                    KitLugia.Core.Logger.Log("🩹 Anti-stutter de áudio DESLIGADO — o Kit não toca mais no motor de áudio.");
+                }
+
+                if (persist) SaveSettings();
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"🩹 Falha ao aplicar o anti-stutter de áudio: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Grava SÓ a preferência (sem mexer no monitor). Usado pelo checkbox do
+        /// Gerenciador de Tarefas, que tem regras próprias de escuta (aba Latência).
+        /// </summary>
+        public void PersistAudioAntiStutter(bool enabled)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(@"Software\KitLugia\TraySettings");
+                key.SetValue("AudioAntiStutter", enabled ? 1 : 0);
+            }
+            catch { }
+        }
+
         private void AutoFixForceStopContextMenu()
         {
             try
@@ -2059,6 +2134,10 @@ namespace KitLugia.GUI.Services
                 AdvancedMonitorIntervalMs = ReadIntSetting(key, "AdvancedMonitorIntervalMs", 2000);
                 RamLimiterIntervalMs = ReadIntSetting(key, "RamLimiterIntervalMs", 1000);
                 KitMemoryLimitMB = ReadLongSetting(key, "KitMemoryLimitMB", 200);
+                // Anti-stutter de áudio: APLICA o valor salvo (sem regravar — acabou de ser
+                // lido do registro). Ligado = escuta em loopback + recuperação automática
+                // valendo desde a abertura do Kit, sem precisar abrir o Gerenciador de Tarefas.
+                SetAudioAntiStutter(ReadBoolSetting(key, "AudioAntiStutter", false), persist: false);
                 GameBarPresenceWriterDisabled = ReadBoolSetting(key, "GameBarPresenceWriterDisabled", false);
                 SmartScreenDisabled = ReadBoolSetting(key, "SmartScreenDisabled", false);
                 EdgeUpdateDisabled = ReadBoolSetting(key, "EdgeUpdateDisabled", false);

@@ -121,14 +121,32 @@ namespace KitLugia.GUI.Windows.TaskManager
                     // Recuperar o áudio só faz sentido com a escuta ligada (sem medição não há gatilho).
                     if (!AudioGlitchMonitor.Instance.IsRunning && !_audioUserStopped) AudioGlitchMonitor.Instance.Start();
                     AudioGlitchMonitor.Instance.AutoRecover = true;
-                    TxtStatus.Text = "🩹 Recuperação de áudio ligada: se os estalos confirmados se repetirem (2+ em 90s), o Kit sincroniza o motor de áudio sozinho.";
+                    PersistAudioAntiStutterPreference(true);
+                    TxtStatus.Text = "🩹 Recuperação de áudio ligada (salva no Kit → Configurações → Áudio): se os estalos confirmados se repetirem (2+ em 90s), o Kit sincroniza o motor de áudio sozinho.";
                 }
                 else
                 {
                     AudioGlitchMonitor.Instance.AutoRecover = false;
+                    PersistAudioAntiStutterPreference(false);
                     TxtStatus.Text = "🩹 Recuperação de áudio desligada — o Kit só observa, não toca no motor.";
                 }
                 if (_latBuilt) RenderAudioCard();
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Espelha a escolha do checkbox na preferência do Kit (engrenagem → Áudio).
+        /// O anti-stutter de áudio vale entre sessões: sem isto, o usuário teria de marcar
+        /// a MESMA opção em dois lugares, e a do Gerenciador de Tarefas morreria ao fechar
+        /// a janela (o estado do monitor não sobrevive ao processo).
+        /// </summary>
+        private void PersistAudioAntiStutterPreference(bool enabled)
+        {
+            try
+            {
+                if (System.Windows.Application.Current?.MainWindow is KitLugia.GUI.MainWindow mw)
+                    mw.TrayService?.PersistAudioAntiStutter(enabled);
             }
             catch { }
         }

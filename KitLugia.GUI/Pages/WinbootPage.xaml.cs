@@ -226,25 +226,6 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex) { System.Windows.MessageBox.Show($"Erro ao abrir editor: {ex.Message}"); }
         }
 
-        private void BtnQuickViewXml_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                SyncQuickToMain();
-                string lang = GetSelectedWinbootLanguage();
-                string user = TxtQuickUser?.Text ?? "Usuario";
-                var tempPath = Path.Combine(Path.GetTempPath(), $"kitlugia_view_{Guid.NewGuid()}.xml");
-                WinbootManager.GenerateAutounattendXml(tempPath, bypassRequirements: ChkQuickBypass?.IsChecked ?? true, localAccount: ChkQuickLocal?.IsChecked ?? true, disablePrivacy: true, userName: user, password: "", fullAuto: ChkQuickAuto?.IsChecked ?? true, language: lang, timeZone: WinbootManager.GetTimeZoneFromLanguage(lang));
-                if (File.Exists(tempPath))
-                {
-                    TxtAutounattendXml.Text = File.ReadAllText(tempPath);
-                    try { File.Delete(tempPath); } catch { }
-                    OverlayAutounattendEditor.Visibility = Visibility.Visible;
-                }
-            }
-            catch (Exception ex) { System.Windows.MessageBox.Show($"Erro: {ex.Message}"); }
-        }
-
         private void BtnQuickAdvanced_Click(object sender, RoutedEventArgs e)
         {
             SyncQuickToMain();

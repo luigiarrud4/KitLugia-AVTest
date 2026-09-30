@@ -835,12 +835,6 @@ namespace KitLugia.GUI.Pages
                 $"{processName} → {limitMB} MB\nMínimo seguro: {safeMin} MB (app não será interrompido abaixo disso)");
         }
 
-        private void BtnAddProcessLimit_Click(object sender, RoutedEventArgs e)
-        {
-            // Mantido para compatibilidade — abre o picker
-            BtnOpenProcessPicker_Click(sender, e);
-        }
-
         private void BtnRemoveProcessLimit_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button btn) return;

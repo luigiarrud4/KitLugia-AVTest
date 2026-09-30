@@ -183,7 +183,7 @@
                         <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock x:Name="TxtMonProcMem" Text="0 MB" FontSize="16" FontWeight="Bold" Foreground="#8888FF" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Memoria" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                <TextBlock Text="Memória" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">

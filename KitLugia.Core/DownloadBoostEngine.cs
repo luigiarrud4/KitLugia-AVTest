@@ -185,7 +185,9 @@ namespace KitLugia.Core
             {
                 try
                 {
-                    if (config.UseBBR2 && Environment.OSVersion.Version.Build >= 26000)
+                    // BBR2 so existe do build 26000 em diante. Usar OperatingSystem.* (API atual,
+                    // sem depender de manifest/parsing de Environment.OSVersion).
+                    if (config.UseBBR2 && OperatingSystem.IsWindowsVersionAtLeast(10, 0, 26000))
                     {
                         SystemUtils.RunExternalProcess("netsh", "int tcp set supplemental template=internet congestionprovider=bbr2", true);
                         SystemUtils.RunExternalProcess("netsh", "int tcp set supplemental template=datacenter congestionprovider=bbr2", true);

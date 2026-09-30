@@ -27,14 +27,6 @@ public static class ContextMenuQuickAdd
         public Action Remove = () => { };
     }
 
-    private static string ExePath()
-    {
-        var exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "KitLugia.GUI.exe");
-        if (!File.Exists(exe))
-            exe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? exe;
-        return exe;
-    }
-
     /// <summary>
     /// Resolve a ação Add de qualquer item do menu de contexto (super OU clássico)
     /// pelo ID persistido em HKCU\Software\KitLugia\ContextMenu. Usado pelo
@@ -140,23 +132,27 @@ public static class ContextMenuQuickAdd
             Remove = () => SystemTweaks.RemoveForceStopUnlock(),
         });
 
-        // ── 2. TAKE OWNERSHIP SUPER (PowerShell SetAccessControl recursivo) ──
+        // ── 2. TAKE OWNERSHIP (entrada ÚNICA do Kit) ──
+        // (29/09) Existiam DUAS chaves para a MESMA ação: \shell\kittakeown (registrada
+        // pelo toggle da página Force Stop Unlock) e \shell\kit_takeownership (registrada
+        // aqui). O Explorer listava as duas — "Take Ownership (KitLugia)" e "Take Ownership
+        // Super (KitLugia)" — com o comando idêntico. Agora este item delega para a
+        // entrada CANÔNICA (SystemTweaks.AddTakeOwnershipKit / RemoveTakeOwnershipKit),
+        // que apaga as variantes legadas antes de gravar: um único item no menu.
         list.Add(new QuickItem
         {
             Id = "takeownership",
-            DisplayName = "Take Ownership Super",
+            DisplayName = "Take Ownership (KitLugia)",
             Description = "Assume propriedade e concede controle total.",
-            SuperNote = "Versão turbo: PowerShell SetAccessControl (instantâneo, sem spawn de cmd), herda para subpastas, log silencioso, fallback takeown/icacls só se PS falhar.",
+            SuperNote = "Executado pelo próprio Kit (in-process): privilégios nativos + FileTakeOwnership, recursivo, com fallback takeown/icacls. Sem spawn de cmd.",
             Emoji = "👑",
-            Check = () => RegHas(@"Software\Classes\*\shell\kit_takeownership\command")
-                       || SystemTweaks.IsTakeOwnershipAdded(), // clássica "runas" também conta como ativo
-            Add = () => { SystemTweaks.RemoveTakeOwnership(); AddTakeOwnershipSuper(); },
+            Check = () => SystemTweaks.IsTakeOwnershipKitAdded()
+                       || RegHas(@"Software\Classes\*\shell\kit_takeownership\command"), // variante legada
+            Add = () => { SystemTweaks.RemoveTakeOwnership(); SystemTweaks.AddTakeOwnershipKit(); },
             Remove = () =>
             {
-                RemoveKeyTrees(new[] {
-                    @"Software\Classes\*\shell\kit_takeownership",
-                    @"Software\Classes\Directory\shell\kit_takeownership" });
-                SystemTweaks.RemoveTakeOwnership(); // limpa a clássica também
+                SystemTweaks.RemoveTakeOwnershipKit();   // inclui as variantes legadas
+                SystemTweaks.RemoveTakeOwnership();      // limpa a clássica (runas) também
             },
         });
 
@@ -259,72 +255,6 @@ public static class ContextMenuQuickAdd
     }
 
     // ══════════════════════ Implementações SUPER ══════════════════════
-
-    private static void AddTakeOwnershipSuper()
-    {
-        try
-        {
-            // SUPER: o comando chama o próprio KitLugia (--takeown) que executa
-            // FileTakeOwnership in-process: SeTakeOwnershipPrivilege via P/Invoke +
-            // FileSystemSecurity nativo. Zero spawns de cmd/powershell, recursivo,
-            // com toast de progresso na UI do Kit. Fallback PS se exe não encontrado.
-            string exePath = ExePath();
-            if (File.Exists(exePath))
-            {
-                string cmd = $"\"{exePath}\" --takeown \"%1\"";
-                string label = "👑 Take Ownership Super (KitLugia)";
-
-                using (var k = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\kit_takeownership"))
-                {
-                    k.SetValue("", label);
-                    k.SetValue("Icon", "imageres.dll,-78");
-                    k.SetValue("NoWorkingDirectory", "");
-                }
-                using (var c = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\kit_takeownership\command"))
-                    c.SetValue("", cmd);
-
-                using (var k2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\kit_takeownership"))
-                {
-                    k2.SetValue("", label);
-                    k2.SetValue("Icon", "imageres.dll,-78");
-                    k2.SetValue("NoWorkingDirectory", "");
-                }
-                using (var c2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\kit_takeownership\command"))
-                    c2.SetValue("", cmd);
-
-                Logger.Log("[CONTEXT MENU] Take Ownership Super registrado (via KitLugia --takeown)");
-                return;
-            }
-
-            // FALLBACK: PowerShell SetAccessControl (sem Kit rodando)
-            Logger.Log("[CONTEXT MENU] Take Ownership: exe não achado, usando fallback PS");
-            string psCmd = "powershell -NoProfile -WindowStyle Hidden -Command \"" +
-                "$ErrorActionPreference='SilentlyContinue'; " +
-                "$p='%1'; " +
-                "$items=@($p); if(Test-Path $p -PathType Container){$items+=@(Get-ChildItem $p -Recurse -Force | %% FullName)}; " +
-                "$rule=New-Object System.Security.AccessControl.FileSystemAccessRule('Administrators','FullControl','ContainerInherit,ObjectInherit','None','Allow'); " +
-                "foreach($f in $items){ $acl=Get-Acl $f; $acl.SetOwner([System.Security.Principal.NTAccount]'Administrators'); Set-Acl $f $acl; $acl2=Get-Acl $f; $acl2.SetAccessRule($rule); Set-Acl $f $acl2 }\"";
-
-            using (var kf = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\kit_takeownership"))
-            {
-                kf.SetValue("", "👑 Take Ownership Super");
-                kf.SetValue("Icon", "imageres.dll,-78");
-                kf.SetValue("NoWorkingDirectory", "");
-            }
-            using (var cf = Registry.CurrentUser.CreateSubKey(@"Software\Classes\*\shell\kit_takeownership\command"))
-                cf.SetValue("", psCmd);
-
-            using (var kf2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\kit_takeownership"))
-            {
-                kf2.SetValue("", "👑 Take Ownership Super");
-                kf2.SetValue("Icon", "imageres.dll,-78");
-                kf2.SetValue("NoWorkingDirectory", "");
-            }
-            using (var cf2 = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\kit_takeownership\command"))
-                cf2.SetValue("", psCmd);
-        }
-        catch (Exception ex) { Logger.Log($"[CONTEXT MENU] Erro takeown super: {ex.Message}"); }
-    }
 
     private static void AddTerminalHereSuper()
     {

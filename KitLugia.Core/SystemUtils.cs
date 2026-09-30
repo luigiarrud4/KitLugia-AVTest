@@ -45,6 +45,18 @@ namespace KitLugia.Core
 
         public static double GetTotalSystemRamGB()
         {
+            // GlobalMemoryStatusEx primeiro: 1 syscall, sem servico WMI (as consultas Win32_OperatingSystem
+            // custam 100-300 ms e este metodo e chamado em varios fluxos de UI).
+            try
+            {
+                var memStatus = default(NativeMethods.MEMORYSTATUSEX);
+                memStatus.dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>();
+                if (NativeMethods.GlobalMemoryStatusEx(ref memStatus) && memStatus.ullTotalPhys > 0)
+                    return memStatus.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            // Fallback: WMI (caso o P/Invoke falhe)
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT TotalVisibleMemorySize FROM Win32_OperatingSystem");
@@ -55,15 +67,6 @@ namespace KitLugia.Core
                     ulong totalRamKB = Convert.ToUInt64(mem);
                     return totalRamKB / 1048576.0;
                 }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-
-            try
-            {
-                var memStatus = default(NativeMethods.MEMORYSTATUSEX);
-                memStatus.dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>();
-                if (NativeMethods.GlobalMemoryStatusEx(ref memStatus))
-                    return memStatus.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 

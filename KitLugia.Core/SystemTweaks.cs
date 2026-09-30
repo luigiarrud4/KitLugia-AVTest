@@ -9214,12 +9214,64 @@ namespace KitLugia.Core
                     @"Software\Classes\Directory\shell",
                     @"Software\Classes\Drive\shell"
                 };
-                string[] keyNames = { "kittakeown", "kit_takeown", "kit_takeownership" };
+                // "kit_takeownership" era a variante SUPER (registrada pelo catálogo
+                // ContextMenuQuickAdd) — o Explorer mostrava as DUAS opções com o mesmo
+                // comando ("Take Ownership (KitLugia)" + "Take Ownership Super (KitLugia)").
+                // A entrada canônica é \shell\kittakeown; tudo mais é legado e sai daqui.
+                string[] keyNames = { "kittakeown", "kit_takeown", "kit_takeownership", "kit_takeown_super" };
                 foreach (var shellPath in shellPaths)
                     foreach (var keyName in keyNames)
                         try { using var s = Registry.CurrentUser.OpenSubKey(shellPath, true); s?.DeleteSubKeyTree(keyName, false); } catch { }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        /// <summary>
+        /// Consolida as opções de Take Ownership do menu de contexto numa ÚNICA entrada
+        /// canônica (\* | Directory | Drive\shell\kittakeown) — idempotente, roda no
+        /// startup do Kit. Versões anteriores registravam a MESMA ação em duas chaves
+        /// diferentes ("kittakeown" pelo toggle da página Force Stop Unlock e
+        /// "kit_takeownership" pelo catálogo super de menus), e o clique direito no
+        /// Explorer mostrava duas opções idênticas:
+        ///   "Take Ownership (KitLugia)" e "Take Ownership Super (KitLugia)".
+        /// Aqui o legado é removido e, se ele estava ativo, a canônica é recriada com o
+        /// caminho atual do exe.
+        /// </summary>
+        public static void ConsolidateTakeOwnershipMenu()
+        {
+            try
+            {
+                string[] shellPaths =
+                {
+                    @"Software\Classes\*\shell",
+                    @"Software\Classes\Directory\shell",
+                    @"Software\Classes\Drive\shell"
+                };
+                string[] legacyKeys = { "kit_takeownership", "kit_takeown_super", "kit_takeown" };
+
+                bool legacyFound = false;
+                foreach (var shellPath in shellPaths)
+                {
+                    foreach (var keyName in legacyKeys)
+                    {
+                        try
+                        {
+                            using var s = Registry.CurrentUser.OpenSubKey(shellPath, true);
+                            if (s?.OpenSubKey(keyName) != null) legacyFound = true;
+                            s?.DeleteSubKeyTree(keyName, false);
+                        }
+                        catch { }
+                    }
+                }
+
+                if (!legacyFound) return;
+
+                // O legado estava instalado — recria a entrada canônica (com o exe atual)
+                AddTakeOwnershipKit();
+                SaveContextMenuPref("kittakeown", true);
+                Logger.Log("[TAKEOWN KIT] Duplicatas consolidadas em uma única entrada: kittakeown");
+            }
+            catch (Exception ex) { Logger.Log($"[TAKEOWN KIT] Falha na consolidação: {ex.Message}"); }
         }
 
         /// <summary>Chamado a cada abertura do Kit: se o exe mudou de pasta (update/cópia), atualiza o comando do menu para o Kit mais recente.</summary>

@@ -25,14 +25,19 @@ public partial class ContextMenuAddPage : Page
                 BuildCards();
             }
         };
-        Unloaded += (_, _) => Cleanup();
+        Unloaded += ContextMenuAddPage_Unloaded;
     }
+
+    // Handler nomeado (e nao lambda): permite desinscrever no Cleanup.
+    private void ContextMenuAddPage_Unloaded(object sender, RoutedEventArgs e) => Cleanup();
 
     public void Cleanup()
     {
+        Unloaded -= ContextMenuAddPage_Unloaded;
         QuickAddGrid.Children.Clear();
         _items.Clear();
         _loaded = false;
+        DataContext = null;
     }
 
     private void BuildCards()

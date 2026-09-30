@@ -3426,6 +3426,48 @@
                     </Grid>
                 </Grid>
             </Grid>
+
+            <!-- ═══ VÉU DA 1ª CARGA (a janela abre antes dos dados) ═══
+                 Em máquina fraca o TM abria com a lista e os gráficos VAZIOS e sem nenhum
+                 sinal de trabalho em andamento — parecia travado. Este véu aparece SÓ na
+                 primeira carga e sai sozinho quando a 1ª lista e a 1ª amostra chegam na tela.
+                 IsHitTestVisible=False: informa sem bloquear (as abas seguem clicáveis) e o
+                 fundo é translúcido para dar para ver os valores chegando atrás dele. -->
+            <Grid x:Name="LoadOverlay" Grid.Row="1" Grid.ColumnSpan="2" Panel.ZIndex="60"
+                  Background="#8C070B11" IsHitTestVisible="False">
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        MinWidth="340" MaxWidth="440" Padding="24,20"
+                        Background="#141C28" BorderBrush="#243040" BorderThickness="1" CornerRadius="10">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Ellipse x:Name="LoadSpinner" Width="22" Height="22" Margin="0,0,12,0"
+                                     Stroke="#4FC3F7" StrokeThickness="3" StrokeDashArray="3 5"
+                                     StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5"
+                                     VerticalAlignment="Center">
+                                <Ellipse.RenderTransform>
+                                    <RotateTransform x:Name="LoadSpinnerRotate"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <TextBlock x:Name="LoadTitle" Text="Carregando o gerenciador" FontSize="14"
+                                       FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="LoadStage" Text="Enumerando os processos" FontSize="11"
+                                   Foreground="#8FA6BF" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+
+                        <!-- Etapas (acesas conforme a carga avança) -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                            <Border x:Name="LoadStep1" Width="52" Height="4" CornerRadius="2" Background="#4FC3F7" Margin="0,0,4,0"/>
+                            <Border x:Name="LoadStep2" Width="52" Height="4" CornerRadius="2" Background="#243040" Margin="0,0,4,0"/>
+                            <Border x:Name="LoadStep3" Width="52" Height="4" CornerRadius="2" Background="#243040" Margin="0,0,4,0"/>
+                            <Border x:Name="LoadStep4" Width="52" Height="4" CornerRadius="2" Background="#243040"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="LoadElapsed" Text="0,0 s" FontSize="10" Foreground="#5B6B7C"
+                                   HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </Window>

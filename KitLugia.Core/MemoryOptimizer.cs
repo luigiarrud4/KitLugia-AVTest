@@ -48,7 +48,11 @@ namespace KitLugia.Core
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hObject);
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        // ★ CORREÇÃO 28/09: layout nativo = DWORD(4) + LUID(8, alinhado a 4) + DWORD(4) = 16 bytes.
+        // Com Pack=1 o campo caía no offset 1 e com o layout padrão no offset 8 — nos dois casos
+        // o Windows lia um LUID inválido e devolvia TRUE + ERROR_NOT_ALL_ASSIGNED (1300), ou seja:
+        // SeProfileSingleProcessPrivilege NUNCA era habilitado (purge da standby list sem efeito).
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct TOKEN_PRIVILEGES
         {
             public int PrivilegeCount;

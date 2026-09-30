@@ -37,7 +37,7 @@ public static class FileTakeOwnership
     private static extern bool OpenProcessToken(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
 
     [DllImport("advapi32.dll", SetLastError = true)]
-    private static extern bool LookupPrivilegeValue(string? systemName, string name, out long luid);
+    private static extern bool LookupPrivilegeValue(string? systemName, string name, out LUID luid);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     private static extern bool AdjustTokenPrivileges(IntPtr tokenHandle, bool disableAll,
@@ -85,12 +85,19 @@ public static class FileTakeOwnership
     private const int ERROR_ACCESS_DENIED = 5;
     private const int ERROR_NOT_READY = 21;
 
+    // ★ CORREÇÃO 28/09: LUID é { DWORD; LONG } (alinhamento 4). Com `long` (alinhado a 8) o campo
+    // caía no offset 8, o Windows lia um LUID inválido e AdjustTokenPrivileges devolvia
+    // TRUE + ERROR_NOT_ALL_ASSIGNED (1300): **nenhum privilégio era habilitado**, e o
+    // take ownership in-process só funcionava quando caía no fallback takeown.exe/icacls.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LUID { public uint LowPart; public int HighPart; }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct TOKEN_PRIVILEGES
     {
-        public int PrivilegeCount;
-        public long Luid;
-        public int Attributes;
+        public uint PrivilegeCount;
+        public LUID Luid;
+        public uint Attributes;
     }
 
     /// <summary>
@@ -126,11 +133,19 @@ public static class FileTakeOwnership
                 return false;
             try
             {
-                foreach (var priv in new[] { "SeTakeOwnershipPrivilege", "SeRestorePrivilege", "SeBackupPrivilege" })
+                foreach (var priv in new[] { "SeTakeOwnershipPrivilege", "SeRestorePrivilege", "SeBackupPrivilege", "SeDebugPrivilege" })
                 {
-                    if (!LookupPrivilegeValue(null, priv, out long luid)) continue;
+                    if (!LookupPrivilegeValue(null, priv, out LUID luid))
+                    {
+                        Logger.Log($"[TAKE OWNERSHIP] {priv}: LookupPrivilegeValue falhou (erro {Marshal.GetLastWin32Error()})");
+                        continue;
+                    }
                     var tp = new TOKEN_PRIVILEGES { PrivilegeCount = 1, Luid = luid, Attributes = SE_PRIVILEGE_ENABLED };
                     AdjustTokenPrivileges(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                    // 1300 (ERROR_NOT_ALL_ASSIGNED) = privilégio ausente no token (não é admin).
+                    int err = Marshal.GetLastWin32Error();
+                    if (err != 0)
+                        Logger.Log($"[TAKE OWNERSHIP] {priv} NAO habilitado (erro {err}).");
                 }
                 return true;
             }

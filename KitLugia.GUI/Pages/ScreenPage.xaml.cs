@@ -74,7 +74,7 @@ namespace KitLugia.GUI.Pages
             var result = DisplayManager.SaveColorProfile("UserBackup", _defaultPath);
             if (result.Success)
             {
-                mw.ShowSuccess("SALVO", "Calibragem de cores salva com sucesso!");
+                mw.ShowSuccess("SALVO", "Calibra\u00E7\u00E3o de cores salva com sucesso!");
                 _ = CheckExistingProfileAsync();
             }
             else

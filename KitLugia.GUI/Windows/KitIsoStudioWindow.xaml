@@ -134,7 +134,7 @@
                                 <StackPanel>
                                     <TextBlock Text="Remoção granular — cada pacote é opcional (wimlib dir + update delete --recursive)" Style="{StaticResource StudioSectionTitle}"/>
                                     <TextBlock Text="Muito além do preset único. Cada CheckBox vira um wimlib update delete + registro Deprovisioned offline. Rápido, sem montar." Style="{StaticResource StudioDesc}"/>
-                                    <WrapPanel>
+                                    <WrapPanel x:Name="PanelAppxPacks">
                                         <CheckBox Content="Copilot" IsChecked="True" Style="{StaticResource StudioCheck}"/>
                                         <CheckBox Content="Xbox App" IsChecked="True" Style="{StaticResource StudioCheck}"/>
                                         <CheckBox Content="Xbox Overlay" IsChecked="True" Style="{StaticResource StudioCheck}"/>
@@ -156,7 +156,7 @@
                                     </WrapPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                         <Button Content="✅ Marcar 40+" Height="28" Width="110" Click="BtnApplyDebloat_Click" Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"/>
-                                        <Button Content="Desmarcar tudo" Height="28" Width="120" Margin="8,0,0,0" Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"/>
+                                        <Button Content="Desmarcar tudo" Height="28" Width="120" Margin="8,0,0,0" Click="BtnUnmarkDebloat_Click" Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -207,8 +207,8 @@
                                     <TextBlock Text="📝 Registro custom (.reg) — injetado offline via wimlib" Style="{StaticResource StudioSectionTitle}"/>
                                     <TextBox x:Name="TxtReg" Height="110" AcceptsReturn="True" TextWrapping="Wrap" Background="#0A0A0A" Foreground="#E0E0E0" BorderBrush="#2A2A2A" BorderThickness="1" FontFamily="Consolas" FontSize="11" Padding="8" VerticalScrollBarVisibility="Auto" Text="Windows Registry Editor Version 5.00&#x0a;&#x0a;[HKEY_LOCAL_MACHINE\SOFTWARE\Exemplo]&#x0a;&quot;Valor&quot;=dword:00000001"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <Button Content="Importar .reg" Width="110" Height="28" Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"/>
-                                        <Button Content="Limpar" Width="80" Height="28" Margin="8,0,0,0" Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"/>
+                                        <Button Content="Importar .reg" Width="110" Height="28" Click="BtnImportReg_Click" ToolTip="Carrega um arquivo .reg do disco para o campo acima" Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"/>
+                                        <Button Content="Limpar" Width="80" Height="28" Margin="8,0,0,0" Click="BtnClearReg_Click" ToolTip="Limpa o campo de registro" Background="#2A2A2A" Foreground="White" BorderBrush="#444" BorderThickness="1"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>

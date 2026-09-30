@@ -350,7 +350,7 @@
                             <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{StaticResource AccentColor}" Background="#1A1A1A" BorderThickness="0" Margin="0,0,0,10"/>
                             <TextBlock x:Name="TxtOpStatus" Text="Processando..." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap"/>
                             <Border Background="#22FF3D00" BorderBrush="#88FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,10,0,0">
-                                <TextBlock Text="ACAO CRITICA: NAO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
+                                <TextBlock Text="AÇÃO CRÍTICA: NÃO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
                             </Border>
                         </StackPanel>
                     </ScrollViewer>

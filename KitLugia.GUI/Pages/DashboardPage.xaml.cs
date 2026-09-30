@@ -145,7 +145,6 @@ namespace KitLugia.GUI.Pages
 
         private void BtnGoToWindowsUpdate_Click(object sender, RoutedEventArgs e) =>
             NavigationHelper.NavigateTo(PageType.WindowsUpdate);
-        private void BtnGoToTools_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools);
         private void BtnGoToPowerPlans_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools, 0);
 
         // === REDE E INTERNET ===
@@ -339,7 +338,6 @@ namespace KitLugia.GUI.Pages
         }
         private void BtnGoToDrivers_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Drivers);
         private void BtnGoToScreen_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Screen);
-        private void BtnGoToAllTweaks_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.AllTweaks);
         private void BtnGoToExmTweaks_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.ExmTweaks);
 
         // === ATIVACAO E CONFIGURACOES ===
@@ -703,13 +701,6 @@ namespace KitLugia.GUI.Pages
                 mw.ShowError("ERRO", $"Falha na otimização: {ex.Message}");
             }
         }
-
-        // Métodos antigos removidos para evitar duplicidade ou confusão
-        [Obsolete("Use BtnOpenQuickMenu_Click")]
-        private void BtnOptimizeStandard_Click(object sender, RoutedEventArgs e) => BtnOpenQuickMenu_Click(sender, e);
-
-        [Obsolete("Use Selection Overlay instead")]
-        private void BtnOptimizeExtreme_Click(object sender, RoutedEventArgs e) => BtnOpenQuickMenu_Click(sender, e);
 
         // --- GAMING LATENCY PROFILE EVENT HANDLERS ---
 

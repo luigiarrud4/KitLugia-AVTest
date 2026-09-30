@@ -47,7 +47,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="TxtStatusIcon" Text="&#x2705;" FontSize="32" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock x:Name="TxtStatusTitle" Text="rEFInd nao detectado" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock x:Name="TxtStatusTitle" Text="rEFInd não detectado" FontSize="16" FontWeight="Bold" Foreground="White"/>
                                     <TextBlock x:Name="TxtStatusDetail" Text="Clique em Instalar para adicionar ao ESP" FontSize="11" Foreground="#AAA" Margin="0,2,0,0"/>
                                 </StackPanel>
                                 <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,12,0,0">
@@ -107,7 +107,7 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Timeout configuravel, entrada padrao, protetor de tela" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Timeout configurável, entrada padrão, protetor de tela" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                             </StackPanel>
                         </Border>

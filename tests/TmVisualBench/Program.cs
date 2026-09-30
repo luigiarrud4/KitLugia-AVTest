@@ -23,7 +23,13 @@
 //      se acha um estilo global do Kit que vazou para a janela azul do Task Manager.
 //
 // Uso:
-//   dotnet run -- [tabs] [overlap] [flicker] [sort] [gold] [--size WxH] [--tab Nome] [--top N]
+//   7) modo `load`: mede a PRIMEIRA CARGA — quando o véu de carregamento aparece, quando a
+//      1ª lista de processos e o 1º valor do Resumo chegam à tela e quando o véu sai.
+//      Salva o print do véu em ação. É assim que "abre mas demora para mostrar os valores"
+//      (relato em PCs mais fracos) vira número, e que se prova que o véu não ficou preso.
+//
+// Uso:
+//   dotnet run -- [tabs] [overlap] [flicker] [sort] [gold] [load] [--size WxH] [--tab Nome] [--top N]
 //
 // Nada aqui altera o sistema (a janela do TM é read-only para o SO).
 
@@ -59,11 +65,12 @@ internal static class Program
     {
         ParseArgs(args);
 
-        bool modoTabs = args.Contains("tabs") || (!args.Contains("overlap") && !args.Contains("flicker"));
+        bool modoTabs = args.Contains("tabs") || (!args.Contains("overlap") && !args.Contains("flicker") && !args.Contains("load"));
         bool modoOverlap = args.Contains("overlap") || modoTabs;
         bool modoFlicker = args.Contains("flicker");
         bool modoSort = args.Contains("sort");
         bool modoGold = args.Contains("gold");
+        bool modoLoad = args.Contains("load");
         int top = TopN(args);
 
         Directory.CreateDirectory(_outDir);
@@ -110,6 +117,15 @@ internal static class Program
             Console.WriteLine(mostrou ? "janela criada e exibida fora da tela (Loaded disparou)"
                                       : "janela apenas medida/arranjada (modo offscreen)");
             Console.WriteLine();
+
+            // Modo `load`: só mede a PRIMEIRA CARGA (linha do tempo + print do véu) e sai.
+            if (modoLoad)
+            {
+                MedirPrimeiraCarga(janela, mostrou);
+                try { janela.Close(); } catch { }
+                Console.WriteLine("=== fim ===");
+                return 0;
+            }
 
             // Deixa o primeiro refresh/coleta inicial terminar.
             Pump(2500);
@@ -185,6 +201,149 @@ internal static class Program
 
         Console.WriteLine("=== fim ===");
         return 0;
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    //  1ª CARGA — LINHA DO TEMPO (transforma olhômetro em número)
+    // ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Mede QUANDO cada marco da primeira carga aparece na tela: véu de carregamento,
+    /// primeira linha de processo, primeiro valor do Resumo, status com a contagem e
+    /// saída do véu. Bombeia o dispatcher em janelas de 25 ms (os timers reais do TM
+    /// rodam de verdade) e salva um print do véu em ação.
+    ///
+    /// É este modo que dá o número para "abre mas demora para mostrar os valores":
+    /// antes da correção a lista só aparecia depois do pipeline inteiro (GPU via PDH
+    /// incluída, ~1-3 s na primeira chamada do perflib).
+    /// </summary>
+    private static void MedirPrimeiraCarga(KitTaskManagerWindow janela, bool mostrou)
+    {
+        var relogio = System.Diagnostics.Stopwatch.StartNew();
+        long tVeu = -1, tLista = -1, tResumo = -1, tStatus = -1, tVeuFora = -1;
+        long tPrintVeu = -1;
+        string etapa = "", decorrido = "";
+        int linhas = 0;
+
+        var dg = janela.FindName("DgProcesses") as DataGrid;
+        var veu = janela.FindName("LoadOverlay") as FrameworkElement;
+        var txtStatus = janela.FindName("TxtStatus") as TextBlock;
+        // Marcador do Resumo COM VALOR: o rodapé do cartão de CPU só é escrito pelo tick de
+        // desempenho (o subtítulo tem texto estático no XAML — não serve como prova).
+        var txtSub = janela.FindName("TxtSumCpuFooter") as TextBlock;
+        var dgTop = janela.FindName("DgSumTopCpu") as DataGrid;
+        var txtEtapa = janela.FindName("LoadStage") as TextBlock;
+        var txtDecorrido = janela.FindName("LoadElapsed") as TextBlock;
+
+        for (int i = 0; i < 600 && relogio.ElapsedMilliseconds < 25000; i++)
+        {
+            Pump(25);
+            long ms = relogio.ElapsedMilliseconds;
+
+            if (veu != null && veu.Visibility == Visibility.Visible)
+            {
+                if (tVeu < 0) tVeu = ms;
+                if (txtEtapa != null && !string.IsNullOrWhiteSpace(txtEtapa.Text)) etapa = txtEtapa.Text;
+                if (txtDecorrido != null && !string.IsNullOrWhiteSpace(txtDecorrido.Text)) decorrido = txtDecorrido.Text;
+                // Print do véu em ação (~600 ms: já deu tempo de ele ser pintado).
+                if (tPrintVeu < 0 && ms >= 600)
+                {
+                    var (bmpV, raizV) = Capture(janela, mostrou);
+                    if (bmpV != null)
+                    {
+                        string arq = Path.Combine(_outDir, "tm_carregando.png");
+                        SalvarPng(bmpV, arq);
+                        tPrintVeu = ms;
+                        Console.WriteLine($"   print do véu : {arq}");
+
+                        // O cartão do véu tem 4 textos (título, etapa, tempo, rodapé das etapas):
+                        // se algum sobrepõe, o véu é justamente o "sinal de carregamento" mal feito.
+                        if (raizV != null)
+                        {
+                            var col = DetectarSobreposicao(raizV, bmpV.PixelWidth, bmpV.PixelHeight);
+                            Console.WriteLine(col.Count == 0
+                                ? "   layout do véu : OK — nenhum texto sobreposto"
+                                : $"   layout do véu : {col.Count} TEXTO(S) SOBREPOSTO(S): " +
+                                  string.Join(" | ", col.Take(4).Select(c => $"\"{c.A}\" ✕ \"{c.B}\"")));
+                        }
+                    }
+                }
+            }
+            else if (tVeuFora < 0 && tVeu >= 0) tVeuFora = ms;
+
+            if (tLista < 0 && dg != null && dg.Items.Count > 0) { tLista = ms; linhas = dg.Items.Count; }
+            if (tResumo < 0 && txtSub != null && !string.IsNullOrWhiteSpace(txtSub.Text)
+                           && dgTop != null && dgTop.Items.Count > 0) tResumo = ms;
+            if (tStatus < 0 && txtStatus != null && (txtStatus.Text ?? "").Contains("processos em")) tStatus = ms;
+
+            if (tVeuFora >= 0 && tLista >= 0 && tResumo >= 0) break;
+        }
+
+        Console.WriteLine("── 1ª CARGA ─────────────────────────────────────────");
+        Console.WriteLine($"   véu na tela      : {(tVeu >= 0 ? $"t+{tVeu} ms" : "não apareceu")}");
+        Console.WriteLine($"   1ª lista         : {(tLista >= 0 ? $"t+{tLista} ms  ({linhas} linhas em DgProcesses)" : "NÃO apareceu em 25 s")}");
+        Console.WriteLine($"   Resumo c/ valor  : {(tResumo >= 0 ? $"t+{tResumo} ms  ({dgTop?.Items.Count ?? 0} linhas no Top processos)" : "NÃO apareceu em 25 s")}");
+        Console.WriteLine($"   status final     : {(tStatus >= 0 ? $"t+{tStatus} ms" : "não apareceu")}");
+        Console.WriteLine($"   véu saiu         : {(tVeuFora >= 0 ? $"t+{tVeuFora} ms" : "NÃO saiu")}");
+        Console.WriteLine($"   última etapa     : \"{etapa}\"  ({decorrido})");
+
+        var (bmpF, raizF) = Capture(janela, mostrou);
+        if (bmpF != null)
+        {
+            string arq = Path.Combine(_outDir, "tm_primeiro_conteudo.png");
+            SalvarPng(bmpF, arq);
+            Console.WriteLine($"   print final      : {arq}  ({bmpF.PixelWidth}x{bmpF.PixelHeight})");
+        }
+        if (raizF != null)
+        {
+            var ouro = new List<string>();
+            RelatarOuroSilencioso(raizF, ouro);
+            Console.WriteLine($"   dourado visível  : {(ouro.Count == 0 ? "0 (ok)" : string.Join(" | ", ouro.Take(4)))}");
+        }
+        Console.WriteLine($"   véu ainda visível: {(veu != null && veu.Visibility == Visibility.Visible ? "SIM (problema)" : "não")}");
+        Console.WriteLine();
+    }
+
+    /// <summary>Versão silenciosa do detector de dourado (mesma lógica do modo `gold`).</summary>
+    private static void RelatarOuroSilencioso(FrameworkElement raiz, List<string> achados)
+    {
+        bool EhOuro(Color c) => c.R > 200 && c.G > 195 && c.B < 70 && c.A > 40;
+
+        void Olhar(DependencyObject o, string prop, Brush? b)
+        {
+            if (b is SolidColorBrush sc && EhOuro(sc.Color))
+                achados.Add($"{o.GetType().Name}.{prop} #{sc.Color.R:X2}{sc.Color.G:X2}{sc.Color.B:X2}");
+        }
+
+        try
+        {
+            foreach (var o in Descendentes(raiz))
+            {
+                if (!IsVisivelNaTela(o)) continue;
+                switch (o)
+                {
+                    case TextBlock tb:
+                        Olhar(o, "Foreground", tb.Foreground);
+                        Olhar(o, "Background", tb.Background);
+                        break;
+                    case Control ct:
+                        Olhar(o, "Foreground", ct.Foreground);
+                        Olhar(o, "BorderBrush", ct.BorderBrush);
+                        break;
+                    case System.Windows.Shapes.Shape sh:
+                        Olhar(o, "Fill", sh.Fill);
+                        Olhar(o, "Stroke", sh.Stroke);
+                        break;
+                }
+                if (o is Border bd)
+                {
+                    Olhar(o, "Background", bd.Background);
+                    Olhar(o, "BorderBrush", bd.BorderBrush);
+                }
+                if (o is Panel pn) Olhar(o, "Background", pn.Background);
+            }
+        }
+        catch { }
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -754,7 +913,12 @@ internal static class Program
         var linhas = dg.Items.OfType<object>().Where(r => Prop(r, "IsChild") is not true).ToList();
         if (linhas.Count < 5) return (false, $"poucas linhas ({linhas.Count})");
 
-        int viol = 0, pares = 0, grupos = 1;
+        int viol = 0, pares = 0, grupos = 1, empates = 0;
+        // Pior violação em VALOR absoluto: distingue "empate/defasagem de 1 s" (Δ de décimos)
+        // de "linha realmente fora de lugar" (Δ de centenas de MB). Sem isto o teste acusa
+        // FALHA sem dizer se o usuário veria algo errado na tela.
+        double piorDelta = 0;
+        string pior = "";
         for (int i = 1; i < linhas.Count; i++)
         {
             if (!string.Equals(Str(linhas[i - 1], "Group"), Str(linhas[i], "Group"), StringComparison.Ordinal)) { grupos++; continue; }
@@ -762,10 +926,29 @@ internal static class Program
             int cmp = numerico
                 ? Num(linhas[i - 1], coluna).CompareTo(Num(linhas[i], coluna))
                 : string.Compare(Str(linhas[i - 1], coluna), Str(linhas[i], coluna), StringComparison.CurrentCultureIgnoreCase);
-            if (asc ? cmp > 0 : cmp < 0) viol++;
+            if (asc ? cmp > 0 : cmp < 0)
+            {
+                if (numerico)
+                {
+                    double va = Num(linhas[i - 1], coluna), vb = Num(linhas[i], coluna);
+                    // A ordenação do TM arredonda em 1 casa (anti-pisca: métrica que oscila
+                    // décimos movia linhas todo segundo). Logo, duas linhas separadas por até
+                    // 0,1 são EMPATE de propósito — não é "ordem errada", é valor
+                    // indistinguível na tela. Só é violação o que o usuário veria errado.
+                    if (Math.Abs(va - vb) <= 0.1001) { empates++; continue; }
+                    if (Math.Abs(va - vb) > piorDelta)
+                    {
+                        piorDelta = Math.Abs(va - vb);
+                        pior = $"{Str(linhas[i - 1], "DisplayName")}={va:F1} acima de {Str(linhas[i], "DisplayName")}={vb:F1}";
+                    }
+                }
+                viol++;
+            }
         }
         double pct = pares == 0 ? 0 : (double)viol / pares;
-        string info = $"{linhas.Count} linhas · {grupos} grupos · {viol}/{pares} pares fora de ordem ({pct:P0})";
+        string detalhe = pior.Length > 0 ? $" · pior: {pior} (Δ {piorDelta:F1})" : "";
+        string empateTxt = empates > 0 ? $" · {empates} empate(s) até 0,1 (anti-pisca)" : "";
+        string info = $"{linhas.Count} linhas · {grupos} grupos · {viol}/{pares} pares fora de ordem ({pct:P0}){detalhe}{empateTxt}";
         // Tolerância de 5%: as métricas mudam entre o refresh e a leitura (defasagem de 1 s).
         return (pct <= 0.05, info);
     }

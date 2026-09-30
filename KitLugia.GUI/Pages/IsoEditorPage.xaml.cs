@@ -1180,10 +1180,17 @@ exit
             }
         }
 
+        /// <summary>Voltar do fluxo de criacao — sai da pagina (usado pelo botao VOLTAR do rodape).</summary>
         private void BtnCancelConfig_Click(object sender, RoutedEventArgs e)
         {
             var mw = Application.Current.MainWindow as MainWindow;
             mw?.NavigateToPage(PageType.AdvancedTools);
+        }
+
+        /// <summary>Fecha SO o overlay de configuracao — o usuario continua na pagina do ISO Editor.</summary>
+        private void BtnCancelConfigOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayConfig.Visibility = Visibility.Collapsed;
         }
 
         // ==========================================

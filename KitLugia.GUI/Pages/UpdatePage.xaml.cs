@@ -42,8 +42,11 @@ namespace KitLugia.GUI.Pages
                 }
             });
 
-            // Benchmark Rust native vs C# (roda em background)
-            Task.Run(() => Confidence.Benchmark());
+            // NOTA: aqui rodava Task.Run(() => Confidence.Benchmark()) a cada abertura da pagina.
+            // Aquele benchmark executa 10.000 iteracoes x 25 pares x 2 implementacoes
+            // (500.000 chamadas, P/Invoke incluso) so para escrever uma linha no log —
+            // o resultado nunca era lido pela pagina. Removido do construtor: abrir
+            // "Atualizacoes" nao deve custar CPU.
         }
 
 

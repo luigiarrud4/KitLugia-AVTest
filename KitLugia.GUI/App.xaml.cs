@@ -116,6 +116,8 @@ namespace KitLugia.GUI
                 _ = Task.Run(() =>
                 {
                     KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded();
+                    // Remove as duplicatas do menu ("Take Ownership Super") antes de reaplicar
+                    KitLugia.Core.SystemTweaks.ConsolidateTakeOwnershipMenu();
                     KitLugia.Core.SystemTweaks.ReapplyContextMenuPrefs();
                 });
                 // Cria MainWindow mas já navega pra aba correta antes de Show
@@ -176,6 +178,9 @@ namespace KitLugia.GUI
             _ = Task.Run(() =>
             {
                 KitLugia.Core.SystemTweaks.RefreshContextMenuPathsIfNeeded();
+                // Consolida as DUAS chaves de Take Ownership numa só ("Take Ownership
+                // Super" era registrada à parte e o Explorer listava as duas opções).
+                KitLugia.Core.SystemTweaks.ConsolidateTakeOwnershipMenu();
                 // Recria os itens de menu de contexto ativos com a configuração MAIS
                 // recente (path do exe, comandos, ícones) — "recoloca" os menus no startup
                 KitLugia.Core.SystemTweaks.ReapplyContextMenuPrefs();

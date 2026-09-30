@@ -596,11 +596,6 @@ namespace KitLugia.GUI.Pages
 
         // ─── Helpers ────────────────────────────────────────────────────────────
 
-        private void RegistryIssueSelection_Changed(object sender, RoutedEventArgs e)
-        {
-            UpdateCleanButton();
-        }
-
         private void ChkIssue_Click(object sender, RoutedEventArgs e)
         {
             UpdateCleanButton();

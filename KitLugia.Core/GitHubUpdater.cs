@@ -214,9 +214,8 @@ namespace KitLugia.Core
 
                 Logger.Log($"📥 Baixando {asset.Name} ({asset.Size / 1024 / 1024}MB)...");
 
-                using var downloadClient = new HttpClient();
+                using var downloadClient = KitHttp.CreateClient(TimeSpan.FromMinutes(30));
                 downloadClient.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater");
-                downloadClient.Timeout = TimeSpan.FromMinutes(30);
                 var downloadResponse = await downloadClient.GetAsync(asset.BrowserDownloadUrl);
                 await using (var fileStream = File.Create(updatePath))
                 {
@@ -362,10 +361,9 @@ namespace KitLugia.Core
                 var tempDir = Path.GetTempPath();
                 var zipPath = Path.Combine(tempDir, "KitLugia_Update.zip");
 
-                using var client = new HttpClient();
+                using var client = KitHttp.CreateClient(TimeSpan.FromMinutes(30));
                 client.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater");
                 client.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
-                client.Timeout = TimeSpan.FromMinutes(30);
 
                 using var response = await client.GetAsync(asset.BrowserDownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
                 response.EnsureSuccessStatusCode();

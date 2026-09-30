@@ -44,6 +44,9 @@ namespace KitLugia.GUI.Pages
         public ServerPage()
         {
             InitializeComponent();
+            // Rede de seguranca: sem esta inscricao, o Cleanup() da pagina nunca roda quando
+            // a navegacao nao passa pelo MainWindow.CleanupAndNavigate (ex: MainFrame.Navigate).
+            this.Unloaded += Page_Unloaded;
             Log("🌐 Servidor Minecraft pronto. Abra o mundo e clique em Detectar.");
         }
 

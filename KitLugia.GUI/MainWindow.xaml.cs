@@ -1232,7 +1232,7 @@ namespace KitLugia.GUI
                 if (NavTagMap.TryGetValue(tag, out var pageType))
                     NavigateToPage(pageType);
                 else
-                    ShowInfo("EM BREVE", "Página em desenvolvimento.");
+                    ShowInfo("PÁGINA NÃO ENCONTRADA", "Este atalho não corresponde a nenhuma página do kit. Use o menu lateral ou a busca (Ctrl+K).");
             }
         }
 
@@ -1332,7 +1332,7 @@ namespace KitLugia.GUI
             else if (NavTagMap.TryGetValue(pageTag, out var mappedType))
                 NavigateToPage(mappedType, tabIndex);
             else
-                ShowInfo("EM BREVE", "Página em desenvolvimento.");
+                ShowInfo("PÁGINA NÃO ENCONTRADA", "Este atalho não corresponde a nenhuma página do kit. Use o menu lateral ou a busca (Ctrl+K).");
         }
 
         /// <summary>
@@ -1421,13 +1421,53 @@ namespace KitLugia.GUI
                 }
                 else
                 {
-                    ShowInfo("EM BREVE", "Página em desenvolvimento.");
+                    ShowInfo("PÁGINA NÃO ENCONTRADA", "Este atalho não corresponde a nenhuma página do kit. Use o menu lateral ou a busca (Ctrl+K).");
                 }
             }
             finally
             {
                 Mouse.OverrideCursor = null;
                 _isNavigating = false;
+            }
+        }
+
+        /// <summary>
+        /// Mostra e ativa a janela principal partindo de QUALQUER estado: fechada na
+        /// bandeja (Hide), minimizada ou já visível. Reaproveita o mesmo caminho do
+        /// duplo-clique no ícone do tray (OnOpenMainWindow): restaura os timers, garante
+        /// o MainFrame visível (Opacity=1 — começa em 0 no XAML) e faz Show + Activate.
+        ///
+        /// (29/09) Sem isto o clique no menu de contexto com o Kit na bandeja parecia
+        /// morto: o IPC chamava Activate()/Focus() numa janela HIDDEN, que continuava
+        /// invisível. Agora o fluxo --unlock/--takeown SEMPRE traz o Kit para a frente.
+        /// </summary>
+        public void ShowAndActivateFromTray()
+        {
+            try
+            {
+                if (!Dispatcher.CheckAccess())
+                {
+                    Dispatcher.Invoke(ShowAndActivateFromTray);
+                    return;
+                }
+
+                try { _trayService?.ResumeMonitoring(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                EnsureUIInitialized();
+
+                if (MainFrame != null)
+                {
+                    MainFrame.BeginAnimation(Frame.OpacityProperty, null);
+                    MainFrame.Opacity = 1;
+                }
+
+                if (!IsVisible) Show();
+                if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+                Activate();
+                Focus();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NAV] Erro ao mostrar a janela da bandeja: {ex.Message}");
             }
         }
 
@@ -1439,6 +1479,9 @@ namespace KitLugia.GUI
         {
             try
             {
+                // O Kit pode estar na bandeja — mostra a janela ANTES de navegar
+                ShowAndActivateFromTray();
+
                 var page = new Pages.WindowsSettings.ForceStopUnlockPage(0);
                 CleanupAndNavigate(page);
 
@@ -1463,6 +1506,9 @@ namespace KitLugia.GUI
         {
             try
             {
+                // Idem: clique no menu de contexto com o Kit na bandeja precisa ABRIR o Kit
+                ShowAndActivateFromTray();
+
                 var page = new Pages.WindowsSettings.ForceStopUnlockPage(1);
                 CleanupAndNavigate(page);
                 HighlightNavItem("ForceStopUnlock");
@@ -2535,9 +2581,18 @@ namespace KitLugia.GUI
         {
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
+                // "AGUARDE"/"PROCESSANDO" sao progresso (instalacoes, loja) e erros sao
+                // criticos — os dois continuam aparecendo mesmo com "Notificações" desligado.
+                bool isProgressToast = title == "AGUARDE" || title == "PROCESSANDO";
+                if (!Pages.AppSettingsHelper.ShowNotifications && !isProgressToast && type != NotificationType.Error)
+                {
+                    ConsoleManager.WriteLine($"NOTIFICAÇÃO (silenciada nas opções): [{title}] {message}");
+                    return;
+                }
+
                 ConsoleManager.WriteLine($"NOTIFICAÇÃO: [{title}] {message}");
 
-                if (title != "AGUARDE" && title != "PROCESSANDO")
+                if (!isProgressToast)
                     NotificationHistoryManager.Add(title, message, type);
 
                 string searchId = (type == NotificationType.Info) ? "GENERIC_INFO" : $"{type}|{title}|{message}";

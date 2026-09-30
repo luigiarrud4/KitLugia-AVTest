@@ -208,13 +208,6 @@ namespace KitLugia.GUI.Pages
 
         private void BtnRefreshStatus_Click(object sender, RoutedEventArgs e) => RefreshStatus();
 
-        private void BtnExpandAll_Click(object sender, RoutedEventArgs e)
-        {
-            // Na nova UI, tudo já está expandido por padrão neste design simplificado.
-            // Poderíamos adicionar lógica de expandir/colapsar nos ViewModels se necessário.
-            LoadData();
-        }
-
         // --- "Presets Personalizados": janela própria (padrão PathExplorerWindow) ---
         // A janela mostra o que SERÁ ativado e o que NÃO será em cada item.
 

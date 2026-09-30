@@ -41,8 +41,7 @@ public sealed class NetworkExposureManager : IDisposable
             ("https://ipecho.net/plain", "text/plain")
         };
 
-        using var client = new HttpClient();
-        client.Timeout = TimeSpan.FromSeconds(5);
+        using var client = KitHttp.CreateClient(TimeSpan.FromSeconds(5));
 
         foreach (var (url, contentType) in services)
         {
@@ -598,7 +597,7 @@ public class UPnPDevice
                 "<s:Body><u:GetExternalIPAddress xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\" />" +
                 "</s:Body></s:Envelope>";
 
-            using var client = new HttpClient();
+            using var client = KitHttp.CreateClient(TimeSpan.FromMinutes(2));
             var content = new StringContent(soapBody);
             content.Headers.Add("SOAPACTION", "\"urn:schemas-upnp-org:service:WANIPConnection:1#GetExternalIPAddress\"");
             
@@ -640,7 +639,7 @@ public class UPnPDevice
                 $"<NewLeaseDuration>{leaseDuration}</NewLeaseDuration>" +
                 "</u:AddPortMapping></s:Body></s:Envelope>";
 
-            using var client = new HttpClient();
+            using var client = KitHttp.CreateClient(TimeSpan.FromMinutes(2));
             var content = new StringContent(soapBody);
             content.Headers.Add("SOAPACTION", "\"urn:schemas-upnp-org:service:WANIPConnection:1#AddPortMapping\"");
             
@@ -669,7 +668,7 @@ public class UPnPDevice
                 $"<NewProtocol>{protocol}</NewProtocol>" +
                 "</u:DeletePortMapping></s:Body></s:Envelope>";
 
-            using var client = new HttpClient();
+            using var client = KitHttp.CreateClient(TimeSpan.FromMinutes(2));
             var content = new StringContent(soapBody);
             content.Headers.Add("SOAPACTION", "\"urn:schemas-upnp-org:service:WANIPConnection:1#DeletePortMapping\"");
             
@@ -687,7 +686,7 @@ public class UPnPDevice
 
         try
         {
-            using var client = new HttpClient();
+            using var client = KitHttp.CreateClient(TimeSpan.FromMinutes(2));
             var response = await client.GetStringAsync(_controlUrl);
             
             // Parse XML para encontrar WANIPConnection service

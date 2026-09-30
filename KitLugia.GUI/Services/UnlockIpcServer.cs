@@ -118,31 +118,18 @@ namespace KitLugia.GUI.Services
         {
             try
             {
-                // Navigate within the existing Kit window (like Guardian does)
+                // Navigate within the existing Kit window.
+                // IMPORTANTE (29/09): usar ShowAndActivateFromTray — a janela pode estar
+                // HIDDEN na bandeja (CloseToTray), e Activate()/Focus() numa janela
+                // invisível não mostra nada (era o "cliquei e o Kit não abriu").
                 if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mw)
                 {
-                    // Bring window to front
-                    if (mw.WindowState == WindowState.Minimized)
-                        mw.WindowState = WindowState.Normal;
-                    mw.Activate();
-                    mw.Focus();
-
-                    // Navigate to ForceStopUnlock page and pass the path
+                    mw.ShowAndActivateFromTray();
                     mw.NavigateToUnlock(path);
                 }
                 else
                 {
-                    // Fallback: open a new window if MainWindow isn't available
-                    var win = new Windows.ForceStopUnlockWindow();
-                    win.Show();
-                    win.Loaded += async (s, e) =>
-                    {
-                        var txtPath = win.FindName("TxtPath") as System.Windows.Controls.TextBox;
-                        if (txtPath != null) txtPath.Text = path;
-                        await Task.Delay(200);
-                        var btn = win.FindName("BtnAnalyze") as System.Windows.Controls.Button;
-                        btn?.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, btn));
-                    };
+                    OpenFallbackWindow(path);
                 }
             }
             catch (Exception ex)
@@ -150,7 +137,6 @@ namespace KitLugia.GUI.Services
                 Logger.Log($"[IPC] Erro ao abrir unlock: {ex.Message}");
             }
         }
-
 
         /// <summary>
         /// Abre a página unificada na aba Take Ownership (reaproveita File Operations).
@@ -163,42 +149,42 @@ namespace KitLugia.GUI.Services
             {
                 if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mw)
                 {
-                    if (mw.WindowState == WindowState.Minimized)
-                        mw.WindowState = WindowState.Normal;
-                    mw.Activate();
-                    mw.Focus();
+                    // Mostra a janela (mesmo escondida na bandeja) e navega para a aba
+                    // Take Ownership já com o caminho — a ação começa na própria página.
+                    mw.ShowAndActivateFromTray();
                     mw.NavigateToTakeOwn(path);
                 }
                 else
                 {
-                    // Fallback headless (sem MainWindow): executa direto e mostra toast quando possível
-                    bool isDir = Directory.Exists(path);
-                    if (!isDir)
-                    {
-                        FileTakeOwnership.ProbePath(path, out bool pExists, out bool pIsDir, out _);
-                        isDir = pExists ? pIsDir : false;
-                    }
-                    string name = Path.GetFileName(path.TrimEnd('\\')) ?? path;
-                    _ = Task.Run(() =>
-                    {
-                        var result = FileTakeOwnership.TakeOwn(path, recursive: isDir);
-                        Application.Current?.Dispatcher?.Invoke(() =>
-                        {
-                            if (Application.Current.MainWindow is KitLugia.GUI.MainWindow mw2)
-                            {
-                                if (result.Ok)
-                                    mw2.ShowSuccess("TAKE OWNERSHIP", $"✅ {name}: {result.Success} item(ns) agora são seus." + (isDir ? "\n(Recursivo — incluiu todas as subpastas)" : ""));
-                                else
-                                    mw2.ShowError("TAKE OWNERSHIP", $"{name}: {result.Failed} falha(s) de {result.Total}.\n" + string.Join("\n", result.Errors.Take(3)));
-                            }
-                        });
-                    });
+                    // Sem MainWindow (não deve acontecer com o app normal): abre a janela
+                    // dedicada em vez de executar a operação às escondidas — o usuário
+                    // PRECISA ver que o clique fez algo.
+                    OpenFallbackWindow(path);
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"[IPC] Erro take ownership: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Último recurso quando não existe MainWindow: abre uma janela dedicada de
+        /// Force Stop Unlock com o caminho pré-preenchido e dispara a análise.
+        /// Nunca executa a operação de forma invisível.
+        /// </summary>
+        private static void OpenFallbackWindow(string path)
+        {
+            var win = new Windows.ForceStopUnlockWindow();
+            win.Show();
+            win.Loaded += async (s, e) =>
+            {
+                var txtPath = win.FindName("TxtPath") as System.Windows.Controls.TextBox;
+                if (txtPath != null) txtPath.Text = path;
+                await Task.Delay(200);
+                var btn = win.FindName("BtnAnalyze") as System.Windows.Controls.Button;
+                btn?.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, btn));
+            };
         }
 
         /// <summary>

@@ -7730,3 +7730,526 @@ nao pode regredir.
 - [ ] (pendencia da sessao anterior) refatorar os 11 botoes da sidebar num style unico
 - [ ] (opcional) `TmVisualBench sort` salvar tambem um print de cada aba em janela PEQUENA
       (400x600) para pegar clipping de overlay automaticamente
+### Sessao 28/09 — TaskManager: "abre mas demora para mostrar valor" (véu de carga) + anti-stutter de áudio na engrenagem
+
+Pedido: "continue e olhe tudo que puder sobre o taskmanager depois quando tiver certeza que
+tudo dele funciona voltaremos a focar só no app", mais: (1) nos PCs dos amigos o TM abre mas
+os valores demoram e não aparece nenhum sinal de carregamento; (2) o item de anti-stutter de
+áudio poderia estar nas configurações do Kit (engrenagem).
+
+**1. Diagnóstico (caminho crítico do 1º refresh)**
+
+`RefreshAsync` fazia `await Task.WhenAll(netTask, gpuTask, gpuPerPidTask, snapTask)`: o
+desenho esperava o coletor MAIS LENTO do pipeline — o `PDH \GPU Engine(*)` por processo, que
+na 1ª chamada custa 800-1400 ms aqui (perflib frio + warmup de 150 ms) e 2-6 s em máquina
+fraca. Somado a isso, o Resumo (aba que abre) só recebia número no 1º tick do `_graphTimer` —
+1 s DEPOIS do Loaded. Resultado: estrutura pronta, tela vazia e nenhuma indicação de trabalho.
+
+**2. Correções na janela do TM**
+
+- `KitTaskManagerWindow.xaml`: novo `LoadOverlay` (row 1, ColumnSpan 2, ZIndex 60) com
+  spinner (elipse tracejada), título, etapa, 4 barrinhas de progresso e tempo decorrido.
+  Fundo `#8C070B11` + `IsHitTestVisible=False`: informa sem bloquear (abas seguem clicáveis e
+  dá para ver os valores chegando atrás).
+- `KitTaskManager.Loading.cs` (novo partial): `BeginLoadingOverlay` (chamado no Loaded),
+  `SetLoadStage`, `NotifyLoadCountersReady/RowsPainted/GraphicsRendered`,
+  `FinishLoadingOverlay` (fade de 220 ms + log `[KIT TASK MANAGER] 1ª carga em ... ms`) e
+  `StopLoadingOverlay` no `Closing`. UM `DispatcherTimer` de 100 ms (giro + tempo), parado
+  quando o véu sai. Teto de segurança de 15 s: nenhuma falha de coleta deixa o véu preso.
+- `RefreshAsync`: `KickAuxCollectors()` (GPU por processo, conexões TCP, nomes de usuário)
+  passa a rodar DESACOPLADO do desenho, publicando objetos novos (`_auxGpuPerPid`,
+  `_auxNetConnections`, `_auxUserNames`) com guarda `_auxCollecting` (uma coleta por vez). O
+  refresh usa o último valor publicado; só a 1ª pintura dá uma janela de 300 ms. `_lastGpuPct`
+  só é sobrescrito por valor real (`>= 0`).
+- `Loaded`: primeiro `UpdatePerformanceGraphsSafe()` IMEDIATO (antes: 1 s depois) — o Resumo
+  recebe número assim que a 1ª amostra fica pronta.
+
+**3. Bench: modo `load` (novo) — "lento" virou número**
+
+`tests/TmVisualBench` agora tem o modo `load`: bombeia o dispatcher em passos de 25 ms e
+imprime a linha do tempo da 1ª carga, salva `out/tm_carregando.png` (véu em ação) e
+`out/tm_primeiro_conteudo.png`, checa sobreposição no cartão do véu e dourado visível.
+Medido (Debug, 1680x1000 e 1180x740): véu em t+28 ms · 1ª lista t+435 ms (131 linhas) ·
+Resumo com valor t+1007 ms (14 linhas no Top processos) · status t+488 ms · véu saiu
+t+1235 ms · "layout do véu OK" · 0 dourado · véu ainda visível: não.
+
+**4. Bug de TESTE (não do app): `sort` acusava "ordem errada" por empate de 0,1**
+
+`RamValue|Descending` acusava 8-10 pares fora de ordem (7-8%). Investigação: a pior violação
+era **Δ 0,1 MB** — a ordenação do TM arredonda em 1 casa (anti-pisca) e depois desempata pela
+posição anterior, ou seja: empate proposital, invisível na tela. O bench agora só conta
+violação quando a diferença passa a granularidade (> 0,1) e reporta os empates à parte.
+Resultado: `sort` → **TUDO OK** (9 critérios de ordenação, detalhe ao vivo, submenu, fixar,
+histórico). Nenhuma mudança no app foi necessária.
+
+**5. Anti-stutter de áudio nas configurações do Kit (engrenagem)**
+
+- `TrayIconService`: `AudioAntiStutterEnabled` (lê o monitor = fonte única),
+  `SetAudioAntiStutter(enabled, persist)` (monitor + AutoRecover + Start/Stop da escuta +
+  SaveSettings) e `PersistAudioAntiStutter(enabled)` (só registro, para o TM).
+  `LoadSettings()` aplica o valor salvo com `persist:false` — o recurso vale desde a abertura
+  do Kit, sem abrir o Gerenciador de Tarefas.
+- Chave: `HKCU\Software\KitLugia\TraySettings\AudioAntiStutter` (mesmo padrão dos toggles
+  da comunidade/GameBoost).
+- `SettingsPage.xaml(.cs)`: card **ÁUDIO → Anti-Stutter de Áudio** com `ToggleAudioAntiStutter`
+  e linha de estado honesta (`UpdateAudioStutterStatus`: "Ativo: escutando…", "Ativo (salvo): a
+  escuta não subiu agora…", "Desligado"). Evento em `AddToggleEvents` e desassinatura no
+  `Cleanup` (convenção da página).
+- `KitTaskManager.Audio.cs`: o checkbox da aba Latência (que mantém as regras próprias de
+  escuta do diagnóstico) agora ESPELHA a escolha na mesma chave de registro
+  (`PersistAudioAntiStutterPreference`), então as duas telas nunca divergem.
+- Motor (gatilho/cooldown/limite/reset) INTOCADO — a auditoria de 53 asserções de 25/09
+  segue valendo.
+
+**Verificação**
+- Build: **0 erros** (solução completa; o processo `KitLugia.GUI` travava a cópia dos DLLs —
+  encerrado com autorização do usuário).
+- `load` em 1680x1000 e 1180x740: OK (números acima), `layout do véu` OK nos dois tamanhos.
+- `tabs gold` 10/10 abas: nenhum texto sobreposto, **0 dourado**.
+- `flicker`: Resumo 3,1 % · Processes 3,1 % · Storage 12,1 % · Diagnostic 25,0 % (mesmos
+  patamares de 27/09 — sem regressão).
+- `sort`: **TUDO OK**. `PagesBench loaded`: SettingsPage constrói em 8,7 ms, sem erro e sem
+  vazamento (sobra3 = 0).
+
+**Docs**: `docs/TM_FIRST_LOAD.md` (novo: diagnóstico, correções, números),
+`docs/TM_STYLE_MAP.md` (seção 9 "Véu de carregamento" + comandos do bench + histórico),
+`docs/AUDIO_RECOVERY_ROBUSTNESS.md` (seção do item nas configurações do Kit).
+
+### Proxima sessao
+- [ ] Testar no app: abrir o TM (de preferência em VM/máquina fraca) e ver o véu com spinner,
+      etapa e tempo saindo sozinho quando a 1ª lista e o 1º valor do Resumo aparecem
+- [ ] Testar no app: engrenagem → ÁUDIO → Anti-Stutter de Áudio ON → conferir
+      `HKCU\Software\KitLugia\TraySettings\AntiStutter` (nome exato: `AudioAntiStutter`),
+      reabrir o Kit e ver o card em "Ativo: escutando…" + checkbox do TM (Latência) marcado
+- [ ] (pendência) desenho incremental dos canvas: Storage (12,1 % de repintura) e Diagnostic
+      (25,0 %) — desenhar só o que mudou, como no histórico do Resumo
+- [ ] (pendência) migrar os ~15 cartões do TM para `Style="{StaticResource TmCard}"`
+- [ ] (pendência) refatorar os 11 botões da sidebar do TM num style único
+- [ ] (pendência) alinhamento/espaçamento das abas (começando por Latência)
+- [ ] (pendência) ForceStop/TakeOwnership: revisar robustez
+- [ ] (opcional) rodar `tests/AudioRecoveryAudit phase1` depois de mexer em áudio (executa um
+      reset real do audiodg por ~300 ms)
+
+### Sessao 28/09 — Auditoria das páginas ATIVAS (42 páginas alcançáveis)
+
+Pedido: "dê uma geral nas pages ativas do app, as que o usuário pode acessar, e veja se está
+tudo em ordem".
+
+**1. Universo fechado (como o usuário chega em cada página)**
+
+Pontos de entrada reais: sidebar+toolbar (14 itens), busca global (`SearchEngine.AddNav` →
+`MainWindow.NavigateToPage(string)` → `Enum.TryParse<PageType>` + `NavTagMap`), cards do
+Dashboard, cards da `WindowsPage`, cards da `AdvancedToolsPage`, engrenagem → `SettingsPage`,
+`KitStoreWindow` → `StoreRemakePage`, aba Diagnóstico do TM, IPC do Explorer → ForceStopUnlock.
+Resultado: **42 páginas ativas**;
+
+**6 páginas são código MORTO** (nenhuma referência fora dos dois `switch` de navegação):
+`AboutPage`, `BloatwarePage`, `OptimizationPage`, `ProcessMonitorPage`, `ProgramsPage`,
+`ContextMenuPreviewPage` (o preview foi embutido na `ContextMenuPage`). Continuam compilando e
+aparecem nos benches (48 páginas construídas) — remoção NÃO feita (decisão do usuário).
+Ponto obscuro: `ContextMenuPage` só é alcançável pela busca global (nenhum botão/card).
+
+**2. Ferramentas de auditoria criadas (ficam no repo)**
+
+- `tests/page_audit.sh` — checklist por página: `public void Cleanup()`, `Unloaded +=`,
+  lambda em `Unloaded`, timer com Stop/Dispose, `DataContext = null`, trabalho pesado no
+  construtor (regex na 1a região do ctor), paths absolutos em C#.
+- `tests/page_cleanup_audit.sh` — checa DENTRO do corpo do `Cleanup()` se cada timer da página
+  é parado, eventos estáticos desinscritos, `Loaded` removido e `DataContext = null`.
+- `dotnet run --project tests/PagesBench -- leak` (48 páginas, 3 corridas).
+
+**3. Correções aplicadas (todas são defeitos reais, não estilo)**
+
+1. `ServerPage`: inscrição `Unloaded` NUNCA existia (só o `Unloaded -=` no Cleanup) → Cleanup
+   morto em navegação comum (túnel/Playit não eram encerrados). Inscrição adicionada.
+2. `QuickInstallPage`: sem `Unloaded` → pasta temporária da ISO (`%TEMP%\KL_WIN_*`) ficava para
+   trás. Handler nomeado + `Unloaded` + `DataContext = null`.
+3. `ShrinkPage`: sem `Unloaded` → CTS de operações longas não cancelado ao sair.
+4. `UpdatePage`: o construtor disparava `Task.Run(Confidence.Benchmark())` — **10.000 iterações
+   × 25 pares × 2 implementações = 500.000 chamadas (P/Invoke incluso)** a cada abertura da
+   página, só para escrever uma linha no log (o resultado nunca era lido). Removido do ctor.
+5. `PartitionsPage`: `LoadDisks()` no construtor (anti-pattern 8) movido para o `Loaded`
+   (uma vez, em background); bloco `_usageMonitorCts` duplicado no Cleanup removido.
+6. `ForceStopUnlockPage`, `ContextMenuManagerPage`, `ContextMenuAddPage`:
+   `Unloaded += (_,_) => Cleanup();` (lambda não removível) → handlers nomeados + `-=`.
+7. `StoreRemakePage`: cleanup embutido no handler, sem `public void Cleanup()` → extraído.
+8. `SearchEngine`: tag de navegação `"Games"` NÃO existe em `PageType` nem no `NavTagMap` →
+   buscar "Jogos" respondia "EM BREVE". Virou entrada `Windows` (a `WindowsPage` não tinha
+   entrada na busca; o GameBoost já tinha a sua).
+9. `ServicesPage`: `StartsWith(@"C:\Program Files\WindowsApps")` (path absoluto, regra 1)
+   → resolvido por `Environment.SpecialFolder.ProgramFiles`.
+10. `WinpeToolsPage.xaml` (dicas): texto mandava olhar `C:\Program Files\KitLugia\WinPE\` e
+    `C:\KitLugia_WinPE_Log.txt` — kit é portátil e o log vai para a raiz do volume alvo.
+    Texto corrigido (staging `C:\KL_WINPE`, log no volume alvo).
+
+**4. Evidências**
+
+- Build: **0 erros** (solução completa).
+- `PagesBench leak`: frio total 656–801 ms, quente 3,5–3,9 ms/página, layout 19,4–21,1 ms/página,
+  retido 15,3 MB, working set 44 → 186/194 MB. **Nenhuma página ativa reteve >512 KB depois do
+  Cleanup() em 2 corridas seguidas** (sem vazamento).
+- Tags da busca: todas resolvem (após o item 8).
+- Hotspots (backlog, não vazamento): `PrivacyPage` layout ~190 ms, `RepairsPage` ~167 ms,
+  `GameBoostPage` frio ~88 ms, `GlobalSearchPage` frio ~54 ms.
+- Falsos positivos documentados (não reabrir): `DiagnosticPage` (nomes de campos de OUTROS
+  componentes lidos por reflection — é o visualizador de timers), `NetworkPage` (`_timersStarted`),
+  `ScreenPage` (só `GetSystemMetrics` no ctor), `WinpeToolsPage` (regex de log, não path de
+  recurso), lambdas em `Loaded`/`Unloaded` do próprio `this` (sem raiz externa).
+
+**Docs**: `docs/PAGES_ACTIVE_AUDIT.md` (novo: universo, achados, evidências, falsos positivos,
+backlog).
+
+### Proxima sessao
+- [ ] Decidir o destino do código morto (6 páginas: About/Bloatware/Optimization/ProcessMonitor/
+      Programs/ContextMenuPreview) — remover ou reancorar na UI
+- [ ] Reduzir o layout de `PrivacyPage` (~190 ms) e `RepairsPage` (~167 ms) — virtualizar/reduzir
+      a árvore (mesmo item da "Fase 1" do plano de páginas)
+- [ ] Dar um ponto de entrada visível para a `ContextMenuPage` (hoje só a busca global alcança)
+- [ ] Testar no app: navegar por todas as 42 páginas ativas e conferir visual/estado
+      (validação humana — o bench não abre janela)
+- [ ] (carregado) Testar o véu de carregamento do TM e o toggle Anti-Stutter na engrenagem
+- [ ] (carregado) desenho incremental dos canvas do TM (Storage 12,1 % / Diagnostic 25,0 %)
+- [x] ~~(carregado) ForceStop/TakeOwnership: revisar robustez~~ → feito na sessão 28/09 (ver abaixo)
+
+### Sessao 28/09 (cont.) — Force Stop + Take Ownership "SEMPRE funcionam" (pipeline garantido)
+
+Pedido: "faça tanto o force stop quanto o take ownership sempre funcionar sem parar quando o
+usuário for usar" (entrada: card Force Stop na `WindowsPage`; também o menu de contexto do Kit).
+
+**1. CAUSA RAIZ ENCONTRADA (a mais importante de todas): privilégio nunca era habilitado**
+
+`TOKEN_PRIVILEGES` estava declarado em 4 lugares como `int PrivilegeCount; long Luid; int
+Attributes;` (e em 2 como `Pack = 1`). O `LUID` nativo é `{ DWORD LowPart; LONG HighPart; }`
+com **alinhamento 4** — com `long` (alinhado a 8) o campo cai no offset 8 e o Windows lê um
+**LUID inválido**: `AdjustTokenPrivileges` retorna **TRUE + ERROR_NOT_ALL_ASSIGNED (1300)** e
+**nenhum privilégio entra no token**.
+
+Consequências reais que isso explica:
+- `EnableDebugPrivilege()` nunca habilitava SeDebug → o scan nativo de handles não enxergava
+  processo de outro usuário ("não acha nada");
+- `FileTakeOwnership.EnablePrivileges()` nunca habilitava SeTakeOwnership/Backup/Restore → o
+  take ownership in-process só funcionava quando caía no fallback `takeown.exe`+`icacls`;
+- `RegistryOwnership` (struct sem `PrivilegeCount`!) e `MemoryOptimizer`/`TrayIconService`
+  (Pack=1) idem (ownership de registro e purge da standby list).
+
+Corrigido com struct `LUID` explícita (layout 4+8+4 = 16 bytes) + checagem de 1300 com log
+honesto em: `ForceStopUnlockService`, `Tweaks/FileTakeOwnership`, `RegistryOwnership`,
+`MemoryOptimizer`(Pack=4), `Services/TrayIconService`(Pack=4) e no novo `FileOpGuarantee`.
+Evidência (log do worker, antes → depois): `Privilégios habilitados: nenhum` →
+`SeDebugPrivilege, SeTakeOwnershipPrivilege, SeBackupPrivilege, SeRestorePrivilege,
+SeLoadDriverPrivilege`.
+Diagnóstico usado: `tests/check_elevation.ps1` (TokenElevation) e `tests/list_privs.ps1`
+(lista os privilégios do token via `GetTokenInformation/TokenPrivileges`).
+
+**2. Pipeline garantido (`KitLugia.Core/FileOpGuarantee.cs`, novo)**
+
+Ordem fixa, nenhuma etapa opcional: (0) habilita os 5 privilégios; (1) probe NATIVO do caminho
+(distingue "não existe" de "ACL nega"); (2) TakeOwnership quando a ACL nega (ou sempre, na ação
+de ownership); (3) bloqueadores (Restart Manager → handles nativos → handle64 → drivers .sys);
+(4) ação pedida — ForceStop confere com handle EXCLUSIVO, Delete usa os 6 métodos (pasta
+recursiva); (5) **nunca beco sem saída**: se ainda houver handle ativo, agenda a remoção no
+próximo boot (`ScheduleDeleteOnReboot`) e reporta como sucesso agendado.
+`GuaranteeResult` tem `Ok/ScheduledForReboot/StillBlocked/NeedsAdmin` + contadores e a lista de
+passos (progresso ao vivo na UI).
+
+**3. Um único UAC, sem tirar o usuário da tela**
+
+- `KitLugia.GUI/Services/ElevatedFileOpRunner.cs` (novo): se não elevado, sobe o MESMO exe como
+  `--worker` com `Verb=runas`, acompanha o progresso por arquivo e devolve o resultado à página;
+  UAC cancelado → roda in-process no melhor esforço e diz o que exigia admin (nunca no-op).
+  `IsAdmin` agora usa `FileOpGuarantee.IsElevated()` (TokenElevation) — `IsInRole(Administrator)`
+  pode dar "true" com token filtrado (UAC ligado) e era o caso em que o app não elevava.
+- `Program.cs`: modo `--worker` parseado ANTES do mutex/da UI (o app principal segue dono da
+  janela). `RunHeadlessFileOperation` (menu de contexto, `--unlock`/`--takeown`) passou a usar o
+  pipeline e o toast reporta "agendado para o próximo boot"/"precisa de admin".
+- `ForceStopUnlockPage`: `EnsureElevatedForFileOp` REMOVIDO (perguntava "relançar elevado?" e
+  encerrava o clique). Agora `RunGuaranteedAsync` atende **Tentar Deletar**, **Liberar
+  Selecionados** (Force Stop) e **Assumir** (Take Ownership), com progresso no painel da página.
+- Card da `WindowsPage` atualizado (tooltip + descrição) para refletir o comportamento novo.
+
+**4. Evidências dos testes headless (exe real, no host)**
+
+| Cenário | Resultado |
+|---|---|
+| arquivo travado por outro processo (PowerShell com handle exclusivo) + `--action delete` | 1 bloqueador → handle fechado via Restart Manager → `File.Delete` OK → `R|OK|1`, arquivo removido |
+| árvore de teste + `--action takeown --recursive` | 5/5 itens, dono mudou de `0PKM6PR0\Lugia` para `BUILTIN\Administradores`, "Acesso confirmado" |
+| arquivo travado + `--action force-stop` | handle fechado, "Caminho liberado: nenhum handle ativo restante", arquivo intacto |
+
+Build: **0 erros** (solução completa). Docs: `docs/FORCE_STOP_UNLOCK.md` (seção nova com o
+pipeline, os bugs de raiz e o checklist de teste no app).
+
+### Proxima sessao
+- [ ] Testar no app (com o Kit SEM elevação): Windows → Force Stop → colar caminho → **Tentar
+      Deletar** / **Liberar Selecionados** → aceitar o UAC UMA vez e ver o progresso chegando na
+      própria página (não deve abrir outra janela nem parar)
+- [ ] Testar no app: aba **Take Ownership** → **Assumir** em item protegido (ex: `C:\Windows.old`)
+- [ ] Testar o menu de contexto do Explorer (Force Stop / Take Ownership) com o Kit rodando
+      normalmente (deve resolver via worker elevado + toast)
+- [ ] Confirmar no log (`%LocalAppData%\KitLugia\Logs\KitLugia.log`) as linhas
+      `Privilégios habilitados: SeDebugPrivilege, ...` (se aparecer "nenhum" de novo, é regressão
+      de layout de LUID)
+- [ ] (carregado) Decidir o destino do código morto (6 páginas) e reduzir o layout de `PrivacyPage`/
+      `RepairsPage`
+- [ ] (carregado) desenho incremental dos canvas do TM (Storage 12,1 % / Diagnostic 25,0 %)
+
+### Sessao 29/09 — Menu de contexto: "nada acontecia" + duplicatas (RESOLVIDO)
+
+Sintoma (print do usuario): o clique direito no Explorer mostrava DUAS entradas
+("Take Ownership (KitLugia)" e "Take Ownership Super (KitLugia)") e o clique nao abria
+o Kit nem fazia nada — "o antigo conseguia pelo menos abrir o kit para iniciar a
+operacao sem scripts externos; o de agora nao consegue nem abrir o kit".
+
+**Causa 1 — o bootstrap engolia o clique (`Program.cs`).**
+`--unlock/--takeown` fazia: (a) sem admin → relancava o exe elevado (`Verb=runas`) e
+ENCERRAVA esta instancia; (b) a instancia elevada, encontrando o Kit ja aberto (mutex
+ocupado), rodava `RunHeadlessFileOperation` (worker headless + toast) e saia —
+NENHUMA janela. Com o Kit na bandeja (caso comum) o clique ficava mudo.
+Log do host, minutos antes do fix: `[ELEV] Instancia elevada + mutex ocupado → worker
+headless.` (5x seguidas — era o usuario clicando e nada abrindo).
+
+Correcao: o bootstrap agora SO entrega o comando — IPC para a instancia existente ou
+abre a UI em modo `--unlock/--takeown` quando nao ha nenhuma. A elevacao passa a ser
+responsabilidade da PAGINA (`RunGuaranteedAsync` → `ElevatedFileOpRunner`: 1 UAC, com
+progresso visivel, e so quando o alvo exigir). `RunHeadlessFileOperation` REMOVIDO
+(dead code). O `--worker` (processo elevado chamado pelo runner) continua igual.
+
+**Causa 2 — janela na bandeja nao era mostrada (`MainWindow` / `UnlockIpcServer`).**
+`CloseToTray` usa `Hide()`; o IPC chamava `Activate()/Focus()` → janela invisivel
+continua invisivel. Novo `MainWindow.ShowAndActivateFromTray()` (resume os timers,
+`EnsureUIInitialized`, `MainFrame.Opacity=1`, `Show()` se invisivel, `Normal` se
+minimizada, `Activate`+`Focus`), chamado no inicio de `NavigateToUnlock`/
+`NavigateToTakeOwn` e pelo IPC. O fallback headless do `OpenTakeOwnership` (executava
+takeown sem UI nenhuma) virou `OpenFallbackWindow` (janela dedicada com o caminho) —
+o usuario PRECISA ver que o clique fez algo.
+
+**Causa 3 — duplicatas.** Duas chaves registravam a MESMA acao, com o comando
+identico: `\shell\kittakeown` (`AddTakeOwnershipKit`, toggle da pagina) e
+`\shell\kit_takeownership` (`ContextMenuQuickAdd.AddTakeOwnershipSuper`).
+Canonica = `kittakeown`. `AddTakeOwnershipSuper` REMOVIDO; o item super do catalogo
+agora delega para `AddTakeOwnershipKit()/RemoveTakeOwnershipKit()` (que passou a apagar
+tambem `kit_takeownership`/`kit_takeown`/`kit_takeown_super`). Novo
+`SystemTweaks.ConsolidateTakeOwnershipMenu()` — migracao idempotente chamada no startup
+junto de `RefreshContextMenuPathsIfNeeded`/`ReapplyContextMenuPrefs`: remove o legado e
+recria a canonica com o path atual do exe. O item da ContextMenuAddPage agora aparece
+como "Take Ownership (KitLugia)".
+
+**Validado no host (exe Debug real):**
+- startup com as 2 chaves: `kit_takeownership` removida, resta so `kittakeown`
+  (`*` e `Directory`); log `[TAKEOWN KIT] Duplicatas consolidadas em uma unica
+  entrada: kittakeown`
+- `--takeown <arquivo>` com o Kit na bandeja: `[IPC] Comando recebido: TAKEOWN` +
+  entrega na instancia existente E **janela visivel** (`MainWindowHandle` valido,
+  titulo "Kit Lugia - Gold Edition") — exatamente o bug reportado
+- `--unlock <arquivo>`: `[IPC] Comando recebido: UNLOCK` (mesmo caminho)
+- `--worker --action takeown`: `R|OK|1` / `OWNED|1` + os 5 privilegios (sem regressao)
+
+Build: 0 erros. Arquivos: `KitLugia.GUI/Program.cs`, `KitLugia.GUI/MainWindow.xaml.cs`,
+`KitLugia.GUI/Services/UnlockIpcServer.cs`, `KitLugia.Core/Tweaks/ContextMenuQuickAdd.cs`,
+`KitLugia.Core/SystemTweaks.cs`, `KitLugia.GUI/App.xaml.cs`, `docs/FORCE_STOP_UNLOCK.md`.
+
+### Proxima sessao
+- [ ] Testar no app o clique real do Explorer (com o Kit na bandeja):
+      "Take Ownership (KitLugia)" e "Force Stop Unlock (KitLugia)" → a janela deve ABRIR
+      na pagina certa com o caminho ja analisado, pedindo no maximo 1 UAC
+- [ ] Confirmar que o menu de contexto agora tem UMA unica entrada de Take Ownership
+      (a duplicata "Take Ownership Super" nao deve voltar apos reiniciar o Kit/Windows)
+- [ ] (carregado) Testar no app (com o Kit SEM elevacao): Windows → Force Stop →
+      **Tentar Deletar** / **Liberar Selecionados** com 1 UAC e progresso na propria pagina
+- [ ] (carregado) Decidir o destino do codigo morto (6 paginas) e reduzir o layout de
+      `PrivacyPage`/`RepairsPage`
+- [ ] (carregado) desenho incremental dos canvas do TM (Storage 12,1 % / Diagnostic 25,0 %)
+
+### Sessao 29/09 (cont.) — Force Stop: auditoria de cobertura + bug de PERDA DE DADOS
+
+Pedido do usuario: "o force stop tem que ser infalivel e suportar todos os arquivos;
+nos ultimos testes derrubar o goodbyedpi (servicos .sys e arquivos .sys) deu certo, so
+veja se nao falta nada e nao quebre o codigo".
+
+Auditoria do pipeline (`FileOpGuarantee` -> `ForceStopUnlockService` ->
+`DriverUnlockService`) e 4 correcoes cirurgicas (nada removido ou invertido):
+
+**1. BUG DE PERDA DE DADOS — "Liberar" agendava a EXCLUSAO (corrigido).**
+Sem conseguir liberar, a acao ForceStop chamava
+`DriverUnlockService.ScheduleDeleteOnReboot` = `MoveFileEx(path, NULL,
+DELAY_UNTIL_REBOOT)` / `PendingFileRenameOperations` com destino vazio -> **apaga no
+proximo boot**. E o teste de lock era `!isDir && !IsLockedNow(...)`: **toda pasta**
+caia nesse ramo, entao "Liberar Selecionados" numa pasta agendava a exclusao dela.
+Fix: `HasActiveLock(target, isDir)` novo (arquivo = teste exclusivo; pasta = amostra de
+ate 512 arquivos internos) + ForceStop NAO agenda nada — reporta `StillBlocked` honesto
+e orienta usar **Tentar Deletar** (acao Delete mantem o agendamento no boot).
+
+**2. Raiz de unidade recusada.** ForceStop/Delete em `C:\`/`E:\` varriam o disco
+inteiro (logando cada arquivo) e podiam agendar a exclusao da raiz. Agora respondem
+"selecione um arquivo ou pasta" em **0,17 s**.
+
+**3. Fase 4 sem dependencia externa.** O fechamento de handle usava so `handle64.exe`;
+sem a ferramenta instalada, TODO handle achado pelo scan nativo virava erro falso.
+Agora tenta `CloseNativeHandle` (DuplicateHandle + DUPLICATE_CLOSE_SOURCE) primeiro e
+deixa o handle64 como fallback.
+
+**4. Erro fantasma do Restart Manager.** O RM registra `HandleId = "RM"`; a fase 4
+tentava "fechar RM" e gravava `Falha ao liberar handle RM de ...` no painel mesmo com a
+operacao bem-sucedida. `IsRealHandleId()` aceita apenas hex; o PID do RM segue para a
+fase 7 (se o RM nao liberou, o processo e finalizado).
+
+**Cobertura confirmada** (motor): arquivo comum; ACL negada (ownership antes de
+continuar); travado por app (Restart Manager -> handles nativos -> handle64 -> kill);
+`.dll`/`.exe` carregados; `.sys` carregado (driver scan -> SCM stop+delete ->
+NtUnloadDriver -> sc stop/delete); servico registrado (WinDivert/goodbyedpi — foi o que
+derrubou o goodbyedpi); pasta; processo de sistema (nunca morto, RM tenta antes); e raiz
+de unidade (recusada).
+Limitacoes honestas: handle de driver de kernel sem servico correspondente nao tem como
+ser fechado (reporta travado, sem mentir nem ter efeito colateral); UNC depende das ACLs
+do servidor; processos protegidos (PPL) nao sao finalizados.
+
+**Validado no host (exe Debug, worker elevado):**
+- pasta LIVRE: `OK=1`, "Pasta liberada: nenhum dos 2 arquivo(s) verificados esta
+  travado", NADA em `PendingFileRenameOperations`, pasta intacta (antes: agendava a
+  exclusao dela)
+- pasta com arquivo travado (`tests/hold_file_lock.ps1`, novo): `OK=1`, 1 handle + 1
+  processo finalizado, **sem erros fantasma**
+- arquivo livre: `OK=1` "Caminho liberado..." (antes: agendava a exclusao do arquivo)
+- `force-stop` em `C:\`: recusa em 0,17 s (antes: varria/logava o disco)
+- `delete` em arquivo travado: `DELETED=1` na hora; `delete` em pasta: pasta removida
+- `takeown`: `OWNED=1`
+
+Build: 0 erros. Arquivos: `KitLugia.Core/FileOpGuarantee.cs`,
+`KitLugia.Core/ForceStopUnlockService.cs`,
+`KitLugia.GUI/Pages/WindowsSettings/ForceStopUnlockPage.xaml.cs` (so comentario),
+`tests/hold_file_lock.ps1` (novo), `docs/FORCE_STOP_UNLOCK.md` (secao nova).
+
+### Sessao 29/09 (cont.) — Checklist VISUAL + COMANDOS pagina por pagina (48 paginas)
+
+Pedido do usuario: "olhar cada pagina individualmente e corrigir os elementos visuais e os
+comandos incorretos ou fora do lugar". Relatorio completo em **`docs/PAGES_VISUAL_AUDIT.md`**
+(tabela das 48 paginas + backlog). Complementa `docs/PAGES_ACTIVE_AUDIT.md` (que tratou
+Cleanup/Unloaded/timers/vazamento).
+
+**6 scripts read-only novos (ficam no repo):**
+`tests/pages_wiring_audit.sh` (handler XAML->cs e cs->XAML, FindName fantasma, path
+hardcoded), `tests/buttons_without_action.py` (`<Button>` sem Click/Command, ignorando os
+botoes "i" de ToolTip que sao o padrao do kit), `tests/pages_text_health.py` (mojibake,
+TODO/EM BREVE visivel, recurso removido, acento perdido), `tests/pages_visual_audit.py`
+(Title x cabecalho, secao repetida, pagina sem ScrollViewer, texto com Height fixo sem
+wrap), `tests/pages_accent_audit.py` (palavra PT sem acento em Text/Content/ToolTip/Header)
+e `tests/normalize_crlf.sh` (garante CRLF do .editorconfig preservando o BOM).
+
+**Regressoes reais corrigidas (funcionalidade inalcancavel):**
+1. `SecurityPage`: o card **"Acoes Rapidas"** tinha sumido do XAML mas os 3 handlers
+   (`BtnMaxSecurity_Click`, `BtnGamingMode_Click`, `BtnRestoreDefaults_Click`) continuavam
+   no .cs -> card RESTAURADO (Maxima Seguranca / Modo Gaming / Restaurar Padroes).
+2. `KitIsoStudioWindow` (janela viva do Studio): 3 botoes **sem Click** ("Importar .reg",
+   "Limpar", "Desmarcar tudo") e `BtnApplyDebloat_Click` com **corpo vazio** -> handlers
+   implementados (`.reg` via OpenFileDialog, limpar campo, marcar/desmarcar os AppX de
+   `PanelAppxPacks`).
+3. `SettingsPage`: 2 toggles que **mentiam** — "Log Detalhado" salvava e nunca aplicava
+   (havia `// TODO`), "Notificacoes" nao era lido por ninguem. Agora: log ->
+   `Logger.VerboseCheckLogs`; notificacoes -> `AppSettingsHelper.ShowNotifications`
+   (cache lazy, sem I/O no ctor) lido pelo `MainWindow.ShowNotification` — erro e toast de
+   progresso ("AGUARDE"/"PROCESSANDO") continuam aparecendo; subtitulo do toggle explica.
+4. `WinTunePage`: `InfoButton_Click` era codigo morto (o texto do tooltip em dialogo nao
+   tinha quem chamasse) -> religado por evento roteado (`ButtonBase.ClickEvent` no ctor),
+   funciona em qualquer aba (as abas so materializam quando abertas).
+5. `DriversPage`: `BtnWindowsUpdate_Click` era orfao -> botao **Windows Update** adicionado
+   no card "Instalar Driver" (capacidade ja existia em `DriverManager.OpenWindowsUpdateSettings`).
+
+**Comandos fora do lugar:**
+6. `IsoEditorPage`: o CANCELAR do overlay de configuracao chamava o MESMO handler do
+   "<- VOLTAR" e jogava o usuario para `AdvancedTools` -> novo `BtnCancelConfigOverlay_Click`
+   fecha so o overlay (VOLTAR segue saindo da pagina).
+7. `PrivacyPage`: botao **"Expandir Tudo"** nao expandia nada (a pagina nao tem 1 Expander;
+   so refazia o load, duplicando o "Atualizar") -> botao + handler removidos.
+8. `DashboardPage`: card "Ferramentas de Sistema" + tooltip prometendo SFC/DISM/BCDedit
+   abria a `ExmTweaksPage` ("Tweaks Avancados (EXM)", que a busca chama de "Exm Tweaks") ->
+   card renomeado para "Tweaks Avancados (EXM)" com tooltip fiel e icone da busca.
+9. `MainWindow` (3 pontos): atalho invalido respondia "EM BREVE / Pagina em desenvolvimento"
+   -> agora "PAGINA NAO ENCONTRADA" + orientacao (menu lateral / Ctrl+K).
+
+**Handlers orfaos removidos:** `DashboardPage` x4 (`BtnGoToTools`, `BtnGoToAllTweaks`,
+`BtnOptimizeStandard`, `BtnOptimizeExtreme` — os 2 ultimos ja vinham `[Obsolete]`),
+`CleanupPage` (`RegistryIssueSelection_Changed`), `TraySettingsPage`
+(`BtnAddProcessLimit_Click`, shim), `WinbootPage` (`BtnQuickViewXml_Click`, duplicava o EDITAR).
+
+**Visual/texto:** `WindowsUpdatePage` tinha um **"X" de 32 px** no lugar do emoji do
+cabecalho -> emoji de refresh; `ScreenPage` "Calibragem" -> "Calibracao" (cabecalho + toast);
+**42 textos visiveis sem acento** corrigidos em 11 paginas (Usuario, nao, versao,
+configuracoes, "ACAO CRITICA: NAO FECHE...", tooltips do Windows Update/Tweaks) — a
+varredura fechou em 0.
+
+**Verificacao:** build 0 erros (baseline de warnings) e as auditorias fechando em
+**0 handlers ausentes / 0 orfaos / 0 mojibake / 0 acento faltando**.
+
+**Backlog carregado:** o overlay `OverlayIsoStudio` da `IsoEditorPage` (~158 linhas a partir
+do `x:Name`) e **codigo morto** (so e setado como `Collapsed`; o Studio real e a janela
+`KitIsoStudioWindow`) — junto dele sobraram 2 botoes sem Click e 3 handlers exclusivos;
+remover exige confirmacao. `KitIsoStudioWindow` continua sem aplicar nada de verdade (o
+`.reg`/pasta de drivers do Studio nao chegam ao fluxo de criacao da ISO). `Title` cru em
+ServicesPage/ToolsPage/IsoEditorPage/QuickInstallPage/WinbootPage (Title nao e exibido).
+
+### Proxima sessao
+- [ ] Abrir o app e validar: SecurityPage (3 botoes de Acoes Rapidas), ISO Studio
+      (Importar .reg / Limpar / Marcar 40+), CANCELAR do IsoEditor, Drivers -> Windows Update,
+      WinTune (clique no "i"), Settings (desligar Notificacoes / ligar Log Detalhado)
+- [ ] Decidir remocao do overlay morto `OverlayIsoStudio` (IsoEditorPage) + 3 handlers dele
+- [ ] Decidir se o `KitIsoStudioWindow` deve aplicar o que o usuario preenche (hoje e so visual)
+
+### Proxima sessao (Force Stop — pendente)
+- [ ] Testar na pagina (Kit na bandeja): Force Stop num arquivo travado e numa PASTA ->
+      "Liberar" nunca pode apagar nada (confirmar `PendingFileRenameOperations` e o alvo intacto)
+- [ ] Re-testar Force Stop no goodbyedpi (driver .sys + servico) depois desta rodada
+- [ ] (carregado) Testar no app (com o Kit SEM elevacao): Windows -> Force Stop ->
+      **Tentar Deletar** / **Liberar Selecionados** com 1 UAC e progresso na propria pagina
+- [ ] (carregado) Decidir o destino do codigo morto (6 paginas) e reduzir o layout de
+      `PrivacyPage`/`RepairsPage`
+- [ ] (carregado) desenho incremental dos canvas do TM (Storage 12,1 % / Diagnostic 25,0 %)
+
+### Sessao 29/09 (cont.) - Auditoria do Core: APIs atuais x legadas + 9 correcoes
+
+Pedido: "foque no backend no core e veja se esta tudo em ordem e se nao tem metodos
+mais recentes e atualizados". 152 arquivos / ~87k linhas varridos com 5 scripts novos
+em tests/ (core_audit, core_deep_audit + v2 deterministico, core_modern_api,
+core_redundant_api, core_privilege_layout). Relatorio completo: docs/CORE_API_AUDIT.md.
+
+**Veredito**: Core em ordem estrutural - 0 [Obsolete] em uso, 0 Sleep em async,
+layout TOKEN_PRIVILEGES/LUID correto (5/5), Encoding.ASCII e DateTime.Now restantes
+justificados (protocolos/relatorios). Corrigido (build 0 erros):
+1. DashboardManager REESCRITO: snapshot nativo primeiro (registry CPU/GPU/SO +
+   GetSystemTimes + GlobalMemoryStatusEx + PartitionManager.GetAllDisks IOCTL);
+   WMI e fallback registry mantidos - Dashboard nao depende mais do servico Winmgmt.
+2. new HttpClient() 12x -> KitHttp (NOVO KitLugia.Core/KitHttp.cs: SocketsHttpHandler
+   compartilhado, PooledConnectionLifetime 2min; KitHttp.CreateClient(timeout) mantem
+   timeout por chamada). 7 arquivos migrados (GitHubUpdater, NetworkExposureManager,
+   KitTunnelManager, PlayitTunnelAdapter, UniversalTunnelAdapter, SmartVersionDetector,
+   WinpeBuilder).
+3. SystemUtils.GetTotalSystemRamGB: GlobalMemoryStatusEx primeiro (1 syscall), WMI
+   virou fallback (7 call sites, alguns em UI).
+4. WinbootManager: ShrinkPartitionUsingWMI + ShrinkPartitionUsingRunOnceAdvanced
+   REMOVIDOS (601 linhas, 0 chamadores; fluxo real = StorageAPI + WinPE/marcador).
+   Atencao: a remocao por linha-range chegou a comer a assinatura de
+   CalculateRequiredSizeGB - restaurada e verificada.
+5. Environment.OSVersion gating (DownloadBoostEngine BBR2, LatencyAnalyzer Win11)
+   -> OperatingSystem.IsWindowsVersionAtLeast.
+6. new Random() 7x -> Random.Shared (colisao real de seed no mesmo tick:
+   transaction ID, porta de relay, codigo de sala).
+7. DeepUninstaller.IsEmptyDirectory: GetFiles().Length -> EnumerateFiles().Any().
+8. DnsBenchmark: _queryIdRng (Random nao thread-safe usado em paralelo p/ Query ID)
+   -> Random.Shared.
+9. tests/core_deep_audit.py ficou flaky (2 AttributeErrors diferentes e impossiveis
+   em 2 runs seguidos, python 3.14) - reescrito como tests/core_deep_audit2.py
+   (indice em 1 passada, deterministico: 2 runs identicos confirmados).
+
+**Backlog (docs/CORE_API_AUDIT.md)**: 136 metodos publicos sem uso (GPEditManager
+inteiro, BloatwareManager, ServiceHelper.*, DriverManager.CheckForOutdatedDrivers...),
+15 awaits sincronos, 28x WMI Win32_* restante, 16x ServiceController, ~60 empty
+catches (13 no ForceStopUnlockService), consolidacao ProcessRunner (385 call sites).
+
+**Verificacao**: build 0 erros (Core+GUI); new HttpClient 12->0; new Random 7->0;
+metodos mortos 138->136 (-601 linhas).
+
+### Proxima sessao
+- [ ] Decidir lote de remocao dos 136 metodos mortos (lista no output do
+      core_deep_audit2.py) - exige confirmacao por arquivo/familia
+- [ ] (opcional) Migrar awaits sincronos restantes para async end-to-end
+- [ ] (opcional) Empty catches -> Logger.LogWarning (comecar por ForceStopUnlockService)
+- [ ] Pendencias carregadas: testes de VM do Fresh Install, Downgrade de build em VM,
+      validacao visual das paginas (docs/PAGES_VISUAL_AUDIT.md)

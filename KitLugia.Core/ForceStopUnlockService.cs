@@ -114,18 +114,25 @@ namespace KitLugia.Core
         private static extern bool OpenProcessTokenDbg(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
 
         [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool LookupPrivilegeValueDbg(string? systemName, string name, out long luid);
+        private static extern bool LookupPrivilegeValueDbg(string? systemName, string name, out LUID_DBG luid);
 
         [DllImport("advapi32.dll", SetLastError = true)]
         private static extern bool AdjustTokenPrivilegesDbg(IntPtr tokenHandle, bool disableAll,
             ref TOKEN_PRIVILEGES_DBG newState, int bufferLength, IntPtr previousState, IntPtr returnLength);
 
+        // LUID é { DWORD; LONG } com alinhamento 4. Com `long` (alinhado a 8) o campo caía no
+        // offset 8 e o Windows lia um LUID INVÁLIDO: AdjustTokenPrivileges retornava TRUE +
+        // ERROR_NOT_ALL_ASSIGNED (1300) e SeDebugPrivilege NUNCA era habilitado — exatamente o
+        // motivo de o scan nativo não achar handle de processo de outro usuário.
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LUID_DBG { public uint LowPart; public int HighPart; }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct TOKEN_PRIVILEGES_DBG
         {
-            public int PrivilegeCount;
-            public long Luid;
-            public int Attributes;
+            public uint PrivilegeCount;
+            public LUID_DBG Luid;
+            public uint Attributes;
         }
 
         private const uint TOKEN_ADJUST_PRIVILEGES_DBG = 0x0020;
@@ -149,10 +156,15 @@ namespace KitLugia.Core
                 }
                 try
                 {
-                    if (!LookupPrivilegeValueDbg(null, "SeDebugPrivilege", out long luid))
+                    if (!LookupPrivilegeValueDbg(null, "SeDebugPrivilege", out LUID_DBG luid))
                         return false;
                     var tp = new TOKEN_PRIVILEGES_DBG { PrivilegeCount = 1, Luid = luid, Attributes = SE_PRIVILEGE_ENABLED_DBG };
-                    return AdjustTokenPrivilegesDbg(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                    bool ok = AdjustTokenPrivilegesDbg(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                    // TRUE + ERROR_NOT_ALL_ASSIGNED (1300) = privilégio não está no token.
+                    int err = Marshal.GetLastWin32Error();
+                    if (!ok || err != 0)
+                        Logger.Log($"[FORCE STOP] SeDebugPrivilege NAO habilitado (ok={ok}, erro={err}).");
+                    return ok && err == 0;
                 }
                 finally { CloseHandleNative(token); }
             }
@@ -508,14 +520,23 @@ namespace KitLugia.Core
                 }
             }
 
-            // Phase 4: Close individual handles via handle tool
+            // Phase 4: Fechar handles individuais — NATIVO primeiro (não depende de handle64.exe)
             Logger.Log($"[FORCE STOP] Phase 4: Fechando handles individuais...");
             var nonDriverTargets = targetList.Where(t => t.HandleId?.StartsWith("DRV:") != true);
-            foreach (var target in nonDriverTargets.Where(t => !string.IsNullOrEmpty(t.HandleId)))
+            foreach (var target in nonDriverTargets.Where(t => IsRealHandleId(t.HandleId)))
             {
                 try
                 {
-                    bool closed = CloseHandleViaTool(target.Pid, target.HandleId);
+                    // 1) Caminho NATIVO (DuplicateHandle + DUPLICATE_CLOSE_SOURCE) — confiável e
+                    //    sem dependência externa: o handle64.exe pode não existir na máquina, e
+                    //    antes isso virava "falha ao liberar handle" mesmo como scan nativo OK.
+                    bool closed = TryParseHandleValue(target.HandleId, out IntPtr handleValue)
+                                  && CloseNativeHandle(target.Pid, handleValue);
+
+                    // 2) Fallback: handle64.exe (quando presente)
+                    if (!closed)
+                        closed = CloseHandleViaTool(target.Pid, target.HandleId);
+
                     if (closed)
                     {
                         result.HandlesClosed++;
@@ -873,6 +894,30 @@ namespace KitLugia.Core
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Handle que dá para fechar de verdade? O Restart Manager registra o placeholder "RM"
+        /// (a fase 1 já pediu o fechamento por lá) — tentar "fechar RM" via handle64 gerava ERRO
+        /// FANTASMA no painel ("Falha ao liberar handle RM de ...") mesmo com a operação tendo
+        /// dado certo. Só um valor hexadecimal (scan nativo "0x1234" / handle64) conta.
+        /// </summary>
+        private static bool IsRealHandleId(string? handleId) => TryParseHandleValue(handleId, out _);
+
+        /// <summary>Converte um HandleId hexadecimal ("0x1234" ou "1234") no valor nativo.</summary>
+        private static bool TryParseHandleValue(string? handleId, out IntPtr value)
+        {
+            value = IntPtr.Zero;
+            if (string.IsNullOrWhiteSpace(handleId)) return false;
+            string s = handleId.Trim();
+            if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) s = s[2..];
+            if (s.Length == 0 || !s.All(Uri.IsHexDigit)) return false;
+            try
+            {
+                value = (IntPtr)Convert.ToInt64(s, 16);
+                return value != IntPtr.Zero;
+            }
+            catch { return false; }
         }
 
         private static bool CloseHandleViaTool(int pid, string handleId)

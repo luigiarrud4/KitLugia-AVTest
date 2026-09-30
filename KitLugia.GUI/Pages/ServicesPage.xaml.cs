@@ -479,7 +479,10 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                return path.StartsWith(@"C:\Program Files\WindowsApps", StringComparison.OrdinalIgnoreCase);
+                // Sem path absoluto: o Windows pode estar em outro volume (D:, etc.).
+                string appsRoot = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps");
+                return path.StartsWith(appsRoot, StringComparison.OrdinalIgnoreCase);
             }
             catch { return false; }
         }

@@ -386,7 +386,7 @@ public sealed class UniversalTunnelAdapter : IDisposable
             }
 
             // Baixar usando HttpClient
-            using var client = new HttpClient();
+            using var client = KitHttp.CreateClient(TimeSpan.FromMinutes(5));
             var response = await client.GetAsync(downloadUrl);
             var content = await response.Content.ReadAsByteArrayAsync();
             await System.IO.File.WriteAllBytesAsync(downloadPath, content);

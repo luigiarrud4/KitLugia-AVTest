@@ -161,7 +161,7 @@
                                 <ColumnDefinition Width="120"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Usuário:" Foreground="#AAA" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBox x:Name="TxtWinUser" Text="Usuario" Grid.Column="1" Background="#2d2d2d" Foreground="White" BorderBrush="#444" Padding="6,0" Height="28" FontSize="12"/>
+                            <TextBox x:Name="TxtWinUser" Text="Usuário" Grid.Column="1" Background="#2d2d2d" Foreground="White" BorderBrush="#444" Padding="6,0" Height="28" FontSize="12"/>
                             <TextBlock Grid.Column="2" Text="Senha:" Foreground="#AAA" FontSize="11" VerticalAlignment="Center" Margin="12,0,8,0"/>
                             <PasswordBox x:Name="TxtWinPass" Grid.Column="3" Background="#2d2d2d" Foreground="White" BorderBrush="#444" Padding="6,0" Height="28" FontSize="12"/>
                         </Grid>

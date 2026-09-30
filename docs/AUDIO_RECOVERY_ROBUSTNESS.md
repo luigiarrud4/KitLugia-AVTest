@@ -160,8 +160,44 @@ decisão nova, nenhum timer novo, nenhum thread novo.
    problema que só reaparece depois de 2 minutos aparece como "eficaz" e volta na
    renovação do gatilho — o que é o comportamento correto, mas convém saber.
 
+## Item nas configurações do Kit (28/09/2026)
+
+A recuperação automática existia **apenas** dentro do Gerenciador de Tarefas (aba Latência,
+checkbox "Recuperação de áudio") e o estado morria ao fechar a janela — `AutoRecover` é um
+campo em memória, sem persistência. Pedido: *"aquele item de anti-stutter de áudio poderia
+estar nas configurações do Kit, na engrenagem dentro do app"*.
+
+**Agora:** card **ÁUDIO → Anti-Stutter de Áudio** em `KitLugia.GUI\Pages\SettingsPage.xaml`
+(a engrenagem do menu lateral abre a `SettingsPage`), com:
+
+- **persistência** em `HKCU\Software\KitLugia\TraySettings\AudioAntiStutter` (mesmo padrão dos
+  outros toggles do Kit) — a escolha sobrevive ao fechamento e vale entre sessões;
+- **aplicação no startup**: `TrayIconService.LoadSettings()` chama
+  `SetAudioAntiStutter(valorSalvo, persist: false)`, que liga/desliga o monitor e o
+  `AutoRecover` **sem precisar abrir o Gerenciador de Tarefas**;
+- **ligar também liga a escuta** (`AudioGlitchMonitor.Start()`): sem medição não existe
+  gatilho — a recuperação só dispara com estalos CONFIRMADOS pelo Windows;
+- **desligar também para a escuta** (`Stop()`): não faz sentido manter uma thread de loopback
+  a 100 Hz medindo um problema que deixou de ser tratado;
+- **linha de estado honesta** no card: "Ativo: escutando…" / "Ativo (salvo): a escuta não
+  subiu agora — o Kit tenta de novo na próxima abertura" / "Desligado" (lê `IsRunning` do
+  monitor, não só a preferência salva);
+- **fonte única de verdade**: o checkbox da aba Latência do TM (que continua com as regras
+  próprias de escuta do diagnóstico) agora **espelha** a escolha na mesma chave de registro
+  (`TrayService.PersistAudioAntiStutter`), então as duas telas nunca divergem.
+
+O **gatilho, o cooldown, o limite por hora e o reset do motor não mudaram** — a auditoria
+de 53 asserções desta página continua valendo para o motor; o que foi adicionado é a
+superfície de configuração e a persistência.
+
 ## Ficheiros
 
+- `KitLugia.GUI\Services\TrayIconService.cs` — `AudioAntiStutterEnabled`,
+  `SetAudioAntiStutter(enabled, persist)`, `PersistAudioAntiStutter(enabled)` e o apply no
+  `LoadSettings`.
+- `KitLugia.GUI\Pages\SettingsPage.xaml(.cs)` — card ÁUDIO + `UpdateAudioStutterStatus`.
+- `KitLugia.GUI\Windows\TaskManager\KitTaskManager.Audio.cs` — espelho da escolha via
+  `PersistAudioAntiStutterPreference`.
 - `KitLugia.Core\TaskManager\AudioGlitchMonitor.cs` — janela de observação
   (`RecoveryAssessSeconds`, `_assessFrom/_assessAfter`, `AssessLastRecovery`),
   cancelamento honesto no `Clear()` e a seção de recuperação no `BuildAiReport()`.

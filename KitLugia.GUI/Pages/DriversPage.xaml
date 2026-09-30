@@ -79,7 +79,15 @@
                             <StackPanel>
                                 <TextBlock Text="&#x1F4E5; Instalar Driver" Foreground="White" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
                                 <TextBlock Text="Instala drivers de arquivos CAB, ZIP ou de uma pasta espec&#xED;fica." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
-                                <Button Content="Instalar de Arquivo" Click="BtnInstallFromFolder_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
+                                <Grid VerticalAlignment="Bottom">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="Instalar de Arquivo" Click="BtnInstallFromFolder_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30"/>
+                                    <Button Grid.Column="1" Content="Windows Update" Margin="8,0,0,0" Click="BtnWindowsUpdate_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30"
+                                            ToolTip="Abre o Windows Update para instalar drivers opcionais oferecidos pela Microsoft"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 

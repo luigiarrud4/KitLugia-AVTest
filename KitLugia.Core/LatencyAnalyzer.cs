@@ -161,7 +161,9 @@ namespace KitLugia.Core
             // Mede o tempo mínimo de resposta do thread scheduler
             
             long start, end;
-            var random = new Random();
+            // Random.Shared (.NET 6+): thread-safe e sem a seed do relogio — varios
+            // `new Random()` no mesmo tick produzem exatamente a mesma sequencia.
+            var random = Random.Shared;
             
             // Mede o tempo de execução de múltiplas operações rápidas
             // Isso captura o overhead do sistema operacional
@@ -334,8 +336,9 @@ namespace KitLugia.Core
             {
                 if (driverName.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Adiciona variação aleatória
-                    var random = new Random();
+                    // Adiciona variação aleatória (Random.Shared — antes cada `new Random()`
+                    // nascia com a mesma seed no mesmo tick e a variação não variava)
+                    var random = Random.Shared;
                     return kvp.Value * (0.8 + random.NextDouble() * 0.4);
                 }
             }
@@ -434,7 +437,9 @@ namespace KitLugia.Core
                 {
                     profile.WindowsVersion = "Unknown";
                 }
-                profile.IsWindows11 = Environment.OSVersion.Version.Build >= 22000;
+                // Windows 11 = build 22000+. API atual (OperatingSystem.*) em vez de
+                // ler Environment.OSVersion e comparar build a mao.
+                profile.IsWindows11 = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000);
 
                 Logger.Log($"Hardware detectado: {profile.CpuName}, {profile.GpuName}, {profile.TotalRamGB}GB RAM");
             }

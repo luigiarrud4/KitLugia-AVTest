@@ -11,7 +11,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30,30,30,50" MaxWidth="900">
 
-            <TextBlock Text="Calibragem e Tela" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Text="Calibra&#xE7;&#xE3;o e Tela" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
             <TextBlock Text="Gerencie perfis de cores e corrija resets causados por updates de driver." Foreground="#A0A0A0" Margin="0,0,0,30"/>
 
             <!-- PAINEL DE INFORMA&#xC7;&#xD5;ES -->
