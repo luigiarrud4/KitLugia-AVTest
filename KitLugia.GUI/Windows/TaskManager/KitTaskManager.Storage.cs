@@ -414,6 +414,11 @@ namespace KitLugia.GUI.Windows.TaskManager
             while (_stRows.Count > merged.Count)
                 _stRows.RemoveAt(_stRows.Count - 1);
 
+            // Reaplica o sort clicado (padrao de qualidade): a reconciliacao por Move
+            // reordena a source pelo ranking, mas a view com CustomSort mostra pelo
+            // criterio do usuario — o Refresh re-sorteia com os valores novos do tick.
+            RefreshTmGridSort(DgStProcs);
+
             // Se a linha marcada saiu da lista (processo morreu), as ações não podem
             // continuar apontando para um fantasma.
             if (_stSelected != null && !_stRows.Contains(_stSelected))

@@ -9,31 +9,6 @@ namespace KitLugia.Core
     [SupportedOSPlatform("windows")]
     public static class IntegrityCheckManager
     {
-        public record IntegrityResult(bool Passed, string Message, string Details);
-
-        /// <summary>
-        /// Realiza uma verificação completa de pré-operação para evitar falhas catastróficas.
-        /// </summary>
-        public static IntegrityResult RunPreOperationCheck(string targetDrive)
-        {
-            Logger.Log($"[INTEGRIDADE] Iniciando verificação de pré-operação para {targetDrive}...");
-
-            // 1. Verificar se o disco está saudável (S.M.A.R.T via WMI)
-            if (!CheckDiskHealth(targetDrive))
-                return new IntegrityResult(false, "Disco em estado crítico!", "Atributos S.M.A.R.T indicam falha iminente no hardware.");
-
-            // 2. Verificar consistência do Sistema de Arquivos (Chkdsk modo RO)
-            if (!VerifyFileSystem(targetDrive))
-                return new IntegrityResult(false, "Sistema de Arquivos Corrompido!", "Erros detectados no NTFS. Execute 'chkdsk /f' antes de prosseguir.");
-
-            // 3. Verificar Espaço em Disco
-            long freeSpace = GetFreeSpaceBytes(targetDrive);
-            if (freeSpace < 15L * 1024 * 1024 * 1024) // 15GB mínimo
-                return new IntegrityResult(false, "Espaço Insuficiente!", $"Necessário 15GB livres, mas há apenas {freeSpace / 1024 / 1024 / 1024}GB.");
-
-            return new IntegrityResult(true, "Integridade Verificada!", "O sistema está pronto para a operação de particionamento.");
-        }
-
         private static bool CheckDiskHealth(string drive)
         {
             try

@@ -95,20 +95,5 @@ namespace KitLugia.Core
             }
             return mappings;
         }
-
-        /// <summary>
-        /// Scanner de arquivos ultra-rápido (Prototipagem de MFT-like scan).
-        /// Usa EnumerateFileSystemInfos para melhor performance que GetFiles.
-        /// </summary>
-        public static long GetFolderSizeFast(string path)
-        {
-            try
-            {
-                return new DirectoryInfo(path)
-                    .EnumerateFiles("*", SearchOption.AllDirectories)
-                    .Sum(fi => fi.Length);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
-        }
     }
 }

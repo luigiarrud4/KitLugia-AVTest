@@ -101,33 +101,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Verifica drivers antigos (data > 2 anos).
-        /// </summary>
-        public static async Task<List<DriverItem>> CheckForOutdatedDrivers()
-        {
-            Logger.Log("Iniciando verificação de drivers obsoletos...");
-
-
-            var sourceList = _cachedDrivers.Count > 0 ? _cachedDrivers : await GetSystemDriversAsync(false);
-
-            return await Task.Run(() =>
-            {
-                var outdated = new List<DriverItem>();
-
-                foreach (var driver in sourceList)
-                {
-                    if (DateTime.TryParse(driver.Date, out DateTime dDate))
-                    {
-                        if (dDate < DateTime.Now.AddYears(-2)) outdated.Add(driver);
-                    }
-                }
-
-                Logger.Log($"[SCAN] Análise concluída. {outdated.Count} drivers parecem antigos.");
-                return outdated;
-            });
-        }
-
-        /// <summary>
         /// Instala drivers de arquivos compactados (CAB/ZIP), pastas ou arquivos INF diretamente.
         /// </summary>
         public static async Task<(bool Success, string Message)> SmartInstallDriver(string path)
@@ -144,7 +117,9 @@ namespace KitLugia.Core
             if (Directory.Exists(path) || path.EndsWith(".inf", StringComparison.OrdinalIgnoreCase))
             {
                 string targetPath = Directory.Exists(path) ? path : Path.GetDirectoryName(path)!;
-                return InstallDriversFromFolder(targetPath);
+                // Task.Run: o pnputil é síncrono e pode levar dezenas de segundos; a página
+                // chamava este método direto do handler da UI (await SmartInstallDriver).
+                return await Task.Run(() => InstallDriversFromFolder(targetPath));
             }
 
             // Se for arquivo compactado, extrai
@@ -179,8 +154,8 @@ namespace KitLugia.Core
                     return (false, "Formato não suportado. Use .CAB, .ZIP ou uma Pasta.");
                 }
 
-                // Instala da pasta temporária
-                var result = InstallDriversFromFolder(tempFolder);
+                // Instala da pasta temporária (fora da thread da UI)
+                var result = await Task.Run(() => InstallDriversFromFolder(tempFolder));
 
                 // Limpeza
                 try { Directory.Delete(tempFolder, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -207,29 +182,22 @@ namespace KitLugia.Core
                 Logger.Log($"Executando PnPUtil na pasta: {folderPath}");
                 string args = $"/add-driver \"{folderPath}\\*.inf\" /subdirs /install";
 
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "pnputil.exe",
-                    Arguments = args,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var process = System.Diagnostics.Process.Start(psi)!;
-                string output = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
+                // ProcessRunner em vez do Process.Start + WaitForExit() sem timeout: o código
+                // antigo lia SÓ o stdout com stderr redirecionado - um pnputil falante enche o
+                // pipe de stderr (~4 KB) e trava os dois lados em deadlock, sem timeout para
+                // resgatar (instalar uma pasta com vários drivers leva dezenas de segundos).
+                var (exitCode, output, error) = ProcessRunner.Run("pnputil.exe", args, 300000);
+                string details = string.IsNullOrEmpty(error) ? output : output + "\n" + error;
 
                 // pnputil retorna 0 em sucesso, ou 259/outro no failed
-                if (process.ExitCode == 0 || process.ExitCode == 259)
+                if (exitCode == 0 || exitCode == 259)
                 {
                     Logger.Log("[SUCESSO] Driver instalado e adicionado ao repositório (ou nenhuma alteração necessária).");
                     return (true, "Instalação concluída com sucesso!");
                 }
                 else
                 {
-                    Logger.Log($"[FALHA] PnPUtil Código: {process.ExitCode}. Detalhes: {output}");
+                    Logger.Log($"[FALHA] PnPUtil Código: {exitCode}. Detalhes: {details}");
                     return (false, "Nenhum driver compatível foi instalado.");
                 }
             }
@@ -249,27 +217,17 @@ namespace KitLugia.Core
                 Logger.Log($"Tentando remover driver: {infName}...");
                 string args = $"/delete-driver {infName} /uninstall /force";
 
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "pnputil.exe",
-                    Arguments = args,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                // Mesmo motivo do InstallDriversFromFolder: timeout + leitura dos DOIS streams.
+                var (exitCode, output, error) = ProcessRunner.Run("pnputil.exe", args, 120000);
+                string details = string.IsNullOrEmpty(error) ? output : output + "\n" + error;
 
-                using var process = System.Diagnostics.Process.Start(psi)!;
-                string output = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
-
-                if (process.ExitCode != 0)
+                if (exitCode != 0)
                 {
-                    Logger.LogError("UninstallDriver", output);
-                    if (output.Contains("in use", StringComparison.OrdinalIgnoreCase) || output.Contains("em uso", StringComparison.OrdinalIgnoreCase))
+                    Logger.LogError("UninstallDriver", details);
+                    if (details.Contains("in use", StringComparison.OrdinalIgnoreCase) || details.Contains("em uso", StringComparison.OrdinalIgnoreCase))
                         return (false, "O driver está em uso. Reinicie e tente novamente.");
 
-                    return (false, $"Falha ao remover. Código: {process.ExitCode}");
+                    return (false, $"Falha ao remover. Código: {exitCode}");
                 }
 
                 Logger.Log("[SUCESSO] Driver removido.");
@@ -279,76 +237,6 @@ namespace KitLugia.Core
             {
                 Logger.LogError("UninstallDriver", ex.Message);
                 return (false, ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Pesquisa segura no Catálogo Microsoft usando o ID de Hardware.
-        /// </summary>
-        public static void SearchDriverOnWeb(string deviceName, string hardwareId)
-        {
-            try
-            {
-                Logger.Log($"Abrindo navegador para buscar: {deviceName}");
-                string url;
-
-                // Detectar vendor pelo Hardware ID e abrir site oficial
-                if (!string.IsNullOrEmpty(hardwareId))
-                {
-                    string hwIdUpper = hardwareId.ToUpper();
-
-                    // Intel (VID_8086)
-                    if (hwIdUpper.Contains("VID_8086"))
-                    {
-                        string query = Uri.EscapeDataString(deviceName);
-                        url = $"https://www.intel.com/content/www/us/en/download-center/home.html?q={query}";
-                        Logger.Log($"[INFO] Detectado Intel, abrindo site oficial");
-                    }
-                    // NVIDIA (VID_10DE)
-                    else if (hwIdUpper.Contains("VID_10DE"))
-                    {
-                        url = $"https://www.nvidia.com/Download/index.aspx";
-                        Logger.Log($"[INFO] Detectado NVIDIA, abrindo site oficial");
-                    }
-                    // AMD (VID_1002 ou VID_1022)
-                    else if (hwIdUpper.Contains("VID_1002") || hwIdUpper.Contains("VID_1022"))
-                    {
-                        url = $"https://www.amd.com/support";
-                        Logger.Log($"[INFO] Detectado AMD, abrindo site oficial");
-                    }
-                    // Realtek (VID_10EC)
-                    else if (hwIdUpper.Contains("VID_10EC"))
-                    {
-                        url = $"https://www.realtek.com/Download/List?cate_id=584";
-                        Logger.Log($"[INFO] Detectado Realtek, abrindo site oficial");
-                    }
-                    // Microsoft (VID_045E)
-                    else if (hwIdUpper.Contains("VID_045E"))
-                    {
-                        url = $"https://support.microsoft.com/hardware";
-                        Logger.Log($"[INFO] Detectado Microsoft, abrindo site oficial");
-                    }
-                    // Outros - usa Microsoft Update Catalog
-                    else
-                    {
-                        string queryId = Uri.EscapeDataString(hardwareId);
-                        url = $"https://www.catalog.update.microsoft.com/Search.aspx?q={queryId}";
-                        Logger.Log($"[INFO] Vendor não identificado, abrindo Microsoft Update Catalog");
-                    }
-                }
-                else
-                {
-                    // Fallback - Google search
-                    string query = $"{deviceName} driver official download";
-                    url = $"https://www.google.com/search?q={Uri.EscapeDataString(query)}";
-                    Logger.Log($"[INFO] Hardware ID vazio, usando Google search");
-                }
-
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("WebSearch", ex.Message);
             }
         }
 
@@ -383,7 +271,7 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
-        public static void ExportDriverListToTxt(string filePath)
+        public static async Task ExportDriverListToTxtAsync(string filePath)
         {
             try
             {
@@ -394,7 +282,7 @@ namespace KitLugia.Core
                 sb.AppendLine($"Data: {DateTime.Now}");
                 sb.AppendLine("========================================");
 
-                var list = _cachedDrivers.Count > 0 ? _cachedDrivers : Task.Run(() => GetSystemDriversAsync(true)).GetAwaiter().GetResult();
+                var list = _cachedDrivers.Count > 0 ? _cachedDrivers : await GetSystemDriversAsync(true).ConfigureAwait(false);
                 foreach (var d in list)
                 {
                     sb.AppendLine($"Dispositivo: {d.DeviceName}");

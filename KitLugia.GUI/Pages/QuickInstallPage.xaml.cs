@@ -83,7 +83,7 @@ namespace KitLugia.GUI.Pages
                 else await allTask;
 
                 await proc.WaitForExitAsync();
-                return (proc.ExitCode, outTask.Result, errTask.Result);
+                return (proc.ExitCode, await outTask, await errTask);
             }
             catch (Exception ex)
             {

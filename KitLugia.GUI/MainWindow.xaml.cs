@@ -157,6 +157,8 @@ namespace KitLugia.GUI
         ContextMenuAddPage,
         WinpeTools,
         ReinstallPreserve,
+        BcdRepair,
+        DiskConverter,
         WindowsUpdate,
         StoreRemake,
     }
@@ -813,7 +815,19 @@ namespace KitLugia.GUI
                     {
                         var currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
                         Logger.Log($"KitLugia iniciado: {currentPath}");
-                        TrayIconService.SetAutoStart(true);
+
+                        // BUG CORRIGIDO (04/10/2026): aqui rodava SetAutoStart(true) INCONDICIONAL.
+                        // Como o ícone do tray é sempre visível, trayActive é true em TODOS os
+                        // starts — inclusive quando o usuário tinha DESLIGADO o auto-start de
+                        // propósito. Resultado: o app ressuscitava sozinho o auto-start que o
+                        // usuário tinha desligado, um start após o outro.
+                        // O método correto é EnsureAutoStartMethods(): ele reconfigura quando
+                        // existe entrada viva/preferência ativa, REGISTRA na 1ª execução e
+                        // RESPITA a preferência desligada (valor 0 gravado).
+                        // Também é idempotente e protegido por lock — o App.OnStartup já chama
+                        // este mesmo método em paralelo, e as duas rotinas escreviam no mesmo
+                        // registro/Task Scheduler ao mesmo tempo (corrida).
+                        TrayIconService.EnsureAutoStartMethods();
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
@@ -1150,9 +1164,11 @@ namespace KitLugia.GUI
 
                 (bool success, string message) result = (false, "");
 
-                await Task.Run(() =>
+                await Task.Run(async () =>
                 {
-                    if (item.ExecuteAction != null)
+                    if (item.ExecuteActionAsync != null)
+                        result = await item.ExecuteActionAsync.Invoke().ConfigureAwait(false);
+                    else if (item.ExecuteAction != null)
                         result = item.ExecuteAction.Invoke();
 
                     if (item.IsToggle)
@@ -1208,10 +1224,34 @@ namespace KitLugia.GUI
             ["💾"] = PageType.Drivers,
             ["💽"] = PageType.Partitions,
             ["🧰"] = PageType.Integrity,
+            ["🛠️"] = PageType.WinpeTools,
             ["🔔"] = PageType.TraySettings,
             ["🚀"] = PageType.GameBoost,
             ["🔬"] = PageType.Diagnostic,
+            ["🩺"] = PageType.BcdRepair,
+            ["🔀"] = PageType.DiskConverter,
         };
+
+        /// <summary>
+        /// Expande/cola o grupo de opcoes de disco na barra lateral.
+        /// Criado em 03/10/2026: as 4 paginas de disco (WinPE Tools, Fresh Install, Reparar
+        /// Boot/BCD, Conversor MBR/GPT) ficavam sempre abertas e quebravam a barra lateral.
+        /// Agora "Gerenciar Discos" fica sempre visivel e as extras ficam sob a seta.
+        /// </summary>
+        private void BtnDiscosExpand_Click(object sender, RoutedEventArgs e)
+        {
+            if (PanelDiscosExtras == null || BtnDiscosExpand == null) return;
+            bool open = PanelDiscosExtras.Visibility != Visibility.Visible;
+            SetDiscosExtrasExpanded(open);
+        }
+
+        private void SetDiscosExtrasExpanded(bool open)
+        {
+            if (PanelDiscosExtras == null || BtnDiscosExpand == null) return;
+            PanelDiscosExtras.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            // Tag dirige o RotateTransform do chevron no NavExpandButtonStyle (0=recolhido, 1=aberto)
+            BtnDiscosExpand.Tag = open ? "1" : "0";
+        }
 
         private void NavButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1280,6 +1320,12 @@ namespace KitLugia.GUI
             else if (MainFrame.Content is RepairsPage) BtnRepairs.IsChecked = true;
             else if (MainFrame.Content is DriversPage) BtnDrivers.IsChecked = true;
             else if (MainFrame.Content is PartitionsPage) BtnPartitions.IsChecked = true;
+            else if (MainFrame.Content is BcdRepairPage) BtnBcdRepair.IsChecked = true;
+            else if (MainFrame.Content is DiskConverterPage) BtnDiskConverter.IsChecked = true;
+            else if (MainFrame.Content is WinpeToolsPage) { SetDiscosExtrasExpanded(true); BtnWinpeTools.IsChecked = true; }
+            // Fresh Install: sem atalho na sidebar (nao testado), mas se o usuario chegar pelo
+            // Dashboard a categoria "Gerenciar Discos" ainda abre, para nao esconder onde ele esta.
+            else if (MainFrame.Content is ReinstallPreservePage) { SetDiscosExtrasExpanded(true); }
             else if (MainFrame.Content is TraySettingsPage) { if (BtnTray != null) BtnTray.IsChecked = true; }
             else if (MainFrame.Content is IntegrityPage) { if (BtnIntegrity != null) BtnIntegrity.IsChecked = true; }
             else if (MainFrame.Content is GameBoostPage) { if (BtnGameBoost != null) BtnGameBoost.IsChecked = true; }
@@ -1308,6 +1354,9 @@ namespace KitLugia.GUI
             if (BtnRepairs != null) BtnRepairs.IsChecked = false;
             if (BtnDrivers != null) BtnDrivers.IsChecked = false;
             if (BtnPartitions != null) BtnPartitions.IsChecked = false;
+            if (BtnWinpeTools != null) BtnWinpeTools.IsChecked = false;
+            if (BtnBcdRepair != null) BtnBcdRepair.IsChecked = false;
+            if (BtnDiskConverter != null) BtnDiskConverter.IsChecked = false;
 
             // CORREÇÃO: Garante que o botão de integridade no topo também seja desmarcado
             if (BtnIntegrity != null) BtnIntegrity.IsChecked = false;
@@ -1379,6 +1428,8 @@ namespace KitLugia.GUI
                 PageType.Drivers => new DriversPage(),
                 PageType.Partitions => new PartitionsPage(),
                 PageType.Winboot => new WinbootPage(),
+                PageType.BcdRepair => new BcdRepairPage(),
+                PageType.DiskConverter => new DiskConverterPage(),
                 PageType.AdvancedTools => new AdvancedToolsPage(),
                 PageType.IsoEditor => new IsoEditorPage(),
                 PageType.Integrity => new IntegrityPage(),
@@ -2864,7 +2915,7 @@ namespace KitLugia.GUI
             {
                 await Task.Delay(3000);
                 Logger.Log("[SHRINK] Verificando conclusão do shrink...");
-                bool completed = RefindManager.IsPreBootCompleted();
+                bool completed = await RefindManager.IsPreBootCompletedAsync();
 
                 if (completed)
                 {
@@ -3047,8 +3098,7 @@ namespace KitLugia.GUI
             try
             {
                 (introEnabled, introDuration) = await Task.Run(() => ReadIntroSettingsWithTimeout())
-                    .WaitAsync(TimeSpan.FromMilliseconds(500))
-                    .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : (true, 2.2));
+                    .WaitAsync(TimeSpan.FromMilliseconds(500));
             }
             catch (Exception ex)
             {

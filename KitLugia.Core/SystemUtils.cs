@@ -168,12 +168,87 @@ namespace KitLugia.Core
             return string.Empty;
         }
 
-        // --- RETROCOMPATIBILIDADE SÍNCRONA ---
-        // Mantém a assinatura antiga para não quebrar centenas de chamadas no projeto 
-        // e redireciona para a versão async de forma segura (GetAwaiter().GetResult()).
+        // --- API SÍNCRONA (bloqueante por design) ---
+        // Mantem a assinatura antiga usada por centenas de chamadas. Executa o processo
+        // de verdade de forma sincrona (threads dedicadas por stream evitam deadlock de
+        // pipe) - sem Task/GetAwaiter, eliminando o sync-over-async.
         public static string RunExternalProcess(string fileName, string arguments, bool hidden = false, bool waitForExit = true, bool runAs = false)
         {
-            return RunExternalProcessAsync(fileName, arguments, hidden, waitForExit, runAs).GetAwaiter().GetResult();
+            ProcessStartInfo psi = new(fileName, arguments)
+            {
+                CreateNoWindow = hidden,
+                WindowStyle = hidden ? ProcessWindowStyle.Hidden : ProcessWindowStyle.Normal
+            };
+
+            if (runAs) psi.Verb = "runas";
+
+            if (waitForExit)
+            {
+                psi.RedirectStandardOutput = true;
+                psi.RedirectStandardError = true;
+                psi.UseShellExecute = false;
+                var oem = GetOemEncoding();
+                psi.StandardOutputEncoding = oem;
+                psi.StandardErrorEncoding = oem;
+            }
+            else
+            {
+                psi.UseShellExecute = true;
+            }
+
+            try
+            {
+                using var process = Process.Start(psi);
+                if (process == null) return string.Empty;
+                if (waitForExit)
+                {
+                    var (exitCode, output) = ReadProcessOutputSync(process, 120000);
+                    if (exitCode < 0) return "[TIMEOUT] Processo excedeu 120 segundos.";
+                    return output;
+                }
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return "Processo cancelado pelo usuario.";
+            }
+            catch (Exception ex)
+            {
+                return $"Erro ao executar processo: {ex.Message}";
+            }
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Le stdout+stderr de um processo de forma sincrona, com uma thread dedicada por
+        /// stream (evita deadlock de pipe quando o filho enche um buffer) e timeout opcional.
+        /// ExitCode -1 = timeout. Sem Task/GetAwaiter em nenhum ponto.
+        /// </summary>
+        private static (int ExitCode, string Output) ReadProcessOutputSync(Process process, int timeoutMs)
+        {
+            string output = string.Empty, error = string.Empty;
+            var readOut = new System.Threading.Thread(() => { try { output = process.StandardOutput.ReadToEnd(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } }) { IsBackground = true };
+            var readErr = new System.Threading.Thread(() => { try { error = process.StandardError.ReadToEnd(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } }) { IsBackground = true };
+            readOut.Start();
+            readErr.Start();
+
+            bool exited;
+            if (timeoutMs > 0) exited = process.WaitForExit(timeoutMs);
+            else { process.WaitForExit(); exited = true; }
+
+            if (!exited)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                readOut.Join(5000);
+                readErr.Join(5000);
+                return (-1, string.Empty);
+            }
+
+            readOut.Join(10000);
+            readErr.Join(10000);
+
+            if (!string.IsNullOrEmpty(error))
+                return (process.ExitCode, string.IsNullOrEmpty(output) ? error : $"{output}\n{error}");
+            return (process.ExitCode, output);
         }
 
         /// <summary>
@@ -225,7 +300,34 @@ namespace KitLugia.Core
 
         public static (int ExitCode, string Output) RunExternalProcessWithCode(string fileName, string arguments, bool hidden = false)
         {
-            return RunExternalProcessWithCodeAsync(fileName, arguments, hidden).GetAwaiter().GetResult();
+            var psi = new ProcessStartInfo(fileName, arguments)
+            {
+                CreateNoWindow = hidden,
+                WindowStyle = hidden ? ProcessWindowStyle.Hidden : ProcessWindowStyle.Normal,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            var oem = GetOemEncoding();
+            psi.StandardOutputEncoding = oem;
+            psi.StandardErrorEncoding = oem;
+
+            try
+            {
+                using var process = Process.Start(psi);
+                if (process == null) return (1, "Falha ao iniciar o processo.");
+                var (exitCode, output) = ReadProcessOutputSync(process, 120000);
+                if (exitCode < 0) return (1, "[TIMEOUT] Processo excedeu 120 segundos.");
+                return (exitCode, output);
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return (1, "Processo cancelado pelo usuario.");
+            }
+            catch (Exception ex)
+            {
+                return (1, $"Erro ao executar processo: {ex.Message}");
+            }
         }
 
         public static string? FindWingetPath()
@@ -273,53 +375,6 @@ namespace KitLugia.Core
 
         #region Utilitários de Restauração e Sistema
 
-        // Modelo de dados para a lista de backups
-        public record RestorePointModel(int SequenceNumber, string Description, string Date);
-
-        /// <summary>
-        /// Obtém a lista de pontos de restauração do sistema via WMI.
-        /// </summary>
-        public static List<RestorePointModel> GetRestorePoints()
-        {
-
-            // Típico: 5-20 pontos de restauração
-            var points = new List<RestorePointModel>(20);
-            ManagementScope? scope = null;
-            try
-            {
-                // Conecta ao WMI na raiz padrão
-                scope = new ManagementScope("\\\\localhost\\root\\default");
-                ObjectQuery query = new ObjectQuery("SELECT * FROM SystemRestore");
-                using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                using ManagementObjectCollection results = searcher.Get();
-
-                foreach (ManagementObject obj in results)
-                {
-                    string desc = obj["Description"]?.ToString() ?? "Ponto Automático";
-                    uint seq = (uint)(obj["SequenceNumber"] ?? 0);
-
-                    // A data vem em formato WMI (ex: 20230501120000.000000+000)
-                    string rawDate = obj["CreationTime"]?.ToString() ?? "";
-                    string prettyDate = rawDate;
-
-                    // Formata para algo legível (DD/MM/AAAA HH:MM)
-                    if (rawDate.Length >= 14)
-                    {
-                        prettyDate = $"{rawDate.Substring(6, 2)}/{rawDate.Substring(4, 2)}/{rawDate.Substring(0, 4)} {rawDate.Substring(8, 2)}:{rawDate.Substring(10, 2)}";
-                    }
-
-                    points.Add(new RestorePointModel((int)seq, desc, prettyDate));
-                }
-            }
-            catch
-            {
-                // Ignora falhas (ex: Restauração desativada no Windows)
-            }
-
-            // Retorna ordenado do mais recente para o mais antigo
-            return points.OrderByDescending(x => x.Date).ToList();
-        }
-
         public static (bool Success, string Message) CreateRestorePoint()
         {
             // Cria um ponto de restauração via PowerShell
@@ -336,43 +391,11 @@ namespace KitLugia.Core
             }
         }
 
-        public static void OpenSystemRestoreWizard()
-        {
-            // Abre o assistente nativo do Windows (rstrui.exe) para restaurar o sistema
-            RunExternalProcess("rstrui.exe", "", hidden: false, waitForExit: false);
-        }
-
         public static bool IsAdmin()
         {
             using var identity = WindowsIdentity.GetCurrent();
             var principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
-        }
-
-        public static List<string> RunPreflightCheck()
-        {
-            var errors = new List<string>();
-            try
-            {
-                using var searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem");
-                if (!searcher.Get().Cast<ManagementObject>().Any()) errors.Add("- WMI não está retornando dados.");
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-
-            try
-            {
-                const string testKey = @"Software\KitLUGIA_Test";
-                Registry.CurrentUser.CreateSubKey(testKey)?.Close();
-                Registry.CurrentUser.DeleteSubKey(testKey);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-
-            string[] requiredTools = { "sc.exe", "ipconfig.exe", "bcdedit.exe", "powershell.exe", "sfc.exe", "dism.exe", "powercfg.exe", "compact.exe" };
-            foreach (var tool in requiredTools)
-            {
-                if (!CommandExists(tool)) errors.Add($"- Ferramenta essencial '{tool}' não encontrada no PATH.");
-            }
-            return errors;
         }
 
         private static bool CommandExists(string command)
@@ -382,17 +405,6 @@ namespace KitLugia.Core
         }
 
         #region Registro
-
-        public static object? GetRegistryValue(RegistryKey hive, string subKey, string valueName)
-        {
-            try
-            {
-                using var key = hive.OpenSubKey(subKey, false);
-                if (key == null) return null;
-                return key.GetValue(valueName);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
-        }
 
         public static void SetRegistryValue(RegistryKey hive, string subKey, string valueName, object value, RegistryValueKind kind)
         {

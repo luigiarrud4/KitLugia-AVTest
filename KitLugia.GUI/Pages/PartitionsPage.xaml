@@ -487,8 +487,9 @@
                             <StackPanel x:Name="PanelExtendSources">
                                 <RadioButton x:Name="RadioUnallocatedRight" Content="Espaço Não Alocado Adjacente" Foreground="White" IsChecked="True" GroupName="ExtendSource"/>
                                 <RadioButton x:Name="RadioNeighborRight" Content="Puxar da Partição Vizinha" Foreground="White" GroupName="ExtendSource" Margin="0,8,0,0"/>
-                                <CheckBox x:Name="ChkMergeMode" Content="Mesclar (DISM) - Melhor opção (Move tudo e usa 100%)" Foreground="{StaticResource AccentColor}" Margin="20,10,0,0" Visibility="Collapsed" IsChecked="True" ToolTip="Engine principal: DISM Imaging (tolerante a arquivos em uso / limitações do Windows). Fallback automático: Robocopy /B."/>
+                                <CheckBox x:Name="ChkMergeMode" Content="Mesclar vizinha (DISM)" Foreground="{StaticResource AccentColor}" Margin="20,10,0,0" Visibility="Collapsed" IsChecked="False" ToolTip="Engine principal: DISM Imaging (tolerante a arquivos em uso / limitações do Windows). Fallback automático: Robocopy /B."/>
                             </StackPanel>
+                            <TextBlock x:Name="TxtExtendWarning" Text="⚠️ Aviso" Foreground="#FFA500" FontSize="10" TextWrapping="Wrap" Margin="0,10,0,0" Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
 

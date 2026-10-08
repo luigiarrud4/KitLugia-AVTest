@@ -310,25 +310,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
-        public static List<ExportBackupInfo> ListBackups()
-        {
-            var results = new List<ExportBackupInfo>();
-            if (!Directory.Exists(ExtTempDir)) return results;
-            foreach (var dir in Directory.EnumerateDirectories(ExtTempDir))
-            {
-                string name = Path.GetFileName(dir);
-                if (name.Contains("_to_"))
-                {
-                    var parts = name.Split(new[] { "_to_" }, 2, StringSplitOptions.None);
-                    string src = parts[0].Replace('_', ' ');
-                    string tgt = parts.Length > 1 ? parts[1].Replace('_', ' ') : "";
-                    string datePart = tgt.Contains('_') ? tgt.Split('_').Last() : "";
-                    results.Add(new ExportBackupInfo(dir, src, tgt, "Transferência", datePart));
-                }
-            }
-            return results;
-        }
-
         private static int CountExportedExtensions(string root)
         {
             int count = 0;

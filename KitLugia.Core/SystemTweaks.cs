@@ -728,10 +728,6 @@ namespace KitLugia.Core
         }
 
         // ReinstallBloatwareApp REMOVIDO — não há mais integração com Microsoft Store
-        public static void ReinstallBloatwareApp(string storeId)
-        {
-            // Método mantido vazio para compatibilidade, sem abrir a Store
-        }
         #endregion
 
         #region Registry Tweaks (UI & General)
@@ -795,14 +791,10 @@ namespace KitLugia.Core
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
-
-        public static bool IsLastClickInstalled() => (int?)Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "LastActiveClick", 0) == 1;
         public static void ApplyLastClickTweak() => Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "LastActiveClick", 1, RegistryValueKind.DWord);
 
         public static bool IsBingDisabled() => (int?)Registry.GetValue(@"HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows\Explorer", "DisableSearchBoxSuggestions", 0) == 1;
         public static void ApplyBingTweak() => Registry.SetValue(@"HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows\Explorer", "DisableSearchBoxSuggestions", 1, RegistryValueKind.DWord);
-
-        public static bool IsWin10ContextEnabled() => Registry.CurrentUser.OpenSubKey(@"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae252}") != null;
         public static void ApplyWin10ContextTweak(bool enable)
         {
             try
@@ -838,9 +830,6 @@ namespace KitLugia.Core
             }
             catch (Exception ex) { return (false, ex.Message); }
         }
-        public static bool IsHddFixEnabled() => SystemUtils.GetServiceStartMode("SysMain") == "Disabled";
-        public static bool IsSegmentHeapEnabled() => (int?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Segment Heap", "Enabled", 0) == 1;
-        public static bool IsLargeCacheEnabled() => (int?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "LargeSystemCache", 0) == 1;
 
         public static void ApplyAutoCacheTweak()
         {
@@ -937,12 +926,6 @@ namespace KitLugia.Core
             catch (Exception ex) { return (false, ex.Message); }
         }
 
-        public static bool IsFastStartupTweakEnabled() => (int?)Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", "StartupDelayInMSec", 1) == 0;
-        public static void ToggleFastStartupTweak()
-        {
-            if (IsFastStartupTweakEnabled()) RevertRegistryValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", "StartupDelayInMSec");
-            else Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", "StartupDelayInMSec", 0, RegistryValueKind.DWord);
-        }
 
         public static bool IsFastShutdownEnabled() => (string?)Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "AutoEndTasks", "0") == "1";
         public static void ToggleFastShutdown()
@@ -1191,20 +1174,6 @@ namespace KitLugia.Core
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return null;
-        }
-
-        /// <summary>
-        /// Obtém lista de GPUs com dispose automático. Use apenas quando necessário.
-        /// </summary>
-        [Obsolete("Use GetAllGpuNames() para evitar memory leaks")]
-        public static List<ManagementObject> GetAllGpus()
-        {
-            try
-            {
-                using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController");
-                return searcher.Get().Cast<ManagementObject>().ToList();
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<ManagementObject>(); }
         }
 
         public static ManagementObject? GetPrimaryGpu()
@@ -1829,8 +1798,6 @@ namespace KitLugia.Core
             }
             catch (Exception ex) { return (false, $"Erro: {ex.Message}"); }
         }
-
-        public static bool IsGameDvrEnabled() => (int?)Registry.GetValue(@"HKEY_CURRENT_USER\System\GameConfigStore", "GameDVR_Enabled", 1) == 1;
         public static void ToggleGameDvr(bool enable)
         {
             try
@@ -2201,26 +2168,6 @@ namespace KitLugia.Core
         // ============================================================
         // Boot Configuration (bcdedit) — Fast Boot Optimization
         // ============================================================
-        public static bool IsBootLogEnabled()
-        {
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "bcdedit",
-                    Arguments = "/enum {current}",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var proc = System.Diagnostics.Process.Start(psi);
-                if (proc == null) return false;
-                string output = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit();
-                return output.Contains("bootlog", StringComparison.OrdinalIgnoreCase) && output.Contains("Yes", StringComparison.OrdinalIgnoreCase);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
 
         public static (bool Success, string Message) ToggleBootLog(bool enable)
         {
@@ -2238,27 +2185,6 @@ namespace KitLugia.Core
                 return (true, enable ? "Boot log ativado." : "Boot log desativado.");
             }
             catch (Exception ex) { return (false, ex.Message); }
-        }
-
-        public static bool IsNoGuiBootEnabled()
-            {
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "bcdedit",
-                    Arguments = "/enum {current}",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var proc = System.Diagnostics.Process.Start(psi);
-                if (proc == null) return false;
-                string output = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit();
-                return output.Contains("noguirolstatus Yes", StringComparison.OrdinalIgnoreCase);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
         public static (bool Success, string Message) ToggleNoGuiBoot(bool enable)
@@ -2301,26 +2227,10 @@ namespace KitLugia.Core
             return drives;
         }
 
-        public static bool HasNvMeDrive()
-        {
-            return DetectNvMeDrives().Count > 0;
-        }
-
         // ============================================================
         // Detect GPU Vendor for Conditional Tweaks
         // ============================================================
         public enum GpuVendor { Unknown, NVIDIA, AMD, Intel }
-
-        public static GpuVendor DetectPrimaryGpuVendor()
-        {
-            var names = GetAllGpuNames();
-            var primary = names.FirstOrDefault(n => !n.Contains("Microsoft Basic") && !n.Contains("Parsec"));
-            if (string.IsNullOrEmpty(primary)) return GpuVendor.Unknown;
-            if (primary.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)) return GpuVendor.NVIDIA;
-            if (primary.Contains("AMD", StringComparison.OrdinalIgnoreCase) || primary.Contains("Radeon", StringComparison.OrdinalIgnoreCase)) return GpuVendor.AMD;
-            if (primary.Contains("Intel", StringComparison.OrdinalIgnoreCase)) return GpuVendor.Intel;
-            return GpuVendor.Unknown;
-        }
 
         // ============================================================
         // AMD-Specific GPU Tweaks
@@ -2373,20 +2283,6 @@ namespace KitLugia.Core
         #endregion
 
         #region Network & Driver
-        /// <summary>
-        /// Obtém lista de adaptadores de rede ativos. IMPORTANTE: Caller deve descartar os ManagementObject.
-        /// </summary>
-        [Obsolete("Use apenas quando necessario - lembre-se de dar dispose nos objetos retornados")]
-        public static List<ManagementObject> GetActiveNetworkAdapters()
-        {
-            try
-            {
-                var query = "SELECT * FROM Win32_NetworkAdapter WHERE NetConnectionStatus = 2";
-                using var searcher = new ManagementObjectSearcher(query);
-                return searcher.Get().Cast<ManagementObject>().ToList();
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return new List<ManagementObject>(); }
-        }
 
         public static void SetDnsServers(string provider, string? primaryDns, string? secondaryDns)
         {
@@ -2404,28 +2300,6 @@ namespace KitLugia.Core
                 }
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
-        }
-
-        public static string? FindNetworkAdapterRegistryPath(string adapterGuid)
-        {
-            if (string.IsNullOrEmpty(adapterGuid)) return null;
-            try
-            {
-                string netClassGuid = "{4d36e972-e325-11ce-bfc1-08002be10318}";
-                string basePath = $@"SYSTEM\CurrentControlSet\Control\Class\{netClassGuid}";
-                using var classKey = Registry.LocalMachine.OpenSubKey(basePath);
-                if (classKey == null) return null;
-                foreach (var subKeyName in classKey.GetSubKeyNames())
-                {
-                    using var subKey = classKey.OpenSubKey(subKeyName);
-                    if (subKey?.GetValue("NetCfgInstanceId")?.ToString()?.Equals(adapterGuid, StringComparison.OrdinalIgnoreCase) == true)
-                    {
-                        return $"HKEY_LOCAL_MACHINE\\{basePath}\\{subKeyName}";
-                    }
-                }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            return null;
         }
 
         public static bool AreNetworkDriverOptimizationsApplied(string regPath)
@@ -2539,53 +2413,6 @@ namespace KitLugia.Core
             public bool Success { get; set; }
             public string Details { get; set; } = "";
             public string Recommendation { get; set; } = "";
-        }
-
-        public static List<NetworkDiagnosticResult> RunNetworkDiagnostics()
-        {
-            var results = new List<NetworkDiagnosticResult>();
-            
-            try
-            {
-                // 1. Testar conectividade básica
-                results.Add(TestConnectivity());
-                
-                // 2. Verificar configuração de IP
-                results.Add(CheckIPConfiguration());
-                
-                // 3. Testar resolução DNS
-                results.Add(TestDNSResolution());
-                
-                // 4. Verificar adaptadores de rede
-                results.Add(CheckNetworkAdapters());
-                
-                // 5. Testar conexões TCP
-                results.Add(CheckTCPConnections());
-                
-                // 6. Verificar tabela de roteamento
-                results.Add(CheckRoutingTable());
-                
-                // 7. Testar latência e velocidade
-                results.Add(TestLatencyAndSpeed());
-                
-                // 8. Verificar serviços de rede
-                results.Add(CheckNetworkServices());
-                
-                // 9. Limpar cache DNS se necessário
-                results.Add(ClearDNSCacheIfNeeded());
-            }
-            catch (Exception ex)
-            {
-                results.Add(new NetworkDiagnosticResult
-                {
-                    TestName = "Erro Geral",
-                    Success = false,
-                    Details = $"Erro ao executar diagnósticos: {ex.Message}",
-                    Recommendation = "Verifique se o aplicativo está sendo executado como administrador"
-                });
-            }
-            
-            return results;
         }
 
         private static NetworkDiagnosticResult TestConnectivity()
@@ -2971,104 +2798,83 @@ namespace KitLugia.Core
             return StartupManager.CreateDelayedStartupTask(name, path, args).Success;
         }
 
-        public static void ResetEthernetSettings()
+        /// <summary>
+        /// Reseta a pilha de rede (TCP/IP + Winsock) para o padrão do Windows.
+        /// Agora retorna o resultado real — antes era void e a UI mostrava
+        /// "sucesso" mesmo sem admin (netsh falha silenciosamente).
+        /// </summary>
+        public static (bool Success, string Message) ResetEthernetSettings()
         {
+            if (!SystemUtils.IsAdmin())
+                return (false, "Acesso Negado!\nExecute como Administrador para resetar a pilha de rede.");
+
             try
             {
-                SystemUtils.RunExternalProcess("netsh", "int ip reset", true);
-                SystemUtils.RunExternalProcess("netsh", "winsock reset", true);
+                var (code1, out1) = SystemUtils.RunExternalProcessWithCode("netsh", "int ip reset", true);
+                var (code2, out2) = SystemUtils.RunExternalProcessWithCode("netsh", "winsock reset", true);
+                if (code1 != 0 || code2 != 0)
+                {
+                    Logger.Log($"[NETWORK] ResetEthernetSettings: ip reset={code1}, winsock={code2} | {out1.Trim()} {out2.Trim()}");
+                    return (false, $"Reset retornou erro (TCP/IP: código {code1}, Winsock: código {code2}).\nVerifique o log.");
+                }
+                return (true, "Pilha de rede resetada com sucesso!\nReinicie o PC para aplicar as alterações.");
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao resetar a pilha de rede: {ex.Message}");
+            }
         }
 
-        public static void AutoTuneNetworkAdapter()
-        {
-            try
-            {
-                SystemUtils.RunExternalProcess("netsh", "int tcp set global autotuninglevel=normal", true);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
+        private const string NetAdapterClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}";
 
         /// <summary>
-        /// Otimiza adaptador de rede para gaming (NIC settings).
-        /// Desabilita Interrupt Moderation, Power Savings e configura buffers.
-        /// Baseado em guías 2024-2026.
-        /// Atualiza registry diretamente para garantir verificação correta.
+        /// Desabilita Interrupt Moderation nos adaptadores que expõem o parâmetro.
+        /// CORREÇÕES sobre a versão antiga (verificadas nesta máquina):
+        /// 1. `netsh int ip set interface ... interruptmoderation/rss=` é sintaxe INVÁLIDA
+        ///    (testado: "não é um argumento válido") — as 2 chamadas eram placebo e
+        ///    mesmo assim contavam como "adaptador otimizado".
+        /// 2. *InterruptModeration foi escrito em Tcpip\Parameters\Interfaces, local que
+        ///    o driver NÃO lê (0 ocorrências naturais no registro). O local CORRETO é a
+        ///    class key do driver (Control\Class\{4d36e972...}\NNN) — é onde o Gerenciador
+        ///    de Dispositivos lê/escreve (confirmado: 0008\*InterruptModeration REG_SZ).
         /// </summary>
         public static (bool Success, string Message) OptimizeNetworkAdapterForGaming()
         {
+            if (!SystemUtils.IsAdmin())
+                return (false, "Acesso Negado!\nExecute como Administrador para otimizar o adaptador.");
+
             try
             {
-                // Obter adaptadores de rede físicos
-                var adapters = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                int optimizedCount = 0;
+
+                using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using var classKey = localMachine.OpenSubKey(NetAdapterClassKey, true);
+                if (classKey == null)
+                    return (false, "Chave de classe de adaptadores de rede não encontrada.");
+
+                foreach (string subKeyName in classKey.GetSubKeyNames())
                 {
-                    FileName = "powershell",
-                    Arguments = "-Command \"Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Virtual -eq $false } | Select-Object -ExpandProperty Name\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                });
+                    if (!int.TryParse(subKeyName, out _)) continue; // pula "Properties" etc.
 
-                if (adapters != null)
-                {
-                    string output = adapters.StandardOutput.ReadToEnd();
-                    adapters.WaitForExit();
+                    using var adapterKey = classKey.OpenSubKey(subKeyName, true);
+                    if (adapterKey == null) continue;
 
-                    string[] adapterNames = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    // Só toca adaptadores cujo driver EXPÕE o parâmetro (não cria lixo em virtual/VPN)
+                    var existing = adapterKey.GetValue("*InterruptModeration");
+                    if (existing == null) continue;
 
-                    int optimizedCount = 0;
-                    foreach (var adapterName in adapterNames)
-                    {
-                        if (string.IsNullOrWhiteSpace(adapterName)) continue;
-
-                        try
-                        {
-                            // Desabilitar Interrupt Moderation (reduz latência)
-                            SystemUtils.RunExternalProcess("netsh", $"int ip set interface \"{adapterName}\" interruptmoderation=disabled", true);
-
-                            // Configurar RSS no adaptador
-                            SystemUtils.RunExternalProcess("netsh", $"int ip set interface \"{adapterName}\" rss=enabled", true);
-
-                            optimizedCount++;
-                        }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                    }
-
-
-                    // Define *InterruptModeration=0 em todas as interfaces TCP com IP configurado
-
-                    using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                    using var tcpipKey = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", false);
-                    if (tcpipKey != null)
-                    {
-                        using var interfacesKey = tcpipKey.OpenSubKey("Interfaces", false);
-                        if (interfacesKey != null)
-                        {
-                            foreach (string subKeyName in interfacesKey.GetSubKeyNames())
-                            {
-                                using var subKey = interfacesKey.OpenSubKey(subKeyName, false);
-                                if (subKey == null)
-                                    continue;
-
-                                var ipAddress = subKey.GetValue("IPAddress");
-                                var dhcpIpAddress = subKey.GetValue("DhcpIPAddress");
-
-                                if (ipAddress != null || dhcpIpAddress != null)
-                                {
-                                    // Esta interface tem IP configurado, definir *InterruptModeration=0
-                                    using var writeKey = tcpipKey.OpenSubKey($@"Interfaces\{subKeyName}", true);
-                                    writeKey?.SetValue("*InterruptModeration", "0", RegistryValueKind.String);
-                                }
-                            }
-                        }
-                    }
-
-                    return (true, $"{optimizedCount} adaptador(es) otimizado(s) para gaming.");
+                    // Preserva o tipo original (REG_SZ em drivers Intel/Realtek, DWORD em outros)
+                    if (existing is int)
+                        adapterKey.SetValue("*InterruptModeration", 0, RegistryValueKind.DWord);
+                    else
+                        adapterKey.SetValue("*InterruptModeration", "0", RegistryValueKind.String);
+                    optimizedCount++;
                 }
 
-                return (false, "Não foi possível obter lista de adaptadores.");
+                if (optimizedCount == 0)
+                    return (false, "Nenhum driver expõe Interrupt Moderation neste PC — toggle indisponível.");
+
+                return (true, $"Interrupt Moderation desabilitado em {optimizedCount} adaptador(es).\nReinicie o PC (ou o adaptador) para aplicar.");
             }
             catch (Exception ex)
             {
@@ -3077,80 +2883,66 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Reverte configurações do adaptador para padrão.
-        /// Atualiza registry diretamente para garantir verificação correta.
+        /// Reverte Interrupt Moderation ao padrão do driver (class key) e remove o
+        /// valor legado gravado por versões antigas em Tcpip\Parameters\Interfaces.
         /// </summary>
         public static (bool Success, string Message) RevertNetworkAdapterSettings()
         {
+            if (!SystemUtils.IsAdmin())
+                return (false, "Acesso Negado!\nExecute como Administrador para reverter o adaptador.");
+
             try
             {
-                var adapters = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                int revertedCount = 0;
+
+                using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using var classKey = localMachine.OpenSubKey(NetAdapterClassKey, true);
+                if (classKey != null)
                 {
-                    FileName = "powershell",
-                    Arguments = "-Command \"Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Virtual -eq $false } | Select-Object -ExpandProperty Name\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true
-                });
-
-                if (adapters != null)
-                {
-                    string output = adapters.StandardOutput.ReadToEnd();
-                    adapters.WaitForExit();
-
-                    string[] adapterNames = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-                    int revertedCount = 0;
-                    foreach (var adapterName in adapterNames)
+                    foreach (string subKeyName in classKey.GetSubKeyNames())
                     {
-                        if (string.IsNullOrWhiteSpace(adapterName)) continue;
+                        if (!int.TryParse(subKeyName, out _)) continue;
 
+                        using var adapterKey = classKey.OpenSubKey(subKeyName, true);
+                        var existing = adapterKey?.GetValue("*InterruptModeration");
+                        if (existing == null) continue; // não personalizado → já está no padrão
+
+                        // Padrão declarado pelo driver (Ndi\Params\...\default); fallback "1"
+                        string defaultValue = "1";
                         try
                         {
-                            // Habilitar Interrupt Moderation (padrão)
-                            SystemUtils.RunExternalProcess("netsh", $"int ip set interface \"{adapterName}\" interruptmoderation=enabled", true);
-
-                            // RSS (padrão)
-                            SystemUtils.RunExternalProcess("netsh", $"int ip set interface \"{adapterName}\" rss=enabled", true);
-
-                            revertedCount++;
+                            using var paramsKey = adapterKey!.OpenSubKey(@"Ndi\Params\*InterruptModeration");
+                            var def = paramsKey?.GetValue("default");
+                            if (def != null) defaultValue = def.ToString() ?? "1";
                         }
                         catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                        if (existing is int)
+                            adapterKey!.SetValue("*InterruptModeration",
+                                int.TryParse(defaultValue, out var defInt) ? defInt : 1, RegistryValueKind.DWord);
+                        else
+                            adapterKey!.SetValue("*InterruptModeration", defaultValue, RegistryValueKind.String);
+                        revertedCount++;
                     }
-
-
-                    // Remove *InterruptModeration de todas as interfaces TCP (reverte para padrão)
-
-                    using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                    using var tcpipKey = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", false);
-                    if (tcpipKey != null)
-                    {
-                        using var interfacesKey = tcpipKey.OpenSubKey("Interfaces", false);
-                        if (interfacesKey != null)
-                        {
-                            foreach (string subKeyName in interfacesKey.GetSubKeyNames())
-                            {
-                                using var subKey = interfacesKey.OpenSubKey(subKeyName, false);
-                                if (subKey == null)
-                                    continue;
-
-                                var ipAddress = subKey.GetValue("IPAddress");
-                                var dhcpIpAddress = subKey.GetValue("DhcpIPAddress");
-
-                                if (ipAddress != null || dhcpIpAddress != null)
-                                {
-                                    // Esta interface tem IP configurado, remover *InterruptModeration (reverte para padrão)
-                                    using var writeKey = tcpipKey.OpenSubKey($@"Interfaces\{subKeyName}", true);
-                                    writeKey?.DeleteValue("*InterruptModeration", false);
-                                }
-                            }
-                        }
-                    }
-
-                    return (true, $"{revertedCount} adaptador(es) revertido(s) para padrão.");
                 }
 
-                return (false, "Não foi possível obter lista de adaptadores.");
+                // Remove o valor legado que versões antigas gravavam em
+                // Tcpip\Parameters\Interfaces (local não lido pelo driver = lixo)
+                using var tcpipKey = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", false);
+                using var interfacesKey = tcpipKey?.OpenSubKey("Interfaces", false);
+                if (interfacesKey != null)
+                {
+                    foreach (string subKeyName in interfacesKey.GetSubKeyNames())
+                    {
+                        using var writeKey = interfacesKey.OpenSubKey(subKeyName, true);
+                        writeKey?.DeleteValue("*InterruptModeration", false);
+                    }
+                }
+
+                if (revertedCount == 0)
+                    return (true, "Nenhum adaptador com Interrupt Moderation personalizado (já está no padrão).");
+
+                return (true, $"{revertedCount} adaptador(es) revertido(s) para padrão.\nReinicie o PC (ou o adaptador) para aplicar.");
             }
             catch (Exception ex)
             {
@@ -3370,27 +3162,6 @@ namespace KitLugia.Core
         }
 
         // 2. Shutdown Speed Optimization (Baseado em Spyboy 2025 + KitLugia Aggressive Mods)
-        public static void OptimizeShutdownSpeed()
-        {
-            try
-            {
-                // Sistema Geral
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control", 
-                    "WaitToKillServiceTimeout", 2000, RegistryValueKind.DWord);
-                
-                // Aplicativos de Usuário (Desktop)
-                var desktopKey = @"HKEY_CURRENT_USER\Control Panel\Desktop";
-                Registry.SetValue(desktopKey, "AutoEndTasks", "1", RegistryValueKind.String);
-                Registry.SetValue(desktopKey, "WaitToKillAppTimeout", "2000", RegistryValueKind.String);
-                Registry.SetValue(desktopKey, "HungAppTimeout", "1000", RegistryValueKind.String);
-
-                Logger.Log("Shutdown speed otimizado: 2s Serviços, 2s Apps, 1s Travados, Auto-End ativado.");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao otimizar shutdown speed: {ex.Message}");
-            }
-        }
 
         // 3. System Responsiveness (Baseado em Spyboy 2025)
         public static void OptimizeSystemResponsiveness()
@@ -3408,19 +3179,6 @@ namespace KitLugia.Core
         }
 
         // 4. Menu Show Delay (Baseado em Spyboy 2025)
-        public static void OptimizeMenuDelay()
-        {
-            try
-            {
-                Registry.SetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop",
-                    "MenuShowDelay", 100, RegistryValueKind.String);
-                Logger.Log("Menu delay otimizado: 100ms");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao otimizar menu delay: {ex.Message}");
-            }
-        }
 
         // 5. Network Throttling Disable (Baseado em Spyboy 2025)
         public static void DisableNetworkThrottling()
@@ -3454,68 +3212,14 @@ namespace KitLugia.Core
         }
 
         // 7. SHA-3 Support Verification (Windows 11 24H2)
-        public static bool IsSHA3Supported()
-        {
-            try
-            {
-                using var cngKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography\Defaults\Provider Types");
-                var sha3Support = cngKey?.GetValue("SHA3") != null;
-                Logger.Log($"SHA-3 support: {sha3Support}");
-                return sha3Support;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao verificar SHA-3 support: {ex.Message}");
-                return false;
-            }
-        }
 
         // 8. Wi-Fi 7 Optimization (Windows 11 24H2)
 
         // 9. Bluetooth LE Audio Optimization (Windows 11 24H2)
-        public static void OptimizeBluetoothLE()
-        {
-            try
-            {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Bluetooth\Audio",
-                    "LEAudioOptimization", 1, RegistryValueKind.DWord);
-                Logger.Log("Bluetooth LE Audio otimizado para assistive devices");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao otimizar Bluetooth LE: {ex.Message}");
-            }
-        }
 
         // 10. Windows Protected Print Mode (Windows 11 24H2)
-        public static void EnableProtectedPrintMode()
-        {
-            try
-            {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Printers",
-                    "ProtectedPrint", 1, RegistryValueKind.DWord);
-                Logger.Log("Windows Protected Print Mode ativado");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao ativar protected print mode: {ex.Message}");
-            }
-        }
 
         // 11. App Control for Business (Windows 11 24H2)
-        public static void ConfigureAppControl()
-        {
-            try
-            {
-                Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\AppControl",
-                    "BusinessMode", 1, RegistryValueKind.DWord);
-                Logger.Log("App Control for Business configurado");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao configurar App Control: {ex.Message}");
-            }
-        }
 
         // 12. Rust Kernel Optimization (Windows 11 24H2)
 
@@ -3550,17 +3254,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
-        public static bool IsShutdownSpeedOptimized()
-        {
-            try
-            {
-                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control", 
-                    "WaitToKillServiceTimeout", 5000);
-                return Convert.ToInt32(value) == 2000;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
         public static bool IsNetworkThrottlingDisabled()
         {
             try
@@ -3569,45 +3262,16 @@ namespace KitLugia.Core
                     "NetworkThrottlingIndex", 10);
                 long valueLong = Convert.ToInt64(value);
 
-                return valueLong == 0xFFFFFFFF || valueLong != 10;
+                // REG_DWORD 0xFFFFFFFF é lido como -1 (int com sinal) e pode vir como
+                // 4294967295 (QWORD). Bug antigo: `== 0xFFFFFFFF || != 10` — a 1ª parte
+                // era morta (nunca igual) e a 2ª retornava true para QUALQUER valor ≠ 10
+                // (ex.: 5 = throttling ATIVO era reportado como "desativado").
+                return valueLong == -1 || valueLong == 0xFFFFFFFF;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
 
-        public static bool IsBluetoothLEOptimized()
-        {
-            try
-            {
-                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Bluetooth\Audio", 
-                    "LEAudioOptimization", 0);
-                return Convert.ToInt32(value) == 1;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-        public static bool IsProtectedPrintModeEnabled()
-        {
-            try
-            {
-                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Printers", 
-                    "ProtectedPrint", 0);
-                return Convert.ToInt32(value) == 1;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-
-        public static bool IsSudoEnabled()
-        {
-            try
-            {
-                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", 
-                    "EnableSudo", 0);
-                return Convert.ToInt32(value) == 1;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
 
         #endregion
         // =========================================================
@@ -7195,22 +6859,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
-        public static void DisableExplorerFolderDiscovery()
-        {
-            try
-            {
-                int idx = ExplorerFolderTypeKey.IndexOf('\\');
-                string subPath = idx >= 0 ? ExplorerFolderTypeKey.Substring(idx + 1) : ExplorerFolderTypeKey;
-                using var key = Registry.CurrentUser.CreateSubKey(subPath, true);
-                key?.SetValue("FolderType", "NotSpecified", RegistryValueKind.String);
-                Logger.Log("Explorer: FolderType=NotSpecified aplicado (Turbo do Explorer)");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao aplicar Turbo do Explorer: {ex.Message}");
-            }
-        }
-
         public static void RestoreExplorerFolderDiscovery()
         {
             try
@@ -7249,22 +6897,6 @@ namespace KitLugia.Core
                 return Convert.ToInt32(value) != 0;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-        public static void DisableExplorerThumbnails()
-        {
-            try
-            {
-                int idx = ExplorerAdvancedKey.IndexOf('\\');
-                string subPath = idx >= 0 ? ExplorerAdvancedKey.Substring(idx + 1) : ExplorerAdvancedKey;
-                using var key = Registry.CurrentUser.CreateSubKey(subPath, true);
-                key?.SetValue("IconsOnly", 1, RegistryValueKind.DWord);
-                Logger.Log("Explorer: IconsOnly=1 aplicado (ir direto ao arquivo sem miniaturas)");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao aplicar IconsOnly: {ex.Message}");
-            }
         }
 
         public static void RestoreExplorerThumbnails()
@@ -7364,16 +6996,6 @@ namespace KitLugia.Core
         private const string ExplorerShellViewsMirror =
             @"Software\Microsoft\Windows\Shell";
 
-        /// <summary>Estado "visual normal": miniaturas ligadas + folder-type discovery ativo.</summary>
-        public static bool IsExplorerVisualNormal()
-        {
-            try
-            {
-                return !IsExplorerThumbnailsDisabled() && !IsExplorerFolderDiscoveryDisabled();
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
         /// <summary>Apaga as views salvas POR PASTA (numericas) + BagMRU nos 2 locais,
         /// mantendo o template global AllFolders — equivale ao "Restaurar Padroes das
         /// Pastas" do Explorer. As pastas conhecidas (Downloads etc.) sao recriadas
@@ -7432,18 +7054,6 @@ namespace KitLugia.Core
                     .Any(n => n.Equals("Desktop", StringComparison.OrdinalIgnoreCase)) == true;
             }
             catch { return false; }
-        }
-
-        /// <summary>Restaura o visual padrao do Explorer de uma vez: miniaturas de
-        /// fotos/videos + deteccao de tipo de pasta + views por pasta no template
-        /// padrao (agrupamento por data volta em Downloads etc.). Requer reiniciar o
-        /// explorer.exe para o shell reconstruir as Bags.</summary>
-        public static void RestoreExplorerNormalVisuals()
-        {
-            RestoreExplorerThumbnails();        // IconsOnly removido
-            RestoreExplorerFolderDiscovery();   // FolderType=NotSpecified removido
-            int cleared = ResetSavedFolderViews();
-            Logger.Log($"Explorer: visual normal restaurado (miniaturas + template padrao; {cleared} chaves de view resetadas). Reinicie o explorer.");
         }
 
         public static void DisableRecentFiles()
@@ -8477,30 +8087,6 @@ namespace KitLugia.Core
             return ("Desconhecido", 0, 0);
         }
 
-        public static string GetPrimaryGpuName()
-        {
-            try
-            {
-                var names = GetAllGpuNames();
-                return names.Count > 0 ? names[0] : "N/A";
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return "N/A"; }
-        }
-
-        public static int GetVramAppliedMb()
-        {
-            try
-            {
-                using var primaryGpu = GetPrimaryGpu();
-                if (primaryGpu == null) return 0;
-                string? regPath = FindGpuRegistryPath(primaryGpu);
-                if (string.IsNullOrEmpty(regPath)) return 0;
-                var val = Registry.GetValue(regPath, "DedicatedSegmentSize", 0);
-                return val != null ? Convert.ToInt32(val) : 0;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
-        }
-
         #endregion
 
         #region TweaksPage UI - Check Methods
@@ -8821,54 +8407,8 @@ namespace KitLugia.Core
         }
 
         // --- WaitToKillAppTimeout (HKCU): 2000ms ---
-        public static bool IsWaitToKillAppOptimized()
-        {
-            try
-            {
-                var val = Registry.GetValue(DesktopPath, "WaitToKillAppTimeout", null) as string;
-                return val != null && int.TryParse(val, out var ms) && ms <= 2000;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-        public static void OptimizeWaitToKillApp()
-        {
-            try { Registry.SetValue(DesktopPath, "WaitToKillAppTimeout", "2000", RegistryValueKind.String); }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
-        public static void RevertWaitToKillApp()
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(DesktopPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
-                key?.DeleteValue("WaitToKillAppTimeout", false);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
 
         // --- HungAppTimeout (HKCU): 1000ms ---
-        public static bool IsHungAppTimeoutOptimized()
-        {
-            try
-            {
-                var val = Registry.GetValue(DesktopPath, "HungAppTimeout", null) as string;
-                return val != null && int.TryParse(val, out var ms) && ms <= 1000;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-        public static void OptimizeHungAppTimeout()
-        {
-            try { Registry.SetValue(DesktopPath, "HungAppTimeout", "1000", RegistryValueKind.String); }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
-        public static void RevertHungAppTimeout()
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(DesktopPath.Replace(@"HKEY_CURRENT_USER\", ""), true);
-                key?.DeleteValue("HungAppTimeout", false);
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
 
         // --- ClearPageFileAtShutdown: 0 (disabled) ---
         public static bool IsClearPageFileDisabled()
@@ -9683,16 +9223,6 @@ namespace KitLugia.Core
             }
         }
 
-        // --- ForceStopUnlock (unlock locked files via Handle tool) ---
-        public static string GetForceStopUnlockFolder()
-        {
-            return System.IO.Path.Combine(KitLugiaBaseFolder, "External", "ForceStopUnlock");
-        }
-        public static string GetForceStopUnlockScriptPath()
-        {
-            return System.IO.Path.Combine(GetForceStopUnlockFolder(), "Unlock-File.ps1");
-        }
-
         public static bool IsForceStopUnlockAdded()
         {
             try
@@ -10207,12 +9737,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
         }
 
-        public static int GetContextMenuEntryCount()
-        {
-            try { return GetAllUserContextMenuEntries().Count; }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return 0; }
-        }
-
         #endregion
 
         #region Telemetria e Relatorios (servicos + tarefas agendadas)
@@ -10524,9 +10048,6 @@ namespace KitLugia.Core
 
         // ───────────────────────── 5. Delivery Optimization ─────────────────────────
 
-        public static void SetDeliveryOptimizationMode(int mode) // 0=HTTP only, 1=LAN only, 2=Group, 3=Internet
-            => RegSetDword(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", mode);
-
         public static void RestrictDeliveryOptimization()
         {
             // DODownloadMode: 0 = HTTP sem P2P (mais restrito), 1 = LAN apenas
@@ -10794,17 +10315,6 @@ namespace KitLugia.Core
         }
 
         // ───────────────────────── 16. Reserved Storage ─────────────────────────
-
-        public static bool IsReservedStorageSupported()
-        {
-            // Só existe no Win10 1903+
-            try
-            {
-                var output = SystemUtils.RunExternalProcess("dism", "/Online /Get-ReservedStorageState", hidden: true);
-                return !output.Contains("7968", StringComparison.Ordinal) || output.Contains("Reserved"); // tem estado reservado?
-            }
-            catch { return false; }
-        }
 
         public static (bool Success, string Message) DisableReservedStorage()
         {

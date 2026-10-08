@@ -649,19 +649,6 @@ namespace KitLugia.Core
             return result;
         }
 
-        /// <summary>
-        /// Quick check: does the target path have any blocking handles?
-        /// Returns true if handles were found (meaning the path is locked).
-        /// </summary>
-        public static bool IsLocked(string targetPath)
-        {
-            var targets = Directory.Exists(targetPath)
-                ? new[] { targetPath }
-                : new[] { targetPath };
-
-            return FindViaHandleTool(targets, targetPath, quickMode: true).Count > 0;
-        }
-
         // ─── Restart Manager Implementation ──────────────────────────────
 
         private static List<BlockingProcessInfo> FindViaRestartManager(string[] filePaths)

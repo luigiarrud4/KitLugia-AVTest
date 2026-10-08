@@ -120,7 +120,7 @@ namespace KitLugia.GUI.Pages
             ChkTurboShutdown.IsChecked = tray.TurboShutdownEnabled;
 
             // ISLC: mostrar threshold auto-calculado
-            TxtIslcDescription.Text = $"Threshold: {tray.IslcThresholdMB} MB (auto). Reduz stuttering e freezes em jogos.";
+            TxtIslcDescription.Text = $"Threshold: {tray.IslcThresholdMB} MB (auto). Recomendado p/ 16 GB RAM (32 GB+ raramente precisa — passe o mouse no ⓘ).";
 
             // Auto-Start - usa novo método que verifica o caminho
             try
@@ -170,14 +170,12 @@ namespace KitLugia.GUI.Pages
                 if (nameStack.Children[1] is not TextBlock statusTb) continue;
                 statusTb.FontFamily = _emojiFont;
 
-                bool exceeded = limit.LastKnownMB > limit.LimitMB;
-                statusTb.Text = limit.LastKnownMB > 0
-                    ? $"Atual: {limit.LastKnownMB} MB" +
-                      $"{(exceeded ? " \u26A0\uFE0F excedido" : " \u2713")}" +
-                      $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}"
-                    : "Processo n\u00E3o est\u00E1 rodando";
+                // Mesmo texto da construção (antes o refresh mostrava SÓ "Atual: X MB" e a
+                // linha "piscava" perdendo Pico/Commit a cada 2 s).
+                statusTb.Text = BuildStatusText(limit);
 
                 // excedido = vermelho, OK = cinza, foreground = dourado
+                bool exceeded = limit.LastKnownMB > limit.LimitMB;
                 statusTb.Foreground = exceeded
                     ? new System.Windows.Media.SolidColorBrush(
                         System.Windows.Media.Color.FromRgb(255, 85, 85))  // excedido: vermelho
@@ -187,10 +185,11 @@ namespace KitLugia.GUI.Pages
                         : new System.Windows.Media.SolidColorBrush(
                             System.Windows.Media.Color.FromRgb(102, 102, 102));  // OK: cinza
 
-                // Floor/commit display removed (reverted to old RAM Limiter)
-                if (nameStack.Children.Count >= 3 && nameStack.Children[2] is TextBlock floorTb)
+                // Linha 3: badges do motor + estado do governador (mesmo texto da
+                // construção — antes o refresh APAGAVA a linha e os badges do gear sumiam).
+                if (nameStack.Children.Count >= 3 && nameStack.Children[2] is TextBlock govTb)
                 {
-                    floorTb.Text = "";
+                    govTb.Text = BuildGovText(limit);
                 }
             }
         }
@@ -539,8 +538,9 @@ namespace KitLugia.GUI.Pages
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // 0: Nome
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 1: Limite
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 2: MB
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 3: Gear
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 4: On/Off
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 3: Modo (Gov/Direto)
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 4: Gear
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 5: On/Off
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 6: Remove
 
             // Nome + status
@@ -558,13 +558,7 @@ namespace KitLugia.GUI.Pages
             });
 
             bool exceeded = limit.LastKnownMB > limit.LimitMB;
-            string statusText = limit.LastKnownMB > 0
-                ? $"Atual: {limit.LastKnownMB} MB" +
-                  $"{(exceeded ? " \u26A0\uFE0F excedido" : " \u2713")}" +
-                  $" \u26A1 Pico: {Math.Max(limit.PeakRamMB, limit.LastKnownMB)} MB" +
-                  (limit.CommitSizeMB > 0 ? $" \U0001F4BE Commit: {limit.CommitSizeMB} MB" : "") +
-                  $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}"
-                : "Processo n\u00E3o est\u00E1 rodando";
+            string statusText = BuildStatusText(limit);
 
             var statusColor = exceeded
                 ? System.Windows.Media.Color.FromRgb(255, 85, 85)  // excedido: vermelho
@@ -578,19 +572,21 @@ namespace KitLugia.GUI.Pages
                 FontFamily = _emojiFont,
                 Foreground = new System.Windows.Media.SolidColorBrush(statusColor),
                 FontSize = 10,
-                Margin = new Thickness(0, 2, 0, 0)
+                Margin = new Thickness(0, 2, 0, 0),
+                TextWrapping = TextWrapping.Wrap
             });
 
-            // Linha 3: badges do motor por processo (config do gear ⚙️)
+            // Linha 3: badges do motor por processo (config do gear ⚙️) + governador.
             var engineTb = new TextBlock
             {
-                Text = BuildEngineBadges(limit),
+                Text = BuildGovText(limit),
                 FontFamily = _emojiFont,
                 Foreground = new System.Windows.Media.SolidColorBrush(
                     System.Windows.Media.Color.FromRgb(212, 175, 55)),
                 FontSize = 9,
                 Margin = new Thickness(0, 1, 0, 0),
-                Tag = "engineInfo"
+                Tag = "engineInfo",
+                TextWrapping = TextWrapping.Wrap
             };
             nameStack.Children.Add(engineTb);
             Grid.SetColumn(nameStack, 0);
@@ -630,6 +626,34 @@ namespace KitLugia.GUI.Pages
             });
             Grid.SetColumn(grid.Children[^1], 2);
 
+            // Modo: Governador (🧠, com verificações) ⇄ Direto (⚡, estilo Firemin: passou
+            // do valor, limpa). 1 clique alterna e salva.
+            var modeBtn = new Button
+            {
+                Content = limit.DirectMode ? "⚡" : "🧠",
+                FontFamily = _emojiFont,
+                Width = 24,
+                Height = 24,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(
+                        (byte)(limit.DirectMode ? 255 : 153),
+                        (byte)(limit.DirectMode ? 213 : 153),
+                        (byte)(limit.DirectMode ? 79 : 153))),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Tag = limit.ProcessName,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                ToolTip = limit.DirectMode
+                    ? "Modo DIRETO (estilo Firemin): passou do limite, esvazia na hora. Clique para voltar ao Governador."
+                    : "Modo GOVERNADOR (com verificações anti-storm). Clique para modo DIRETO (limpa ao atingir, estilo Firemin).",
+                Style = (Style)FindResource("FlatIconButton")
+            };
+            modeBtn.Click += BtnProcessMode_Click;
+            Grid.SetColumn(modeBtn, 3);
+            grid.Children.Add(modeBtn);
+
             // ⚙️ Gear – per-process engine config
             var gearBtn = new Button
             {
@@ -649,7 +673,7 @@ namespace KitLugia.GUI.Pages
                 Style = (Style)FindResource("FlatIconButton")
             };
             gearBtn.Click += BtnProcessGear_Click;
-            Grid.SetColumn(gearBtn, 3);
+            Grid.SetColumn(gearBtn, 4);
             grid.Children.Add(gearBtn);
 
             // Toggle on/off
@@ -662,7 +686,7 @@ namespace KitLugia.GUI.Pages
                 Tag = limit.ProcessName
             };
             toggle.Click += ChkProcessLimitEnabled_Click;
-            Grid.SetColumn(toggle, 4);
+            Grid.SetColumn(toggle, 5);
             grid.Children.Add(toggle);
 
             // Botao remover
@@ -681,11 +705,57 @@ namespace KitLugia.GUI.Pages
                 Style = (Style)FindResource("FlatIconButton")
             };
             removeBtn.Click += BtnRemoveProcessLimit_Click;
-            Grid.SetColumn(removeBtn, 5);
+            Grid.SetColumn(removeBtn, 6);
             grid.Children.Add(removeBtn);
 
             row.Child = grid;
             return row;
+        }
+
+        /// <summary>
+        /// Linha de status da linha de limite (usada na construção E no refresh — o texto
+        /// precisa ser idêntico nos dois, senão a linha "pisca" mudando a cada 2 s).
+        /// No modo DIRETO mostra só o essencial (o resto é debug do governador).
+        /// </summary>
+        private static string BuildStatusText(TrayIconService.ProcessRamLimit limit)
+        {
+            if (limit.LastKnownMB <= 0) return "Processo n\u00E3o est\u00E1 rodando";
+            bool exceeded = limit.LastKnownMB > limit.LimitMB;
+            string base_ = $"Atual: {limit.LastKnownMB} MB" +
+                   $"{(exceeded ? " \u26A0\uFE0F excedido" : " \u2713")}";
+            if (limit.DirectMode)
+                return base_ + $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}";
+            return base_ +
+                   $" \u26A1 Pico: {Math.Max(limit.PeakRamMB, limit.LastKnownMB)} MB" +
+                   (limit.CommitSizeMB > 0 ? $" \U0001F4BE Commit: {limit.CommitSizeMB} MB" : "") +
+                   $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}";
+        }
+
+        /// <summary>
+        /// Linha 3 da linha de limite: badges do motor (gear) + estado do governador de RAM.
+        /// A parte do governador (VERY_LOW/faults/backoff/commit) é debug: só aparece com o
+        /// 🧠 ligado. No ⚡ aparece só o badge DIRETO.
+        /// </summary>
+        private static string BuildGovText(TrayIconService.ProcessRamLimit limit)
+        {
+            string badges = BuildEngineBadges(limit);
+            if (limit.DirectMode)
+                return badges + (badges.Length > 0 ? " · " : "") + "⚡ DIRETO";
+            string gov = "";
+            if (limit.LastFaultsPerSec > 0 || limit.StormBackoffLevel > 0 || limit.MemPriorityApplied)
+            {
+                gov = "🧠 gov:";
+                if (limit.MemPriorityApplied) gov += " VERY_LOW";
+                if (limit.LastFaultsPerSec >= 1) gov += $" {limit.LastFaultsPerSec:F0} faults/s";
+                if (limit.StormBackoffLevel > 0) gov += $" ⛈ backoff x{1 << limit.StormBackoffLevel}";
+                if (limit.CommitSizeMB > 0) gov += $" 💾 commit {limit.CommitSizeMB} MB";
+            }
+            else if (limit.CommitSizeMB > 0)
+            {
+                gov = $"💾 commit {limit.CommitSizeMB} MB";
+            }
+            string mid = (gov.Length > 0 && badges.Length > 0) ? " · " : "";
+            return badges + mid + gov;
         }
 
         /// <summary>
@@ -720,7 +790,8 @@ namespace KitLugia.GUI.Pages
                 parts.Add("\U0001F9E5 E-cores");
             if (cfg.TimerBoost)
                 parts.Add("\u23F1 Timer 1ms");
-            if (cfg.ThreadMemoryPriority != 0)
+            // MemPrio 5 (NORMAL) é o default — mostrar seria ruído em toda linha.
+            if (cfg.ThreadMemoryPriority != 0 && cfg.ThreadMemoryPriority != 5)
                 parts.Add($"\U0001F9E0 MemPrio {cfg.ThreadMemoryPriority}");
 
             return string.Join(" \u00B7 ", parts);
@@ -833,6 +904,33 @@ namespace KitLugia.GUI.Pages
             long safeMin = 60; // old default minimum
             ShowNotification("✅ Limite configurado",
                 $"{processName} → {limitMB} MB\nMínimo seguro: {safeMin} MB (app não será interrompido abaixo disso)");
+        }
+
+        private void BtnProcessMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            string? name = btn.Tag?.ToString();
+            if (string.IsNullOrEmpty(name)) return;
+
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            bool direto = tray.ToggleProcessRamDirectMode(name);
+            // Atualiza o botão na hora (sem reconstruir a lista inteira).
+            btn.Content = direto ? "⚡" : "🧠";
+            btn.Foreground = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(
+                    (byte)(direto ? 255 : 153),
+                    (byte)(direto ? 213 : 153),
+                    (byte)(direto ? 79 : 153)));
+            btn.ToolTip = direto
+                ? "Modo DIRETO (estilo Firemin): passou do limite, esvazia na hora. Clique para voltar ao Governador."
+                : "Modo GOVERNADOR (com verificações anti-storm). Clique para modo DIRETO (limpa ao atingir, estilo Firemin).";
+            // A linha gov (3ª linha) mostra o modo: reconstrói as linhas para refletir.
+            LoadProcessLimits();
+            ShowNotification(direto ? "⚡ Modo Direto" : "🧠 Modo Governador",
+                direto ? $"'{name}': passou do valor, o kit limpa na hora."
+                       : $"'{name}': com verificações anti-storm.");
         }
 
         private void BtnRemoveProcessLimit_Click(object sender, RoutedEventArgs e)

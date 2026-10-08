@@ -44,13 +44,22 @@ namespace KitLugia.GUI.Pages
             try
             {
                 AppendLog("Verificando status do rEFInd...");
-                bool installed = await Task.Run(() =>
+                // MountEspAsync + DismountEspAsync no finally: o MountEspSync legado chamava
+                // mountvol com WaitForExit na thread de UI (loop S..Z) e deixava a ESP montada.
+                string? esp = await RefindManager.MountEspAsync();
+                bool installed = false;
+                try
                 {
-                    string? esp = RefindManager.MountEspSync();
-                    if (esp == null) return false;
-                    string backup = System.IO.Path.Combine(esp, "EFI", "KitLugia", "bootmgfw.original.efi");
-                    return System.IO.File.Exists(backup);
-                });
+                    if (esp != null)
+                    {
+                        string backup = System.IO.Path.Combine(esp, "EFI", "KitLugia", "bootmgfw.original.efi");
+                        installed = System.IO.File.Exists(backup);
+                    }
+                }
+                finally
+                {
+                    if (esp != null) await RefindManager.DismountEspAsync(esp);
+                }
 
                 if (installed)
                 {

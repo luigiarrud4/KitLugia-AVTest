@@ -78,36 +78,8 @@ namespace KitLugia.Core
         // ANÁLISE DE DESLIGAMENTO (SHUTDOWN)
         // =========================================================
 
-        /// <summary>
-        /// Retorna o evento de tempo total do último desligamento.
-        /// </summary>
-        public static PerformanceEvent? AnalyzeShutdownPerformance()
-        {
-            // ID 200 = Shutdown Total
-            var shutdownEvents = SystemTweaks.GetPerformanceEvents(200, 200, 299);
-            return shutdownEvents.FirstOrDefault(e => e.EventId == 200);
-        }
-
         // =========================================================
         // UTILITÁRIOS
         // =========================================================
-
-        /// <summary>
-        /// Abre uma pesquisa no Google para ajudar o usuário a entender o que é um processo desconhecido.
-        /// Útil para o menu de contexto da lista de boot.
-        /// </summary>
-        public static void SearchBootItemOnline(string itemName)
-        {
-            try
-            {
-                // Remove extensão .exe para melhorar a busca
-                string queryName = itemName.Replace(".exe", "", StringComparison.OrdinalIgnoreCase);
-                string query = Uri.EscapeDataString($"what is {queryName} process windows");
-                string url = $"https://www.google.com/search?q={query}";
-
-                Process.Start(new ProcessStartInfo("cmd", $"/c start {url}") { CreateNoWindow = true });
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
     }
 }

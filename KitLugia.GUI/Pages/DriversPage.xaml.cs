@@ -250,7 +250,7 @@ namespace KitLugia.GUI.Pages
 
                 if (dialog.ShowDialog() == true)
                 {
-                    await Task.Run(() => DriverManager.ExportDriverListToTxt(dialog.FileName));
+                    await DriverManager.ExportDriverListToTxtAsync(dialog.FileName);
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowSuccess("EXPORTADO", "Lista salva com sucesso.");
                 }

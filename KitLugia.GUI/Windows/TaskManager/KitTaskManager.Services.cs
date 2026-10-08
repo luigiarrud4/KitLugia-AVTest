@@ -25,9 +25,13 @@ namespace KitLugia.GUI.Windows.TaskManager
             });
             _allServices = services;
             _servicesLoaded = true;
-            ApplyServiceFilter("Todos");
+            _servicesLoadedAt = DateTime.Now;
+            // Reaplica o filtro que está NA COMBO, não "Todos": recarregar a lista
+            // (ou trocar de aba) não pode descartar a escolha do usuário.
+            ApplyServiceFilter(GetServiceFilter());
             TxtServiceCount.Text = $"— {services.Count} serviços";
             TxtServiceStatus.Text = $"{services.Count(s => s.Status == "Executando")} executando, {services.Count(s => s.Status == "Parado")} parados";
+            UpdateServiceActionButtons();
         }
 
         private bool _servicesLoaded = false;
@@ -35,7 +39,9 @@ namespace KitLugia.GUI.Windows.TaskManager
 
         private void CmbServiceFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (!_servicesLoaded) return;
+            // NÃO exige _servicesLoaded: mudar o filtro antes da 1ª carga é normal e o
+            // guard antigo engolia o clique (a combo dizia "Parados" e a grade seguia
+            // mostrando tudo — o "botão de filtro não funciona").
             if (CmbServiceFilter?.SelectedItem is ComboBoxItem item && item.Content is string filter)
                 ApplyServiceFilter(filter);
         }
@@ -43,6 +49,7 @@ namespace KitLugia.GUI.Windows.TaskManager
         private void ApplyServiceFilter(string filter)
         {
             if (_allServices == null || DgServices == null) return;
+            if (string.IsNullOrEmpty(filter)) filter = "Todos";
             var filtered = filter switch
             {
                 "Executando" => _allServices.Where(s => s.Status == "Executando").ToList(),
@@ -58,40 +65,151 @@ namespace KitLugia.GUI.Windows.TaskManager
                     s.DisplayName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
                     (s.Manufacturer?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
             }
+            // Reaplica a ORDENAÇÃO escolhida pelo usuário (o filtro antigo trocava o
+            // ItemsSource e voltava para a ordem do WMI).
+            filtered = SortServices(filtered);
+
             DgServices.ItemsSource = filtered;
-            TxtServiceCount.Text = $"— {filtered.Count} serviços";
+            TxtServiceCount.Text = $"— {filtered.Count} de {_allServices.Count} serviços";
+            if (!_servicesLoaded) TxtServiceStatus.Text = "Carregando serviços...";
         }
 
-        private void MenuStartService_Click(object sender, RoutedEventArgs e)
+        private List<ServiceInfo> SortServices(List<ServiceInfo>? src)
         {
-            if (DgServices.SelectedItem is not ServiceInfo svc) return;
-            try
+            if (src == null || src.Count == 0) return src ?? new List<ServiceInfo>();
+            if (string.IsNullOrEmpty(_svcSortProp)) return src;
+            Func<ServiceInfo, string> key = _svcSortProp switch
             {
-                using var controller = new System.ServiceProcess.ServiceController(svc.Name);
-                if (controller.Status == System.ServiceProcess.ServiceControllerStatus.Stopped)
-                {
-                    controller.Start();
-                    TxtStatus.Text = $"▶ Serviço {svc.DisplayName} iniciado.";
-                    _ = LoadServicesAsync();
-                }
-            }
-            catch (Exception ex) { TxtStatus.Text = $"Erro ao iniciar serviço: {ex.Message}"; }
+                "DisplayName" => s => s.DisplayName ?? "",
+                "Status" => s => s.Status ?? "",
+                "StartMode" => s => s.StartMode ?? "",
+                "Manufacturer" => s => s.Manufacturer ?? "",
+                _ => s => s.Name ?? "",
+            };
+            return _svcSortDir == ListSortDirection.Ascending
+                ? src.OrderBy(key, StringComparer.OrdinalIgnoreCase).ToList()
+                : src.OrderByDescending(key, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private void MenuStopService_Click(object sender, RoutedEventArgs e)
+        private async void MenuStartService_Click(object sender, RoutedEventArgs e)
         {
             if (DgServices.SelectedItem is not ServiceInfo svc) return;
+            TxtStatus.Text = $"▶ Iniciando {svc.DisplayName}...";
+            // ServiceController.Start/Stop/WaitForStatus fala com o SCM e pode levar DEZESSEGUNDOS
+            // (o reinício tinha WaitForStatus(10s) na thread da UI): a janela ficava travada.
+            string result = await Task.Run(() =>
+            {
+                try
+                {
+                    using var controller = new System.ServiceProcess.ServiceController(svc.Name);
+                    if (controller.Status == System.ServiceProcess.ServiceControllerStatus.Stopped)
+                    {
+                        controller.Start();
+                        return $"▶ Serviço {svc.DisplayName} iniciado.";
+                    }
+                    return $"O serviço {svc.DisplayName} já estava em execução.";
+                }
+                catch (Exception ex) { return $"Erro ao iniciar serviço: {ex.Message}"; }
+            });
+            TxtStatus.Text = result;
+            _ = LoadServicesAsync();
+        }
+
+        private async void MenuStopService_Click(object sender, RoutedEventArgs e)
+        {
+            if (DgServices.SelectedItem is not ServiceInfo svc) return;
+            TxtStatus.Text = $"⏹ Parando {svc.DisplayName}...";
+            string result = await Task.Run(() =>
+            {
+                try
+                {
+                    using var controller = new System.ServiceProcess.ServiceController(svc.Name);
+                    if (controller.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                    {
+                        controller.Stop();
+                        return $"⏹ Serviço {svc.DisplayName} parado.";
+                    }
+                    return $"O serviço {svc.DisplayName} já estava parado.";
+                }
+                catch (Exception ex) { return $"Erro ao parar serviço: {ex.Message}"; }
+            });
+            TxtStatus.Text = result;
+            _ = LoadServicesAsync();
+        }
+
+        // ══════════════════════════════════════════════
+        //  ESTADO DOS BOTÕES (Seleção)
+        //  Antes os botões ficavam SEMPRE habilitados e, sem linha selecionada, o
+        //  handler fazia `return` mudo: o usuario clica e "nao acontece nada".
+        //  Agora eles acendem/apagam com a seleção e o recarregar é explícito.
+        // ══════════════════════════════════════════════
+
+        private void DgServices_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateServiceActionButtons();
+
+        private void UpdateServiceActionButtons()
+        {
             try
             {
-                using var controller = new System.ServiceProcess.ServiceController(svc.Name);
-                if (controller.Status == System.ServiceProcess.ServiceControllerStatus.Running)
-                {
-                    controller.Stop();
-                    TxtStatus.Text = $"⏹ Serviço {svc.DisplayName} parado.";
-                    _ = LoadServicesAsync();
-                }
+                var svc = DgServices?.SelectedItem as ServiceInfo;
+                bool has = svc != null;
+                if (BtnSvcStart != null) BtnSvcStart.IsEnabled = has && svc!.Status != "Executando";
+                if (BtnSvcStop != null) BtnSvcStop.IsEnabled = has && svc!.Status == "Executando";
+                if (BtnSvcRestart != null) BtnSvcRestart.IsEnabled = has;
+                if (BtnSvcReload != null) BtnSvcReload.IsEnabled = _servicesBusy == 0;
             }
-            catch (Exception ex) { TxtStatus.Text = $"Erro ao parar serviço: {ex.Message}"; }
+            catch { }
+        }
+
+        private int _servicesBusy;
+
+        private async void BtnSvcReload_Click(object sender, RoutedEventArgs e)
+        {
+            if (Interlocked.Exchange(ref _servicesBusy, 1) != 0) return;
+            try { await LoadServicesAsync(); }
+            finally { Interlocked.Exchange(ref _servicesBusy, 0); UpdateServiceActionButtons(); }
+        }
+
+        private DateTime _servicesLoadedAt = DateTime.MinValue;
+        private DateTime _startupLoadedAt = DateTime.MinValue;
+
+        private async Task ReloadServicesSafeAsync()
+        {
+            if (Interlocked.Exchange(ref _servicesBusy, 1) != 0) return;
+            try { await LoadServicesAsync(); }
+            catch (Exception ex) { try { TxtServiceStatus.Text = $"Erro: {ex.Message}"; } catch { } }
+            finally { Interlocked.Exchange(ref _servicesBusy, 0); UpdateServiceActionButtons(); }
+        }
+
+        private async Task ReloadStartupSafeAsync()
+        {
+            if (Interlocked.CompareExchange(ref _servicesBusy, 1, 0) != 0) return;
+            try { await LoadStartupAppsAsync(); }
+            catch (Exception ex) { try { TxtStartupStatus.Text = $"Erro: {ex.Message}"; } catch { } }
+            finally { Interlocked.Exchange(ref _servicesBusy, 0); UpdateStartupActionButtons(); }
+        }
+
+        private void DgStartup_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateStartupActionButtons();
+
+        private void UpdateStartupActionButtons()
+        {
+            try
+            {
+                var app = DgStartup?.SelectedItem as StartupAppDetails;
+                bool has = app != null;
+                if (BtnStartupEnable != null) BtnStartupEnable.IsEnabled = has && app!.Status != StartupStatus.Enabled;
+                if (BtnStartupDisable != null) BtnStartupDisable.IsEnabled = has && app!.Status != StartupStatus.Disabled;
+                if (BtnStartupFolder != null) BtnStartupFolder.IsEnabled = has;
+                if (BtnStartupWeb != null) BtnStartupWeb.IsEnabled = has;
+            }
+            catch { }
+        }
+
+        private async void BtnStartupReload_Click(object sender, RoutedEventArgs e)
+        {
+            // Já há uma varredura em curso (órfãs/recarregar): ela recarrega no fim.
+            if (Interlocked.CompareExchange(ref _servicesBusy, 1, 0) != 0) return;
+            try { await LoadStartupAppsAsync(); }
+            finally { Interlocked.Exchange(ref _servicesBusy, 0); UpdateStartupActionButtons(); }
         }
 
         private void BtnOpenServicesMsc_Click(object sender, RoutedEventArgs e)
@@ -122,21 +240,49 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (DgStartup.SelectedItem is not StartupAppDetails app) return;
             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"https://www.google.com/search?q={Uri.EscapeDataString(app.Name)}") {UseShellExecute=true}); } catch {}
         }
-        private void BtnStartupRemoveOrphans_Click(object sender, RoutedEventArgs e)
+        private async void BtnStartupRemoveOrphans_Click(object sender, RoutedEventArgs e)
         {
-            int removed=0;
-            foreach(var a in _allStartupApps.ToList()){
-                try{
-                    string p2 = a.FullCommand ?? "";
-                    var mm = System.Text.RegularExpressions.Regex.Match(p2, "\"([^\"]+)\"|(\\S+\\.exe)");
-                    string f = mm.Success ? (mm.Groups[1].Success ? mm.Groups[1].Value : mm.Groups[2].Value) : p2.Split(' ')[0].Trim('"');
-                    if(!string.IsNullOrEmpty(f) && !System.IO.File.Exists(f) && !System.IO.Directory.Exists(f)){
-                        try{ StartupManager.SetStartupItemState(a.Name,false); removed++; }catch{}
+            if (Interlocked.Exchange(ref _servicesBusy, 1) != 0) return;
+            if (BtnStartupOrphans != null) BtnStartupOrphans.IsEnabled = false;
+            try
+            {
+                var snapshot = _allStartupApps.ToList();
+                TxtStartupStatus.Text = $"Verificando {snapshot.Count} itens de inicialização...";
+                // File.Exists/Directory.Exists em caminho de rede pode BLOQUEAR por vários
+                // segundos; o laço inteiro (e o SetStartupItemState) vai para a thread-pool.
+                int removed = await Task.Run(() =>
+                {
+                    int n = 0;
+                    foreach (var a in snapshot)
+                    {
+                        try
+                        {
+                            string p2 = a.FullCommand ?? "";
+                            var mm = System.Text.RegularExpressions.Regex.Match(p2, "\"([^\"]+)\"|(\\S+\\.exe)");
+                            string f = mm.Success ? (mm.Groups[1].Success ? mm.Groups[1].Value : mm.Groups[2].Value) : p2.Split(' ')[0].Trim('"');
+                            if (!string.IsNullOrEmpty(f) && !System.IO.File.Exists(f) && !System.IO.Directory.Exists(f))
+                            {
+                                try { StartupManager.SetStartupItemState(a.Name, false); n++; } catch { }
+                            }
+                        }
+                        catch { }
                     }
-                }catch{}
+                    return n;
+                });
+                TxtStartupStatus.Text = removed > 0 ? $"{removed} órfãs desabilitadas." : "Nenhuma órfã encontrada.";
             }
-            TxtStartupStatus.Text = removed>0 ? $"{removed} órfãs desabilitadas." : "Nenhuma órfã encontrada.";
-            _ = LoadStartupAppsAsync();
+            catch (Exception ex)
+            {
+                TxtStartupStatus.Text = $"Erro ao procurar órfãs: {ex.Message}";
+            }
+            finally
+            {
+                // SEMPRE devolve o botão e a trava: sem este finally uma exceção deixava o
+                // "🗑️ Órfãs" cinza e a aba travada até fechar a janela.
+                _ = LoadStartupAppsAsync();
+                Interlocked.Exchange(ref _servicesBusy, 0);
+                if (BtnStartupOrphans != null) BtnStartupOrphans.IsEnabled = true;
+            }
         }
 
         // Performance helpers
@@ -156,22 +302,28 @@ namespace KitLugia.GUI.Windows.TaskManager
         private void BtnPerfResmon_Click(object sender, RoutedEventArgs e){ try{ System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("resmon.exe"){UseShellExecute=true}); }catch{} }
         // (legado removido: ShowPerfDetail/Load*Detail substituídos pela lista de dispositivos Win11)
 
-        private void MenuRestartService_Click(object sender, RoutedEventArgs e)
+        private async void MenuRestartService_Click(object sender, RoutedEventArgs e)
         {
             if (DgServices.SelectedItem is not ServiceInfo svc) return;
-            try
+            TxtStatus.Text = $"🔄 Reiniciando {svc.DisplayName}...";
+            string result = await Task.Run(() =>
             {
-                using var controller = new System.ServiceProcess.ServiceController(svc.Name);
-                if (controller.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                try
                 {
-                    controller.Stop();
-                    controller.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
-                    controller.Start();
-                    TxtStatus.Text = $"🔄 Serviço {svc.DisplayName} reiniciado.";
-                    _ = LoadServicesAsync();
+                    using var controller = new System.ServiceProcess.ServiceController(svc.Name);
+                    if (controller.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                    {
+                        controller.Stop();
+                        controller.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
+                        controller.Start();
+                        return $"🔄 Serviço {svc.DisplayName} reiniciado.";
+                    }
+                    return $"O serviço {svc.DisplayName} não estava em execução.";
                 }
-            }
-            catch (Exception ex) { TxtStatus.Text = $"Erro ao reiniciar serviço: {ex.Message}"; }
+                catch (Exception ex) { return $"Erro ao reiniciar serviço: {ex.Message}"; }
+            });
+            TxtStatus.Text = result;
+            _ = LoadServicesAsync();
         }
 
         // ══════════════════════════════════════════════
@@ -259,15 +411,23 @@ namespace KitLugia.GUI.Windows.TaskManager
             });
             _allStartupApps = apps;
             _startupLoaded = true;
+            _startupLoadedAt = DateTime.Now;
             DgStartup.ItemsSource = apps;
             TxtStartupCount.Text = $"— {apps.Count} apps";
-            TxtStartupStatus.Text = $"{apps.Count(a => a.Status != StartupStatus.Enabled && a.Status != StartupStatus.Disabled)} ativos";
+            // "ativos" = HABILITADOS. A condição anterior (diferente de Enabled E diferente de
+            // Disabled) contava justamente os que NÃO estão em nenhum dos dois — o número
+            // estava invertido.
+            TxtStartupStatus.Text = $"{apps.Count(a => a.Status == StartupStatus.Enabled)} habilitados, " +
+                                    $"{apps.Count(a => a.Status == StartupStatus.Disabled)} desabilitados";
+            // Reaplica o filtro ativo: recarregar (após habilitar/desabilitar) mantinha a
+            // lista inteira visível mesmo com um filtro escolhido.
+            ApplyStartupFilter();
+            UpdateStartupActionButtons();
         }
 
         private void TxtStartupSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyStartupFilter();
         private void CmbStartupFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (!_startupLoaded) return;
             ApplyStartupFilter();
         }
         private void ApplyStartupFilter()
@@ -303,28 +463,32 @@ namespace KitLugia.GUI.Windows.TaskManager
             TxtStartupCount.Text = $"{view.Cast<object>().Count()} itens";
         }
 
-        private void MenuEnableStartup_Click(object sender, RoutedEventArgs e)
+        private async void MenuEnableStartup_Click(object sender, RoutedEventArgs e)
         {
             if (DgStartup.SelectedItem is not StartupAppDetails app) return;
-            try
+            TxtStatus.Text = $"Habilitando {app.Name}...";
+            // SetStartupItemState mexe em Run/RunOnce +HKLM (precisa de elevação): na thread
+            // da UI qualquer espera de UAC/política congelava o Gerenciador inteiro.
+            string err = await Task.Run(() =>
             {
-                StartupManager.SetStartupItemState(app.Name, true);
-                TxtStatus.Text = $"✅ {app.Name} habilitado na inicialização.";
-                _ = LoadStartupAppsAsync();
-            }
-            catch (Exception ex) { TxtStatus.Text = $"Erro: {ex.Message}"; }
+                try { StartupManager.SetStartupItemState(app.Name, true); return ""; }
+                catch (Exception ex) { return ex.Message; }
+            });
+            TxtStatus.Text = string.IsNullOrEmpty(err) ? $"✅ {app.Name} habilitado na inicialização." : $"Erro: {err}";
+            _ = LoadStartupAppsAsync();
         }
 
-        private void MenuDisableStartup_Click(object sender, RoutedEventArgs e)
+        private async void MenuDisableStartup_Click(object sender, RoutedEventArgs e)
         {
             if (DgStartup.SelectedItem is not StartupAppDetails app) return;
-            try
+            TxtStatus.Text = $"Desabilitando {app.Name}...";
+            string err = await Task.Run(() =>
             {
-                StartupManager.SetStartupItemState(app.Name, false);
-                TxtStatus.Text = $"❌ {app.Name} desabilitado na inicialização.";
-                _ = LoadStartupAppsAsync();
-            }
-            catch (Exception ex) { TxtStatus.Text = $"Erro: {ex.Message}"; }
+                try { StartupManager.SetStartupItemState(app.Name, false); return ""; }
+                catch (Exception ex) { return ex.Message; }
+            });
+            TxtStatus.Text = string.IsNullOrEmpty(err) ? $"❌ {app.Name} desabilitado na inicialização." : $"Erro: {err}";
+            _ = LoadStartupAppsAsync();
         }
     }
 }

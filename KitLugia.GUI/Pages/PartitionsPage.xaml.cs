@@ -119,7 +119,7 @@ namespace KitLugia.GUI.Pages
                         int oldIdx = CmbDisk.SelectedIndex;
                         CmbDisk.Items.Clear();
                         foreach (var disk in _disks)
-                            CmbDisk.Items.Add(disk.DisplayName);
+                            CmbDisk.Items.Add(DiskComboLabel(disk));
 
                         if (CmbDisk.Items.Count > 0)
                             CmbDisk.SelectedIndex = (oldIdx >= 0 && oldIdx < CmbDisk.Items.Count) ? oldIdx : 0;
@@ -132,11 +132,27 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        /// <summary>Rótulo do combo: identifica o disco (tipo de bus + espaço livre é o que diferencia NVMe de USB).</summary>
+        private static string DiskComboLabel(DiskInfoEx disk)
+        {
+            decimal unalloc = disk.Partitions.Where(p => p.IsUnallocated).Sum(p => (decimal)p.Size);
+            string unallocTxt = unalloc > 0 ? $" • {(double)unalloc / (1024.0 * 1024 * 1024):F1} GB livres" : "";
+            string sys = disk.IsSystemDisk ? " • SISTEMA" : "";
+            return $"{disk.DisplayName} • {disk.Interface}{unallocTxt}{sys}";
+        }
+
         private void CmbDisk_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (CmbDisk?.SelectedIndex < 0 || CmbDisk?.SelectedIndex >= _disks?.Count) return;
             var disk = _disks[CmbDisk.SelectedIndex];
-            TxtDiskInfo.Text = $"{disk.Model} - {disk.SizeString} - {disk.PartitionStyle} - Interface: {disk.Interface}";
+
+            decimal unalloc = disk.Partitions.Where(p => p.IsUnallocated).Sum(p => (decimal)p.Size);
+            int parts = disk.Partitions.Count(p => !p.IsUnallocated);
+            TxtDiskInfo.Text = $"{disk.Model} - {disk.SizeString} - {disk.PartitionStyle} - Interface: {disk.Interface}"
+                             + $" • {parts} partição(ões)"
+                             + $" • {(double)unalloc / (1024.0 * 1024 * 1024):F1} GB não alocados"
+                             + (disk.IsSystemDisk ? "  [DISCO DO SISTEMA — não use Excluir/Limpar]" : "");
+
             GridPartitions.ItemsSource = disk.Partitions;
             _selectedPartition = null;
             UpdateButtons();
@@ -433,6 +449,20 @@ namespace KitLugia.GUI.Pages
         private void ShowSuccess(string t, string m) { var mw = Application.Current.MainWindow as MainWindow; if (mw != null) mw.ShowSuccess(t, m); else MessageBox.Show(m, t, MessageBoxButton.OK, MessageBoxImage.Information); }
         private void ShowError(string t, string m) { var mw = Application.Current.MainWindow as MainWindow; if (mw != null) mw.ShowError(t, m); else MessageBox.Show(m, t, MessageBoxButton.OK, MessageBoxImage.Error); }
 
+        /// <summary>
+        /// Erro de operação com CAUSA REAL: usa o LastError do PartitionManager (que explica
+        /// espaço não contíguo, limite de redução, BitLocker, VDS...) e cai no texto genérico
+        /// apenas quando o Core nãoiebenha nada. Antes o usuário só via "Não foi possível".
+        /// </summary>
+        private void ShowOpError(string fallback)
+        {
+            string detail = PartitionManager.LastError;
+            ShowError("Operação não concluída", string.IsNullOrWhiteSpace(detail) ? fallback : detail);
+        }
+
+        /// <summary>Junta linhas de diagnóstico (bloqueios/avisos) em texto para overlay ou toast.</summary>
+        private static string JoinLines(IEnumerable<string> lines) => string.Join("\n", lines.Select(l => "• " + l.Trim()));
+
         private async Task<string?> ShowInputOverlay(string title, string msg, string def = "")
         {
             Dispatcher.Invoke(() => {
@@ -466,7 +496,7 @@ namespace KitLugia.GUI.Pages
                     Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, ok, ok ? "Partição criada com sucesso" : "Falha ao criar partição");
 
                     if (ok) ShowSuccess("Sucesso", "Partição criada.");
-                    else ShowError("Erro", "Não foi possível criar.");
+                    else ShowOpError("Não foi possível criar a partição.");
                 }
                 else
                 {
@@ -481,7 +511,7 @@ namespace KitLugia.GUI.Pages
                     Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, ok, ok ? "Partição formatada com sucesso" : "Falha ao formatar partição");
 
                     if (ok) ShowSuccess("Formatada", "A partição foi limpa.");
-                    else ShowError("Erro", "Não foi possível formatar.");
+                    else ShowOpError("Não foi possível formatar a partição.");
                 }
                 LoadDisks();
             }
@@ -496,29 +526,38 @@ namespace KitLugia.GUI.Pages
 
         private void BtnResize_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedPartition == null || string.IsNullOrEmpty(_selectedPartition.DriveLetter)) return;
+            if (_selectedPartition == null) return;
+            if (string.IsNullOrEmpty(_selectedPartition.DriveLetter))
+            {
+                ShowError("Sem letra", $"{(_selectedPartition.Label ?? "Esta partição")} não tem letra de unidade. Atribua uma letra antes de reduzir.");
+                return;
+            }
+
+            // Diagnóstico ANTES: pagefile/hiberfil/BitLocker são as causas reais de "reduz só X MB".
+            var (blockers, warnings) = PartitionManager.GetResizeDiagnostics(_selectedPartition, forExtend: false);
+            if (blockers.Count > 0) { ShowError("Não é possível reduzir", JoinLines(blockers)); return; }
+
             _maxShrinkMb = (long)(_selectedPartition.FreeSpace / (1024 * 1024));
             TxtShrinkTitle.Text = $"REDUZIR VOLUME [{_selectedPartition.DriveLetter}]";
             TxtMaxShrinkInfo.Text = $"Máximo estimativo: {_maxShrinkMb} MB";
             TxtShrinkMb.Text = (_maxShrinkMb / 2).ToString();
 
-
-            var sysDrive = Path.GetPathRoot(Environment.SystemDirectory)?.Replace(":", "");
-            string selectedDrive = _selectedPartition.DriveLetter.Replace(":", "");
-            bool isSystemPartition = selectedDrive.Equals(sysDrive, StringComparison.OrdinalIgnoreCase);
-
-
-            System.Diagnostics.Debug.WriteLine($"[DEBUG] SystemDirectory: {Environment.SystemDirectory}");
-            System.Diagnostics.Debug.WriteLine($"[DEBUG] sysDrive: {sysDrive}");
-            System.Diagnostics.Debug.WriteLine($"[DEBUG] selectedDrive: {selectedDrive}");
-            System.Diagnostics.Debug.WriteLine($"[DEBUG] isSystemPartition: {isSystemPartition}");
+            TxtShrinkWarning.Visibility = warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (warnings.Count > 0) TxtShrinkWarning.Text = "⚠️ " + JoinLines(warnings);
 
             OverlayShrink.Visibility = Visibility.Visible;
             TxtShrinkMb.Focus();
+
+            // Limite REAL (Storage API: Size - SizeMin) — instantâneo e exato, sem parsing de diskpart.
             string drive = _selectedPartition.DriveLetter;
             _ = Task.Run(async () => {
                 long realMax = await PartitionManager.GetMaxShrinkMb(drive);
-                Dispatcher.Invoke(() => { if (_selectedPartition?.DriveLetter == drive) { _maxShrinkMb = realMax; TxtMaxShrinkInfo.Text = $"Máximo real (Diskpart): {realMax} MB"; } });
+                Dispatcher.Invoke(() => {
+                    if (_selectedPartition?.DriveLetter == drive) {
+                        _maxShrinkMb = realMax;
+                        TxtMaxShrinkInfo.Text = $"Máximo real: {realMax} MB";
+                    }
+                });
             });
         }
 
@@ -592,7 +631,7 @@ namespace KitLugia.GUI.Pages
                 SetActionBusy(false);
                 Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, ok, ok ? "Volume reduzido com sucesso" : "Falha ao reduzir volume");
                 if (ok) ShowSuccess("Sucesso", "Volume reduzido.");
-                else ShowError("Erro", "Não foi possível reduzir.");
+                else ShowOpError($"Não foi possível reduzir {_selectedPartition.DriveLetter} em {shrinkMb} MB.");
             }
             catch (Exception ex)
             {
@@ -608,71 +647,107 @@ namespace KitLugia.GUI.Pages
 
         private void BtnShrinkPercent_Click(object sender, RoutedEventArgs e) { if (sender is Button btn && int.TryParse(btn.Tag?.ToString(), out int percent)) { long targetMb = (_maxShrinkMb * percent) / 100; TxtShrinkMb.Text = targetMb.ToString(); } }
         private void BtnShrinkMax_Click(object sender, RoutedEventArgs e) => TxtShrinkMb.Text = _maxShrinkMb.ToString();
-        private void BtnCancelShrink_Click(object sender, RoutedEventArgs e) => OverlayShrink.Visibility = Visibility.Collapsed;
-
-        private void BtnExtend_Click(object sender, RoutedEventArgs e)
+        private void BtnCancelShrink_Click(object sender, RoutedEventArgs e) => OverlayShrink.Visibility = Visibility.Collapsed;private void BtnExtend_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedPartition == null) return;
+            if (string.IsNullOrEmpty(_selectedPartition.DriveLetter))
+            {
+                ShowError("Sem letra", $"{(_selectedPartition.Label ?? "Esta partição")} não tem letra de unidade — atribua uma letra antes de estender.");
+                return;
+            }
+
             var disk = _disks.FirstOrDefault(d => d.Index == _selectedPartition.DiskIndex);
             if (disk == null) return;
+
+            // Diagnóstico ANTES: é aqui que se descobre o motivo real de "estender falhou"
+            // (FAT32, espaço não contíguo, limite MBR 2 TB...).
+            var (blockers, warnings) = PartitionManager.GetResizeDiagnostics(_selectedPartition, forExtend: true);
+            if (blockers.Count > 0) { ShowError("Não é possível estender", JoinLines(blockers)); return; }
+
             var parts = disk.Partitions.OrderBy(p => p.StartingOffset).ToList();
             int myIdx = parts.IndexOf(_selectedPartition);
-            
-            _maxExtendMb = 0; 
-            _neighborPartition = null; 
+
+            _maxExtendMb = 0;
+            _neighborPartition = null;
             _maxNeighborMb = 0;
-            
-            RadioUnallocatedRight.IsEnabled = false; 
+
+            RadioUnallocatedRight.IsEnabled = false;
             RadioNeighborRight.IsEnabled = false;
+            ChkMergeMode.Visibility = Visibility.Collapsed;
+            ChkMergeMode.IsChecked = false;
+            TxtExtendWarning.Visibility = warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (warnings.Count > 0) TxtExtendWarning.Text = "⚠️ " + JoinLines(warnings);
             TxtExtendMb.Text = "0";
 
             if (myIdx >= 0 && myIdx < parts.Count - 1)
             {
                 var next = parts[myIdx + 1];
-                if (next.IsUnallocated) 
-                { 
-                    _maxExtendMb = (long)(next.Size / (1024 * 1024)); 
-                    RadioUnallocatedRight.Content = $"Espaço Não Alocado ({next.SizeString})"; 
-                    RadioUnallocatedRight.IsEnabled = true; 
+                if (next.IsUnallocated)
+                {
+                    _maxExtendMb = (long)(next.Size / (1024 * 1024));
+                    RadioUnallocatedRight.Content = $"Espaço Não Alocado ({next.SizeString})";
+                    RadioUnallocatedRight.IsEnabled = true;
                     RadioUnallocatedRight.IsChecked = true;
                     TxtExtendMb.Text = _maxExtendMb.ToString();
                 }
-                else 
-                { 
-                    _neighborPartition = next; 
-                    _maxNeighborMb = (long)Math.Max(1, (next.Size / (1024 * 1024))); 
-                    RadioNeighborRight.Content = $"Vizinha ({next.DriveLetter} {next.Label})"; 
-                    RadioNeighborRight.IsEnabled = true; 
-                    
-                    if (!RadioUnallocatedRight.IsEnabled) 
+                else
+                {
+                    _neighborPartition = next;
+                    _maxNeighborMb = (long)Math.Max(1, (next.Size / (1024 * 1024)));
+                    RadioNeighborRight.Content = $"Vizinha ({next.DriveLetter} {next.Label})";
+                    RadioNeighborRight.IsEnabled = true;
+
+                    if (!RadioUnallocatedRight.IsEnabled)
                     {
                         RadioNeighborRight.IsChecked = true;
                         TxtExtendMb.Text = _maxNeighborMb.ToString();
                     }
-                    
+
+                    // Mesclar é DESTRUTIVO (copia tudo da vizinha para cá): fica opt-in.
                     ChkMergeMode.Visibility = Visibility.Visible;
-                    ChkMergeMode.IsChecked = true; // Always active by default per user request
-                    
-                    _ = Task.Run(async () => 
-                    { 
-                        long realMax = await PartitionManager.GetMaxShrinkMb(next.DriveLetter); 
-                        Dispatcher.Invoke(() => 
-                        { 
-                            // Em modo merge (DISM), o vizinho inteiro é movido — não usa o shrink máximo
-                            if (_neighborPartition == next && ChkMergeMode.IsChecked != true) 
-                                _maxNeighborMb = realMax; 
-                        }); 
-                    }); 
+                    ChkMergeMode.IsChecked = false;
+
+                    if (!string.IsNullOrEmpty(next.DriveLetter))
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            long realMax = await PartitionManager.GetMaxShrinkMb(next.DriveLetter);
+                            Dispatcher.Invoke(() =>
+                            {
+                                // Em modo merge (DISM) a vizinha inteira é movida — não usa o shrink máximo.
+                                if (_neighborPartition == next && ChkMergeMode.IsChecked != true)
+                                    _maxNeighborMb = realMax;
+                            });
+                        });
+                    }
                 }
             }
 
-            if (!RadioUnallocatedRight.IsEnabled && !RadioNeighborRight.IsEnabled) 
-            { 
-                ShowError("Indisponível", "Não há espaço livre à direita."); 
-                return; 
+            if (!RadioUnallocatedRight.IsEnabled && !RadioNeighborRight.IsEnabled)
+            {
+                ShowError("Indisponível", "Não há espaço livre contíguo à direita.\n\n" +
+                    "O Windows só estende uma partição para o lado DIREITO. Se o espaço não alocado estiver no meio " +
+                    "ou à esquerda, é preciso mexer antes na partição que está entre as duas.");
+                return;
             }
-            
+
             OverlayExtend.Visibility = Visibility.Visible;
+
+            // Máximo real pela Storage API (instantâneo): agrupa blocos não alocados contíguos
+            // que a barra pode mostrar como entradas separadas.
+            string letter = _selectedPartition.DriveLetter;
+            _ = Task.Run(async () =>
+            {
+                long realMax = await PartitionManager.GetMaxExtendMb(letter);
+                Dispatcher.Invoke(() =>
+                {
+                    if (RadioUnallocatedRight.IsChecked == true && realMax > _maxExtendMb)
+                    {
+                        _maxExtendMb = realMax;
+                        TxtExtendMb.Text = realMax.ToString();
+                    }
+                });
+            });
         }
 
 
@@ -685,42 +760,59 @@ namespace KitLugia.GUI.Pages
             try {
                 if (RadioUnallocatedRight.IsChecked == true)
                 {
-                    SetActionBusy(true, "Estendendo (Atomic Sniper Mode)...", target: _selectedPartition);
+                    SetActionBusy(true, "Estendendo volume...", target: _selectedPartition);
 
                     taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"Estendendo {_selectedPartition.DriveLetter}", "Partitions");
 
-                    bool ok = await PartitionManager.ExtendPartition(_selectedPartition!.DriveLetter, extendMb, UpdateProgress);
+                    // Escada do Core: Storage API -> IOCTL nativo -> diskpart (com verificação real).
+                    // Task.Run OBRIGATÓRIO (03/10/2026): ExtendPartition é async, mas o caminho
+                    // rápido (Storage API via WMI: GetPartitionSizeLimits + ResizeStoragePartition)
+                    // roda 100% SÍNCRONO antes do primeiro await. Chamado direto do handler ele
+                    // executava inteiro na thread de UI -> [UI-FREEZE] de ~5,5 s e janela "Nao
+                    // Respondendo". UpdateProgress ja e thread-safe (faz Dispatcher.Invoke).
+                    bool ok = await Task.Run(() => PartitionManager.ExtendPartition(
+                        _selectedPartition!.DriveLetter, extendMb, UpdateProgress,
+                        _selectedPartition.DiskIndex, _selectedPartition.Index));
 
                     if (!ok)
                     {
-                        UpdateProgress(-1, "Diskpart falhou (Limite de 3GB/Imóveis). Iniciando Bypass Atômico (DISM)...");
-                        ok = await PartitionManager.AtomicExtendDISM(_selectedPartition.DiskIndex, _selectedPartition.Index, _selectedPartition.DriveLetter, UpdateProgress);
+                        UpdateProgress(-1, "Extensão nativa recusou. Tentando modo atômico (wimlib: snapshot + recria)...");
+                        ok = await Task.Run(() => PartitionManager.AtomicExtendDISM(
+                            _selectedPartition.DiskIndex, _selectedPartition.Index,
+                            _selectedPartition.DriveLetter, UpdateProgress));
                     }
 
                     SetActionBusy(false);
 
                     Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, ok, ok ? "Volume estendido com sucesso" : "Falha ao estender volume");
 
-                    if (ok) ShowSuccess("Sucesso", "Volume estendido com Engine Atômica DISM!");
-                    else ShowError("Erro", "Falha crítica ao estender mesmo com Engine Atômica.");
+                    if (ok) ShowSuccess("Sucesso", "Volume estendido com sucesso.");
+                    else ShowOpError($"Não foi possível estender {_selectedPartition.DriveLetter}:.");
                 }
                 else if (RadioNeighborRight.IsChecked == true && _neighborPartition != null)
                 {
                     if (ChkMergeMode.IsChecked == true)
                     {
-                        if (!await ShowConfirm("MESCLAR ATÔMICO (DISM)", "Deseja usar a Engine Atômica? Ela é mais lenta, porém IGNRORA o limite de 3GB e arquivos imóveis, movendo TUDO de " + _neighborPartition.DriveLetter + " para 'Arquivos_Mesclados'.")) { EndCriticalOperation(); return; }
-                        SetActionBusy(true, "Mesclando (Atomic DISM Engine)...", active: _neighborPartition, target: _selectedPartition);
+                        if (!await ShowConfirm("MESCLAR VIZINHA",
+                            $"A partição {_neighborPartition.DriveLetter} será EXCLUÍDA e o conteúdo dela copiado para " +
+                            $"{_selectedPartition.DriveLetter}:\\Arquivos_Mesclados.\n\n" +
+                            "A Engine Atômica ignora o limite de redução do Windows, mas é mais lenta (imagem WIM temporária).\n" +
+                            $"Deseja continuar?")) { EndCriticalOperation(); return; }
+
+                        SetActionBusy(true, "Mesclando (Engine Atômica)...", active: _neighborPartition, target: _selectedPartition);
 
                         taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"Mesclando {_neighborPartition.DriveLetter}", "Partitions");
 
-                        bool mergeOk = await PartitionManager.AtomicMergeDISM(_neighborPartition.DiskIndex, _neighborPartition.Index, _neighborPartition.DriveLetter, _selectedPartition.DriveLetter, UpdateProgress);
+                        bool mergeOk = await Task.Run(() => PartitionManager.AtomicMergeDISM(
+                            _neighborPartition.DiskIndex, _neighborPartition.Index,
+                            _neighborPartition.DriveLetter, _selectedPartition.DriveLetter, UpdateProgress));
 
                         SetActionBusy(false);
 
                         Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, mergeOk, mergeOk ? "Mesclagem concluída com sucesso" : "Falha na mesclagem");
 
-                        if (mergeOk) ShowSuccess("Sucesso", "Mesclagem Atômica concluída com sucesso absoluto!");
-                        else ShowError("Erro", "Falha na Mesclagem Atômica. Os dados podem estar em uso severo.");
+                        if (mergeOk) ShowSuccess("Sucesso", "Mesclagem concluída com sucesso!");
+                        else ShowOpError("Falha na mesclagem atômica. Os dados podem estar em uso severo.");
                     }
                     else
                     {
@@ -728,40 +820,26 @@ namespace KitLugia.GUI.Pages
 
                         taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Transferindo Espaço", "Partitions");
 
-                        if (await PartitionManager.ShrinkPartition(_neighborPartition.DiskIndex, _neighborPartition.Index, _neighborPartition.DriveLetter, extendMb, UpdateProgress))
+                        if (await Task.Run(() => PartitionManager.ShrinkPartition(_neighborPartition.DiskIndex, _neighborPartition.Index, _neighborPartition.DriveLetter, extendMb, UpdateProgress)))
                         {
-                            bool extOk = await PartitionManager.ExtendPartition(_selectedPartition!.DriveLetter, extendMb, UpdateProgress);
+                            bool extOk = await Task.Run(() => PartitionManager.ExtendPartition(
+                                _selectedPartition!.DriveLetter, extendMb, UpdateProgress,
+                                _selectedPartition.DiskIndex, _selectedPartition.Index));
                             SetActionBusy(false);
 
                             Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, extOk, extOk ? "Espaço transferido com sucesso" : "Falha ao estender partição principal");
 
                             if (extOk) ShowSuccess("Sucesso", "Espaço transferido entre partições.");
-                            else ShowError("Erro", "Vizinho reduzido, mas falha ao estender principal.");
+                            else ShowOpError("A partição vizinha foi reduzida, mas a principal não estendeu até o fim.");
                         }
                         else
                         {
-                            UpdateProgress(-1, "Diskpart falhou (Limite de 3GB). Tentando Bypass Atômico (DISM)...");
-                            // OBS: Engine atômica recria o volume ocupando TODO o espaço não alocado contíguo.
-                            // Para o caso de 'puxar do vizinho' com valor específico, este bypass é melhor usado em modo MESCLAR.
-                            bool ok = await PartitionManager.AtomicExtendDISM(_neighborPartition.DiskIndex, _neighborPartition.Index, _neighborPartition.DriveLetter, UpdateProgress);
-                            if (ok)
-                            {
-                                await Task.Delay(2000);
-                                await PartitionManager.ExtendPartition(_selectedPartition.DriveLetter, extendMb, UpdateProgress);
-                                SetActionBusy(false);
+                            UpdateProgress(-1, "A vizinha não pode ser reduzida além do limite do Windows. Sugestão: marque 'Mesclar vizinha (DISM)' ou use Emergency Pre-Boot.");
+                            SetActionBusy(false);
 
-                                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Espaço transferido com Engine Atômica");
+                            Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, false, "Falha ao transferir espaço");
 
-                                ShowSuccess("Sucesso", "Espaço transferido com Engine Atômica DISM.");
-                            }
-                            else
-                            {
-                                SetActionBusy(false);
-
-                                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, false, "Falha ao transferir espaço");
-
-                                ShowError("Erro", "Não foi possível reduzir o vizinho nem com Engine Atômica.");
-                            }
+                            ShowOpError($"Não foi possível reduzir {_neighborPartition.DriveLetter} em {extendMb} MB.");
                         }
                     }
                 }
@@ -791,7 +869,7 @@ namespace KitLugia.GUI.Pages
                 bool ok = await PartitionManager.MovePartition(_selectedPartition.DiskIndex, _selectedPartition.Index, _selectedPartition.DriveLetter, UpdateProgress);
                 SetActionBusy(false);
                 if (ok) ShowSuccess("Sucesso", "Movida.");
-                else ShowError("Erro", "Falha ao mover.");
+                else ShowOpError("Falha ao mover a partição (veja o log do terminal: [MOVE] nn.Falha).");
                 LoadDisks();
             }
             catch (Exception ex)
@@ -809,7 +887,7 @@ namespace KitLugia.GUI.Pages
             {
                 bool ok = await PartitionManager.DeletePartition(_selectedPartition.DiskIndex, _selectedPartition.Index, _selectedPartition.DriveLetter);
                 if (ok) ShowSuccess("Removida", "Partição deletada.");
-                else ShowError("Erro", "Falha ao deletar partição.");
+                else ShowOpError("Falha ao deletar partição.");
             }
             catch (Exception ex)
             {
@@ -834,7 +912,7 @@ namespace KitLugia.GUI.Pages
             bool ok = await PartitionManager.ChangeDriveLetter(_selectedPartition.DriveLetter, l, _selectedPartition.DiskIndex, _selectedPartition.Index);
             SetActionBusy(false);
             if (ok) ShowSuccess("Sucesso", $"Letra alterada para {l}:.");
-            else ShowError("Erro", "Não foi possível alterar a letra.");
+            else ShowOpError($"Não foi possível alterar a letra de {_selectedPartition?.DriveLetter}.");
             LoadDisks();
         }
 

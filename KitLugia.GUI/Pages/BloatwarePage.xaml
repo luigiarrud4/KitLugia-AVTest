@@ -28,21 +28,81 @@
 
         <Border x:Name="LoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Ellipse Width="40" Height="40" Stroke="#FFD700" StrokeThickness="3" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="70 30">
-                    <Ellipse.RenderTransform>
-                        <RotateTransform x:Name="SpinnerRotate"/>
-                    </Ellipse.RenderTransform>
-                    <Ellipse.Triggers>
+                <!-- SPINNER DE 3 ARCOS (05/10/2026)
+                     Era um unico arco que rodava a 360 em 1 s - o aspeto generico
+                     que toda a gente reconhece. Agora sao 3 arcos com velocidades e
+                     opacidades diferentes: o olho segue o mais rapido e o
+                     movimento parece continuo, sem "saltos".
+
+                     Custo: 3 RotateTransform. A rotacao e' uma propriedade de
+                     RenderTransform, ou seja, e' composicao - a GPU resolve sem
+                     redesenhar. Nao ha DropShadowEffect nem blur (ver a nota de
+                     performance no GameBoostPage). O code-behind so mexe na
+                     visibilidade do LoadingPanel, por isso nada dependia do
+                     nome SpinnerRotate.
+                     -->
+                <Grid Width="50" Height="50">
+                    <Ellipse Width="44" Height="44" Stroke="#FFD700" StrokeThickness="4" Fill="Transparent"
+                             StrokeDashArray="26 112" Opacity="0.28">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform Angle="240"/>
+                        </Ellipse.RenderTransform>
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard x:Name="SpinLento">
+                                        <DoubleAnimation Storyboard.TargetProperty="Angle" From="0" To="360"
+                                                         Duration="0:0:2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                    <Ellipse Width="44" Height="44" Stroke="#FFD700" StrokeThickness="4" Fill="Transparent"
+                             StrokeDashArray="26 112" Opacity="0.6">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform Angle="120"/>
+                        </Ellipse.RenderTransform>
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard x:Name="SpinMedio">
+                                        <DoubleAnimation Storyboard.TargetProperty="Angle" From="0" To="360"
+                                                         Duration="0:0:1.35"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                    <Ellipse Width="44" Height="44" Stroke="#FFD700" StrokeThickness="4" Fill="Transparent"
+                             StrokeDashArray="26 112">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform Angle="0"/>
+                        </Ellipse.RenderTransform>
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard x:Name="SpinRapido">
+                                        <DoubleAnimation Storyboard.TargetProperty="Angle" From="0" To="360"
+                                                         Duration="0:0:0.9"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                </Grid>
+                <TextBlock Text="Analisando..." Foreground="White" FontSize="16" Margin="0,15,0,0">
+                    <TextBlock.Triggers>
                         <EventTrigger RoutedEvent="Loaded">
                             <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetName="SpinnerRotate" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="0:0:1"/>
+                                <Storyboard x:Name="TxtPulse" RepeatBehavior="Forever" AutoReverse="True">
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.55"
+                                                     Duration="0:0:1.1"/>
                                 </Storyboard>
                             </BeginStoryboard>
                         </EventTrigger>
-                    </Ellipse.Triggers>
-                </Ellipse>
-                <TextBlock Text="Analisando..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
+                    </TextBlock.Triggers>
+                </TextBlock>
             </StackPanel>
         </Border>
 

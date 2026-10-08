@@ -243,12 +243,5 @@ namespace KitLugia.Core
 
             return null;
         }
-
-        public static string[]? SuggestArgsForCommand(string fullCommand)
-        {
-            if (string.IsNullOrWhiteSpace(fullCommand)) return null;
-            StartupManager.ExtractCommandParts(fullCommand, out string? path, out _);
-            return SuggestArgs(path ?? fullCommand);
-        }
     }
 }

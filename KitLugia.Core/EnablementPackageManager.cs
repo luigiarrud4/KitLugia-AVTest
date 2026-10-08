@@ -37,39 +37,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Procura um Enablement Package (.cab KB) em locais comuns:
-        /// diretorio do app, diretorio atual, Desktop, Downloads.
-        /// </summary>
-        public static string? FindEnablementCab()
-        {
-            var candidates = new[]
-            {
-                AppDomain.CurrentDomain.BaseDirectory,
-                Environment.CurrentDirectory,
-                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + @"\Downloads"
-            };
-
-            foreach (var dir in candidates.Distinct())
-            {
-                try
-                {
-                    if (!Directory.Exists(dir)) continue;
-                    var cab = Directory.GetFiles(dir, "*.cab")
-                        .FirstOrDefault(f =>
-                        {
-                            var name = Path.GetFileName(f);
-                            return name.StartsWith("Windows1", StringComparison.OrdinalIgnoreCase) &&
-                                   name.Contains("-KB", StringComparison.OrdinalIgnoreCase);
-                        });
-                    if (cab != null) return cab;
-                }
-                catch { }
-            }
-            return null;
-        }
-
-        /// <summary>
         /// Verifica se o pacote (por KB number) ja esta instalado no sistema.
         /// </summary>
         public static bool IsPackageInstalled(string kbNumber)
@@ -142,7 +109,7 @@ namespace KitLugia.Core
                 var errorTask = proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(600000))
                 {
-                    try { proc.Kill(); } catch { }
+                    try { proc.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     return (false, "DISM excedeu o tempo limite (10 min).");
                 }
                 var output = await outputTask;

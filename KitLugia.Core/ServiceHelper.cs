@@ -60,63 +60,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Verifica se um serviço está rodando.
-        /// </summary>
-        public static bool IsServiceRunning(string serviceName)
-        {
-            try
-            {
-                using (var sc = new ServiceController(serviceName))
-                {
-                    return sc.Status == ServiceControllerStatus.Running;
-                }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-        /// <summary>
-        /// Tenta iniciar um serviço.
-        /// </summary>
-        public static bool TryStartService(string serviceName, int timeoutMs = 10000)
-        {
-            try
-            {
-                using (var sc = new ServiceController(serviceName))
-                {
-                    if (sc.Status != ServiceControllerStatus.Running)
-                    {
-                        sc.Start();
-                        sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMilliseconds(timeoutMs));
-                        return sc.Status == ServiceControllerStatus.Running;
-                    }
-                    return true;
-                }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-        /// <summary>
-        /// Tenta parar um serviço.
-        /// </summary>
-        public static bool TryStopService(string serviceName, int timeoutMs = 10000)
-        {
-            try
-            {
-                using (var sc = new ServiceController(serviceName))
-                {
-                    if (sc.Status != ServiceControllerStatus.Stopped)
-                    {
-                        sc.Stop();
-                        sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMilliseconds(timeoutMs));
-                        return sc.Status == ServiceControllerStatus.Stopped;
-                    }
-                    return true;
-                }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-        /// <summary>
         /// Inicia o serviço e devolve mensagem amigável em português (usado pela ServicesPage).
         /// </summary>
         public static (bool Success, string Message) TryStartServiceWithMessage(string serviceName, int timeoutMs = 15000)

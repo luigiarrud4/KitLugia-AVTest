@@ -855,7 +855,33 @@
                             <RadioButton x:Name="BtnTweaks"    GroupName="Menu" Tag="&#x26A1;" Content="Desempenho" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnApps"      GroupName="Menu" Tag="&#x1F4F1;" Content="Aplicativos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnStorage"   GroupName="Menu" Tag="&#x1F4BF;" Content="Armazenamento" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
-                            <RadioButton x:Name="BtnPartitions" GroupName="Menu" Tag="&#x1F4BD;" Content="Gerenciar Discos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
+                            <!-- GRUPO DISCOS (03/10/2026): item principal sempre visivel + seta que
+                                 expande as opcoes extras. Antes as 4 paginas de disco ficavam sempre
+                                 abertas e quebavam a barra lateral. Requisito do usuario: "esses
+                                 extras nao podem ficar consumindo espaco da barra lateral... se
+                                 quiser manter coloque uma seta ao lado do gerenciador de discos para
+                                 expandir a categoria dele". -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <RadioButton x:Name="BtnPartitions" Grid.Column="0" GroupName="Menu" Tag="&#x1F4BD;" Content="Gerenciar Discos" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
+                                <Button Grid.Column="1" x:Name="BtnDiscosExpand" Tag="0" Click="BtnDiscosExpand_Click"
+                                        Style="{StaticResource NavExpandButtonStyle}"
+                                        ToolTip="Mais opcoes de disco: WinPE Tools, Fresh Install, Reparar Boot/BCD e Conversor MBR/GPT"/>
+                            </Grid>
+                            <StackPanel x:Name="PanelDiscosExtras" Visibility="Collapsed">
+                                <RadioButton x:Name="BtnWinpeTools" GroupName="Menu" Tag="&#x1F6E0;&#xFE0F;" Content="WinPE Tools (shrink)" Style="{StaticResource NavSubButtonStyle}" Click="NavButton_Click" ToolTip="Shrink sem limitacoes e teste de boot pelo WinPE ramdisk"/>
+                                <!-- Fresh Install (preservar) NAO entra aqui (03/10/2026): a operacao
+                                     NUNCA foi testada de ponta a ponta. Exposta na sidebar ela
+                                     convida o usuario a clicar numa funcao que mexe em todo o
+                                     Windows — e se falhar no meio, o PC fica sem SO.
+                                     A pagina segue existindo (Dashboard), so nao foi promovida a
+                                     atalho de primeira classe. -->
+                                <RadioButton x:Name="BtnBcdRepair" GroupName="Menu" Tag="&#x1FA7A;" Content="Reparar Boot/BCD" Style="{StaticResource NavSubButtonStyle}" Click="NavButton_Click" ToolTip="Diagnostica e reconstroi a inicializacao do Windows (bcdboot + bootsect), com backup antes"/>
+                                <RadioButton x:Name="BtnDiskConverter" GroupName="Menu" Tag="&#x1F500;" Content="Conversor MBR/GPT" Style="{StaticResource NavSubButtonStyle}" Click="NavButton_Click" ToolTip="Converte a tabela de particoes no lugar (particoes e dados preservados), inicializa disco RAW e faz backup do setor 0"/>
+                            </StackPanel>
                             <RadioButton x:Name="BtnNetwork"   GroupName="Menu" Tag="&#x1F310;" Content="Rede e Internet" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnGames"     GroupName="Menu" Tag="&#x1FA9F;" Content="Windows" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
                             <RadioButton x:Name="BtnDrivers"   GroupName="Menu" Tag="&#x1F4BE;" Content="Drivers" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click"/>
@@ -1243,7 +1269,10 @@
                         Orientation="Vertical"/>
 
             <!-- Central de Notifica&#xE7;&#xF5;es (Sino) -->
+            <!-- IsHitTestVisibleInChrome: o overlay cobre a faixa de legenda (CaptionHeight=40); sem isto
+                 o WM_NCHITTEST devolve HTCAPTION e o botao Limpar tudo nunca recebe o clique. -->
             <controls:NotificationCenter x:Name="NotifPanel" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                         WindowChrome.IsHitTestVisibleInChrome="True"
                                          Panel.ZIndex="20000" Visibility="Collapsed"/>
 
             <!-- Modal Overlay (Di&#xE1;logos) -->

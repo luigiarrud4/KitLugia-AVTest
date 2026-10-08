@@ -30,6 +30,21 @@ namespace KitLugia.Core
             return $"{name}|{safePath}";
         }
 
+        /// <summary>
+        /// Monta o comando completo a partir de uma ExecAction do Agendador.
+        /// CAUSA RAIZ (Process Lasso sumia da lista): o ExecAction.Path de algumas tarefas
+        /// JA vem entre aspas ("C:\Program Files\Process Lasso\processlasso.exe"). O codigo
+        /// antigo embrulhava com OUTRO par de aspas (""C:\...exe"") e o ExtractCommandParts
+        /// lia string VAZIA entre as duas primeiras aspas - a tarefa era descartada como
+        /// "sem executavel" (28 tarefas nesta maquina, incluindo as 2 do Process Lasso).
+        /// </summary>
+        private static string FullCommandFromExecAction(Microsoft.Win32.TaskScheduler.ExecAction action)
+        {
+            string rawPath = (action.Path ?? "").Trim().Trim('"', ' ', '\t');
+            string args = (action.Arguments ?? "").Trim();
+            return string.IsNullOrEmpty(args) ? $"\"{rawPath}\"" : $"\"{rawPath}\" {args}";
+        }
+
         private static void InvalidateCache()
         {
             _cachedApps = null;
@@ -67,7 +82,11 @@ namespace KitLugia.Core
             string cleanName = appName.Replace(" [Desabilitado]", "").Trim();
 
             var exact = all.FirstOrDefault(a => a.Name.Equals(appName, StringComparison.OrdinalIgnoreCase)
-                                             || a.Name.Equals(cleanName, StringComparison.OrdinalIgnoreCase));
+                                             || a.Name.Equals(cleanName, StringComparison.OrdinalIgnoreCase)
+                                             // Itens do backup RemovedApps aparecem como "Nome [Desabilitado]"
+                                             // (BuildAppList secao 8): comparar o nome sem o sufixo tambem, para o
+                                             // clique em "Habilitar" cair no match EXATO e nao no parcial.
+                                             || a.Name.Replace(" [Desabilitado]", "").Trim().Equals(cleanName, StringComparison.OrdinalIgnoreCase));
             if (exact != null) return exact;
 
             // Fallback: busca por nome de arquivo (sem extensão) no comando
@@ -266,7 +285,7 @@ namespace KitLugia.Core
                         string fullCommand = "";
                         if (task.Definition.Actions.FirstOrDefault() is ExecAction action)
                         {
-                            fullCommand = $"\"{action.Path}\" {action.Arguments}".Trim();
+                            fullCommand = FullCommandFromExecAction(action);
                         }
 
                         bool isTaskEnabled = task.Enabled;
@@ -482,6 +501,70 @@ namespace KitLugia.Core
                                 int version = compKey.GetValue("Version") as int? ?? 0;
                                 var status = version > 0 ? StartupStatus.Enabled : StartupStatus.Disabled;
                                 apps[k] = new StartupAppDetails($"ActiveSetup: {subName}", stubPath, @"HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components", status);
+                            }
+                        }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    }
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            // --- 8. ENTRADAS DESABILITADAS PELO KITLUGIA (backup em RemovedApps) ---
+            // Ao desabilitar um item de Run, o SetStartupItemState (Acao A2) salva o comando
+            // original em HKCU\Software\KitLugia\RemovedApps e DELETA o valor Run (apps que
+            // ignoram o StartupApproved). Sem este bloco a entrada desaparecia da lista e nao
+            // havia caminho de reabilitacao na UI - o backup ficava orfao no registro.
+            // O item entra como Disabled com a Location reconstruida (hive + path) para o
+            // SetStartupItemState(nome, true) cair no CASO 2 e restaurar o valor Run do backup.
+            try
+            {
+                using var backupKey = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey);
+                if (backupKey != null)
+                {
+                    // Nomes ja visiveis na lista (com/sem sufixo) - evita linha duplicada
+                    // quando o valor Run voltou a existir mas o backup antigo continua gravado.
+                    var nomesExistentes = new HashSet<string>(
+                        apps.Values.Select(a => a.Name.Replace(" [Desabilitado]", "").Trim()),
+                        StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var valueName in backupKey.GetValueNames())
+                    {
+                        try
+                        {
+                            // Formato novo (SetStartupItemState): Nome__RunCommand/__RunHive/__RunPath/__RunValueName
+                            if (valueName.EndsWith("__RunCommand", StringComparison.Ordinal))
+                            {
+                                string appName = valueName.Substring(0, valueName.Length - "__RunCommand".Length);
+                                if (string.IsNullOrWhiteSpace(appName) || nomesExistentes.Contains(appName)) continue;
+                                string command = backupKey.GetValue(valueName)?.ToString() ?? "";
+                                if (string.IsNullOrEmpty(command)) continue;
+
+                                string hive = backupKey.GetValue(appName + "__RunHive")?.ToString() ?? "HKCU";
+                                string path = backupKey.GetValue(appName + "__RunPath")?.ToString() ?? @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+                                string valName = backupKey.GetValue(appName + "__RunValueName")?.ToString() ?? appName;
+
+                                ExtractCommandParts(command, out string? exePath, out _);
+                                string k = MakeKey(valName, exePath);
+                                if (apps.ContainsKey(k)) continue;
+                                apps[k] = new StartupAppDetails($"{valName} [Desabilitado]", command, $"{hive}\\{path}", StartupStatus.Disabled);
+                                nomesExistentes.Add(valName);
+                                continue;
+                            }
+
+                            // Formato antigo (BackupStartupItem): Nome__Command/__Location
+                            if (valueName.EndsWith("__Command", StringComparison.Ordinal))
+                            {
+                                string appName = valueName.Substring(0, valueName.Length - "__Command".Length);
+                                if (string.IsNullOrWhiteSpace(appName) || nomesExistentes.Contains(appName)) continue;
+                                string command = backupKey.GetValue(valueName)?.ToString() ?? "";
+                                if (string.IsNullOrEmpty(command)) continue;
+                                string location = backupKey.GetValue(appName + "__Location")?.ToString() ?? "";
+
+                                ExtractCommandParts(command, out string? exePath, out _);
+                                string k = MakeKey(appName, exePath);
+                                if (apps.ContainsKey(k)) continue;
+                                apps[k] = new StartupAppDetails($"{appName} [Desabilitado]", command, location, StartupStatus.Disabled);
+                                nomesExistentes.Add(appName);
                             }
                         }
                         catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -777,9 +860,14 @@ namespace KitLugia.Core
                 else if (enable && resolvedRegPath != null && !string.IsNullOrEmpty(resolvedValueName))
                 {
                     // Restaura o valor Run do backup ao reabilitar
+                    bool restoredFromBackup = false;
                     try
                     {
-                        using var backupKey = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey);
+                        // writable: a limpeza dos valores de backup no fim precisa de escrita. Sem
+                        // isto o DeleteValue lancava UnauthorizedAccessException (engolida pelo
+                        // catch) e o backup ficava no registro para sempre - a entrada nunca saia
+                        // da lista "[Desabilitado]" apos reabilitar (bug achado no teste 04/10).
+                        using var backupKey = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey, writable: true);
                         if (backupKey != null)
                         {
                             string? savedCommand = backupKey.GetValue(appName + "__RunCommand")?.ToString();
@@ -798,10 +886,32 @@ namespace KitLugia.Core
                                 backupKey.DeleteValue(appName + "__RunHive", false);
                                 backupKey.DeleteValue(appName + "__RunPath", false);
                                 backupKey.DeleteValue(appName + "__RunValueName", false);
+                                restoredFromBackup = true;
                             }
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+                    // Fallback: formato ANTIGO do backup (BackupStartupItem: __Command/__Location).
+                    // RestoreRemovedItem sabe restaurar esses (valor Run ou pasta de Startup) e
+                    // limpa as chaves; sem isto, entradas gravadas no formato antigo nao
+                    // reabilitavam pela lista (o item aparecia mas o clique nao fazia nada).
+                    if (!restoredFromBackup)
+                    {
+                        string locBackup = startupApp.Location ?? "";
+                        bool restauravel = locBackup.StartsWith("HK", StringComparison.OrdinalIgnoreCase)
+                                        || locBackup.Contains("\\Startup", StringComparison.OrdinalIgnoreCase)
+                                        || locBackup.Contains("\\Start Menu", StringComparison.OrdinalIgnoreCase);
+                        if (restauravel)
+                        {
+                            try
+                            {
+                                var legado = RestoreRemovedItem(appName);
+                                if (legado.Success) actionsTaken.Add("Run value restaurado do backup legado");
+                            }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        }
+                    }
                 }
             }
 
@@ -1163,17 +1273,6 @@ namespace KitLugia.Core
 
         #region Gerenciamento de Tarefas (Elevadas/Atrasadas)
 
-        public static List<string> GetElevatedStartupTaskFullNames()
-        {
-            using (var ts = new TaskService())
-            {
-                return ts.RootFolder.Tasks
-                    .Where(task => task.Name.StartsWith("KitLUGIA_"))
-                    .Select(task => task.Name)
-                    .ToList();
-            }
-        }
-
         public static List<StartupAppDetails> GetExternalTaskSchedulerApps()
         {
             var apps = new List<StartupAppDetails>();
@@ -1198,7 +1297,7 @@ namespace KitLugia.Core
                             string fullCommand = "";
                             if (task.Definition.Actions.FirstOrDefault() is ExecAction action)
                             {
-                                fullCommand = $"\"{action.Path}\" {action.Arguments}".Trim();
+                                fullCommand = FullCommandFromExecAction(action);
                             }
 
                             StartupManager.ExtractCommandParts(fullCommand, out string? exePath, out _);
@@ -1472,7 +1571,7 @@ namespace KitLugia.Core
                     if (p == null) return list;
                     string? outText = p.StandardOutput.ReadToEnd();
                     string? errText = p.StandardError.ReadToEnd();
-                    if (!p.WaitForExit(PackageQueryTimeoutMs)) { try { p.Kill(); } catch { } }
+                    if (!p.WaitForExit(PackageQueryTimeoutMs)) { try { p.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } }
                     joined = (outText ?? "").Trim();
                     if (string.IsNullOrWhiteSpace(joined)) joined = null;
                 }
@@ -1711,6 +1810,11 @@ namespace KitLugia.Core
                     td.RegistrationInfo.Description = $"Startup task for {appName} by KitLUGIA (Elevated: {elevated}, Delayed: {forceLongDelay})";
 
                     td.Principal.RunLevel = elevated ? TaskRunLevel.Highest : TaskRunLevel.LUA;
+                    // CAUSA RAIZ da tarefa elevada "nao funcionar": sem UserId/LogonType o
+                    // Principal ficava vazio e o Agendador nao disparava a tarefa no logon
+                    // (o RegisterNonAdminTask, que funciona, define os dois). Mesma receita aqui.
+                    td.Principal.UserId = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                    td.Principal.LogonType = TaskLogonType.InteractiveToken;
 
                     var trigger = new LogonTrigger();
 
@@ -1773,44 +1877,6 @@ namespace KitLugia.Core
         #endregion
 
         #region KitLugia Parallel Startup (Turbo)
-
-        public static bool GetBootTrayAdminFlag(string appName)
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(KitLugiaStartupKey);
-                return key?.GetValue(appName + "__Admin")?.ToString() != "0";
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return true; }
-        }
-
-        public static void SetBootTrayAdminFlag(string appName, bool runAsAdmin)
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.CreateSubKey(KitLugiaStartupKey);
-                if (key != null)
-                {
-                    key.SetValue(appName + "__Admin", runAsAdmin ? "1" : "0");
-
-                    if (!runAsAdmin)
-                    {
-                        string command = key.GetValue(appName)?.ToString() ?? "";
-                    if (!string.IsNullOrEmpty(command))
-                    {
-                        ExtractCommandParts(command, out string? path, out string? args);
-                        if (!string.IsNullOrEmpty(path))
-                            RegisterNonAdminTask(appName, path, args);
-                    }
-                }
-                else
-                {
-                    UnregisterNonAdminTask(appName);
-                }
-                }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
 
         public static (bool Success, string Message) DelegateToKitLugia(string appName, bool runAsAdmin = true)
         {
@@ -2093,26 +2159,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
-        public static List<string> GetRemovedApps()
-        {
-            var list = new List<string>();
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey);
-                if (key == null) return list;
-                var names = new HashSet<string>();
-                foreach (var val in key.GetValueNames())
-                {
-                    if (val.EndsWith("__Command") && !val.EndsWith("__RunCommand")) names.Add(val.Replace("__Command", ""));
-                    else if (val.EndsWith("__Location") && !val.EndsWith("__RunLocation"))
-                        names.Add(val.Replace("__Location", ""));
-                }
-                list = names.OrderBy(n => n).ToList();
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            return list;
-        }
-
         public static string GetRemovedAppCommand(string appName)
         {
             try
@@ -2226,18 +2272,36 @@ namespace KitLugia.Core
         if (string.IsNullOrWhiteSpace(commandLine)) return;
         commandLine = Environment.ExpandEnvironmentVariables(commandLine.Trim());
 
+        // Colapsa aspas duplicadas no inicio (""C:\...): ExecAction.Path de algumas
+        // tarefas ja vem entre aspas e a montagem antiga adicionava outro par. Sem isso
+        // o parse abaixo lia string vazia entre as duas primeiras aspas e a tarefa era
+        // descartada (foi assim que o Process Lasso sumiu da lista).
+        while (commandLine.Length >= 2 && commandLine[0] == '"' && commandLine[1] == '"')
+            commandLine = commandLine.Substring(1).TrimStart();
+        while (commandLine.Length >= 2 && commandLine[commandLine.Length - 1] == '"' && commandLine[commandLine.Length - 2] == '"')
+            commandLine = commandLine.Substring(0, commandLine.Length - 1).TrimEnd();
+
         if (commandLine.StartsWith("\""))
         {
             int endQuote = commandLine.IndexOf('"', 1);
             if (endQuote > 0)
             {
                 path = commandLine.Substring(1, endQuote - 1);
-                if (endQuote < commandLine.Length - 1) args = commandLine.Substring(endQuote + 1).Trim();
-                if (!string.IsNullOrEmpty(path) && !path.Contains(".") && args == "")
+                if (string.IsNullOrEmpty(path))
                 {
-                    path = commandLine;
+                    // Aspas vazias na frente (comando malformado): remove e tenta sem aspas.
+                    commandLine = commandLine.Substring(endQuote + 1).Trim();
+                    if (string.IsNullOrEmpty(commandLine)) return;
                 }
-                return;
+                else
+                {
+                    if (endQuote < commandLine.Length - 1) args = commandLine.Substring(endQuote + 1).Trim();
+                    if (!string.IsNullOrEmpty(path) && !path.Contains(".") && args == "")
+                    {
+                        path = commandLine;
+                    }
+                    return;
+                }
             }
         }
 
@@ -2337,16 +2401,35 @@ namespace KitLugia.Core
             {
                 using (var ts = new TaskService())
                 {
-                    foreach (var task in ts.RootFolder.Tasks)
+                    // Varre a raiz E as subpastas: tarefas elevadas de terceiros (ex: Process
+                    // Lasso) vivem na raiz, mas nada impede outra em subpasta. O path e
+                    // normalizado sem aspas porque a comparacao e contra o exePath ja limpo
+                    // do ExtractCommandParts (antes o path com aspas nunca casava).
+                    void Scan(Microsoft.Win32.TaskScheduler.TaskFolder folder)
                     {
-                        if (task.Definition.Actions.FirstOrDefault() is ExecAction action)
+                        foreach (var task in folder.Tasks)
                         {
-                            bool isElevated = task.Name.StartsWith("KitLUGIA_Elevated_") ||
-                                              task.Definition.Principal.RunLevel == TaskRunLevel.Highest;
-                            if (isElevated)
-                                paths.Add(action.Path);
+                            try
+                            {
+                                if (task.Definition.Actions.FirstOrDefault() is ExecAction action)
+                                {
+                                    bool isElevated = task.Name.StartsWith("KitLUGIA_Elevated_") ||
+                                                       task.Definition.Principal.RunLevel == TaskRunLevel.Highest;
+                                    if (isElevated)
+                                    {
+                                        string clean = (action.Path ?? "").Trim().Trim('"', ' ', '\t');
+                                        if (!string.IsNullOrEmpty(clean)) paths.Add(clean);
+                                    }
+                                }
+                            }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        }
+                        foreach (var sf in folder.SubFolders)
+                        {
+                            try { Scan(sf); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                         }
                     }
+                    Scan(ts.RootFolder);
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -2712,62 +2795,9 @@ namespace KitLugia.Core
             return items;
         }
 
-        public static List<StartupAppDetails> GetAllAdvancedItems()
-        {
-            var all = new List<StartupAppDetails>();
-            all.AddRange(GetWinlogonItems());
-            all.AddRange(GetAppInitDlls());
-            all.AddRange(GetBHOItems());
-            all.AddRange(GetBootExecuteItems());
-            all.AddRange(GetKnownDllsItems());
-            all.AddRange(GetShellServiceObjectDelayLoad());
-            all.AddRange(GetShellExecuteHooks());
-            all.AddRange(GetContextMenuHandlers());
-            return all;
-        }
-
         #endregion
 
         #region Auto-Updater Integration
-
-        public static void CheckAndFixStartupMethods()
-        {
-            try
-            {
-                Logger.Log("🔍 Verificando métodos de inicialização do KitLugia...");
-                
-                var currentExe = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
-                
-                // Executar em background para não travar a UI
-                System.Threading.Tasks.Task.Run(() =>
-                {
-                    try
-                    {
-                        // Pequena pausa para o app terminar de iniciar antes de fazer I/O pesado
-                        System.Threading.Thread.Sleep(1500);
-
-                        // 1. Verificar Registry Run (HKCU)
-                        CheckRegistryRun(currentExe);
-                        
-                        // 2. Verificar Task Scheduler
-                        CheckTaskScheduler(currentExe);
-                        
-                        // 3. Verificar Startup Folder
-                        CheckStartupFolder(currentExe);
-
-                        Logger.Log("✅ Verificação de inicialização concluída com sucesso");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"❌ Erro na verificação de inicialização: {ex.Message}");
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"❌ Erro ao iniciar verificação de inicialização: {ex.Message}");
-            }
-        }
         
         private static void CheckRegistryRun(string exePath)
         {

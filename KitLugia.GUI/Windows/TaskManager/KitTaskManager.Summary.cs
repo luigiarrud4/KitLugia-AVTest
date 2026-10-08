@@ -73,6 +73,14 @@ namespace KitLugia.GUI.Windows.TaskManager
             public double CpuValue { get; set; }
             public double RamValue { get; set; }
 
+            // Metadados do cartão de detalhe (o clique simples precisa mostrar ALGO útil).
+            public string UserName { get; set; } = "";
+            public string Status { get; set; } = "";
+            public string Path { get; set; } = "";
+            public string Disk { get; set; } = "";
+            public string Network { get; set; } = "";
+            public int GroupCount { get; set; } = 1;
+
             private bool _pinned;
             /// <summary>"Congelado" na lista pelo usuário: continua no topo mesmo caindo do Top 14.</summary>
             public bool Pinned { get => _pinned; set { if (_pinned == value) return; _pinned = value; Raise(nameof(Pinned)); Raise(nameof(PinIcon)); } }
@@ -91,6 +99,12 @@ namespace KitLugia.GUI.Windows.TaskManager
         }
 
         private readonly ObservableCollection<TopProcRow> _topProcRows = new();
+
+        /// <summary>
+        /// PID selecionado no Top do Resumo. Sobrevive a reconstrucao da lista: sem ele o
+        /// cartao do processo fecha sozinho a cada mudanca de ordem (1x por segundo).
+        /// </summary>
+        private int _sumSelectedPid;
 
         /// <summary>
         /// Ajusta a largura de uma coluna proporcional (GridLength com pesos).
@@ -199,6 +213,41 @@ namespace KitLugia.GUI.Windows.TaskManager
         private static string Gb(ulong bytes) => (bytes / 1073741824.0).ToString("F1");
         private static string Mb(ulong bytes) => (bytes / 1048576.0).ToString("F0");
 
+        /// <summary>
+        /// Traduz o gráfico de CPU numa frase: O QUE está acontecendo, não o número.
+        /// Era a queixa "o gráfico central não ajuda em muita coisa" — sem uma leitura, três
+        /// linhas coloridas não dizem se o problema é do kernel (driver) ou de um programa.
+        /// </summary>
+        private static string BuildCpuVerdict(float cpuNow, double kernel, Queue<float> hist, float temp)
+        {
+            int n = hist?.Count ?? 0;
+            double avg = 0, peak = 0;
+            if (n > 0)
+            {
+                foreach (var v in hist) { avg += v; if (v > peak) peak = v; }
+                avg /= n;
+            }
+
+            // Kernel alto = tempo preso no driver; é a pista mais valiosa do gráfico.
+            string causa;
+            if (kernel >= 25)
+                causa = $" uso de Kernel em {kernel:F0}% — o gargalo está em um DRIVER (clique no gráfico para ver qual).";
+            else if (cpuNow >= 85)
+                causa = " CPU no limite — algum programa está consumindo tudo (o Top ao lado mostra quem).";
+            else if (cpuNow >= 50)
+                causa = " CPU ocupada, mas nada saturado — uso normal com várias abas abertas.";
+            else if (cpuNow <= 10)
+                causa = " CPU ociosa — se algo estiver lento, o problema NÃO é a CPU.";
+            else
+                causa = " CPU em uso moderado.";
+
+            string janela = n < 2
+                ? ""
+                : $" Últimos {n}s: média {avg:F0}%, pico {peak:F0}%.";
+            string calor = temp >= 82 ? $" CPU a {temp:F0} °C — quite quente." : "";
+            return causa + janela + calor;
+        }
+
         /// <summary>Tick do Resumo (chamado do mesmo timer de 1s dos gráficos).</summary>
         private void UpdateSummaryTick()
         {
@@ -233,6 +282,9 @@ namespace KitLugia.GUI.Windows.TaskManager
 
             SetText(TxtSumCpuBig, $"{cpu:F0}%", GetHeatColor(cpu, 80, 95));
             SetText(TxtSumCpuSub, kernelF > 0 ? $"Kernel {kernelF:F0}%" : "");
+            // LEITURA DO GRÁFICO em português: antes o rodapé só trazia frequência/núcleos/
+            // uptime — números que não respondem "o gráfico está dizendo o quê?".
+            SetText(TxtSumCpuVerdict, BuildCpuVerdict(cpu, kernel, _sumCpuHist, temp), GetHeatColor(cpu, 80, 95));
             var uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
             // Uptime em minutos: sem isso o rodapé mudava a cada segundo e piscava.
             SetText(TxtSumCpuFooter,
@@ -447,6 +499,8 @@ namespace KitLugia.GUI.Windows.TaskManager
                         dst.RamValue = src.RamValue;
                         dst.Gpu = src.Gpu;
                         dst.Pinned = _sumPinned.Contains(src.Pid);
+                        dst.UserName = src.UserName; dst.Status = src.Status;
+                        dst.Path = src.Path; dst.Disk = src.Disk; dst.Network = src.Network;
                         // Ícone chega depois (carregado em background) — não perde a chance
                         if (dst.Icon == null && src.ProcessIcon != null) dst.Icon = src.ProcessIcon;
                     }
@@ -459,11 +513,139 @@ namespace KitLugia.GUI.Windows.TaskManager
                         {
                             Pid = src.Pid, Name = src.Name, Cpu = src.Cpu, CpuValue = src.CpuValue,
                             RamMB = src.RamMB, RamValue = src.RamValue, Gpu = src.Gpu,
+                            UserName = src.UserName, Status = src.Status, Path = src.Path,
+                            Disk = src.Disk, Network = src.Network,
                             Icon = src.ProcessIcon, Pinned = _sumPinned.Contains(src.Pid)
                         });
                 }
+
                 SetText(TxtSumStatus, $"{rows.Count} processos · top {top.Count} por CPU" +
-                    (_sumPinned.Count > 0 ? $" · {_sumPinned.Count} fixado(s) 📌" : ""));
+                    (_sumPinned.Count > 0 ? $"· {_sumPinned.Count} fixado(s) 📌" : ""));
+
+                // Reaplica a selecao depois da reconstrucao da lista (Clear + Add zera a
+                // SelectedItem): e o que mantem o cartao aberto enquanto o Top muda de ordem.
+                RestoreSummarySelection();
+            }
+            catch { }
+        }
+
+        // ────────────────────────────────────────────────────────────────────
+        //  CLIQUE SIMPLES NA LISTA DO TOP — abre o CARTÃO do processo.
+        //  Antes só havia duplo clique e botão direito: clicar numa linha não fazia
+        //  NADA e a lista parecia morta. Aqui o clique mostra quem é o processo
+        //  (usuário, estado, caminho, disco, rede) e habilita as ações.
+        // ────────────────────────────────────────────────────────────────────
+
+        private void DgSumTopCpu_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                var t = DgSumTopCpu.SelectedItem as TopProcRow;
+                if (t == null)
+                {
+                    // O refresh de 1 s reconstroi a lista (Clear + Add) sempre que a ORDEM
+                    // muda — com CPU viva isso acontece o tempo todo e a selecao (logo, o
+                    // cartao) sumia. Nao recolapsa aqui: o PID selecionado e reescolhido em
+                    // UpdateSummaryTopCpu; so recolapsa se o processo tiver mesmo sumido.
+                    if (Volatile.Read(ref _sumSelectedPid) > 0) return;
+                    SumProcCard.Visibility = Visibility.Collapsed;
+                    TxtSumTopHint.Visibility = Visibility.Visible;
+                    return;
+                }
+                Volatile.Write(ref _sumSelectedPid, t.Pid);
+                var live = SumRowByPid(t.Pid);
+                string user = !string.IsNullOrEmpty(live?.UserName) ? live!.UserName : (string.IsNullOrEmpty(t.UserName) ? "—" : t.UserName);
+                string status = !string.IsNullOrEmpty(live?.Status) ? live!.Status : t.Status;
+                string path = live?.Path ?? t.Path;
+                int instances = CountInstances(live);
+                string group = instances > 1 ? $" · {instances} instâncias" : "";
+
+                TxtSumProcTitle.Text = $"{t.Name} (PID {t.Pid}){group}" + (t.Pinned ? "  📌" : "");
+                TxtSumProcMeta.Text = $"CPU {t.Cpu}   RAM {t.RamMB}   GPU {t.Gpu}   ·   usuário: {user}   ·   {status}";
+                TxtSumProcPath.Text = string.IsNullOrEmpty(path)
+                    ? "caminho indisponível (processo protegido ou encerrado)"
+                    : path;
+                TxtSumProcPath.ToolTip = path;
+                BtnSumFix.Content = t.Pinned ? "📌 Soltar" : "📌 Congelar";
+                SumProcCard.Visibility = Visibility.Visible;
+                TxtSumTopHint.Visibility = Visibility.Collapsed;
+            }
+            catch { }
+        }
+
+        /// <summary>Quantas instâncias do mesmo nome existem agora (o Top agrupa por nome).</summary>
+        private int CountInstances(ProcessRow? groupRow)
+        {
+            if (groupRow == null) return 1;
+            try
+            {
+                string name = groupRow.Name;
+                lock (_lock) return Math.Max(1, _allRows.Count(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase)));
+            }
+            catch { return 1; }
+        }
+
+        /// <summary>Processo selecionado no Top, resolvido na fonte viva (_allRows).</summary>
+        private ProcessRow? SumSelectedLive() =>
+            DgSumTopCpu.SelectedItem is TopProcRow t ? SumRowByPid(t.Pid) : null;
+
+        private void BtnSumGoProcess_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (SumRowByPid((DgSumTopCpu.SelectedItem as TopProcRow)?.Pid ?? -1) is not ProcessRow target) return;
+                SwitchTab(BtnTabProcesses, new RoutedEventArgs());
+                DgProcesses.SelectedItem = target;
+                DgProcesses.ScrollIntoView(target);
+                DgProcesses.Focus();
+            }
+            catch { }
+        }
+
+        private async void BtnSumKillSelected_Click(object sender, RoutedEventArgs e)
+        {
+            if (SumRowByPid((DgSumTopCpu.SelectedItem as TopProcRow)?.Pid ?? -1) != null) await KillAsync(false);
+        }
+
+        private void BtnSumPinSelected_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (DgSumTopCpu.SelectedItem is not TopProcRow t) return;
+                if (_sumPinned.Contains(t.Pid)) _sumPinned.Remove(t.Pid);
+                else _sumPinned.Add(t.Pid);
+                t.Pinned = _sumPinned.Contains(t.Pid);
+                UpdateSummaryTopCpu();
+                TxtStatus.Text = t.Pinned
+                    ? $"📌 {t.Name} fixado: continua na lista mesmo caindo do Top 14."
+                    : $"📌 {t.Name} liberado da lista fixa.";
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Reescolhe o processo do cartao apos a lista ser reconstruida. Se o PID nao esta
+        /// mais no Top, o cartao e fechado (o processo morreu ou saiu do ranking).
+        /// </summary>
+        private void RestoreSummarySelection()
+        {
+            try
+            {
+                int pid = Volatile.Read(ref _sumSelectedPid);
+                if (pid <= 0) return;
+                if (DgSumTopCpu.SelectedItem is TopProcRow cur && cur.Pid == pid) return;
+
+                var again = _topProcRows.FirstOrDefault(r => r.Pid == pid);
+                if (again != null)
+                {
+                    DgSumTopCpu.SelectedItem = again;
+                    return;
+                }
+
+                // Saiu do Top: solta o cartao em vez de deixar texto velho na tela.
+                Volatile.Write(ref _sumSelectedPid, 0);
+                SumProcCard.Visibility = Visibility.Collapsed;
+                TxtSumTopHint.Visibility = Visibility.Visible;
             }
             catch { }
         }
@@ -570,9 +752,9 @@ namespace KitLugia.GUI.Windows.TaskManager
             catch { }
         }
 
-        private void MenuSumKill_Click(object sender, RoutedEventArgs e)
+        private async void MenuSumKill_Click(object sender, RoutedEventArgs e)
         {
-            if (SumPrepareAction() != null) Kill(false);
+            if (SumPrepareAction() != null) await KillAsync(false);
         }
 
         private void MenuSumSuspend_Click(object sender, RoutedEventArgs e)
@@ -1021,11 +1203,30 @@ namespace KitLugia.GUI.Windows.TaskManager
                         e.State.Contains(filter, StringComparison.OrdinalIgnoreCase));
                 }
 
-                var list = q.OrderByDescending(e => !e.Listening)
-                            .ThenBy(e => e.ProcessName, StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(e => e.Protocol)
-                            .ThenBy(e => e.Local)
-                            .ToList();
+                List<NetworkTrafficMonitor.NetEndpoint> list;
+                if (!string.IsNullOrEmpty(_connSortColumn))
+                {
+                    // Criterio do usuario (clique no cabecalho) sobrepoe o default.
+                    bool asc = _connSortDir == ListSortDirection.Ascending;
+                    Func<NetworkTrafficMonitor.NetEndpoint, IComparable> key = _connSortColumn switch
+                    {
+                        "Pid" => e => e.Pid,
+                        "Protocol" => e => e.Protocol,
+                        "Local" => e => e.Local,
+                        "Remote" => e => e.Remote,
+                        "State" => e => e.State,
+                        _ => e => e.ProcessName ?? "",
+                    };
+                    list = (asc ? q.OrderBy(key) : q.OrderByDescending(key)).ToList();
+                }
+                else
+                {
+                    list = q.OrderByDescending(e => !e.Listening)
+                                .ThenBy(e => e.ProcessName, StringComparer.OrdinalIgnoreCase)
+                                .ThenBy(e => e.Protocol)
+                                .ThenBy(e => e.Local)
+                                .ToList();
+                }
 
                 if (group)
                 {
@@ -1047,6 +1248,34 @@ namespace KitLugia.GUI.Windows.TaskManager
         }
 
         private void TxtConnFilter_TextChanged(object sender, TextChangedEventArgs e) => ApplyConnectionFilter();
+
+        // Ordenacao da aba Conexoes (padrao de qualidade: toda coluna clicavel tem
+        // SortMemberPath e o criterio sobrevive ao refresh — antes o clique caia no sort
+        // default do WPF e o refresh seguinte (que reconstroi a lista) desfazia tudo).
+        private string _connSortColumn = "";
+        private ListSortDirection _connSortDir = ListSortDirection.Ascending;
+
+        private void DgConnections_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            try
+            {
+                e.Handled = true;
+                string prop = e.Column?.SortMemberPath ?? "";
+                if (string.IsNullOrEmpty(prop)) return;
+                if (_connSortColumn == prop)
+                    _connSortDir = _connSortDir == ListSortDirection.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
+                else
+                {
+                    _connSortColumn = prop;
+                    _connSortDir = prop == "Pid" ? ListSortDirection.Descending : ListSortDirection.Ascending;
+                }
+                ApplyConnectionFilter();
+                foreach (var c in DgConnections.Columns) c.SortDirection = null;
+                var active = DgConnections.Columns.FirstOrDefault(c => c.SortMemberPath == _connSortColumn);
+                if (active != null) active.SortDirection = _connSortDir;
+            }
+            catch { }
+        }
 
         private void ChkConnFilter_Changed(object sender, RoutedEventArgs e) => ApplyConnectionFilter();
 

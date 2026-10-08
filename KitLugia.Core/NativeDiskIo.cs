@@ -26,7 +26,12 @@ namespace KitLugia.Core
         internal const uint IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS = 0x00560000;
         internal const uint FSCTL_QUERY_SHRINK_VOLUME = 0x00090114;
         internal const uint FSCTL_SHRINK_VOLUME = 0x000901DC;
-        internal const uint FSCTL_EXTEND_VOLUME = 0x00090118;
+        // ATENÇÃO: valor CORRIGIDO em 02/10. O código antigo (0x00090118) NÃO é o
+        // FSCTL_EXTEND_VOLUME — 0x00090018 é o FSCTL_LOCK_VOLUME (winioctl.h).
+        // O valor real é 0x000900F0 (confirmado na tabela de IOCTLs do winioctl.h).
+        // Suportado em NTFS/RAW/ReFS, apenas AUMENTA o volume, e aceita volume
+        // ONLINE (sem lock/dismount) — é o caminho nativo para estender sem diskpart.
+        internal const uint FSCTL_EXTEND_VOLUME = 0x000900F0;
 
         private const uint PARTITION_STYLE_MBR = 0;
         private const uint PARTITION_STYLE_GPT = 1;
@@ -185,6 +190,64 @@ namespace KitLugia.Core
         private static bool DeviceIoControlPtr(SafeFileHandle handle, uint code, IntPtr inBuf, uint inSize, IntPtr outBuf, uint outSize, out uint bytesReturned)
         {
             return DeviceIoControl(handle, code, inBuf, inSize, outBuf, outSize, out bytesReturned, IntPtr.Zero);
+        }
+
+        // --- CRESCIMENTO NATIVO DE PARTIÇÃO/VOLUME (substitui "diskpart extend") ---
+
+        /// <summary>DISK_PARTITION_INFO (ntdddisk.h): LBA inicial + comprimento em setores.</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct DISK_PARTITION_INFO
+        {
+            public long StartLba;   // LARGE_INTEGER
+            public uint Length;     // em setores (512 bytes)
+        }
+
+        /// <summary>
+        /// IOCTL_DISK_GROW_PARTITION (0x7C0D0): aumenta a particao no proprio disco.
+        /// docs: "You can extend or shrink a live partition, and the partition can be open for
+        /// sharing during the extend or shrink operation" (sem lock, volume pode estar em uso).
+        /// Retorna false + GetLastWin32Error se o espaco nao for contiguo a direita.
+        /// </summary>
+        internal static bool GrowPartition(SafeFileHandle diskHandle, ulong startingOffset, ulong sectorLength)
+        {
+            if (diskHandle.IsInvalid) return false;
+
+            // Length e em setores; a particao precisa caber inteira no novo fim.
+            ulong sectors = (sectorLength + 511UL) / 512UL;
+            if (sectors > uint.MaxValue) return false; // particao > 2 TB: fora do formato do IOCTL
+
+            var info = new DISK_PARTITION_INFO
+            {
+                StartLba = (long)(startingOffset / 512),
+                Length = (uint)sectors
+            };
+
+            int size = Marshal.SizeOf<DISK_PARTITION_INFO>();
+            IntPtr buf = Marshal.AllocHGlobal(size);
+            try
+            {
+                Marshal.StructureToPtr(info, buf, false);
+                return DeviceIoControlPtr(diskHandle, IOCTL_DISK_GROW_PARTITION, buf, (uint)size, IntPtr.Zero, 0, out _);
+            }
+            finally { Marshal.FreeHGlobal(buf); }
+        }
+
+        /// <summary>
+        /// FSCTL_EXTEND_VOLUME (0x900F0): diz ao NTFS/ReFS "cresca mais X bytes" depois que a
+        /// particao ja foi ampliada no disco. Aceita volume ONLINE (nao precisa lock).
+        /// O novo volume precisa ter pelo menos um cluster a mais que o anterior.
+        /// </summary>
+        internal static bool ExtendVolume(SafeFileHandle volumeHandle, long extensionBytes)
+        {
+            if (volumeHandle.IsInvalid || extensionBytes <= 0) return false;
+
+            IntPtr buf = Marshal.AllocHGlobal(sizeof(long));
+            try
+            {
+                Marshal.WriteInt64(buf, extensionBytes);
+                return DeviceIoControlPtr(volumeHandle, FSCTL_EXTEND_VOLUME, buf, sizeof(long), IntPtr.Zero, 0, out _);
+            }
+            finally { Marshal.FreeHGlobal(buf); }
         }
 
         internal static bool GetDeviceNumber(SafeFileHandle handle, out STORAGE_DEVICE_NUMBER number)

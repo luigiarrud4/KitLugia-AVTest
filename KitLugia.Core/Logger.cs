@@ -49,13 +49,6 @@ namespace KitLugia.Core
             OnLogReceived?.Invoke(msg);
         }
 
-        public static void LogRegistry(string key, string value, object data)
-        {
-            var msg = $"[REG] Setando '{value}' = '{data}' em {key}";
-            WriteToFile("REG", msg);
-            OnLogReceived?.Invoke(msg);
-        }
-
         public static void LogError(string context, string error)
         {
             var msg = $"[ERRO] ({context}): {error}";
@@ -120,31 +113,6 @@ namespace KitLugia.Core
                 SuppressedWarnings.Add(key, (1, now));
                 return false;
             }
-        }
-
-        public static void ToggleOutputLimit()
-        {
-            DisableOutputLimit = !DisableOutputLimit;
-            var msg = DisableOutputLimit
-                ? "LIMITE DE 500 LINHAS REMOVIDO - Logs completos serao capturados"
-                : "LIMITE DE 500 LINHAS ATIVADO - Logs serao truncados";
-            WriteToFile("TOGGLE", msg);
-            OnLogReceived?.Invoke(msg);
-        }
-
-        public static void ToggleVerboseCheck()
-        {
-            VerboseCheckLogs = !VerboseCheckLogs;
-            var msg = VerboseCheckLogs
-                ? "Logs CHECK detalhados ATIVADOS - Mostra todas as verificacoes"
-                : "Logs CHECK detalhados DESATIVADOS - Mostra apenas erros e mudancas";
-            WriteToFile("TOGGLE", msg);
-            OnLogReceived?.Invoke(msg);
-        }
-
-        public static string GetLogPath()
-        {
-            return LogFilePath;
         }
     }
 }

@@ -28,13 +28,16 @@ namespace KitLugia.Core
                 };
                 
                 process.Start();
-                
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
-                
+
+                // Os DOIS streams precisam ser drenados em paralelo: ler um até o fim antes do
+                // outro esbarra no limite do pipe (~4 KB) do stream ainda não lido - o processo
+                // bloqueia escrevendo e o ReadToEnd do outro lado nunca retorna (deadlock).
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                var stderrTask = process.StandardError.ReadToEndAsync();
+
                 if (process.WaitForExit(timeoutMs))
                 {
-                    return (process.ExitCode, output, error);
+                    return (process.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult());
                 }
                 else
                 {

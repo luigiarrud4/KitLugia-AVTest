@@ -55,6 +55,5 @@ namespace KitLugia.Core.KitStore
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        public void RaiseAll() { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty)); }
     }
 }

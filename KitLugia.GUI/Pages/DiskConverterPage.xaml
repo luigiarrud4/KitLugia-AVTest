@@ -1,0 +1,229 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.DiskConverterPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
+      mc:Ignorable="d"
+      d:DesignHeight="780" d:DesignWidth="1050"
+      Title="Conversor de Disco (MBR / GPT)">
+
+    <Page.Resources>
+        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="30" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#333333" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="BorderBrush" Value="#444444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton" Template="{StaticResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
+                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiskComboItemStyle" TargetType="{x:Type ComboBoxItem}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="8,5"/>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="25,20,25,20">
+
+            <!-- CABEÇALHO -->
+            <TextBlock Text="CONVERSOR DE DISCO  MBR &#x2194; GPT" FontSize="26" FontWeight="Bold"
+                       Foreground="{StaticResource AccentColor}" Margin="0,0,0,5"/>
+            <TextBlock Text="Converte a tabela de partições no lugar (partições e dados preservados) pela Storage Management API do Windows — a sucessora moderna do VDS usado pelo EaseUS — com todas as verificações antes e leitura de confirmação depois."
+                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,20"/>
+
+            <!-- DISCO SELECIONADO -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="DISCO" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   FontWeight="Bold" Margin="0,0,0,8"/>
+                        <ComboBox x:Name="CmbDisk" Height="36" FontSize="13"
+                                  Style="{StaticResource DarkComboBoxStyle}"
+                                  ItemContainerStyle="{StaticResource DiskComboItemStyle}"
+                                  SelectionChanged="CmbDisk_SelectionChanged"/>
+                        <TextBlock x:Name="TxtDiskInfo" Text="Carregando discos..."
+                                   Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="18,0,0,0">
+                        <Button x:Name="BtnAnalyze" Content="&#x1F50D; ANALISAR" Width="150" Height="40"
+                                FontWeight="Bold" Click="BtnAnalyze_Click"
+                                Style="{StaticResource GoldButtonStyle}"/>
+                        <Button x:Name="BtnReload" Content="&#x21BB; RECARREGAR" Width="150" Height="32"
+                                Margin="0,8,0,0" Click="BtnReload_Click"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- STATUS + RELATÓRIO -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="MAPA DO DISCO" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   FontWeight="Bold" VerticalAlignment="Center"/>
+                        <controls:InfoButton Margin="8,0,0,0" VerticalAlignment="Center" ToolTipText="COMO LER O MAPA: cada bloco é uma partição, no tamanho proporcional ao espaço que ocupa no disco.&#x0a;&#x0a;CORES: dourado = EFI (boot UEFI) &#x2022; roxo = MSR/recuperação &#x2022; azul forte = C: ou boot &#x2022; azul-claro = dados &#x2022; cinza tracejado = espaço livre. Borda dourada = destaque (Windows/ESP).&#x0a;&#x0a;EMBAIXO: uma linha por partição (letra, tamanho, flags como [SISTEMA]/[BOOT]) + a linha do disco (modelo, tamanho, estilo, se é do sistema).&#x0a;&#x0a;O mapa é só leitura — nada aqui altera o disco."/>
+                    </StackPanel>
+                    <StackPanel x:Name="PanelDiskMap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- STATUS + RELATÓRIO -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock x:Name="TxtStatusTitle" Text="PRONTO PARA ANÁLISE" FontSize="18" FontWeight="Bold"
+                               Foreground="{StaticResource AccentColor}" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="TxtStatusSub" Text="Escolha um disco e clique em ANALISAR para ver o que impede (ou não) a conversão."
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <TextBox x:Name="TxtReport" Height="260" IsReadOnly="True" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"
+                             TextWrapping="Wrap" Foreground="White" BorderThickness="0" Background="Transparent"
+                             Text="Aguardando análise..."/>
+                </StackPanel>
+            </Border>
+
+            <!-- CONVERSÃO -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="CONVERSÃO DA TABELA" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   FontWeight="Bold" VerticalAlignment="Center"/>
+                        <controls:InfoButton Margin="8,0,0,0" VerticalAlignment="Center" ToolTipText="O QUE É CONVERTER: trocar a 'capa' do disco (MBR &#x2194; GPT) mantendo partições e dados no lugar. Não formata nada.&#x0a;&#x0a;LIMITES DO MBR: 4 partições primárias e 2 TiB por partição. GPT não tem esses limites, mas precisa de 1 MB livre no fim do disco.&#x0a;&#x0a;QUANDO USA CADA BOTÃO: CONVERTER = com o Windows rodando (disco de dados). WinPE = com o Windows DESLIGADO (pré-boot): para o disco do sistema/em uso, que o Windows não libera. O PC reinicia, converte e volta; o log fica em C:\KitLugia_Convert_Log.txt.&#x0a;&#x0a;DISCO DO WINDOWS: virar GPT exige ESP + BCD nova (use Reparar Boot/BCD depois). Com BitLocker ligado, suspenda a proteção antes.&#x0a;&#x0a;SEGURANÇA: análise antes, dupla confirmação para forçar, verificação do resultado depois (estilo e nº de partições)."/>
+                    </StackPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BtnToGpt" Content="CONVERTER PARA GPT" Height="44" FontWeight="Bold"
+                                Click="BtnToGpt_Click" Style="{StaticResource GoldButtonStyle}"
+                                ToolTip="MBR → GPT. As partições são convertidas no lugar (in-place), com os dados intactos."/>
+                        <Button Grid.Column="2" x:Name="BtnToMbr" Content="CONVERTER PARA MBR" Height="44" FontWeight="Bold"
+                                Click="BtnToMbr_Click" Style="{StaticResource SecondaryButtonStyle}"
+                                ToolTip="GPT → MBR. Limite do MBR: 4 partições primárias e 2 TiB por partição."/>
+                    </Grid>
+
+                    <TextBlock Text="DISCO RAW (sem tabela) — a operação correta é INICIALIZAR:" Foreground="{StaticResource TextMuted}"
+                               FontSize="11" Margin="0,16,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BtnInitGpt" Content="INICIALIZAR COMO GPT" Height="38"
+                                Click="BtnInitGpt_Click" Style="{StaticResource SecondaryButtonStyle}"
+                                ToolTip="Cria a tabela GPT num disco sem tabela (equivale a &quot;Initialize to GPT disk&quot; do EaseUS)."/>
+                        <Button Grid.Column="2" x:Name="BtnInitMbr" Content="INICIALIZAR COMO MBR" Height="38"
+                                Click="BtnInitMbr_Click" Style="{StaticResource SecondaryButtonStyle}"
+                                ToolTip="Cria a tabela MBR num disco sem tabela."/>
+                    </Grid>
+
+                    <TextBlock Text="DISCO DO SISTEMA (em uso) — converte com o Windows desligado, no WinPE:" Foreground="{StaticResource TextMuted}"
+                               FontSize="11" Margin="0,16,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BtnWinpeGpt" Content="WinPE: CONVERTER PARA GPT" Height="38"
+                                Click="BtnWinpeGpt_Click" Style="{StaticResource SecondaryButtonStyle}"
+                                ToolTip="Agenda a conversão para o pré-boot (WinPE, estilo EaseUS PreOS): o PC reinicia, converte com o Windows offline e volta. Só aparece como opção quando o disco é do sistema/em uso."/>
+                        <Button Grid.Column="2" x:Name="BtnWinpeMbr" Content="WinPE: CONVERTER PARA MBR" Height="38"
+                                Click="BtnWinpeMbr_Click" Style="{StaticResource SecondaryButtonStyle}"
+                                ToolTip="Agenda a conversão para o pré-boot (WinPE, estilo EaseUS PreOS)."/>
+                    </Grid>
+
+                    <TextBlock Foreground="#FFAA44" FontSize="11" TextWrapping="Wrap" Margin="0,14,0,0"
+                               Text="⚠️ Converter o disco do Windows só é seguro com UEFI (e exige ESP + BCD nova: use Reparar Boot/BCD). Com o BitLocker ligado a conversão é recusada — suspenda a proteção antes."/>
+                </StackPanel>
+            </Border>
+
+            <!-- MBR / SETOR 0 -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="SETOR 0 / MBR" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   FontWeight="Bold" VerticalAlignment="Center"/>
+                        <controls:InfoButton Margin="8,0,0,0" VerticalAlignment="Center" ToolTipText="O QUE É O SETOR 0: os primeiros 512 bytes do disco — 446 de código de boot + tabela de partições + assinatura 0x55AA. É o que o BIOS lê para iniciar.&#x0a;&#x0a;LER = só mostra o estado, não muda nada.&#x0a;SALVAR = guarda os 512 bytes + SHA256 (prova de integridade) para restaurar depois.&#x0a;RESTAURAR = reescreve a partir do arquivo. Modo SEGURO (padrão): troca só o código de boot e MANTÉM a tabela atual — é o que recupera o boot sem tocar nas partições. Modo COMPLETO: grava os 512 bytes (inclui a tabela do arquivo). O setor atual é salvo antes, automaticamente."/>
+                    </StackPanel>
+                    <TextBlock Text="Lê, salva e reescreve o setor 0 do disco (os 512 bytes que dizem ao BIOS como iniciar)."
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                    <Button x:Name="BtnReadMbr" Content="&#x1F50E; LER ESTADO DO SETOR 0" Height="38" Margin="0,0,0,8"
+                            Click="BtnReadMbr_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="BtnBackupMbr" Content="&#x1F4BE; SALVAR BACKUP DO SETOR 0" Height="38" Margin="0,0,0,8"
+                            Click="BtnBackupMbr_Click" Style="{StaticResource GoldButtonStyle}"
+                            ToolTip="Grava os 512 bytes em %LOCALAPPDATA%\KitLugia\MBR-Backup\&lt;data&gt; com SHA256 e um .txt descritivo."/>
+                    <Button x:Name="BtnRestoreMbr" Content="&#x1F527; RESTAURAR DE UM ARQUIVO .BIN" Height="38"
+                            Click="BtnRestoreMbr_Click" Style="{StaticResource SecondaryButtonStyle}"
+                            ToolTip="Reescreve o setor 0 a partir de um .bin salvo. Por padrão mantém a tabela de partições atual e só troca o código de boot (modo seguro para recuperar o boot)."/>
+                </StackPanel>
+            </Border>
+
+            <!-- ALINHAMENTO -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="ALINHAMENTO 4K / 1 MiB" Foreground="{StaticResource TextMuted}" FontSize="11"
+                               FontWeight="Bold" Margin="0,0,0,12"/>
+                    <Button x:Name="BtnAlign" Content="&#x1F4CF; DIAGNOSTICAR ALINHAMENTO" Height="38"
+                            Click="BtnAlign_Click" Style="{StaticResource SecondaryButtonStyle}"
+                            ToolTip="Compara o início de cada partição com 1 MiB e 4 KiB. Corrigir alinhamento existente exige reposicionar os dados — o diagnóstico é apenas informativo."/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

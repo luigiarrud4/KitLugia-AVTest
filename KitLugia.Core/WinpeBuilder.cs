@@ -436,17 +436,65 @@ namespace KitLugia.Core
             return sb.ToString();
         }
 
-        // Gera o winpeshl.ini correto (WinPE só precisa do startnet.cmd padrão).
-        // Documentação Microsoft: [LaunchApps] não suporta scripts batch — usa startnet.cmd.
-        // Deixamos vazio para o WinPE rodar o cmd.exe padrão + startnet.cmd.
+        // Gera o winpeshl.ini do KitLugia.
+        //
+        // ATENÇÃO — este método foi corrigido em 03/10/2026. A versão anterior escrevia
+        // "[LaunchApps]" com a seção VAZIA, acompanhada do comentário (errado) de que
+        // "[LaunchApps] não suporta scripts batch".
+        //
+        // Esse comentário estava errado e era perigoso:
+        //   * o próprio IsoEditorManager.InstallSetupStartnetAsync (mesmo projeto) documenta
+        //     que, QUANDO winpeshl.ini existe, o winpeshl.exe lança SOMENTE o que estiver
+        //     em [LaunchApps] — uma seção vazia = tela preta morta, sem cmd e sem script;
+        //   * o EaseUS (docs/EASEUS_EPM_DESKTOP.md §1.3) usa [LaunchApps] com executável +
+        //     argumentos, inclusive um .bat.
+        //
+        // Por que o fluxo de shrink FUNCIONA hoje: o boot.wim em uso (C:\KL_WINPE\boot.wim)
+        // NÃO tem winpeshl.ini — verificado em 03/10/2026, zero ocorrências. Sem o arquivo,
+        // o winpeshl cai no padrão da Microsoft (wpeinit + cmd /k startnet.cmd) e o script roda.
+        // Ou seja, o caminho que funciona dependia da AUSÊNCIA do arquivo.
+        //
+        // Agora escrevemos explicitamente o MESMO comportamento do padrão, de forma determinística:
+        // não depende mais do WIM-base não ter o arquivo, e nunca mais pode gerar PE mudo.
         public static string GenerateWinpeshlIni()
         {
+            // SEM COMENTÁRIOS de propósito: este arquivo decide se o WinPE sobe ou fica
+            // numa tela preta. O formato e byte-a-byte o mesmo que o IsoEditorManager
+            // (InstallSetupStartnetAsync) usa em producao e que funciona.
+            // NÃO ESCREVER [LaunchApps] VAZIO NUNCA — ver o comentario acima.
             var sb = new StringBuilder();
-            sb.AppendLine("; winpeshl.ini - KitLugia WinPE");
-            sb.AppendLine("; O script de shrink roda em startnet.cmd (executado automaticamente).");
-            sb.AppendLine("; Deixe [LaunchApps] vazio para usar o shell padrão (cmd.exe).");
             sb.AppendLine("[LaunchApps]");
+            sb.AppendLine("\"%systemdrive%\\Windows\\System32\\wpeinit.exe\"");
+            sb.AppendLine("\"%systemdrive%\\Windows\\System32\\cmd.exe\", /k startnet.cmd");
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Remove o winpeshl.ini do WIM (opcional). NÃO é mais usado pelo fluxo normal —
+        /// ver <see cref="GenerateWinpeshlIni"/> para o porquê. Mantido caso algum WIM-base
+        /// traga um winpeshl.ini que aponte para o shell errado (ex.: o setup.exe shim).
+        /// </summary>
+        public static async Task<bool> RemoveWinpeshIniFromWimAsync(string wimPath)
+        {
+            string? wimlibExe = FindBundledWimlib();
+            if (wimlibExe == null)
+            {
+                Log("wimlib-imagex.exe nao encontrado; nao foi possivel remover winpeshl.ini.");
+                return false;
+            }
+
+            EnsureFileWritable(wimPath);
+            string args = $"update \"{wimPath}\" 1 --command=\"delete /Windows/System32/winpeshl.ini\"";
+            var (code, output) = await RunProcess(wimlibExe, args, 60000);
+
+            if (code == 0)
+            {
+                Log("winpeshl.ini removido do WIM (o WinPE voltara ao shell padrao cmd /k startnet.cmd).");
+                return true;
+            }
+
+            Log($"Aviso: wimlib nao conseguiu remover winpeshl.ini (codigo {code}): {output}");
+            return false;
         }
 
         // Monta o WIM base, injeta drivers do host + scripts KitLugia, e commita.
@@ -597,54 +645,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Monta o boot.wim e substitui o startnet.cmd por um novo com valores embutidos.
-        /// Mais robusto que config separado: os valores ficam no proprio script.
-        /// </summary>
-        public static async Task<bool> InjectStartnetCmdIntoWimAsync(string wimPath, string startnetContent, string scriptName = "startnet.cmd")
-        {
-            string mountDir = Path.Combine(WinpeCacheDir, "mount_cfg");
-            try
-            {
-                if (Directory.Exists(mountDir))
-                {
-                    try { Directory.Delete(mountDir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                    await RunDism("dism.exe", "/Cleanup-Mountpoints", 30000);
-                }
-                Directory.CreateDirectory(mountDir);
-
-                var (mntCode, mntOut) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" ", 180000);
-                if (mntCode != 0 && !mntOut.Contains("already mounted"))
-                {
-                    Log($"Falha ao montar WIM para {scriptName}: {mntOut}");
-                    return false;
-                }
-
-                string system32 = Path.Combine(mountDir, "Windows", "System32");
-                Directory.CreateDirectory(system32);
-                string scriptPath = Path.Combine(system32, scriptName);
-                await File.WriteAllTextAsync(scriptPath, startnetContent, Encoding.ASCII);
-                Log($"{scriptName} substituido em boot.wim");
-
-                var (cmtCode, cmtOut) = await RunDism("dism.exe",
-                    $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
-                if (cmtCode != 0)
-                {
-                    Log($"Falha ao commitar WIM com {scriptName}: {cmtOut}");
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Log($"Erro ao injetar {scriptName} no boot.wim: {ex.Message}");
-                try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Injetar shrink_config.ini na raiz do WIM. Tenta wimlib primeiro, depois DISM.
         /// </summary>
         /// <summary>
@@ -739,45 +739,6 @@ namespace KitLugia.Core
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
             }
-        }
-
-        public static async Task<bool> InjectConfigIntoWimAsync(string wimPath, string configContent)
-        {
-            string? wimlibExe = FindBundledWimlib();
-            if (wimlibExe != null)
-            {
-                string tmpDir = Path.Combine(WinpeCacheDir, "wimlib_cfg");
-                try
-                {
-                    if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
-                    Directory.CreateDirectory(tmpDir);
-
-                    string tmpFile = Path.Combine(tmpDir, "shrink_config.ini");
-                    await File.WriteAllTextAsync(tmpFile, configContent, Encoding.ASCII);
-
-                    Log("Usando wimlib-imagex para injetar shrink_config.ini na raiz do WIM...");
-                    string escapedTmpFile = tmpFile.Contains(' ') ? $"\"{tmpFile}\"" : tmpFile;
-                    string args = $"update \"{wimPath}\" 1 --command=\"add {escapedTmpFile} /shrink_config.ini\"";
-                    var (code, output) = await RunProcess(wimlibExe, args, 180000);
-                    if (code == 0)
-                    {
-                        Log("shrink_config.ini adicionado ao WIM via wimlib-imagex.");
-                        return true;
-                    }
-                    Log($"wimlib falhou para config ({code}), tentando DISM: {output.Trim()}");
-                }
-                catch (Exception ex)
-                {
-                    Log($"wimlib exceção para config: {ex.Message}. Tentando DISM...");
-                }
-                finally
-                {
-                    try { if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true); } catch { }
-                }
-            }
-
-            // Fallback: DISM mount+commit
-            return await InjectConfigIntoWimDismAsync(wimPath, configContent);
         }
 
         private static async Task<bool> InjectConfigIntoWimDismAsync(string wimPath, string configContent)
@@ -930,60 +891,6 @@ namespace KitLugia.Core
                     return c;
             }
             return null;
-        }
-
-        /// <summary>
-        /// Monta o boot.wim UMA ÚNICA VEZ e injeta script + shrink_config.ini.
-        /// Evita duas montagens/commits separados para o mesmo WIM.
-        /// </summary>
-        public static async Task<bool> InjectBootFilesIntoWimAsync(string wimPath, string startnetContent, string configContent, string scriptName = "startnet.cmd")
-        {
-            string mountDir = Path.Combine(WinpeCacheDir, "mount_cfg");
-            try
-            {
-                if (Directory.Exists(mountDir))
-                {
-                    try { Directory.Delete(mountDir, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                    await RunDism("dism.exe", "/Cleanup-Mountpoints", 30000);
-                }
-                Directory.CreateDirectory(mountDir);
-
-                var (mntCode, mntOut) = await RunDism("dism.exe",
-                    $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\" ", 180000);
-                if (mntCode != 0 && !mntOut.Contains("already mounted"))
-                {
-                    Log($"Falha ao montar WIM para boot files: {mntOut}");
-                    return false;
-                }
-
-                // Script
-                string system32 = Path.Combine(mountDir, "Windows", "System32");
-                Directory.CreateDirectory(system32);
-                string startnetPath = Path.Combine(system32, scriptName);
-                await File.WriteAllTextAsync(startnetPath, startnetContent, Encoding.ASCII);
-
-                // shrink_config.ini
-                string cfgPath = Path.Combine(mountDir, "shrink_config.ini");
-                await File.WriteAllTextAsync(cfgPath, configContent, Encoding.ASCII);
-
-                Log($"{scriptName} + shrink_config.ini injetados em boot.wim (1 montagem)");
-
-                var (cmtCode, cmtOut) = await RunDism("dism.exe",
-                    $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
-                if (cmtCode != 0)
-                {
-                    Log($"Falha ao commitar WIM com boot files: {cmtOut}");
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Log($"Erro ao injetar boot files no boot.wim: {ex.Message}");
-                try { await RunDism("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard", 120000); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                return false;
-            }
         }
 
         // Gera a ISO final do WinPE usando oscdimg.exe embutido.
@@ -1707,7 +1614,7 @@ namespace KitLugia.Core
             }
 
             await proc.WaitForExitAsync().ConfigureAwait(false);
-            string output = outputTask.Result + errorTask.Result;
+            string output = await outputTask.ConfigureAwait(false) + await errorTask.ConfigureAwait(false);
             return (proc.ExitCode, output);
         }
 
@@ -1742,7 +1649,7 @@ namespace KitLugia.Core
             }
 
             await proc.WaitForExitAsync().ConfigureAwait(false);
-            string output = outputTask.Result + errorTask.Result;
+            string output = await outputTask.ConfigureAwait(false) + await errorTask.ConfigureAwait(false);
             return (proc.ExitCode, output);
         }
 

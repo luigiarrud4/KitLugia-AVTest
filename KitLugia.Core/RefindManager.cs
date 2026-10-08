@@ -22,9 +22,13 @@ namespace KitLugia.Core
 
         public static async Task<(bool Success, string Message)> InstallRefindOnlyAsync()
         {
+            string? espDrive = null;
             try
             {
-                string? espDrive = MountEspSync();
+                // MountEspAsync (e não MountEspSync): a versão sync fazia Process.Start +
+                // WaitForExit(10000) na thread da UI e, num ESP sem letra, podia iterar S..Z
+                // (9 tentativas) = até 90 s de congelamento.
+                espDrive = await MountEspAsync();
                 if (espDrive == null)
                     return (false, "Não foi possível montar ESP.");
 
@@ -67,6 +71,11 @@ menuentry ""EFI Shell"" {{
             {
                 return (false, $"Erro: {ex.Message}");
             }
+            finally
+            {
+                // Sem isto a ESP ficava montada (com letra) para sempre depois de instalar o rEFInd.
+                if (espDrive != null) await DismountEspAsync(espDrive);
+            }
         }
 
         public static async Task<(bool Success, string Message)> CleanupRefindAsync()
@@ -108,16 +117,26 @@ menuentry ""EFI Shell"" {{
             }
         }
 
-        public static bool IsPreBootCompleted()
+        /// <summary>
+        /// Procura o marcador de pré-boot na ESP. Async de propósito: a versão síncrona chamava
+        /// MountEspSync (mountvol + WaitForExit na thread da UI) e era disparada 3 s depois de
+        /// CADA abertura do app pela janela principal.
+        /// </summary>
+        public static async Task<bool> IsPreBootCompletedAsync()
         {
+            string? espDrive = null;
             try
             {
-                string? espDrive = MountEspSync();
+                espDrive = await MountEspAsync();
                 if (espDrive == null) return false;
                 string markerPath = Path.Combine(espDrive, ESP_KITLUGIA_DIR, MARKER_FILE);
                 return File.Exists(markerPath);
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
+            catch (Exception ex) { Logger.LogWarning("Unknown", $"IsPreBootCompletedAsync: {ex.Message}"); return false; }
+            finally
+            {
+                if (espDrive != null) await DismountEspAsync(espDrive);
+            }
         }
 
         public static async Task TriggerReboot()
@@ -125,14 +144,16 @@ menuentry ""EFI Shell"" {{
             await RunProcessCaptured("shutdown", "/r /t 3 /c \"KitLugia: Reinicie e selecione antiX Live no rEFInd\"", 10000);
         }
 
-        internal static async Task<string?> MountEspAsync()
+        public static async Task<string?> MountEspAsync()
         {
             for (char letter = 'S'; letter <= 'Z'; letter++)
             {
                 string drive = $"{letter}:";
                 try { if (new DriveInfo(drive).IsReady) continue; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-                var (exit, _) = await RunProcessCaptured("mountvol", $"{drive} /S");
+                // 10 s por tentativa (era o timeout do MountEspSync removido): o mountvol
+                // responde na hora; o limite evita travar o fluxo se ele enrolar.
+                var (exit, _) = await RunProcessCaptured("mountvol", $"{drive} /S", 10000);
                 if (exit != 0) continue;
 
                 if (Directory.Exists($"{drive}\\EFI"))
@@ -144,33 +165,20 @@ menuentry ""EFI Shell"" {{
             return null;
         }
 
-        internal static async Task DismountEspAsync(string drive)
+        public static async Task DismountEspAsync(string drive)
         {
             await RunProcessCaptured("mountvol", $"{drive} /D");
         }
 
-        public static string? MountEspSync()
+        private static async Task<(int ExitCode, string Output)> RunProcessCaptured(string filename, string args, int timeoutMs = 60000)
         {
-            for (char letter = 'S'; letter <= 'Z'; letter++)
-            {
-                string drive = $"{letter}:";
-                try { if (new DriveInfo(drive).IsReady) continue; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-
-                var psi = new System.Diagnostics.ProcessStartInfo("mountvol", $"{drive} /S")
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var proc = System.Diagnostics.Process.Start(psi);
-                proc?.WaitForExit(10000);
-
-                if (Directory.Exists($"{drive}\\EFI"))
-                    return drive;
-            }
-            return null;
+            // Task.Run obrigatorio: o corpo e 100% sincrono (WaitForExit + WaitOne) e o metodo
+            // nao tinha NENHUM await - um async sem await roda inteiro na thread do chamador,
+            // ou seja, o await MountEspAsync() continuaria congelando a UI ate o timeout.
+            return await Task.Run(() => RunProcessCapturedSync(filename, args, timeoutMs));
         }
 
-        private static async Task<(int ExitCode, string Output)> RunProcessCaptured(string filename, string args, int timeoutMs = 60000)
+        private static (int ExitCode, string Output) RunProcessCapturedSync(string filename, string args, int timeoutMs)
         {
             try
             {

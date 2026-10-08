@@ -421,11 +421,11 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <controls:InfoButton Grid.Column="0" ToolTipText="ISLC (Intelligent Standby List Cleaner) - WagnardSoft. Limpa a Standby List (cache do Windows) quando ela fica grande demais. Threshold automático: TotalRAM/8 (8GB=1024MB, 16GB=2048MB, 32GB=4096MB). Em jogos, a Standby List fica cheia de dados de niveis antigos. Quando o jogo precisa carregar mapa novo, o Windows precisa decidir QUEM remover - isso causa micro-stuttering e freezes. O ISLC limpa isso ANTES de acontecer. Não fecha nenhum processo. Jogos: GTA V, RDR2, Cyberpunk 2077, Tarkov, Star Citizen, CoD"/>
+                    <controls:InfoButton Grid.Column="0" ToolTipText="ISLC (Intelligent Standby List Cleaner) - WagnardSoft. Limpa a Standby List (cache do Windows) quando ela fica grande demais. Threshold automático: TotalRAM/8 (8GB=1024MB, 16GB=2048MB, 32GB=4096MB). Em jogos, a Standby List fica cheia de dados de niveis antigos. Quando o jogo precisa carregar mapa novo, o Windows precisa decidir QUEM remover - isso causa micro-stuttering e freezes. O ISLC limpa isso ANTES de acontecer. Não fecha nenhum processo. Jogos: GTA V, RDR2, Cyberpunk 2077, Tarkov, Star Citizen, CoD&#x0a;&#x0a;QUANDO AJUDA: stutter que PIORA com o tempo jogado (30+ min) + standby gigante + RAM livre baixa. Caso clássico: 16 GB de RAM. Com 32 GB+ quase nunca precisa - só em extremo.&#x0a;&#x0a;QUANDO PREJUDICA: thresholds agressivos (limpando toda hora). A própria limpeza causa stutter, apps recarregam do disco (mais lento que o cache) e o PC fora de jogos fica mais lento. Regra: se ligou e piorou, DESLIGUE - o Windows gerencia bem sozinho na maioria dos casos.&#x0a;&#x0a;COMO TESTAR: jogue 1h com desligado (anote o stutter), depois 1h com ligado. Melhorou? Mantenha. Igual ou pior? Desligue."/>
 
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="Limpeza Inteligente de Standby (ISLC)" FontSize="15" Foreground="White"/>
-                        <TextBlock x:Name="TxtIslcDescription" Text="Threshold auto-calculado. Reduz stuttering e freezes em jogos." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
+                        <TextBlock Text="Limpeza Inteligente de Standby (ISLC)" FontSize="15" Foreground="White" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="TxtIslcDescription" Text="Threshold auto-calculado. Reduz stuttering e freezes em jogos." FontSize="12" Foreground="#808080" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <Border x:Name="IslcStatusBadge" Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#1A3020" BorderBrush="#308050" BorderThickness="1" Margin="0,0,15,0">
@@ -447,33 +447,30 @@
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0" Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x1F4BE; LIMITADOR DE RAM POR PROCESSO"
-                                           FontSize="12" FontWeight="Bold" Foreground="#666"/>
-                                <Border Background="#3a86ff" CornerRadius="4" Padding="6,1" Margin="8,1,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="v2" FontSize="9" FontWeight="Bold" Foreground="White"/>
-                                </Border>
-                            </StackPanel>
-                            <TextBlock Text="Monitora e limita o uso de RAM de apps espec&#xED;ficos. Igual ao Firemin."
-                                       FontSize="11" Foreground="#555" Margin="0,3,0,0"/>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="&#x1F4BE; LIMITADOR DE RAM POR PROCESSO"
+                                       FontSize="12" FontWeight="Bold" Foreground="#666"
+                                       FontFamily="Segoe UI Emoji, Segoe UI"/>
+                            <Border Background="#3a86ff" CornerRadius="4" Padding="6,1" Margin="8,1,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="v2" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                            </Border>
+                            <controls:InfoButton Margin="8,0,0,0" VerticalAlignment="Center" ToolTipText="COMO FUNCIONA (2 modos — o botão ⚡/🧠 de cada linha alterna):&#x0a;&#x0a;⚡ DIRETO (padrão, estilo Firemin): passou do valor, o Kit esvazia a RAM do processo na hora. Simples e obediente: 200 MB é 200 MB. Use este na maioria dos casos.&#x0a;&#x0a;🧠 GOVERNADOR: com verificações. Só esvazia app quieto; se o app está em uso, espera; se der avalanche de page faults, pausa sozinho (⛈ backoff) e tenta depois. Use este SE o Direto causar engasgos (ex.: áudio cortando, micro-travadas ao voltar ao app).&#x0a;&#x0a;Nos dois modos o Kit nunca mexe na janela em foco. A linha mostra o estado: VERY_LOW (descarte preferencial), faults/s, backoff e commit."/>
                         </StackPanel>
-
-                        <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                    VerticalAlignment="Center" Margin="0,0,8,0">
+                        <TextBlock Grid.Row="1" Text="Monitora e limita o uso de RAM de apps específicos. Igual ao Firemin."
+                                   FontSize="11" Foreground="#555" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                        <WrapPanel Grid.Row="2" Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="Intervalo:" FontSize="11" Foreground="#666"
                                        VerticalAlignment="Center" Margin="0,0,5,0"/>
                             <TextBox x:Name="TxtRamLimiterInterval" Width="55" Text="3000"
                                      Background="#252525" Foreground="White"
                                      BorderBrush="#444" BorderThickness="1"
                                      Padding="5,4" FontSize="11" VerticalAlignment="Center"
-                                     ToolTip="Intervalo em ms entre verifica&#xE7;&#xF5;es (500-30000ms). Menor = mais agressivo."
+                                     ToolTip="Intervalo em ms entre verificações (500-30000ms). Menor = mais agressivo."
                                      LostFocus="TxtRamLimiterInterval_LostFocus"/>
                             <TextBlock Text="ms" FontSize="11" Foreground="#555"
                                        VerticalAlignment="Center" Margin="4,0,0,0"/>
@@ -487,18 +484,17 @@
                                      LostFocus="TxtKitMemoryLimit_LostFocus"/>
                             <TextBlock Text="MB" FontSize="11" Foreground="#555"
                                        VerticalAlignment="Center" Margin="4,0,0,0"/>
-                        </StackPanel>
-
-                        <Button Grid.Column="2" Content="&#x1F4C1; Adicionar por Arquivo"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Height="32" FontSize="11" Padding="10,0" Margin="0,0,6,0"
-                                ToolTip="Selecionar execut&#xE1;vel manualmente"
-                                Click="BtnAddByFile_Click"/>
-                        <Button Grid.Column="3" Content="&#x26A1; Selecionar Processo"
-                                Style="{StaticResource GoldButtonStyle}"
-                                Height="32" FontSize="11" Padding="10,0"
-                                ToolTip="Abre lista de processos rodando para selecionar"
-                                Click="BtnOpenProcessPicker_Click"/>
+                            <Button Content="&#x1F4C1; Adicionar por Arquivo"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Height="32" FontSize="11" Padding="10,0" Margin="12,4,6,0"
+                                    ToolTip="Selecionar executável manualmente"
+                                    Click="BtnAddByFile_Click"/>
+                            <Button Content="&#x26A1; Selecionar Processo"
+                                    Style="{StaticResource GoldButtonStyle}"
+                                    Height="32" FontSize="11" Padding="10,0" Margin="0,4,0,0"
+                                    ToolTip="Abre lista de processos rodando para selecionar"
+                                    Click="BtnOpenProcessPicker_Click"/>
+                        </WrapPanel>
                     </Grid>
 
                     <Grid Grid.Row="1" Margin="0,0,0,8">

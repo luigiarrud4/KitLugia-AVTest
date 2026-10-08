@@ -57,23 +57,6 @@ namespace KitLugia.Core.TaskManager
             return _nativeAvailable.Value;
         }
 
-        public static string GetProcessPath(int pid)
-        {
-            if (!IsNativeAvailable()) return GetProcessPathFallback(pid);
-            if (pid <= 4) return "";
-            const int cap = 1024;
-            var buf = Marshal.AllocHGlobal(cap * sizeof(char));
-            try
-            {
-                int len = get_process_path_safe((uint)pid, buf, cap);
-                // FIX: se len >= cap, houve truncamento/estouro; descarta
-                if (len <= 0 || len >= cap) return "";
-                return Marshal.PtrToStringUni(buf, len) ?? "";
-            }
-            catch { return ""; }
-            finally { Marshal.FreeHGlobal(buf); }
-        }
-
         public static Dictionary<int, string> GetProcessPathsBatch(IEnumerable<int> pids)
         {
             var result = new Dictionary<int, string>();
@@ -213,15 +196,6 @@ namespace KitLugia.Core.TaskManager
                 finally { Marshal.FreeHGlobal(buf); }
             }
             return null;
-        }
-
-        /// <summary>
-        /// Stackalloc-friendly single-path fetch that avoids heap alloc (for hot loops).
-        /// Uses native buffer on heap but minimized; fallback uses OpenProcess.
-        /// </summary>
-        public static string GetProcessPathFast(int pid)
-        {
-            return GetProcessPath(pid);
         }
     }
 }

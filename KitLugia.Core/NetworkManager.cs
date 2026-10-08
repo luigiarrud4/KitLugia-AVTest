@@ -288,42 +288,44 @@ namespace KitLugia.Core
                 return congestionProvider?.ToLower() == "ctcp";
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Verifica se Interrupt Moderation está desabilitado (otimizado para gaming).
-        /// Verifica registry de adaptadores físicos com IP configurado.
-        /// Usa RegistryKey.OpenBaseKey com RegistryView.Registry64 para acesso correto
+        /// Local CORRETO: class key do driver (Control\Class\{4d36e972...}\NNN) — é onde o
+        /// Gerenciador de Dispositivos lê *InterruptModeration. O leitor antigo só olhava
+        /// Tcpip\Parameters\Interfaces (local que o driver NÃO lê e que o código antigo
+        /// escrevia = placebo; 0 ocorrências naturais no registro).
         /// </summary>
         public static bool IsInterruptModerationDisabled()
         {
             try
             {
-
                 using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                using var tcpipKey = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", false);
-                if (tcpipKey == null)
-                    return false;
 
-                using var interfacesKey = tcpipKey.OpenSubKey("Interfaces", false);
-                if (interfacesKey == null)
-                    return false;
-
-                foreach (string subKeyName in interfacesKey.GetSubKeyNames())
+                // 1) Class key (onde o driver realmente lê)
+                using var classKey = localMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}", false);
+                if (classKey != null)
                 {
-                    using var subKey = interfacesKey.OpenSubKey(subKeyName, false);
-                    if (subKey == null)
-                        continue;
-
-
-                    var ipAddress = subKey.GetValue("IPAddress");
-                    var dhcpIpAddress = subKey.GetValue("DhcpIPAddress");
-
-                    if (ipAddress != null || dhcpIpAddress != null)
+                    foreach (string subKeyName in classKey.GetSubKeyNames())
                     {
-                        // Esta interface tem IP configurado, verificar Interrupt Moderation
-                        var interruptModeration = subKey.GetValue("*InterruptModeration");
-                        if (interruptModeration?.ToString() == "0")
+                        if (!int.TryParse(subKeyName, out _)) continue;
+                        using var adapterKey = classKey.OpenSubKey(subKeyName, false);
+                        if (adapterKey == null) continue;
+                        if (adapterKey.GetValue("*InterruptModeration")?.ToString() == "0")
+                            return true;
+                    }
+                }
+
+                // 2) Legado: versões antigas gravavam em Tcpip\Parameters\Interfaces —
+                //    mantido só para não exibir "Padrão" para quem aplicou com a versão antiga.
+                using var tcpipKey = localMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", false);
+                using var interfacesKey = tcpipKey?.OpenSubKey("Interfaces", false);
+                if (interfacesKey != null)
+                {
+                    foreach (string subKeyName in interfacesKey.GetSubKeyNames())
+                    {
+                        using var subKey = interfacesKey.OpenSubKey(subKeyName, false);
+                        if (subKey?.GetValue("*InterruptModeration")?.ToString() == "0")
                             return true;
                     }
                 }
@@ -560,68 +562,56 @@ namespace KitLugia.Core
 
         /// <summary>
         /// Identifica o adaptador físico com maior uso de dados (bytes enviados + recebidos).
-        /// Retorna o nome do adaptador físico com maior tráfego.
-        /// Apenas adaptadores físicos (Ethernet e WiFi) são considerados.
+        /// Implementação .NET pura (NetworkInterface) — a versão anterior spawnava PowerShell,
+        /// parseava CSV com split de aspas e detectava erro por substring ("error"/"erro"),
+        /// quebrando com idioma/encoding e custando ~1-2s no load da página.
         /// </summary>
         public static (string AdapterName, string AdapterType, string Description, string AdapterGuid) GetAdapterWithHighestUsage()
         {
             try
             {
-
-                var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                // Mesmo recorte de "físico" do GetActiveDnsInfo + marcas de VPNs/soft-bridges
+                // que o antigo `Get-NetAdapter -Physical` excluía.
+                string[] virtualKeywords =
                 {
-                    FileName = "powershell",
-                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"$adapters = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' }; $maxUsage = 0; $maxAdapter = $null; foreach ($adapter in $adapters) { $stats = Get-NetAdapterStatistics -Name $adapter.Name -ErrorAction SilentlyContinue; $usage = if ($stats) { $stats.ReceivedBytes + $stats.SentBytes } else { 0 }; if ($usage -gt $maxUsage) { $maxUsage = $usage; $maxAdapter = $adapter } }; if ($maxAdapter) { Write-Output $maxAdapter.Name; Write-Output $maxAdapter.InterfaceDescription; Write-Output $maxAdapter.PhysicalMediaType; Write-Output $maxAdapter.InterfaceGuid }\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = System.Text.Encoding.UTF8,
-                    StandardErrorEncoding = System.Text.Encoding.UTF8
-                });
+                    "virtual", "vpn", "loopback", "tap", "tun", "wintun", "wireguard",
+                    "zerotier", "radmin", "tailscale", "hyper-v", "vmware", "vbox",
+                    "vethernet", "wsl", "docker", "bluetooth", "wan miniport"
+                };
 
-                if (process != null)
+                var candidates = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(i => i.OperationalStatus == OperationalStatus.Up &&
+                                (i.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
+                                 i.NetworkInterfaceType == NetworkInterfaceType.Wireless80211) &&
+                                !virtualKeywords.Any(k => i.Description.Contains(k, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                // Preferência: interfaces com gateway (conectividade real) — igual ao filtro antigo
+                // Where-Object { $_.Status -eq 'Up' } + quem de fato roteia tráfego.
+                var withGateway = candidates.Where(i =>
                 {
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
+                    try { return i.GetIPProperties().GatewayAddresses.Any(); }
+                    catch { return false; }
+                }).ToList();
 
-                    if (!string.IsNullOrWhiteSpace(output) && !output.Contains("error") && !output.ToLower().Contains("erro"))
-                    {
-                        var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                var pool = withGateway.Count > 0 ? withGateway : candidates;
+                if (pool.Count == 0)
+                    return ("Desconhecido", "Desconhecido", "Não foi possível detectar adaptador", "");
 
-                        string name = "Desconhecido";
-                        string description = "Adaptador desconhecido";
-                        string mediaType = "";
-                        string guid = "";
-
-                        if (lines.Length >= 4)
-                        {
-                            name = lines[0].Trim();
-                            description = lines[1].Trim();
-                            mediaType = lines[2].Trim();
-                            guid = lines[3].Trim();
-
-
-                            guid = System.Text.RegularExpressions.Regex.Replace(guid, @"[^0-9a-fA-F-]", "");
-                            if (guid.Length != 36 || !guid.Contains('-'))
-                            {
-                                guid = "";
-                            }
-                        }
-
-                        // Determina tipo do adaptador
-                        string adapterType = "Ethernet";
-                        if (mediaType.Contains("802.11") || name.ToLower().Contains("wi-fi") || name.ToLower().Contains("wlan"))
-                        {
-                            adapterType = "WiFi";
-                        }
-
-                        return (name, adapterType, description, guid);
-                    }
+                static long Usage(NetworkInterface ni)
+                {
+                    try { var s = ni.GetIPv4Statistics(); return s.BytesReceived + s.BytesSent; }
+                    catch { return -1; }
                 }
 
-                return ("Desconhecido", "Desconhecido", "Não foi possível detectar adaptador", "");
+                var best = pool.OrderByDescending(Usage).First();
+                string adapterType = best.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? "WiFi" : "Ethernet";
+
+                // Id de adaptadores físicos no Windows = GUID da interface (NetCfgInstanceId)
+                var guid = best.Id.Trim('{', '}');
+                if (!guid.Contains('-')) guid = "";
+
+                return (best.Name, adapterType, best.Description, guid);
             }
             catch (Exception ex)
             {
@@ -766,33 +756,101 @@ namespace KitLugia.Core
         // =========================================================
 
         /// <summary>
-        /// Limpeza segura de rede — não altera configurações permanentes do PC.
-        /// Limpa cache DNS, Winsock, TCP/IP, ARP, proxy, certificados SSL e credenciais de rede.
+        /// Limpeza segura de rede (Winsock/TCP-IP/ARP/proxy/SSL/credenciais).
+        /// Requer admin — sem elevação, o netsh falha silenciosamente e a UI antiga
+        /// mostrava ✓ mesmo sem limpar nada. Etapas bem-comportadas (netsh/ipconfig)
+        /// são verificadas por exit code; arp/cmdkey/certutil ficam lenientes (alguns
+        /// retornam código não-zero em situações legítimas).
         /// </summary>
-        public static string CleanNetworkSafe()
+        public static (bool Success, string Message) CleanNetworkSafe()
         {
+            if (!SystemUtils.IsAdmin())
+                return (false, "Acesso Negado!\nExecute como Administrador — netsh/winsock exigem elevação.");
+
             var steps = new List<string>();
+            int failed = 0;
 
-            try { SystemUtils.RunExternalProcess("ipconfig", "/flushdns", hidden: true); steps.Add("Cache DNS limpo"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { SystemUtils.RunExternalProcess("netsh", "winsock reset", hidden: true); steps.Add("Winsock resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { SystemUtils.RunExternalProcess("netsh", "int ip reset", hidden: true); steps.Add("TCP/IP resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { SystemUtils.RunExternalProcess("arp", "-d *", hidden: true); steps.Add("Tabela ARP esvaziada"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { SystemUtils.RunExternalProcess("netsh", "winhttp reset proxy", hidden: true); steps.Add("Proxy winhttp resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { SystemUtils.RunExternalProcess("cmdkey", "/list", hidden: true); SystemUtils.RunExternalProcess("cmdkey", "/delete:*", hidden: true); steps.Add("Credenciais de rede limpas"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { SystemUtils.RunExternalProcess("certutil", "-urlcache * delete", hidden: true); steps.Add("Cache SSL limpo"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            void Checked(string label, string file, string args)
+            {
+                try
+                {
+                    var (exitCode, output) = SystemUtils.RunExternalProcessWithCode(file, args, hidden: true);
+                    if (exitCode == 0) { steps.Add($"✓ {label}"); }
+                    else
+                    {
+                        failed++;
+                        steps.Add($"✗ {label} (código {exitCode})");
+                        Logger.Log($"[NETWORK] Limpeza - {label} falhou ({exitCode}): {output.Trim()}");
+                    }
+                }
+                catch { failed++; steps.Add($"✗ {label} (exceção)"); Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
 
-            return "✓ " + string.Join("\n✓ ", steps);
+            void Lenient(string label, string file, string args)
+            {
+                try { SystemUtils.RunExternalProcess(file, args, hidden: true); steps.Add($"✓ {label}"); }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); steps.Add($"? {label} (sem confirmação)"); }
+            }
+
+            Checked("Cache DNS limpo", "ipconfig", "/flushdns");
+            Checked("Winsock resetado", "netsh", "winsock reset");
+            Checked("TCP/IP resetado", "netsh", "int ip reset");
+            Lenient("Tabela ARP esvaziada", "arp", "-d *");
+            Checked("Proxy winhttp resetado", "netsh", "winhttp reset proxy");
+            Lenient("Credenciais de rede limpas", "cmdkey", "/delete:*");
+            Lenient("Cache SSL limpo", "certutil", "-urlcache * delete");
+
+            string message = string.Join("\n", steps) +
+                (failed == 0
+                    ? "\n\nReinicie o PC para efeito completo (Winsock/TCP-IP)."
+                    : $"\n\n{failed} etapa(s) falharam — verifique o log.");
+            return (failed == 0, message);
         }
 
-        public static string CleanNetworkFull()
+        /// <summary>Limpeza segura + reset completo do firewall (perde regras personalizadas).</summary>
+        public static (bool Success, string Message) CleanNetworkFull()
         {
-            var safe = CleanNetworkSafe();
-            var steps = new List<string>(safe.Split('\n').Select(l => l.TrimStart('✓', ' ')).Where(l => l.Length > 0));
+            if (!SystemUtils.IsAdmin())
+                return (false, "Acesso Negado!\nExecute como Administrador — netsh/advfirewall exigem elevação.");
 
-            try { SystemUtils.RunExternalProcess("netsh", "advfirewall reset", hidden: true); steps.Add("Firewall resetado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try { SystemUtils.RunExternalProcess("netsh", "advfirewall set allprofiles state on", hidden: true); steps.Add("Firewall reativado"); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            var (_, safeMsg) = CleanNetworkSafe();
+            var steps = new List<string>(safeMsg.Split('\n'));
 
-            return "✓ " + string.Join("\n✓ ", steps);
+            // Remove a nota final / linhas vazias da limpeza segura para não duplicar
+            while (steps.Count > 0)
+            {
+                var last = steps[^1];
+                if (last.Length == 0 || last.StartsWith("Reinicie") || last.Contains("etapa(s)"))
+                    steps.RemoveAt(steps.Count - 1);
+                else
+                    break;
+            }
+            int failed = steps.Count(s => s.StartsWith("✗"));
+
+            void Checked(string label, string args)
+            {
+                try
+                {
+                    var (exitCode, output) = SystemUtils.RunExternalProcessWithCode("netsh", args, hidden: true);
+                    if (exitCode == 0) { steps.Add($"✓ {label}"); }
+                    else
+                    {
+                        failed++;
+                        steps.Add($"✗ {label} (código {exitCode})");
+                        Logger.Log($"[NETWORK] Limpeza completa - {label} falhou ({exitCode}): {output.Trim()}");
+                    }
+                }
+                catch { failed++; steps.Add($"✗ {label} (exceção)"); Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+
+            Checked("Firewall resetado", "advfirewall reset");
+            Checked("Firewall reativado", "advfirewall set allprofiles state on");
+
+            string message = string.Join("\n", steps) +
+                (failed == 0
+                    ? "\n\nReinicie o PC para efeito completo (Winsock/TCP-IP/firewall)."
+                    : $"\n\n{failed} etapa(s) falharam — verifique o log.");
+            return (failed == 0, message);
         }
     }
 }

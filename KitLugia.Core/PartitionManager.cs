@@ -40,6 +40,19 @@ namespace KitLugia.Core
 
         public static string GetSessionLog() => string.Join("\n", _logBuffer);
 
+        /// <summary>
+        /// Motivo REAL da ultima operacao que falhou. A UI mostra este texto em vez do generico
+        /// "Nao foi possivel estender" — sem isso o usuario nao descobre que era BitLocker,
+        /// espaco nao contiguo, limite real de reducao ou o diskpart devolvendo OK sem fazer nada.
+        /// </summary>
+        public static string LastError { get; private set; } = "";
+
+        private static string SetError(string? message)
+        {
+            LastError = string.IsNullOrWhiteSpace(message) ? "" : message.Trim();
+            return LastError;
+        }
+
         private static string NormalizeLetter(string letter)
         {
             letter = (letter ?? string.Empty).Trim();
@@ -92,6 +105,18 @@ namespace KitLugia.Core
                 var disks = GetAllDisksStorageApi();
                 sw.Stop();
                 Logger.Log($"[DISK] GetAllDisks: caminho STORAGE API (MSFT_*) - {disks.Count} disco(s) em {sw.ElapsedMilliseconds} ms");
+                // A Storage API pode voltar "com sucesso" mas SEM partições (ex.: MSFT_Partition
+                // negado via DCOM para token não elevado, enquanto o MSFT_Disk passa). Disco sem
+                // partição real é inútil para as páginas — cai no legado em vez de mostrar
+                // "Não Alocado" do tamanho do disco inteiro.
+                if (disks.Count > 0 && disks.All(d => d.Partitions.All(p => p.IsUnallocated)))
+                {
+                    Log("Storage API voltou sem partições reais — usando fallback legado (Win32_*).");
+                    var legacy = GetAllDisksLegacy();
+                    sw.Stop();
+                    Logger.Log($"[DISK] GetAllDisks: caminho LEGADO (Win32_*) - {legacy.Count} disco(s) em {sw.ElapsedMilliseconds} ms");
+                    return legacy;
+                }
                 return disks;
             }
             catch (Exception ex)
@@ -209,6 +234,8 @@ namespace KitLugia.Core
 
             if (disks.Count == 0)
                 throw new InvalidOperationException("Nenhum disco físico detectado via IOCTL nativo");
+            if (disks.All(d => d.Partitions.All(p => p.IsUnallocated)))
+                throw new InvalidOperationException("IOCTL nativo sem permissão de leitura de layout (sem admin?): nenhum disco trouxe partições reais — caindo no fallback");
             swTotal.Stop();
             Logger.Log($"[DISK]  Enumeracao nativa total (volumes+boot+layout): {swTotal.ElapsedMilliseconds} ms");
             return disks.OrderBy(d => d.Index).ToList();
@@ -534,14 +561,66 @@ namespace KitLugia.Core
         }
 
         // --- RESIZE (SHRINK) PARTITION ---
+        /// <summary>
+        /// Reduz a particao. Escada: (1) Storage Management API (MSFT_Partition.Resize — oficial do
+        /// Windows, sem diskpart), (2) diskpart. Antes valida o limite REAL (GetSupportedSize),
+        /// que e o unico numero confiavel de "quanto da para tirar" (arquivos imoveis, hiberfil,
+        /// pagefile e shadow copies no fim do volume cortam a reducao).
+        /// </summary>
         public static async Task<bool> ShrinkPartition(uint diskIndex, uint partitionIndex, string driveLetter, int shrinkMb, Action<double, string>? progressCallback = null)
         {
+            string letter = NormalizeLetter(driveLetter).ToUpperInvariant();
+            SetError("");
             Log($"Reduzindo Partição {partitionIndex} em {shrinkMb} MB...");
 
+            long before = GetVolumeSizeBytes(letter);
+            var reasons = new List<string>();
+
+            // (1) Storage Management API
+            progressCallback?.Invoke(5, "Consultando limite real de redução...");
+            var limits = GetPartitionSizeLimits(string.IsNullOrEmpty(letter) ? '?' : letter[0]);
+
+            if (limits.ReturnCode == 0 && limits.Size > 0)
+            {
+                long maxShrinkMb = (long)((limits.Size - limits.SizeMin) / (1024UL * 1024UL));
+                ulong wantBytes = before > 0
+                    ? (ulong)Math.Max(0L, before - (long)shrinkMb * 1024 * 1024)
+                    : (ulong)Math.Max(0L, (long)limits.Size - (long)shrinkMb * 1024 * 1024);
+
+                if (wantBytes < limits.SizeMin)
+                {
+                    SetError($"Limite real de redução em {(string.IsNullOrEmpty(letter) ? "?" : letter + ":")}: {maxShrinkMb} MB (você pediu {shrinkMb} MB). " +
+                             "O que ocupa o fim do volume não sai do lugar: hiberfil.sys, pagefile, shadow copies ou arquivos imóveis. " +
+                             "Soluções: desative a hibernação (powercfg /h off), mova o pagefile, ou use 'Emergency Pre-Boot' (WinPE).");
+                    Log($"[SHRINK] Abortado: {shrinkMb} MB > maximo real {maxShrinkMb} MB (Size={limits.Size} SizeMin={limits.SizeMin})");
+                    progressCallback?.Invoke(-1, SetError(""));
+                    return false;
+                }
+
+                progressCallback?.Invoke(30, "Reduzindo via Storage API...");
+                uint rc = ResizeStoragePartition(letter[0], wantBytes);
+                long after = GetVolumeSizeBytes(letter);
+
+                if (rc == 0 && after > 0 && before > 0 && after < before)
+                {
+                    Log($"✅ Reduzido via Storage API em {before / 1048576} MB -> {after / 1048576} MB");
+                    progressCallback?.Invoke(100, $"Reduzido para {after / 1048576} MB");
+                    return true;
+                }
+
+                reasons.Add(rc == 0
+                    ? "a Storage API respondeu OK, mas o volume não diminuiu"
+                    : $"Storage API: {GetStorageErrorMessage(rc)}");
+                progressCallback?.Invoke(45, $"Storage API recusou. Tentando diskpart...");
+            }
+            else
+            {
+                reasons.Add($"Storage API indisponível (rc={limits.ReturnCode}: {limits.ErrorMessage})");
+            }
+
+            // (2) diskpart
             await EnsureVds();
 
-
-            // Típico: 5-10 linhas de script diskpart
             StringBuilder script = new StringBuilder(256);
             script.AppendLine("rescan");
             if (!string.IsNullOrEmpty(driveLetter))
@@ -556,7 +635,34 @@ namespace KitLugia.Core
             script.AppendLine($"shrink desired={shrinkMb}");
             script.AppendLine("exit");
 
-            return await RunDiskpartScript(script.ToString(), "shrink", progressCallback);
+            // Retry estilo EaseUS (CAsynLockVolume): repete 1x após 3 s somente quando a
+            // medição prova que nada mudou (sem efeito parcial — shrink parcial + repetição
+            // encolheria 2x, por isso o gate é pela medição).
+            bool ok;
+            {
+                var (ok2, _) = await RunDiskpartWithRetryAsync(
+                    script.ToString(), "shrink", () => GetVolumeSizeBytes(letter), before, progressCallback);
+                ok = ok2;
+            }
+
+            // VERIFICAÇÃO PÓS-OPERAÇÃO: o diskpart devolve exit 0 em vários cenários de falha.
+            long afterDp = GetVolumeSizeBytes(letter);
+            if (ok && before > 0 && afterDp > 0 && afterDp >= before)
+            {
+                SetError($"diskpart retornou OK, mas o volume NÃO diminuiu (antes {before / 1048576} MB, depois {afterDp / 1048576} MB). Motivos comuns: " +
+                         "arquivos imóveis no fim do volume, pagefile/hiberfil.sys ou shadow copies. Use 'Emergency Pre-Boot' (WinPE).");
+                Log($"[SHRINK] diskpart exit=0 sem efeito real: {before} -> {afterDp}");
+                return false;
+            }
+
+            if (!ok)
+            {
+                var extra = string.Join("; ", reasons);
+                if (!string.IsNullOrEmpty(extra) && string.IsNullOrEmpty(LastError))
+                    SetError($"Falha na redução ({extra}).");
+            }
+
+            return ok;
         }
 
         /// <summary>
@@ -567,38 +673,9 @@ namespace KitLugia.Core
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                var task = Task.Run(() =>
-                {
-                    var session = new ManagementScope(@"\\.\ROOT\Microsoft\Windows\Storage");
-                    session.Connect();
-
-                    var partitionQuery = new ObjectQuery($"SELECT * FROM MSFT_Partition WHERE DriveLetter = '{driveLetter}'");
-                    using var searcher = new ManagementObjectSearcher(session, partitionQuery);
-                    using var partitions = searcher.Get();
-
-                    foreach (ManagementObject partition in partitions)
-                    {
-                        using (partition)
-                        {
-                            object[] methodArgs = { null!, null!, null! };
-                            var result = partition.InvokeMethod("GetSupportedSize", methodArgs);
-                            uint returnCode = Convert.ToUInt32(result);
-
-                            if (returnCode != 0)
-                            {
-                                string errorMsg = GetStorageErrorMessage(returnCode);
-                                return (0UL, 0UL, returnCode, errorMsg);
-                            }
-
-                            ulong sizeMin = Convert.ToUInt64(methodArgs[0]);
-                            ulong sizeMax = Convert.ToUInt64(methodArgs[1]);
-                            return (sizeMin, sizeMax, returnCode, "");
-                        }
-                    }
-
-                    return (0UL, 0UL, 999u, "Partição não encontrada");
-                });
-                return await task.WaitAsync(cts.Token);
+                var task = Task.Run(() => GetPartitionSizeLimits(driveLetter));
+                var limits = await task.WaitAsync(cts.Token);
+                return (limits.SizeMin, limits.SizeMax, limits.ReturnCode, limits.ErrorMessage);
             }
             catch (OperationCanceledException)
             {
@@ -609,6 +686,341 @@ namespace KitLugia.Core
             {
                 return (0, 0, 999, $"Exceção: {ex.Message}");
             }
+        }
+
+        // --- HELPERS: tamanho real, limites via Storage API, diagnóstico ---
+
+        /// <summary>Tamanho real do volume em bytes (0 se inacessível/sem letra).</summary>
+        private static long GetVolumeSizeBytes(string letter)
+        {
+            string l = NormalizeLetter(letter);
+            if (string.IsNullOrWhiteSpace(l)) return 0;
+            try
+            {
+                var d = new DriveInfo($"{l[0]}:\\");
+                return d.IsReady ? d.TotalSize : 0;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>Tamanho atual + limites de redimensionamento reportedos pela Storage API.</summary>
+        public sealed class PartitionSizeLimits
+        {
+            public ulong Size { get; init; }      // tamanho atual da partição (bytes)
+            public ulong SizeMin { get; init; }   // menor tamanho possível (limite de redução)
+            public ulong SizeMax { get; init; }   // maior tamanho possível (limite de extensão)
+            public uint ReturnCode { get; init; } // 0 = ok
+            public string ErrorMessage { get; init; } = "";
+        }
+
+        /// <summary>
+        /// MSFT_Partition.GetSupportedSize: numero EXATO e instantaneo de quanto da para
+        /// estender/reduzir (e o mesmo que o Gerenciador de Discos mostra). Sem spawn de diskpart.
+        /// </summary>
+        public static PartitionSizeLimits GetPartitionSizeLimits(char driveLetter)
+        {
+            if (!char.IsLetter(driveLetter))
+                return new PartitionSizeLimits { ReturnCode = 5, ErrorMessage = "Letra de unidade inválida" };
+
+            try
+            {
+                var session = new ManagementScope(StorageScopePath);
+                session.Connect();
+
+                var query = new ObjectQuery($"SELECT * FROM MSFT_Partition WHERE DriveLetter = '{char.ToUpperInvariant(driveLetter)}'");
+                using var searcher = new ManagementObjectSearcher(session, query);
+                using var parts = searcher.Get();
+
+                foreach (ManagementObject p in parts)
+                {
+                    using (p)
+                    {
+                        ulong size = Convert.ToUInt64(p["Size"] ?? 0UL);
+                        object[] methodArgs = { null!, null!, null! };
+                        uint rc = Convert.ToUInt32(p.InvokeMethod("GetSupportedSize", methodArgs));
+                        if (rc != 0)
+                            return new PartitionSizeLimits { Size = size, ReturnCode = rc, ErrorMessage = GetStorageErrorMessage(rc) };
+
+                        return new PartitionSizeLimits
+                        {
+                            Size = size,
+                            SizeMin = Convert.ToUInt64(methodArgs[0]),
+                            SizeMax = Convert.ToUInt64(methodArgs[1]),
+                            ReturnCode = 0
+                        };
+                    }
+                }
+
+                return new PartitionSizeLimits { ReturnCode = 404, ErrorMessage = "Partição não encontrada" };
+            }
+            catch (Exception ex)
+            {
+                Log($"[STORAGE] GetSupportedSize falhou: {ex.Message}");
+                return new PartitionSizeLimits { ReturnCode = 999, ErrorMessage = ex.Message };
+            }
+        }
+
+        /// <summary>MSFT_Partition.Resize — redimensiona partição E sistema de arquivos de uma vez.</summary>
+        private static uint ResizeStoragePartition(char driveLetter, ulong newSizeBytes)
+        {
+            try
+            {
+                var session = new ManagementScope(StorageScopePath);
+                session.Connect();
+
+                var query = new ObjectQuery($"SELECT * FROM MSFT_Partition WHERE DriveLetter = '{char.ToUpperInvariant(driveLetter)}'");
+                using var searcher = new ManagementObjectSearcher(session, query);
+                using var parts = searcher.Get();
+
+                foreach (ManagementObject p in parts)
+                {
+                    using (p)
+                    {
+                        object[] methodArgs = { newSizeBytes, null! };
+                        return Convert.ToUInt32(p.InvokeMethod("Resize", methodArgs));
+                    }
+                }
+                return 404;
+            }
+            catch (Exception ex)
+            {
+                Log($"[STORAGE] Resize falhou: {ex.Message}");
+                return 999;
+            }
+        }
+
+        /// <summary>Espaço não alocado contíguo (encostado) à direita da partição.</summary>
+        private static ulong ContiguousFreeRight(DiskInfoEx disk, PartitionInfoEx part)
+        {
+            var ordered = disk.Partitions.OrderBy(p => p.StartingOffset).ToList();
+            int idx = ordered.FindIndex(p => p.StartingOffset == part.StartingOffset && p.Index == part.Index);
+            if (idx < 0) return 0;
+
+            ulong free = 0;
+            for (int i = idx + 1; i < ordered.Count; i++)
+            {
+                if (!ordered[i].IsUnallocated) break;   // partição real no meio = espaço não contíguo
+                free += ordered[i].Size;
+            }
+            return free;
+        }
+
+        /// <summary>
+        /// Estende 100% nativo (sem diskpart): IOCTL_DISK_GROW_PARTITION (amplia a partição no disco)
+        /// + FSCTL_EXTEND_VOLUME (NTFS/ReFS cresce online, sem lock/dismount do volume).
+        /// </summary>
+        private static (bool Ok, string Error) TryExtendNativeIoctl(string letter, uint diskIndex, uint partIndex, ulong targetBytes, long volumeBytes)
+        {
+            try
+            {
+                var disk = GetAllDisks().FirstOrDefault(d => d.Index == diskIndex);
+                var part = disk?.Partitions.FirstOrDefault(p => p.Index == partIndex && !p.IsUnallocated);
+                if (disk == null || part == null) return (false, "partição não encontrada na tabela do disco");
+
+                ulong freeRight = ContiguousFreeRight(disk, part);
+                ulong delta = targetBytes > 0 && volumeBytes > 0
+                    ? (ulong)Math.Max(0L, (long)targetBytes - volumeBytes)
+                    : freeRight;
+
+                if (delta == 0) return (false, "sem espaço contíguo à direita");
+
+                ulong newPartSize = part.Size + delta;
+                if (newPartSize > disk.Size) newPartSize = disk.Size;   // segurança contra estouro do disco
+
+                using var hDisk = NativeDiskIo.OpenDisk(diskIndex, write: true);
+                if (hDisk.IsInvalid) return (false, $"sem acesso a \\\\.\\PhysicalDrive{diskIndex} (err={Marshal.GetLastWin32Error()})");
+
+                if (!NativeDiskIo.GrowPartition(hDisk, part.StartingOffset, newPartSize - part.Size))
+                    return (false, $"IOCTL_DISK_GROW_PARTITION falhou (err={Marshal.GetLastWin32Error()})");
+
+                using var hVol = NativeDiskIo.OpenVolume(letter[0], write: true);
+                if (hVol.IsInvalid) return (false, $"sem acesso a \\\\.\\{letter}: (err={Marshal.GetLastWin32Error()})");
+
+                if (!NativeDiskIo.ExtendVolume(hVol, (long)(newPartSize - (ulong)Math.Max(0L, volumeBytes))))
+                    return (false, $"FSCTL_EXTEND_VOLUME falhou (err={Marshal.GetLastWin32Error()})");
+
+                return (true, "");
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
+        /// <summary>Quantos MB dá para ESTENDER (limite real, via Storage API; 0 se não souber).</summary>
+        public static async Task<long> GetMaxExtendMb(string driveLetter)
+        {
+            string letter = NormalizeLetter(driveLetter).ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(letter)) return 0;
+
+            await Task.CompletedTask;
+            var limits = GetPartitionSizeLimits(letter[0]);
+            if (limits.ReturnCode == 0 && limits.SizeMax > limits.Size)
+                return (long)((limits.SizeMax - limits.Size) / (1024UL * 1024UL));
+
+            // Sem Storage API: soma o não alocado contíguo pela tabela do disco.
+            try
+            {
+                var part = GetAllDisks()
+                    .SelectMany(d => d.Partitions)
+                    .FirstOrDefault(p => !p.IsUnallocated && p.DriveLetter.Equals(letter, StringComparison.OrdinalIgnoreCase));
+                if (part == null) return 0;
+
+                var disk = GetAllDisks().FirstOrDefault(d => d.Index == part.DiskIndex);
+                return disk == null ? 0 : (long)(ContiguousFreeRight(disk, part) / (1024UL * 1024UL));
+            }
+            catch { return 0; }
+        }
+
+        private static bool? _bitLockerSupported;
+
+        /// <summary>True se o volume está protegido por BitLocker (consulta somente-leitura, sem desabilitar nada).</summary>
+        private static bool IsBitLockerProtected(string letter)
+        {
+            string l = NormalizeLetter(letter).ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(l)) return false;
+            if (_bitLockerSupported == false) return false;
+
+            try
+            {
+                var scope = new ManagementScope(@"\\.\root\CIMV2\Security\Microsoft\VolumeEncryption");
+                scope.Connect();
+                var query = new ObjectQuery($"SELECT * FROM Win32_EncryptableVolume WHERE DriveLetter='{l}:'");
+                using var searcher = new ManagementObjectSearcher(scope, query);
+                using var vols = searcher.Get();
+
+                _bitLockerSupported = true;
+
+                foreach (ManagementObject v in vols)
+                {
+                    using (v)
+                    {
+                        object? ps = v["ProtectionStatus"];
+                        return ps != null && Convert.ToInt32(ps) == 1;   // 0=desligado 1=ligado 2=desconhecido
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Sem o provedor (BitLocker não instalado) a consulta sempre falha — testa 1x e desliga.
+                if (_bitLockerSupported == null)
+                {
+                    _bitLockerSupported = false;
+                    Log($"[BITLOCKER] provedor indisponível (BitLocker não instalado?): {ex.Message}");
+                }
+            }
+            return false;
+        }
+
+        /// <summary>True se existe pagefile configurado no volume.</summary>
+        private static bool HasPageFileOn(string letter)
+        {
+            string l = NormalizeLetter(letter).ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(l)) return false;
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management");
+                if (key?.GetValue("PagingFiles") is string[] files)
+                    return files.Any(f => f.Contains($"{l}:", StringComparison.OrdinalIgnoreCase));
+            }
+            catch { }
+            return false;
+        }
+
+        private static bool HasHiberFileOn(string letter)
+        {
+            string l = NormalizeLetter(letter).ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(l)) return false;
+            try { return File.Exists($"{l}:\\hiberfil.sys"); }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Diagnóstico ANTES de estender/reduzir: devolve o que BLOQUEIA a operação e o que apenas
+        /// AVISA (pagefile, BitLocker, hiberfil). É isso que a página mostra em vez de um
+        /// "não foi possível" depois de facturar erro.
+        /// </summary>
+        public static (List<string> Blockers, List<string> Warnings) GetResizeDiagnostics(PartitionInfoEx part, bool forExtend)
+        {
+            var blockers = new List<string>();
+            var warnings = new List<string>();
+            if (part == null) return (blockers, warnings);
+
+            string letter = NormalizeLetter(part.DriveLetter).ToUpperInvariant();
+            string alvo = string.IsNullOrEmpty(letter) ? "a partição selecionada" : $"{letter}:";
+
+            if (string.IsNullOrEmpty(letter))
+                blockers.Add($"{alvo} está sem letra de unidade — atribua uma letra primeiro.");
+
+            if (forExtend)
+            {
+                string fs = (part.FileSystem ?? string.Empty).ToUpperInvariant();
+                if (fs.Length > 0 && fs != "NTFS" && fs != "REFS" && fs != "RAW")
+                    blockers.Add($"{alvo} está em {fs}. Só NTFS/ReFS podem ser estendidos online (FAT32/exFAT não).");
+
+                var disk = GetAllDisks().FirstOrDefault(d => d.Index == part.DiskIndex);
+                ulong freeRight = disk == null ? 0 : ContiguousFreeRight(disk, part);
+                if (disk != null && freeRight == 0)
+                    blockers.Add($"{alvo} não tem espaço não alocado encostado à direita. O Windows só estende para o lado direito — " +
+                                 "se o espaço estiver no meio ou à esquerda, reduza/exclua a partição que está entre as duas.");
+
+                if (disk != null && disk.PartitionStyle == "MBR" && part.StartingOffset + part.Size + freeRight > 2UL * 1024 * 1024 * 1024)
+                    blockers.Add("Limite de 2 TB da tabela MBR: a extensão passaria de 2 TB. Converta o disco para GPT (disco vazio) ou reduza o alvo.");
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(letter))
+                {
+                    if (HasHiberFileOn(letter))
+                        warnings.Add($"Há hiberfil.sys no fim de {letter}: — ele trava a redução. Rode 'powercfg /h off' para liberar esse espaço.");
+                    if (HasPageFileOn(letter))
+                        warnings.Add($"Existe pagefile em {letter}: — mova-o para outro disco em 'Configurações advanced > Memória virtual' para liberar espaço no fim do volume.");
+                }
+            }
+
+            if (!string.IsNullOrEmpty(letter) && IsBitLockerProtected(letter))
+                warnings.Add($"{letter}: está protegido por BitLocker. Se o redimensionamento falhar, desbloqueie/suspenda a proteção antes.");
+
+            if (part.IsProtected)
+                warnings.Add($"{alvo} é partição de sistema/boot (proteção ativa) — operações podem exigir WinPE.");
+
+            return (blockers, warnings);
+        }
+
+        /// <summary>Offset de início da partição (necessário p/ achar a partição recriada depois de delete).</summary>
+        private static long GetPartitionOffset(uint diskIndex, uint partitionIndex)
+        {
+            try
+            {
+                var part = GetAllDisks()
+                    .FirstOrDefault(d => d.Index == diskIndex)?
+                    .Partitions.FirstOrDefault(p => p.Index == partitionIndex && !p.IsUnallocated);
+                return part == null ? -1 : (long)part.StartingOffset;
+            }
+            catch { return -1; }
+        }
+
+        /// <summary>
+        /// Acha a partição que RECRIOU a original, pelo offset mais próximo. O código antigo usava
+        /// Partitions.LastOrDefault(...) — que devolve a última partição do DISCO, não a nova:
+        /// depois de um delete+create o WIM podia ser aplicado na partição errada.
+        /// </summary>
+        private static PartitionInfoEx? DetectRecreatedPartition(uint diskIndex, long oldStartingOffset)
+        {
+            try
+            {
+                var parts = GetAllDisks()
+                    .FirstOrDefault(d => d.Index == diskIndex)?
+                    .Partitions.Where(p => !p.IsUnallocated).ToList();
+                if (parts == null || parts.Count == 0) return null;
+
+                if (oldStartingOffset < 0) return parts.LastOrDefault(p => !string.IsNullOrEmpty(p.DriveLetter));
+
+                return parts
+                    .OrderBy(p => Math.Abs((long)p.StartingOffset - oldStartingOffset))
+                    .FirstOrDefault(p => !string.IsNullOrEmpty(p.DriveLetter));
+            }
+            catch { return null; }
         }
 
         /// <summary>
@@ -713,24 +1125,132 @@ namespace KitLugia.Core
         }
 
         // --- EXTEND PARTITION ---
-        public static async Task<bool> ExtendPartition(string driveLetter, int extendMb = 0, Action<double, string>? progressCallback = null)
+        /// <summary>
+        /// Estende a particao. Escada de 3 degraus, todas VERIFICADAS medindo o volume antes/depois:
+        ///   (1) Storage Management API (MSFT_Partition.Resize) — o mesmo caminho do Gerenciador de Discos;
+        ///   (2) IOCTL nativo (IOCTL_DISK_GROW_PARTITION + FSCTL_EXTEND_VOLUME) — volume online, sem lock;
+        ///   (3) diskpart (ultimo recurso, mantem compatibilidade).
+        /// O motivo do "estender falhou" na maioria dos casos e espaco nao alocado NAO contiguo a
+        /// direita — e isso e detectado antes de qualquer chamada (SizeMax == tamanho atual).
+        /// </summary>
+        public static async Task<bool> ExtendPartition(string driveLetter, int extendMb = 0, Action<double, string>? progressCallback = null, uint? diskIndex = null, uint? partitionIndex = null)
         {
-            driveLetter = driveLetter.Replace(":", "");
-            Log($"Estendendo {driveLetter}: {(extendMb > 0 ? $"em {extendMb} MB" : "para todo espaço disponível")}...");
+            string letter = NormalizeLetter(driveLetter).ToUpperInvariant();
+            SetError("");
 
+            if (string.IsNullOrWhiteSpace(letter))
+            {
+                SetError("Esta partição não tem letra de unidade. Atribua uma letra antes de estender.");
+                return false;
+            }
+            if (!Directory.Exists(letter + ":\\"))
+            {
+                SetError($"A unidade {letter}: não está acessível (sem letra, RAW ou volume desmontado).");
+                return false;
+            }
+
+            var sw = Stopwatch.StartNew();
+            long before = GetVolumeSizeBytes(letter);
+            Log($"Estendendo {letter}: {(extendMb > 0 ? $"em {extendMb} MB" : "para todo espaço contíguo")} (antes: {before / 1048576} MB)");
+            var reasons = new List<string>();
+
+            ulong targetBytes = extendMb > 0 ? (ulong)Math.Max(0L, before + (long)extendMb * 1024 * 1024) : 0;
+
+            // (1) Storage Management API
+            progressCallback?.Invoke(10, "Consultando espaço disponível...");
+            var limits = GetPartitionSizeLimits(letter[0]);
+
+            if (limits.ReturnCode == 0 && limits.SizeMax > 0)
+            {
+                ulong newSize = targetBytes > 0 ? Math.Min(targetBytes, limits.SizeMax) : limits.SizeMax;
+
+                if (limits.SizeMax <= limits.Size || limits.SizeMax <= (ulong)Math.Max(0L, before))
+                {
+                    SetError($"Não há espaço não alocado CONTÍGUO à direita de {letter}: para estender, o espaço precisa " +
+                             "estar imediatamente depois da partição (o Windows não move partições). " +
+                             "Opções: reduza a partição vizinha à direita (Estender → Vizinha) ou exclua a partição que está no meio.");
+                    Log($"[EXTEND] Sem espaço contiguo: Size={limits.Size} SizeMax={limits.SizeMax}");
+                    progressCallback?.Invoke(-1, SetError(""));
+                    return false;
+                }
+
+                if (newSize > limits.SizeMax) newSize = limits.SizeMax;
+
+                progressCallback?.Invoke(25, "Estendendo via Storage API...");
+                uint rc = ResizeStoragePartition(letter[0], newSize);
+                long after = GetVolumeSizeBytes(letter);
+
+                if (rc == 0 && after > before)
+                {
+                    Log($"✅ Estendido via Storage API em {sw.ElapsedMilliseconds} ms: {before / 1048576} MB -> {after / 1048576} MB (+{(after - before) / 1048576} MB)");
+                    progressCallback?.Invoke(100, $"Estendido (+{(after - before) / 1048576} MB)");
+                    return true;
+                }
+
+                reasons.Add(rc == 0 ? "a Storage API respondeu OK, mas o volume não cresceu" : $"Storage API: {GetStorageErrorMessage(rc)}");
+                progressCallback?.Invoke(40, "Storage API recusou. Tentando IOCTL nativo...");
+            }
+            else
+            {
+                reasons.Add($"Storage API indisponível (rc={limits.ReturnCode}: {limits.ErrorMessage})");
+            }
+
+            // (2) IOCTL nativo (partição ao vivo, volume online)
+            if (diskIndex.HasValue && partitionIndex.HasValue)
+            {
+                progressCallback?.Invoke(50, "IOCTL nativo (GROW_PARTITION + EXTEND_VOLUME)...");
+                var (ioctlOk, ioctlErr) = TryExtendNativeIoctl(letter, diskIndex.Value, partitionIndex.Value, targetBytes, before);
+                if (ioctlOk)
+                {
+                    long after = GetVolumeSizeBytes(letter);
+                    Log($"✅ Estendido via IOCTL nativo em {sw.ElapsedMilliseconds} ms: {before / 1048576} MB -> {after / 1048576} MB");
+                    progressCallback?.Invoke(100, $"Estendido (+{(after - before) / 1048576} MB)");
+                    return after > before;
+                }
+                reasons.Add($"IOCTL nativo: {ioctlErr}");
+                progressCallback?.Invoke(65, "IOCTL nativo recusou. Usando diskpart...");
+            }
+
+            // (3) diskpart
             await EnsureVds();
 
-
-            // Típico: 5-10 linhas de script diskpart
             StringBuilder script = new StringBuilder(256);
-            script.AppendLine($"select volume {driveLetter}");
+            script.AppendLine($"select volume {letter}");
             if (extendMb > 0)
                 script.AppendLine($"extend size={extendMb}");
             else
                 script.AppendLine("extend");
             script.AppendLine("exit");
 
-            return await RunDiskpartScript(script.ToString(), "extend", progressCallback);
+            bool ok;
+            {
+                // Retry estilo EaseUS (CAsynLockVolume): 1 repetição após 3 s quando a 1ª
+                // tentativa não mudou nada (handle aberto libera em segundos). Só repete
+                // com medição provando "nada mudou" — nunca após efeito parcial.
+                var (ok2, _) = await RunDiskpartWithRetryAsync(
+                    script.ToString(), "extend", () => GetVolumeSizeBytes(letter), before, progressCallback);
+                ok = ok2;
+            }
+
+            // VERIFICAÇÃO PÓS-OPERAÇÃO: o diskpart frequentemente devolve exit 0 sem aplicar nada.
+            long afterDp = GetVolumeSizeBytes(letter);
+            if (ok && afterDp <= before)
+            {
+                SetError($"diskpart retornou OK, mas {letter}: NÃO aumentou (antes {before / 1048576} MB, depois {afterDp / 1048576} MB). " +
+                         "Causas: espaço não contíguo à direita, sistema de arquivos não-NTFS ou partição de sistema/boot bloqueada. Motivos da API: " +
+                         string.Join("; ", reasons));
+                Log($"[EXTEND] diskpart exit=0 sem efeito real: {before} -> {afterDp}");
+                return false;
+            }
+
+            if (!ok)
+            {
+                var extra = string.Join("; ", reasons);
+                if (!string.IsNullOrEmpty(extra) && string.IsNullOrEmpty(LastError))
+                    SetError($"Falha ao estender {letter}: ({extra}).");
+            }
+
+            return ok;
         }
 
         // --- DELETE PARTITION ---
@@ -870,9 +1390,27 @@ namespace KitLugia.Core
         }
 
         // --- QUERY MAX SHRINK ---
+        /// <summary>
+        /// Maximo real reduzivel em MB. Caminho primario: Storage API (SizeMax - Size) — exato e
+        /// instantaneo, sem spawn de diskpart e sem parsing de texto localizado. Fallback: diskpart
+        /// "shrink querymax" (necessario em RAW/onde a Storage API nao responde).
+        /// </summary>
         public static async Task<long> GetMaxShrinkMb(string driveLetter)
         {
-            driveLetter = driveLetter.Replace(":", "");
+            driveLetter = NormalizeLetter(driveLetter).ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(driveLetter)) return 0;
+
+            char letter = driveLetter[0];
+            var limits = GetPartitionSizeLimits(letter);
+            if (limits.ReturnCode == 0 && limits.Size > 0)
+            {
+                long mb = (long)((limits.Size - limits.SizeMin) / (1024UL * 1024UL));
+                Log($"Máximo reduzível em {driveLetter}: = {mb} MB (Storage API: Size={limits.Size} SizeMin={limits.SizeMin})");
+                Logger.Log($"[DISK] MaxShrink {driveLetter}:={mb} MB via Storage API (sem diskpart)");
+                return mb;
+            }
+
+            Log($"[DISK] Storage API indisponível para {driveLetter} (rc={limits.ReturnCode}), usando diskpart querymax...");
             await EnsureVds();
 
             StringBuilder script = new();
@@ -950,6 +1488,21 @@ namespace KitLugia.Core
             return await RunDiskpartScript(script.ToString(), "clean");
         }
 
+        // --- CLEAR READ-ONLY (estilo EaseUS: limpa antes de operar, nao so reporta) ---
+        // O EaseUS roda "attributes disk clear readonly" ANTES de qualquer operacao
+        // (ver docs/EASEUS_EPM_MAP.md §3.2). O Kit so REPORTAVA read-only como bloqueio
+        // e parava — o usuario tinha que descobrir sozinho como tirar.
+        public static async Task<bool> ClearDiskReadOnlyAsync(uint diskIndex)
+        {
+            Log($"Disco {diskIndex}: limpando flag somente-leitura (attributes disk clear readonly)...");
+            StringBuilder script = new();
+            script.AppendLine($"select disk {diskIndex}");
+            script.AppendLine("attributes disk clear readonly");
+            script.AppendLine("exit");
+
+            return await RunDiskpartScript(script.ToString(), "readonly");
+        }
+
         // --- SET ACTIVE PARTITION (MBR only) ---
         public static async Task<bool> SetActivePartition(uint diskIndex, uint partitionIndex)
         {
@@ -1000,48 +1553,34 @@ namespace KitLugia.Core
                             exitCode != 0;
 
             return (!hasErrors, output);
-        }
-
-        // --- CONVERT DISK STYLE (MBR <-> GPT) ---
-        // NOTA: Requer disco VAZIO (sem partições)
+        }// --- CONVERT DISK STYLE (MBR <-> GPT) ---
+        // Agora delega ao DiskConverterManager (MSFT_Disk.ConvertStyle): converte a tabela NO
+        // LUGAR, preservando as partições, e valida antes/depois (o antigo caminho exigia disco
+        // vazio e recusava o disco do sistema — restrição que o EaseUS não tem).
         public static async Task<bool> ConvertDiskStyle(uint diskIndex, string targetStyle)
         {
+            var target = DiskConverterManager.ParseStyle(targetStyle);
             Log($"Convertendo Disco {diskIndex} para {targetStyle}...");
-            
 
-            var disks = GetAllDisks();
-            var targetDisk = disks.FirstOrDefault(d => d.Index == diskIndex);
-            
-            if (targetDisk == null)
-            {
-                Log("❌ ERRO: Disco não encontrado");
-                return false;
-            }
-            
-            if (targetDisk.Partitions.Any(p => !p.IsUnallocated))
-            {
-                Log($"❌ ERRO CRÍTICO: Disco {diskIndex} não está vazio. Tem {targetDisk.Partitions.Count(p => !p.IsUnallocated)} partição(ões).");
-                Log("❌ A conversão MBR/GPT requer que o disco esteja completamente vazio.");
-                Log("❌ Use 'Limpar Disco' primeiro para apagar todas as partições.");
-                return false;
-            }
-            
+            var (ok, message) = await DiskConverterManager.ConvertAsync(
+                diskIndex, target, force: true, progress: null, logLine: Log);
 
-            if (IsSystemDisk(diskIndex))
-            {
-                Log($"❌ ERRO CRÍTICO: Disco {diskIndex} parece ser o disco do sistema.");
-                Log("❌ Converter o disco do sistema pode tornar o Windows inoperável.");
-                return false;
-            }
-            
+            foreach (var line in message.Split('\n')) Log(line);
+            return ok;
+        }
+
+        /// <summary>diskpart "select disk N" + "convert gpt|mbr" (fallback do DiskConverterManager).</summary>
+        internal static async Task<bool> RunDiskpartAsync(uint diskIndex, string targetStyle, Action<string>? logLine = null)
+        {
             await EnsureVds();
 
-            StringBuilder script = new();
-            script.AppendLine($"select disk {diskIndex}");
-            script.AppendLine($"convert {targetStyle.ToLower()}"); // "gpt" or "mbr"
-            script.AppendLine("exit");
+            var sb = new StringBuilder();
+            sb.AppendLine($"select disk {diskIndex}");
+            sb.AppendLine($"convert {targetStyle.ToLower()}");   // "gpt" ou "mbr"
+            sb.AppendLine("exit");
 
-            return await RunDiskpartScript(script.ToString(), "convert");
+            logLine?.Invoke($"[DISKPART] convert {targetStyle.ToLower()} no disco {diskIndex}");
+            return await RunDiskpartScript(sb.ToString(), "convert");
         }
         
 
@@ -1097,19 +1636,6 @@ namespace KitLugia.Core
         }
 
         // --- REMOVE DRIVE LETTER ---
-        public static async Task<bool> RemoveDriveLetter(string driveLetter)
-        {
-            driveLetter = driveLetter.Replace(":", "");
-            Log($"Removendo letra {driveLetter}:...");
-            await EnsureVds();
-
-            StringBuilder script = new();
-            script.AppendLine($"select volume {driveLetter}");
-            script.AppendLine($"remove letter={driveLetter}");
-            script.AppendLine("exit");
-
-            return await RunDiskpartScript(script.ToString(), "removeletter");
-        }
 
         public static async Task<bool> MoveVolumeData(string sourceLetter, string targetLetter, Action<double, string>? progressCallback = null, string folderName = "Arquivos_Mesclados")
         {
@@ -1136,6 +1662,82 @@ namespace KitLugia.Core
             return exitCode < 8;
         }
 
+        /// <summary>
+        /// Motor de imagem: wimlib-imagex (primário) em vez de DISM (fallback).
+        ///
+        /// POR QUE (03/10/2026, relato do usuario): "o processo de aplicar imagem via dism é lento".
+        ///
+        /// **MEDIÇÃO REAL (03/10/2026) — e o resultado NÃO confirma o speedup esperado.**
+        /// 1,2 GB / 300 arquivos incompressíveis, no mesmo host:
+        ///   capture: wimlib 5.063 ms  vs  DISM /Compress:fast 4.819 ms
+        ///   apply  : wimlib 1.734 ms  vs  DISM 2.168 ms
+        ///   ciclo  : wimlib 6.797 ms  vs  DISM 6.987 ms  (2,7% = ruido)
+        /// Conteudo restaurado IDÊNTICO nos dois (diff recursivo sem diferencas).
+        /// Motivo: neste fluxo (`AtomicExtendDISM` / `AtomicMergeDISM` / `MovePartition`) NUNCA
+        /// houve `/Mount-Image` + `/Unmount /Commit` — o DISM so faz Capture/Apply direto, e
+        /// quem paga o mount/commit caro é o `EmergencyWinREManager` e o `WinpeBuilder`.
+        ///
+        /// ENTÃO O MOTIVO REAL DA TROCA É ROBUSTEZ, não velocidade:
+        ///   1. o wimlib é à prova do bug de quoting do DISM (`/ApplyDir:"E:\"` -> exit 123,
+        ///      que em 02/08 fez a partição ser recriada SEM restaurar os dados);
+        ///   2. não depende do serviço TrustedInstaller/CBS, que falha quando o Windows Update
+        ///      está em andamento — comum em maquina real, justamente no pior momento.
+        ///
+        /// Os WIMs sao interoperaveis nos dois sentidos, entao o fallback cruzado vale.
+        /// Se um dia medir-mos em maquina real e o DISM ganhar, e so trocar a ordem.
+        /// </summary>
+        internal static string? WimlibExe => WinpeBuilder.FindBundledWimlib();
+
+        /// <summary>
+        /// Escapa um caminho para a linha de comando SEM o bug de aspas + barra final.
+        /// Raiz de volume ("C:\") e tokens especiais (@, #, %) vao SEM aspas: no
+        /// CommandLineToArgvW/CRT a barra final escaparia a aspa e truncaria o caminho
+        /// (é exatamente o bug que fazia o DISM /ApplyDir:"E:\" devolver exit 123).
+        /// </summary>
+        private static string CmdArg(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "\"\"";
+            if (path.Length <= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/')) return path;
+            if (path == "@" || path == "#" || path == "%") return "\"" + path + "\"";
+            if (path.IndexOf(' ') < 0 && path.IndexOf('\t') < 0) return path;
+            return "\"" + path + "\"";
+        }
+
+        private static void ReportImageProgress(Action<double, string>? cb, string label, string line)
+        {
+            if (cb == null) return;
+            var m = Regex.Match(line, @"(\d+\.?\d*)%");
+            if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out double pct))
+                cb(pct, $"{label}: {pct}%");
+        }
+
+        /// <summary>
+        /// Loga a SAIDA de um processo, truncando.
+        /// O wimlib-imagex escreve o progresso com '\r' e SEM '\n', entao uma unica "linha"
+        /// pode ter centenas de KB ("412 GiB scanned (679676 files...)" repetido). Medido em
+        /// 03/10/2026 no capture de um volume de 400+ GB. Logar isso inteiro estoura o arquivo
+        /// de log e trava a UI do console. Aqui ficam so as ultimas linhas UTEIS (o wimlib
+        /// escreve o resumo e o erro no fim).
+        /// </summary>
+        private static void LogTail(string output, string titulo, int maxChars = 3000)
+        {
+            if (string.IsNullOrWhiteSpace(output)) { Log($"--- {titulo} ---"); Log("(sem saida)"); return; }
+
+            // Normaliza \r em \n para as linhas de progresso virarem linhas separadas.
+            string norm = output.Replace('\r', '\n');
+            var meaningful = norm.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                                .Where(l => !Regex.IsMatch(l, @"(scanned|\(\d+ bytes of \d+ bytes).*%.*done", RegexOptions.IgnoreCase)
+                                         && !Regex.IsMatch(l, @"^\s*\d+(\.\d+)?% (scanned|done)", RegexOptions.IgnoreCase))
+                                .ToList();
+
+            string body = string.Join(Environment.NewLine, meaningful);
+            if (body.Length > maxChars)
+                body = "…(saida truncada, " + body.Length + " chars)…\n" + body[^maxChars..];
+
+            Log($"--- {titulo} ---");
+            Log(body);
+        }
+
         public static async Task<bool> CaptureVolumeImage(string sourceLetter, string wimPath, Action<double, string>? progressCallback = null, string name = "KitLugia_Capture")
         {
             sourceLetter = NormalizeLetter(sourceLetter);
@@ -1145,8 +1747,36 @@ namespace KitLugia.Core
             string? wimDir = Path.GetDirectoryName(wimPath);
             if (!string.IsNullOrWhiteSpace(wimDir) && !Directory.Exists(wimDir)) Directory.CreateDirectory(wimDir);
 
+            // --- MOTOR 1: wimlib-imagex (sem mount, sem commit) ---
+            string? wimlib = WimlibExe;
+            if (wimlib != null)
+            {
+                progressCallback?.Invoke(0, "Capturando snapshot (wimlib-imagex, sem DISM)...");
+                var sw = Stopwatch.StartNew();
+                // wimlib capture DIRECTORY WIMFILE [IMAGE_NAME] — o nome da imagem e POSICIONAL
+                // (--name= nao existe nessa versao e faz o binario imprimir o usage inteiro).
+                string wlArgs = $"capture {CmdArg($"{sourceLetter}:\\")} {CmdArg(wimPath)} {CmdArg(name)}";
+                var (wlExit, wlOut) = await RunProcessStreamed(wimlib, wlArgs, line => ReportImageProgress(progressCallback, "Capturando", line));
+
+                LogTail(wlOut, "WIMLIB CAPTURE");
+                Logger.Log($"[WIMLIB] Capture exit={wlExit} em {sw.ElapsedMilliseconds} ms ({sourceLetter}: -> {Path.GetFileName(wimPath)})");
+
+                if (wlExit == 0 && File.Exists(wimPath) && new FileInfo(wimPath).Length > 0)
+                    return true;
+
+                if (wlExit != 0)
+                {
+                    LogErrorsFrom(wlOut, "WIMLIB-CAPTURE");
+                    if (File.Exists(wimPath))
+                        Log($"Aviso: o wimlib costuma recusar capturar para um WIM que ja existe ({Path.GetFileName(wimPath)}). " +
+                            "Apague o arquivo antes de repetir a operacao.");
+                }
+                Log("wimlib-imagex nao concluiu a captura; voltando para o DISM...");
+            }
+
+            // --- MOTOR 2: DISM (fallback) ---
             Log($"Capturando Imagem de {sourceLetter}: para {wimPath}...");
-            
+
             string args = $"/Capture-Image /ImageFile:\"{wimPath}\" /CaptureDir:{sourceLetter}:\\ /Name:\"{name}\" /Compress:fast /NoRestart";
             
             var (exitCode, output) = await RunProcessStreamed("dism.exe", args, (line) => {
@@ -1170,8 +1800,33 @@ namespace KitLugia.Core
         public static async Task<bool> ApplyVolumeImage(string wimPath, string targetPath, Action<double, string>? progressCallback = null)
         {
             Log($"Aplicando Imagem {wimPath} para {targetPath}...");
-            
+
             if (!Directory.Exists(targetPath)) Directory.CreateDirectory(targetPath);
+            string applyRoot = targetPath.TrimEnd('\\');
+
+            // --- MOTOR 1: wimlib-imagex (apply direto no arquivo, sem depender do CBS) ---
+            string? wimlibExe = WimlibExe;
+            if (wimlibExe != null && File.Exists(wimPath))
+            {
+                progressCallback?.Invoke(0, "Restaurando snapshot (wimlib-imagex, sem DISM)...");
+                var sw = Stopwatch.StartNew();
+                string wimlibArgs = $"apply {CmdArg(wimPath)} 1 {CmdArg(applyRoot)}";
+                var (wExit, wOut) = await RunProcessStreamed(wimlibExe, wimlibArgs, line => ReportImageProgress(progressCallback, "Restaurando (wimlib)", line));
+
+                LogTail(wOut, "WIMLIB APPLY");
+                Logger.Log($"[WIMLIB] Apply exit={wExit} em {sw.ElapsedMilliseconds} ms ({Path.GetFileName(wimPath)} -> {applyRoot})");
+
+                if (wExit == 0)
+                {
+                    Logger.Log("[WIMLIB] Imagem aplicada via wimlib-imagex (à prova do bug de quoting do DISM, exit 123).");
+                    return true;
+                }
+
+                LogErrorsFrom(wOut, "WIMLIB-APPLY");
+                Log("wimlib-imagex nao concluiu a aplicacao; voltando para o DISM...");
+            }
+
+            // --- MOTOR 2: DISM (fallback) ---
 
             // IMPORTANTE (bug 123): raiz de volume NÃO pode ir entre aspas com barra final.
             // "/ApplyDir:\"E:\"" quebra no parsing da linha de comando (\" vira aspa literal)
@@ -1199,31 +1854,9 @@ namespace KitLugia.Core
             Logger.Log($"[DISM] Apply exit={exitCode} ({Path.GetFileName(wimPath)} -> {targetPath})");
             if (exitCode != 0)
             {
+                // O wimlib (motor 1) JA foi tentado acima e falhou — repetir aqui seria
+                // so perder tempo. Fica so o log do erro do DISM.
                 LogErrorsFrom(output, "APPLY");
-
-                // Fallback: wimlib-imagex apply (mais rápido e sem o bug de quoting)
-                string? wimlibExe = WinpeBuilder.FindBundledWimlib();
-                if (wimlibExe != null)
-                {
-                    Log("DISM falhou; tentando wimlib-imagex apply...");
-                    string wimlibArgs = isDriveRoot
-                        ? $"apply \"{wimPath}\" 1 {trimmed}\\"
-                        : $"apply \"{wimPath}\" 1 \"{trimmed}\"";
-                    var (wExit, wOut) = await RunProcessStreamed(wimlibExe, wimlibArgs, (line) => {
-                        var m = Regex.Match(line, @"(\d+\.?\d*)%");
-                        if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out double pct))
-                            progressCallback?.Invoke(pct, $"Restaurando (wimlib): {pct}%");
-                    });
-                    Log("--- WIMLIB APPLY ---");
-                    Log(wOut);
-                    Logger.Log($"[WIMLIB] Apply exit={wExit} ({Path.GetFileName(wimPath)} -> {trimmed})");
-                    if (wExit == 0)
-                    {
-                        Logger.Log("[WIMLIB] Aplicação via wimlib-imagex concluída com sucesso.");
-                        return true;
-                    }
-                    LogErrorsFrom(wOut, "WIMLIB-APPLY");
-                }
             }
             return exitCode == 0;
         }
@@ -1271,28 +1904,11 @@ namespace KitLugia.Core
         }
 
 
-        public static async Task<bool> CreateVhdBypass(uint diskIndex, string driveLetter, int sizeMb)
-        {
-            string vhdPath = Path.Combine($"{driveLetter}:\\", "virtual_disk.vhdx");
-            Log($"Iniciando Bypass de Limite 3GB via VHD em {driveLetter}:\\ ({sizeMb} MB)...");
-
-            StringBuilder script = new();
-            script.AppendLine($"create vdisk file=\"{vhdPath}\" maximum={sizeMb} type=expandable");
-            script.AppendLine($"attach vdisk");
-            script.AppendLine("create partition primary");
-            script.AppendLine("format quick fs=ntfs label=\"VHD_Bypass\"");
-            script.AppendLine("assign");
-            script.AppendLine("exit");
-
-            bool ok = await RunDiskpartScript(script.ToString(), "vhd_bypass");
-            if (ok) Log("VHD criado e montado com sucesso para bypass.");
-            return ok;
-        }
-
         public static async Task<bool> MovePartition(uint diskIndex, uint partitionIndex, string driveLetter, Action<double, string>? progressCallback = null)
         {
             Log($"Iniciando Movimentação Segura (Imaging) da Partição {partitionIndex}...");
             string tempWim = Path.Combine(Path.GetTempPath(), $"move_part_{partitionIndex}.wim");
+            long oldOffset = GetPartitionOffset(diskIndex, partitionIndex);   // p/ localizar a recriada depois
             
             progressCallback?.Invoke(0, "Capturando imagem da partição...");
             bool capOk = await CaptureVolumeImage(driveLetter, tempWim, progressCallback);
@@ -1313,9 +1929,8 @@ namespace KitLugia.Core
             if (!createOk) { Logger.Log($"[MOVE] 3.Create FALHOU (disco {diskIndex})"); Log("Falha ao recriar partição."); return false; }
             Logger.Log($"[MOVE] 3.Create OK");
 
-            // Encontrar a nova letra (assign automático do diskpart)
-            var disks = GetAllDisks();
-            var newPart = disks.FirstOrDefault(d => d.Index == diskIndex)?.Partitions.LastOrDefault(p => !p.IsUnallocated);
+            // Encontrar a nova letra: partição mais próxima do offset original (NÃO a última do disco)
+            var newPart = DetectRecreatedPartition(diskIndex, oldOffset);
             string newLetter = newPart?.DriveLetter ?? "";
             Logger.Log($"[MOVE] Nova letra: '{newLetter}' label='{newPart?.Label}'");
 
@@ -1404,6 +2019,7 @@ namespace KitLugia.Core
             
             Log($"Iniciando Extensão Atômica (Bypass 3GB) em {driveLetter}:...");
             Logger.Log($"[ATOMIC] Extend {driveLetter}: -> 1.Capture (WIM={Path.GetFileName(tempWim)})");
+            long oldOffset = GetPartitionOffset(diskIndex, partIndex);   // p/ localizar a recriada depois
             
             // 1. Captura
             progressCallback?.Invoke(0, "Capturando Snapshot para Bypass...");
@@ -1435,9 +2051,9 @@ namespace KitLugia.Core
             }
             Logger.Log($"[ATOMIC] 3.Create OK (disco {diskIndex}, tudo não alocado)");
 
-            // Detectar nova letra
-            var disks = GetAllDisks();
-            var newPart = disks.FirstOrDefault(d => d.Index == diskIndex)?.Partitions.LastOrDefault(p => !p.IsUnallocated);
+            // Detectar nova letra: partição mais próxima do offset original (NÃO a última do disco —
+            // se o disco tem partições depois, o WIM seria aplicado na partição ERRADA)
+            var newPart = DetectRecreatedPartition(diskIndex, oldOffset);
             string newLetter = newPart?.DriveLetter ?? "";
             Logger.Log($"[ATOMIC] Nova partição detectada: letra='{newLetter}' label='{newPart?.Label}' type='{newPart?.Type}' size={newPart?.SizeString}");
             if (string.IsNullOrEmpty(newLetter))
@@ -1459,7 +2075,7 @@ namespace KitLugia.Core
         }
 
         // --- INTERNAL HELPERS ---
-        private static async Task<bool> RunDiskpartScript(string scriptContent, string operationName, Action<double, string>? progressCallback = null)
+        internal static async Task<bool> RunDiskpartScript(string scriptContent, string operationName, Action<double, string>? progressCallback = null)
         {
             string scriptPath = Path.Combine(Path.GetTempPath(), $"pm_{operationName}.txt");
             File.WriteAllText(scriptPath, scriptContent);
@@ -1497,10 +2113,17 @@ namespace KitLugia.Core
                     Logger.Log($"[DISKPART] {t}");
             }
 
-            bool hasVdsError = output.Contains("Virtual Disk Service error", StringComparison.OrdinalIgnoreCase);
+            bool hasVdsError = output.Contains("Virtual Disk Service error", StringComparison.OrdinalIgnoreCase) ||
+                           output.Contains("Erro do Serviço de Disco Virtual", StringComparison.OrdinalIgnoreCase) ||
+                           output.Contains("serviço de disco virtual", StringComparison.OrdinalIgnoreCase);
             if (hasVdsError)
             {
+                string vdsLine = output.Split('\n')
+                    .FirstOrDefault(l => l.Contains("Virtual Disk Service error", StringComparison.OrdinalIgnoreCase)
+                                      || l.Contains("Disco Virtual", StringComparison.OrdinalIgnoreCase)
+                                      || l.Contains("Virtual Disk", StringComparison.OrdinalIgnoreCase));
                 Log($"ERRO VDS na operação '{operationName}'.");
+                SetError($"diskpart/VDS na operação '{operationName}': {(vdsLine ?? "").Trim()}");
                 return false;
             }
 
@@ -1509,11 +2132,46 @@ namespace KitLugia.Core
             if (exitCode != 0)
             {
                 Log($"ERRO detectado na operação '{operationName}'. Código de saída: {exitCode}");
+                if (string.IsNullOrEmpty(LastError))
+                    SetError($"diskpart terminou com código {exitCode} na operação '{operationName}' (veja o log do terminal para a linha de erro).");
                 return false;
             }
 
             Log($"Operação '{operationName}' concluída.");
             return true;
+        }
+
+        /// <summary>
+        /// Roda o script diskpart com 1 repetição após 3 s quando a 1ª tentativa não mudou nada.
+        /// Estilo EaseUS CAsynLockVolume (MAX_RETRY_TIMES): file handle aberto (antivírus,
+        /// indexer, shadow copy em andamento) é a causa nº 1 de "extend/shrink falhou" e
+        /// libera em segundos. A repetição SÓ acontece quando a medição prova que nada mudou
+        /// (sizeAfter == sizeBefore) — repetir um shrink que já mexeu encolheria 2x, por isso
+        /// o gate é pela medição, nunca pela mensagem de erro.
+        /// </summary>
+        internal static async Task<(bool Ok, bool Retried)> RunDiskpartWithRetryAsync(
+            string scriptContent, string operationName,
+            Func<long> measureSize, long sizeBefore,
+            Action<double, string>? progressCallback = null)
+        {
+            bool ok = await RunDiskpartScript(scriptContent, operationName, progressCallback);
+            if (ok) return (true, false);
+
+            long after = 0;
+            try { after = measureSize(); } catch { }
+            if (after != sizeBefore)
+            {
+                Log($"[DISK] '{operationName}' falhou mas o volume mudou ({sizeBefore} -> {after}): sem repetição (efeito parcial).");
+                return (false, false);
+            }
+
+            Log($"[DISK] '{operationName}' sem efeito — aguardando 3 s (handle aberto?) e tentando de novo...");
+            progressCallback?.Invoke(-1, "Sem efeito na 1ª tentativa — aguardando 3 s e tentando de novo...");
+            await Task.Delay(3000).ConfigureAwait(false);
+            SetError("");
+            bool ok2 = await RunDiskpartScript(scriptContent, operationName, progressCallback);
+            Log(ok2 ? $"[DISK] '{operationName}' OK na 2ª tentativa." : $"[DISK] '{operationName}' falhou nas 2 tentativas.");
+            return (ok2, true);
         }
 
         private static async Task<(int ExitCode, string Output)> RunProcess(string filename, string args)

@@ -540,19 +540,13 @@ namespace KitLugia.GUI.Pages
                         LogActivity("✅ PartitionManager._logBuffer limpo");
                     }
 
-                    // 2. Limpar ThreadLocal do LatencyAnalyzer
-                    var latencySamplesField = typeof(LatencyAnalyzer).GetField("_latencySamples", BindingFlags.NonPublic | BindingFlags.Static);
-                    var driverStatsField = typeof(LatencyAnalyzer).GetField("_driverStats", BindingFlags.NonPublic | BindingFlags.Static);
+                    // 2. Liberar buffers do LatencyAnalyzer (API publica; antes acessava
+                    //    campos privados por reflection que nem existem mais)
+                    LatencyAnalyzer.ReleaseBuffers();
+                    LogActivity("✅ LatencyAnalyzer buffers liberados");
 
-                    latencySamplesField?.GetValue(null)?.GetType().GetMethod("Clear")?.Invoke(latencySamplesField.GetValue(null), null);
-                    driverStatsField?.GetValue(null)?.GetType().GetMethod("Clear")?.Invoke(driverStatsField.GetValue(null), null);
-                    LogActivity("✅ LatencyAnalyzer collections limpas");
-
-                    // 3. Medir apenas, sem forçar GC
-                    await Task.Run(() =>
-                    {
-                        // Apenas medir, sem forçar GC
-                    });
+                    // 3. Ceder o frame para a UI atualizar o log (sem forçar GC)
+                    await Task.Yield();
 
                     long after = GC.GetTotalMemory(false);
                     double freed = (before - after) / (1024.0 * 1024.0);

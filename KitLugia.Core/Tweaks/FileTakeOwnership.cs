@@ -525,7 +525,7 @@ public static class FileTakeOwnership
         string e = p.StandardError.ReadToEnd();
         if (!p.WaitForExit(timeoutMs))
         {
-            try { p.Kill(); } catch { }
+            try { p.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return -2;
         }
         Logger.Log($"[TAKE OWNERSHIP] {exe} exit={p.ExitCode} out={(o.Length > 300 ? o[..300] : o)} err={(e.Length > 300 ? e[..300] : e)}");
