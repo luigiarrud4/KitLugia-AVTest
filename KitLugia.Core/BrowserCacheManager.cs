@@ -114,18 +114,6 @@ namespace KitLugia.Core
             return (totalBytes, totalFiles, results);
         }
 
-        /// <summary>
-        /// Retorna o tamanho total do cache de todos os navegadores instalados.
-        /// </summary>
-        public static long GetTotalBrowserCacheSize()
-        {
-            var browsers = GetDetectedBrowsers();
-            long total = 0;
-            foreach (var b in browsers)
-                total += b.CacheSizeBytes;
-            return total;
-        }
-
         // ─── Helpers ────────────────────────────────────────────────────────────
 
         private static long GetDirectorySize(string path)

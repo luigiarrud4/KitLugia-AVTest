@@ -35,6 +35,12 @@ namespace KitLugia.GUI.Pages
         private bool _isLoadingSettings = false;
         private CustomMotorProfile? _profileToDelete = null;
 
+        /// <summary>
+        /// Numero do motor Automatico no combo/servico (= GameBoostEngine.Auto).
+        /// Fonte unica: a UI tinha 0, "custom" e 1..4 espalhados e nenhum sabia deste.
+        /// </summary>
+        private const int AutoEngineNumber = 5;
+
 
         public static bool AutoOpenCustomOverlayOnLoad = false;
         // CORREÇÃO: Usar LocalApplicationData em vez de ApplicationData (Roaming)
@@ -176,13 +182,56 @@ namespace KitLugia.GUI.Pages
             return 0;
         }
 
+        /// <summary>
+        /// Cor da bola + halo conforme o motor em uso (05/10/2026).
+        ///
+        /// AZUL com halo = MOTOR AUTOMÁTICO a escolher os parâmetros (o motor novo).
+        /// VERDE         = motor legado escolhido à mão.
+        /// VERMELHO      = GameBoost desligado.
+        ///
+        /// O halo é um Ellipse separado (StatusGlow) dentro de um Grid intermédio
+        /// (StatusGlowHost) porque a Opacity do Ellipse está animada em XAML: se o
+        /// código mexesse nela, a animação ganharia a todos os writes. A Opacity do
+        /// pai multiplica a do filho, por isso acender/apagar o halo não quebra o pulso.
+        /// </summary>
+        private void AtualizarIndicadorStatus()
+        {
+            bool ativo = TglGameBoost != null && TglGameBoost.IsChecked == true;
+            bool automatico = Services.TrayIconService.CurrentEngine
+                              == Services.TrayIconService.GameBoostEngine.Auto;
+
+            if (!ativo)
+            {
+                if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                if (StatusGlowHost != null) StatusGlowHost.Opacity = 0;
+                if (TxtStatus != null) TxtStatus.Text = "Desativado";
+                return;
+            }
+
+            if (automatico)
+            {
+                if (StatusIndicator != null)
+                    // "Color" e' ambiguo nesta pagina (System.Drawing vs System.Windows.Media).
+                    StatusIndicator.Fill = new SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(0x3D, 0x8B, 0xFF));
+                if (StatusGlowHost != null) StatusGlowHost.Opacity = 1;
+                if (TxtStatus != null)
+                    TxtStatus.Text = "Motor Automático ativo — a escolher os melhores parâmetros";
+            }
+            else
+            {
+                if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.LimeGreen);
+                if (StatusGlowHost != null) StatusGlowHost.Opacity = 0;
+                if (TxtStatus != null) TxtStatus.Text = "Ativo e monitorando processos";
+            }
+        }
+
         private void TglGameBoost_Checked(object sender, RoutedEventArgs e)
         {
             // PROTEÇÃO: Ignora eventos durante carregamento inicial
             if (_isLoadingSettings) return;
             
-            if (TxtStatus != null) TxtStatus.Text = "Ativo e monitorando processos";
-            if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.Lime);
+            AtualizarIndicadorStatus();
             KitLugia.Core.Logger.Log("🚀 GameBoost Pro ativado via interface");
             
             // CORREÇÃO: Ativa E inicializa o GameBoost no serviço
@@ -209,8 +258,7 @@ namespace KitLugia.GUI.Pages
             // PROTEÇÃO: Ignora eventos durante carregamento inicial
             if (_isLoadingSettings) return;
             
-            if (TxtStatus != null) TxtStatus.Text = "Desativado";
-            if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+            AtualizarIndicadorStatus();
             KitLugia.Core.Logger.Log("🚀 GameBoost Pro desativado via interface");
             
             // CORREÇÃO: Desativa E encerra o GameBoost no serviço
@@ -376,17 +424,8 @@ namespace KitLugia.GUI.Pages
                     TxtDownloadBoostThreshold.Text = mw.TrayService.DownloadBoostThreshold.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
                 }
                 
-                // Atualiza indicador de status
-                if (gameBoostEnabled)
-                {
-                    if (TxtStatus != null) TxtStatus.Text = "Ativo e monitorando processos";
-                    if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.LimeGreen);
-                }
-                else
-                {
-                    if (TxtStatus != null) TxtStatus.Text = "Desativado";
-                    if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.Red);
-                }
+                // Atualiza indicador de status (bola + halo conforme o motor)
+                AtualizarIndicadorStatus();
                 
                 // Atualiza status do ProBalance
                 UpdateProBalanceStatusText(proBalance);
@@ -461,8 +500,10 @@ namespace KitLugia.GUI.Pages
                     mw.TrayService.SaveSettings();
                 }
                 
-                Services.TrayIconService.SetAutoStart(ChkStartWithWindows?.IsChecked == true);
-                
+                // NÃO grava o auto-start aqui: SaveGameBoostSettings é chamado por VÁRIOS toggles
+                // (GameBoost, Unpark CPU...) e o ChkStartWithWindows pode estar null ou
+                // desmarcado — o SetAutoStart(false) resultante APAGAVA as 3 vias de
+                // inicialização. Quem muda o auto-start é só ChkStartWithWindows_Click.
                 var settings = new Dictionary<string, object>
                 {
                     { "gameBoostEnabled", TglGameBoost?.IsChecked == true },
@@ -968,6 +1009,10 @@ namespace KitLugia.GUI.Pages
                     if (tagValue == "custom")
                     {
                         OpenCustomMotorOverlay();
+                        // O overlay pode ter aplicado um perfil (SetCustomEngine põe o
+                        // motor em V1_Balanced) ou o utilizador pode ter cancelado —
+                        // nos dois casos a bola tem de sair de azul.
+                        AtualizarIndicadorStatus();
                         return;
                     }
                     
@@ -979,6 +1024,10 @@ namespace KitLugia.GUI.Pages
 
 
                         SaveLastEngine(0, customProfile.Id);
+                        // Este return acontece ANTES do AtualizarIndicadorStatus() do
+                        // fim do metodo. Sem esta chamada, escolher um perfil
+                        // personalizado deixava a bola azul de "motor automatico".
+                        AtualizarIndicadorStatus();
                         return;
                     }
 
@@ -987,8 +1036,9 @@ namespace KitLugia.GUI.Pages
                         return;
                     }
 
-                    // s️ AVISO: Mostra alerta para V2, V3 e V4 sobre possíveis travamentos
-                    if (engineNumber != 1)
+                    // AVISO: so para os motores LEGADO V2/V3/V4. O Automatico (5) e o padrao
+                    // recomendado e nao tem nada disso - avisar nele seria assustar sem motivo.
+                    if (engineNumber is 2 or 3 or 4)
                     {
                         string engineName = engineNumber switch
                         {
@@ -1005,7 +1055,7 @@ namespace KitLugia.GUI.Pages
                             "⚠️ Feche aplicativos desnecessários antes de usar\n" +
                             "⚠️ V2: Pode causar micro-travamentos em alguns jogos\n" +
                             "⚠️ V3: Pode causar travamentos mais frequentes\n" +
-                            "⚠️ V4: Prioridade RealTime + Critical I/O - APENAS para jogos pesados!\n\n" +
+                            "⚠️ V4: sem RealTime (removido de proposito - causava tela preta), I/O Alta + Timer + Rede\n\n" +
                             "Use por sua conta e risco!\n\n" +
                             "Deseja continuar?",
                             "⚠️ Aviso de Performance",
@@ -1014,7 +1064,7 @@ namespace KitLugia.GUI.Pages
 
                         if (result == MessageBoxResult.No)
                         {
-                            // Volta para V1
+                            // Nao troca: volta para o Automatico (indice 0 = recomendado).
                             CmbEngine.SelectedIndex = 0;
                             return;
                         }
@@ -1023,18 +1073,12 @@ namespace KitLugia.GUI.Pages
                     // Chama o serviço para trocar o motor
                     Services.TrayIconService.SetEngine(engineNumber);
 
-                    // Atualiza descrição na UI
-                    if (TxtEngineDescription != null)
-                    {
-                        TxtEngineDescription.Text = engineNumber switch
-                        {
-                            1 => "YY V1 - Original Plus: Win32PrioritySeparation + CPU/IO/Page boost (PADRfO) - Seguro e estável",
-                            2 => "YY V2 - FPS Estável Plus: P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
-3 => "V3 - Extremo Plus: P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance agressivo (>3%)",
-                    4 => "V4 - Extreme Pro: RealTime + Critical I/O + P-Cores + Network + Win32 + ProBalance OFF",
-                    _ => "Desconhecido"
-                };
-            }
+                    // Atualiza descrição na UI (texto agora vem de ShowMotorDescription)
+                    ShowMotorDescription(engineNumber);
+
+                    // O halo azul só acende no motor AUTOMÁTICO (5): ao trocar de motor
+                    // a bola tem de mudar logo, sem esperar o próximo load de settings.
+                    AtualizarIndicadorStatus();
 
                     // Mostra mensagem de confirmação
                     string engineNameConfirm = engineNumber switch
@@ -1093,29 +1137,34 @@ namespace KitLugia.GUI.Pages
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            // Mostrar lista de exceções e configurações
-            var exceptions = Services.TrayIconService.GetUserExceptions();
-            string exceptionList = exceptions.Count > 0 
-                ? string.Join(", ", exceptions) 
-                : "Nenhum (padrão: Discord, Opera GX, Spotify, etc.)";
-            
             string currentEngine = Services.TrayIconService.GetEngineDescription(Services.TrayIconService.CurrentEngine);
             
             MessageBox.Show(
                 $"Configurações do GameBoost Pro:\n\n" +
                 $"Motor Atual: {currentEngine}\n\n" +
-                "YY V1 - ORIGINAL PLUS:\n" +
+                "🤖 AUTOMÁTICO (RECOMENDADO - padrão do kit):\n" +
+                "  • Escolhe o perfil por cena, sozinho\n" +
+                "  • CPU: High · Página: Normal (o padrão)\n" +
+                "  • Honra o timer do próprio jogo (sem timer global de 1 ms)\n" +
+                "  • Rebaixa o FUNDO só quando a máquina está > 70% de CPU\n" +
+                "  • Rede: NÃO aplica o tweak global do V3\n" +
+                "  • Revert automático ao perder o foco (faixa Sustentado)\n" +
+                "  • Nunca usa RealTime nem I/O crítico\n\n" +
+                "⚠️ Sobre I/O priority: o Windows só aceita VeryLow/Normal para processos\n" +
+                "   alheios — subir para High é recusado (0xC0000061), mesmo com o\n" +
+                "   Kit elevado. Foi medido. O motor fica no Normal e segue normal.\n\n" +
+                "🟢 V1 - ORIGINAL PLUS (LEGADO):\n" +
                 "  • CPU: High Priority\n" +
                 "  • I/O: High (3)\n" +
-                "  • Page: Maximum (5)\n" +
+                "  • Página: Normal (5)\n" +
                 "  • Timer: Não boosta\n" +
                 "  • EcoQoS: Não aplica\n" +
                 "  • ProBalance: Não aplica\n" +
                 "  • Win32PrioritySeparation: ATIVADO\n\n" +
-                "YY V2 - FPS ESTÁVEL PLUS:\n" +
+                "🟡 V2 - FPS ESTÁVEL PLUS (LEGADO):\n" +
                 "  • CPU: High Priority\n" +
                 "  • I/O: High (3)\n" +
-                "  • Page: Maximum (5)\n" +
+                "  • Página: Normal (5)\n" +
                 "  • EcoQoS: DESATIVADO\n" +
                 "  • ProBalance: >8% CPU\n" +
                 "  • ThreadEfficiencyMode: P-Cores\n" +
@@ -1124,7 +1173,7 @@ namespace KitLugia.GUI.Pages
                 "V3 - EXTREMO PLUS (Tudo no máximo):\n" +
                 "  • CPU: High Priority\n" +
                 "  • I/O: High (3)\n" +
-                "  • Page: Maximum (5)\n" +
+                "  • Página: Below Normal (4)\n" +
                 "  • Timer: 1ms (precisão balanceada)\n" +
                 "  ⚠️ Pode causar estouros em áudio virtual (Voicemeeter, VB-Cable)\n" +
                 "  • EcoQoS: DESATIVADO\n" +
@@ -1133,7 +1182,6 @@ namespace KitLugia.GUI.Pages
                 "  • ThreadEfficiencyMode: P-Cores\n" +
                 "  • GameClassInfo: ATIVADO\n" +
                 "  • Win32PrioritySeparation: ATIVADO\n\n" +
-                "Exceções do Usuário:\n" + exceptionList + "\n\n" +
                 "Windows 11 25H2 Optimized",
                 "GameBoost Pro Settings",
                 MessageBoxButton.OK,
@@ -1152,8 +1200,8 @@ namespace KitLugia.GUI.Pages
             TxtCustomProfileName.Text = "Meu Motor Personalizado";
             CmbCpuPriority.SelectedIndex = 1; // High
             CmbIoPriority.SelectedIndex = 1; // High
-            CmbPagePriority.SelectedIndex = 1; // Maximum
-            CmbThreadMemory.SelectedIndex = 0; // Normal
+            CmbPagePriority.SelectedIndex = 0; // Normal (5) — o padrao e o topo; ver escala em 5.2 do doc
+            CmbThreadMemory.SelectedIndex = 0; // Normal (5)
             
             // Inicializa toggles com valores padrão
             TglTimerResolution.IsChecked = false;
@@ -1348,14 +1396,7 @@ namespace KitLugia.GUI.Pages
             if (TxtEngineDescription != null)
             {
                 int restoredEngine = (int)Services.TrayIconService.CurrentEngine;
-                TxtEngineDescription.Text = restoredEngine switch
-                {
-                    1 => "V1 - Original Plus: Win32PrioritySeparation + CPU/IO/Page boost (PADRÃO) - Seguro e estável",
-                    2 => "V2 - FPS Estável Plus: P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
-                    3 => "V3 - Extremo Plus: P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance agressivo (>3%)",
-                    4 => "V4 - Extreme Pro: RealTime + Critical I/O + P-Cores + Network + Win32 + ProBalance OFF",
-                    _ => "Desconhecido"
-                };
+                ShowMotorDescription(restoredEngine);
             }
         }
 
@@ -1556,18 +1597,20 @@ namespace KitLugia.GUI.Pages
             try
             {
                 
-                // Converte para configurações do TrayIconService
+                // Converte para configurações do TrayIconService.
+                // O perfil guarda o INDICE do ComboBox; a escala real e' 1=VERY_LOW..5=NORMAL.
+                // Sem esta traducao, "Maximum" (indice 1) aplicava VERY_LOW — o pior valor.
                 var config = new Services.CustomEngineConfig
                 {
                     CpuPriority = profile.CpuPriority,
                     IoPriorityLevel = profile.IoPriority,
-                    PagePriorityLevel = profile.PagePriority,
+                    PagePriorityLevel = Services.TrayIconService.PagePriorityFromIndex(profile.PagePriority),
                     TimerBoost = profile.TimerResolution,
                     EcoQoSEnabled = profile.EcoQoS,
                     ProBalance = profile.ProBalanceEnabled,
                     ProBalanceCpuThreshold = profile.ProBalanceThreshold,
                     NetworkBoost = profile.NetworkBoost,
-                    ThreadMemoryPriority = profile.ThreadMemoryPriority,
+                    ThreadMemoryPriority = Services.TrayIconService.ThreadMemoryPriorityFromIndex(profile.ThreadMemoryPriority),
                     ThreadEfficiencyMode = profile.ThreadEfficiencyMode,
                     GameClassInfo = profile.GameClassInfo,
                     Win32PrioritySeparation = profile.Win32PrioritySeparation
@@ -1718,7 +1761,9 @@ namespace KitLugia.GUI.Pages
             {
                 if (!File.Exists(_engineConfigPath))
                 {
-                    return new EngineConfig { EngineType = "fixed", EngineNumber = 1 };
+                    // Sem config gravada = primeira execucao: o motor tem de ser o
+                    // RECOMENDADO (Automatico = 5), nao um legado que ninguem escolheu.
+                    return new EngineConfig { EngineType = "fixed", EngineNumber = AutoEngineNumber };
                 }
 
                 var json = File.ReadAllText(_engineConfigPath);
@@ -1734,7 +1779,10 @@ namespace KitLugia.GUI.Pages
                             return config;
                         }
                     }
-                    if (config.EngineType == "fixed" && config.EngineNumber >= 1 && config.EngineNumber <= 4)
+                    // 1..5: o 5 (Automatico) TEM de ser aceite. Antes o intervalo era 1..4,
+                    // por isso escolher Automatico gravava 5, esta validacao REJEITAVA e o
+                    // arranque seguinte voltava silenciosamente para V1 (legado).
+                    if (config.EngineType == "fixed" && config.EngineNumber >= 1 && config.EngineNumber <= 5)
                     {
                         return config;
                     }
@@ -1745,9 +1793,34 @@ namespace KitLugia.GUI.Pages
                 KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao carregar motor: {ex.Message}");
             }
 
-            return new EngineConfig { EngineType = "fixed", EngineNumber = 1 };
+            return new EngineConfig { EngineType = "fixed", EngineNumber = AutoEngineNumber };
         }
 
+
+        /// <summary>
+        /// Texto longo do motor para a UI — FONTE ÚNICA.
+        ///
+        /// Antes havia 3 switches duplicados (troca de motor, saída do personalizado e
+        /// restauração no arranque) e já tinham divergido entre si: um dizia "PADRfO",
+        /// outro dizia que o V4 usava RealTime (o V4 removeu o RealTime de propósito, era
+        /// o que causava tela preta) e NENHUM conhecia o Automatico, apesar de ele ser o
+        /// padrão do serviço desde 03/10/2026.
+        /// </summary>
+        private static string MotorDescriptionText(int engineNumber) => engineNumber switch
+        {
+            1 => "🟢 V1 - Original Plus (LEGADO): Win32PrioritySeparation + CPU/IO/Page boost - Seguro e estável",
+            2 => "🟡 V2 - FPS Estável Plus (LEGADO): P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
+            3 => "🔴 V3 - Extremo Plus (LEGADO): P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance (>3%)",
+            4 => "💥 V4 - Performance Pro (LEGADO): I/O Alta + Timer + Rede + Win32PrioritySeparation - SEM RealTime por segurança",
+            5 => "🤖 Automático (RECOMENDADO): escolhe por cena - CPU/I-O/Page dinâmicos, timer só no loading, rede do V3 desligada, revert ao perder o foco",
+            _ => "⚙️ Motor personalizado"
+        };
+
+        private void ShowMotorDescription(int engineNumber)
+        {
+            try { if (TxtEngineDescription != null) TxtEngineDescription.Text = MotorDescriptionText(engineNumber); }
+            catch { }
+        }
 
         private void SaveLastEngine(int engineNumber, string? customProfileId = null)
         {
@@ -1830,16 +1903,7 @@ namespace KitLugia.GUI.Pages
                             CmbEngine.SelectedIndex = i;
 
                             // Atualiza a descrição também
-                            if (TxtEngineDescription != null)
-                            {
-                                TxtEngineDescription.Text = config.EngineNumber switch
-                                {
-                                    1 => "🟢 V1 - Original Plus: Win32PrioritySeparation + CPU/IO/Page boost (PADRÃO) - Seguro e estável",
-                                    2 => "🟡 V2 - FPS Estável Plus: P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
-                                    3 => "🔴 V3 - Extremo Plus: P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance agressivo (>3%)",
-                                    _ => "Desconhecido"
-                                };
-                            }
+                            ShowMotorDescription(config.EngineNumber);
 
                             // Aplica o motor
                             Services.TrayIconService.SetEngine(config.EngineNumber);

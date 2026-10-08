@@ -614,39 +614,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Close a handle from another process by duplicating and closing it.
-        /// This is the most powerful user-mode technique for releasing file locks.
-        /// </summary>
-        public static bool CloseHandleFromProcess(int pid, IntPtr handleValue)
-        {
-            try
-            {
-                IntPtr processHandle = OpenProcess(PROCESS_DUP_HANDLE, false, pid);
-                if (processHandle == IntPtr.Zero) return false;
-
-                try
-                {
-                    bool dupOk = DuplicateHandle(processHandle, handleValue,
-                        GetCurrentProcess(), out IntPtr dupHandle,
-                        0, false, DUPLICATE_CLOSE_SOURCE);
-
-                    if (dupOk)
-                    {
-                        CloseHandle(dupHandle);
-                        Logger.Log($"[HANDLE] Handle 0x{handleValue.ToInt64():X} do PID {pid} duplicado e fechado.");
-                        return true;
-                    }
-                    return false;
-                }
-                finally
-                {
-                    CloseHandle(processHandle);
-                }
-            }
-            catch { return false; }
-        }
-
-        /// <summary>
         /// Force-delete a file that is held open by a driver.
         /// Uses NtSetInformationFile with FileDispositionInformation.
         /// </summary>

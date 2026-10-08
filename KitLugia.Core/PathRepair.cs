@@ -761,17 +761,6 @@ namespace KitLugia.Core
             return (changed, newPath, logMessage);
         }
 
-        /// <summary>
-        /// Verifica se o PATH está saudável (sem problemas críticos).
-        /// </summary>
-        public static bool IsPathHealthy(string pathValue)
-        {
-            if (string.IsNullOrWhiteSpace(pathValue)) return false;
-
-            var entries = DiagnosePath(pathValue, "User");
-            return entries.All(e => e.Problem == PathEntryProblem.None);
-        }
-
         // --- API de leitura/escrita do PATH (usada pelo Explorador de PATH) ----
 
         public const string SystemPathRegistryKey = @"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";

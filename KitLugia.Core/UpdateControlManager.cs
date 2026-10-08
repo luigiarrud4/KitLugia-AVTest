@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace KitLugia.Core
 {
@@ -54,19 +55,19 @@ namespace KitLugia.Core
         /// Desinstala um KB instalado. ExitCode: 0 = sucesso, 3010 = sucesso (reinicio pendente),
         /// 2359302 = KB nao encontrado / desinstalacao nao suportada, 87 = argumento invalido.
         /// </summary>
-        public static (int ExitCode, string Output) UninstallUpdate(string kbNumber)
+        public static async Task<(int ExitCode, string Output)> UninstallUpdateAsync(string kbNumber)
         {
             EnsureElevated();
             var kb = kbNumber.Trim().ToUpperInvariant();
             if (!kb.StartsWith("KB", StringComparison.Ordinal)) kb = "KB" + kb;
-            return RunProcess("wusa.exe", $"/uninstall /kb:{kb} /quiet /norestart", 10 * 60 * 1000);
+            return await RunProcessAsync("wusa.exe", $"/uninstall /kb:{kb} /quiet /norestart", 10 * 60 * 1000).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Instala um pacote de update manual (.msu via wusa, .cab via DISM).
         /// ExitCode: 0 = sucesso, 3010 = sucesso (reinicio pendente).
         /// </summary>
-        public static (int ExitCode, string Output) InstallUpdatePackage(string path)
+        public static async Task<(int ExitCode, string Output)> InstallUpdatePackageAsync(string path)
         {
             EnsureElevated();
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
@@ -74,9 +75,9 @@ namespace KitLugia.Core
 
             var ext = Path.GetExtension(path).ToLowerInvariant();
             if (ext == ".msu")
-                return RunProcess("wusa.exe", $"\"{path}\" /quiet /norestart", 10 * 60 * 1000);
+                return await RunProcessAsync("wusa.exe", $"\"{path}\" /quiet /norestart", 10 * 60 * 1000).ConfigureAwait(false);
             if (ext == ".cab")
-                return RunProcess("dism.exe", $"/English /Online /NoRestart /Add-Package /PackagePath:\"{path}\"", 10 * 60 * 1000);
+                return await RunProcessAsync("dism.exe", $"/English /Online /NoRestart /Add-Package /PackagePath:\"{path}\"", 10 * 60 * 1000).ConfigureAwait(false);
             throw new ArgumentException("Formato nao suportado. Use .msu ou .cab.");
         }
 
@@ -113,7 +114,7 @@ namespace KitLugia.Core
             }
         }
 
-        private static (int ExitCode, string Output) RunProcess(string file, string args, int timeoutMs)
+        private static async Task<(int ExitCode, string Output)> RunProcessAsync(string file, string args, int timeoutMs)
         {
             try
             {
@@ -122,12 +123,15 @@ namespace KitLugia.Core
                 if (proc == null) return (-1, "Falha ao iniciar o processo.");
                 var outTask = proc.StandardOutput.ReadToEndAsync();
                 var errTask = proc.StandardError.ReadToEndAsync();
-                if (!proc.WaitForExit(timeoutMs))
+                var exitTask = proc.WaitForExitAsync();
+                if (await Task.WhenAny(exitTask, Task.Delay(timeoutMs)).ConfigureAwait(false) != exitTask)
                 {
-                    try { proc.Kill(); } catch { }
+                    try { proc.Kill(entireProcessTree: true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     return (-1, "Operacao excedeu o tempo limite.");
                 }
-                return (proc.ExitCode, (outTask.IsCompleted ? outTask.Result : "") + (errTask.IsCompleted ? errTask.Result : ""));
+                string output = await outTask.ConfigureAwait(false);
+                string error = await errTask.ConfigureAwait(false);
+                return (proc.ExitCode, output + error);
             }
             catch (Exception ex)
             {

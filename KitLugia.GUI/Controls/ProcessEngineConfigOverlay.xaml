@@ -103,13 +103,16 @@
                                 <ColumnDefinition Width="190"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <controls:InfoButton Grid.Column="0" ToolTipText="Prioridade das páginas de memória do processo no pool do sistema.&#x0a;&#x0a;• Normal: padrão.&#x0a;• Acima do Normal: as páginas deste processo são mantidas por mais tempo na RAM antes de irem para o arquivo de paginação — útil para apps que você usa o tempo todo."/>
+                            <controls:InfoButton Grid.Column="0" ToolTipText="Prioridade das páginas de memória do processo.&#x0a;&#x0a;Escala oficial do Windows: 1=Very Low até 5=Normal (que é o PADRÃO).&#x0a;Não existe &quot;acima do normal&quot;: 5 já é o topo. Para manter o processo na RAM por mais tempo o que se mexe é a memória do PROCESSO em si, não a página."/>
                             <TextBlock Grid.Column="1" Text="Prioridade Página" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
-                            <ComboBox Grid.Column="2" x:Name="CboPagePriority" SelectedIndex="0"
+                            <ComboBox Grid.Column="2" x:Name="CboPagePriority" SelectedIndex="4"
                                       Background="#2d2d2d" Foreground="White" BorderBrush="#555"
                                       Height="28" FontSize="12">
-                                <ComboBoxItem Content="Normal (0)"/>
-                                <ComboBoxItem Content="Acima do Normal (1)"/>
+                                <ComboBoxItem Content="Very Low (1)"/>
+                                <ComboBoxItem Content="Low (2)"/>
+                                <ComboBoxItem Content="Medium (3)"/>
+                                <ComboBoxItem Content="Below Normal (4)"/>
+                                <ComboBoxItem Content="Normal (5) — padrão"/>
                             </ComboBox>
                         </Grid>
 
@@ -119,15 +122,16 @@
                                 <ColumnDefinition Width="190"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <controls:InfoButton Grid.Column="0" ToolTipText="Prioridade de memória (quem é escolhido primeiro para ser compactado/despejado quando a RAM fica curta).&#x0a;&#x0a;• Alta: este processo é o último a perder memória — bom para o app que você não quer que trave.&#x0a;• Baixa/Média: o sistema pode recolher memória dele primeiro — bom para processos pesados em segundo plano."/>
+                            <controls:InfoButton Grid.Column="0" ToolTipText="Prioridade de memória: quem é escolhido primeiro para ser compactado/despejado quando a RAM fica curta.&#x0a;&#x0a;Escala oficial: 1=Very Low até 5=Normal (padrão).&#x0a;• Very Low: o SO recolhe memória deste processo primeiro — bom para processos pesados em segundo plano.&#x0a;• Normal: melhor para o app que você não quer que trave."/>
                             <TextBlock Grid.Column="1" Text="Memory Priority" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
-                            <ComboBox Grid.Column="2" x:Name="CboMemoryPriority" SelectedIndex="0"
+                            <ComboBox Grid.Column="2" x:Name="CboMemoryPriority" SelectedIndex="4"
                                       Background="#2d2d2d" Foreground="White" BorderBrush="#555"
                                       Height="28" FontSize="12">
-                                <ComboBoxItem Content="Normal (0)"/>
-                                <ComboBoxItem Content="Baixa (1)"/>
-                                <ComboBoxItem Content="Média (2)"/>
-                                <ComboBoxItem Content="Alta (3)"/>
+                                <ComboBoxItem Content="Very Low (1)"/>
+                                <ComboBoxItem Content="Low (2)"/>
+                                <ComboBoxItem Content="Medium (3)"/>
+                                <ComboBoxItem Content="Below Normal (4)"/>
+                                <ComboBoxItem Content="Normal (5) — padrão"/>
                             </ComboBox>
                         </Grid>
 

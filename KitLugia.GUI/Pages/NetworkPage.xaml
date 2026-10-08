@@ -18,7 +18,8 @@
             <Setter Property="Height" Value="13"/>
             <Setter Property="Stroke" Value="#FFD700"/>
             <Setter Property="StrokeThickness" Value="2.5"/>
-            <Setter Property="StrokeDashArray" Value="20 12"/>
+            <!-- DashArray em unidades de StrokeThickness: 20x2.5=50px > circunferência (40px) = círculo sólido (rotação invisível). 3x2.5=7.5px/5px = arco girando -->
+            <Setter Property="StrokeDashArray" Value="3 2"/>
             <Setter Property="StrokeEndLineCap" Value="Round"/>
             <Setter Property="StrokeStartLineCap" Value="Round"/>
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
@@ -69,11 +70,15 @@
                             <Trigger Property="Text" Value="">
                                 <Setter TargetName="ph" Property="Visibility" Value="Visible"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#FFD700"/>
-                            </Trigger>
+                            <!-- ORDEM IMPORTA: o ÚLTIMO trigger que casa vence. Hover antes do foco
+                                 para o anel dourado do campo focado NÃO ser trocado pelo cinza
+                                 quando o rato está em cima (era o caso no print 06/10: campo com
+                                 caret dourado e borda cinza). -->
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bd" Property="BorderBrush" Value="#555"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#FFD700"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -232,9 +237,11 @@
                     <!-- Tabela de provedores -->
                     <Border Background="#161616" BorderBrush="#2A2A2A" BorderThickness="1" CornerRadius="8" Padding="10,6,10,6">
                         <StackPanel>
-                            <Grid Margin="0,2,0,6">
+                            <!-- 6 colunas (igual ao template de item) + margem 6px = alinhamento exato com as linhas -->
+                            <Grid Margin="6,2,6,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
@@ -248,7 +255,7 @@
                                 <TextBlock Grid.Column="5" Text="" Width="66"/>
                             </Grid>
                             <ScrollViewer MaxHeight="230" VerticalScrollBarVisibility="Auto">
-                                <ItemsControl x:Name="DnsProviderList" ItemsSource="{Binding}">
+                                <ItemsControl x:Name="DnsProviderList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Background="{Binding IsCurrent, Converter={StaticResource BoolToCurrentBg}}" CornerRadius="5"
@@ -315,9 +322,8 @@
                                                             </Style>
                                                         </Button.Resources>
                                                     </Button>
-                                                    <!-- Spinner individual (só na coluna de latência, à esquerda do valor) -->
-                                                    <Ellipse Grid.Column="4" HorizontalAlignment="Left" Margin="-14,0,0,0"
-                                                             Style="{StaticResource RowSpinnerStyle}"
+                                                    <!-- Spinner individual (só na coluna de latência, à esquerda do valor) -->                            <Ellipse Grid.Column="4" HorizontalAlignment="Left" Margin="1,0,0,0"
+                                     Style="{StaticResource RowSpinnerStyle}"
                                                              Visibility="{Binding TestState, Converter={StaticResource TestStateToVis}}"/>
                                                 </Grid>
                                             </Border>
@@ -370,7 +376,7 @@
                     <TextBlock Text="&#x1F4E1; Controle do Adaptador" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="20,15,20,5"/>
                     <TextBlock Text="Ligue, desligue ou reinicie o adaptador de rede para resolver problemas de conex&#xE3;o." FontSize="12" Foreground="#808080" Margin="20,0,20,10"/>
                     <Separator Background="{StaticResource CardBorder}"/>
-                    <TextBlock x:Name="TxtSelectedAdapterForControl" Text="Selecione um adaptador acima" FontSize="13" Foreground="#808080" Margin="20,10,20,0"/>
+                    <TextBlock x:Name="TxtSelectedAdapterForControl" Text="Selecione um adaptador de rede" FontSize="13" Foreground="#808080" Margin="20,10,20,0"/>
                     <Grid Margin="20,10,20,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -560,7 +566,7 @@
                             <TextBlock Text="CTCP (Compound TCP)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Algoritmo de congestionamento otimizado para jogos e VoIP." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusCTCP" Text="Desativado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusCTCP" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkCTCP" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkCTCP_Click"/>
                     </Grid>
 
@@ -591,7 +597,7 @@
                             <TextBlock Text="RSS (Receive Side Scaling)" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Distribui processamento de rede entre m&#xFA;ltiplos cores CPU." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusRSS" Text="Desativado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusRSS" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkRSS" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkRSS_Click"/>
                     </Grid>
 
@@ -622,7 +628,7 @@
                             <TextBlock Text="Task Offload" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Permite que a NIC processe tarefas de rede (reduz carga CPU)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusTaskOffload" Text="Desativado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusTaskOffload" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkTaskOffload" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTaskOffload_Click"/>
                     </Grid>
 
@@ -653,7 +659,7 @@
                             <TextBlock Text="Network Throttling" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Remove limita&#xE7;&#xE3;o de largura de banda para aplica&#xE7;&#xF5;es n&#xE3;o-multim&#xED;dia." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusNetworkThrottling" Text="Ativo" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusNetworkThrottling" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkNetworkThrottling" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNetworkThrottling_Click"/>
                     </Grid>
 
@@ -1057,7 +1063,7 @@
                             <TextBlock Text="Interrupt Moderation" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Desabilitar reduz lat&#xEA;ncia (melhor para gaming)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusInterruptModeration" Text="Ativo" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusInterruptModeration" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkInterruptModeration" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkInterruptModeration_Click"/>
                     </Grid>
 
@@ -1088,7 +1094,7 @@
                             <TextBlock Text="Nagle's Algorithm" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Desabilitar para envio imediato de pacotes (reduz lat&#xEA;ncia)." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusNagle" Text="Ativo" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusNagle" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkNagle" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkNagle_Click"/>
                     </Grid>
 
@@ -1125,7 +1131,7 @@
                             <TextBlock Text="TCP Registry Tweaks" FontSize="15" Foreground="White"/>
                             <TextBlock Text="Window Scaling, Max Ports, TTL, ARP Cache e outros." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusTcpRegistry" Text="Desativado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StatusTcpRegistry" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#808080" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkTcpRegistry" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpRegistry_Click"/>
                     </Grid>
 

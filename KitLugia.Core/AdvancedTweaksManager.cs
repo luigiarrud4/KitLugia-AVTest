@@ -58,15 +58,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Verifica se a Segurança Baseada em Virtualização (VBS) está ativa.
-        /// </summary>
-        /// <returns>Verdadeiro se o VBS estiver habilitado.</returns>
-        public static bool GetVbsStatus()
-        {
-            return SystemTweaks.IsVbsEnabled();
-        }
-
-        /// <summary>
         /// Alterna o estado da Segurança Baseada em Virtualização (VBS).
         /// </summary>
         /// <returns>Uma tupla com o resultado da operação.</returns>

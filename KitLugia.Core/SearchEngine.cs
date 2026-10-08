@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace KitLugia.Core
 {
@@ -19,6 +20,13 @@ namespace KitLugia.Core
         public string ButtonText { get; set; } = "ABRIR";
         public SearchResultType Type { get; set; } = SearchResultType.Navigation;
         public Func<(bool Success, string Message)>? ExecuteAction { get; set; }
+
+        /// <summary>
+        /// Variante assincrona de ExecuteAction para acoes que rodam processos longos
+        /// (DISM/SFC). Quando presente, a UI a prefere e faz await real em vez de
+        /// bloquear a thread (sync-over-async).
+        /// </summary>
+        public Func<Task<(bool Success, string Message)>>? ExecuteActionAsync { get; set; }
         public string? NavigationTag { get; set; }
         public int Score { get; set; }
 
@@ -166,6 +174,11 @@ namespace KitLugia.Core
         private static void AddAction(string title, string desc, string icon, Func<(bool, string)> action)
         {
             AddItem(new GlobalSearchResult { Title = title, Description = desc, Icon = icon, ButtonText = "EXECUTAR", Type = SearchResultType.Action, ExecuteAction = action });
+        }
+
+        private static void AddActionAsync(string title, string desc, string icon, Func<Task<(bool, string)>> action)
+        {
+            AddItem(new GlobalSearchResult { Title = title, Description = desc, Icon = icon, ButtonText = "EXECUTAR", Type = SearchResultType.Action, ExecuteActionAsync = action });
         }
 
         private static void AddToggle(string title, string desc, string icon, string stateKey, Func<(bool, string)> action, Func<bool> check)
@@ -353,8 +366,8 @@ namespace KitLugia.Core
             AddAction("Flush DNS", "Limpa cache de resolução DNS.", "🚿", () => Toolbox.FlushDnsCache());
             AddAction("Resetar Windows Update", "Corrige erro 0x800 de atualização.", "🔄", () => { var r = Toolbox.ResetWindowsUpdateComponents(); return (r.Success, "Resetado."); });
             AddAction("Limpeza Total", "Limpa temporários, cache e lixeira.", "🧹", () => { Toolbox.RunFullCleanup(); return (true, "Limpeza concluída."); });
-            AddAction("Reparar Imagem (DISM)", "Corrige corrupção do sistema.", "🚑", () => { var r = System.Threading.Tasks.Task.Run(() => SystemRepair.RunDismRestoreHealthAsync()).GetAwaiter().GetResult(); return (r.Success, r.Output); });
-            AddAction("Verificar Arquivos (SFC)", "Escaneia arquivos protegidos.", "⚕️", () => { var r = System.Threading.Tasks.Task.Run(() => SystemRepair.RunSfcScanNowAsync()).GetAwaiter().GetResult(); return (r.Success, r.Output); });
+            AddActionAsync("Reparar Imagem (DISM)", "Corrige corrupção do sistema.", "🚑", async () => { var r = await SystemRepair.RunDismRestoreHealthAsync().ConfigureAwait(false); return (r.Success, r.Output); });
+            AddActionAsync("Verificar Arquivos (SFC)", "Escaneia arquivos protegidos.", "⚕️", async () => { var r = await SystemRepair.RunSfcScanNowAsync().ConfigureAwait(false); return (r.Success, r.Output); });
         }
 
         /// <summary>
@@ -504,10 +517,5 @@ namespace KitLugia.Core
                 .ToList();
         }
 
-        /// <summary>
-        /// Atalho do popup live: top-N instantaneo, sem checagem de estado.
-        /// </summary>
-        public static List<GlobalSearchResult> SearchTop(string query, int maxResults = 8)
-            => Search(query, maxResults);
     }
 }

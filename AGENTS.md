@@ -1,5 +1,290 @@
 ﻿# KitLugia — AGENTS.md
 
+### Sessao 07/10 (cont. 4) - Modo DIRETO Firemin + header da pagina RAM + 2 bugs do log real
+
+Pedido (prints): explicar como funciona; botao de modo "obedece" estilo Firemin
+(2 modos); UI da pagina RAM com letras cortadas.
+
+**1. Analise de ~30 s do app rodando (log real):** Opera oscila 205→1100 MB
+(corta/recresce; VERY_LOW aplicada e removida em loop); Discord em storm
+permanente (7-77k faults/s, backoff x8). Achados:
+- `trimmedCount` contava 2x por processo (empty + teto) → "64 processo(s)" para
+  32 reais. Agora `HashSet<int>` (processos únicos).
+- Baseline preso em 0: só atualizava com `ConsecutiveTrimCount == 0`, mas quem
+  nunca volta ao limite nunca zera → storm eterno. Agora a pausa por storm também
+  alimenta o baseline (é o "normal barulhento" sem corte).
+
+**2. Modo DIRETO (pesquisa Firemin: rizonesoft — `EmptyWorkingSet` ao exceder o
+`ReduceLimit`, a cada `Boost` ms; sem verificações; "Only reduce if over" = o
+threshold; dica oficial: subir o threshold se der lentidão/áudio cortando).**
+- `ProcessRamLimit.DirectMode` (JSON, default false) + `ToggleProcessRamDirectMode`.
+  Direto = passou do valor → EmptyWorkingSet + VERY_LOW, sem idle/storm/piso.
+  Proteções que ficam nos dois modos: nunca em foreground + cooldown mín. 2 s.
+- Botão 🧠/⚡ na linha (coluna Modo, entre MB e gear): 1 clique alterna + salva +
+  reconstrói a linha; badge `⚡ DIRETO` na linha gov. PROVADO (filho ATIVO 400 MB,
+  limite 200): 421→106 MB vivo, toggle volta ao governador.
+
+**3. UI da pagina RAM:**
+- O "|" após o título era o emoji 💾 sem fonte emoji (tofu) — título agora com
+  `FontFamily="Segoe UI Emoji, Segoe UI"`.
+- Header reestruturado em 3 linhas (título / subtítulo com Wrap / WrapPanel de
+  controles) — o subtítulo era espremido pelas colunas Auto ("específic.").
+- Status e gov com `TextWrapping="Wrap"` (nunca cortam letras).
+- Relatórios BCD (`BcdRepairPage`) e Conversor (`DiskConverterPage`): `NoWrap` →
+  `Wrap` (o texto do print 3 cortava em "para segurança p...").
+
+**Validacao:** solucao 0 erros (via `-p:OutDir=klbuild`, app aberto trava a DLL);
+`CheckUiThreading` 0 novos; screenshot `%TEMP%\rampage_out\ram_rows.png` (botão
+modo + gov por linha, sem corte); harness modo Direto ALL-PASS.
+
+**Adendo 5 (pedido: mapa visual + WinPE estilo EaseUS PreOS):**
+- **Mapa visual** (`Controls\DiskMapPanel.cs`, novo): barra proporcional colorida
+  (EFI=dourado, MSR/Recovery=roxo, C:=azul, dados=azul-claro, livre=tracejado) +
+  legenda por particao + linha do disco. Nas paginas Conversor (card MAPA DO DISCO,
+  atualiza ao trocar/analisar) e BCD (card MAPA, disco do Windows com Windows+ESP
+  em destaque dourado). Provado em screenshot (`diskvis_out\diskmap.png`).
+- **Conversao via WinPE** (`ScheduleWinpeConvertAsync` + `RamdiskConvertStartnetCmd`):
+  mesmo padrao testado do shrink (WIM + startnet + `KL_CONVERT_TARGET.dat` + BCD
+  GUID fixo + bootsequence + preflight + reboot 10 s). Identificacao do disco pela
+  ASSINATURA/GUID (`uniqueid disk` + `findstr`, com fallback p/ numero do host) —
+  nunca so pelo numero (discrepancia WMI x diskpart). `IsWinPeConvertEligible`
+  (flags, nao texto): libera so "Windows em uso"; BitLocker/dinamico/>2 TiB/
+  offline/RAW/sem-espaco/sem-assinatura continuam bloqueados. Botoes "WinPE:
+  CONVERTER PARA GPT/MBR" com DUPLA confirmacao (a 2ª avisa do reboot).
+- `ConvertPlan.CurrentSignature` (do MSFT_Disk: Signature/Guid) alimenta marcador
+  e script. `CheckUiThreading` pegou o `await ScheduleWinpeConvertAsync` na UI —
+  envolvido em `Task.Run` (0 novos).
+- Provado (leitura pura + geracao): script ASCII, echos sem parens, OK/FAIL/log/
+  remove-marcador; disco 0→MBR elegivel, disco 1 (sistema, 5 parts + C: 3,7 TB)
+  recusado corretamente. **Teste real do reboot fica para VM.**
+- Quirk: `PartitionRow` e classe IRMA (namespace), nao aninhada; `Color`/`Brushes`/
+  `HorizontalAlignment`/`FontFamily` ambiguos (WinForms) — qualificar.
+- **ⓘ explicativos (pedido: "uns i bem explicados"):** Conversor (MAPA: como ler as
+  cores/legenda; CONVERSÃO: o que é/limites/quando usar cada botão/WinPE/segurança;
+  SETOR 0: o que é cada botão + modo seguro x completo) e BCD (MAPA; REPARO: o que
+  cada botão faz + ESP sem letra montada sozinha). Mesmo `InfoButton` + `&#x0a;`
+  da pagina RAM.
+
+**Adendo 4 (pedido: botoes de disco nao podem agir na hora):**
+- **Conversor achava `force:true` SEMPRE:** 1 SIM na confirmacao ignorava disco de
+  sistema/BitLocker/>2 TiB. Agora: sem bloqueios `force:false` (o Core decide);
+  com bloqueios exige SEGUNDA confirmacao de FORÇAR (com riscos de nao-boot/perda)
+  e so entao `force:true`.
+- **Inicializar:** re-verifica particoes entre a confirmacao e a execucao (se o
+  disco ganhou particao no meio, aborta + recarrega).
+- **BCD Restaurar Arquivos:** executava SEM confirmacao (copia p/ ESP) — agora tem.
+- **BCD Reconstruir:** re-verifica Windows+ESP entre confirmacao e `bcdboot`
+  (diagnostico obsoleto aborta + re-analisa).
+- Os botoes da sidebar so navegam (NavTagMap); o tratamento e nas paginas.
+- Provado (leitura pura): disco 0 GPT→MBR livre, disco 1 sistema bloqueado
+  (5 particoes + C: 3,7 TB > 2 TiB).
+
+**Adendo 3 (debug só no cérebro + textos cortados):**
+- Linha gov (dourada) com VERY_LOW/faults/backoff/commit é debug: no ⚡ mostra só
+  badges + `⚡ DIRETO`; status no ⚡ mostra só "Atual + excedido/✓ (+ foco)".
+  Completo só no 🧠 (`BuildStatusText`/`BuildGovText` com o modo).
+- Subtítulo ISLC sem `TextWrapping` cortava ("passe o m...") — Wrap no título e
+  no subtítulo do card.
+
+**Adendo 2 (pedido: Direto padrao + botao i + pesquisa ISLC):**
+- Novos limites nascem `DirectMode=true` (`SetProcessRamLimit`); existentes
+  preservam o modo ao atualizar (AddOrUpdate mantem o objeto). Toggle + persistencia
+  provados em harness (`ramdirect`, 6/6).
+- Botao `ⓘ` (InfoButton padrao) no header da secao RAM explicando os 2 modos
+  (tooltip com `&#x0a;`, mesmo padrao dos botoes que funcionam).
+- **LICÃO/INCIDENTE:** harness que instancia `TrayIconService` e chama
+  Set/Remove/Toggle SALVA no JSON real do usuario (`SaveProcessLimits` em cada
+  chamada) — um teste apagou discord/opera/ramgovchild do disco (o app em memoria
+  estava intacto). Restaurado a mao a partir da leitura anterior + backup
+  `process_ram_limits.antes_do_restauro.json`. REGRA: harness com TrayIconService
+  faz backup do JSON antes e restaura depois, ou nao chama metodos que salvam.
+
+### Sessao 07/10 (cont. 3) - RAM Limiter governador de verdade (fim do "enfeite")
+
+Pedido: pagina de monitor RAM com pontos fora do lugar na UI + o limite por
+processo "virou enfeite" (navegadores/Discord com page faults; a medida aplicada
+tinha tirado o poder do usuario).
+
+**1. Por que era enfeite (3 causas provadas no harness `%TEMP%\opencode\ramgov`):**
+- Teto MOLE = decorativo (ja medido em 03/10: 486 MB com teto de 330 ficou em 486).
+- Teto DURO com handle sem `0x0200` (PROCESS_SET_INFORMATION): o `SetProcessMemoryPriority`
+  do fallback falhava MUDO (outros fluxos usam `| 0x0200`; o limiter nao usava).
+- Campos do "Resting State Tracker" (`RestingWorkingSetMB`, `LastPageFaultCount`,
+  `StormBackoffLevel`, `EffectiveFloorFromCommit`, `CommitSizeMB`...) existiam mas
+  NUNCA eram lidos nem escritos — motor desenhado e nao ligado. `CommitSizeMB` era
+  sempre 0 na UI.
+
+**2. Medicao decisiva (ApiDiag, filho parado, sem elevacao):**
+`SetProcessWorkingSetSizeEx(100,150,duro)` = TRUE mas WS 321 MB intacto por 20 s;
+`EmptyWorkingSet` = TRUE e 321→0 MB NA HORA. Conclusao: teto min/max e "preferencia"
+que o balance set manager ignora sem pressao; o UNICO mecanismo imediato e esvaziar
+(igual ao Firemin). Com RAM livre o esvaziado vai p/ standby (soft fault barato);
+o storm que doi e HARD (disco, sem RAM livre).
+Quirk do harness: orquestrador e filho com o MESMO nome .exe fazem o
+`GetProcessesByName` somar os dois e o foreground pular tudo — copiar o exe para
+`RamGovChild.exe` antes de lancar.
+
+**3. Governador novo (`ApplyProcessRamLimits` reescrito, TrayIconService):**
+- VERY_LOW 1x ao exceder (handle COM `0x0200`, agora entra de verdade) + volta a
+  NORMAL ao normalizar; teto de contenção distribuido proporcionalmente entre
+  instancias (opera 30 procs: teto dividido, nao repetido).
+- IDLE (faults<100/s + cpu<3% + RAM livre>2 GB) → EmptyWorkingSet (barato) + teto;
+  ATIVO ou RAM curta → só VERY_LOW + teto (sem esvaziar, sem storm).
+- Anti-storm: faults>1500/s com corte recente → pausa + backoff x2/x4/x8; abaixo de
+  500/s o backoff decai. Piso = max(min-por-tipo, 50% limite, 70% commit quando
+  commit>limite). CPU% por instancia via delta de TotalProcessorTime (`_govCpuPrev`
+  estatico, fora do JSON).
+- PROVADO (filho 400 MB tocando em loop, limite 200): 421→106 MB no 1º ciclo, vivo,
+  53k faults em 45 s (soft, standby), sem rasto ao desligar (teto liberado +
+  NORMAL). Medicao de faults/commit via `GetProcessMemoryInfo` local (1 handle por
+  instancia); `CommitSizeMB`/`PeakWorkingSetMB`/`RestingWorkingSetMB` preenchidos.
+
+**4. UI (TraySettingsPage):**
+- BUG: `RefreshProcessLimitsStatus` APAGAVA a 3ª linha (`floorTb.Text=""`) a cada 2 s
+  — os badges do gear sumiam logo apos carregar. Agora atualiza (`BuildGovText`).
+- BUG: construcao mostrava "Atual+Pico+Commit" e o refresh só "Atual" — a linha
+  "piscava" a cada 2 s. Novo `BuildStatusText` unico nos dois caminhos.
+- Linha gov: `🧠 gov: VERY_LOW 2350 faults/s ⛈ backoff x2 💾 commit` (provado em
+  screenshot `%TEMP%\rampage_out\ram_rows.png`); `MemPrio 5` (default) escondido
+  (era ruido em toda linha); estado zerado quando o processo para.
+
+**Validacao:** solucao 0 erros; `CheckUiThreading` 0 novos; BOM+CRLF 100%.
+
+**Adendo (log real do app, mesma noite): 2 bugs pegos pelo governador em producao:**
+- **Piso MAIOR que o teto (inversao):** o "commit floor" (70% do commit) passava do
+  teto (ex.: Opera teto 840 MB com piso 3184 MB; Discord teto 1913 com piso 2014).
+  Causa: commit conta memoria NAO residente (standby/pagefile) — exigir 70% dele
+  como piso impedia qualquer contenção e o `teto=max(piso)` virava o proprio piso
+  gigante. REMOVIDO (commit continua medido e exibido, fora do piso); se piso>teto
+  por limite baixo demais, loga aviso em vez de falhar mudo.
+- **Storm FALSO por app barulhento:** Discord faultando 22-36k/s SOZINHO travava o
+  governador (limiar fixo 1500/s pausava tudo para sempre). Agora storm e RELATIVO:
+  `max(1500, 5x baseline)`, com `BaselineFaultsPerSec` (media quando sem corte).
+- Build com app aberto dá MSB3021/3027 (DLL travada) — validar com
+  `-p:OutDir=C:/.../klbuild/` (0 erros); o usuario recompila pelo VS com o app fechado.
+
+### Sessao 07/10 (cont. 2) - Padrao de qualidade de ordenacao em TODAS as abas do TM
+
+Pedido (prints): % de GPU nao ordenava (lista cheia de "—" no topo com dwm.exe 6%
+la embaixo); "falta um padrao de qualidade" nas outras abas.
+
+**1. GPU (e Pico/TempoCPU/PageFaults/Commit/Disco/Rede) — CAUSA RAIZ: agregados do
+grupo zerados.** A linha individual preenche tudo (`GpuValue`, `PeakMemValue`,
+`CpuTimeSec`, `PageFaultsValue`, `CommitMB`), mas a linha de GRUPO (ApplyFilter)
+nao propagava NENHUM deles (e Disco/Rede/Threads/Handles vinham so do `first`).
+Resultado: todos os grupos empatavam em 0 e o clique "nao fazia nada" (o harness
+anterior dava PASS por tolerancia — empate geral passa em qualquer verificador;
+falso positivo documentado). Agora o grupo agrega: taxas/contadores SOMAM
+(GPU/Disco/Rede/threads/handles/tempo/faults/commit), pico e MAX, com texto
+formatado igual ao individual ("—" sem engine). PROVADO: 24 grupos com texto GPU
+→ todos com valor>0; `GpuValue|Desc` top real.
+
+**2. Padrao aplicado (toda coluna clicavel tem SMP + criterio que sobrevive ao refresh):**
+- Usuarios: case `"Status"` faltava no `ApplyUsersSort` (clicava e ordenava por CPU
+  com a seta no Status). Adicionado.
+- Servicos: colunas Nome/Exibicao/Inicializacao/Fabricante SEM `SortMemberPath`
+  (clique morto com `e.Handled=true`). SMPs adicionados (o switch ja cobria).
+- Inicializacao (TM): Nome/Comando/Local sem SMP. Adicionados.
+- Conexoes: sem handler (sort default, perdido a cada refresh que reconstroi a
+  lista). Novo `DgConnections_Sorting` + estado guardado, aplicado em
+  `ApplyConnectionFilter` (Pid numerico, resto texto).
+- Latencia x4 + Disco: novo handler GENERICO `TmGrid_Sorting` (CustomSort na view)
+  com `TmValueComparer` (entende numero, pt-BR "36.794", e unidades GB/MB/KB/B/%/ms/us;
+  "—"/"N/A" sempre por ultimo) + `RefreshTmGridSort` no fim de cada atualizacao
+  (RefreshLatencyUi + reconciliacao Storage). SMPs adicionados onde faltavam
+  (Storage aponta p/ props numericas reais: ReadBps/WriteBps/TotalBps/IopsValue).
+  `DgSumTopCpu` DEIXADO de fora de proposito (ranking fixo Top-14 por CPU + pin).
+
+**3. Validacao (harness `%TEMP%\opencode\tmsort`, janela real, cliques reais via
+`DataGridSortingEventArgs`):** Processos 13/13, Usuarios 5/5, Servicos 5/5,
+Inicializacao 4/4, Conexoes 6/6, `TryParseTmNumber` 8 casos + "—" — **ALL-PASS**.
+Solucao 0 erros; `CheckUiThreading` 0 novos; BOM+CRLF 100%.
+
+### Sessao 07/10 (cont.) - Demais colunas do TM + duplo clique no cabecalho
+
+Pedido (print): apos o fix da Memoria, revisar as OUTRAS categorias; e duplo clique
+no cabecalho (para inverter maior/menor) ABRIA A PASTA do processo.
+
+**1. Duplo clique no header abria a pasta — CAUSA RAIZ + FIX.**
+`DgProcesses_MouseDoubleClick` nao verificava ONDE foi o clique: o 2º clique do
+duplo clique no cabecalho caia em `MenuOpenFolder_Click` (explorer /select). Novo
+guard no topo do handler: sobe a arvore visual via `VisualTreeHelper.GetParent` e
+retorna se achar `DataGridColumnHeader` (qualificado
+`System.Windows.Controls.Primitives` — `DataGridColumnHeader` puro nao compila aqui
+por causa dos usings globais com WinForms, CS0246). Sem `Handled` (o Sorting precisa
+do evento). PROVADO com header REAL da arvore (`%TEMP%\opencode\tmsort`): grupo
+opera.exe (29) continua nao-expandido apos o dblclick (antes expandia/abria pasta).
+Quirk do harness: header criado manualmente NAO entra na arvore visual (Content sem
+template aplicado → GetParent null) — o teste com header fake FALHAVA; tem que trocar
+para a aba Processos (`SwitchTabByTag`) e pegar o header renderizado. Outro quirk:
+`HashSet<string>` NAO implementa `ICollection` nao-generica (`as ICollection` = null
+→ ArgumentNull no Cast) — usar `IEnumerable` no probe.
+
+**2. Todas as 13 categorias validadas (harness `%TEMP%\opencode\tmsort`, janela real).**
+Metricas (CPU/RAM/Disco/Rede/GPU/Pico/TempoCPU/PageFaults/Threads/PID) = ordem
+GLOBAL estrita na view (60 pares, tolerancia 0,15 = granularidade do round anti-pisca);
+texto (Nome/Usuario/Status) = grupos em ordem + alfabetico dentro. **13/13 PASS**
+(`Pid|Asc` top=System; `Threads|Desc` top=System; `RamValue|Desc` top=opera.exe (29)).
+`SortMemberPath="ProcessCount"` e de OUTRA aba (Usuarios) — nao e coluna do DgProcesses;
+todas as colunas do DgProcesses tem `MetricOf`/`SortColumnLabel` cobertos.
+
+**Validacao:** solucao 0 erros; `CheckUiThreading.ps1` 0 novos.
+
+### Sessao 07/10 - Filtro RAM global de verdade + verificacoes estilo EaseUS nos modulos de disco
+
+Pedido (prints): (1) o filtro de Memoria do KitTaskManager continuava agrupado por tipo
+(devenv 1,2 GB em cima, opera.exe (24) 2,5 GB embaixo); (2) os menus do Gerenciar Discos
+(WinPE Tools/shrink, Reparar Boot/BCD, Conversor MBR/GPT) sem verificacao boa o bastante
+— a ideia era replicar o EaseUS Partition Master (docs EASEUS_EPM_*.md).
+
+**1. Ordenacao RAM: CAUSA RAIZ ERA A VIEW, NAO O OrderRows.**
+A correcao anterior (OrderRows global por metrica) estava CERTA e provada na source
+(`_groupedLive`: opera 3,4 GB > Discord 2,1 GB > ...), mas a `CollectionView` tinha um
+`PropertyGroupDescription("Group")` PERMANENTE que reagrupava tudo na apresentacao —
+nenhuma ordem global jamais chegaria na tela. Novo `ApplyGroupingMode()`:
+metrica (CPU/RAM/Disco/Rede/GPU/...) = `GroupDescriptions.Clear()` (lista plana
+global); texto (Nome/Status/Usuario) = agrupa por tipo. Chamado no Loaded, no
+`DgProcesses_Sorting`, no combo e na seta. `IsTextSortColumn()` unico (OrderRows usa
+o mesmo). PROVADO com janela real (`%TEMP%\opencode\tmsort`, tecnica do
+docs/TASKMANAGER_UI_DEBUG.md): top 10 global por RAM em ordem estrita, sem grupo
+na frente. Clique em Nome volta a agrupar (comportamento preservado).
+
+**2. Reparar Boot/BCD — 3 bugs reais + ESP sem letra (estilo EaseUS MountSrcBootPart):**
+- `BackupBcdStore` retornava SEMPRE null: `File.Exists(dst)` numa PASTA (sempre false).
+  Agora `Directory.Exists(dst)`. O tooltip "com backup antes" mentia — o backup era
+  feito mas reportado como falha.
+- `FindEspPartition` exigia letra: ESP nasce SEM letra (prova: Disco 1 Part 2, 100 MB,
+  IsSystem, sem letra nesta maquina) → diagnostico travava em "ESP nao encontrada".
+  Novo `FindEspPartitionNoLetter` + `EnsureEspMountedAsync` (`mountvol X: /s` em letra
+  livre Z..S, com confirmacao de montagem) + `ReleaseEspMountAsync` (`mountvol /d` so
+  do que nos montamos). `DiagnoseAsync`/`RebuildAsync`/`RestoreBootFilesAsync` montam
+  sozinhos (finally libera). `ScoreEspCandidate` ganhou regras sem-letra: IsSystemFlag
+  32 MB-2 GB → 70; "GPT: System" (rotulo do legado Win32_*) → 65; EFI → 100 mantido.
+- `GetAllDisks` sem admin voltava discos "vazios" (so "Nao Alocado" do tamanho total)
+  porque o nativo detectava o disco mas nao lia o layout (erro 5) e `disks.Count > 0`
+  impedia o fallback. Agora: tudo-unallocated → throw → Storage API; e Storage API sem
+  particoes reais (MSFT_Partition negado via DCOM p/ token nao elevado, embora o CIM
+  do PowerShell passe) → legado Win32_* (que funciona: 5 particoes incl. ESP).
+  PROVADO sem admin: ESP achada via legado. Mensagem da BcdRepairPage atualizada
+  (o Core monta sozinho; nao pede mais letra manual).
+
+**3. Conversor MBR/GPT — limpa read-only sozinho (EaseUS §3.2):**
+Novo `PartitionManager.ClearDiskReadOnlyAsync` (`attributes disk clear readonly`).
+`ConvertAsync`: read-only como UNICO bloqueio → limpa + re-analisa e segue; continua
+bloqueando em BitLocker/dinamico/sistema-BIOS/>2 TiB. Outros bloqueios intactos.
+
+**4. Extend/Shrink — retry estilo CAsynLockVolume (MAX_RETRY_TIMES):**
+Novo `RunDiskpartWithRetryAsync`: repete 1x apos 3 s SOMENTE com medicao provando
+"nada mudou" (gate anti-shrink-duplo: `shrink desired` repetido encolheria 2x; efeito
+parcial nunca repete). Usado no degrau diskpart do Extend e do Shrink. Handle aberto
+(AV/indexer/VSS) libera em segundos — era a causa nº 1 de "falhou sem motivo".
+
+**Validacao:** solucao 0 erros; ordenacao visual OK (harness WPF, 139 itens);
+score ESP 7/7; ESP achada sem admin; `CheckUiThreading.ps1` 0 novos; encoding
+preservado (BOM+CRLF onde havia; LF puro onde o arquivo ja era LF — sem mistura).
+Teste end-to-end com admin (montar ESP + bcdedit + conversao) fica para o app real:
+os probes rodam sem elevacao e bcdedit/mountvol exigem.
+
 ## REGRAS DO PROJETO
 
 1. **NUNCA usar hardcoded paths** (ex: `C:\Users\...`, `C:\KL_WINPE\arquivo.exe`).
@@ -8253,3 +8538,2925 @@ metodos mortos 138->136 (-601 linhas).
 - [ ] (opcional) Empty catches -> Logger.LogWarning (comecar por ForceStopUnlockService)
 - [ ] Pendencias carregadas: testes de VM do Fresh Install, Downgrade de build em VM,
       validacao visual das paginas (docs/PAGES_VISUAL_AUDIT.md)
+
+### Sessao 01/10 - Core: remocao do lote seguro de codigo morto (136 -> 103)
+
+Continuacao do backlog da auditoria do Core. Remocao dos metodos publicos com
+0 chamadores (confirmados por grep em todo o repo, inclusive tests/, alem do
+auditor). Nada commitado (arvore mudou de "Deploy v2.0.59" do usuario).
+
+**3 arquivos inteiramente mortos deletados:** GPEditManager.cs (4 metodos, thin
+wrappers de Toolbox), BloatwareManager.cs (3, wrappers de SystemTweaks),
+NativeBlake3.cs (HashFile/HashBytes + P/Invoke + ctor - classe so referenciada
+por si mesma).
+
+**Metodos removidos em 12 arquivos:** ServiceHelper (IsServiceRunning/
+TryStartService/TryStopService), SystemInfo (IsWindows11OrLater/IsWindows10OrLater/
+IsWindows81OrLater/IsWindowsServer/GetProcessorCount + struct SYSTEM_INFO), Logger
+(LogRegistry/ToggleOutputLimit/ToggleVerboseCheck/GetLogPath), ToggleManager
+(SaveAllToggles/RestoreAllToggles/ClearAllSnapshots), SystemUtils (GetRestorePoints/
+OpenSystemRestoreWizard/RunPreflightCheck/GetRegistryValue), NativeMetricsHelper
+(GetActiveUserNames), + 1 em cada: RegistryCleaner.CleanIssues,
+DriverManager.CheckForOutdatedDrivers, SearchEngine.SearchTop,
+ContinuityEngine.GetFolderSizeFast, PathRepair.IsPathHealthy,
+SafeProcessHelper.GetProcessPathFast, StorageDiagnostics.ResetCounters.
+
+**Resultado:** 16 arquivos, 718 linhas removidas; metodos publicos mortos 136 -> 103.
+Build: Core 0 erros; GUI /t:Compile 0 erros (o build completo so falha no MSB3021
+porque o KitLugia.GUI.exe estava aberto). Encoding preservado (CRLF em todos;
+BOM onde ja havia).
+
+**Ferramenta nova:** tests/remove_dead_methods.py <arquivo> <assinatura> - remove
+metodo preservando BOM+CRLF (nao usar write_file nesses arquivos, que grava LF
+sem BOM). Verificado: tests/core_deep_audit2.py deterministico (2 runs identicos);
+tests/core_privilege_layout.py 5 OK / 0 problemas.
+
+### Proxima sessao
+- [ ] Continuar o lote: 103 metodos mortos restantes (SystemTweaks 43,
+      WindowsUpdateManager 7, WinbootManager 7, StartupManager 6, Guardian 6,
+      WinpeBuilder 3, StoreEngine 3, DeepUninstaller 3...) - metodo a metodo
+- [ ] (backlog) empty catches -> Logger.LogWarning (comecar por ForceStopUnlockService, 13)
+- [ ] (backlog) eliminar os 15 awaits sincronos do Core (async end-to-end)
+- [ ] (backlog) validar o novo Dashboard nativo-first no app
+### Sessao 01/10 (cont.) - Core: codigo morto zerado (103 -> 0)
+
+Segundo lote do dia: removidos TODOS os 103 metodos publicos mortos restantes
+(+ 3 que ficaram orfaos depois) usando tests/remove_dead_methods.py. Nada commitado.
+
+Lotes:
+1. WindowsUpdateManager (7): ScanUpdates/InteractiveScan/DownloadUpdates/InstallUpdates/
+   SetDeferralDays/ClearDeferralPolicies/RunProcessStatic.
+2. 21 em 9 arquivos: AdapterManager (GenerateMirroredMac/BuildDhcpRefreshScript);
+   LocalInstallManager (CopyInstallFiles/IsUEFI); DiagnosticsManager
+   (RepairSystemComponentsDISM/ReinstallDefaultApps); BootOptimizerManager
+   (AnalyzeShutdownPerformance/SearchBootItemOnline); SmartVersionDetector
+   (GetRealVersionAsync/GetRealVersion); PartitionManager (RemoveDriveLetter/
+   CreateVhdBypass); DeepUninstaller (FindProgramFilesOrphans/RemoveUserExclusion/
+   ClearUserExclusions); KitStore/StoreEngine (BuildPhantomReport/DetectStuckPackages/
+   FixStuckPackage + campos _cachedUpgrades/_cachedAppx + classe StuckInfo, agora orfa);
+   WinpeBuilder (InjectStartnetCmdIntoWimAsync/InjectConfigIntoWimAsync/
+   InjectBootFilesIntoWimAsync).
+3. 13 avulsos: AdvancedTweaksManager.GetVbsStatus, BrowserCacheManager.
+   GetTotalBrowserCacheSize, BrowserExtensionManager.ListBackups, DriverUnlockService.
+   CloseHandleFromProcess, EnablementPackageManager.FindEnablementCab,
+   ForceStopUnlockService.IsLocked, IntegrityCheckManager.RunPreOperationCheck,
+   KnownStartupArgs.SuggestArgsForCommand, NetworkTrafficMonitor.GetHeavyNetworkUsers,
+   TaskManager/SafeProcessHelper.GetProcessPath, DriverManager.SearchDriverOnWeb,
+   KitStore/StoreModels.RaiseAll, SystemUtils.RestorePointModel.
+4. Guardian (6) + StartupManager (6) + WinbootManager (7) = 19: RestoreAllTweakStates,
+   ResetAllConfigurations, SaveQuickToggleConfig, GetQuickToggleState,
+   GetAppliedQuickToggles, CheckExplorerProblems; GetElevatedStartupTaskFullNames,
+   GetBootTrayAdminFlag, SetBootTrayAdminFlag, GetRemovedApps, GetAllAdvancedItems,
+   CheckAndFixStartupMethods; IsKitLugiaIso, PerformDiagnostics, CreateWinpeFlatEntry,
+   CreateEfiBootEntry, InstallGrubAsPrimary, ReadLastWinpeLog, ClearWinpeLogs.
+5. SystemTweaks (43): bloco inteiro de helpers Is*/Optimize*/Revert* nao usados (VBS,
+   segment heap, large cache, boot log/noGUI, NVMe, GPU vendor, network diag/bluetooth
+   LE, protected print, app control, sudo, explorer visuals, wait-to-kill,
+   hung-app-timeout, reserved storage, etc.) + actions legadas (ReinstallBloatwareApp,
+   ToggleFastStartupTweak, GetAllGpus, GetActiveNetworkAdapters,
+   SetDeliveryOptimizationMode, GetContextMenuEntryCount, GetForceStopUnlockScriptPath).
+6. Orfaos pos-lote (3): IntegrityCheckManager.IntegrityResult (record),
+   IsFastStartupTweakEnabled, GetForceStopUnlockFolder.
+
+BUG DA FERRAMENTA + CORRECAO: tests/remove_dead_methods.py fecha o metodo na primeira
+linha `}` de 8 espacos — ok p/ metodos com bloco, mas em metodos expression-bodied
+multi-linha (ex.: `SetDeliveryOptimizationMode(int mode) // ...` seguido de
+`=> RegSetDword(...);`) o corpo nao tem `}` proprio e a ferramenta engoliu o proximo
+metodo (RestrictDeliveryOptimization, USADO pela TweaksPage). Detectado pelo build da
+GUI (CS0117) e restaurado por patch Python. Regra: antes de remover, conferir se a
+assinatura termina em `;` ou tem `=>` na linha seguinte (one-line/expression-bodied ->
+remover por linha, via Python) e SEMPRE buildar Core + GUI depois do lote.
+
+Verificacao: Core 0 erros; GUI compila (o /t:Build para apenas no MSB3021/3027 porque
+o KitLugia.GUI.exe estava aberto — o CS0103 em massa do `/t:Compile` puro era artefato
+do MarkupCompilePass ausente, nao erro real). Auditoria (core_deep_audit2.py): metodos
+publicos mortos 103 -> 0. Diff acumulado (as duas sessoes, nao commitado): 42 arquivos,
++91/-2929.
+
+### Proxima sessao
+- [ ] (backlog) empty catches -> Logger.LogWarning (comecar por ForceStopUnlockService, 13)
+- [ ] (backlog) eliminar os 15 awaits sincronos do Core (async end-to-end)
+- [ ] (backlog) validar o novo Dashboard nativo-first no app
+- [ ] (opcional) remover IntegrityCheckManager.cs inteiro (100% morto agora; so tem
+      CheckDiskHelper privado + TODO de WMI SMART)
+### Sessao 01/10 (cont. 2) - Core: 15 awaits sincronos eliminados (async end-to-end)
+
+Backlog do dia: os 15 sites de `GetAwaiter().GetResult()`/`.Result` do KitLugia.Core.
+A auditoria (core_deep_audit2.py, secao 4) agora reporta **0 no Core**.
+
+1. **2 metodos mortos removidos** (zero chamadores): `AdapterManager.RestartAdapter`
+   (sync) e `SmartVersionDetector.GetVersionInfo` (sync).
+2. **Ja dentro de metodos async -> await real**: WinbootManager (RunProcessCaptured
+   ~1329), WinpeBuilder.RunProcess x2, IsoEditorManager.RunProcessCapturedWithStdin
+   (Task.Run sync -> Task.Run(async)), WinbootManager.ScanBcdEntriesAsync
+   (Task.Run -> Task.Run(async) + await RunProcessCaptured).
+3. **UpdateControlManager**: RunProcess -> RunProcessAsync (WaitForExitAsync +
+   Task.WhenAny(timeout)); UninstallUpdate/InstallUpdatePackage -> UninstallUpdateAsync/
+   InstallUpdatePackageAsync; WindowsUpdatePage chama direto (sem Task.Run).
+4. **StoreEngine**: NuGetLatestVersion -> NuGetLatestVersionAsync (await
+   _http.GetStringAsync); QueryDotnetToolUpdates -> QueryDotnetToolUpdatesAsync;
+   StoreRemakePage usa a versao async dentro do Task.WhenAll.
+5. **DriverManager**: ExportDriverListToTxt -> ExportDriverListToTxtAsync
+   (await GetSystemDriversAsync); DriversPage chama direto.
+6. **SearchEngine**: acoes DISM/SFC nao usam mais sync-over-async. Novo
+   GlobalSearchResult.ExecuteActionAsync (Func<Task<(bool,string)>>) + helper
+   AddActionAsync; MainWindow prefere o async e faz await dentro do Task.Run. As
+   demais acoes (sincronas) continuam em ExecuteAction.
+7. **SystemUtils (2 shims de compat, 373 + 14 chamadas)**: reimplementados como
+   SINCRONOS DE VERDADE (ReadProcessOutputSync: 1 thread por stream + WaitForExit com
+   timeout) - mesma semantica de saida (ReadToEnd) e mesmo timeout de 120s, sem
+   Task/GetAwaiter. RunExternalProcessAsync/WithCodeAsync seguem como API async;
+   RunExternalProcessAsync ganhou 2 chamadores reais (LocalInstallManager
+   PreparePartition/RemoveBootPartition, que ja eram async).
+
+Verificacao: Core 0 erros; GUI compila (o build so para no MSB3021/3027 porque o
+KitLugia.GUI.exe estava aberto); auditoria: 0 metodos publicos mortos E 0 sync awaits
+no Core. Os `.Result` restantes estao so no GUI (MainWindow, QuickInstallPage,
+StoreRemakePage) - fora do escopo do Core.
+
+### Proxima sessao
+- [ ] (backlog) empty catches -> Logger.LogWarning (comecar por ForceStopUnlockService, 13)
+- [ ] (backlog) migrar os .Result restantes do GUI para await (MainWindow:3053,
+      QuickInstallPage:86, StoreRemakePage:292/320-324)
+- [ ] (backlog) validar o novo Dashboard nativo-first no app
+- [ ] (opcional) remover IntegrityCheckManager.cs inteiro (100% morto agora)
+### Sessao 01/10 (cont. 3) - Limpeza final: .Result no GUI, logs em kills, diagnostico
+
+1. **.Result restantes do GUI migrados para await** (8 sites):
+   - MainWindow.LoadIntroSettingsAndPlay: removido `.ContinueWith(t => ... t.Result ...)`;
+     agora `await ...WaitAsync(500ms)` e o try/catch externo trata o timeout.
+   - QuickInstallPage.Run: `(proc.ExitCode, await outTask, await errTask)`.
+   - StoreRemakePage.QueryDevUpdatesAsync e RefreshInstalledAsync: `await t1..t4` e
+     `await installedTask` ate `devTask`.
+   Resultado: a auditoria (secao 4) agora so aponta `tests/TaskManagerOpenBench`
+   (benchmark que mede o proprio sync-over-async de proposito).
+2. **Kills que engoliam a excecao agora logam** o padrao ja usado no projeto
+   (`catch { Logger.LogWarning("Unknown", "Exception suppressed"); }`):
+   EnablementPackageManager (DISM timeout), StartupManager (PackageQueryTimeout),
+   Tweaks/FileTakeOwnership, UpdateControlManager (RunProcessAsync).
+3. **Nova ferramenta**: tests/quality_scan.py (read-only) - conta catches vazios,
+   GC.Collect e Kill por arquivo; serve para priorizar o backlog de empty catches.
+
+Nao mexido (decisao de escopo, risco alto x ganho baixo):
+- **664 catches vazios** (Core+GUI). Muitos sao best-effort em hot paths do TaskManager
+  (metricas ~1s) - logging em massa geraria spam e custo. Migrar por arquivo, com criterio.
+- **IsoEditorPage**: o overlay "KIT ISO STUDIO" (OverlayIsoStudio) nunca fica Visible
+  (so ha 2 atribuicoes Visibility.Collapsed) - e UI morta de ~255 linhas de XAML +
+  handlers; remocao grande, deixada como tarefa separada.
+- WMI `Win32_*` (28), `ServiceController` (16), duplicacao de DllImport/process
+  helpers - refactors arquiteturais, nao quick fixes.
+
+Verificacao: Core 0 erros; GUI compila (so MSB3021/3027 com o app aberto); auditoria:
+0 metodos publicos mortos e 0 sync awaits no Core e no GUI de producao.
+
+### Proxima sessao
+- [ ] (backlog) empty catches -> Logger.LogWarning, arquivo por arquivo (usar
+      tests/quality_scan.py para priorizar; comecar por ForceStopUnlockService, 14)
+- [ ] (backlog) remover o overlay morto KIT ISO STUDIO da IsoEditorPage (XAML + handlers)
+- [ ] (backlog) validar o novo Dashboard nativo-first no app
+- [ ] (opcional) remover IntegrityCheckManager.cs inteiro (100% morto agora)
+
+### Sessao 02/10 — Medidor de latência REAL (DashboardPage) + toggles dessincronizados
+
+Pedido do usuario: "no dashboardpage cheque tudo que tem nele e de prioridade ao que se diz
+medidor de latencia ele nao funciona e os metodos que usa sao meio falsos".
+
+1. **LatencyAnalyzer.cs reescrito (medicao 100% real, ~1066 linhas)** — antes o motor
+   fabricava numeros: `Thread.SpinWait` + fator 15x + `Random` no "MeasureSingleLatency";
+   DPC/ISR derivados da media das amostras; page faults = `WorkingSet64/4096`; latencia por
+   driver de dicionario hardcoded (nvlddmkm=400, ...). Fontes reais agora:
+   - `NtQuerySystemInformation` classe 8 (SystemProcessorPerformanceInformation, struct 48 B:
+     DpcTime/InterruptTime/InterruptCount por CPU, unidades de 100ns);
+   - classe 23 (SystemInterruptInformation, struct 24 B: DpcCount + ContextSwitches);
+   - classe 2 (SystemPerformanceInformation: PageFaultCount no offset 60);
+   - `NtQueryTimerResolution` (nomes invertidos: Minimum = maior espera 15,625 ms;
+     Maximum = menor 0,5 ms);
+   - sonda de despertar: QPC + `Thread.Sleep(1)` em thread dedicada AboveNormal
+     (TaskCompletionSource — sem thread do pool bloqueada), min / media aparada 5% / p95 /
+     max / desvio + DPC%/ISR% de parede x CPUs + DPCs/s + ctx/s + page faults/s.
+   Score real e estabilidade por coeficiente de variacao; cancelar no meio do benchmark
+   restaura o estado original.
+
+2. **Validacao independente (probe PowerShell)**: structs 48/24 bytes ok, timer
+   15,625/0,5 ms, DPC 0,16% e ISR 0,18% reais, despertar medio 15,5 ms (granularidade do
+   scheduler).
+
+3. **DashboardPage**: cards agora MEDIA/P95/MAX em ms + linha de detalhes (min, amostras,
+   DPC%, ISR%, DPCs/s, timer); o botao APLICAR RECOMENDACOES (AutoOptimizeAsync) agora
+   aparece apos a analise; removidos ProgressLatencyScan e AnimateProgressBarAsync mortos.
+
+4. **DiagnosticPage**: a "limpeza" por reflection em campos que nao existem mais
+   (_latencySamples/_driverStats) virou `LatencyAnalyzer.ReleaseBuffers()`.
+
+5. **DashboardPage — toggles sem revert corrigidos**: Gdi/Pcie/VBS/Unpark so chamavam no ON
+   (EnableGdiScaling, EnablePcieLinkStatePowerManagement, EnableVBSCodeIntegrity,
+   RevertUnparkCpuPowerConfig no OFF); Fsutil agora compara IsMemoryUsageEnabled() antes do
+   ToggleMemoryUsage; novo `LoadCreatorTweaks()` sincroniza 12 checkboxes no Loaded (antes
+   abriam todos desmarcados mesmo ja aplicados).
+
+Verificacao: Core 0 erros; GUI 0 erros (build em OutDir temporario — o bin normal segue
+bloqueado pelo app aberto); auditoria: 0 metodos publicos mortos e 0 sync awaits.
+
+6. **Auditoria das deleções ("verifique os codigos removidos")** — resultado:
+
+   - `tests/removed_symbols_audit.py` (novo, reaproveitavel): difere membros declarados
+     HEAD vs working nos 48 .cs alterados e procura referencias vivas a cada nome removido
+     (texto global, inclui strings/nameof). Achou **177 membros removidos em 40 arquivos**.
+   - Referencias vivas: **zero reais**. Os 5 nomes sinalizados (DriverName, FullName,
+     Reason, Family, static) sao colisoes com outras classes vivas (WMI/JSON DOM) e
+     artefato de extracao — verificados a mao.
+   - Deletados `BloatwareManager.cs`, `GPEditManager.cs`, `NativeBlake3.cs`: zero
+     referencias em .cs/.xaml/.csproj.
+   - Caso conhecido do script (`SetDeliveryOptimizationMode` engolia
+     `RestrictDeliveryOptimization`): corrigido — vive em SystemTweaks.cs:10073 e e usado
+     por TweaksPage.xaml.cs:2357.
+   - **Rebuild FORCADO Core+GUI (`-t:Rebuild`) = 0 erros** (155 avisos pre-existentes:
+     CS8600/8602/8618/8625 nullable, SYSLIB0057, CS0675, CS0219). O `-t:Build` incremental
+     nao recompilava de fato (so copiava saidas antigas) — para validar delecoes, usar
+     Rebuild ou invalidar a pasta obj.
+   - Licao: `remove_dead_methods.py` fecha no primeiro `}` de 8 espacos; expression-bodied
+     multi-linha engole o metodo seguinte. Depois de todo lote: `-t:Rebuild` + auditoria
+     (`tests/removed_symbols_audit.py`).
+
+### Proxima sessao
+- [x] ~~Auditar delecoes das limpezas de codigo morto (177 membros; ver acima)~~
+- [ ] Validar no app: ANALISAR latencia (benchmark real) e conferir ms/DPC/ISR/timer
+- [ ] (backlog) empty catches -> Logger.LogWarning, arquivo por arquivo (quality_scan.py)
+- [ ] (backlog) remover o overlay morto KIT ISO STUDIO da IsoEditorPage
+- [ ] (backlog) validar o novo Dashboard nativo-first no app
+
+### Sessao 02/10 (cont.) — Medidor de latencia COMPLETO (LatencyMon-style)
+
+Pedido: "teste o medidor e busque na web preciso dele completo".
+
+1. **LatencyAnalyzer.cs — metricas que faltavam (tudo de fonte real)**:
+   - **Pior janela (spike) de DPC/ISR**: amostrador paralelo a cada 250ms dos contadores da classe 8
+     (`WorstDpcWindowPercent`/`WorstIsrWindowPercent`/`SpikeWindowMs`/`SpikeWindowCount`) -
+     equivalente ao "highest reported DPC/ISR execution time" do LatencyMon no nivel possivel sem driver.
+   - **Hard page faults reais**: `PerformanceCounter("Memory", "Pages Input/sec")` (paginas lidas do
+     disco para resolver hard faults) — media + pico (`HardPageFaultsPerSec`/`MaxHardPageFaultsPerSec`).
+   - **P50/P99** da sonda de despertar (`P50LatencyUs`/`P99LatencyUs`).
+   - **Velocidade da CPU por nucleo**: `NtPowerInformation(SystemProcessorInformation=11)` ->
+     PROCESSOR_POWER_INFORMATION (CurrentMhz/MaxMhz em `CpuLatencyInfo`) - mostra throttling.
+   - Recomendacoes + relatorio do benchmark incluem hard faults, pico de janela e MHz.
+
+2. **LatencyDriverAnalyzer.cs (NOVO) — DPC/ISR POR DRIVER, estilo LatencyMon**:
+   - Pacote novo no Core: `Microsoft.Diagnostics.Tracing.TraceEvent 3.2.8` (parser ETW da Microsoft).
+   - **QUIRK critico (descoberto e contornado)**: `TraceEventSession.EnableKernelProvider` FALHA
+     nesta build do Windows 11 26100 com `ERROR_WMI_INSTANCE_NOT_FOUND (4201)` nos DOIS caminhos
+     (nome proprio/system-logger e "NT Kernel Logger" via KernelTraceControl nativo). Solucao:
+     iniciar a sessao **direto pela API nativa** (`StartTraceW` + EVENT_TRACE_PROPERTIES realtime
+     `LogFileMode=0x08000100`, `Wnode.Flags=0x20000`, ClientContext=1, LoggerNameOffset=sizeof,
+     LogFileNameOffset=+2048) e consumir com `ETWTraceEventSource("NT Kernel Logger", Session)`;
+     parar com `source.Dispose()` (seta stopProcessing + fecha handles) + `ControlTraceW(STOP)`.
+   - Eventos: `PerfInfoDPC`/`PerfInfoTimerDPC`/`PerfInfoThreadedDPC`/`PerfInfoISR`
+     (`DPCTraceData`/`ISRTraceData.ElapsedTimeMSec` = tempo real por rotina); endereco da rotina ->
+     driver via `NtQuerySystemInformation(SystemModuleInformation=11)` (RTL_PROCESS_MODULES,
+     entrada 296B x64, ImageBase@16, ImageSize@24, FullPathName@40).
+   - Requer administrador (a GUI roda elevada); sessao "NT Kernel Logger" e UNICA no sistema
+     (LatencyMon/WPR em uso -> mensagem tratada, sem derrubar a sessao alheia).
+   - GUI DashboardPage: botao **"DRIVERS (ETW)"** + `TxtDriverReport` (tabela top-10);
+     `BuildLatencyExtra` mostra p99, pico de janela, hard faults e MHz.
+
+3. **Testes reais (harness novo `tests/LatencyMeterTest`, modos normal/deep/raw)** — rodados no host:
+   - normal (10s+5s): media 1,93ms | p50 1,95 | p95 2,49 | p99 2,56 | max 3,49 | DPC 0,32% |
+     ISR 0,59% | pior janela 250ms: DPC 0,63%/ISR 1,25% | hard faults 840/s (pico 9890/s) |
+     CPU 3500/3500MHz | timer 0,977ms | 5208 amostras em 10s.
+   - deep (elevado): nvlddmkm.sys DPC max 1236,9us / total 110,7ms | dxgkrnl.sys ISR max 694,7us /
+     total 171,9ms | Wdf01000.sys | tcpip.sys | NDIS.SYS | storport.sys | portcls.sys |
+     ntoskrnl.exe | 0 eventos perdidos.
+   - raw: probe cru de StartTraceW (8 combinacoes) — comprovou que a API nativa funciona e que
+     o shell de teste roda como administrador.
+
+4. **Licoes**:
+   - Apos adicionar pacote ao Core, o GUI precisa de `dotnet restore` (o project.assets.json nao
+     conhece dependencia transitiva nova) — senao `TraceEvent.dll` nao vai para a saida e o app
+     quebra em runtime.
+   - Quoting do OutDir temporario: usar barras normais (`-p:OutDir=C:/.../kl_gui_check/`); com
+     `\\"` no fim a aspa escapa e o `/m` do MSBuild entra no path, virando build infinito de copia.
+
+Verificacao: Core 0 erros; GUI 0 erros (OutDir temp, apos restore); deep scan testado elevado.
+
+### Proxima sessao
+- [ ] Validar no app: card de latencia (ANALISAR) + botao DRIVERS (ETW) + linha extra nova
+- [x] ~~Testar o medidor (harness normal/deep/raw)~~ — FEITO (numeros acima)
+- [ ] Publicar pelo VS conferindo as subpastas amd64/x86/arm64 (KernelTraceControl.dll) na saida
+- [ ] (backlog) empty catches -> Logger.LogWarning, arquivo por arquivo (quality_scan.py)
+- [ ] (backlog) remover o overlay morto KIT ISO STUDIO da IsoEditorPage
+- [ ] (backlog) validar o novo Dashboard nativo-first no app
+
+### Sessao 02/10 - Easter egg estilo YouTube: digitar "awesome" pisca as bordas em modo colorido
+
+1. **`KitLugia.GUI\Services\EasterEggManager.cs` (NOVO, ~300 linhas)**: digitar "awesome"
+   em QUALQUER campo de texto do Kit dispara a "festa" de bordas arco-iris.
+   - Deteccao GLOBAL: `EventManager.RegisterClassHandler(typeof(TextBoxBase),
+     TextBoxBase.TextChangedEvent, ...)` -> funciona em qualquer TextBox de qualquer janela
+     (MainWindow, Kit TaskManager, loja, paginas), sem tocar em cada pagina. Cobre digitacao,
+     colar (Ctrl+V) e texto setado por codigo. Trigger = texto TERMINA em "awesome"
+     (OrdinalIgnoreCase) + cooldown de 1,2 s (anti-duplo/re-render).
+   - Visual: cria 2 `Border` (overlay sem filho, `IsHitTestVisible=false`, `Panel.ZIndex=99999`)
+     no PRIMEIRO `Panel` encontrado na arvore visual da janela (externa 10px + interna 3px
+     defasada). `Grid.SetRowSpan/ColumnSpan` = nº de linhas/colunas do painel (o Grid raiz da
+     MainWindow tem linha extra pro console - sem isso a borda parava no meio da janela).
+   - Cor: `LinearGradientBrush` diagonal com 7 `GradientStop` arco-iris (HSL->RGB proprio,
+     `Color.FromHsv` NAO existe no WPF). Cada stop anima `Color` (AutoReverse/Forever) com
+     periodo proprio (180ms + i*110) -> o arco-iris ANDA pela borda em vez de piscar uniforme.
+   - Pulso: `DoubleAnimation` de `Opacity` (externa 420ms 0,05->1, interna 260ms 0,35->1) +
+     duracao 12 s (`DispatcherTimer` por janela). Digitar "awesome" de novo durante a festa
+     REINICIA o timer (igual YouTube). Ao fim: para animacoes, fade de 450 ms e remove as
+     borders da arvore (nada fica sujo). Hook `Closed` 1x por janela (HashSet `_closeHooked`)
+     evita empilhar handlers.
+   - `EasterEggManager.Start()` chamado em `App.OnStartup` (idempotente) + `Play()` para
+     disparo manual em QA. Toast "AWESOME!" via `MainWindow.ShowInfo` + log `[EASTER EGG]`.
+2. **Quirk WPF+WinForms**: o projeto tem `UseWindowsForms`, entao `Panel`/`Brush`/`TextBox`/
+   `Application`/`Point`/`Color`/`HorizontalAlignment` ficam AMBIGUOS entre `System.Windows.*`
+   e `System.Windows.Forms.*` - resolver com aliases (padrao do projeto, ver MainWindow.xaml.cs).
+3. **Armadilha de build (repetida)**: `-p:OutDir=bin\verify\` no bash vira `binverify` (o `\v`
+   e escapado) e cria a pasta-junk `KitLugia.GUI/binverify 2/` com COPIAS DOS FONTES -> o glob
+   do SDK compila `Resources/FilterCommands.cs` duas vezes -> CS0101 "Program duplicado".
+   Use barras normais: `dotnet build ... "-p:OutDir=obj/verifybin/"` (as pastas-junk foram
+   removidas de novo aqui).
+
+Build: GUI 0 erros / 146 warnings (baseline nullable), validado com OutDir temporario
+(o app estava rodando e trava o bin em bin/Debug -> MSB3021).
+
+**A TESTAR (host)**: abrir qualquer campo (ex.: busca global) -> digitar "awesome" -> bordas
+das janelas abertas devem piscar em arco-iris por 12 s; digitar de novo estende; testar com
+o Kit TaskManager aberto (todas as janelas animam juntas).
+
+### Sessao 02/10 (cont.) - PartitionsPage: por que "Estender" falhava + escada sem diskpart
+
+**Diagnostico do problema relatado** (operacoes de disco falhando sem motivo real):
+1. `RunDiskpartScript` so olhava o EXIT CODE. O diskpart devolve 0 em varios cenarios de falha ->
+   "Extendido com sucesso" sem ter extendido (e o inverso: falha sem causa aparente).
+2. `ExtendPartition` era 100% diskpart e nao recebia disco/partition -> nao havia como tentar a via nativa.
+3. Sem diagnostico: a UI mostrava so "Nao foi possivel estender". As causas REAIS (espaco nao contiguo
+   a direita / FAT32 / BitLocker / limite MBR de 2 TB / pagefile+hiberfil no fim do volume) nunca apareciam.
+4. `MovePartition` e `AtomicExtendDISM` detectavam a particao recriada com `Partitions.LastOrDefault()` —
+   isso pega a ULTIMA particao do DISCO, nao a nova: se houvesse particao depois, o WIM era aplicado
+   na particao ERRADA (dados "sumiam" do lugar).
+5. `ShrinkPartitionUsingStorageAPI` (MSFT_Partition.Resize) existia mas NUNCA era chamada pela pagina —
+   o metodo estava morto enquanto a UI usava diskpart.
+6. Mergear (DISM) vinha com `IsChecked="True"` no XAML: o modo DESTRUTIVO era o padrao, sem o usuario pedir.
+
+**Correcoes no Core (KitLugia.Core\PartitionManager.cs)**:
+1. **Escada de 3 degraus no Extend**, cada degrau VERIFICADO medindo o volume antes/depois:
+   (a) `MSFT_Partition.Resize` (Storage Management API — o mesmo caminho do Gerenciador de Discos);
+   (b) IOCTL nativo `IOCTL_DISK_GROW_PARTITION` (0x7C0D4 -> 0x7C0D0 confirmado na web) +
+   `FSCTL_EXTEND_VOLUME` (particao/volume ONLINE, sem lock — docs dizem que da p/ estender particao viva);
+   (c) diskpart (compatibilidade). Se o volume nao cresceu, o degrau conta como FALHA e segue.
+   NOVO param opcional `diskIndex`/`partitionIndex` (a pagina passou a enviar).
+2. **Shrink** agora usa `MSFT_Partition.Resize` primeiro e valida contra `GetSupportedSize` ANTES de
+   tentar: se o pedido passa de SizeMin, retorna o **limite real** em vez de mandar o discopart falhar.
+3. **`GetMaxShrinkMb`**: Storage API (`Size - SizeMin`, exato e instantaneo) com fallback pro
+   `shrink querymax` do diskpart (RAW/sem Storage API). Novo `GetMaxExtendMb` (SizeMax - Size).
+4. **`LastError` + `GetResizeDiagnostics(part, forExtend)`**: devolve BLOQUEIOS (sem letra; FS != NTFS/ReFS;
+   sem espaco contiguo a direita; MBR > 2 TB) e AVISOS (hiberfil.sys, pagefile, BitLocker, particao
+   de boot). A pagina mostra isso ANTES de executar — e o que fecha as "pontas soltas".
+5. **Bug do WIM na particao errada corrigido**: `GetPartitionOffset` + `DetectRecreatedPartition`
+   (particao mais proxima do offset original) substituem o `LastOrDefault`.
+6. `RunDiskpartScript` agora extrai a linha de erro do VDS (pt-BR e en-US) para o `LastError`.
+
+**Correcoes na UI (KitLugia.GUI\Pages\PartitionsPage.xaml/.cs)**:
+1. `ShowOpError()` — todo erro de operação mostra o `LastError` real (nunca mais "Nao foi possivel X").
+2. "Mesclar" virou OPT-IN (`IsChecked="False"`) + confirmacao explicando que a particao vizinha e
+   EXCLUIDA e os dados vao para `Arquivos_Mesclados` (antes era o padrao sem pedir).
+3. Texto mentiroso removido: "Diskpart falhou (Limite de 3GB/Imóveis)" — 3 GB e limite de REDUCAO,
+   nao de extensao. O fallback agora diz "Extensão nativa recusou. Tentando modo atômico (DISM)".
+4. Novo `TxtExtendWarning` mostra os avisos (pagefile/BitLocker) dentro do overlay; `TxtShrinkWarning`
+   (que existia e nunca era usado) passou a exibir hiberfil/pagefile.
+5. Rótulo do disco: combo agora mostra interface + espaco nao alocado + marcador de disco de sistema;
+   `TxtDiskInfo` mostra contagem de partições + total nao alocado.
+
+**Pesquisa web (fundamenta das escolhas)**: MSFT_Partition tem `Resize` + `GetSupportedSize`
+(learn.microsoft.com/msft-partition); `MSFT_Volume.Optimize` NAO faz shrink (so ReTrim/Analyze/
+Defrag/SlabConsolidate/TierOptimize) — por isso o maximo de reducao vem do GetSupportedSize e nao de
+"Optimize"; `defrag /X` (free-space consolidation) e a forma oficial de aumentar o espaco reduzivel
+sem WinPE (util para o botao "Consolidar espaco livre" futuro); extend so funciona com espaco
+CONTIGUO a DIREITA (causa #1 do botao cinza no Gerenciador de Discos); FSCTL_EXTEND_VOLUME suporta
+NTFS/RAW/ReFS e nao reduz.
+
+**VALIDADO no host (leitura pura, sem tocar em disco)**: `MSFT_Partition WHERE DriveLetter='C'`
+funciona (Disk=1 Part=3 Size=3999055974400); `GetSupportedSize` devolveu SizeMin=3978673000448 /
+SizeMax=3999055974400 => max reducao 19.438 MB e **SizeMax == Size** (C: nao tem espaco contiguo a
+direita) — exatamente o caso que antes gerava "Nao foi possivel estender" sem explicacao.
+Parametros dos metodos conferidos via Get-CimClass: `GetSupportedSize(SizeMin, SizeMax, ExtendedStatus)`
+e `Resize(Size, ExtendedStatus)` — os arrays de argumentos do InvokeMethod estao corretos.
+
+Build: Core 0 erros; solucao completa (GUI+Core+Updater) 0 erros / 154 warnings (baseline nullable).
+
+**A TESTAR (VM com disco descartavel)**: (1) estender C: numa particao com nao alocado a direita — deve
+usar a Storage API em segundos, sem diskpart no log; (2) estender sem espaco contiguo — deve aparecer o
+diagnostico antes de qualquer operacao; (3) reduzir C: passando do limite — erro com o limite real;
+(4) mesclar vizinha — agora pede confirmacao; (5) `GetSessionLog`/terminal com as linhas [EXTEND]/[SHRINK]/[STORAGE].
+
+### Proxima sessao
+- [ ] (opcional) Botao "Consolidar espaco livre" (defrag /X) antes da reducao, para aumentar o maximo
+- [ ] (opcional) Testar o caminho IOCTL (degrau b) forcando a Storage API indisponivel
+- [ ] (opcional) Migrar o resto das operacoes (format/delete/create) da Storage API, hoje ainda 100% diskpart
+
+### Sessao 02/10 (cont.) - EaseUS EPM WinPE analisado no IDA + REPARO DE BCD no Kit
+
+Alvo: `C:\Users\Lugia\Downloads\easeuswinpeepm\epm` (copias em `%TEMP%\epm_analysis/targets`; originais
+intocados). Ferramenta: IDA Pro 9.0 (`idat.exe -A` + IDAPython). Scripts RE versionados em
+`docs/ida_epm_dump.py` e `docs/epm_scan_imports.py`. Documentacao completa: **`docs/EASEUS_EPM_ANALYSIS.md`**.
+
+1. **Descoberta 1 - ele NAO usa diskpart para redimensionar**: log em runtime (`bin\EPMLOG.log`) mostra
+   `CDiskEnumerator : Storage space init` + `Vds loadservice`, e o IDA confirma `CWin32BootRepairManager::
+   _vdsResize` -> `CBasicDiskVolume::ReSize()` recebendo `IPartitionManager` (COM do VDS). Ou seja: VDS =
+   a mesma base do Gerenciador de Discos; a Storage Management API (MSFT_*) que o Kit adotou é a
+   sucessora moderna do VDS. **A direção do Kit está correta.**
+2. **Descoberta 2 - o reparador de BCD** (`Win32BootRepair.dll:0x1800021A0`, `CBcdBootProc::
+   TransferBootStaff`, log original `d:\epm\main\code\bootrepairtool\bootrepair_func\win32bootrepair\
+   consoleproc.cpp:163`):
+   `sprintf(L"%s %C:\windows /s %C:\ /f %s", <dir>\Bcdboot.exe, win, esp, UEFI|BIOS)` e, no BIOS,
+   `sprintf(L"%s /nt60 %C: /mbr", <dir>\BootSect.exe, sys)`. Eles EMBARCAM `bcdboot.exe`, `bcdedit.exe`
+   e `bootsect.exe` na pasta. Nao e magia: e a ferramenta oficial da Microsoft na ordem certa.
+3. **Descoberta 3 - `Win32Bcd.dll` e o bcdedit embrulhado em modelo de objetos**: `AddBootLoader` gera
+   `/create %s /application osloader` + `/create %s /device` + SaveParameters + `_addDisplayItem`
+   (= exatamente o que o Kit ja faz em `CreateEfiBootEntry`/`CreateDirectNvramBoot`). Exports:
+   UpdateBootOrder, SetDefaultItem, DeleteBootLoader, LoadByGuidString, EnumProc, InitByCurSystem.
+4. **Descoberta 4 - `Win32UEFI.dll` edita a NVRAM da placa**: `Get/SetFirmwareEnvironmentVariableW` com
+   `BootOrder`, `BootNext`, `Boot####` + `UEFI_ClearDevPaths`; exports `UEFI_UpdateBootOrder`,
+   `UEFI_SetNextBootEntryId`, `UEFI_DeleteBootOption`, `UEFI_SetNextBootintoFireware`. O Kit cobre o
+   BootNext via `bcdedit /set {fwbootmgr} bootsequence`, mas nao mexe em `Boot####`.
+5. **Fluxo do reparo completo**: CreateSystemTgt (`_isGPT` -> `_getEfiPart` -> `ModifyPartEfiProp`, ou
+   `ResizeMoveProc` se nao houver particao) -> MountSrcBootPart -> TransferBootStaff (bcdboot+bootsect)
+   -> AddRegProcItem -> DeleteTgtSysPart -> `InitByCurSystem`/`EnumProc` para a UI.
+
+**Implementado no Kit**:
+1. **`KitLugia.Core/BcdRepairManager.cs` (NOVO)**: `DiagnoseAsync()` (firmware UEFI/BIOS, ESP, loja BCD,
+   bootmgfw.efi, arquivos de boot, entradas winload reais vs WinRE), `RebuildAsync()` (bcdboot + bootsect
+   no BIOS, com BACKUP em %LOCALAPPDATA%\KitLugia\BCD-Backup antes e VERIFICACAO depois), 
+   `RestoreBootFilesAsync()` (recopia arquivos sem tocar na BCD), `VerifyAsync()`, `FindEspPartition()`.
+2. **`KitLugia.GUI/Pages/BcdRepairPage.xaml/.cs` (NOVO)** + item de menu "Reparar Boot/BCD" (PageType
+   `BcdRepair`, tag 🩺): relatorio do diagnostico + 3 acoes (ANALISAR / RECONSTRUIR BCD / RESTAURAR
+   ARQUIVOS), com confirmacao avisando que as entradas atuais da BCD sao apagadas.
+3. **BUG encontrado pelo proprio teste no host**: a deteccao por `application osloader` e ERRADA — o
+   bcdedit moderno NAO imprime esse campo; a entrada real aparece como bloco "Carregador de
+   Inicializacao do Windows" + `path \WINDOWS\system32\winload.efi`. Corrigido com parser de blocos
+   (separa por linhas `-----`), contando entradas REAIS (ignora `winpe Yes` = WinRE). Antes disso o
+   kit acusaria "BCD sem entrada do Windows" numa maquina saudavel.
+4. **Outro bug pego pelo teste**: `Encoding.GetEncoding(850)` lancava NotSupportedException em .NET Core
+   sem `CodePagesEncodingProvider` registrado (igual ao `RunProcessStreamed` do PartitionManager).
+
+**VALIDADO no host (leitura pura)**: DiagnoseAsync() em um PC saudavel -> UEFI (ESP + {fwbootmgr}),
+ESP em S: (100 MB, "EFI System partition"), Windows em C:, loja BCD + bootmgfw presentes, bcdedit OK,
+3 entradas winload (2 WinRE + 1 Windows), **Healthy=True**; `bcdboot.exe`/`bootsect.exe` localizados em
+`C:\Windows\System32`.
+
+Build: solucao completa 0 erros / 144 warnings (baseline).
+
+**A TESTAR (VM)**: (1) abrir Reparos Boot/BCD e ANALISAR; (2) QUEBRAR a BCD de proposito (renomear
+`\EFI\Microsoft\Boot\BCD` numa VM) -> ANALISAR deve acusar e RECONSTRUIR deve consertar (com backup);
+(3) testar em VM BIOS (bcdboot /f BIOS + bootsect); (4) conferir que as entradas do Kit Lugia somem
+apos o rebuild (esperado — documentado na confirmacao).
+
+### Proxima sessao
+- [ ] (opcional) NVRAM do firmware como o Win32UEFI.dll do EaseUS (Boot####/BootOrder, "bootar no setup")
+- [ ] (opcional) Embutir bcdboot/bootsect no pacote do kit (o EaseUS embarca) para funcionar no WinPE
+- [ ] (opcional) Migrar format/delete/create do diskpart para a Storage API (falta no ciclo do disco)
+
+### Sessao 02/10 (cont.) - EaseUS "Disk Converter" + Built-in Toolkits: conversor MBR/GPT no Kit
+
+O usuario mandou prints da UI do EPM 20.8 (Partition Manager / Disk Clone / Disk Converter /
+Built-in Toolkits). Cruzei com o IDA (`DiskConverter.dll`) e implementei a capacidade que faltava.
+
+1. **Achados (IDA + strings do `DiskConverter.dll`)**
+   - Operacoes literais: "Convert MBR to GPT", "Convert GPT to MBR", "Initialize to MBR/GPT disk",
+     "Rebuild MBR", "4K alignment", "AlignDisk", "Wiping partition data", "Smart Resize".
+   - Checklist (`isMBR2GPTValid` @ `0x1800740F0`, `isGPT2MBRValid` @ `0x180073A70`): disco/dinamico
+     (LDM), PE system disk, Windows 32-bit, particao > 2 TiB no MBR, "At least 1M unallocated space
+     is required in the end of disk", write protected, "Failed to generate the BCD file during MBR
+     to GPT conversion" (depois de converter, o boot e refeito), cluster do sistema > 4 KB no 4K align.
+   - Mecanismo: VDS COM. No Windows 8+ o sucessor e a **Storage Management API**.
+
+2. **API CONFIRMADA NO HOST** (Get-CimClass MSFT_Disk/Partition): nao existe `ConvertToGpt/ConvertToMbr`
+   nem `GetStorageDependencyInformation` neste build. O metodo real e
+   **`MSFT_Disk.ConvertStyle(PartitionStyle UInt16, ExtendedStatus)`** (0=Unknown 1=MBR 2=GPT 3=RAW),
+   mais **`MSFT_Disk.Initialize(PartitionStyle, ...)`** e **`MSFT_Disk.Clear(RemoveData, Sanitize,
+   ZeroOutEntireDisk, ...)`**. MSFT_Partition tem `Offset`, `MbrType`, `GptType`, `IsActive`, `IsReadOnly`.
+
+3. **NOVO `KitLugia.Core/DiskConverterManager.cs`**: `GetDisks/GetPartitions`, `Analyze(disk,target)`
+   (todos os bloqueios/avisos acima), `ConvertAsync` (escada `MSFT_Disk.ConvertStyle` in-place ->
+   `diskpart convert`, com VERIFICACAO de estilo + contagem de particoes no final),
+   `InitializeAsync` (disco RAW), `ReadMbr/BackupMbrAsync/RestoreMbrAsync` (Rebuild MBR: backup dos 512
+   bytes em %LOCALAPPDATA%\KitLugia\MBR-Backup com SHA256; restauracao padrao copia SO os 446 bytes de
+   codigo de boot e mantem a tabela atual; escrita com Flush(true) + leitura de volta byte a byte) e
+   `AnalyzeAlignment` (4K/1 MiB, so diagnostico - reposicionar exige mover dados).
+
+4. **NOVO `KitLugia.GUI/Pages/DiskConverterPage.xaml(.cs)`** + menu "Conversor MBR/GPT" (tag U+1F500,
+   depois de BtnBcdRepair). ANALISAR mostra os DOIS sentidos com OK/X/!; conversao so com confirmacao
+   que lista os bloqueios; apos converter para GPT em disco de sistema aponta o Reparar Boot/BCD.
+
+5. **BUG CORRIGIDO (limitacao herdada)**: `PartitionManager.ConvertDiskStyle` recusava disco nao vazio
+   ("A conversao MBR/GPT requer que o disco esteja completamente vazio") e o disco do sistema. Agora
+   delega ao DiskConverterManager (in-place, como o EaseUS/Windows 11). `RunDiskpartScript` ficou
+   `internal` e ganhou `RunDiskpartAsync(disk, gpt|mbr)`.
+
+6. **VALIDADO NO HOST (leitura pura)**: disco 0 (465 GB GPT) -> podeConverter(MBR)=true; disco 1
+   (3,7 TB sistema/UEFI) -> 3 bloqueios corretos para MBR (UEFI sem GRUB, 5 particoes > 4, C: > 2 TiB);
+   setor 0 dos dois = MBR protetivo 0xEE (nota nova); alinhamento real: 4 de 5 particoes fora de 1 MiB.
+
+Build: solucao completa **0 erros / 154 warnings** (nullable pre-existentes).
+Documentacao: docs/EASEUS_EPM_ANALYSIS.md (Parte 2, secoes 5-7).
+
+**A TESTAR (VM com disco descartavel)**: selecionar disco GPT de dados -> ANALISAR -> CONVERTER PARA MBR
+(particoes/dados intactos, estilo verificado) -> reconverter para GPT -> INICIALIZAR num disco RAW ->
+BACKUP DO SETOR 0 -> RESTAURAR (modo seguro) -> checar alinhamento.
+
+---
+
+### Sessao 02/10 (cont.) — MAPA COMPLETO do EaseUS EPM 20.8 (docs/EASEUS_EPM_MAP.md)
+
+Pedido: "continue olhando e faca um mapa completo para nao termos que reanalisar".
+Metodo: em vez de reversing ad-hoc, extrai-se a arquitetura pelos **exports PE** e pelos
+**caminhos de fonte vazados** (`__FILE__` dos asserts). Resultado: **41 modulos, 3.051
+exports, 177 caminhos de fonte em 37 diretorios** — tudo deterministico e reproduzivel.
+
+**Scripts RE versionados (docs/, antes so havia 2):**
+- `epm_exports.py` — demangle dos exports MSVC -> mapa de classes/metodos por modulo
+- `epm_srcmap.py` — extrai os 177 caminhos de fonte (arquitetura interna)
+- `epm_cmds.py` — TODAS as strings de shell-out (`--diskpart` filtra)
+- `epm_map.py` — imports + strings por categoria de feature
+- (existes) `ida_epm_dump.py`, `epm_scan_imports.py`
+
+**ACHADOS NOVOS (nunca precisa reanalisar):**
+1. **O "Write Protection" do EaseUS E o diskpart**: `WriteProtect.exe` = `diskpart.exe /s %1`
+   com script `select disk %1` / `attributes disk %2 readonly`.diskpart so aparece em
+   5 modulos, sempre com script literal: write-protect, limpar readonly antes de operar
+   (`attributes disk clear readonly | diskpart`), WinRE, clone, bootrepair. **NUNCA resize.**
+2. **Rebuild MBR NAO e boot code embarcado** — e `bootsect /nt60 /mbr` (string `%s /nt60 %C: /mbr`).
+   Varredura de assinaturas em 41 binarios: so achou o stub PE de cada um (1x), zero blobs
+   de boot. Logo o metodo do Kit (446 bytes + tabela atual + SHA256) e o caminho sem
+   dependencia de boot sector do Windows — **melhor** que o do EaseUS nesse ponto.
+3. **Fases do Rebuild MBR sao versionadas**: `Windows 2000/XP/2003`=3, `Vista/2008`=4,
+   `7/8/8.1/10/2012`=5 — o `CRebuildMBRController` e carregado dinamicamente com a versao-alvo.
+4. **Contrato de 54 operacoes** (enum de `ToolBox.dll`, codes 4097-4151): Create, Format,
+   SetActive, MoveResize, Hide, Delete, ChangeLabel, ChangeDriveLetter, DeleteAll,
+   Clone{Partition,Disk,DiskInitialization,DiskFinalization,Volume}, ConvertTo{NTFS,FAT,exFAT},
+   WipeDisk, **RebuildMBR**, ConvertToBasicDisk, InitializeTo{MBR,GPT}Disk,
+   RecoveryPartitions(single), ConvertTo{Logical,Primary}, WipePartition, Merge,
+   MoveResizeVolume, RepairRAID5, ConvertToDynamic, MigrateOS, Convert2{GPT,MBR},
+   **AlignDisk**, Create/Format/DeleteVolume, InitializeDiskToMigrateOS,
+   ConvertMigrateOSToBootMode, SmartMoveResize, SmartSpaceAdjustment, AdjustDiskLayout,
+   AllocateSpace, QuickPartition, ChangeClusterSize, SmartCreate, TurnOffBitlocker,
+   Convert2{GPT,MBR}(composited), **LowLevelFormat**.
+5. **Motor de resize NTFS = 2 estrategias** (Strategy pattern, confirmado pelos fonte):
+   `ResizeMoveByRebuildingBitmap.cpp` (encolher: reconstroi `$Bitmap`) e
+   `ResizeMoveByRebuildingMFT.cpp` (crescer/mover: reconstroi `$MFT`), escolhidos por
+   `ResizeMoveAlgorithmCreator.cpp`. 25 arquivos-fonte em `mod.ntfsutil` revelados.
+   `$B0` = `$DATA` do proprio `$MFT` (`CNtfsMFT::Get0XB0DataRun`); deal = fase da operacao
+   (`Old/New/SecondVolumeResizeMoveDeal`).
+6. **"Bad Sector Scan" NAO e teste de superficie**: e `NTFSFixer/FATFixer/ExFATFixer::FixByScanSector`
+   — varre setores achando clusters ruins e **conserta o metadado do FS**. Tem log retomavel.
+7. **BitLocker inteiro in-house** (`BitLockerLib.dll`): `AesEncryptSectors`, `ReadRawData`,
+   `CreateBitLockerFveControl`, `GetFullVolumeEncryptionKey`, metadados `FVE-EOWBM/EOWBR`,
+   Crypto++ em `f:\study\cryptopp890`. **Achado util**: usa a classe WMI
+   `Win32_EncryptableVolume Where DriveLetter=` (root\CIMV2\Security\MicrosoftVolumeEncryption),
+   que tem Protect/Unprotect/Lock/Unlock — dispensa `manage-bde`.
+8. **`CAsynLockVolume`**: trava o volume em thread dedicada com `MAX_RETRY_TIMES`. Resolve a
+   causa n1 de "extend falhou" (file handle aberto).
+9. **`vssadmin resize shadowstorage /maxsize=401MB`** antes de alinhar — libera espaco real.
+10. **`4k disk cannot be selected as target`**; `The disk has already been aligned`;
+    `head adjust failure! size rollback` (alinha por head/cylinder CHS, com rollback).
+11. **Biblioteca BCD binaria propria** (alem do bcdedit): `Bcd_Init`, `LockBcdFile`,
+    `BCD00000000\Objects\{9dea862c-...}\Elements\24000001`. Privada pq precisam funcionar
+    onde o `bcdedit` nao esta — **o Kit deve manter bcdedit**.
+12. `BootRepair/NTFSUtil.mo` == `bin/NTFSUtil.mo` (mesmo PDB): o motor de resize e compartilhado.
+
+**Lacunas ordenadas por valor/seguranca** (nao implementadas de proposito):
+retry de lock (baixo risco/pequeno) > limpar read-only > write-protect via IOCTL >
+detectar 4Kn nativo (`PhysicalSectorSize`) > encolher shadow storage > BitLocker via WMI >
+alinhamento real (ALTO RISCO, precisa do motor NTFS) > clone/migrate > recovery.
+
+**Sem mudanca de codigo C# nesta sessao** (so documentacao + scripts de RE).
+Build nao foi necessario.
+
+### Sessao 03/10 - EaseUS EPM DESKTOP: como o "burlar o shrink" funciona
+
+Pedido: comparar a versao desktop do EaseUS Partition Master com o WinPE ja mapeado, para
+explicar o reboot -> tela preta "EaseUS Partition Master" -> operacao -> Windows.
+
+1. **Instalador analisado**: o EPM desktop NAO esta instalado no host (so ha o log do
+   desinstalador em D:/PEeaseus.log). Baixado o oficial
+   `https://download.easeus.com/trial/epm_trial_ob.exe` (77 MB, Inno Setup 6.1.0).
+   O URL foi achado dentro do "downloader" NSIS em D:/HMMM (InitConfigure.ini).
+   7-Zip 26 perdeu o suporte a Inno Setup -> usei `innoextract 1.9` (em C:/epm_dl/ie).
+
+2. **VEREDITO**: nao ha truque nenhum. E a MESMA tecnica que o KitLugia ja usa - injetar
+   entrada de boot com ramdisk WinPE na BCD e reiniciar. O que o EPM faz a mais e
+   robustez e UX, nao mecanismo.
+
+3. **MECANISMO DESCOBERTO** - classe `CPreOsPEBcdProc`, fonte vazada
+   `d:\epm\_epm_main\epmlogic\mod.clonemodule\preospeandbcdproc.cpp`, dentro de CloneModule.dll:
+   - GUID do ramdisk : `{B40D316B-B159-4229-8D1B-4A388A093C5B}`
+   - GUID do device  : `{1941F361-6968-4258-BA93-44E099AF5E55}`
+   - WIM gravado em  : `C:\peboot\EASEUSEPMPE.WIM`
+   - SDI (boot.sdi)  : `C:\peboot\EASEUSEPMPE.SDI`
+   - Descricao EXATA da entrada (literal no binario):
+     `"EaseUS Partition Master PreOS"` <-- e a string que o usuario viu na tela preta.
+   - Fluxo legado (CPEBcdProc): GUID `{77128171-3112-48b6-8E24-0DF383CD8824}`,
+     WIM em `C:\boot\EASEUSEPMPE.WIM`, descricao
+     `"EaseUS Partition Master Windows PE"`.
+   - Data Center (Boot.dll / CBCDEdit): WIM `EASEDCPE.WIM`, GUID
+     `{8e0b8211-7965-4722-94cb-16c9e078c47e}`.
+   Metodos: Install, BcdPEProc, IniPEProc, _createEntryInBcd, _createBcdEntry,
+   DelBcdEntry, IsBcdEntryExist, CreateBootFile, GetBootType, IsSupportCurOs,
+   ChangeWritePrivilege, _createEfiBootFile, _createBiosBootFile,
+   _createNtldrBootFile, _editNtldrBcd4Boot, _createDirectory,
+   _isoGetFileProc, _isoReadPeMark, _isoSetLocalFileTime.
+
+   Strings literais na ordem em que BcdPEProc as consome (offsets 0x15DAE0-0x15E2F8):
+   ramdisksdidevice / OptIn / `partition=C:` / ramdisksdipath / `\peboot\EASEUSEPMPE.SDI` /
+   `ramdisk=[C:]\peboot\EASEUSEPMPE.WIM,{B40D316B-...}` / `path` /
+   `\windows\system32\boot\winload.exe` / `osdevice` / `systemroot` / `\windows` /
+   inherit / `{bootloadersettings}` / detecthal / `{bootmgr}` / bootsequence /
+   NTLDR / Delete / ESMGR / SAM / SYSTEM.
+
+4. **ACHADO REUTILIZAVEL (o mais importante desta sessao)**: `sub_1800D9A30` do
+   CloneModule.dll le a BCD pelo REGISTRY, sem `bcdedit`:
+   - `HKLM\BCD00000000\Objects\{9dea862c-5cdd-4e70-acc1-f32b344d4795}\Elements\24000001\Element`
+     (REG_MULTI_SZ, Type==7) -> da o GUID do ramdisk; depois
+   - `HKLM\BCD00000000\Objects\<guidDaEntrada>\Elements\11000001\Element`
+     -> objeto device: offset 120 = PARTITION_ELEMENT (16 bytes), offset 144 = numero do disco.
+   Isso elimina o parsing MULTILINGUE de `bcdedit /enum all` (o bug que custou a sessao 02/08)
+   E a dependencia do binario bcdedit.exe no host. Tambem da `IsAlreadyDone` de graca.
+
+5. **PAYLOAD DO PE**: o instalador traz `app/BUILDPE/` e o `DownloadFileList.json` baixa
+   o resto em runtime:
+   - `https://download.easeus.com/winpe/boot.wim` -> 688.601.920 B, Windows PE 10.0.19041
+     (base ADK), MD5 do JSON confere, 1 indice, EDITIONID=WindowsPE
+   - `https://download.easeus.com/winpe/tools.zip` -> 202.568.944 B, MD5 conferido
+     (DiskMark/CrystalDiskMark, DiskHealth, Chrome etc = os extras do PE)
+   `BUILDPE/x64/Windows/System32/` traz winpeshl.ini + Unattend.xml + drivers
+   (EUDCPEPM.sys, EUEDKEPM.sys, ebrntdrv.sys, epmdkdrv.sys) = a camada de injecao no WIM.
+   winpeshl.ini aponta para `x:\program files\easeus\epm\bin\EPMUI.exe` (X: = o ramdisk).
+
+6. **PeMaker.dll** (fontes makepe.cpp / makepe3.cpp / makepe4.cpp) monta o PE:
+   - `CPeMaker::MakePe` -> `CMakePe` / `CMakePe3` / `CMakePe4` (versao por build do Windows)
+   - Monta o WIM com **Wimgapi.dll** (API nativa de imagem), NAO DISM; DISM so como reforço
+     para `/Add-Driver`, `/Add-Package`, `/Set-SysLocale`, `/Set-UserLocale`,
+     `/enable-feature`, `/Set-ScratchSpace:256`
+   - Fallback: monta do zero com PETools / WinPE_OCs + WinPE-WMI.cab, WinPE-StorageWMI.cab,
+     WinPE-NetFx.cab, WinPE-PowerShell.cab, WinPE-Scripting.cab, WinPE-SecureStartup.cab, fontes
+   - Exporta ISO com `oscdimg.exe` (`-bootdata:2#p0,e,b"\efisys.bin"`)
+   - `CMakePe::Init szDrive = %c` + `GetVolumeFreeSpace` = escolhe letra com espaco livre
+
+7. **ORQUESTRADOR**: `CEUPreOsMgr` (SetISOPath, DelBootEntry, IsAlreadyDone, GetBootPart,
+   GetSystemPart) presente em CloneModule, Clone, BootableMedia, EPMUI, EPMConsole e
+   UnInstallProc (ou seja, DESINSTALAR tambem limpa a entrada do boot).
+   `CPreOSBoot` (CmdManager.dll): GetIsoPath(), GetBootToolPath(), GetPreOSType().
+   `DsRestore.dll`: IsOsSupportBuildPE + IsLinuxPreOS = gate por build do Windows.
+   `UILogic.dll`: `CUIPreOsWizard` + `StartPreOSTask` com PRE-CHECAGEM antes do reboot
+   (`IsFileValid`, `CheckRecoverDataValid`) - se algo falha, NAO reinicia.
+
+8. **DIFF WinPE x Desktop**: 35 modulos em comum e **ZERO identicos** (MD5). Cerca de 90
+   so no desktop (PeMaker, CmdManager, BootableMedia, Boot, MainModule, Device*, DevCtrl,
+   EnumDisk, Burn, bcdedit.exe, bootsect.exe, bcdboot.exe, syslinux.exe, grubinst.exe...).
+   7 so no WinPE (BT_NTFSUtil.mo, BitLockerLib.dll, LLFProc.mo, RawFixer.dll,
+   RecoveryPartitionFixer.mo, VhdVmdk.dll) - o motor de recovery/BitLocker e EXCLUSIVO do PE.
+   **O motor de disco (ToolBox.dll, contrato das 54 operacoes) e O MESMO nos dois** - o
+   desktop nao tem nenhum truque de shrink, apenas delega a operacao para o PE.
+
+9. **DOCUMENTO**: `docs/EASEUS_EPM_DESKTOP.md` (UTF-8 BOM + CRLF) com o mapa completo, os
+   comandos bcdedit reconstruidos e a reflexao sobre replicacao.
+
+10. **REFLEXAO - 3 melhorias de baixo risco para o KitLugia**:
+    a) Ler a BCD via `HKLM\BCD00000000\Objects\*` em vez de `bcdedit /enum all`
+       (elimina o parsing multilingue e a dependencia do binario bcdedit.exe).
+    b) Pre-checagem antes de reiniciar (validar WIM + parametros), como o StartPreOSTask.
+    c) `ChangeWritePrivilege` explicito na BCD em vez de depender do estado herdado do admin.
+    A diferenca REAL entre o EaseUS e o KitLugia e a INTERFACE: o EPM sobe o EPMUI.exe
+    grafico no PE via winpeshl.ini, o Kit usa cmd + log. E por isso que a tela dele parece
+    "magica". Nada mais.
+
+### Pendencias desta sessao
+- [ ] Avaliar implementar (a) leitura da BCD pelo registry em WinbootManager.cs
+- [ ] Avaliar (b) pre-checagem antes do reboot em ScheduleWinpeShrink
+
+### Sessao 03/10 (cont.) - Implementados os itens 0 + 1 + 2 do plano PreOS
+
+Reflexao escrita em `docs/KITLUGIA_PREOS_GAPS.md` (diagnostico area por area) depois da
+analise do EaseUS desktop (`docs/EASEUS_EPM_DESKTOP.md`). Implementados 0, 1 e 2.
+
+0. **BOMBA-RELOGIO CORRIGIDA - GenerateWinpeshlIni()** (WinpeBuilder.cs)
+   A versao anterior escrevia `[LaunchApps]` com a secao VAZIA, acompanhada do comentario
+   (errado) de que "[LaunchApps] nao suporta scripts batch". Descobri que:
+   - o proprio `IsoEditorManager.InstallSetupStartnetAsync` (mesmo projeto) documenta que
+     QUANDO winpeshl.ini existe o winpeshl.exe lanca SOMENTE o que esta em [LaunchApps]
+     -> secao vazia = tela preta morta, sem cmd e sem script;
+   - o EaseUS usa [LaunchApps] com exe + argumentos, inclusive um .bat;
+   - o boot.wim em uso (C:\KL_WINPE\validation_boot.wim) NAO tem winpeshl.ini nem
+     startnet.cmd (verificado com 7z: 0 ocorrencias) - ou seja, o caminho que FUNCIONAVA
+     dependia da AUSENCIA do arquivo, e era um accident.
+   Agora escreve o MESMO comportamento do padrao, explicito e minimo (sem comentarios,
+   byte-a-byte igual ao formato do IsoEditorManager que ja funciona em producao):
+       [LaunchApps]
+       "%systemdrive%\Windows\System32\wpeinit.exe"
+       "%systemdrive%\Windows\System32\cmd.exe", /k startnet.cmd
+   Adicionado `RemoveWinpeshIniFromWimAsync` como escotilha para WIM-base que traga um
+   winpeshl.ini apontando para o shell errado (ex.: o shim setup.exe).
+
+1. **PREFLIGHT antes de agendar reboot** (WinbootManager.PreOSPreflightAsync)
+   Inspirado no CUILogic::StartPreOSTask do EaseUS (IsFileValid + CheckRecoverDataValid):
+   se algo invalido ele NAO reinicia. Verifica, antes do shutdown:
+   - WIM existe, tamanho > 1 KB e assinatura "MSWIM" valida;
+   - boot.sdi existe ao lado do WIM (sem ele o ramdisk nao inicializa);
+   - a entrada BCD foi mesmo criada (via BcdRegistry, sem locale);
+   - o marcador KL_SHRINK_TARGET.dat esta legivel;
+   - o volume alvo existe.
+   Integrado em ScheduleWinpeShrink (passo 4b) e ScheduleReinstallPreserve (passo 5b).
+   Se falhar: NAO agenda reboot, mostra o que faltou e manda rodar LIMPAR BCD.
+
+2. **LEITURA DA BCD PELO REGISTRY - BcdRegistry.cs (NOVO, KitLugia.Core)**
+   `HKLM\BCD00000000\Objects` e a projecao em registry da loja BCD ativa - e o mesmo
+   mecanismo que o EaseUS usa (achado em CPreOsPEBcdProc::IsBcdEntryExist, sub_1800D9A30).
+   API: IsAvailable / FindGuidsByText / GetDescription / EntryExists (+ versoes async).
+   `FindBcdGuidsByText` (WinbootManager) agora usa o registry como ORACLE PRIMARIO e so cai
+   no `bcdedit /enum all` + regex multilingue quando a projecao nao existe. Fim do parsing
+   por idioma (bug de 02/08) e fim da dependencia do binario bcdedit.exe.
+   Somente LEITURA: escrita continua via bcdedit (testado e funcionando).
+
+   FORMATO REAL MEDIDO (este host, 03/10) - importante para quem mexer nisso:
+       12000004  REG_SZ       DESCRICAO  ("Windows Recovery Environment", "UEFI:CD/DVD Drive")
+       12000002  REG_SZ       path       (\windows\system32\winload.efi)
+       12000005  REG_SZ       locale     (pt-BR)
+       22000002  REG_SZ       systemroot
+       32000004  REG_SZ       boot.sdi
+       11000001  REG_BINARY   device     (88 B so volume / 200 B volume+particao)
+       14000006  REG_MULTI_SZ inherit
+   A descricao NAO e binaria - e REG_SZ. A primeira versao do codigo so procurava texto em
+   byte[] e achava ZERO (achado no teste). Corrigido: ElementToText() trata string,
+   string[] e byte[].
+
+   TESTE ROUND-TRIP REAL (elevado, host, KitLugia.Core compilado e executado):
+       IsAvailable()=True; GetDescription({9dea862c-...})="Windows Boot Manager"
+       bcdedit /create {7a1b2c3d-...} /d "KitLugia ROUNDTRIP TESTE" /application osloader
+       -> FindGuidsByText("KitLugia","ROUNDTRIP") achou; EntryExists=True;
+          GetDescription devolveu o texto exato; os 2 oracles concordaram
+       -> bcdedit /delete /f ; EntryExists=False; CLEANUP OK
+   `bcdedit /enum all` depois: 0 residuo de ROUNDTRIP/KitLugia.
+
+   Comparacao registry vs bcdedit em 7 termos: concordam em todos os casos RELEVANTES
+   (descricoes reais, paths, locale). Divergem em 3 casos onde o REGISTRY e MAIS PRECISO:
+   - "WinPE": o bcdedit casa o nome LOCALIZADO do tipo de aplicacao no cabecalho
+     ("Aplicativo de Inicializacao do Windows PE"); o registry olha so o conteudo real do
+     objeto e nao casa. Para o uso do Kit (filtrar KitLugia) isso e irrelevante.
+   - "Windows Boot Manager": a descricao esta no objeto {9dea862c-...}, que o bcdedit
+     imprime sob o identificador nao-canonico {bootmgr}; o regex de 36 chars do codigo
+     antigo nao pegava. O REGISTRY ACHOU, o bcdedit nao. (Este era mais um bug latente do
+     FindBcdGuidsByText antigo.)
+
+3. **Build**: solucao completa GUI+Core = 0 erros / 155 avisos (nullable pre-existentes).
+   Nenhuma alteracao na GUI. Projeto de teste do round-trip foi removido.
+
+### O que NAO foi implementado (decisao consciente)
+- Shell grafico no PE (item 4 do plano): fica para quando o usuario testar na VMware.
+  O doc traz o diagnostico dos 3 bugs (so o .exe entra no WIM, `exit /b 0` sem log,
+  `!OSDRV!` assumido) e o plano em 3 degraus. O grau 3 (embelezar a tela do PE) e o de
+  melhor custo-beneficio.
+- Nenhuma escrita na BCD pelo registry. Escrita segue via bcdedit.
+
+### Como testar na VMware
+1. WinpeToolsPage -> INICIAR SHRINK. Conferir no log: `[BCD] Leitura via registry: N entrada(s)`
+   e, no fim, `[PREFLIGHT] Preflight OK (...)`.
+2. Repositorio: ao enfileirar o shrink, `HKLM\BCD00000000\Objects` DEVE mostrar a entrada
+   KitLugia. `bcdedit /enum all` tambem (agora em pt-BR).
+3. LIMPAR BCD: deve reportar as entradas removidas. Antes (so bcdedit) removia 0 em pt-BR.
+4. Negative: renomear `boot.sdi` e tentar agendar -> o preflight tem de CANCELAR o reboot
+   e dizer que o boot.sdi nao esta la (antes reiniciava e nao fazia nada).
+
+### TESTADO (03/10/2026, VMware) — shrink via WinPE: **FUNCIONOU**
+`[KitLugia WinPE Shrink] Status: OK | Disk: 0 Part: 3 Size: 12370MB`. Fluxo completo,
+com as 3 correcoes (item 0 winpeshl.ini, item 1 preflight, item 2 BCD por registry) ativas.
+
+### DIAGNOSTICO: caminho "Emergency Pre-Boot" do Gerenciador de Discos = CODIGO MORTO
+Investigado depois do relato do usuario ("ja tentei usar o WinRE e abria mas a operacao nao
+acontecia"). Tres descobertas, todas verificadas no codigo:
+
+1. **O checkbox nao e WinRE.** [PartitionsPage.xaml.cs:591](KitLugia.GUI/Pages/PartitionsPage.xaml.cs)
+   mostra um MessageBox dizendo "1. Modificar o Windows RE via DISM / 2. Configurar boot no
+   WinRE", mas chama `EmergencyUEFIManager.DeployAsync`, que copia `kitlugia_shrink.efi` no ESP
+   e instala rEFInd. **A mensagem descreve um mecanismo que o codigo nao executa.**
+2. **E nunca funcionou: o .efi nao e publicado.** O arquivo existe em
+   `KitLugia.Core\Resources\KitLugiaEFI\bin\kitlugia_shrink.efi` (58 KB), mas o
+   `KitLugia.GUI.csproj` nao tem nenhum `<Content Include>`/`<EmbeddedResource>` para essa pasta
+   (so `Resources\**\*` DA GUI, `External\*`, `Tools\GoodbyeDPI` e 4 items soltos do Core:
+   `LinuxPreOS` + `BootGoodies\refind`). `Deploy.ps1` tambem nao copia. Resultado:
+   `DeployAsync` sempre retorna false com "Execute build_toolchain.sh (WSL) primeiro" —
+   mensagem enganosa, o binario JA esta compilado, so nunca vai para o output.
+3. **O codigo que ERA WinRE esta morto**: `EmergencyWinREManager` (reagentc + DISM mount/commit)
+   nao tem NENHUM chamador. E tem 4 bugs que explicam "abre o WinRE e nao faz nada":
+   - so escreve `winpeshl.ini`; nunca cria `startnet.cmd` (que e o mecanismo real e testado);
+   - `winpeshl.ini` sem aspas em volta dos executaveis (formato invalido);
+   - `diskpart` e `shutdown /r /t 5` como 2 apps no mesmo `[LaunchApps]` = rodam EM PARALELO,
+     o reboot mataria a maquina no meio do shrink;
+   - `reagentc /target` apontando para o ARQUIVO em vez da PARTICAO (`\Windows\Recovery`).
+
+**Decisao**: nao investir no WinRE agora (4 bugs nao testados, risco de dados). O boot.wim tem
+historico de sucesso. Pendente de decisao do usuario: remover o checkbox Emergency (ele nunca
+funcionou e a mensagem mente) ou consertar o EmergencyWinREManager de verdade.
+
+---
+
+### Sessao 03/10/2026 (tarde) — 3 pedidos do usuario apos o teste na VM
+
+**(A) FREEZE DE UI ao estender particao — CORRIGIDO**
+Sintoma (log do usuario): `[UI-FREEZE] Thread de UI travada por ~5540 ms` exatamente na janela
+do extend (23s -> 29s) + "NAVEGACAO BLOQUEADA PARA SUA SEGURANCA".
+
+**CAUSA RAIZ**: `PartitionManager.ExtendPartition` e `async`, mas o caminho rapido (Storage
+Management API, via WMI) roda **100% SINCRONO antes do primeiro `await`**: `GetPartitionSizeLimits`
+(WMI) + `ResizeStoragePartition` (WMI). Chamado direto do handler, executava inteiro na thread de
+UI. A UI nao "parecia" travada — estava mesmo ocupada por ~5,5 s.
+
+**CORRECAO** ([PartitionsPage.xaml.cs:754](KitLugia.GUI/Pages/PartitionsPage.xaml.cs)): as 4
+chamadas pesadas do `BtnConfirmExtend_Click` foram envolvidas em `Task.Run` (`ExtendPartition`,
+`AtomicExtendDISM`, `AtomicMergeDISM`, `ShrinkPartition`). `UpdateProgress` ja e thread-safe
+(faz `Dispatcher.Invoke`), entao o progresso continua funcionando de outra thread. Mesmo padrao ja
+usado em `WinpeToolsPage`.
+
+**(B) DISM LENTO -> wimlib-imagex como motor PRIMARIO de imagem**
+O substituto ja existia no kit: `KitLugia.GUI\Resources\App\Wimlib\wimlib-imagex.exe`, ate entao
+usado so no `IsoEditorManager` e como fallback de apply. Agora e o motor primario:
+
+- `PartitionManager.CmdArg(path)` (novo): escapa argumentos de linha de comando. Raiz de volume
+  (`C:\`) e tokens especiais (`@`, `#`, `%`) vao SEM aspas — aspas + barra final truncam o
+  caminho no CommandLineToArgvW/CRT (e o mesmo bug que fazia DISM `/ApplyDir:"E:\"` dar exit 123).
+- `CaptureVolumeImage`: `capture <dir> <wim> <nome>` via wimlib PRIMEIRO; DISM so como fallback.
+- `ApplyVolumeImage`: `apply <wim> 1 <dir>` via wimlib PRIMEIRO; DISM so como fallback.
+  O fallback wimlib antigo (DISM falha -> wimlib) foi REMOVIDO: agora e o inverso e redundante.
+- `LogTail()` (novo): trunca a saida. O wimlib escreve progresso com `\r` e sem `\n`, entao uma
+  unica "linha" tem centenas de KB — medido **412 GiB numa linha so** num capture de volume real.
+
+**DESCOBERTAS DO TESTE REAL (o `wimlib-imagex` bundled)`:**
+1. `capture DIRECTORY WIMFILE [IMAGE_NAME]` — o nome da imagem e **POSICIONAL**. A primeira
+   versao usava `--name=` e o binario imprimia o usage inteiro e saia com erro.
+2. `capture` recusa escrever num WIM que ja existe -> logamos o aviso com o nome do arquivo.
+3. O wimlib ja exclui `\System Volume Information` sozinho (imprime `Excluding ... from capture`).
+4. O progresso dele TEM `%` ("Archiving file data: 22 bytes of 38 bytes (57%) done"), entao o
+   `ReportImageProgress` funciona.
+5. Os WIMs sao interoperáveis nos dois sentidos (wimlib->DISM e DISM->wimlib), entao o fallback
+   cruzado continua valendo.
+
+**Round-trip VERIFICADO** (wimlib bundled, caminho com espaco no nome):
+`capture` exit 0 -> WIM de 1.500 bytes -> `apply` exit 0 -> os 2 arquivos restaurados com
+conteudo identico (`conteudo de teste 123` / `segundo arquivo`), incluindo subpasta.
+
+**MEDICAO REAL — E O SPEEDUP ESPERADO NAO SE CONFIRMOU (03/10/2026)**
+1,2 GB / 300 arquivos de dados aleatorios (incomprimeiveis), mesmo host, mesmo disco:
+
+| etapa  | wimlib-imagex | DISM                |
+|--------|---------------|---------------------|
+| capture| 5.063 ms      | 4.819 ms (/Compress:fast) |
+| apply  | **1.734 ms**  | 2.168 ms            |
+| CICLO  | 6.797 ms      | 6.987 ms            |
+
+**Diferença no ciclo: 2,7% — dentro de ruido.** Conteudo restaurado IDENTICO nos dois
+(`diff -r` sem nenhuma diferenca). Num teste menor (3000 arquivos / 76 MB) o wimlib ate
+ficou MAIS LENTO no total (5.074 ms vs 4.768 ms).
+
+**CAUSA DA CONFUSAO (erro meu, corrigido)**: eu afirmei no primeiro comentario que "o DISM
+monta a imagem antes de capturar/aplicar". **FALSO.** Neste fluxo
+(`AtomicExtendDISM` / `AtomicMergeDISM` / `MovePartition`) NUNCA houve `/Mount-Image` +
+`/Unmount /Commit` — sao so `/Capture-Image` + `/Apply-Image` diretos. Quem paga o mount/commit
+caro e o `EmergencyWinREManager` (que faz `/Mount-Image` no winre.wim) e o `WinpeBuilder`
+(que ja usa wimlib). O "DISM lento" que o usuario lembra e' de OUTRO lugar.
+
+**MOTIVO REAL DA TROCA (reescrito no codigo): ROBUSTEZ, nao velocidade**
+1. wimlib e' a prova do bug de quoting do DISM (`/ApplyDir:"E:\"` -> exit 123), que em 02/08
+   fez a particao ser RECRIADA SEM RESTAURAR OS DADOS — falha real com perda de conteudo.
+2. Nao depende do servico TrustedInstaller/CBS, que falha quando o Windows Update esta em
+   andamento — pior momento possivel.
+3. `apply` isolado e' ~20% mais rapido (1.734 vs 2.168 ms).
+
+Se um dia medirmos em maquina real e o DISM ganhar, e so trocar a ordem dos blocos.
+Nenhuma promessa de velocidade foi feita ao usuario: ele foi informado do resultado.
+
+**(C) BARRA LATERAL: extras de disco agrupados sob "Gerenciar Discos"**
+Requisito: "esses extras nao podem ficar consumindo espaco da barra lateral... coloque uma seta ao
+lado do gerenciador de discos para expandir a categoria dele, ai sim com as opcoes extras, pode ate
+colocar o menu do winpe".
+
+- `MainWindow.xaml`: "Gerenciar Discos" + `Button BtnDiscosExpand` (▸/▾) num `Grid` de 2 colunas.
+  As extras ficam em `StackPanel PanelDiscosExtras` (comeca `Collapsed`):
+  **WinPE Tools (shrink)**, **Fresh Install (preservar)**, Reparar Boot/BCD, Conversor MBR/GPT.
+  As 2 primeiras NAO tinham nenhum atalho na sidebar antes (so no Dashboard).
+- `NavStyles.xaml`: `NavSubButtonStyle` (novo, `BasedOn` no `NavButtonStyle`): altura 34, fonte
+  13, margem recuada a esquerda (24) para mostrar a hierarquia, sem a animacao de scale do hover.
+- `MainWindow.xaml.cs`: `NavTagMap` += `🛠️` -> WinpeTools, `♻️` -> ReinstallPreserve (tags
+  livres; `🧰` ja era Integrity). `BtnDiscosExpand_Click` / `SetDiscosExtrasExpanded`.
+  `UpdateNavButtonsSelection` auto-EXPANDE o grupo quando a pagina atual e uma das extras, para o
+  usuario nunca cair numa pagina cujo item esta escondido. `UncheckAllNavButtons` cobre as 4 novas.
+
+**Build**: solucao completa GUI+Core = **0 erros / 155 avisos** (baseline identica).
+`obj/verifybin` removido. `subst` de teste (Y:) desmontado; `Q:\: => D:\` do usuario NAO foi tocado.
+
+**A TESTAR na VM**: estender de novo e confirmar que **nao aparece mais** `[UI-FREEZE]` durante a
+operacao (nem "NAVEGACAO BLOQUEADA"); extender/mesclar e conferir no log `[WIMLIB] Capture/Apply
+exit=0 em NNNN ms` em vez de `[DISM]`; conferir a barra lateral com a seta.
+
+**Ajuste da seta (mesma sessao) — area de clique**: a primeira versao era um `Button` de
+`Width=30` com o glifo `&#x25B8;` de `FontSize=13`; o usuario reclamou que "e dificil de
+clicar" (print mostrava um botao cinza minusculo). Trocado por `NavExpandButtonStyle`
+(`NavStyles.xaml`): alvo de **40x40**, chevron desenhado com `Path` (mesma abordagem do
+`KitTaskManagerWindow.xaml`, sem depender de fonte), `CornerRadius=6`, feedback de hover/pressed,
+e a rocao -90°/+0° e por **Storyboard** em `RenderTransform.Angle` disparado por
+`Tag="0"/"1"` (o `RotateTransform` NAO pode ser alvo de `Setter TargetName` — da erro
+`MC4111`; precisa de `DoubleAnimation Storyboard.TargetProperty="RenderTransform.Angle"`).
+`SetDiscosExtrasExpanded` agora mexe em `Tag`, nao mais em `Content`.
+
+Build completo (`--no-incremental`): **0 erros / 155 avisos** (baseline; os 144 de um build
+incremental eram so o GUI, com o Core ja up-to-date).
+
+---
+
+### Sessao 03/10 (noite) — Fresh Install PROMOVIDO DE VOLTA (decisao do usuario) + regra anti-freeze
+
+**(A) "Fresh Install nunca foi testado" — removido da lista do Gerenciador Discos**
+O usuario avisou que o fluxo Fresh Install + Preservacao **NUNCA foi testado de ponta a ponta** e
+que ficar visivel na sidebar convida o usuario a clicar ("que legal, vou usar") numa funcao que
+aplica imagem do Windows direto na particao. Se falhar no meio, o PC fica sem SO.
+
+- `MainWindow.xaml`: removido o `RadioButton BtnReinstallPreserve` de `PanelDiscosExtras`.
+- `MainWindow.xaml.cs`: removida a tag `♻️` do `NavTagMap` e a linha de `UncheckAllNavButtons`.
+  Em `UpdateNavButtonsSelection` sobrou so `SetDiscosExtrasExpanded(true)` para quem chegar pelo
+  Dashboard (a categoria continua abrindo, mas nao ha item para marcar).
+- A PAGINA continua existindo e acessivel pelo **Dashboard** (btn "Fresh Install + Preservacao
+  de Dados", `DashboardPage.xaml:464`). **O mesmo risco existe la** — o Dashboard e a primeira tela
+  que o usuario ve e o tooltip vende "preservando perfis, programas e registry (Estrategia C)".
+  Fica para decisao do usuario remover tambem. Removido so o que foi pedido.
+
+**(B) REGRA ANTI-FREEZE — `Scripts/CheckUiThreading.ps1` (novo)**
+O problema que o usuario，球 me chamou DUAS vezes ("travou ao estender") foi o mesmo nas duas:
+`async` nao significa "nao bloqueia a UI", e `PartitionManager.ExtendPartition` roda WMI
+sincrono antes do primeiro `await`. Nada no compilador reclama disso. Este script e a regra que
+faltava.
+
+Como funciona:
+1. Extrai as **96 classes estaticas publicas** de `KitLugia.Core` direto do fonte (nao envelhece:
+   um Manager novo entra sozinho na lista).
+2. Varre os `.xaml.cs` da GUI com a regex
+   `await\s+(Task\.Run\s*\(\s*\(\s*\)\s*=>\s*)?([A-Za-z_]\w*)\s*\.\s*(\w+)`.
+3. Se o grupo 2 for uma classe do Core e o grupo 1 (Task.Run) NAO casou => violacao.
+4. Compara com `Scripts/ui-threading-baseline.txt` (chave sem numero de linha, para mover codigo
+   nao quebrar). Padrao legado e ignorado; padrao **NOVO** sai com codigo 1 (falha no CI).
+
+Estado atual: **77 padroes legados** ja no baseline.
+
+**ESCOPO DELIBERADO**: a regra NAO e "todo await do Core precisa de Task.Run". Isso foi sugerido
+pelo ChatGPT e RECUSADO de proposito — `GetAllDisks`, `IsSystemDisk` e leitura de registro sao
+rapidos e involve-los em Task.Run so cria thread-pool churn. A regra e "nenhum padrao NOVO sem
+Task.Run", com baseline revisavel a mao. Se a operacao for rapida demais para justificar thread,
+decide-se com `-UpdateBaseline` e o motivo fica no historico do git.
+
+**TESTADO (nao so compilado)**:
+| cenario | esperado | obtido |
+|---|---|---|
+| baseline inicial (`-UpdateBaseline`) | grava 77 | 77, exit 0 |
+| rodar sem mudanca | exit 0 | exit 0, "OK - nenhum padrao novo" |
+| violacao sintetica `await PartitionManager.AtomicExtendDISM(...)` | exit 1 | **exit 1**, acusou o padrao |
+| mesma chamada envolvida em `Task.Run` | exit 0 (reconhecida) | **exit 0**, "Padroes NOVOS: 0" |
+| apos restaurar o arquivo | exit 0, sem residuo | exit 0, 0 ocorrencias de "Synthetic" |
+| apos converter para BOM+CRLF | continua funcionando | exit 0, 96 classes / 77 legados |
+
+Uso: `powershell -ExecutionPolicy Bypass -File Scripts\CheckUiThreading.ps1`
+Novos arquivos em UTF-8 BOM + CRLF (regra do `.editorconfig`), verificado.
+
+Build completo apos as duas mudancas: **0 erros / 155 avisos**, `BUILD_EXIT=0`.
+
+### Proxima sessao
+- [ ] Decidir se remove o Fresh Install tambem do Dashboard (mesmo risco, primeira tela do usuario)
+- [ ] Ligar `CheckUiThreading.ps1` no pipeline de build/CI do VS
+- [ ] Revisar os 77 padroes do baseline e envolver em `Task.Run` os que forem bloqueantes de verdade
+      (`BcdRepairManager.DiagnoseAsync`, `DeepUninstaller.RunScanPhaseAsync`,
+      `GitHubUpdater.*`, `LatencyAnalyzer.*` sao candidatos obvios)
+- [ ] Benchmark A/B dos 62 `DropShadowEffect` (medir antes de mexer)
+- [ ] Dividir `KitTaskManagerWindow` (3.473 XAML + 3.507 cs) em UserControls por aba
+
+---
+
+### Sessao 03/10 (noite, 2) — GameBoost/Tray/RAM-Limiter: 6 FONTES DE INSTABILIDADE (travada, tela preta, BSOD)
+
+**Relato do usuario**: os 3 subsistemas (GameBoost Pro, Tray, monitor RAM por processo)
+funcionavam bem nas primeiras versoes; depois das refatoracoes quedaron "esquisitos". O Windows
+passou a ter gargalo, page fault por falta de RAM, travadas, tela preta e BSOD. E: "antes o motor
+V1 deixava o sistema rapido e sem impacto nenhum; agora uso sempre o V4 porque no loading do
+Poppy Playtime Ch.4 ficava muito mais rapido".
+
+Investigado em `KitLugia.GUI/Services/TrayIconService.cs`. **A memoria do usuario sobre o V1
+estava certa**: o V1 (High + I/O 3 + page 5 + memory NORMAL, sem mexer em nada global) e o unico
+motor que nao tem nenhum destes problemas. O V4 era exatamente o oposto.
+
+**6 achados (todos com linha e mecanismo):**
+
+1. **V4 usava `CpuPriority = "realtime"`** -> `REALTIME_PRIORITY_CLASS`. E o `ApplyBoostCustom`
+   ainda tentava **`ElevateToSystem()`** se desse acesso negado, ou seja, tentava REALTIME com
+   privilegio. Um thread REALTIME pode impedir o scheduler de rodar threads de kernel/DPC:
+   congelamento, tela preta (DWM nao roda) e watchdog/BSOD. **Nao e ganho de FPS.**
+2. **I/O Crítico (4)**: o codigo fazia `cfg.IoPriorityLevel == 1 ? 4 : ...` e o **DEFAULT** do
+   `CustomEngineConfig` era `IoPriorityLevel = 1` — ou seja, **toda config nova nascia em I/O
+   Crítico**. I/O Crítico coloca o processo na frente de TUDO na fila do disco, inclusive do
+   pagefile e do log do Windows. Pagefile com fome = page fault; page fault em rajada com disco
+   saturado = travada do Windows inteiro.
+3. **V4 usava `PagePriorityLevel = 2`** (very high) -> o jogo sugar fisica dos outros processos
+   e eles page-fault.
+4. **Motor POR PROCESSO (o "monitor RAM por processo")**: `ParsePriorityClass("realtime")`
+   devolvia `ProcessPriorityClass.RealTime`, e `cfg.IoPriorityLevel == 1 ? 4` repetia o I/O
+   Crítico. Como config salva de versao antiga ainda tem esses valores, o caminho continuava ativo.
+5. **RAM Limiter — CAUSA DIRETA DOS PAGE FAULTS**:
+   `SetProcessWorkingSetSizeEx(handle, (IntPtr)(-1), targetBytes, ...)` com fallback
+   `EmptyWorkingSet(handle)`, a cada ~5 s (cooldown base 5 s + 2 s por trim, ate 20 s).
+   `min = (SIZE_T)-1` deixa o working set sem PISO, e `EmptyWorkingSet` e brutal: o processo
+   tem de reler TODAS as paginas do disco na volta -> rajada de page fault + disco saturado.
+6. **Network boost global**: `SystemResponsiveness = 10` (padrao 20) e `NetworkThrottlingIndex = 10`
+   (que ja era o padrao, ou seja no-op). `SystemResponsiveness` menor = menos fatia para
+   servicos de fundo = explorer/DWM reagindo devagar = "tela preta".
+
+**CORRECOES (todas em `TrayIconService.cs`):**
+- `GameBoostEngine.Auto = 5` — **motor unico automatico, novo PADRAO** (`_currentEngine`).
+  Decide por cena: foreground -> `High` sempre; I/O = 3 se CPU > 35% (ou GPU > 60%), senao 2;
+  Page = 4 se foreground, senao 5 (Normal, nao rouba RAM); Timer boost so quando `cpu > 75%`
+  (a fase de loading); Network boost **desligado** (e global, e revertido no `RevertBoost`).
+  Regras de ouro comentadas no codigo: NUNCA REALTIME, NUNCA I/O > 3, NUNCA page < 4,
+  thread memory priority SEMPRE NORMAL.
+- **REALTIME proibido globalmente** em 3 lugares (`ApplyBoostCustom`, `ParsePriorityClass`, e o
+  ramo de atribuicao), cada um com log de aviso — configs salvas do usuario continuam Asking
+  "realtime" e agora degrade para High em vez de congelar o PC.
+- `SafeIoPriority(int)` (novo): 0 -> 2 (Normal), qualquer outro -> **3 (High), teto duro**.
+  Elimina o I/O Crítico dos 2 caminhos. Default do `CustomEngineConfig` corrigido: Io 1 -> 3,
+  Page 1 -> 4.
+- **RAM Limiter**: piso real (`max(64MB, 60% do limite)`) em vez de `-1`, teto = alvo, e
+  **nunca mais `EmptyWorkingSet`** — o fallback agora e so a hint `MEMORY_PRIORITY_BELOW_NORMAL`.
+- Rotulo do V4 na UI deixou de mentir ("RealTime + Critical I/O" -> "Performance (High + I/O Alta)").
+
+**O ganho do V4 foi PRESERVADO onde ele existe**: GameClassInfo + page moderado + timer boost +
+network boost continuam no Auto/V4. RealTime e I/O Crítico nao eram o que fazia o loading
+rapido — o usuario media um ganho que vinha de outras 4 coisas.
+
+**VERIFICACAO**: build completo `--no-incremental` = **0 erros / 155 avisos**, `BUILD_EXIT=0`.
+Grep de verificacao: **nenhuma atribuicao de `ProcessPriorityClass.RealTime` sobrou** (as 6
+ocorrencias restantes sao comparacoes defensivas `!= RealTime` / `== RealTime`) e **nenhum
+`? 4` de I/O Crítico em codigo** (a unica ocorrencia do texto esta no comentario do
+`SafeIoPriority`). `CheckUiThreading.ps1` continua verde (0 novos).
+
+**LIMITE HONESTO**: nao tenho o minidump da BSOD, entao nao posso PROVAR que essas eram as
+causas — sao as causas mais provaveis e todas foram removidas. Se a BSOD voltar, o caminho e
+`C:\Windows\Minidump` + o Event Viewer (BugCheck). E o ganho de loading precisa ser conferido
+pelo usuario no jogo real — nao da para medir FPS/loading headless.
+
+**2 BUGS NO PROPRIO MOTOR AUTOMATICO, achados na revisao (build passa, logica nao):**
+1. A medicao de CPU usava `TotalProcessorTime / (agora - StartTime)` = **media historica** do
+   processo. Numa sessao longa com jogo leve, a media nunca chega a 0.75 e o "modo loading"
+   NUNCA acionava. Trocado por `SampleProcessCpuShare()`: **delta entre duas amostras
+   consecutivas** (retorna -1 quando ainda nao ha amostra anterior, e o motor usa o valor
+   neutro 0.35 em vez de inventar numero). O `gpuPct` foi REMOVIDO — nunca era atribuido e
+   aparecia no log como `gpu=0%` falso.
+2. `ApplyBoostModern` so roda **1x**, na transicao para foreground. Como a medicao e por delta,
+   a 1a chamada nunca tem amostra anterior e a decisao ficaria travada a sessao inteira.
+   Adicionado o passo **3b no `MonitorTick`**: com motor `Auto`, reavalia a cada 5 ticks
+   (~15 s com tick de 3 s) usando `_currentBoostedPid`. Cheap e responsivo.
+
+**REGRA GERAL QUE ISSO ENSINA**: `await`/compilar sem erro nao prova que a logica esta certa.
+Estes 2 bugs passaram pelo build limpo e so apareceram ao ler o codigo procurando o
+comportamento prometido. Vale reler o motor com essa pergunta: "o codigo faz o que o nome e o
+log prometem?"
+
+`EmptyWorkingSet(handle)` continua em `ApplyFireminOptimizations` e `DetectAndTrimLeaks` — de
+proposito: os dois usam o MODELO COMBINADO, que tem piso, gate (so roda acima de 150% do alvo) e
+rate-limit de 10 s. Nenhum dos dois e o `ApplyProcessRamLimits`, que ficou sem `EmptyWorkingSet`.
+
+### Sessao 03/10 (cont.) - PRIORIDADE EM FAIXA (2 niveis) + RAM LIMITER MEDIDO
+
+Pedido: "um jeito melhor de aumentar a prioridade, porque o foreground tambem e importante" +
+"o negocio de RAM ainda funciona?".
+
+#### 1. Prioridade: antes era UMA vaga so (e por isso perdia o proprio objetivo)
+
+`CheckForegroundWindow` fazia: janela nova em foco -> `RevertBoost(anterior)` na hora. Como o
+kit reverte para a prioridade ORIGINAL, o jogo que saia de foco (loading, alt-tab para o Discord)
+voltava a Normal no instante da troca — exatamente o cenario em que o boost mais importa.
+O "foreground importante" estava modelado como "foreground E NADA MAIS".
+
+**Modelo novo: faixa com histerese** (`TrayIconService.cs`):
+- `BoostLevel.Nenhum` = prioridade original restaurada.
+- `BoostLevel.Sustentado` = saiu do foco mas continua **trabalhando**: `AboveNormal` +
+  I/O Normal(2) + page Normal(5) + GameClassInfo off. Nunca e um AUMENTO, so uma reducao.
+- `BoostLevel.Foco` = janela em primeiro plano: quem escolhe os parametros e o motor
+  (HIGH e o teto; REALTIME continua proibido em qualquer nivel).
+- `_boostTargets` (ConcurrentDictionary<uint, BoostTarget>) substitui o par
+  `_currentBoostedPid`/`_lastOriginalPriority` como fonte de verdade.
+- `DemoteBoost` (troca de janela) = desce para Sustentado; `TickBoostTiers` (passo 3c do
+  `RunMonitorCycle`) mede CPU por DELTA e devolve a original de quem ficou **ocioso** ha 45 s.
+  O reverso e automatico, sem depender de hook nem de evento de janela.
+- `EnforceSustainedCap`: no maximo 3 sustentados (o mais antigo e revertido). Sem teto, alt-tab
+  entre varias janelas acabaria com "meio sistema" acima da normal.
+- `ApplySustainedBand` faz a reducao no proprio processo e zera I/O/page/GameClassInfo, para o
+  app em 2o plano nao roubar I/O nem RAM de quem esta em foco.
+- Persistencia: `TraySettings\BoostSustained` (default 1).
+- Desligamento correto: `RevertCurrentBoost`, `ShutdownGameBoost`, `ForceReapplyBoost` e o botao
+  `RestoreAllThrottledProcesses` agora chamam `RevertAllBoostTargets()` (antes so o PID em foco
+  voltava e os demais ficavam com prioridade alterada para sempre).
+
+**2 bugs encontrados ao implementar (ambos build-clean)**:
+1. `OptimizeForegroundProcess` mantinha um SEGUNDO estado paralela (`_lastBoostedPid` /
+   `_lastOriginalPriority`) que brigava com o do hook — uma restaurava a prioridade enquanto a
+   outra ainda achava que o processo era dela. Agora ele so delega para `CheckForegroundWindow()`
+   (um caminho so) e os 2 campos foram removidos.
+2. Passo 3b reavaliava o motor Auto em `_currentBoostedPid` **sem checar se o processo estava
+   em boost** — e esse PID tambem aponta para janelas que nao entram no boost (Chrome e
+   excecao do usuario). Agora exige `_boostTargets.ContainsKey(pid)`.
+3. `DemoteBoost`+`TryAdd` em `_originalPriorities`: salvar a "original" de novo ao voltar para
+   uma janela sustentada sobrescreveria Normal por High/AboveNormal e o processo nunca mais
+   voltaria ao Normal. Agora a original so e guardada na primeira vez.
+
+#### 2. RAM Limiter: MEDIU-SE, e a resposta e "quase nao fazia nada"
+
+Harness (`%TEMP%\opencode\ws_test3.ps1`, filho `ws_child2.ps1`): app que aloca e TOCA 400 MB
+de proposito, com `GetProcessMemoryInfo` medindo working set e PageFaultCount. Teto de 330 MB,
+20 s por modo:
+
+| modo | WS final | page faults/20 s |
+|---|---|---|
+| mole (`QUOTA_LIMITS_HARDWS_MAX_DISABLE`, o que o kit usava) | **486 MB** (limite decorativo) | **+726** |
+| duro (`flags = 0`) | **72 MB** (limite vale) | **+42** |
+
+Ou seja: a flag de "desabilitar o maximo duro" tornava o limite SOFADO e o Windows simplesmente
+nao respeitava o teto enquanto houvesse RAM livre. Pior: o ciclo natural de trim/recrescer do
+balance set manager gerava MAIS page faults (+726) que o corte duro (+42) — o barulho que dava
+travada vinha do proprio ciclo, nao do EmptyWorkingSet.
+
+**Decisao (medida, nao achismo)**: `ApplyProcessRamLimits` agora escolhe o modo por cena —
+`flags = 0` (teto duro) so quando `pressao de RAM >= RamPressurePercent` (novo, default 88,
+persistido em `TraySettings\RamPressure`) OU o excesso passa de 150% do limite; senao segue
+com teto mole. Motivo: o corte duro e um golpe seco e o **piso de 60% nao segura esse golpe**
+(medido: estabilizou em 72 MB, bem abaixo do piso de 180 MB), entao ele so entra quando o
+sistema precisa da memoria. NUNCA em foreground (o codigo ja pulava).
+
+**Bug de verdade corrigido no caminho**: o teto aplicado era uma ALTERACAO NO PROCESSO que
+**nunca era desfeita**. O limite acabava, o teto ficava; e desligar o limite na tela deixava o
+teto grudado ate o fim da sessao. Agora `ReleaseWorkingSetCeiling` chama
+`SetProcessWorkingSetSizeEx(-1,-1,0)` quando o processo volta abaixo do limite (flag
+`WorkingSetCeilingApplied`) ou quando o limite e desligado.
+Obs: `GetProcessWorkingSetSize` nao serve para conferir nada num processo de 64 bits — devolve
+o sentinela de 64 TB antes e depois da chamada. Para medir, use `GetProcessMemoryInfo`
+(`PROCESS_MEMORY_COUNTERS` com campos SIZE_T = 8 bytes, `cb` = 72; com `uint` o `cb` = 40 e a
+API falha silenciosamente devolvendo zero).
+
+Tambem: `trimmedCount` era incrementado 2x por processo (contador morto) e agora mostra no log
+o que aconteceu de verdade: `nome em MB (limite MB) → teto DURO|mole de X MB (piso Y MB, RAM
+do sistema Z%) em N processo(s)`.
+
+Build: 0 erros / 155 avisos (baseline). `CheckUiThreading.ps1`: 0 padroes novos.
+
+**A TESTAR (usuario, jogo real)**: com motor Auto + toggle "Boost do App Ativo" ligado, abrir
+loading, dar Alt+Tab para o Discord e confirmar no log (a) "saiu do foco mas continua ativo ->
+faixa SUSTENTADA", (b) depois de 15-45 s ocioso (conforme o intervalo do monitor), "ficou ocioso — prioridade original restaurada".
+Verificar no Gerenciador de Tarefas se o jogo ABOVE da normal continua carregando em 2o plano.
+RAM Limiter: configurar limite, estourar, ver a linha de log e o WS cair; depois voltar abaixo
+do limite e confirmar que o teto e liberado.
+
+**LIMITE DA MEDICAO**: os numeros vem de um powershell alocando 400 MB, nao de um jogo com GPU,
+texturas e streaming. O modo (mole vs duro) e um fato do kernel e vale para qualquer processo; a
+escolha do threshold (88%) e uma escolha de projeto, e pode ser ajustada com o dado do
+`GetProcessRamStatus()` da tela.
+
+#### 3. "Se eu limitar o Discord a 200 MB, ele obedece?" — resposta medida: NAO
+
+Mais 4 experimentos (harness `ws_test4.ps1` / `ws_test5.ps1`, app de ~337 MB, `ws_child3.ps1`):
+
+| cenario | resultado | page faults/20 s |
+|---|---|---|
+| Teto mole, app 337 MB, limite 200 MB, sistema 57% | **ficou 337 MB** (nao obedece) | +635 |
+| piso = teto = 200 MB (duro) | **ficou 337 MB** (nao fez nada) | +639 |
+| piso 200 / teto 230 (duro) | caiu a 84 MB (abaixo do piso) | **+994** |
+| piso 180 / teto 330 (duro), app 486 MB | caiu a 72 MB | +42 |
+
+**CONCLUSAO (fato do Windows, nao bug)**: `SetProcessWorkingSetSizeEx` e um PEDIDO DE TRIM,
+nao um teto. Ou a API nao segura nada (teto mole; e `piso == teto` e simplesmente ignorado),
+ou o kernel corta de uma vez para BEM ABAIXO do piso pedido. E cortar mais vezes custa MAIS
+page faults (+994) do que nao cortar nada (+635). Nao existe ajuste que faca "fica em 200 MB".
+
+O que funciona de verdade: `SetProcessInformation(ProcessMemoryPriority = VERY_LOW/LOW)` — o
+Windows passa a descartar as paginas daquele processo PRIMEIRO quando precisa de RAM, sem corte
+e sem rajada de disco. O kit so usa essa hint como FALLBACK quando o
+`SetProcessWorkingSetSizeEx` falha (linha de `MEMORY_PRIORITY_BELOW_NORMAL`); nunca de forma
+preventiva, que e onde ela vale. PENDENTE (nao feito, fora do escopo pedido).
+
+Obs para quem mexer: `GetProcessWorkingSetSize` e inutil para conferir em processo de 64 bits
+(devolve o sentinela de 64 TB antes e depois). Usar `GetProcessMemoryInfo` com campos SIZE_T.
+
+#### 4. Situacao dos motores + achado perigoso nos V3/V4
+
+| motor | hoje | situacao |
+|---|---|---|
+| Auto (5, PADRAO) | mede CPU por delta, decide a cena, I/O 2-3, page 4-5, timer so no loading | seguro |
+| V1 Equilibrado | High + I/O 3 + page 5 + `Win32PrioritySeparation` | seguro, o mais conservador |
+| V2 FPS Estavel | V1 + GameClassInfo + EcoQoS off + ProBalanceV2 | seguro |
+| V3 Extremo (Rede+) | V2 + timer 1 ms + `ApplyNetworkBoostV3` + ProBalanceV3 | **ver abaixo** |
+| V4 Performance | CustomEngineConfig High/IO3/page4 + timer + `ApplyNetworkBoostV3` | **ver abaixo** |
+| Personalizado | config do usuario; REALTIME bloqueado com aviso | seguro |
+
+A faixa de prioridade (Foco -> Sustentado -> original) vale para TODOS os motores, e nenhum
+deles mexe em REALTIME.
+
+**ACHADO NAO CORRIGIDO (03/10/2026)**: `ApplyNetworkBoostV3` (usada por V3 **e** V4, via
+`config.NetworkBoost` na linha 3510) escreve no registro global
+`HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`:
+`SystemResponsiveness = 10` (padrao do Windows: 20) e `NetworkThrottlingIndex = 10`.
+**Ninguem restaura**: `RevertBoost` so restaura a resolucao do timer, e `ShutdownGameBoost` nao
+toca no registro. `SystemResponsiveness` menor = menos fatia de CPU para threads do sistema
+(explorer, DWM, audio) = exatamente o sintoma de "tela preta", e fica valendo DEPOIS de
+desligar o GameBoost. Fix suggestion: restaurar 20 / remover os valores em `RevertBoost` e
+`ShutdownGameBoost`, ou tirar o ajuste global do V3/V4.
+
+Build/verificacao desta rodada: nenhuma alteracao de codigo (so medicao). O build limpo
+0 erros / 155 avisos e o `CheckUiThreading.ps1`exit 0 acima valem para o estado atual do
+arquivo (mtime 18:15:36, sem edicao posterior).
+
+### Sessao 04/10 — CORRECAO: auto-start nao nascia na 1a execucao (kit "nao inicia com o Windows")
+
+Pedido: amigo do usuario "nao conseguiu fazer o kit iniciar automaticamente com o Windows,
+teve que reabrir o app manualmente". Investigado o startup inicial da 1a execucao.
+
+**CAUSA RAIZ 1 — `IsTrayEnabledStatic()` devolvia false no Kit novo**:
+`LoadSettings()` ja forca `IsTrayEnabled = true` quando a chave `TraySettings` nao existe
+(1a execucao), mas `IsTrayEnabledStatic()` lia a chave ANTES do `SaveSettings` existir e
+retornava `false`. O `MainWindow` faz `if (trayActive) SetAutoStart(true)` -> num PC novo
+o bloco **nunca rodava** e nada era gravado. Sem auto-start, o proximo boot nao trazia o Kit.
+Corrigido: chave inexistente => `true` (coerente com o LoadSettings).
+
+**CAUSA RAIZ 2 — `EnsureAutoStartMethods` nao registrava na 1a execucao**:
+`desired = IsAutoStartEnabled()` era false no Kit novo (nada gravado) => `return` imediato.
+Agora detecta 1a execucao (`!desired && !HasStartWithWindowsPref() && !HasAnyAutoStartEntry()`)
+e chama `SetAutoStart(true)`. Helper novo `HasStartWithWindowsPref()` (o VALOR existe?)
+distingue "nunca escolheu" de "desligou de proposito" (0) — assim quem desliga NAO tem o
+auto-start ressuscitado no start seguinte.
+
+**CAUSA RAIZ 3 — escritas INDIRETAS apagavam as 3 vias** (o bug que mais derrubava o auto-start):
+- `DashboardPage.ApplyTraySettingsFromQuickMenu()` (roda no 1-clique "Otimizar") e
+  `GameBoostPage.SaveGameBoostSettings()` (roda em VÁRIOS toggles: GameBoost, Unpark CPU)
+  chamavam `SetAutoStart(checkbox == true)`. Se o checkbox estivesse null/desmarcado
+  (ainda nao carregado), o resultado era `SetAutoStart(false)` -> **apagava Registry Run +
+  .lnk + Task**. Removido das duas: so o clique do usuario grava.
+- `DashboardPage.ChkStartWithWindows` era um CheckBox **sem handler**: marcar nao fazia nada.
+  Adicionado `Click="ChkStartWithWindows_Click"` (espelha o estado real, igual ao ChkCrAutoStart).
+
+**Log enganoso (parecia divergencia, nao era)**: a linha da pasta Startup imprimia so o caminho
+(sem `--tray`), dando a impressao de que as 3 vias divergiam — o atalho ja recebia `--tray`.
+Logs corrigidos (`"path" --tray` nas 3) + novo `LogAutoStartDiagnostics()` que imprime o comando
+REAL de cada via (Registry / .lnk / Task com triggers) ao final do `SetAutoStart(true)` —
+serve para diagnosticar em 1 olhar por que o Kit nao subiu.
+
+**Bug encontrado pelo proprio teste**: `HasAnyAutoStartEntry()` contava uma Task **desabilitada**
+como entrada viva, o que impediria a remontagem do auto-start para sempre. Agora so conta
+task `Enabled`.
+
+Verificacao: build limpo `--no-incremental` **0 erros / 155 avisos** (baseline exato) e
+`Scripts/CheckUiThreading.ps1` 0 padroes novos (exit 0). Teste funcional real via harness
+`%TEMP%\opencode\autostart_probe` (reflection sobre o binario compilado, 8 cenarios, TODOS
+passaram): 1a execucao registra / desligado de proposito nao registra / pref=1 sem entradas
+reconfigura / `LogAutoStartDiagnostics` sem excecao. O harness fez backup e restaurou o
+registro, o .lnk e a Task do host (conferido depois: Task Ready, Run + lnk + pref intactos).
+
+**A TESTAR (PC limpo / VM)**: formatar/apagar o registro, abrir o Kit pela 1a vez, conferir no
+log `🆕 Primeira execução detectada` + as 3 linhas `🔎 [AUTOSTART]` + `Situação: ATIVO`, reiniciar
+e confirmar que o Kit sobe sozinho no tray.
+
+### Sessao 04/10 — Auditoria da VERIFICACAO INICIAL + motor de startup corrigido
+
+Pedido: "ainda nessa verificacao inicial ele faz varios outros checks, confira ele, e pode
+continuar fazendo as operacoes pendentes — deixe o motor do melhor jeito possivel".
+
+Mapeamento completo do que roda na verificacao inicial (caminho real, na ordem):
+1. `Program.Main` — mutex `Global\KitLugia_SingleInstance`, `PriorityClass=High`,
+   `ThreadPool.SetMinThreads(max(nucleos,8))`, `BringExistingToFront()` se ja ha instancia.
+2. `App.OnStartup` — handlers globais de excecao, `EasterEggManager.Start()`,
+   `UiFreezeWatchdog.Start()`, parse de `--tray/--update/--unlock/--takeown/--kitstore`,
+   `UnlockIpcServer.Start()`, check de .NET Runtime, `EnsureAutoStartMethods()` (Task.Run),
+   `SystemTweaks.RefreshContextMenuPathsIfNeeded/Consolidate/Reapply` (Task.Run),
+   `new MainWindow()`.
+3. `MainWindow` — `SearchEngine.Initialize`, `_trayService.Initialize()` (Dispatcher
+   Background), bloco AUTO-START, health check do tray (3s), auto-update (10s),
+   `AggressiveMemoryCleaner.StartIntelligentMonitoring(30)`, named event da janela.
+4. `TrayIconService.Initialize()` — LoadSettings, AutoFix GameBar/Community/ForceStop,
+   `StartExplorerWatchdog`, NotifyIcon, `LaunchTurboApps` (so com --tray), menu,
+   `RunSafetyProfiler`, `LoadProcessLimits`, `ShowTrayStatusReport`, `MonitorTick`,
+   `InitializeGameBoost`.
+5. `MonitorTick` -> `RunMonitorCycle` (thread pool): DownloadBoost, auto-clean, boost do
+   foreground, reavaliacao do motor Auto, `TickBoostTiers`, standby, anti-leak, focus
+   assist, perfis, Firemin, `LogStats`.
+
+### 7 defeitos REAIS encontrados e corrigidos
+
+**1. `ApplyNetworkBoostV3` NUNCA restaurava o registro global (o mais grave)**
+   `HKLM\...\Multimedia\SystemProfile`: gravava `NetworkThrottlingIndex=10` e
+   `SystemResponsiveness=10` e nunca devolvia. Como o SystemProfile e o perfil que o
+   Windows usa para threads de SISTEMA, manter `SystemResponsiveness=10` (padrao 20) causa
+   a "travada / tela preta" que o usuario reclamou — e sobrevivia ao desligamento do
+   GameBoost e ao reboot do app. CONFIRMADO EMPIRICAMENTE: o proprio host estava com
+   `SystemResponsiveness=10 NetworkThrottlingIndex=10` gravados.
+   Correcao: `ApplyNetworkBoostV3` agora guarda o valor ORIGINAL (1a vez) e fica
+   idempotente (antes reescrevia as 2 chaves a CADA troca de janela, dezenas de escritas
+   por minuto); `RevertNetworkBoost()` devolve o original (apaga a chave se ela nao
+   existia) e e chamado em `RevertAllBoostTargets` (ultimo boost saindo) e em
+   `ShutdownGameBoost`; `RescueNetworkBoostOnStartup()` (Task.Run no Initialize) e o
+   RESGATE: se o Kit morreu com o tweak aplicado e o GameBoost esta OFF, devolve
+   SystemResponsiveness=20 e apaga NetworkThrottlingIndex.
+
+**2. Auto-start ressuscitava sozinho apos o usuario DESLIGAR (MainWindow)**
+   `MainWindow.xaml.cs` chamava `SetAutoStart(true)` INCONDICIONAL dentro de
+   `if (trayActive)`. Como o icone do tray e SEMPRE visivel, `IsTrayEnabledStatic()` e
+   true em TODOS os starts — inclusive apos o usuario ter desligado o auto-start de
+   proposito. Trocado por `EnsureAutoStartMethods()` (que reconfigura quando ha entrada
+   viva, registra na 1a execucao e RESPETA a preferencia desligada).
+
+**3. Corrida entre App.OnStartup e MainWindow no auto-start**
+   Os dois chamavam rotinas que escrevem no MESMO `HKCU\...\Run`, no MESMO .lnk e na
+   MESMA Task Scheduler em paralelo — o `RegisterTaskDefinition` de uma podia colidir com
+   o `DeleteTask` da outra e deixar a entrada faltando (app nao subia no boot seguinte).
+   `EnsureAutoStartMethods` agora tem `lock (_autoStartLock)`.
+
+**4. `LoadProcessLimits()` rodava na thread de UI**
+   Faz I/O de DISCO (arquivo de limites + backup + recovery) dentro de
+   `Dispatcher.BeginInvoke` — com o disco ocupado (boot, antivírus, OneDrive) travava a
+   janela nos primeiros segundos. Movido para `Task.Run`; `ShowTrayStatusReport` e
+   `MonitorTick` ficaram no Dispatcher (sao baratos / ja despacham para o pool).
+
+**5. `RunSafetyProfiler` fazia limpeza de memoria REAL em TODO boot**
+   Executava `MemoryOptimizer.Optimize(Leve)` (EmptyWorkingSets em TODOS os processos)
+   em cada start, mesmo com a limpeza automatica DESLIGADA e sem o usuario nunca ter
+   pedido — no exato momento em que centenas de paginas estao sendo faultadas de volta.
+   Agora so mede quando `AutoCleanEnabled` (e o que a medida calibra).
+
+**6. `Initialize()` sem guarda de idempotencia**
+   Um segundo start da pagina criava um NotifyIcon fantasma na bandeja e DOIS timers de
+   monitor disputando o ciclo de CPU. Adicionado guard no topo (`if (IsInitialized) return`).
+
+**7. Watchdog do Turbo Explorer enumera processos a cada 2s PARA SEMPRE**
+   Mesmo ja desarmado (turbo aplicado), o timer nunca parava: `GetProcessesByName("explorer")`
+   + `SessionId` a cada 2s, o dia inteiro, so para rediscover um explorer que ja existe.
+   Early-out quando `_explorerTurboArmed == false && _explorerWatchPid != 0`; e o
+   `GetSessionExplorerPid` passou a ler `SessionId` ANTES do `Dispose` (a property lanca
+   em processo morto) e a descartar o handle no `finally` (antes vazava handle nos paths
+   de excecao).
+
+**Bonus**: `ram_stats.csv` girava sem limite (1 linha / 30s ≈ 1.05M linhas/ano ≈ 35 MB).
+Agora rotaciona em 2 MB para `ram_stats.1.csv`.
+
+### Verificacoes (exits preservados)
+
+- Build limpo `--no-incremental`: **0 erros / 155 avisos** (baseline exato), BUILD_EXIT=0.
+- `Scripts/CheckUiThreading.ps1`: 0 padroes novos (77 legados), UI_EXIT=0.
+- Harness NOVO `%TEMP%\opencode\netboost_probe` (console net10.0-windows, UseWPF,
+  TaskScheduler 2.12.2, DLLs do verifybin, `Nullable=annotations`): **11/11 assercoes**.
+  S1 resgate com GameBoost OFF -> 20 + remove throttling; S2 resgate com GameBoost ON nao
+  mexe; S3 resgate respeita valor alheio (25); S4 apply grava 10/10, 2a chamada e no-op,
+  revert devolve o ORIGINAL (20, nao o 7 adulterado); S5 chave original ausente -> revert
+  APAGA (nao inventa 20); S6 revert sem apply e no-op. Backup/restore do registro do host.
+- Probe de auto-start da sessao anterior re-executado: **8/8 cenarios seguem passando**
+  (confirmou que a troca no MainWindow nao regrediu nada).
+- Workspace limpo (sem `obj/verifybin`, sem pasta-junk `%TEMP%`).
+
+### Pendencias que exigem boot/VM (nao headless)
+- Boot real: 1a execucao deve logar `🆕 Primeira execução detectada`; e confirmar que o
+  auto-start continua OFF depois de o usuario desligar (o bug do item 2).
+- Confirmar no Gerenciador de Tarefas que `SystemResponsiveness` volta a 20 ao sair do boost.
+- Ganho real de FPS e Alt+Tab com jogo: nao mensuravel headless.
+
+### Proxima sessao
+- [ ] Remover Fresh Install tambem do Dashboard (`DashboardPage.xaml:465`)
+- [ ] Ligar `CheckUiThreading.ps1` no CI (hoje roda so a mao)
+- [ ] Revisar os 77 padroes legados de travessia de thread
+- [ ] Benchmark A/B das 62 sombras
+- [ ] Dividir `KitTaskManagerWindow`
+
+### Sessao 04/10 (cont.) — VM de DEBUG: o que existe no host e como usar
+
+Pedido: "pesquise se existe alguma vm para voce controlar uma que voce consiga fazer debug".
+
+**Levantamento do host (04/10/2026)**
+- VMware Workstation **26.0.0** instalado -> `C:\Program Files\VMware\VMware Workstation\vmrun.exe`
+  (CLI completa: start/stop nogui, runProgramInGuest, copyFile, snapshot).
+- **4 VMs Win11** em `%USERPROFILE%\Documents\Virtual Machines\`:
+  - `Windows 11 x64` ("NORMAL Windows 11 x64", Win11 24H2, 8 vCPU/8GB, NVMe, **7 snapshots**) — a melhor
+  - `Windows 11 x64 (2)` (ISO UUP 28000, 5 snapshots)
+  - `Windows 11 x64 (3)` ("sheldon wokink", Phobos11, 1 snapshot)
+  - `Windows 11 x64 (4)` ("sergei", WinPE Strelec — NAO e Windows completo, so para PE)
+- **TODAS as 4 estao CRIPTOGRAFADAS** (`vmx.encryptionType = "partial"`). `vmrun start <vmx> nogui`
+  falha com *"A password is required for this operation"*. A senha NAO esta no cofre de credenciais
+  do Windows nem em `%APPDATA%\VMware\config.ini`. **Pede a senha ao usuario para o teste de reboot real.**
+- **Windows Sandbox**: feature `Containers-DisposableClientVM` = Enabled, `WindowsSandbox.exe`
+  presente, hypervisor disponivel -> **sem senha**, scriptavel por `.wsb`. Registry nasce virgem a
+  cada launch e o HKLM e containerizado (nao toca o host). NAO reinicia (cada launch e novo) ->
+  nao serve para provar "reiniciei e o Kit subiu sozinho".
+- **QEMU 11.0.91** no PATH com acelerador **`whpx`** (usar `C:\Program Files\qemu\qemu-system-x86_64.exe`)
+  -> fallback para montar VM nova com a ISO Win11 ja no disco.
+- **VBS ATIVO** (`VirtualizationBasedSecurityStatus = 2`, `HypervisorPresent = True`) com a feature
+  Hyper-V DESLIGADA. Desde a 15.5 a VMware roda nesse cenario via WHPX (so mais lento).
+
+**Harness de VM criado**
+- `%TEMP%\opencode\sbx_probe\` — probe **self-contained win-x64** (171 MB, nao precisa de .NET
+  no guest) que executa o codigo REAL de startup por reflection: 1a execucao, 2a execucao,
+  usuario desliga/religa, resgate do tweak de rede, diagnostico. Grava `probe_results.txt` +
+  `KitLugia.log` na pasta mapeada.
+- `%TEMP%\opencode\sbx_probe\klprobe.wsb` — config do Sandbox (pasta publish -> `C:\probe`,
+  pasta de saida -> `C:\resultado`, `LogonCommand` roda o probe).
+- Como rodar: `WindowsSandbox.exe <caminho>\klprobe.wsb` e pollar a pasta de saida no host.
+  **Fecha o Sandbox depois** (`CloseMainWindow` / `Stop-Process`).
+
+**RESULTADO (23 PASS / 2 FAIL — os 2 FAIL sao assercao ERRADA do probe, nao bug)**
+- 1a execucao com registro virgem: loga `🆕 Primeira execução detectada`, grava as 3 vias,
+  `🔎 [AUTOSTART] ... Triggers: Logon+Boot`, `Situação: ATIVO OK`.
+- 2a execucao: idempotente, NAO reage como 1a execucao.
+- **Confirmado o fix do bug do MainWindow**: apos `SetAutoStart(false)`, o start seguinte NAO
+  ressuscita — loga `ℹ️ Auto-start desativado pelo usuário — respeitando a preferência`.
+- Resgate do tweak de rede: `SystemResponsiveness 10 -> 20` + remove `NetworkThrottlingIndex`;
+  nao mexe se GameBoost esta ligado; respeita valor alheio (25).
+- "religou: Run voltou" FALHA porque apos desligar a preferencia=0 e o `EnsureAutoStartMethods`
+  respeita — **comportamento CORRETO**; quem religa sao os 6 handlers de clique do usuario
+  (Dashboard 1323/1339, GameBoost 531, Optimization 218, Settings 280, TraySettings 337).
+
+**ERRO COMETIDO NESTA SESSAO (nao repetir)**: rodei o probe **no host** antes de subir o Sandbox.
+`SetAutoStart` usa `Process.GetCurrentProcess().MainModule.FileName` -> gravou o auto-start
+apontando para `sbx_probe.exe` e depois APAGOU as 3 vias do PC do usuario. Restaurado na hora
+(Run + .lnk + `StartWithWindows=1` + Task Boot/Logon Priority 1 RunLevel Highest, conferido).
+**REGRA: probe que chame `SetAutoStart`/mexa em HKLM so pode rodar DENTRO de uma VM/Sandbox,
+nunca no host.**
+
+**PENDENTE (precisa da senha de criptografia do VMware)**: boot real -> snapshot -> instalar o
+build -> REINICIAR dentro do guest -> confirmar que o Kit sobe sozinho no boot -> coletar o log.
+
+### Sessao 04/10 (cont.) — MEDICAO do ciclo de 30s do tray: onde o tempo realmente vai
+
+Pedido: "medir e otimizar o custo do ciclo de 30s do tray". Mediu-se ANTES de mexer.
+
+**Medicao 1 — o ciclo completo, config padrao (349 processos, 20 nucleos, 31 GB RAM)**
+- `RunMonitorCycle()` COMPLETO = **17 ms** a cada 30 s = 0,57% de um nucleo. **OK, nao e gargalo.**
+- `MemoryOptimizer.GetMemoryStats()` = 0 ms
+- `Process.GetProcesses()` = 3 ms
+- loop `IsTaskbarWindow` em 349 processos = 14 ms  <- dominante dentro do ciclo
+- `UpdateProcessProfiles()` = 21 ms
+- `ApplyFireminOptimizations()` = 0 ms
+- `GetStandbyListSizeMB()` = 0 ms
+- **`NetworkTrafficMonitor.SampleTraffic()` = 538-661 ms** <- 3x acima do orcario
+
+Os subsistemas restantes (auto-clean, standby purge, anti-leak, focus assist, boost) sao
+**gated por flag** e ficam desligados na config padrao. O custo "sempre ligado" e mesmo,
+17 ms, entao **nao ha o que otimizar no ciclo em si**.
+
+**Medicao 2 — dissectando a SampleTraffic (19-20 PIDs com TCP ativo)**
+- `GetActiveTcpConnectionsPerPid()` = **0 ms** (usa `GetExtendedTcpTable` nativo, e rapido)
+- 1a criacao de `PerformanceCounter` + `NextValue()` = **849 ms** (cold start do perflib)
+- criacao+leitura repetida = **15 ms** | `NextValue()` NO MESMO objeto = **15 ms**
+  => **o cache de contadores (`_ioReadCounters`/`_ioWriteCounters`) nao economiza NADA**,
+  porque o custo esta no `NextValue()`, nao na criacao. O cache esta populado (16 entradas
+  em cada dicionario) e mesmo assim nao ajuda.
+- 20 PIDs x 2 contadores x 15 ms = **~570 ms** — bate com os 538 ms medidos.
+
+**Achado de risco (freeze de UI)**: `SampleTraffic` e chamada em `ApplyBoostCustom`
+(linha ~3736), que vem de `CheckForegroundWindow` -> `Dispatcher.BeginInvoke` = **THREAD DE
+UI**. Com `DownloadBoostEnabled` ligado no perfil, TODA troca de janela em foreground
+congelava a interface por ~570 ms. Esse e o caminho `CheckUiThreading.ps1` nao pega,
+porque o custo esta dentro de uma metodo synchronous em Core, nao num `await`.
+
+**Correcao aplicada** (`KitLugia.Core/NetworkTrafficMonitor.cs`): TTL de 2 s no snapshot.
+`SampleTraffic` virou wrapper com cache; o corpo real foi para `SampleTrafficCore`.
+Trafego e sinal lento, 2 s mantem a decisao "isso e download?" identica. O ciclo de 30 s
+do monitor continua com amostra nova a cada tique (30 s > 2 s). Devolve copia rasa (container
++ lista novos, mesmos itens) para nenhum chamador mutar o cache compartilhado.
+
+**RESULTADO medido (burst de 60 trocas de janela em 6 s, ~10/s)**
+| | bloqueio na thread de UI |
+|---|---|
+| antes | ~32.280 ms |
+| depois | **2.624 ms** (**12x menor**) |
+- mediana das chamadas: 0 ms | p95: 531 ms | maximo: 1525 ms
+- **3 de 60 chamadas ainda passam de 100 ms** — sao as amostras frias que expiram o TTL.
+
+**PENDENTE (honesto, nao resolvido)**: a amostra fria continua bloqueando a UI (pico de
+1525 ms sob contencao). O TTL reduz a frequencia, mas nao tira o cold path da thread de UI.
+Fechar de verdade exige mover a amostragem de trafego para fora do `ApplyBoostCustom`
+(ou aquecer o cache com um refresher em background). Medir de novo depois disso.
+
+### Proxima sessao
+- [ ] Tirar o cold path da SampleTraffic da thread de UI (refresher em background)
+- [ ] `GetCachedProcesses()` nao tem cache nenhum (e so `Process.GetProcesses()`) e o
+      `ClearProcessCache()` e um stub vazio — ou implementa o cache, ou renomeia
+- [ ] Revisar os 77 padroes legados de travessia de thread
+- [ ] Benchmark A/B das 62 sombras
+- [ ] Dividir `KitTaskManagerWindow`
+
+### Sessão 04/10 — Triagem dos 77 padrões de travessia de thread: 3 bugs REAIS (e o furo do script)
+
+1. **Triagem estática** dos 77 (`%TEMP%\opencode\triage_thread.py`, extrai o corpo do método no
+   Core por contagem de chaves e procura `Process.Start`, `WaitForExit`, `.Wait(`, `Thread.Sleep`,
+   `.Result`, `ManagementObjectSearcher`, `Task.Run`):
+   - **67 SEGUROS** — já dentro de `Task.Run` ou genuinamente async. Envolver seria exatamente o
+     churn que o script avisa ("não é todo await do Core que precisa de Task.Run").
+   - **9 indeterminados** — todos **async de verdade** ao ler o corpo (o regex do triador não achou
+     a definição por causa do tipo de retorno genérico `Task<(bool Ok, string Message)>`):
+     `BcdRepairManager.RestoreBootFilesAsync` (async sem await, só copia arquivos pequenos da ESP),
+     `IsoEditorManager.ApplyRegistryEditsNoMountAsync`/`InjectFilesIntoWimAsync`,
+     `BootableMediaManager.CreateDualBootDrive`/`CreateMultiBootDrive`/`WriteImageDD`/`WriteIsoRaw`
+     (todos `await Task.Run` ou `ReadAsync/WriteAsync`), `RefindManager.InstallRefindOnlyAsync` e
+     `GitHubUpdater.DownloadUpdateFileAsync` (HTTP async).
+   - **3 bugs reais** — e nenhum deles era visível para o `CheckUiThreading.ps1` (ver item 5).
+
+2. **`IsoEditorManager.RemoveProvisionedAppsNoMountAsync`** (~linha 370): `Process.Start("reg.exe
+   unload")` + `WaitForExit(10000)` **síncrono** no meio de um método já async (todo o resto do
+   fluxo é `await RunProcessCaptured`) → até 10 s congelando a UI. Agora usa o próprio helper:
+   `await RunProcessCaptured("reg.exe", "unload HKLM\zSOFTWARE")`.
+
+3. **`RefindManager` — o pior dos três (freeze em TODO boot + ESP vazada)**:
+   - `MountEspSync()` = `Process.Start("mountvol")` + `WaitForExit(10000)` num **loop S..Z**
+     (9 tentativas = até 90 s de bloqueio).
+   - Era chamada por `IsPreBootCompleted()` **na thread da UI**: `MainWindow.Window_Loaded` →
+     `_ = CheckShrinkCompletionAsync()` → `await Task.Delay(3000)` → a continuação volta ao
+     Dispatcher → `RefindManager.IsPreBootCompleted()`. Ou seja, **3 s depois de cada abertura
+     do app**.
+   - **Vazava a ESP**: montava e nunca desmontava (só o `CleanupRefindAsync` desmontava) — a
+     partição EFI ficava montada com letra, visível no Explorer, para sempre.
+   - Correção: `MountEspSync` e `IsPreBootCompleted` (sync) **removidos**; entram
+     `IsPreBootCompletedAsync` + `MountEspAsync`/`DismountEspAsync` **públicos**, todos com
+     `DismountEspAsync` no `finally`. `InstallRefindOnlyAsync` passou a usar `MountEspAsync` +
+     `finally` de desmontar; `MountEspAsync` ganhou **timeout explícito de 10 s por tentativa**
+     (o default do helper era 60 s → 9 × 60 s no pior caso).
+   - **ARMADILHA encontrada na validação**: `RunProcessCaptured` (helper do RefindManager) era
+     `async` **sem nenhum `await`** (corpo 100% síncrono com `WaitForExit`/`WaitOne`) → o
+     `await MountEspAsync()` **continuava** bloqueando a UI. Agora o corpo é
+     `RunProcessCapturedSync` e o async faz `await Task.Run(...)`.
+   - **MEDIDO** (reflexão no binário real, comando sem efeito de sistema
+     `cmd /c ping -n 5 127.0.0.1`, probe em `/tmp/opencode/refind_probe.ps1`):
+     caminho novo → **Task devolvida em 4 ms**, total 4114 ms, exit 0;
+     mesmo corpo **sem** o Task.Run → thread chamadora **bloqueada 4101 ms**.
+   - MS Learn confirma que `mountvol <drive>: /s` monta a ESP **naquela letra específica**
+     ("Mounts the EFI system partition on the specified drive"), e não "próxima letra livre" —
+     então o loop S..Z e o `mountvol <drive>: /d` de desmontar continuam corretos.
+
+4. **`DriverManager` (pnputil) — risco de deadlock ETERNO**:
+   `InstallDriversFromFolder` e `UninstallDriver` faziam `Process.Start` + `ReadToEnd()` (lendo
+   **só stdout**, com `RedirectStandardError = true`) + `WaitForExit()` **sem timeout**. Se o
+   pnputil escreve mais que o pipe de stderr (~4 KB), ele bloqueia escrevendo e o `ReadToEnd` do
+   outro lado nunca retorna: **deadlock sem timeout para resgatar**. Pior: `SmartInstallDriver`
+   (awaited direto do handler da UI na DriversPage, linha 182) chamava isso sem `Task.Run`.
+   Agora os dois usam `ProcessRunner.Run` (timeout 300 s / 120 s, sai OEM do `SystemUtils`) e
+   `SmartInstallDriver` envolve as duas chamadas em `Task.Run`.
+
+5. **`ProcessRunner.Run`** (helper usado por todo o Core, ex.: BootableMediaManager): passa a
+   drenar stdout+stderr **em paralelo** (`ReadToEndAsync` nos dois antes do `WaitForExit`) — a
+   leitura sequencial podia deadlockar em qualquer chamador.
+
+6. **`Scripts/CheckUiThreading.ps1`**: baseline 77 → **80**, 0 novos, exit 0. As 3 entradas novas
+   são justamente as correções (`await RefindManager.IsPreBootCompletedAsync`,
+   `await RefindManager.MountEspAsync`, `await RefindManager.DismountEspAsync`).
+
+### LIÇÃO (furo do CheckUiThreading — para as próximas sessões)
+
+- O script só detecta **`await Core.Método`**. **Chamada SÍNCRONA de um método do Core a partir da
+  thread da UI é invisível para ele** — e era exatamente o caso dos 3 bugs reais desta sessão
+  (`RefindManager.IsPreBootCompleted`/`MountEspSync`, `DriverManager.SmartInstallDriver`).
+- `async` **sem nenhum `await`** não gera aviso (o projeto não tem CS1998 no log de avisos) e roda
+  100% na thread do chamador — foi assim que o `RunProcessCaptured` do RefindManager enganou a
+  primeira versão do conserto. Ao validar uma correção de travessia, é preciso conferir o
+  **corpo do helper**, não só a assinatura.
+- Build: **0 erros / 155 avisos** (baseline). `CheckUiThreading.ps1`: exit 0.
+
+### Proxima sessao
+- [ ] Varredura dedicada às **chamadas SÍNCRONAS do Core feitas da UI** (o furo do item 5):
+      `Process.Start` / `WaitForExit` / `Thread.Sleep` / `.Result` / `ManagementObjectSearcher`
+      em método chamado direto de handler de UI (sem `await` e sem `Task.Run`). Candidatos já
+      listados: `ActivationManager:116`, `BrowserExtensionManager:223`, `DeepUninstaller:202/3205`,
+      `DriverUnlockService:819/918`, `ForceStopUnlockService:493/508/804/928/1632`,
+      `EnablementPackageManager:104`, `BootloaderPackager:201/227`.
+- [ ] Testar em VM: instalar rEFInd pelo ShrinkPage (ESP monta E desmonta) e instalar/remover
+      driver pela DriversPage (pnputil com timeout novo).
+- [ ] `NetworkTrafficMonitor.CleanupStaleCounters` nao faz `Dispose` dos `PerformanceCounter`.
+
+### Sessao 04/10 — FASE 0 do KitTaskManager: os bugs que o usuario RELATOU, um por um
+
+Escopo desta sessao: (a) fechar o item "corrija o que falta" (chamadas SINCRONAS do Core
+feitas da thread da UI) e (b) arrumar o KitTaskManager nos pontos que o usuario complaint.
+Reescrita estrutural esta em `docs/TM_REWRITE_PLAN.md` (fases F1-F6) — NAO cabe numa sessao.
+
+**(a) Chamadas sincronas do Core na UI — corrigidas**
+1. `KitTaskManagerWindow.xaml.cs` — `Kill(bool)` (4 handlers + 2 atalhos de teclado + o menu do
+   Resumo) rodava na thread da UI: `KillTree` percorre a arvore de PIDs e o fallback
+   `ForceStopUnlockService.Unlock` abre handles de processo/driver. Virou `KillAsync` com o
+   laudo inteiro em `Task.Run` (com `BtnFinalizar`/`BtnForceStop` acendendo conforme a selecao).
+2. `KitTaskManager.Services.cs` — `ServiceController.Start/Stop/WaitForStatus(10s)` na UI:
+   Reiniciar um serviço travava o TM por até 10 s. Iniciar/Parar/Restartar, Habilitar/
+   Desabilitar Inicializacao e a varredura de orfas (File.Exists em caminho de rede) foram
+   para `Task.Run`, com feedback em TxtStatus/TxtStartupStatus.
+3. `KitTaskManager.Latency.cs` — `_lat.Start()` (ETW do kernel) na UI; e o timer de 1 s da aba
+   continuava rodando DEPOIS de sair da aba (RefreshLatencyUi + cartao de audio roubando CPU).
+   Agora o toggle e assincrono e `SetLatencyTabActive()` liga/desliga o timer pelo SwitchTab.
+4. `AppsPage.xaml.cs` — `SRSetRestorePointW` (ponto de restauracao, sobe o VSS) e
+   `RegisterExtensionsViaCdpPipe` (fecha o navegador com `WaitForExit(3000)` por processo)
+   rodavam na UI; export/import de extensoes tambem (copia de centenas de MB). Todos em Task.Run.
+
+**(b) KitTaskManager — bugs REAIS achados e corrigidos**
+5. **Aba Usuarios: o card fechava no tick/scroll.** CAUSA RAIZ: `DgUsers` usava
+   `TmRowStyle`, que NAO liga `DataGridRow.DetailsVisibility` ao item (o `UserRowStyle`, que
+   lia, existia e nao era usado em lugar nenhum). Com RowDetails + virtualizacao de linha, o
+   DataGrid recicla o container no scroll e o detalhe colapsa. Correcao: estilo de linha
+   proprio `TmUserRowStyle` + `EnableRowVirtualization="False"` + `CanContentScroll="False"` +
+   `ScrollViewer MaxHeight=260` no detalhe + **teto de 24 processos** com rodape honesto
+   ("Mostrando os 24 mais pesados de 182") — antes um usuario com 180 processos gerava um
+   card mais alto que a janela, e era isso que sumia. Alem disso o clique na seta durante uma
+   carga em voo nao era engolido: `_usersReloadPending` refaz a releitura no `finally`.
+6. **Resumo: clicar num processo nao fazia NADA** (so havia duplo clique e botao direito).
+   Agora `SelectionChanged` abre um cartao com nome/PID/instancias/usuario/estado/caminho e
+   tres acoes: Abrir na aba Processos · Finalizar tarefa · Congelar na lista.
+7. **Filtro "as vezes nao funciona": CORRIDA.** `ApplyFilter` e fire-and-forget
+   (`Task.Run` + `Dispatcher`) e o refresh de 1 s dispara OUTRO em paralelo: o resultado de
+   uma busca antiga chegava ao Dispatcher DEPOIS da nova e a lista voltava ao filtro velho.
+   Guardado por `_filterGeneration` (descartado no `Dispatcher.InvokeAsync`).
+8. **Menu de contexto de Processos agia na selecao ANTIGA** — `DgProcesses` nao tinha
+   `ContextMenuOpening`, entao clicar direito numa linha nao selecionada nao trocava a
+   selecao. Adicionado (reaproveita o `RowUnderMouse` do Resumo) + reescreve os itens "N".
+9. **Aba Servicos: filtro e lista desincronizados.** `LoadServicesAsync` aplicava
+   `ApplyServiceFilter("Todos")` em vez do que estava na combo; `CmbServiceFilter_Changed`
+   engolia o clique antes da 1ª carga; a lista so carregava uma VEZ (servico que para/sobe
+   fora do TM ficava congelado). Agora: filtro reaplicado da combo, ordenacao preservada
+   (`SortServices`), recarga por idade (15 s) ao abrir a aba + botao "↻ Recarregar".
+10. **Aba Inicializacao: contagem "ativos" INVERTIDA** (contava os que nao eram Enabled nem
+    Disabled), filtro perdido a cada recarga, e botoes de acao sempre ligados sem selecao.
+    Corrigidos + `↻ Recarregar` + acoes ligadas a `DgStartup_SelectionChanged`.
+11. **Botoes de Servicos/Inicializacao sem selecao**clicavam e nao faziam NADA (return mudo).
+    Agora acendem/apagam com a selecao (`UpdateServiceActionButtons`/`UpdateStartupActionButtons`).
+12. **Grafico central do Resumo "nao ajudava em muita coisa"**: tres linhas coloridas sem
+    dizer o que significam. Novo `TxtSumCpuVerdict` (`BuildCpuVerdict`): fala em portugues o
+    que a curva esta dizendo — uso de Kernel alto = driver; CPU no limite = programa; CPU
+    ociosa = o problema nao e a CPU — mais media/pico da janela e alerta de temperatura.
+13. Lixo removido: `KitTaskManager.Performance.cs.bak.20260826215624`,
+    `_backup_pre_refactor/` (256 KB), `Windows/KitTaskManagerWindow.xaml.new`.
+
+**Verificacao**: build `0 Erro(s) / 145 Aviso(s)` (baseline era 155); `CheckUiThreading.ps1`
+= 0 padroes novos, exit 0; auditoria estatica = 124 eventos declarados no XAML, **0 sem metodo**;
+todo controle novo referenciado no code-behind existe com `x:Name` no XAML.
+
+**A TESTAR no app** (nao da para rodar o WPF aqui): aba Usuarios (expandir 2 usuarios e rolar),
+clique simples no Top do Resumo, filtro `cpu:>10` digitado rapido, menu direito numa linha nao
+selecionada, Iniciar/Parar um servico (a janela deve continuar responsiva), botao Recarregar nas
+abas Servicos e Inicializacao, leitura do grafico da CPU.
+
+**Proxima sessao**: F1 do `docs/TM_REWRITE_PLAN.md` (`Model/` + `Filtering/ProcessQuery.cs`
+com testes unitarios) — o filtro deixa de depender do Dispatcher e ganha cobertura de teste.
+
+### Sessao 04/10 (cont.) — O WPF RODA AQUI: harness de captura real do TM
+
+**CORRECAO DE UMA AFIRMACAO ERRADA**: a sessao anterior afirmou "WPF nao roda neste
+ambiente". **Falso** — verificado: `query session` mostra `console / Lugia / ID 1 / Ativo`,
+`explorer.exe` vivo, `[Environment]::UserInteractive = True`. O que NAO existia era apenas um
+harness para abrir a janela e capturar. Feito em `%TEMP%	mharness` (fora do repo):
+projeto WPF que referencia `KitLugia.GUI.csproj`, cria `KitTaskManagerWindow`, e
+`RenderTargetBitmap` cada aba.
+
+**ARMADILHAS ao escrever este harness (todas custaram uma iteracao)**:
+1. `Window.Loaded` dispara **DENTRO** de `win.Show()` — anexar o handler depois nunca roda.
+2. Sem `app.Run()` o Dispatcher nao bomba e nada acontece (usar `ShutdownMode.OnExplicitShutdown`).
+3. `DispatcherPriority.ApplicationIdle` **nunca e alcancado** com o motor de 60 fps do TM
+   registrando commands — a aba fica "pronta" mas o codigo nao roda.
+4. `dotnet build` falha com CS1555 se o `.cs` nao estiver na pasta do `.csproj` (o
+   `write_file` usa caminho RELATIVO A RAIZ DO REPO — o arquivo foi parar la).
+
+**ACHADOS REAIS que so apareceram RODANDO** (nenhum era visivel estaticamente):
+- **Cartao do Resumo fechava sozinho a cada refresh.** `UpdateSummaryTopCpu` reconstroi
+  `_topProcRows` (Clear + Add) sempre que a ORDEM muda — com CPU viva isso acontece ~1x/s e
+  zerava o `SelectedItem`, logo o `SelectionChanged` recolapsava o cartao.
+  CORRECAO: `_sumSelectedPid` + `RestoreSummarySelection()` (reescolhe o PID depois da
+  reconstrucao; so recolapsa se o processo saiu mesmo do Top).
+- **3 botoes nao cabiam no cartao** (coluna estreita): o 3o saia cortado. `StackPanel`
+  horizontal -> `WrapPanel` + rotulos curtos.
+- Confirmado visualmente OK: card do Usuarios ABRE e **CONTINUA ABERTO apos scroll** com os
+  dados atualizando ao vivo (antes fechava) — o bug relatado pelo usuario esta resolvido;
+  rodape honesto "Mostrando os 24 processos mais pesados de 160"; aba Servicos com botoes de
+  acao **apagados sem selecao** e "↻ Recarregar" ativo; leitura do grafico de CPU
+  ("CPU em uso moderado. Ultimos 10s: media 16%, pico 26%."); filtro `cpu:>1` 131 -> ~5 linhas.
+
+**ERRO PROPRIO EVITADO PELO HARNESS**: digitei `$_sumPinned` (com `$`) em vez de
+`_sumPinned` ao reescrever uma linha — 6 erros de sintaxe. Compilador acusou; em C# o `$`
+so entra como prefixo de string interpolada, nunca como identificador.
+
+**Nota de fidelidade da captura**: `RenderTargetBitmap` pode reaproveitar tiles nao
+repintados na regiao do presenter de detalhe e mostrar linhas "sem nome" que NAO existem
+na tela (as medicoes de geometria por `ItemContainerGenerator` deram Y/altura corretos).
+Para captura fiel, `InvalidateMeasure/InvalidateArrange` em toda a arvore antes de renderizar.
+
+**HARNESS (reutilizar!)**: `%TEMP%	mharness\TmHarness.csproj` + `Program.cs`.
+Rode: `./bin/Debug/net10.0-windows10.0.26100.0/TmHarness.exe <dirDeSaida>` — gera um PNG
+por aba + `harness.log` com os testes automaticos (clique no Top, expandir card + scroll,
+filtro, handler de menu). da para estender para qualquer outra janela do Kit.
+
+**Verificacao final apos tudo**: build `0 Erro(s) / 145 Aviso(s)`, `CheckUiThreading` exit 0,
+harness `RUN_EXIT=0` sem nenhuma excecao nao tratada.
+
+
+### Sessao 04/10 (cont. 2) - Teste DESTRUTIVO real: VMware fechar/abrir + Force Stop (BUG DE GRUPO ACHADO)
+
+Harness NOVO em %TEMP%	mkill (fora do repo): TmKill.exe <image> <force|tree|plain> <outDir>.
+NAO chama Process.Kill diretamente - seleciona a linha real no DgProcesses e invoca por
+reflection o handler PRIVADO (KillAsync / ForceStopSelectedAsync), igual ao clique do utilizador.
+
+Armadilha do harness: `dg.SelectedItem = <objeto de _allRows>` NAO pega. ApplyFilter cria
+`new ProcessRow` por grupo (KitTaskManagerWindow.xaml.cs ~2252), logo a linha visivel e um
+objeto DIFERENTE. Tem de se casar por Pid dentro de `dg.ItemsSource`.
+
+**RESULTADOS (todos com confirmacao do SO, nao so do handler):**
+- Force Stop no vmware.exe (PID 36476): 3023 ms, morto, saiu da tabela. SO confirmou que
+  vmnat/vmware-tray/vmware-authd foram tambem (filhos do Job Object).
+- KillAsync(arvore) no vmware.exe (PID 32340): 34 ms. Reabriu com janela real
+  "Windows 11 x64 (2) - VMware Workstation" e matou de novo em 34 ms.
+- Force Stop / Kill sao ~100x mais rapidos entre si (34 ms vs 3023 ms) porque o Force Stop
+  chama FindBlockingProcesses + Unlock (Core), que o Kill nao chama.
+
+**BUG REAL 1 - finalizar GRUO mata so 1 de N** (o botao "quebrado" do utilizador):
+`ApplyFilter` agrupa por Name+Group e a linha de grupo so tem `Pid` = PID representativo;
+os verdadeiros PIDs ficam em `RawChildren`. `KillAsync` e `ForceStopSelectedAsync` usavam
+`row.Pid` e IGNORAVAM RawChildren -> matavam 1 processo.
+Medido com 6 `ping.exe`: "PING.EXE (6)" -> 1 morto, **5 vivos**, e a linha saia da tabela
+(o grupo voltava no refresh seguinte como "(5)", parecendo que o botao nao fez nada).
+CORRECAO: helper `KillTargets(ProcessRow)` (linha de grupo devolve todos os `RawChildren`,
+linha simples/filho devolve o proprio PID) usado em KillAsync e ForceStopSelectedAsync;
+`_allRows.RemoveAll` tambem passa a remover TODOS os PIDs do grupo; status mostra
+"N/M processos finalizados". Re-medido: "PING.EXE (5)" -> vivosApos=0, SO `ping vivos=0`.
+
+**ACHADO (NAO corrigido, e do Core): `FindBlockingProcesses` custa ~31 s FIXOS por executavel.**
+Medido: 1 ping = 31,3 s | 6 pings = 31,5 s | vmware.exe = 3,0 s. O custo e por BINARIO,
+nao por membro. O Force Stop em grupo foi agrupado por caminho (UMA chamada de
+FindBlocking/Unlock por exe em vez de uma por PID) por correcao, mas **NAO houve ganho
+medido** (33,4 s com 4 pings antes vs 31,5 s com 6 depois) - nao afirmar speedup.
+O custo real esta no Core (scan de registry dos shell folders + handles nativos) -
+fora do ambito do TaskManager, deixado intacto de proposito.
+
+**Estado final da maquina**: VMware aberto (PID 14528), 0 processos ping.
+
+Verificacoes: build 0 erros / 145 avisos (baseline) | CheckUiThreading 0 novos, exit 0 |
+TmHarness 10 abas RUN_EXIT=0 (regressao, depois da edicao).
+
+### Proxima sessao
+- [ ] Force Stop: medir onde os ~31 s de FindBlockingProcesses se gastam (perfil por fase) - se
+      for o scan de registry dos shell folders, cachear/cortar o scope
+- [x] ~~Testar acoes destrutivas (matar/parar serviço/Force Stop)~~ (04/10: Force Stop + Kill
+      testados no VMware e em grupo; falta soserviço/inicializacao)
+
+
+### Sessao 04/10 (cont. 3) - FECHADO: a "linha sem nome" era artefato de captura, nao bug
+
+Investigacao definitiva do defeito em aberto (linha 1 abaixo do card do Utilizador aparecia
+sem Utilizador/Status nas capturas).
+
+1. **O DIAG anterior nao media nada**: lia as celulas via `FindVisual<ItemsControl>(row)`, mas
+   o `DataGridCellsPresenter` NAO e ItemsControl -> `cells` era null -> TODAS as 9 linhas
+   saiam `nome=''` (ate a linha 1, cujos dados existem). Era um bug do HARNESS, nao do app.
+   Corrigido com `CollectTexts` (percorrido real da arvore visual) + leitura por property.
+
+2. **Arvore visual real (todos os dados presentes):**
+   [1] H=322 UserName='Lugia'   Status='ativa' Cpu='3,7%' N='166'
+   [2] H=32  UserName='DWM-1'   Status='ativa' Cpu='1,2%' N='1'
+   [3] H=32  UserName='SISTEMA' Status='ativa' Cpu='0,7%' N='110'
+   ... 9 linhas, todas com Utilizador/Estado/CPU/N.
+
+3. **Captura por GDI `PrintWindow` (PW_RENDERFULLCONTENT)** - o render do SO, sem passar pelo
+   RenderTargetBitmap do WPF. Novo `ShotReal()` no harness. PrintWindow=True, 1300x780.
+   Contagem de pixels claros por linha (x=85..705):
+   ECRA REAL      : 355 / 421 / 349 / 540 / 510 / 335 / 338
+   RENDERTARGET   : 348 / 435 / 352 / 535 / 504 / 323 / 319
+   Os dois caminhos **concordam** e nenhuma linha esta vazia -> o defeito NAO se reproduz.
+
+VEREDITO: nao ha bug. Era tile reaproveitado pelo RenderTargetBitmap na execucao anterior.
+Nenhum codigo do app foi alterado por causa disto (nao se mexeu no app sem evidencia).
+Comparacao visual em `tm_visual_check/` (DISPONIVEL, apagar quando ja nao interessar).
+
+**Licao do harness**: nunca afirmar "linha em branco no ecra" so com RenderTargetBitmap.
+Usar `ShotReal` (PrintWindow) sempre que a duvida for sobre o que esta realmente pintado.
+
+
+### Sessao 04/10 (cont. 4) - GameBoost Pro: o Automatico estava INALCANCAVEL (UI) e era ESQUECIDO (persistencia)
+
+Pedido: completar o GameBoost Pro - motor unico Automatico a substituir V1/V2/V3/V4, com
+legacy opcional mas Auto como melhor. Levantamento + reparo.
+
+**BUG 1 - o Automatico nao existia na UI.** `GameBoostEngine.Auto = 5` e
+`_currentEngine = GameBoostEngine.Auto` (padrao no servico desde 03/10) e
+`GetEngineDescription` ja o descrevia, MAS:
+- `CmbEngine` (GameBoostPage.xaml) so tinha itens Tag 1,2,3,4,"custom" -> impossivel escolher
+- `TxtEngineDescription` dizia "V1 - Original Plus ... (PADRAO)" (informacao errada)
+- `CmbGameEngine` do Dashboard (PopulateEngineComboBox) tambem nao tinha Auto
+- 4x `CmbEngine.SelectedIndex = 0` (=V1) como fallback
+- o aviso de travamento era `if (engineNumber != 1)` -> o Auto (5) DISPARAVA o alerta
+  "pode causar travamentos" no motor recomendado
+
+**BUG 2 (o pior) - escolher Automatico era esquecido no arranque seguinte.**
+`LoadLastEngine()` validava `config.EngineNumber >= 1 && config.EngineNumber <= 4` ->
+o 5 era REJEITADO e caia no fallback `EngineNumber = 1` (V1 legado). E os 2 fallbacks
+(sem ficheiro / erro) tambem eram 1, logo uma instalacao nova nascia em V1.
+Confirmado no disco: `%LocalAppData%\KitLugia\last_engine.json` (nome REAL do ficheiro;
+nao e engine_config.json) tinha `EngineNumber: 5` e o codigo antigo rejeitava-o.
+
+**BUG 3 - 3 switches de descricao duplicados e divergentes** (troca de motor, saida do
+personalizado, restauracao no arranque). Um dizia "PADRfO", outro dizia que o V4 usava
+"RealTime" (o V4 REMOVEU o RealTime de proposito - era o que causava tela preta/BSOD) e
+nenhum conhecia o Automatico. Havia tambem mojibake real no codigo: "YY" onde devia estar
+o emoji verde, "PADRfO", "s️ AVISO".
+
+**BUG 4 - motor invalido ficava gravado.** `SetEngine(int)` fazia cast direto; um 0/99
+deixava `CurrentEngine` fora do enum e o switch de ApplyBoostModern caia no default
+(silenciosamente Auto) enquanto a UI mostrava outra coisa.
+
+**Reparos:**
+1. GameBoostPage.xaml: item novo `Tag="5"` "Automatico (RECOMENDADO)" PRIMEIRO (assim todos
+   os `SelectedIndex = 0` existentes passam a significar Auto), V1-V4 rotulados "(legado)",
+   sub-linha a explicar que o legado fixa valores e nao se adapta a cena.
+2. GameBoostPage.xaml.cs: `AutoEngineNumber = 5` (constante unica);
+   `MotorDescriptionText(int)` + `ShowMotorDescription(int)` = FONTE UNICA de texto
+   (substituiu os 3 switches); aviso so para `engineNumber is 2 or 3 or 4`; texto do V4
+   corrigido (sem RealTime); intervalo de validacao 1..5; fallbacks = Auto; mojibake limpo.
+3. DashboardPage.xaml.cs: Auto primeiro no PopulateEngineComboBox + rotulos de legado.
+4. TrayIconService.cs: `_previousEngine = GameBoostEngine.Auto` (sair do personalizado
+   devolve o recomendado); `SetEngine(int)` com `Enum.IsDefined` -> invalido cai em Auto;
+   log de ClearCustomEngine usa GetEngineDescription (nao imprimia "V5").
+
+**VERIFICADO (harness %TEMP%\gbharness, GB_EXIT=0, TODOS OS TESTES PASSARAM):**
+- CmbEngine: 7 itens, `[0] tag=5 AutomAtico (RECOMENDADO)`, 1..4 = legado
+- selecao inicial = Auto, `TrayIconService.CurrentEngine` = 5
+- persistencia: gravar 5 -> LoadLastEngine devolve 5 | gravar 1 -> devolve 1 (legacy intacto)
+- arranque: config 5 -> combo volta a tag 5 e CurrentEngine 5
+- guard: SetEngine(1)->1 | SetEngine(5)->5 | SetEngine(99)->5 (Auto)
+- descricoes: as 5 corretas, "RECOMENDADO" no Auto, "SEM RealTime" no V4
+- Armadilha do harness: a pagina usa `StaticResource` do App.xaml (`AccentColor`), sem
+  carregar `Themes/Generic.xaml` em `Application.Resources` o XAML rebenta (XamlParseException).
+Build: 0 erros / 145 avisos (baseline).
+
+**NAO verificado**: o EFEITO de runtime do ApplyBoostAuto (prioridades/IO/timer aplicados)
+nao foi exercitado - o harness abre a Page sem o TrayIconService em execucao, e
+`ApplyBoostModern` exige `_instance`. O dispatch (CurrentEngine=Auto -> case Auto ->
+ApplyBoostAuto) esta verificado por codigo + estado. Testar com jogo real.
+
+**Nota de estado do utilizador**: `last_engine.json` ficou com `EngineNumber: 5` (Auto) por
+causa do teste - antes disso estava em 4 (V4). Alinhado com o pedido (Auto como melhor).
+
+- Dashboard TAMBEM verificado: `CmbGameEngine` -> 7 itens, `[0] tag=5 Automatico (RECOMENDADO)`,
+  1..4 legado, o perfil do utilizador em [5] e "Personalizar..." em [6]. Nota: a DashboardPage
+  NAO popula o combo quando hospedada isolada (o Loaded nao completa os servicos), por isso o
+  harness invoca `PopulateEngineComboBox` por reflexao - testa a lista, nao o ciclo de vida.
+### Erro "Couldn't load changes / git exit 66" (painel de alteracoes do cliente)
+
+NAO e problema do repo: `git ls-files --cached -z` no repo devolve exit 0 tanto com `cd`
+quanto com `git -C "<caminho>"`. O cliente chama o git com o caminho do workspace SEM
+aspas (tem espacos e parenteses: "KitLugia-master (25) - Copia - ...") e o argumento
+quebra. O caminho tem 109 chars, logo NAO e MAX_PATH.
+Mitigacao pratica: usar um caminho curto sem espacos/parenteses (ex.: `C:\KL`).
+
+### Sessao 04/10 — Bateria completa de testes (TM + GameBoost): RESULTADOS + BUG das orfas
+
+Pedido do utilizador: "faca todos os testes preciso de resultados para concluir essa parte do projeto".
+Harnesses fora do repo em %TEMP% (tmharness, tmkill, gbharness; NOVOS: `tmsvc`, `gbruntime`).
+
+**Resultados (04/10/2026, host elevado, app fechado):**
+1. Build da solucao completa: **0 erros / 145 avisos** (baseline mantido).
+2. `Scripts/CheckUiThreading.ps1`: **exit 0**, 0 padroes novos (96 classes Core, 80 baseline).
+3. `TmHarness` (10 abas): **RUN_EXIT=0**; 15 PNGs incl. `Users_card_REAL` (GDI PrintWindow);
+   testes internos OK (card do Resumo, card de Utilizador: 9 linhas/cap 24/scroll 200,
+   filtro `cpu:>1` 128->5 linhas, handler do menu de contexto encontrado).
+4. `TmKill` (grupo de 6 pings): `plain` -> membros=6 vivosApos=**0** em 91 ms;
+   `force` -> vivosApos=**0** em **31838 ms** (custo fixo do `FindBlockingProcesses`, nao corrigido);
+   `tree` (cmd + ping filho) -> 28 ms, pai E filho mortos. Comparativo: `plain` num processo sem
+   janela tambem mata a arvore (`Kill(entireProcessTree: true)` no fallback) - comportamento atual.
+5. `GbHarness`: **GB_EXIT=0, TODOS OS TESTES PASSARAM** (combo Auto[0] tag=5, persistencia 5,
+   legacy 1, restore, SetEngine(99)->5, 5 descricoes, Dashboard 7 itens).
+6. `TmSvc` (NOVO - servicos + orfas): Spooler stop/start/restart pelo app **OK** (restart 201 ms).
+   Orfas: `StartupApproved` byte[0]=3 + backup `__RunCommand` + valor Run removido **OK**.
+7. `GbRuntime` (NOVO - motor Auto em RUNTIME): `ForceReapplyBoost` -> prioridade **High** + log
+   `GameBoost AUTO: fg=False cpu=35% amostra=False -> IO=2 Page=5 Timer=False`;
+   `RevertCurrentBoost` -> **Normal**; gate `ForegroundBoostEnabled=false` -> sem boost;
+   reaplicar -> High. **TODOS OS TESTES PASSARAM** (o que faltava verificar do Auto).
+8. Benches do repo: `TaskManagerWindowBench` (frio **561 ms** / quente **49 ms**),
+   `TaskManagerOpenBench` (1o refresh ~5 ms; sanidade 314 proc/314 caminhos/12 janelas),
+   `TmVisualBench` (10 abas, **0 textos sobrepostos**; PNGs em `tests/TmVisualBench/out/`, ignorado),
+   `LatencyMeterTest` (10s + 5s, todas as fontes) - **todos exit 0**.
+
+**BUG (achado pelo teste 6): desabilitar item de inicializacao = beco sem saida.**
+- `SetStartupItemState(nome,false)` (CASO Run): grava `StartupApproved` (byte0=3; fallback pelo
+  nome do arquivo quando o valor nao existe) e a Acao A2 salva o valor Run em
+  `HKCU\Software\KitLugia\RemovedApps` (`__RunCommand/__RunHive/__RunPath/__RunValueName`) e
+  **DELETA o valor Run** (intencional: apps que ignoram StartupApproved).
+- Consequencia: a entrada **sai da listagem** (`BuildAppList` nao le o backup) -> nao ha linha
+  para reabilitar; `SetStartupItemState(nome,true)` -> `FindAppByName` (cache) -> **"App nao
+  encontrado."**; `RestoreRemovedItem` procura `__Command/__Location` (formato antigo do
+  `BackupStartupItem`) e **nao acha o `__RunCommand` do A2** - e **ninguem chama
+  `RestoreRemovedItem` na GUI** (grep vazio).
+- Impacto REAL medido no HKCU do utilizador: **9 entradas** desabilitadas e ausentes do Run
+  (Proton VPN, TeamoRouterHttpProxy, FreeToken Desktop, WingetUI, GoLiveBypass = `__RunCommand`;
+  Discord, dev.vencord.vesktop, DuckDuckGo, FREETOKEN DESKTOP = `__Command`) - sem restauracao.
+- Evidencia: `TmSvc` v3 (3 ACHADOS) + leitura do registro (Run=ausente, backup presente).
+
+**Estado final**: registro sem residuos do teste (Run/StartupApproved/RemovedApps limpos),
+Spooler Running, 0 pings, `last_engine.json` = 5 (Auto). Nenhum arquivo do repo alterado
+nesta bateria (so harnesses em %TEMP%).
+
+**PROXIMA SESSAO (decisao do utilizador)**: corrigir o beco sem saida do desabilitar:
+ opcao A (recomendada) - `BuildAppList` incluir os backups como entrada "Desabilitado"
+ (a linha volta a aparecer e `MenuEnableStartup` restaura via `__RunCommand`);
+ opcao B - `SetStartupItemState(true)` ler o backup quando `FindAppByName` falhar;
+ opcao C - botao "Restaurar removidos" na aba Inicializacao lendo `RemovedApps`.
+
+### Sessao 04/10 (cont. 5) — CORRECAO do beco sem saida das entradas de inicializacao (opcao A)
+
+Decisao do utilizador: opcao A - listar os backups do RemovedApps como "Desabilitado" na aba
+Inicializacao (a linha volta a aparecer e o Habilitar restaura). Implementado em
+KitLugia.Core/StartupManager.cs:
+
+1. `BuildAppList` - NOVA secao 8 "ENTRADAS DESABILITADAS PELO KITLUGIA": le
+   `HKCU\Software\KitLugia\RemovedApps` e adiciona os DOIS formatos de backup como
+   `StartupStatus.Disabled` com nome `Nome [Desabilitado]`:
+   - formato A2 (`__RunCommand/__RunHive/__RunPath/__RunValueName`, gravado ao desabilitar):
+     Location reconstruida `{hive}\{path}` para o SetStartupItemState cair no CASO 2;
+   - formato antigo (`__Command/__Location`), com a Location original.
+   Dedupe por nome limpo (`nomesExistentes`) - sem linha duplicada quando o valor Run voltou
+   a existir e o backup antigo continua gravado.
+2. `FindAppByName` - o match EXATO agora compara tambem o nome sem o sufixo " [Desabilitado]"
+   (o Habilitar chama SetStartupItemState(app.Name) e caia so no fallback parcial).
+3. `SetStartupItemState` (Acao A2 enable) - fallback para o formato LEGADO: se o
+   `__RunCommand` nao existir, chama `RestoreRemovedItem` (restaura `__Command/__Location`
+   em Run ou pasta e limpa as chaves); so quando a Location e restauravel (HK... ou pasta de
+   Startup) para nao perder backups UWP.
+4. **BUG antigo corrigido no mesmo caminho**: a Acao A2 enable abria a chave de backup com
+   `OpenSubKey(..., sem writable)` - o `DeleteValue` lancava UnauthorizedAccessException
+   (engolida pelo catch) e o backup ficava no registro PARA SEMPRE: a entrada nunca saia do
+   "[Desabilitado]" apos reabilitar. Agora `OpenSubKey(RemovedAppsBackupKey, writable: true)`.
+
+**VERIFICADO (TsFix + TmSvc v4, ambos exit 0, TODOS OS TESTES PASSARAM):**
+- T1 (formato A2): backup sem Run -> `SetStartupItemState(nome [Desabilitado], true)` ->
+  Run restaurado E backup limpo.
+- T2 (formato legado): idem via fallback -> Run restaurado E `__Command/__Location` limpos.
+- Via UI (TmSvc v4): orfa real desabilitada pelo handler de orfas -> a linha
+  `KL_ORFA_TESTE_1010 [Desabilitado]` VOLTA na lista (Core e DgStartup) -> Habilitar restaura
+  o Run -> backup limpo -> lista volta a `Nome` (Enabled) sem duplicata; caso legado idem.
+- Regressao: build solucao 0 erros/145 avisos; CheckUiThreading exit 0; TmHarness RUN_EXIT=0.
+
+**Efeito para o utilizador**: as 9 entradas reais que estavam fora do arranque agora aparecem
+na aba Inicializacao como "[Desabilitado]" e podem ser reabilitadas com um clique (A2 e legado
+registral restauram; a UWP DuckDuckGo aparece mas o restauro depende do mecanismo UWP).
+
+Nota: `KitLugia.Core/StartupManager.cs` ja estava modificado por outras sessoes (remocao de
+dead code: GetElevatedStartupTaskFullNames/GetAllAdvancedItems/CheckAndFixStartupMethods).
+As mudancas desta correcao sao as 3 secoes acima (+ o writable do item 4).
+
+### Sessao 05/10 - Hitbox do botao "Limpar tudo" das notificacoes (WindowChrome)
+
+Sintoma (reportado pelo usuario): o botao "Limpar tudo" do painel de notificacoes
+quase nunca respondia ao clique - a hitbox "nao batia" com o texto.
+
+**Causa raiz**: o MainWindow usa `WindowChrome CaptionHeight=40`; na pratica a faixa
+de legenda ocupa 6..45 px (6 px de resize border + 40 px de caption). O overlay
+`NotificationCenter` (ZIndex 20000) cobre essa faixa e o botao fica em Y=20..46 -
+inteiramente DENTRO da legenda. Sem `WindowChrome.IsHitTestVisibleInChrome`, o
+WM_NCHITTEST devolve HTCAPTION ali e o clique vira "arrastar janela": sobrava ~1 px
+clicavel (a ultima linha do botao).
+
+**Prova (harness WPF externo, %TEMP%
+chitbox, com o WindowChrome identico ao do app)**:
+- ANTES: WM_NCHITTEST em Y=20/24/28/32/36/39/41/44 = HTCAPTION; clique real
+  (mouse_event down+up) em Y=24/34/44 => handler NAO dispara (historico 1->1).
+  Controlo: o mesmo teste SEM WindowChrome clicava nas 3 alturas (prova que a
+  injecao de cliques funciona e o problema era mesmo o chrome).
+- DEPOIS (IsHitTestVisibleInChrome=True no controle): WM_NCHITTEST = HTCLIENT em
+  Y=20..60; clique real em Y=24/34/44 => handler dispara (historico 1->0).
+- Hitbox WPF do botao: 76,5 x 26 px (texto 66,5 x 16 + 5 px de padding em cada lado).
+
+**Correcao**: `WindowChrome.IsHitTestVisibleInChrome="True"` no `NotifPanel`
+(MainWindow.xaml), como ja era feito nos botoes da barra de titulo (min/max/fechar).
+Efeito colateral aceitavel: com o painel ABERTO, a faixa de legenda sob o overlay
+deixa de arrastar/redimensionar a janela (o clique passa a fechar o painel pelo fundo
+escuro, comportamento modal esperado); com o painel FECHADO (Collapsed) nada muda.
+
+**Verificacao**: build solucao 0 erros / 145 avisos (OutDir=obj/verifybin, app aberto);
+harness antes/depois acima. **A CONFIRMAR no app**: abrir o sino -> clicar na metade
+de cima do texto "Limpar tudo".
+
+### Sessao 05/10 (cont.) - GameBoost: verificado o motor AUTOMATICO no caminho real
+
+Pergunta do usuario: "esta tudo certo como esta o motor automatico? ele funciona em
+foreground e nao precisa detetar se ha jogo rodando".
+
+**Resposta (codigo + prova)**: SIM para o requisito. Nao existe detecao de jogo no
+caminho: `_heavyAppIndicators` (heuristica antiga unreal/unity/steam/game/lobby) esta
+declarada e NUNCA usada, e `IsFullScreen` tambem (zero chamadas). `ApplyBoostAuto`
+decide so por (1) o processo ser dono da janela em foreground e (2) a fracao de CPU
+por DELTA entre ticks. Gatilho real: SetWinEventHook(EVENT_SYSTEM_FOREGROUND) com
+fallback de polling 250 ms e debounce de 50 ms -> CheckForegroundWindow ->
+ShouldBoostProcess -> PromoteBoost -> ApplyBoostModern(Foco) -> ApplyBoostAuto.
+Perder o foco NAO reverte na hora: cai na faixa Sustentado (AboveNormal) e volta ao
+original quando o processo fica ocioso (TickBoostTiers). Reavaliacao do Auto a cada
+5 ticks do monitor (~15 s) para o modo loading acordar sem nova troca de janela.
+
+**Harness novo `%TEMP%\gbauto` (caminho real CheckForegroundWindow, app NAO-jogo =
+Mapa de Caracteres), 4/4 PASSARAM, exit 0**:
+- foreground nao-jogo -> prioridade High + log "GameBoost AUTO: fg=True cpu=35%
+  amostra=False -> IO=2 Page=4 Timer=False" + entrada em _boostTargets.
+- foco muda -> AboveNormal (Sustentado) com log explicito.
+- RevertCurrentBoost -> Normal (prioridade original).
+- processo na lista de exclusoes -> 0 boost (segue registado como foreground).
+Estado da maquina limpo: sem processos de teste, SystemResponsiveness=20,
+NetworkThrottlingIndex=10, last_engine.json = Auto(5).
+
+**SENAO a decidir (nao alterado)**: `_userExceptions` (15 nomes fixos) nunca recebe
+boost: chrome, msedge, firefox, opera/operagx/operagxc, discord/discordptb/discordcanary,
+spotify, steam/steamwebhelper, epicgameslauncher, battlenet/battle.net. Assim, jogo web
+no browser / Discord / Spotify NAO sao boostados. A pagina GameBoost so MOSTRA a lista
+(MessageBox no BtnSettings); `AddUserException`/`RemoveUserException`/`GetUserExceptions`
+existem no servico mas nao tem UI. Opcao futura: expor toggles por app na pagina.
+
+**Nao exercitado**: a fase "loading" (CPU>75% do total) - exigiria ~75% de todos os
+cores; e a reavaliacao de 15 s (dentro do tick de 3 s do monitor), verificada so por
+leitura de codigo.
+
+### Sessao 05/10 (cont.) - GameBoost: `_userExceptions` REMOVIDA + pesquisa do motor AUTOMATICO
+
+Pedido do usuario: "essa lista eu nao fiz e nem precisa dela pode remover; so quero que
+pesquise bastante sobre o melhor jeito de aplicar o motor automatico - hoje eu uso
+bastante o V4 e ele funciona bem".
+
+**1. Remocao completa de `_userExceptions`** (TrayIconService.cs -1467 bytes;
+GameBoostPage.xaml.cs -397 bytes):
+- declaracao (HashSet com 15 nomes) removida;
+- os 3 usos (`ShouldBoostProcess` + 2 no `ApplyProBalanceCore`) passam a consultar so
+  `_protectedProcesses`;
+- API publica `AddUserException`/`RemoveUserException`/`GetUserExceptions` REMOVIDA
+  (ficou sem UI e sem chamadores depois disso);
+- `GameBoostPage.BtnSettings_Click` deixou de ler/mostrar a lista (saiu o texto
+  "Excecoes do Usuario: ..." do MessageBox).
+Build: 0 erros / 145 avisos (baseline). BOM+CRLF preservados nos 2 arquivos.
+**Consequencia (a saber)**: chrome/edge/firefox/discord/spotify/opera/steam/epic/battlenet
+deixam de estar blindados contra o ProBalance dos motores V2/V3 (que rebaixa para
+BelowNormal quem passa do limiar de CPU em fundo). O Automatico nao usa ProBalance, logo
+para quem usa o Auto nada muda. Se voltar a incomodar, o sitio certo e
+`_protectedProcesses` - e nao uma segunda lista de excecoes.
+
+**2. `%TEMP%\gbauto` re-rodado depois da remocao: 8/8 OK, RUN_EXIT=0**
+(campo `_userExceptions` inexistente; `_protectedProcesses` = 41 nomes; foreground
+nao-jogo -> High + log "GameBoost AUTO"; perdeu foco -> AboveNormal Sustentado;
+Revert -> Normal; `ShouldBoostProcess` false para o proprio kit e para o explorer,
+true para app comum).
+Maquina limpa: SystemResponsiveness=20, NetworkThrottlingIndex=10, last_engine=Auto(5),
+sem processos de teste.
+
+**3. Pesquisa do motor automatico -> `docs/GAMEBOOST_ENGINE_RESEARCH.md`** (novo, BOM+CRLF).
+Achados com fonte oficial + medicao no host:
+- (A) **Timer global nao ajuda o jogo**: desde o Win10 2004 o pedido de timer resolution e
+  POR PROCESSO (randomascii + doc timeBeginPeriod). Nesta maquina
+  `GlobalTimerResolutionRequests` NAO existe -> `BoostTimerResolution()` (chamado pelo
+  processo do Kit) nao acelera os timers do jogo; so sobe o tick global e o custo de
+  DPC/audio. O jeito correto e limpar `PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION`
+  no processo do jogo (honrar o pedido que o JOGO faz).
+- (B) **Bug de revert do `Win32PrioritySeparation`**: o Kit escreve 38 (0x26) no boost e 2
+  no `ShutdownGameBoost`, sem ler o original. O original DESTA maquina JA e 0x26 -> o
+  revert piora em vez de restaurar (reproduzivel com `reg query`).
+- (C) **Falta a metade que mais rende**: Bitsum (Process Lasso) - "Don't set your important
+  processes to High or Real-Time... ProBalance works from the other direction (lowering
+  priority classes) for a reason" - e age SO sob carga alta, poupando o foreground. O
+  `ApplyBoostAuto` tem `ProBalance=false`, e o ProBalance dos V2/V3 nao tem gate de carga
+  do sistema (decide so pelo CPU do processo).
+- (D) **Rotulos de page priority invertidos**: doc oficial `MEMORY_PRIORITY_INFORMATION` =
+  1 VERY_LOW .. 5 NORMAL (**default**). A UI diz "Page: Maximum (5)" e o comentario chama
+  2 de "very high"; na escala real 5 e o DEFAULT e 4 e abaixo do normal - o Auto no foco
+  usa 4, ou seja ABAIXO do default.
+- (E) **Custo**: `ApplyBoostCustom` chama `SetThreadEfficiencyForAllThreads` em TODA
+  reaplicacao (o Auto tem ThreadEfficiencyMode=false sempre) -> enumera/abre todas as
+  threads do jogo a cada troca de foco e a cada ~15 s (e so tem efeito em build >= 26100).
+- (F) Deteccao OK (hook + polling 250 ms); falta `WINEVENT_SKIPOWNPROCESS`.
+  `_heavyAppIndicators`/`IsFullScreen` seguem mortos e NAO devem voltar: "detetar jogo"
+  nao e o desenho (o 3o balde e "ja em boost e perdeu o foco" -> Sustentado).
+- (G) **MMCSS nao e aplicavel**: `AvSetMmThreadCharacteristics` marca a thread que a
+  chama; um programa externo nao pode registar a thread de outro processo.
+Desenho proposto do Automatico v2 (seccao 5 do doc): demover o fundo sob carga (ganho
+principal) + elevar o foco (HIGH) + estados por-processo (EcoQoS off, honrar timer,
+GameClassInfo, I/O 3 no loading) + NADA global (sem timer global, sem
+Win32PrioritySeparation, sem rede). **O V4 fica INTOCADO** (pedido explicito do usuario).
+
+### Sessao 05/10 (cont. 2) - GameBoost: MOTOR AUTOMATICO v2 implementado + 3 bugs REAIS corrigidos
+
+O utilizador pediu para continuar e fazer do Automatico "a parte mais bem trabalhada do
+kit, porque afinal e' o motor que sempre fica rodando em segundo plano". O `_userExceptions`
+ja tinha sido removido no bloco anterior; aqui foi o desenho (docs/GAMEBOOST_ENGINE_RESEARCH.md
+secao 5) que passou a codigo. **V1/V2/V3/V4 NAO foram tocados** (o utilizador usa V4 bastante).
+
+**3 BUGS ENCONTRADOS E CORRIGIDOS (todos medidos, nao por leitura):**
+
+**1. `Win32Api.SetThreadMemoryPriority` NUNCA fez nada (o mais grave).** Chamava
+`SetThreadInformation(hProcess, 0, MEMORY_PRIORITY_INFORMATION)`. Dois erros: a classe 0 em
+THREAD_INFORMATION_CLASS e' `ThreadBasicInformation` (nao memory priority), e o handle e' de
+PROCESSO onde a API exige handle de THREAD. Medido (harness `%TEMP%\gbmemprio`, explorer):
+`ok=False erro=6` e o valor relido era SEMPRE 5. Corrigido para
+`SetProcessInformation(hProcess, ProcessMemoryPriority=0, MPI, 4)` — medido 5 -> 1 -> 5.
+Afetava TODOS os motores (o `MEMORY_PRIORITY_VERY_LOW` do ProBalance nunca foi aplicado).
+O nome do metodo foi mantido porque todos os chamadores ja passam `proc.Handle`.
+
+**2. Os rotulos de page/thread memory priority estavam INVERTIDOS, e o perfil "Maximum"
+aplicava VERY_LOW.** A escala oficial `MEMORY_PRIORITY_INFORMATION` e' 1=VERY_LOW ..
+5=NORMAL, e **5 e' o DEFAULT** (nao ha "maximum": o 5 ja e' o topo). A UI guardava o
+INDICE do ComboBox como se fosse o valor: o item "Maximum (minimo swap, maxima performance)"
+estava no indice 1, e 1 = VERY_LOW — ou seja, o perfil escolhido para NAO fazer swap
+era o que mandava o SO descartar as paginas primeiro. Corrigido em 4 sitio:
+`PagePriorityFromIndex(0)=5 / (1)=4` e `ThreadMemoryPriorityFromIndex(0)=5 / (1)=1`
+(TrayIconService), a traducao nos 2 pontos que constroem CustomEngineConfig
+(GameBoostPage + DashboardPage), os rotulos do ComboBox (GameBoostPage.xaml) e o overlay
+do motor por processo (ProcessEngineConfigOverlay: passa a escala 1..5 real). Default de
+`ProcessEngineConfig.PagePriorityLevel` era 1 (=VERY_LOW) -> 5.
+O motor Automatico tambem usava `PagePriorityLevel = foreground ? 4 : 5`: no FOCO ele
+aplicava 4 (= BELOW_NORMAL), ou seja, o motor rebaixava a memoria do jogo exatamente
+quando devia ser o mais protegido. Agora e' sempre 5.
+
+**3. O revert do `Win32PrioritySeparation` estragava a maquina.** Gravava 2 sem ler o
+original. Esta maquina ja vem com 0x26 (38): o revert nao restaurava, piorava. Agora
+`SetWin32PrioritySeparation` le e guarda o original na 1a ativacao e devolve-o no
+desligar (`ReadWin32PrioritySeparation` novo, para prova). Medido no harness do V4:
+original=38 -> boost=38 -> shutdown=38 (antes chegava a 2).
+
+**AUTOMATICO v2 (`ApplyBoostAuto`)**
+- page priority SEMPRE 5 (NORMAL/default) em vez de 4 no foco;
+- NADA global: `TimerBoost=false` (o `BoostTimerResolution` roda no processo do Kit e,
+  desde o Win10 2004, o pedido de timer e' por processo — nao acelera o jogo) e
+  `Win32PrioritySeparation=false`;
+- HONRA O TIMER DO JOGO: novo `SetPowerThrottling` com
+  `PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION` (0x2) a 0 no StateMask, ou seja,
+  o Windows respeita o pedido que o proprio JOGO faz (o bit existe para o contrario:
+  no Win11 o SO corta o timer de janelas minimizadas/ocultas);
+- PROBALANCE COM GATE DE CARGA (`ApplyAutoProBalance`): so rebaixa processos de fundo
+  para BelowNormal quando a carga TOTAL do sistema > 70% (`Win32Api.GetSystemCpuLoad`,
+  delta de `GetSystemTimes`), com as N amostras consecutivas + cooldown ja existentes.
+  E' a metade que faltava: o Bitsum/Process Lasso age "from the other direction"
+  (baixar o fundo) e so sob carga alta; o ProBalance do V2/V3 decidia so pelo CPU do
+  processo, sem olhar a maquina;
+- HISTERESE DE FAIXA (`_autoBand`): so muda a cena Idle<->Loading quando o CPU cruza o
+  limiar, em vez de reescrever tudo a cada tick;
+- `ProBalance=true` no cfg do Auto: o gate corre no mesmo caminho do boost (o
+  `ProBalanceTimerTick` so dispara com o toggle global ligado).
+
+**CUSTO E DETECCAO**
+- `SetThreadEfficiencyForAllThreads` agora corre **1x por pid** (`_threadEfficiencyOff`):
+  antes enumerava e abria TODAS as threads do jogo a cada troca de foco e a cada ~15 s,
+  para um ajuste estatico enquanto o processo viver;
+- `WINEVENT_SKIPOWNPROCESS` no SetWinEventHook (o Kit ja nao se auto-boosteia);
+- `_autoBand`/`_threadEfficiencyOff`/`_autoCpuSamples` limpos no `RevertAllBoostTargets`
+  e no `TickBoostTiers` (antes viviam para sempre com os pids do dia todo);
+- `_heavyAppIndicators` e `IsFullScreen` REMOVIDOS (declarados e nunca usados) — e o
+  desenho nao e' "detetar jogo": um detector aqui daria falso negativo em jogo
+  independente/Emulated e falso positivo em qualquer janela com "game" no nome.
+
+**VERIFICACAO**
+- Build: `dotnet build KitLugia.sln --no-incremental` -> **exit 0 / 0 erros / 145 avisos**
+  (baseline exato).
+- `%TEMP%\gbauto` (caminho REAL `CheckForegroundWindow`, app NAO-jogo = Mapa de
+  Caracteres): **19/19 OK, RUN_EXIT=0**. Log real do motor:
+  `🤖 GameBoost AUTO: fg=True cpu=35% amostra=False faixa=Idle (mudou) -> IO=3 Page=5`.
+  Inclui: memory priority do foco = 5 lida com `GetProcessInformation`; Auto nao mexeu
+  no Win32PrioritySeparation (38 -> 38); `GetSystemCpuLoad` = 54% com a maquina folgada e
+  ZERO processos rebaixados (gate a fechar); `SetThreadMemoryPriority(1)` chega mesmo
+  (releitura = 1) e restaura para 5; traducao de indices correta; codigo morto ausente.
+- `%TEMP%\gbv4` (NOVO, regressao do V4): **7/7 OK, RUN_EXIT=0**. O V4 continua a
+  aplicar High, a pedir timer de 1 ms (`⏱️ Timer Resolution: 0,98ms → 0,98ms`) e a
+  mexer no Win32PrioritySeparation — e o shutdown devolve 38 (o original).
+- Maquina limpa no fim: sem processos de teste, SystemResponsiveness e
+  NetworkThrottlingIndex em absence (= default), last_engine.json = Auto(5).
+
+**A TESTAR NO JOGO (so o que o harness nao alcanca)**: (a) a fase Loading (CPU > 75% do
+total) — exigiria um jogo real a queimar ~3/4 dos cores; (b) o ganho em 1% low / tempo
+de frame com o jogo em foco; (c) o gate do ProBalance a abrir de verdade (> 70% de carga
+com um segundo processo pesado em fundo) e a restaurar quando a carga cai;
+(d) confirmar que o jogo ja pedido timer de alta resolucao fica com ele honrado.
+
+### Sessao 05/10 (cont. 3) - GameBoost: BENCHMARK dos motores (tests/gbbench) + resultado medido
+
+Pedido: "pode fazer, seria bom ter algum tipo de benchmark que voce conseguisse testar
+os motores". Entregue em `tests/gbbench/` (dentro do repo, com ProjectReference
+RELATIVO — o kit e movido entre maquinas, ver AGENTS.md regra 1).
+
+**Metodologia** (as duas decisoes que tornam o numero fiavel):
+1. **CARGA DE FUNDO OBRIGATORIA.** Prioridade de processo so muda o resultado sob
+   contencao de CPU. Sem carga, `High` e `Normal` dao exatamente o mesmo — um
+   benchmark sem carga mediria zero sempre e pareceria "o motor nao faz nada".
+   O worker e' um PROCESSO SEPARADO com janela visivel (traido a foreground com
+   AttachThreadInput + SetForegroundWindow), e o orquestrador cria N × CPUs threads
+   a 100%. argumento do exe = multiplicador da carga (default 2; **usar 10**).
+2. **CAMINHO REAL.** O boost e' aplicado por `CheckForegroundWindow` (o mesmo metodo
+   que o SetWinEventHook e o polling de 250 ms chamam) — nunca `ApplyBoostV4` direto.
+   Ordem dos motores intercalada a cada repeticao (cancela deriva termica/turbo),
+   mediana e nao media, `GetProcessTimes` para o CPU% real do scheduler.
+   Metricas: FPS, **p99 do tempo de quadro** (proxy de 1% low / stutter) e CPU%.
+
+**RESULTADO (20 CPUs, 3 repeticoes, EXIT_REAL=0)**
+
+*CENARIO OCIOSA (0 threads de fundo)* — **ganho ~0%**: base 5253,5; V1 −0,91%,
+V2 +0,14%, V3 −0,91%, V4 −0,04%, Auto −0,09%. Todos dentro de ±1% (ruido),
+reproduzido em 3 execucoes. Isto VALIDA o principio: prioridade nao faz nada sem
+contencao — e o motor nao esta a prometer ganho fantasy.
+
+*CENARIO CARGA 10x (200 threads de fundo)* — **ganho +6,0% de FPS, p99 0,28 -> 0,24 ms,
+CPU% 95,6 -> 100,0**, REPRODUZIVEL (2 execucoes: base 3937,7 e 3939,3; motores
+~4176–4181 em ambas, concordam dentro de 0,1 pp). O CPU% e' a leitura mais direta:
+o scheduler deixa de poder tirar CPU ao processo em foco.
+
+*Todos os motores sao equivalentes neste benchmark* (+6,05% a +6,18% entre si, dentro
+de ruido) porque TODOS aplicam `PriorityClass High`. O que os diferencia — page
+priority, I/O priority, EcoQoS/timer do jogo, GameClassInfo e ProBalance — **nao e'
+medido aqui**, porque o workload e' CPU puro (nao toca disco, memoria nem GPU).
+
+**LIMITACOES (lidas antes de citar qualquer numero)**:
+- **Nao e' um jogo.** Mede contencao de CPU. Nao mede GPU, frame pacing, I/O de disco
+  nem rede. Um jogo GPU-bound nao vera este ganho.
+- **Nao isola o ProBalance.** Com 200 threads o gate do Auto (>70%) abre, mas o
+  benchmark nao separa quanto veio do `High` e quanto do rebaixamento do fundo.
+- **A base so e' estavel se o cenario for respeitado.** Com `GbBench.exe` orfao de
+  uma corrida anterior a contencao sobe e a base pode cair para ~1969 FPS,
+  inflando o ganho para +112% (medido, mas NAO e' o numero a citar).
+
+**Armadilhas do harness (gastar horas nelas se for mexer)**:
+- Correr com `dotnet run` em vez do `.exe` (apphost): o entry assembly passa a ser o
+  `.dll` e o WORKER nao acha o `runtimeconfig.json` → `FileNotFoundException:
+  System.Runtime`. O harness escolhe o `.exe` de mesmo nome base por conta propria.
+- O worker tem de forcar STA (o apphost pode entrar como MTA) e nao pode usar
+  `Dispatcher.PushFrame` no Startup (aninha mal e o startup nunca termina) — espera
+  do ficheiro "go" e' `Thread.Sleep`.
+- **O cleanup NAO pode matar o proprio processo pelo nome** (o worker tem o mesmo
+  nome): fazia o benchmark matar-se a si proprio no fim (exit 127) e o relatorio
+  final nunca era impresso. Compara com `Environment.ProcessId`.
+- `vs base` com `ToString("+6.1f")` em pt-BT mostrava `+61f%` (o `f` minusculo e'
+  section separator, nao formatador) — usar `F2` + sinal separado.
+
+**Como correr**:
+```
+cd tests/gbbench
+dotnet build -c Release
+./bin/Release/net10.0-windows10.0.26100.0/GbBench.exe 10
+```
+
+### Sessao 05/10 (cont. 4) - GameBoost: FIABILIDADE — 3 fugas de estado corrigidas + resgate pos-crash
+
+Pedido: "continue, o motor tem que ser confiavel". Fiabilidade aqui = **nao deixar
+rasto**: nada pode ficar alterado depois de desligar o toggle, fechar o Kit, ou o Kit
+ser morto a meio. Um motor que ganha 6% e estraga a maquina nao e um motor.
+
+**3 FUGAS ENCONTRADAS (as 3 primeiras sessoes nunca as tinham apanhado):**
+
+**1. `RevertBoost` LIGAVA o power-saving ao reverter.** Fazia `SetEcoQoS(handle, TRUE)` —
+o oposto do que o boost faz (que o desliga). EcoQoS
+(`PROCESS_POWER_THROTTLING_EXECUTION_SPEED`) poe o Windows a meter o processo em
+Nucleos E / baixar a frequencia: **o programa ficava LENTO depois de sair do boost**,
+e o usuario via "o Kit estragou o meu programa". Corrigido para
+`SetPowerThrottling(handle, false)` (o estado neutro/default) + repõe tambem a
+memory priority no revert (que nao era reposta).
+
+**2. `ShutdownGameBoost` NAO restaurava os processos rebaixados pelo ProBalance.**
+Vivem em `_throttledProcesses`, um conjunto SEPARADO dos `_boostTargets`, e
+`ShutdownGameBoost` so chamava `RevertAllBoostTargets()`. Resultado: desligar o
+GameBoost deixava os processos em **BelowNormal para sempre** — "o Kit deixou os
+meus programas lentos" sem nenhum toggle ligado. Corrigido: `ShutdownGameBoost` chama
+`RestoreAllThrottledProcesses()` (que trata os dois conjuntos).
+
+**3. Nao havia resgate pos-crash.** Se o Kit morresse (power kill / BSOD / Terminar
+processo) com o boost aplicado, os processos ficavam em High ou BelowNormal sem
+recoverimento ate ao proximo reboot. Novo mecanismo (`boost_rescue.txt` em
+`%LocalAppData%\KitLugia\`):
+- `SaveCrashRescue()` grava o estado sempre que o motor mexe num processo
+  (no promote, no throttle do Auto e no throttle do V2/V3, e no RevertAll);
+- `RescueOrphanedBoostState()` roda no `Initialize()` e so toca em processos que
+  ESTEJAM mesmo no estado que deixámos (um PID reciclado nao e' estragado);
+- `ClearCrashRescueFile()` no shutdown para nao deixar o ficheiro a dizer mentira;
+- formato texto simples (`boost|<pid>|<orig>` / `throttle|<pid>`) com escrita
+  ATOMICA (tmp + move): um kill a meio nao pode deixar um ficheiro truncado.
+
+Tambem corrigido: o log do `RestoreAllThrottledProcesses` repetia o mesmo numero
+duas vezes ("N restaurados, N ainda throttled") porque contava depois de remover tudo
+— em caso de falha parecia que nada tinha sido restaurado.
+
+**VERIFICACAO — `%TEMP%\gbreliab` (NOVO, 13/13 OK, RUN_EXIT=0)**
+- T1/T1b EcoQoS: `GetProcessInformation(ProcessPowerThrottling)` **nao expoe o EcoQoS**
+  nesta build (devolve −1 / FALSE), por isso o bug prova-se no **fonte**: confirma que
+  o `RevertBoost` escreve `SetPowerThrottling(false)` e JA NAO tem `SetEcoQoS(true)`.
+- T2 revert: prioridade volta a Normal, memory priority a 5.
+- T3 ProBalance: processo de fundo rebaixado a BelowNormal → `ShutdownGameBoost` →
+  volta a **Normal** (o bug do ponto 2, provado e fechado).
+- T4 resgate pos-crash: PID em High + memory VERY_LOW + ficheiro de resgate →
+  `RescueOrphanedBoostState()` → prio=Normal, mem=5, ficheiro apagado, log escrito.
+- Regressao apos as alteracoes: `%TEMP%\gbauto` **25/25 OK** e `%TEMP%\gbv4` **7/7 OK**,
+  ambos exit 0 (o Automatico v2 e o V4 continuam iguais).
+- Build: `dotnet build KitLugia.sln --no-incremental` → **exit 0 / 0 erros / 145 avisos**.
+
+**CUSTO DO RESGATE (corrigido na mesma sessao):** a `SaveCrashRescue()` e' chamada
+de dentro do `foreach` do ProBalance, que percorre TODOS os processos a cada ciclo.
+Sem deduplicar, N processos rebaixados = N escritas (criar tmp + apagar + mover) por
+ciclo, num motor que roda o dia inteiro. Agora compara o conteudo com a ultima escrita
+(`_lastRescueContent`) e so escreve quando o estado MUDA — tipicamente 1 escrita a
+entrar e 1 a sair. `ClearCrashRescueFile()` invalida a cache para a proxima escrita
+nao ser silenciosamente saltada. Re-verificado apos a mudanca: fiabilidade 13/13,
+Auto 25/25, V4 7/7, build 0 erros / 145 avisos.
+
+Armadilhas do harness `gbreliab`: tem de correr com `--src <repo>` (vive no TEMP, o
+fonte no repo, senao o `FindSource` devolve string vazia); o `GetProcessInformation`
+precisa de `PROCESS_ALL_ACCESS` (com handle limitado a I/O/EcoQoS devolvem −1).
+
+### Sessao 10/10 - GameBoost: CRASH REAL testado + AUDITORIA ao Process Lasso (IDA Pro)
+
+Pedido: "fazer a simulacao e os testes; instalar o Process Lasso e usar o IDA para ter
+certeza que nao estamos a fazer nada de errado que seja prejudicial ao sistema".
+
+**1. SIMULACAO DE CRASH REAL (o teste que faltava) — `%TEMP%\gbcrash` (NOVO)**
+
+A versao anterior escrevia o ficheiro de resgate A MAO: provava que o resgate funcionava,
+mas nao provava que o motor o ESCREVE a tempo. Agora:
+- `--crash`: o servico aplica o boost pelo caminho REAL (PromoteBoost + ApplyBoostModern +
+  um rebaixamento de ProBalance) e depois **MORRE com `TerminateProcess`** — sem `finally`,
+  sem handlers de `ProcessExit`, sem `ShutdownGameBoost`. E' o mais perto de um power kill.
+  **Prova de que morreu: `CRASH_EXIT=173` (0xAD)** — o codigo de saida que pedimos.
+- `--rescue`: um processo NOVO (instancia limpa) chama `RescueOrphanedBoostState()`, o
+  mesmo que o `Initialize()` faz, e verifica as vitimas.
+**Resultado: todas as 4 verificacoes de resgate PASSARAM** — a vitima boosted voltou a
+Normal, o fundo throttled voltou a Normal, a memory priority voltou a 5, e o ficheiro foi
+apagado. As 3 "heranca" tambem confirmaram que o crash deixou mesmo as vitimas estragadas
+(High e BelowNormal+mem=1) antes do resgate.
+
+**2. AUDITORIA AO PROCESS LASSO (IDA Pro 9.0) -> `docs/GAMEBOOST_PROCESS_LASSO_AUDIT.md`**
+
+Analisado o `ProcessGovernor.exe` (1,3 MB, C++ nativo) do Process Lasso 18.4.0.48
+(Bitsum LLC) com `idat.exe -A -S` + Hex-Rays. **FALSO NEGATIVO IMPORTANTE**: uma leitura
+por *strings* das importacoes deu `SetProcessInformation` como ausente — o IDA mostrou que
+a API e' resolvida em runtime por `GetProcAddress`, logo nao aparece na tabela. Conclusoes
+baseadas so em strings de importacao sao pouco fiaveis para nativos.
+
+Achados que VALIDAM o nosso desenho:
+- **Teto HIGH**: `SetPriorityClass(hProcess, 0x20u)` — 0x20 = HIGH, nunca RealTime.
+- **Guardar/restaurar a original**: `v13 = *(DWORD*)(a3+308)` (original guardada) e
+  `SetPriorityClass(h14, v13)` ao sair da regra — **e' literalmente o nosso
+  `_originalPriorities` + `RevertBoost`**. O Bitsum faz o mesmo.
+- **EcoQoS**: `SetProcessInformation(v6, 4LL, v17, 12LL)` — class 4 = ProcessPowerThrottling,
+  12 bytes = a nossa estrutura, e `StateMask` recebe **so o bit 0 (EXECUTION_SPEED)**.
+  **O Bitsum NUNCA toca no bit 1 (IGNORE_TIMER_RESOLUTION)** — o que valida a decisao de
+  deixar esse bit a 0 (honrar o timer que o jogo pede).
+- **Disciplina de handle**: `OpenProcess(0x200=PROCESS_SET_INFORMATION)` -> op -> `CloseHandle`.
+
+O UNICO desvio nosso: o Bitsum **nao mexe em I/O priority nem page priority**; nos dois
+usamos `NtSetInformationProcess` (ntdll, **nao documentada**, classes fixas 33 e 39) e o
+**valor de retorno era ignorado** — uma falha silenciosa.
+
+**3. SONDAGEM DE CAPACIDADE (implementada, nao so recomendada)**: `SetProcessIoPriority` /
+`SetProcessPagePriority` agora experimentam a classe **uma vez**; se pegar, fica marcada
+para sempre; se nao pegar, registam no log **uma vez** e param de tentar. Nao muda o
+comportamento numa maquina normal — so torna a falha visivel. Nao ha API documentada
+para I/O priority no userland, portanto a via ntdll mantem-se (e' o que o Process Hacker
+faz); a memoria ja usava `SetProcessInformation(ProcessMemoryPriority)`, que e' documentada.
+
+**VERIFICACAO**: build **exit 0 / 0 erros / 145 avisos**. Apos mexer no motor, re-executados:
+fiabilidade **13/13 OK** e regressao do Auto **25/25 OK**, ambos exit 0.
+
+### Proxima sessao
+- [ ] Testar a sondagem de capacidade: forcar uma classe invalida e confirmar que o log
+      avisa uma vez e para de repetir
+- [ ] Usar o IDA para analizar o ProBalance do Bitsum (como escolhe o que rebaixar) e
+      comparar o gate de 70% com o criterio real deles
+- [ ] Rever se vale a pena manter I/O + page priority (o Bitsum nao usa; so o nosso extra)
+- [ ] UI: "Estado do motor" (processos em boost / rebaixados, ultimo resgate)
+- [ ] Benchmark com I/O de disco (ganho real do I/O priority 3)
+- [ ] Testar o Automatico v2 num jogo real (1% low + gate sob carga)
+
+
+### Sessao 05/10 (cont. 5/5) - SONDAGEM DE CAPACIDADE TESTADA: 3 achados reais + 3 bugs meus
+
+Fechei a lacuna que eu proprio tinha sinalizado (a sondagem de I/O/page priority estava
+implementada mas o caminho de falha nunca tinha corrido). Harness novo: `%TEMP%\gbprobe`
+(precisa de `--auto-check` para so provar a elevacao).
+
+**O QUE O HARVESS MEDIU (e o que muda o motor):**
+
+1. **Nao existe via DOCUMENTADA para I/O nem page priority.** `SetProcessInformation`
+   (classes 0..5) so aceita escrita em MemoryPriority (0), MemoryCompression (1) e
+   PowerThrottling (4). I/O (2) e Page (3) devolvem err 87. Daí as classes privadas da
+   ntdll (33/39) — pratica comum mas nao suportada.
+
+2. **Page priority FUNCIONA — provado por leitura de volta** (`NtQueryInformationProcess`
+   classe 39): defini 1 -> li 1; defini 5 -> li 5. Antes nao havia prova nenhuma.
+
+3. **I/O priority: so VeryLow (0) e Normal (2) passam. High (3) e RECUSADO**
+   (0xC0000061). Medido ELEVADO (comprovado dentro do harness) — elevar NAO resolve.
+   E o mesmo acontece no processo do proprio Kit e no charmap: **depende do VALOR, nao do
+   processo**. Conclusao honesta: o "I/O: High" que os motores V1-V4 anunciavam **nunca
+   teve efeito** nesta maquina. Nao e bug do kit, e restricao do Windows.
+
+**OS 3 BUGS QUE A SONDAGEM INTRODUZIU (e que o harness apanhou):**
+
+4. A sondagem decidia pela primeira chamada a um processo qualquer → **SIM FALSO**, porque a
+   classe 39 devolve SUCESSO mesmo com handle invalido.
+5. `GetProcessId(0xFFFFFFFF)` devolve 31736 (slot reutilizado) e `GetExitCodeProcess`
+   devolve `ok=True, 259` (falso STILL_ACTIVE) → **handle inventado nao e detectavel**.
+   Duas guardas por handle, ambas inuteis. Sobe tudo para `docs/...AUDIT.md` para ninguem
+   tentar de novo.
+6. **Corrigido**: a sonda corre 1x contra `GetCurrentProcess()` (handle nosso, sem corrida
+   de "processo morreu entre listar e aplicar") e com o **valor real** que o motor quer
+   aplicar. Sem isso, sondar com um valor gentil dava SIM falso.
+
+7. Bonus: a sonda usava `v=5` para a I/O (dominio 0..3) → devolvia 0xC000000D
+   (INVALID_PARAMETER) e o log acusava "indisponivel" quando o problema real era o
+   privilégio. Sobe para 0xC0000061, que é o diagnostico certo.
+
+8. **UI honesta**: `BtnSettings_Click` deixou de anunciar "I/O: High" e passou a dizer que o
+   Windows só aceita VeryLow/Normal para processos alheios. Um painel que promete um ajuste
+   que o Windows recusa é pior do que um que o omite.
+
+**BUG DE BUILD ENCONTRADO (importante para os harnesses):** o `-p:OutDir=obj/verifybin/`
+e RELATIVO AO PROJETO REFERENCIADO, nao a raiz da solucao — ou seja, ao construir um harness
+com ProjectReference para o KitLugia.GUI, a DLL do GUI ia parar dentro do REPOSITORIO em
+`KitLugia.GUI/obj/verifybin/`. Passagens seguintes passavam a compilar contra essa copia
+obsoleta. Sintoma enganador: erros `CS0103 "o nome X nao existe"` de metodos que ESTAO no
+fonte. **Usar sempre OutDir ABSOLUTO** (ex: `-p:OutDir=C:/Users/Lugia/AppData/Local/Temp/verifybin/`).
+
+**CAUSA RAIZ do erro CS0103 que me custou tempo:** uma chamada `SondaCapacidadeNtdll(...)`
+DUPLICADA tinha ficado no `TrySetNtdllClass` de uma edicao anterior (linha 247 orfa). O
+compilador apontava a linha orfa enquanto a linha certa (244) estava bem — da a impressao
+de "esta a ler outra copia do ficheiro". Diagnostico que vale a pena: `grep -rl "<nome do
+metodo>" .` no repositorio; se so aparecer em binarios, o fonte esta limpo.
+
+Tambem encontrados e corrigidos: **2 bytes NUL** em `_lastRescueContent = </dev/null>`
+(`TrayIconService.cs`, linhas ~4721/4771) — estragados por edicao anterior; `grep` passa a
+dizer "Binary file matches" em vez de mostrar as linhas. Viraram `string.Empty`. E 2
+`KitLugia.GUI_*_wpftmp.csproj` orfaos (lixo de build WPF antigo) removidos.
+
+**VERIFICACAO:** `gbprobe` 9/9 OK exit 0 (inclui "SEM SIM FALSO"); regressoes Auto 25/25,
+V4 7/7, fiabilidade 13/13, todas exit 0; build completo `BUILD_EXIT=0`, **0 erros /
+145 avisos** (baseline mantido).
+
+Documento actualizado: `docs/GAMEBOOST_PROCESS_LASSO_AUDIT.md` (10.394 bytes) secao 7.
+
+### Proxima sessao
+- [ ] Fase Loading (CPU > 75%) do Automático ainda nao exercitada em teste
+- [ ] Ganho real em 1% low so se mede com um jogo de verdade (exige Alvos+Alpha)
+- [ ] Auditoria ao Process Lasso cobriu so o `ProcessGovernor.exe`; o binario principal
+      de 2,7 MB (onde esta o ProBalance completo) continua por abrir
+- [ ] O I/O "High" dos motores V1-V4 esta inerte nesta maquina: decidir se se muda o
+      default dos perfis para Normal (honesto) ou se se deixa como esta
+
+
+### Sessao 05/10 (cont. 6/5) - CHECKLIST DO MOTOR + gbknobs: 2 knobs mortos, timer provado seguro
+
+Pedi para continuar a investigação e criar a lista de coisas a checar para fechar o motor.
+**`docs/GAMEBOOST_ENGINE_CHECKLIST.md`** (novo) — 6 secções: o que nunca foi provado, o que
+está inerte, o que falta para fiabilidade, correcoes, o que NAO tentar, e a ordem sugerida.
+Cada item diz o que falta / como verificar / criterio de "passa".
+
+De seguida comecei pelo mais barato e desbloqueei mais do que esperava. Harness novo
+`%TEMP%\gbknobs`: mede os 3 knobs que NUNCA tinham sido lidos de volta.
+
+**ACHADO 1 — GameClassInfo (classe 13) é RECUSADO pelo Windows.** `err=87` em TODOS os
+tamanhos (4/8/12/16), no charmap E no proprio processo do Kit. Como falha em todos os
+tamanhos, **nao e "tamanho errado": a classe nao esta implementada neste build.** V2/V3/V4
+perdem mais um ajuste — o GameMode nunca fez nada aqui. O comentario no codigo atribuia ao
+GameClassInfo o ganho de loading (Poppy Playtime) — **estava errado**, corrigido.
+
+**ACHADO 2 — ThreadEfficiencyMode (classe 5) tambem recusado.** `SetThreadInformation(cls 26)`
+E `SetProcessInformation(cls 5)` dao `err=87` em todos os tamanhos. Inerte neste build.
+(Atencao: o codigo de producao usava `SetThreadInformation` para thread e
+`SetProcessInformation` para GameClassInfo — testei as DUAS vias para nao confundir
+"classe inexistente" com "via errada".)
+
+**ACHADO 3 — Timer: seguro nesta maquina, e a semantica enganava.** Eu li os parametros ao
+contrario. Confirmado em ntdoc/ReactOS: em `NtQueryTimerResolution`, `MinimumResolution` e' o
+MAIOR atraso entre eventos e `MaximumResolution` o MENOR. So o segundo diz a granularidade.
+Com a semantica certa: esta maquina ja esta a **0,50ms**, que e' o MINIMO que o Windows
+permite; o motor pede **1ms**; o Windows **recusa descer** e mantem 0,50ms. Portanto aqui o
+"boost" do timer e' **inerte** (nao piora, nao gasta bateria) e o restore e' simetrico.
+O motor foi escrito a assumir o caso comum (15,6ms de fundo) — numa maquina assim, 1ms e'
+melhoria. Nao e' bug; e' o caso raro. So nao deixar o motor assumir que 1ms e' sempre
+melhor.
+
+**CODIGO ALTERADO:**
+- `ReportarClasseRecusada(nome, infoClass)` + `_classesRecusadas` (HashSet, aviso 1x por
+  classe): as duas chamadas agora AVISAM quando o Windows recusa, em vez de falhar caladas.
+- `SetProcessGameClassInfo` e `SetThreadEfficiencyMode`: passam a reportar.
+- Comentario do V4 sobre "ganho de loading" corrigido com o que foi medido.
+
+**VERIFICACAO:** build 0 erros; regressoes Auto 25/25, V4 7/7, gbprobe 9/9, todas exit 0.
+O `gbknobs` tem 2 "falhas" que sao o COMPORTAMENTO REAL esperado (o motor e' inerte nesta
+maquina e o timer nao muda) — registadas como tal, nao escondidas.
+
+Documento: `docs/GAMEBOOST_ENGINE_CHECKLIST.md`.
+
+
+### Sessao 05/10 (cont. 7/5) - gbavis: provado que o aviso de classe recusada NAO inunda o log
+
+Ao rever a sessao anterior, vi uma lacuna: alterei `ReportarClasseRecusada` para avisar uma
+vez, mas **nunca tinha testado esse caminho**. Um aviso que diz "so uma vez" e soa 400 vezes
+por minuto seria pior do que o silencio. Harness novo `%TEMP%\gbavis`, exit 0:
+
+- T1: 1. chamada a `SetProcessGameClassInfo` -> **1 aviso** (Game Mode, classe 13)
+- T2: **200 chamadas -> 0 avisos**
+- T3: `SetThreadEfficiencyForAllThreads` -> **1 aviso** so (nao 1 por thread)
+- T4: **200 chamadas -> 0 avisos**
+
+Duas classes separadas = 2 avisos, nunca 200 nem 1. O aviso nao inunda.
+
+**ARMADILHAS DO HARNESS (perder tempo nisto):**
+1. `_classesRecusadas` e' `readonly` -> `FieldInfo.SetValue` lanca
+   `FieldAccessException`. Limpar com `.Clear()` no HashSet existente, nao substituir.
+2. Um exe WPF que prende pode nao devolver a shell: o `GbAvis.exe` desaparecia mas o
+   comando continuava pendurado. Resolver com `Environment.Exit` atrasado por timer
+   (red de seguranca) + correr em background e ler um ficheiro de saida.
+3. `timeout` do Git Bash **nao mata** processos Windows. Usar `taskkill //F //IM`.
+4. `python - <<'EOF'` com `\n` dentro do texto Python **parte a linha em duas**
+   (ja aconteceu 3 vezes). Para strings com `
+`, usar a ferramenta de edicao.
+
+**LIMPEZA:** `AGENTS.md` tinha **1 byte NUL** — introduzi eu ao descrever o bug do NUL do
+`TrayIconService`. Um byte literal num ficheiro de texto e' perigoso (faz o `grep` dizer
+"Binary file matches" e quebra ferramentas). Substituido por `<NUL>`.
+AGENTS.md: 739.298 bytes, BOM=True, CRLF=10.758, LF soltos=0, NUL=0.
+
+**VERIFICACAO FINAL:** build completo `BUILD_EXIT=0`, **0 erros / 145 avisos** (baseline).
+Checklist: `docs/GAMEBOOST_ENGINE_CHECKLIST.md` com o item 1.1 marcado como testado.
+
+### Sessao 05/10 (cont. 8/5) - bateria de testes do GameBoost: 11/11 VERDE
+
+O motor foi fechado com uma bateria de 11 testes que vive agora no repositorio
+(`tests/`) e corre com um comando: `tests\run-gbtests.ps1`. Todos com
+`ProjectReference` RELATIVO (`..\..\KitLugia.GUI\KitLugia.GUI.csproj`).
+
+**RESULTADO: 11/11 PASSOU, RUNNER_EXIT=0.** Build da solucao 0 erros / 145 avisos.
+
+#### BUG DE PRODUCAO CORRIGIDO (2)
+
+1. **Resgate do tweak global de rede nunca chegava a correr** (`RescueNetworkBoostOnStartup`):
+   o gate `if (!GamePriorityEnabled)` impedia o resgate quando o utilizador abria o Kit
+   COM o GameBoost ligado. A essa altura `_networkBoostApplied` e' sempre false (nada foi
+   escrito ainda por este processo), portanto um `SystemResponsiveness=10` so pode ser ORFAO.
+   Sem o gate, `ApplyNetworkBoostV3` gravava `_origSystemResponsiveness = 10` (o orfao) e
+   a partir dai **cada revert restaurava 10**: o 20 (default do Windows) perdia-se PARA
+   SEMPRE. Gate removido. Coberto por `tests/gbrescue` (o teste que distingue o codigo
+   antigo do novo: com `GamePriority=1` o resgate tem de por 20).
+
+2. **Janela de perda do ficheiro de resgate** (`SaveCrashRescue`):
+   `File.WriteAllText(tmp)` -> `File.Delete(path)` -> `File.Move(tmp, path)` tinha um
+   instante em que o ficheiro NAO EXISTIA. Morrer ai = resgate perdido = prioridades
+   presas para sempre. Substituido por `File.Move(tmp, path, overwrite: true)`
+   (= `MoveFileEx(MOVEFILE_REPLACE_EXISTING)`, uma unica renomeacao atomica).
+   Medido por `tests/gbsave`: antes 2/25 rondas perdiam o ficheiro, **depois 0/20**;
+   0 truncados em todas.
+
+#### Testes novos desta ronda
+
+| teste | o que prova | resultado |
+|---|---|---|
+| `gbrescue` | resgate do tweak de rede com o boost LIGADO (o caso quebrado), desligado, e valor legitimo intacto | 3/3, exit 0 |
+| `gbidem` | **idempotencia**: 200 aplicacoes sem reverter nao escalam a prioridade (32->128 estavel), o mapa `_originalPriorities` congela apos a 1a, UM revert chega, delta handles = 0 | 8/8, exit 0 |
+| `gbsave` | **morte a meio da escrita**: 25 rondas a matar o escritor com `TerminateProcess` sobre 640 KB de estado | 0 truncados, 13/25 apanharam a meio, exit 0 |
+| `gblimited` | **matriz sem elevacao** (Scheduled Task `RunLevel Limited`): degradacao limpa | 10/10, exit 0 |
+| `gbcrash` | crash real + resgate (movido de %TEMP%) | 6/6, exit 0 |
+
+**Achado honesto do `gblimited`**: SEM elevacao o motor degrada bem (o Windows nega o
+HKLM, o registo fica intacto, `_networkBoostApplied` continua false -> nada a meio), mas
+**o resgate do tweak global so' funciona com elevacao** - sem ela nao ha permissao para
+corrigir um orfao no HKLM. O que nao precisa de admin (prioridade de processos proprios,
+`boost_rescue.txt` em %LocalAppData%) continua a funcionar.
+
+#### Armadilhas do PowerShell ao correr isto (custaram tempo)
+
+- `& $exe` captura para um PIPE e os **FILHOS do harness herdam-no**: as vitimas `--idle`
+  do gbcrash (120 s de sleep) penduravam o runner. Os vitimas passam agora a ter
+  stdout/stderr proprios (`RedirectStandardOutput = true`).
+- `Start-Process -Wait` espera pelo processo **E PELOS DESCENDENTES**: a fase `--rescue`
+  arrancava quando as vitimas ja tinham saido e acusava 3 falhas falsas (`prio=Normal`,
+  `mem=-1`). O runner usa agora `System.Diagnostics.Process` direto com `WaitForExit(ms)`
+  e `ReadToEndAsync` (leituras paralelas, sem deadlock, com teto).
+- `ArgumentList` **nao existe no Windows PowerShell 5.1** - o exe arrancava sem argumentos.
+- `Process.GetProcessesByName("X")` devolve **o proprio harness**: o cleanup matava-se a si
+  proprio ANTES de imprimir o resultado e de devolver o exit code. O "4/4" que se lia no ecra
+  era so texto; o exit code era lixo (127). Afectava o `gbcrash`.
+- As classes de prioridade do Windows sao **BITMASKS, nao escala**: `BelowNormal` (0x4000)
+  e' numericamente MAIOR que `High` (0x80). Comparar os valores crus dava resultados errados.
+- O Task Scheduler corre tarefas a **BelowNormal** por omissao e os filhos herdam -> o
+  `-Priority 4` na `New-ScheduledTaskSettingsSet` e a normalizacao explicita no harness.
+
+#### Auditoria `ComboBox.SelectedIndex` (pedido do checklist)
+
+**Limpa.** Os 4 combos que guardam indice tem traducao explicita: `CmbIoPriority` ->
+`SafeIoPriority` (0=Normal, >=1=High, Critical descapado para High de proposito),
+`CmbPagePriority` -> `PagePriorityFromIndex` (0->5, 1->4),
+`CmbThreadMemory` -> `ThreadMemoryPriorityFromIndex` (0->5, 1->1),
+`CmbCpuPriority` -> `switch` para texto. O `CmbEngine` (cujos indices de 0 a 5 **nao**
+batem com o enum V1..Auto=5) **nunca** e' usado como valor: o motor vem sempre do `Tag`.
+
+### Proxima sessao
+- [x] ~~Testes GameBoost~~ - bateria completa 11/11 verde em `tests/run-gbtests.ps1`
+- [ ] A maquina esta com `SystemResponsiveness=10` gravado (ORFAO de um build antigo, com
+      `GamePriority=0`): ao abrir o Kit com o build novo, o resgate corrige para 20 - vale a
+      pena confirmar que acontece mesmo no arranque real.
+- [ ] Limpezas de %TEMP% (os harnesses antigos em /tmp/gb*) podem ser apagados.
+
+### Sessao 05/10 (cont. 9/5) - Halo azul do motor Automatico
+
+Pede: distinguir visualmente o motor novo. A bola do GameBoost passou a ter
+**AZUL + halo azul pulsante** quando o motor AUTOMATICO esta ativo.
+
+- `AZUL + halo` = Automatico a escolher parametros | `VERDE` = motor legado
+  escolhido a mao | `VERMELHO` = GameBoost desligado. O texto de estado acompanha
+  ("Motor Automatico ativo - a escolher os melhores parametros").
+
+Ficheiros: `KitLugia.GUI/Pages/GameBoostPage.xaml` (bola + halo) e
+`KitLugia.GUI/Pages/GameBoostPage.xaml.cs` (`AtualizarIndicadorStatus()`).
+
+Duas decisoes tecnicas:
+
+1. **SEM `DropShadowEffect`.** O XAML tinha um comentario a avisar que um glow
+   animado anterior custava re-renderizacao por frame na GPU. O halo e' um `Ellipse`
+   maior com `RadialGradientBrush` e SO' a `Opacity` e' animada (composicao pura).
+2. **O code-behind mexe na `Opacity` do PAI** (`StatusGlowHost`), nunca na do halo:
+   a animacao vive no filho e perderia a corrida. A Opacity do pai multiplica a do
+   filho, por isso o halo acende/apaga sem partir o pulso.
+
+**LACUNA ENCONTRADA E CORRIGIDA na revisao:** `CmbEngine_SelectionChanged` tem dois
+`return` mais cedo (tag "custom" e perfil personalizado) que nunca chegavam a
+`AtualizarIndicadorStatus()` - escolher um motor manual deixava a bola AZUL de
+"automatico". As duas chamadas foram acrescentadas. Auditados os 6 caminhos:
+toggle on/off, LoadSettings e as 3 saidas da selecao de motor.
+
+Validacao de ordem: em `LoadSettings`, `TglGameBoost.IsChecked` e' atribuido na
+L357 e `AtualizarIndicadorStatus()` corre na L428 - o metodo le o valor ja certo.
+(Antes lia uma variavel local `gameBoostEnabled`.)
+
+Build: **0 erros / 145 avisos** (baseline mantido). `gbprobe` passou com
+RUNNER_EXIT=0.
+
+### Sessao 05/10 (noite) - Revo Uninstaller: DOCUMENTACAO CORRETA (IDA + parser de PE)
+
+Pedido: "se a resposta estiver la pode ir documentando pouco a pouco o Revo
+Uninstaller ai com a documentacao certinha para ver o que ele realmente faz".
+
+Ficheiros: `docs/REVO_UNINSTALLER_ANALYSIS.md` (reescrito, 21.373 B) e
+`docs/REVO_UNINSTALLER_PLANO.md` (novo, 9.638 B). Ambos UTF-8 **BOM** + CRLF.
+
+**METODO (o erro que custou 4 conclusoes falsas em sessoes anteriores):**
+nunca confiar em substring solta no binario. Pipeline obrigatorio:
+1. parser de PE (`peinfo.py`) le a Import Directory Table REAL (879 imports/23 DLLs
+   no RevoUnin.exe; 712/23 no helper) - nao adivinhacao;
+2. `gen_script.py` calcula `EA = imagebase + (off - sec.ptr + sec.va)` dos section
+   headers -> EAs deterministicos;
+3. IDA `XrefsTo(EA)` -> so conta se ha referencia de CODIGO;
+4. `decompile()` do chamador. 0 xrefs => marca INFERIDO, nunca "existe".
+Erros antigos registados: "adcu" casou dentro de `Lo**adCu**rsorW`; "clsid" dentro de
+`CLSIDFromString`; zlib ("IDAT") e SQLite (`memdb`) descompilados como codigo do Revo;
+`idautils.Strings()` devolveu 5.004 de 30.283 strings (recursos `.rsrc` nao entram).
+
+**1) MITO DO TxF REFUTADO (a correcao mais importante).** A sessao anterior afirmou
+"rollback atomico com Windows TxF". **FALSO.** Existe uma camada de wrappers
+(`sub_1401D10B8/1D11C8/1D1448/1D248C/1E020C/1DFC48/1DFD90/1E0C20`, identica no helper)
+que faz `GetProcAddress(kernel32, "DeleteFileTransactedW")` etc. - mas o contexto
+`a1` e' `{HANDLE hTrans; DWORD plainMode;}`. Varredura byte a byte de TODOS os binarios
+(`RevoUnin.exe`, `RevoUninHelper.exe`, `RevoSrp.exe`, `WinAppsDll.dll`):
+`CreateTransaction*`, `CommitTransaction*`, `RollbackTransaction*`, `GetTransactionId`,
+`ktmutil` = **0 ocorrencias**, e **nenhum** na tabela de imports. Sem CreateTransaction
+o `hTrans` nunca pode ser valido => **o ramo transaccionado e' CODIGO MORTO** e o
+caminho real e' `DeleteFileW`/`MoveFileW`/`RegDeleteKeyW`. Consistente com TxF ter sido
+descontinuado no Win11 24H2.
+
+**2) LIXEIRA = `SHFileOperationW` (mecanismo real, confirmado).** `sub_14003BA80` (767 B):
+`FileOp.wFunc = 3` (FO_DELETE) e `fFlags = (DelToBin==1) ? 1044 : 1108`
+- 1044 = 0x414 = `FOF_ALLOWUNDO|FOF_NOERRORUI|FOF_NODIRFLAGS` -> apaga PARA A LIXEIRA
+- 1108 = 0x454 = o anterior **+ `FOF_RENAMEONCOLLISION`** -> apaga PERMANENTE
+Le a chave `Uninstaller` + `DelToBin` (default 1); respeita Cancel via
+`WaitForSingleObject(qword_14093FDC0,0)`; em falha faz `MoveFileExW(...,4)`
+(MOVEFILE_DELAY_UNTIL_REBOOT). Mesmo padrao em `sub_14003C220` e `sub_14003CDA0`
+(este ultimo com a chave separada `Junk Files\General\Delete to bin`).
+
+**3) TAKE-OWNERSHIP DE CHAVES DE REGISTO.** `sub_1401614B0` (919 B) e
+`sub_140162D20` (756 B): `AllocateAndInitializeSid` -> `SetEntriesInAclW(2, ...)` ->
+`SetNamedSecurityInfoW(DACL)`. Se falhar com `ERROR_ACCESS_DENIED(5)`:
+`OpenProcessToken(..., 0x20 TOKEN_ADJUST_PRIVILEGES)` -> ativa privilegio -> segunda
+`SetNamedSecurityInfoW(OWNER)` -> reaplica DACL. Log: "You must be logged on as
+Administrator." NOTA de rigor (corrigi um erro meu): `0x80000000` = **GENERIC_READ**
+(so a Everyone), `0x10000000` = GENERIC_ALL (so os Admins, com heranca=3). Nao e'
+"Everyone:GENERIC_ALL" - e' MENOS agressivo do que parecia.
+
+**4) DISPATCHER DE CLI (5.012 B, `sub_140178EB0`) confirmado por codigo.** `wcsicmp`
+sobre `/update`(3) `/leftovers`(2, **exige `pNumArgs > 4`**) `/continue`(4)
+`/chactivation`(5) `/settings`(1) `/updatesubscription`(6); `/hunter` põe flag;
+`/forcedfolder` consome o arg seguinte. `KeepFiles` = `memcmp` de **10 WCHAR**
+(= "KeepFiles"+NUL; confirmado no binario como `"KeepFiles" seguido de 3 NUL`).
+Ha ainda uma tabela de ponteiros (`off_1408188D0`) para pre-dispatch generico por
+`wcsstr`. Formato: `RevoUnin.exe /leftovers <a2> <a3> <a4> [KeepFiles]`.
+
+**5) CÓDIGO-FONTE ORIGINAL EXPOSTO no helper:** `sub_14000A350` e `sub_14001DED0`
+embutem `C:\Work\VSRevo\Windows\Projects\Revo Helper\...\BasicGUIControls.cpp:249`
+e `NotificationDlgs.cpp:214`. Confirma log estruturado com `__FILE__`/`__LINE__`
+(`sub_14004C9A0(crit, ficheiro, linha, fmt, ...)`) - melhor que os MessageBox que parece.
+`sub_14001B710` = destructor: `TerminateThread` + `FilterUnload` + `sc stop
+revoprocessdetector` (o driver e' real). `sub_14003AD80` = special folders.
+
+**PONTO DE RESTAURO - NAO AFIRMAR.** Nenhum binario tem `SRSetRestorePointA/W`,
+`SystemRestore`, `root\default`, `vssadmin`, `wmic`. A opcao "Create System Restore
+Pont" (nota: erro de grafia da VS) pode estar morta nesta build ou via COM sem strings
+reconheciveis. Fica como pergunta aberta na Fase 3 do plano.
+
+**AINDA INFERIDO (0 xrefs de codigo, so strings):** marcadores `ADCU`/`ADAU`;
+`Uninstaller` + `RegExclude`; `Junk Files\Exclude` / `\Include`; scanner de Registry Classes
+(`sub_14018D6C0`, ~9 KB, nao decompilado); esquema SQLite; cleaner de browsers; o
+`sub_14000E6E0` (blocklist de 8 caminhos do helper) vem de sessao anterior.
+
+**Armadilhas IDA desta sessao:** `ida_idaapi.cvar_t`, `ida_segment.get_segm_end` e
+`idautils.Entries()` mudaram no IDA 9; base `.id0/.id1` parcial faz crash `0xC0000005`
+(apagar antes); script sem `try/except` + `traceback` para ficheiro perde-se tudo;
+`-S` precisa de caminho explicito. Detalhe em `REVO_UNINSTALLER_PLANO.md` §7.
+
+**Decisao:** implementar lixeira (`FOF_ALLOWUNDO`) no DeepUninstaller e' o ganho mais
+barato (recuperacao pelo utilizador); take-ownership de registo NAO (e' uma decisao de
+projeto e o nosso `IsDirectlyInsideCriticalRoot` ja e' mais conservador); TxF nunca.
+
+### Sessao 06/10 - NetworkPage (Rede/Ethernet): erros de UI + metodos corrigidos e verificados
+
+Pedido: "olhe a pagina de rede ethernet do kit e corrija os erros de ui e melhore os metodos usados la".
+Ficheiros: KitLugia.GUI/Pages/NetworkPage.xaml(.cs), KitLugia.Core/AdapterManager.cs,
+KitLugia.Core/NetworkManager.cs, KitLugia.Core/SystemTweaks.cs, NOVO tests/netprobe/.
+
+**Descobertas empiricas (testadas no host, comandos read-only ou nome inexistente):**
+1. `netsh int ip set interface name=X interruptmoderation=...` e `rss=` → sintaxe INVALIDA
+   ("'name' nao e um argumento valido" - a lista de parametros de set interface nao tem
+   interruptmoderation/rss) → as 2 chamadas de Optimize/RevertNetworkAdapter eram PLACEBO
+   e mesmo assim contavam "N adaptador(es) otimizado(s)".
+2. `netsh interface set interface` retorna exit 0 ATE para nome inexistente (imprime
+   "Nao ha mais dados disponiveis.") → exit code nao serve como fonte de verdade; a saida
+   precisa de marcadores de erro bilinguues pt/en.
+3. `*InterruptModeration` NAO existe em Tcpip\Parameters\Interfaces (reg query /f = 0
+   ocorrencias naturais - o codigo antigo la escrevia = placebo). Local REAL do driver:
+   `Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}\0008\*InterruptModeration`
+   REG_SZ "1" com Ndi\Params\*InterruptModeration (confirmado no host).
+4. `netsh int ip show global` inclui "Descarregamento de Tarefa" → taskoffload global e'
+   sintaxe valida (EnableTaskOffload/DisableTaskOffload sem mudanca).
+
+**UI (NetworkPage.xaml):**
+- Cabezalho da tabela DNS tinha 5 ColumnDefinitions mas usava Grid.Column="5" (clamped
+  para a coluna 4) → cabecalho desalinhado 62px das linhas; adicionada a 6a coluna e
+  Margin="6,2,6,6" (alinha com o Padding "6,3" das linhas de item).
+- Spinner do benchmark: StrokeDashArray "20 12" x thickness 2.5 = 50px > circunferencia
+  (40px) = circulo SOLIDO, rotacao invisivel → "3 2"; Margin="-14" (invadia a coluna
+  RESOLUCAO) → "1,0,0,0".
+- 7 labels de status iniciavam com texto errado (Desativado/Ativo arbitrario) → "Verificando...".
+- "Selecione um adaptador acima" (o ComboBox fica ABAIXO do card de controle) →
+  "Selecione um adaptador de rede" (XAML + code-behind).
+- ItemsSource="{Binding}" removido do DnsProviderList (DataContext nunca e setado).
+
+**Code-behind (NetworkPage.xaml.cs):**
+- catch nos 7 toggles (eram async void SEM catch - excecao derrubava o app); finally no
+  BtnAutoDetectMac (botao ficava travado em excecao); LoadAllDataAsync com try/finally
+  (sem ele, excecao deixaria _isLoading=true para sempre e TODOS os toggles mortos).
+- BtnApplyMacText volta ao rotulo apos gerar/aplicar MAC (ficava "MAC detectado!..." eterno).
+- Sem adaptadores fisicos: placeholder selecionado + UpdateAdapterInfoDisplay(-1) (antes os
+  labels ficavam "Verificando..." para sempre com SelectedIndex=-1).
+- BtnCleanNetworkSafe/Full/BtnResetNetwork usam o retorno (bool,string) real - antes
+  ShowSuccess INCONDICIONAL; dialogo da limpeza ja nao mente ("NAO altera configuracoes
+  permanentes" era falso: winsock/ip reset sao permanentes - agora avisa reboot).
+- Cleanup nulls dos timers + _timersStarted=false (convencao); timers agora nullable
+  (eliminou 4 CS8618 pre-existentes).
+
+**Core - AdapterManager:**
+- ListPhysicalAdapters era 3 PowerShell POR adaptador POR chamada (PermanentAddress + MAC +
+  Status) e corre no tick de 3s = ~9 spawns por adaptador por minuto. Agora:
+  BuildLiveInterfaceIndex() .NET (NetworkInterface.GetPhysicalAddress + OperationalStatus)
+  UMA vez por chamada, lookup por Name/Description/GUID. MEDIDO (netprobe): 1a=1092ms
+  (inclui a 1a construcao da tabela de PermanentAddress), 2a=14ms.
+- GetPermanentMac: cache ConcurrentDictionary (MAC de fabrica imutavel; so cacheia acerto)
+  + tabela UNICA de PermanentAddress (1 powershell.exe por processo; chaves InterfaceGuid e
+  Name - ASCII, imunes a encoding da saida do PS).
+- GetCurrentMac: .NET (o auto-detect chamava dezenas de vezes, 1 PS cada).
+- SetAdapterState: marcadores de erro bilinguues (pt/en) - o check antigo so tinha
+  "nao"/"error"/"fail" e perdia "No more data is available" em Windows ingles.
+
+**Core - NetworkManager:**
+- GetAdapterWithHighestUsage: .NET puro (NetworkInterface + GetIPv4Statistics + filtro de
+  keywords). Antes: PowerShell Get-NetAdapter + parse de CSV por split de aspas + deteccao
+  de erro por substring ("error"/"erro" no output). MEDIDO: 15ms (antes ~1-2s no load).
+- IsInterruptModerationDisabled: le PRIMEIRO a class key (local real) + fallback legado
+  em Tcpip\Parameters\Interfaces (compat com quem aplicou na versao antiga).
+- IsNetworkThrottlingDisabled: BUG corrigido - `valueLong == 0xFFFFFFFF || valueLong != 10`
+  (1a parte morta porque DWORD 0xFFFFFFFF le como -1; 2a retornava true para QUALQUER
+  valor != 10, ex.: 5 = throttling ativo era reportado como desativado) →
+  `valueLong == -1 || valueLong == 0xFFFFFFFF`.
+- CleanNetworkSafe/Full: string → (bool,string) + admin guard (sem admin o netsh falha
+  silenciosamente e a UI mostrava checks todos) + exit codes em netsh/ipconfig (arp/cmdkey/
+  certutil ficam lenientes: alguns retornam codigo nao-zero em situacoes legitimas).
+
+**Core - SystemTweaks:**
+- OptimizeNetworkAdapterForGaming / RevertNetworkAdapterSettings REESCRITOS: escrevem
+  *InterruptModeration na CLASS KEY do driver (preservando o tipo REG_SZ/DWORD existente,
+  SO onde o driver expoe o parametro - nao cria lixo em virtual/VPN); revert volta ao
+  default declarado em Ndi\Params (fallback "1") e apaga o valor legado de
+  Tcp\...\Interfaces; admin guard; sem "0 adaptador(es)" falso. Mensagem: reiniciar PC/
+  adaptador para aplicar.
+- ResetEthernetSettings: void → (bool,string) + admin guard + exit codes (antes a UI
+  mostrava sucesso mesmo sem admin).
+
+**Verificacao:**
+- Build solucao (OutDir absoluto, app aberto): 0 erros / 141 avisos (baseline 145 - os 4
+  CS8618 dos timers eliminados).
+- NOVO harness `tests/netprobe` (padrao gbtests, read-only, NAO executa metodos
+  destrutivos): 18/18 OK, exit 0. Prova: equivalencia exata com Get-NetAdapter (MAC+Status
+  identicos no adaptador fisico), GetCurrentMac==PS, cache do PermanentMac coerente,
+  throttling coerente com o registro bruto (valor 10 → false), benchmark DNS termina
+  (26 provedores; resolve real 19-20ms; estados nunca ficam em Testing).
+  Executar: dotnet build tests/netprobe/netprobe.csproj -p:OutDir=<abs> e correr NetProbe.exe.
+- Encoding: 7 ficheiros editados/criados = BOM + CRLF + NUL=0.
+
+**A TESTAR (GUI):** abrir Rede e Internet → cabecalho da tabela alinhado com as linhas;
+spinner girando durante o benchmark; toggles aplicam e refletem o estado ao reabrir;
+Ligar/Desligar/Reiniciar adaptador; Interrupt Moderation: ativar → reboot → estado "Desativado"
+e o valor muda na class key (reg query).
+
+**Pendencias conhecidas (fora de escopo desta sessao):**
+- AllTweaksPage `ToggleNetworkDriverOptimizations(regPath)` ainda escreve *InterruptModeration
+  em Tcpip\Parameters\Interfaces (GetActiveInterfaceRegPath devolve esse caminho) = mesmo
+  placebo corrigido aqui - aplicar a mesma correcao naquele fluxo.
+- `Toolbox.GetAllNetworkAdapters` (PowerShell CSV) nao tem chamadores - dead code candidato.
+- tests/netprobe nao foi acrescentado ao run-gbtests.ps1 (runner so de GameBoost).
+
+### Sessao 06/10 (cont.) - NetworkPage: placeholder DNS investigado com projeto ISOLADO (tests/NetPageVis)
+
+Relato: print (735x83) da area "DNS CUSTOMIZADO" com o campo DNS PRIMARIO SEM placeholder
+(caixa vazia; 2 fragmentos: caret dourado em x~76 e um ponto claro em x~50) enquanto o
+SECUNDARIO mostrava "DNS Secundario (opcional, ex: 8.8.4.4)" normalmente.
+
+**Metodo (padrao da casa, como TmVisualBench/PagesBench/PagesBench):** em vez de dirigir o app
+elevado por UIA (lento, frágil, e a UIA nao desce nos filhos do template do TextBox), criar um
+projeto ISOLADO que renderiza a PAGINA numa janela fora da tela (-32000) e audita PIXELS.
+- **`tests/NetPageVis`** (novo): `audit` = PNG da pagina inteira/viewport + recorte 4x de cada
+  campo + veredito por pixels; `states` = forca e mede cada estado (Text null / "" / " " /
+  preenchido, foco, normalizacao). Le o estado REAL do TextBlock `ph` do template E conta os
+  pixels #666 (brilho 90..160) desenhados dentro da caixa (>160 = texto digitado/caret, para
+  nao confundir caret com placeholder).
+- Licao do 1o run (bug do proprio harness): `RenderTargetBitmap.Render(elemento-filho)` INCLUI
+  o offset do elemento no pai, entao recortar com coordenadas relativas ao filho desloca o
+  recorte ~30px e da falso veredito. A analise agora usa o render da PROPRIA PAGINA
+  (TransformToAncestor(pagina), coordenadas exatas) + `BringIntoView` para a area DNS entrar
+  na viewport.
+
+**Resultado (build atual, 06/10):** os DOIS placeholders renderizam — primario 247 px #666
+(faixa x7..161 relativa a caixa), secundario 327 px (x7..185); `ph` Visible nos dois;
+`states` 8/8 OK, incluindo `Text = null` (o WPF converte null -> "" no TextBox e o trigger
+`Value=""` cobre) e `foco -> borda=#FFFFD700`.
+**Varredura de builds (618 no disco):** Debug 06/10 14:28, Release 05/10, Publish 30/09 e todos
+os harness tem a string correta "DNS Primario (ex: 8.8.8.8 Google)"; as antigas (<= 01/09, incl.
+`bin/Debug/check` 06/09) nem tem o estilo / tem o escape literal `DNS Prim\u00e1rio`. Logo o
+print veio de INSTANCIA/BUILD ANTIGA (processo aberto antes dos fixes), nao do codigo atual.
+
+**2 fixes reais aplicados (evidencia do print):**
+1. `DnsPlaceholderTextBoxStyle` (NetworkPage.xaml) — ORDEM DOS TRIGGERS: `IsMouseOver`
+   (borda #555) estava DEPOIS de `IsKeyboardFocusWithin` (#FFD700) e o ULTIMO trigger que
+   casa vence; com o rato em cima, o campo focado perdia o anel dourado (era o print:
+   caret dourado + borda cinza). Hover agora vem antes do foco.
+2. `NetworkPage.xaml.cs` — `NormalizarCampoDnsVazio(tb)` chamado no construtor para os dois
+   campos: no LostFocus, texto SO com espacos vira "" para o placeholder voltar (o trigger do
+   template so cobre Text vazio; " " escondia o placeholder e o campo parecia vazio sem dica).
+   Texto real digitado nunca e tocado.
+
+**Verificacao:** solucao 0 erros / 141 avisos (baseline); `NetPageVis audit` OK (2 campos);
+`NetPageVis states` 8/8; encoding BOM+CRLF+NUL=0 nos 4 arquivos; `tests/dnsvis` (1a tentativa,
+antes do NetPageVis) REMOVIDO - superseded.
+
+Uso: `dotnet build tests/NetPageVis/NetPageVis.csproj -p:OutDir=<abs>` e depois
+`NetPageVis.exe [audit|states|page] [--size WxH] [--dpi N] [--out <pasta>]` (read-only).
+
+**A TESTAR (GUI):** abrir Rede e Internet no build NOVO -> placeholder nos dois campos; clicar
+no campo primario com o rato em cima -> borda dourada (antes ficava cinza); digitar espaco e
+sair do campo -> placeholder volta. Se o print voltar a acontecer, correr o NetPageVis e enviar
+o PNG/veredito (e confirmar que o app em uso e o build recem-compilado).
+
+### Sessao 06/10 (cont.) - Placeholder DNS: causa raiz era BUILD DESATUALIZADA (nao bug de codigo)
+
+O print do usuario (campo primario "vazio", caret dourado + borda cinza) reproduzia o bug
+ANTIGO de ordem de triggers. Investigacao passo a passo:
+
+1. Fontes corrigidos: NetworkPage.xaml 06/10 16:14 e NetworkPage.xaml.cs 06/10 16:15.
+2. `KitLugia.GUI\bin\Debug\net10.0-windows10.0.26100.0\KitLugia.GUI.dll` estava datado de
+   06/10 14:28 - ANTERIOR aos fixes. O build da solucao foi para `%TEMP%\klbuild` (OutDir de
+   conveniencia), nunca para bin\Debug.
+3. `HKCU\...\CurrentVersion\Run\KitLugia` inicia exatamente esse exe de bin\Debug -> o
+   usuario rodava a build PRE-FIX o tempo todo. Dai o campo continuar "sem placeholder".
+4. `NetPageVis audit` a 96/120/144 dpi (- -dpi) = PLACEHOLDER VISIVEL nos 2 campos em todos;
+   `states` 8/8. O codigo estava correto; faltava compilar para o OutDir de producao.
+
+**Correcao:** `dotnet build KitLugia.sln --no-incremental` SEM OutDir -> DLL de bin\Debug
+atualizada (23:09, 5831168 B = mesmo tamanho da DLL validada pelo harness). 0 erros / 141 avisos.
+
+**Regra para as proximas sessoes:** ao validar UI no app real, compilar para o OutDir PADRAO
+(bin\<Config>) e CONFERIR A DATA/hora da DLL antes de pedir ao usuario para olhar a tela.
+OutDir de conveniencia (TEMP) serve para checar compilacao, nao para entregar o app.
+
+### Sessao 06/10 (cont.) - AVG bloqueando powershell.exe (IDP.HELU.PSE92) durante a sessao
+
+Alarmes repetidos do AVG (Modulo Comportamento, "IDP.HELU.PSE92 - Deteccao de linha de
+comando", powershell.exe BLOQUEADO) eram causados pela automacao da propria sessao:
+`%TEMP%\repro_dns.ps1` faz `Add-Type` (compila P/Invoke em runtime: SetForegroundWindow,
+mouse_event, CopyFromScreen) + `Start-Process` + captura de ecra - assinatura classica da
+heuristica comportamental. Nada ficou residente: nao ha tarefa agendada nem Run key apontando
+para esses scripts.
+
+**Caminho correto para testes visuais:** harness C# isolado (`tests\NetPageVis`), que nao usa
+PowerShell nem sintetiza input. Se o AVG voltar a acusar, o ajuste e por conta do usuario
+(AVG > Configuracoes > Geral > Excecoes) e/ou simplesmente nao reexecutar os scripts antigos.

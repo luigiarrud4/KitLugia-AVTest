@@ -184,54 +184,10 @@ namespace KitLugia.Core
             RunProcess("UsoClient", "RefreshSettings");
         }
 
-        public static void ScanUpdates()
-        {
-            EnsureElevated();
-            RunProcess("UsoClient", "StartScan");
-        }
-
-        public static void InteractiveScan()
-        {
-            EnsureElevated();
-            RunProcess("UsoClient", "StartInteractiveScan");
-        }
-
-        public static void DownloadUpdates()
-        {
-            EnsureElevated();
-            RunProcess("UsoClient", "StartDownload");
-        }
-
-        public static void InstallUpdates()
-        {
-            EnsureElevated();
-            RunProcess("UsoClient", "StartInstall");
-        }
-
         public static void ScanInstallWait()
         {
             EnsureElevated();
             RunProcess("UsoClient", "ScanInstallWait");
-        }
-
-        public static void SetDeferralDays(int featureUpdatesDays, int qualityUpdatesDays)
-        {
-            EnsureElevated();
-            using var policies = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate");
-            policies?.SetValue("DeferFeatureUpdates", 1, RegistryValueKind.DWord);
-            policies?.SetValue("DeferFeatureUpdatesPeriodInDays", featureUpdatesDays, RegistryValueKind.DWord);
-            policies?.SetValue("DeferQualityUpdates", 1, RegistryValueKind.DWord);
-            policies?.SetValue("DeferQualityUpdatesPeriodInDays", qualityUpdatesDays, RegistryValueKind.DWord);
-        }
-
-        public static void ClearDeferralPolicies()
-        {
-            EnsureElevated();
-            using var policies = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate");
-            policies?.DeleteValue("DeferFeatureUpdates", throwOnMissingValue: false);
-            policies?.DeleteValue("DeferFeatureUpdatesPeriodInDays", throwOnMissingValue: false);
-            policies?.DeleteValue("DeferQualityUpdates", throwOnMissingValue: false);
-            policies?.DeleteValue("DeferQualityUpdatesPeriodInDays", throwOnMissingValue: false);
         }
 
         private static void EnsureElevated()
@@ -241,8 +197,6 @@ namespace KitLugia.Core
             if (!principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))
                 throw new UnauthorizedAccessException("Esta operacao requer privilegios de administrador.");
         }
-
-        public static void RunProcessStatic(string file, string args) => RunProcess(file, args);
 
         private static void RunProcess(string file, string args)
         {

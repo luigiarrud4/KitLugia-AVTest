@@ -362,6 +362,12 @@
                 <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#17324F"/></Trigger>
             </Style.Triggers>
         </Style>
+        <!-- ABa USUÁRIOS: o RowStyle precisa LIGAR o DetailsVisibility ao item.
+             Sem este Setter o DataGrid recicla o container da linha durante o scroll e o
+             detalhe volta a colapsar sozinho (o "cliquei na seta e o card fecha"). -->
+        <Style x:Key="TmUserRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource TmRowStyle}">
+            <Setter Property="DetailsVisibility" Value="{Binding DetailsVisibility}"/>
+        </Style>
         <Style x:Key="TmCellStyle" TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -1029,7 +1035,18 @@
                                             </Grid>
                                         </Border>
                                     </Grid>
-                                    <TextBlock Grid.Row="2" x:Name="TxtSumCpuFooter" Text="" FontSize="10" Foreground="#666"/>
+                                    <!-- LEITURA DO GRÁFICO: o que a linha está dizendo em português.
+                                         Três linhas coloridas sozinhas não dizem se o gargalo é um
+                                         programa ou um driver — era a queixa "o gráfico não ajuda". -->
+                                    <Grid Grid.Row="2" Margin="0,6,0,0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" x:Name="TxtSumCpuVerdict" Text="" FontSize="11" Foreground="#4CAF50"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Grid.Row="1" x:Name="TxtSumCpuFooter" Text="" FontSize="10" Foreground="#666" Margin="0,2,0,0"/>
+                                    </Grid>
                                 </Grid>
                             </Border>
 
@@ -1130,6 +1147,7 @@
                                           RowHeight="26" FontSize="11" Foreground="#DDD"
                                           EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
                                           MouseDoubleClick="DgSumTopCpu_MouseDoubleClick"
+                                          SelectionChanged="DgSumTopCpu_SelectionChanged"
                                           ContextMenuOpening="DgSumTopCpu_ContextMenuOpening">
                                     <!-- Menu de contexto: enquanto ele está ABERTO a lista fica CONGELADA
                                          (o refresh nao reordena/some a linha embaixo do mouse) e o
@@ -1200,7 +1218,33 @@
                                         </DataGridTextColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
-                                <TextBlock Grid.Row="2" Text="Duplo clique abre o processo na aba Processos · clique com o botão direito para agir (a lista congela enquanto o menu está aberto)" FontSize="10" Foreground="#555" Margin="2,6,0,0" TextTrimming="CharacterEllipsis"/>
+                                <!-- CARTÃO DO PROCESSO SELECIONADO: antes o clique simples na lista
+                                     não fazia NADA (só duplo clique e botão direito existiam) — o
+                                     usuário achava a lista morta. Agora o clique abre o cartão com
+                                     caminho/usuário/estado e o botão que leva à aba Processos. -->
+                                <Border Grid.Row="2" x:Name="SumProcCard" Background="#0D131A" BorderBrush="#1F2A3A"
+                                        BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,8,0,0"
+                                        Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock x:Name="TxtSumProcTitle" Text="" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="#EEE" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="TxtSumProcMeta" Text="" FontSize="10" Foreground="#8FA3B8"
+                                                   Margin="0,3,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="TxtSumProcPath" Text="" FontSize="10" Foreground="#666"
+                                                   Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                        <!-- WrapPanel, nao StackPanel: a coluna do Top e estreita e tres botoes em
+                                             linha horizontal SAÍAM do cartao (o 3o ficava cortado). -->
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="BtnSumGoProcess" Content="Abrir na aba Processos" Style="{StaticResource TmToolButton}"
+                                                    Click="BtnSumGoProcess_Click" ToolTip="Seleciona e revela o processo na aba Processos" Margin="0,0,6,6"/>
+                                            <Button x:Name="BtnSumEndTask" Content="Finalizar tarefa" Style="{StaticResource TmToolButton}"
+                                                    Click="BtnSumKillSelected_Click" ToolTip="Finaliza o processo selecionado no Top (Del)" Margin="0,0,6,6"/>
+                                            <Button x:Name="BtnSumFix" Content="📌 Congelar" Style="{StaticResource TmToolButton}"
+                                                    Click="BtnSumPinSelected_Click" ToolTip="Mantém o processo no Top mesmo que ele caia do ranking" Margin="0,0,0,6"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock x:Name="TxtSumTopHint" Grid.Row="2" Text="Clique num processo para ver os detalhes · duplo clique abre na aba Processos · botão direito para agir (a lista congela enquanto o menu está aberto)" FontSize="10" Foreground="#555" Margin="2,6,0,0" TextWrapping="Wrap"/>
                             </Grid>
                         </Border>
                     </Grid>
@@ -1282,7 +1326,8 @@
                               IsReadOnly="True" SelectionMode="Extended" CanUserAddRows="False" RowHeight="26" FontSize="11"
                               EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
                               VirtualizingPanel.IsVirtualizingWhenGrouping="True"
-                              ScrollViewer.CanContentScroll="True">
+                              ScrollViewer.CanContentScroll="True"
+                              CanUserSortColumns="True" Sorting="DgConnections_Sorting">
                         <DataGrid.GroupStyle>
                             <GroupStyle>
                                 <GroupStyle.HeaderTemplate>
@@ -1300,22 +1345,22 @@
                             <Style TargetType="DataGridCell" BasedOn="{StaticResource TmCellStyle}"/>
                         </DataGrid.Resources>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Processo" Binding="{Binding ProcessName}" Width="*">
+                            <DataGridTextColumn Header="Processo" Binding="{Binding ProcessName}" Width="*" SortMemberPath="ProcessName">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#EEE"/><Setter Property="TextTrimming" Value="CharacterEllipsis"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="70">
+                            <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="70" SortMemberPath="Pid">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#777"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Protocolo" Binding="{Binding Protocol}" Width="80">
+                            <DataGridTextColumn Header="Protocolo" Binding="{Binding Protocol}" Width="80" SortMemberPath="Protocol">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#4FC3F7"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Endereço local" Binding="{Binding Local}" Width="230">
+                            <DataGridTextColumn Header="Endereço local" Binding="{Binding Local}" Width="230" SortMemberPath="Local">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#BBB"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Endereço remoto" Binding="{Binding Remote}" Width="230">
+                            <DataGridTextColumn Header="Endereço remoto" Binding="{Binding Remote}" Width="230" SortMemberPath="Remote">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#BBB"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Estado" Binding="{Binding State}" Width="130">
+                            <DataGridTextColumn Header="Estado" Binding="{Binding State}" Width="130" SortMemberPath="State">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#4CAF50"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                         </DataGrid.Columns>
@@ -1348,8 +1393,10 @@
                               RowBackground="#111823" AlternatingRowBackground="#141C28"
                                RowHeight="32" CanUserSortColumns="True"
                                Sorting="DgUsers_Sorting"
-                               RowStyle="{StaticResource TmRowStyle}"
-                               CellStyle="{StaticResource TmCellStyle}">
+                               RowStyle="{StaticResource TmUserRowStyle}"
+                               CellStyle="{StaticResource TmCellStyle}"
+                               EnableRowVirtualization="False" ScrollViewer.CanContentScroll="False"
+                               ScrollViewer.IsDeferredScrollingEnabled="False">
                         <DataGrid.ColumnHeaderStyle>
                             <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource TmColumnHeaderStyle}"/>
                         </DataGrid.ColumnHeaderStyle>
@@ -1359,29 +1406,46 @@
                                 <!-- A visibilidade e dirigida pela SETA (DetailsVisibility), nao pela
                                      selecao: com "VisibleWhenSelected", o refresh de 1s trocava o
                                      ItemsSource, perdia a selecao e o detalhe SUMIA logo apos
-                                     clicar na seta ("apontou para baixo mas nao listou"). -->
+                                     clicar na seta ("apontou para baixo mas nao listou").
+
+                                     O ScrollViewer com teto de altura e ESSENCIAL: sem ele o
+                                     detalhe de um usuario com 180 processos ficava mais alto que
+                                     a janela e o DataGrid (scroll em pixels, sem virtualizacao de
+                                     linha) descartava o container — era o "scroll fecha o card". -->
                                 <Border Background="#0D131A" BorderBrush="#1F2A3A" BorderThickness="0,1,0,1" Padding="26,4,6,6"
                                         Visibility="{Binding DetailsVisibility}">
-                                    <ItemsControl ItemsSource="{Binding Processes}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Height="24">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="90"/>
-                                                        <ColumnDefinition Width="110"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11" Foreground="#DDD"
-                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding Name}"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding Cpu}" FontSize="11" Foreground="#CCC"
-                                                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding MemMB}" FontSize="11" Foreground="#AAA"
-                                                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    <StackPanel>
+                                        <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto"
+                                                      HorizontalScrollBarVisibility="Disabled"
+                                                      CanContentScroll="False">
+                                            <ItemsControl ItemsSource="{Binding VisibleProcesses}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Height="24">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="90"/>
+                                                                <ColumnDefinition Width="110"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11" Foreground="#DDD"
+                                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                                       ToolTip="{Binding Name}"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Cpu}" FontSize="11" Foreground="#CCC"
+                                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                            <TextBlock Grid.Column="2" Text="{Binding MemMB}" FontSize="11" Foreground="#AAA"
+                                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        <!-- Rodapé honesto: mostra quantos ficaram fora em vez de
+                                             truncar a lista sem aviso (antes não dava para saber
+                                             se o card estava completo). -->
+                                        <TextBlock Text="{Binding ExtraLabel}" FontSize="10" Foreground="#6C7A8C"
+                                                   Margin="0,6,10,0" TextWrapping="Wrap"
+                                                   Visibility="{Binding ExtraVisibility}"/>
+                                    </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </DataGrid.RowDetailsTemplate>
@@ -1606,6 +1670,7 @@
                                    CanUserSortColumns="True"
                                    Sorting="DgProcesses_Sorting"
                                    SelectionChanged="DgProcesses_SelectionChanged"
+                                   ContextMenuOpening="DgProcesses_ContextMenuOpening"
                                    MouseDoubleClick="DgProcesses_MouseDoubleClick">
                             <DataGrid.Resources>
                                 <Style TargetType="DataGridColumnHeader">
@@ -2370,9 +2435,10 @@
                             <TextBlock x:Name="TxtServiceCount" Text="" FontSize="12" Foreground="#777" VerticalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Content="▶ Iniciar" Style="{StaticResource TmToolButton}" Click="MenuStartService_Click" ToolTip="Iniciar serviço selecionado"/>
-                            <Button Content="⏹ Parar" Style="{StaticResource TmToolButton}" Click="MenuStopService_Click" ToolTip="Parar serviço"/>
-                            <Button Content="🔄 Reiniciar" Style="{StaticResource TmToolButton}" Click="MenuRestartService_Click" ToolTip="Reiniciar serviço"/>
+                            <Button x:Name="BtnSvcStart" Content="▶ Iniciar" Style="{StaticResource TmToolButton}" Click="MenuStartService_Click" ToolTip="Iniciar serviço selecionado"/>
+                            <Button x:Name="BtnSvcStop" Content="⏹ Parar" Style="{StaticResource TmToolButton}" Click="MenuStopService_Click" ToolTip="Parar serviço"/>
+                            <Button x:Name="BtnSvcRestart" Content="🔄 Reiniciar" Style="{StaticResource TmToolButton}" Click="MenuRestartService_Click" ToolTip="Reiniciar serviço"/>
+                            <Button x:Name="BtnSvcReload" Content="↻ Recarregar" Style="{StaticResource TmToolButton}" Click="BtnSvcReload_Click" ToolTip="Reler oserviços do Windows"/>
                             <Button Content="⚙️ services.msc" Style="{StaticResource TmToolButton}" Foreground="#4FC3F7" Click="BtnOpenServicesMsc_Click" ToolTip="Abrir gerenciador de Serviços do Windows"/>
                             <TextBlock Text="Filtrar:" FontSize="11" Foreground="#777" VerticalAlignment="Center" Margin="6,0,6,0"/>
                             <ComboBox x:Name="CmbServiceFilter" Height="26" Background="#1F2A3A" Foreground="White" BorderBrush="#2C3A4E" BorderThickness="1" FontSize="11" SelectionChanged="CmbServiceFilter_Changed">
@@ -2392,7 +2458,8 @@
                               EnableRowVirtualization="True"
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               RowHeight="30" BorderThickness="0" Cursor="Hand"
-                              CanUserSortColumns="True" Sorting="DgServices_Sorting">
+                              CanUserSortColumns="True" Sorting="DgServices_Sorting"
+                              SelectionChanged="DgServices_SelectionChanged">
                         <DataGrid.Resources>
                             <Style TargetType="DataGridColumnHeader">
                                 <Setter Property="Background" Value="#1A2432"/>
@@ -2441,10 +2508,10 @@
                             </Style>
                         </DataGrid.Resources>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="180">
+                            <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="180" SortMemberPath="Name">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="White"/><Setter Property="FontSize" Value="12"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Exibição" Binding="{Binding DisplayName}" Width="220">
+                            <DataGridTextColumn Header="Exibição" Binding="{Binding DisplayName}" Width="220" SortMemberPath="DisplayName">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#CCC"/><Setter Property="FontSize" Value="12"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                             <DataGridTemplateColumn Header="Status" Width="110" SortMemberPath="Status">
@@ -2457,8 +2524,8 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Inicialização" Binding="{Binding StartMode}" Width="110"/>
-                            <DataGridTextColumn Header="Fabricante" Binding="{Binding Manufacturer}" Width="120"/>
+                            <DataGridTextColumn Header="Inicialização" Binding="{Binding StartMode}" Width="110" SortMemberPath="StartMode"/>
+                            <DataGridTextColumn Header="Fabricante" Binding="{Binding Manufacturer}" Width="120" SortMemberPath="Manufacturer"/>
                         </DataGrid.Columns>
                         <DataGrid.ContextMenu>
                             <ContextMenu Style="{StaticResource TmDarkMenu}">
@@ -2490,11 +2557,12 @@
                             <TextBlock x:Name="TxtStartupCount" Text="" FontSize="12" Foreground="#777" VerticalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Content="✅ Habilitar" Style="{StaticResource TmToolButton}" Click="MenuEnableStartup_Click" ToolTip="Habilitar na inicialização"/>
-                            <Button Content="🚫 Desabilitar" Style="{StaticResource TmToolButton}" Click="MenuDisableStartup_Click" ToolTip="Desabilitar da inicialização"/>
-                            <Button Content="📂 Pasta" Style="{StaticResource TmToolButton}" Click="BtnStartupOpenFolder_Click" ToolTip="Abrir local do arquivo"/>
-                            <Button Content="🔍 Web" Style="{StaticResource TmToolButton}" Click="BtnStartupSearchWeb_Click" ToolTip="Pesquisar no Google"/>
-                            <Button Content="🗑️ Órfãs" Style="{StaticResource TmToolButton}" Click="BtnStartupRemoveOrphans_Click" ToolTip="Remover entradas órfãs (arquivo não existe)"/>
+                            <Button x:Name="BtnStartupEnable" Content="✅ Habilitar" Style="{StaticResource TmToolButton}" Click="MenuEnableStartup_Click" ToolTip="Habilitar na inicialização"/>
+                            <Button x:Name="BtnStartupDisable" Content="🚫 Desabilitar" Style="{StaticResource TmToolButton}" Click="MenuDisableStartup_Click" ToolTip="Desabilitar da inicialização"/>
+                            <Button x:Name="BtnStartupFolder" Content="📂 Pasta" Style="{StaticResource TmToolButton}" Click="BtnStartupOpenFolder_Click" ToolTip="Abrir local do arquivo"/>
+                            <Button x:Name="BtnStartupWeb" Content="🔍 Web" Style="{StaticResource TmToolButton}" Click="BtnStartupSearchWeb_Click" ToolTip="Pesquisar no Google"/>
+                            <Button x:Name="BtnStartupReload" Content="↻ Recarregar" Style="{StaticResource TmToolButton}" Click="BtnStartupReload_Click" ToolTip="Reler os itens de inicialização"/>
+                            <Button x:Name="BtnStartupOrphans" Content="🗑️ Órfãs" Style="{StaticResource TmToolButton}" Click="BtnStartupRemoveOrphans_Click" ToolTip="Desabilitar entradas órfãs (o arquivo não existe mais)"/>
                             <TextBox x:Name="TxtStartupSearch" Width="170" Height="26" Margin="6,0,0,0" Background="#1F2A3A" Foreground="White" BorderBrush="#2C3A4E" BorderThickness="1" Padding="6,0" FontSize="11" VerticalContentAlignment="Center" TextChanged="TxtStartupSearch_TextChanged" ToolTip="Buscar por nome ou caminho..."/>
                             <ComboBox x:Name="CmbStartupFilter" Height="26" Background="#1F2A3A" Foreground="White" BorderBrush="#2C3A4E" BorderThickness="1" FontSize="11" SelectionChanged="CmbStartupFilter_Changed" Margin="4,0,0,0">
                                 <ComboBoxItem Content="Todos" IsSelected="True"/>
@@ -2516,7 +2584,8 @@
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               RowHeight="30" BorderThickness="0" Cursor="Hand"
                               CanUserSortColumns="True" Sorting="DgStartup_Sorting"
-                              MouseDoubleClick="DgStartup_MouseDoubleClick">
+                              MouseDoubleClick="DgStartup_MouseDoubleClick"
+                              SelectionChanged="DgStartup_SelectionChanged">
                         <DataGrid.Resources>
                             <Style TargetType="DataGridColumnHeader">
                                 <Setter Property="Background" Value="#1A2432"/>
@@ -2565,13 +2634,13 @@
                             </Style>
                         </DataGrid.Resources>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="200">
+                            <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="200" SortMemberPath="Name">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="White"/><Setter Property="FontSize" Value="12"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Comando" Binding="{Binding FullCommand}" Width="350">
+                            <DataGridTextColumn Header="Comando" Binding="{Binding FullCommand}" Width="350" SortMemberPath="FullCommand">
                                 <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#CCC"/><Setter Property="FontSize" Value="11"/></Style></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Local" Binding="{Binding Location}" Width="160"/>
+                            <DataGridTextColumn Header="Local" Binding="{Binding Location}" Width="160" SortMemberPath="Location"/>
                             <DataGridTemplateColumn Header="Status" Width="100" SortMemberPath="Status">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -2744,10 +2813,10 @@
 
                         <!-- Tabelas -->
                         <Grid Grid.Row="2">
-                            <DataGrid x:Name="DgLatEvents" Style="{StaticResource TmGrid}">
+                            <DataGrid x:Name="DgLatEvents" Style="{StaticResource TmGrid}" CanUserSortColumns="True" Sorting="TmGrid_Sorting">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Hora" Binding="{Binding Hora}" Width="70"/>
-                                    <DataGridTextColumn Header="Tipo" Binding="{Binding Tipo}" Width="80"/>
+                                    <DataGridTextColumn Header="Hora" Binding="{Binding Hora}" Width="70" SortMemberPath="Hora"/>
+                                    <DataGridTextColumn Header="Tipo" Binding="{Binding Tipo}" Width="80" SortMemberPath="Tipo"/>
                                     <DataGridTemplateColumn Header="Gravidade" Width="100" SortMemberPath="Gravidade">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -2759,25 +2828,25 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="O que aconteceu" Binding="{Binding Titulo}" Width="*"
-                                                        ElementStyle="{StaticResource LatCellEllipsis}"/>
+                                                        ElementStyle="{StaticResource LatCellEllipsis}" SortMemberPath="Titulo"/>
                                     <DataGridTextColumn Header="Explicação (passe o mouse)" Binding="{Binding Resumo}" Width="2*"
-                                                        ElementStyle="{StaticResource LatCellEllipsis}"/>
+                                                        ElementStyle="{StaticResource LatCellEllipsis}" SortMemberPath="Resumo"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-                            <DataGrid x:Name="DgLatDrivers" Style="{StaticResource TmGrid}" Visibility="Collapsed">
+                            <DataGrid x:Name="DgLatDrivers" Style="{StaticResource TmGrid}" Visibility="Collapsed" CanUserSortColumns="True" Sorting="TmGrid_Sorting">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Driver" Binding="{Binding Nome}" Width="170"/>
-                                    <DataGridTextColumn Header="O que é" Binding="{Binding Descricao}" Width="2*"/>
-                                    <DataGridTextColumn Header="DPC" Binding="{Binding DpcCount}" Width="70"/>
-                                    <DataGridTextColumn Header="ISR" Binding="{Binding IsrCount}" Width="70"/>
-                                    <DataGridTextColumn Header="Maior DPC" Binding="{Binding MaxDpc}" Width="90"/>
-                                    <DataGridTextColumn Header="Maior ISR" Binding="{Binding MaxIsr}" Width="90"/>
-                                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="90"/>
+                                    <DataGridTextColumn Header="Driver" Binding="{Binding Nome}" Width="170" SortMemberPath="Nome"/>
+                                    <DataGridTextColumn Header="O que é" Binding="{Binding Descricao}" Width="2*" SortMemberPath="Descricao"/>
+                                    <DataGridTextColumn Header="DPC" Binding="{Binding DpcCount}" Width="70" SortMemberPath="DpcCount"/>
+                                    <DataGridTextColumn Header="ISR" Binding="{Binding IsrCount}" Width="70" SortMemberPath="IsrCount"/>
+                                    <DataGridTextColumn Header="Maior DPC" Binding="{Binding MaxDpc}" Width="90" SortMemberPath="MaxDpc"/>
+                                    <DataGridTextColumn Header="Maior ISR" Binding="{Binding MaxIsr}" Width="90" SortMemberPath="MaxIsr"/>
+                                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="90" SortMemberPath="Total"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-                            <DataGrid x:Name="DgLatCores" Style="{StaticResource TmGrid}" Visibility="Collapsed">
+                            <DataGrid x:Name="DgLatCores" Style="{StaticResource TmGrid}" Visibility="Collapsed" CanUserSortColumns="True" Sorting="TmGrid_Sorting">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Núcleo" Binding="{Binding Nome}" Width="90"/>
+                                    <DataGridTextColumn Header="Núcleo" Binding="{Binding Nome}" Width="90" SortMemberPath="Nome"/>
                                     <DataGridTemplateColumn Header="DPC na janela" Width="120" SortMemberPath="DpcPct">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -2785,18 +2854,18 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="Pico DPC (1s)" Binding="{Binding MaxDpc}" Width="120"/>
-                                    <DataGridTextColumn Header="ISR na janela" Binding="{Binding IsrPct}" Width="120"/>
-                                    <DataGridTextColumn Header="Pico ISR" Binding="{Binding MaxIsr}" Width="100"/>
-                                    <DataGridTextColumn Header="Interrupções" Binding="{Binding Ints}" Width="110"/>
-                                    <DataGridTextColumn Header="DPC acumulado" Binding="{Binding TotalDpc}" Width="*" MinWidth="110"/>
+                                    <DataGridTextColumn Header="Pico DPC (1s)" Binding="{Binding MaxDpc}" Width="120" SortMemberPath="MaxDpc"/>
+                                    <DataGridTextColumn Header="ISR na janela" Binding="{Binding IsrPct}" Width="120" SortMemberPath="IsrPct"/>
+                                    <DataGridTextColumn Header="Pico ISR" Binding="{Binding MaxIsr}" Width="100" SortMemberPath="MaxIsr"/>
+                                    <DataGridTextColumn Header="Interrupções" Binding="{Binding Ints}" Width="110" SortMemberPath="Ints"/>
+                                    <DataGridTextColumn Header="DPC acumulado" Binding="{Binding TotalDpc}" Width="*" MinWidth="110" SortMemberPath="TotalDpc"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-                            <DataGrid x:Name="DgLatProcs" Style="{StaticResource TmGrid}" Visibility="Collapsed">
+                            <DataGrid x:Name="DgLatProcs" Style="{StaticResource TmGrid}" Visibility="Collapsed" CanUserSortColumns="True" Sorting="TmGrid_Sorting">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Processo" Binding="{Binding Nome}" Width="2*"/>
-                                    <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="80"/>
-                                    <DataGridTextColumn Header="Falhas no disco (total)" Binding="{Binding Duras}" Width="170"/>
+                                    <DataGridTextColumn Header="Processo" Binding="{Binding Nome}" Width="2*" SortMemberPath="Nome"/>
+                                    <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="80" SortMemberPath="Pid"/>
+                                    <DataGridTextColumn Header="Falhas no disco (total)" Binding="{Binding Duras}" Width="170" SortMemberPath="Duras"/>
                                     <DataGridTemplateColumn Header="Agora" Width="100" SortMemberPath="Agora">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -2804,8 +2873,8 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="Falhas totais" Binding="{Binding Soft}" Width="130"/>
-                                    <DataGridTextColumn Header="Memória" Binding="{Binding Ws}" Width="*" MinWidth="100"/>
+                                    <DataGridTextColumn Header="Falhas totais" Binding="{Binding Soft}" Width="130" SortMemberPath="Soft"/>
+                                    <DataGridTextColumn Header="Memória" Binding="{Binding Ws}" Width="*" MinWidth="100" SortMemberPath="Ws"/>
                                 </DataGrid.Columns>
                             </DataGrid>
 
@@ -3036,9 +3105,10 @@
                         </Border>
 
                         <!-- Tabela: quem está fazendo E/S -->
-                        <DataGrid x:Name="DgStProcs" Grid.Row="2" Style="{StaticResource TmGrid}" SelectionChanged="DgStProcs_SelectionChanged">
+                        <DataGrid x:Name="DgStProcs" Grid.Row="2" Style="{StaticResource TmGrid}" SelectionChanged="DgStProcs_SelectionChanged"
+                                  CanUserSortColumns="True" Sorting="TmGrid_Sorting">
                             <DataGrid.Columns>
-                                <DataGridTemplateColumn Header="Processo" Width="2*" SortMemberPath="TotalBps">
+                                <DataGridTemplateColumn Header="Processo" Width="2*" SortMemberPath="Name">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -3054,9 +3124,9 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="65"/>
-                                <DataGridTextColumn Header="Leitura" Binding="{Binding Read}" Width="90"/>
-                                <DataGridTextColumn Header="Escrita" Binding="{Binding Write}" Width="90"/>
+                                <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="65" SortMemberPath="Pid"/>
+                                <DataGridTextColumn Header="Leitura" Binding="{Binding Read}" Width="90" SortMemberPath="ReadBps"/>
+                                <DataGridTextColumn Header="Escrita" Binding="{Binding Write}" Width="90" SortMemberPath="WriteBps"/>
                                 <DataGridTemplateColumn Header="Total" Width="95" SortMemberPath="TotalBps">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -3064,8 +3134,8 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Ops/s" Binding="{Binding Iops}" Width="80"/>
-                                <DataGridTextColumn Header="Serviço" Binding="{Binding ServiceText}" Width="*" MinWidth="120"/>
+                                <DataGridTextColumn Header="Ops/s" Binding="{Binding Iops}" Width="80" SortMemberPath="IopsValue"/>
+                                <DataGridTextColumn Header="Serviço" Binding="{Binding ServiceText}" Width="*" MinWidth="120" SortMemberPath="ServiceText"/>
                             </DataGrid.Columns>
                         </DataGrid>
 

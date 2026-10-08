@@ -33,16 +33,33 @@ namespace KitLugia.GUI.Pages
 
         private List<AdapterManager.NetworkAdapterInfo> _physicalAdapters = new();
         private string _generatedMac = "";
-        private DispatcherTimer _refreshTimer;
-        private DispatcherTimer _dnsTimer;
+        private DispatcherTimer? _refreshTimer; // nullable: Cleanup zera (convenção) + sem CS8618/CS8625
+        private DispatcherTimer? _dnsTimer;
         private DateTime _lastRefreshTime = DateTime.MinValue;
 
         public NetworkPage()
         {
             InitializeComponent();
+            NormalizarCampoDnsVazio(TxtCustomDnsPrimary);
+            NormalizarCampoDnsVazio(TxtCustomDnsSecondary);
             _ = LoadAllDataAsync();
             this.Loaded += NetworkPage_Loaded;
             this.Unloaded += NetworkPage_Unloaded;
+        }
+
+        /// <summary>
+        /// Campo de DNS com só espaços é "vazio" para o usuário, mas o placeholder do
+        /// DnsPlaceholderTextBoxStyle só aparece com Text vazio — com " " o campo ficava
+        /// sem nenhuma dica na tela (parecia quebrado). Ao perder o foco, whitespace vira ""
+        /// e o placeholder volta. O texto digitado de verdade nunca é tocado.
+        /// </summary>
+        private static void NormalizarCampoDnsVazio(System.Windows.Controls.TextBox tb)
+        {
+            tb.LostFocus += (_, _) =>
+            {
+                if (!string.IsNullOrEmpty(tb.Text) && string.IsNullOrWhiteSpace(tb.Text))
+                    tb.Text = string.Empty;
+            };
         }
 
         private void NetworkPage_Loaded(object sender, RoutedEventArgs e)
@@ -52,16 +69,29 @@ namespace KitLugia.GUI.Pages
 
         private async Task LoadAllDataAsync()
         {
-            SetRefreshIndicator("Carregando...");
-            var adapterTask = LoadAdapterInfoAsync();
-            var dnsTask = LoadStatus();
-            var settingsTask = LoadNetworkSettingsAsync();
-            await Task.WhenAll(adapterTask, dnsTask, settingsTask);
-            _isLoading = false; // carga inicial concluída: libera os toggles
-            SetRefreshIndicator("OK");
+            try
+            {
+                SetRefreshIndicator("Carregando...");
+                var adapterTask = LoadAdapterInfoAsync();
+                var dnsTask = LoadStatus();
+                var settingsTask = LoadNetworkSettingsAsync();
+                await Task.WhenAll(adapterTask, dnsTask, settingsTask);
+                SetRefreshIndicator("OK");
 
-            // Benchmark automático UMA vez ao abrir a página (sem esperar clique).
-            _ = RunBenchmarkAsync();
+                // Benchmark automático UMA vez ao abrir a página (sem esperar clique).
+                _ = RunBenchmarkAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro ao carregar dados da página: {ex.Message}");
+                SetRefreshIndicator("Erro");
+            }
+            finally
+            {
+                // SEMPRE libera os toggles: sem o finally, uma exceção deixaria
+                // _isLoading=true para sempre e todos os toggles mortos.
+                _isLoading = false;
+            }
         }
 
         /// <summary>Benchmark DNS compartilhado (load automático + botão "Testar Novamente").</summary>
@@ -192,7 +222,10 @@ namespace KitLugia.GUI.Pages
                     {
                         CmbNetworkAdapter.Items.Clear();
                         PopulateAdapterComboBox();
-                        CmbNetworkAdapter.SelectedIndex = _physicalAdapters.Count > 0 ? 0 : -1;
+                        // Sempre ≥ 1 item (placeholder "Nenhum adaptador..." quando vazio) —
+                        // selecionar o placeholder dispara o else do SelectionChanged e
+                        // zera os labels (antes ficavam "Verificando..." para sempre).
+                        CmbNetworkAdapter.SelectedIndex = 0;
                     });
                 }
             }
@@ -237,7 +270,7 @@ namespace KitLugia.GUI.Pages
                 BtnApplyMac.IsEnabled = false;
                 BtnRestoreMac.IsEnabled = false;
                 if (TxtSelectedAdapterForControl != null)
-                    TxtSelectedAdapterForControl.Text = "Selecione um adaptador acima";
+                    TxtSelectedAdapterForControl.Text = "Selecione um adaptador de rede";
                 return;
             }
 
@@ -357,13 +390,17 @@ namespace KitLugia.GUI.Pages
             {
                 if (TxtAdapterInfo != null)
                     TxtAdapterInfo.Text = "\u26A0\uFE0F Nenhum adaptador f\u00edsico encontrado\nVerifique seus adaptadores de rede";
+                UpdateAdapterInfoDisplay(-1); // placeholder: zera status/MAC/botões em vez de deixar "Verificando..."
             }
         }
 
         public void Cleanup()
         {
             _refreshTimer?.Stop();
+            _refreshTimer = null;
             _dnsTimer?.Stop();
+            _dnsTimer = null;
+            _timersStarted = false; // página reativada pode recriar os timers
             this.Loaded -= NetworkPage_Loaded;
             this.Unloaded -= NetworkPage_Unloaded;
             this.DataContext = null;
@@ -543,13 +580,15 @@ namespace KitLugia.GUI.Pages
                     "\u2022 netsh winhttp reset proxy (remover proxy)\n" +
                     "\u2022 cmdkey /delete:* (limpar credenciais salvas)\n" +
                     "\u2022 certutil -urlcache * delete (limpar cache SSL)\n\n" +
-                    "N\u00c3O altera configura\u00e7\u00f5es permanentes do PC.\n" +
+                    "Reverte a rede ao padr\u00e3o do Windows (Winsock/TCP-IP s\u00e3o\n" +
+                    "reescritos - reinicie o PC para efeito completo).\n" +
                     "Deseja continuar?"))
                     return;
 
                 mw.ShowInfo("LIMPEZA", "Executando limpeza segura de rede...");
-                var result = await Task.Run(() => Toolbox.CleanNetworkSafe());
-                mw.ShowSuccess("LIMPEZA", result);
+                var (ok, msg) = await Task.Run(() => Toolbox.CleanNetworkSafe());
+                if (ok) mw.ShowSuccess("LIMPEZA", msg);
+                else mw.ShowError("LIMPEZA", msg);
             }
             catch (Exception ex)
             {
@@ -585,8 +624,9 @@ namespace KitLugia.GUI.Pages
                     return;
 
                 mw.ShowInfo("LIMPEZA TOTAL", "Executando limpeza completa de rede...");
-                var result = await Task.Run(() => Toolbox.CleanNetworkFull());
-                mw.ShowSuccess("LIMPEZA TOTAL", result);
+                var (okFull, msgFull) = await Task.Run(() => Toolbox.CleanNetworkFull());
+                if (okFull) mw.ShowSuccess("LIMPEZA TOTAL", msgFull);
+                else mw.ShowError("LIMPEZA TOTAL", msgFull);
             }
             catch (Exception ex)
             {
@@ -762,6 +802,7 @@ namespace KitLugia.GUI.Pages
             TxtNewMac.Text = formatted;
             TxtNewMac.Foreground = _colorActive;
             BtnApplyMac.IsEnabled = true;
+            BtnApplyMacText.Text = "\u2705  Aplicar MAC + Reiniciar"; // limpa "MAC detectado!" de auto-detect anterior
 
             if (Application.Current.MainWindow is MainWindow mw)
                 mw.ShowSuccess("MAC GERADO", $"Novo MAC: {formatted}");
@@ -867,6 +908,7 @@ namespace KitLugia.GUI.Pages
                     BtnApplyMac.IsEnabled = false;
                     TxtNewMac.Text = "Clique em 'Gerar' para criar um novo";
                     TxtNewMac.Foreground = _colorWarning;
+                    BtnApplyMacText.Text = "\u2705  Aplicar MAC + Reiniciar"; // volta ao rótulo padrão
                 }
                 else
                 {
@@ -975,8 +1017,6 @@ namespace KitLugia.GUI.Pages
                     adp.Id, adp.ConnectionName,
                     progress => Dispatcher.Invoke(() => TxtAutoDetectProgress.Text = progress));
 
-                BtnAutoDetectMac.IsEnabled = true;
-
                 if (result != null)
                 {
                     TxtNewMac.Text = FormatMacDisplay(result);
@@ -999,6 +1039,11 @@ namespace KitLugia.GUI.Pages
             {
                 Logger.Log($"[NETWORK] Erro em BtnAutoDetectMac_Click: {ex.Message}");
                 Logger.Log($"[NETWORK] Erro no handler: {ex.Message}");
+            }
+            finally
+            {
+                // Sempre reabilita: sem o finally, uma exceção deixava o botão travado.
+                BtnAutoDetectMac.IsEnabled = true;
             }
         }
 
@@ -1049,6 +1094,13 @@ namespace KitLugia.GUI.Pages
                         StatusCTCP.Foreground = _colorError;
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em ChkCTCP_Click: {ex.Message}");
+                StatusCTCP.Text = "Erro";
+                StatusCTCP.Foreground = _colorError;
+                mw.ShowError("CTCP", ex.Message);
             }
             finally
             {
@@ -1101,6 +1153,13 @@ namespace KitLugia.GUI.Pages
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em ChkRSS_Click: {ex.Message}");
+                StatusRSS.Text = "Erro";
+                StatusRSS.Foreground = _colorError;
+                mw.ShowError("RSS", ex.Message);
+            }
             finally
             {
                 ChkRSS.IsEnabled = true;
@@ -1152,6 +1211,13 @@ namespace KitLugia.GUI.Pages
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em ChkTaskOffload_Click: {ex.Message}");
+                StatusTaskOffload.Text = "Erro";
+                StatusTaskOffload.Foreground = _colorError;
+                mw.ShowError("TaskOffload", ex.Message);
+            }
             finally
             {
                 ChkTaskOffload.IsEnabled = true;
@@ -1202,6 +1268,13 @@ namespace KitLugia.GUI.Pages
                         StatusNetworkThrottling.Foreground = _colorError;
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em ChkNetworkThrottling_Click: {ex.Message}");
+                StatusNetworkThrottling.Text = "Erro";
+                StatusNetworkThrottling.Foreground = _colorError;
+                mw.ShowError("Network Throttling", ex.Message);
             }
             finally
             {
@@ -1257,6 +1330,13 @@ namespace KitLugia.GUI.Pages
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em ChkInterruptModeration_Click: {ex.Message}");
+                StatusInterruptModeration.Text = "Erro";
+                StatusInterruptModeration.Foreground = _colorError;
+                mw.ShowError("Interrupt Moderation", ex.Message);
+            }
             finally
             {
                 ChkInterruptModeration.IsEnabled = true;
@@ -1307,6 +1387,13 @@ namespace KitLugia.GUI.Pages
                         StatusNagle.Foreground = _colorError;
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em ChkNagle_Click: {ex.Message}");
+                StatusNagle.Text = "Erro";
+                StatusNagle.Foreground = _colorError;
+                mw.ShowError("Nagle's Algorithm", ex.Message);
             }
             finally
             {
@@ -1362,6 +1449,13 @@ namespace KitLugia.GUI.Pages
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.Log($"[NETWORK] Erro em ChkTcpRegistry_Click: {ex.Message}");
+                StatusTcpRegistry.Text = "Erro";
+                StatusTcpRegistry.Foreground = _colorError;
+                mw.ShowError("TCP Registry", ex.Message);
+            }
             finally
             {
                 ChkTcpRegistry.IsEnabled = true;
@@ -1377,11 +1471,12 @@ namespace KitLugia.GUI.Pages
             {
                 if (!(Application.Current.MainWindow is MainWindow mw)) return;
 
-                if (await mw.ShowConfirmationDialog("Deseja resetar TODAS as configura\u00e7\u00f5es de rede para o padr\u00e3o do Windows?\n\nIsso ir\u00e1 reverter todas as otimiza\u00e7\u00f5es aplicadas."))
+                if (await mw.ShowConfirmationDialog("Deseja resetar TODAS as configura\u00e7\u00f5es de rede para o padr\u00e3o do Windows?\n\nIsso ir\u00e1 reverter todas as otimiza\u00e7\u00f5es aplicadas.\nReinicie o PC ap\u00f3s o reset para efeito completo."))
                 {
                     mw.ShowInfo("RESETANDO", "Resetando pilha de rede...");
-                    await Task.Run(() => SystemTweaks.ResetEthernetSettings());
-                    mw.ShowSuccess("RESETADO", "Pilha de rede resetada com sucesso!");
+                    var (okReset, msgReset) = await Task.Run(() => SystemTweaks.ResetEthernetSettings());
+                    if (okReset) mw.ShowSuccess("RESETADO", msgReset);
+                    else mw.ShowError("RESETAR REDE", msgReset);
                 }
             }
             catch (Exception ex)

@@ -538,7 +538,7 @@
                                 <TextBlock Text="TWEAKS QUE INICIAM JUNTO COM O PC" Foreground="#FFD54F" FontSize="11" FontWeight="Bold" Margin="0,0,0,3"/>
                                 <TextBlock Text="Melhorias mantidas em segundo plano ap&#xF3;s otimiza&#xE7;&#xE3;o inicial." Foreground="#AAA" FontSize="9" Margin="0,0,0,6" TextWrapping="Wrap"/>
                                 
-                                <CheckBox x:Name="ChkStartWithWindows" Content="1. Iniciar com o Windows (Silencioso)" Foreground="White" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkStartWithWindows" Content="1. Iniciar com o Windows (SILENCIOSO)" Foreground="White" Margin="0,0,0,6" Click="ChkStartWithWindows_Click"/>
                                 <CheckBox x:Name="ChkGameBoost" Content="2. GameBoost (Prioridade M&#xE1;xima para Jogos)" Foreground="White" Margin="0,0,0,6"/>
                             </StackPanel>
                         </ScrollViewer>
@@ -826,14 +826,16 @@
                                     <TextBlock Text="&#x1F4CA; An&#xE1;lise de Lat&#xEA;ncia" Foreground="#FFD700" FontSize="14" FontWeight="Bold"/>
                                     <TextBlock Text="Me&#xE7;a DPC/ISR e obtenha recomenda&#xE7;&#xF5;es" FontSize="10" Foreground="#888"/>
                                 </StackPanel>
-                                <Button x:Name="BtnScanLatency" Grid.Column="1" Content="ANALISAR" Height="30" Width="90"
-                                        Style="{StaticResource GoldButtonStyle}"
-                                        Click="BtnScanLatency_Click" FontSize="11" FontWeight="Bold"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button x:Name="BtnDeepDrivers" Content="DRIVERS (ETW)" Height="30" Width="112"
+                                            Style="{StaticResource GoldButtonStyle}"
+                                            Click="BtnDeepDrivers_Click" FontSize="11" FontWeight="Bold" Margin="0,0,6,0"
+                                            ToolTip="Analise profunda por driver: tempo real de DPC/ISR via ETW (requer administrador)"/>
+                                    <Button x:Name="BtnScanLatency" Content="ANALISAR" Height="30" Width="90"
+                                            Style="{StaticResource GoldButtonStyle}"
+                                            Click="BtnScanLatency_Click" FontSize="11" FontWeight="Bold"/>
+                                </StackPanel>
                             </Grid>
-                            
-                            <!-- Progress Bar -->
-                            <ProgressBar x:Name="ProgressLatencyScan" Height="4" Background="#333" Foreground="#FFD700" 
-                                         Visibility="Collapsed" Margin="0,0,0,10"/>
                             
                             <!-- Results Panel -->
                             <StackPanel x:Name="PanelLatencyResults" Visibility="Collapsed">
@@ -845,33 +847,39 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Grid.Column="0" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="0,0,4,0">
                                         <StackPanel>
-                                            <TextBlock Text="ATUAL" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
-                                            <TextBlock x:Name="TxtCurrentLatency" Text="--" FontSize="16" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="&#xB5;s" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="M&#xC9;DIA" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtLatencyAvg" Text="--" FontSize="16" Foreground="#4CAF50" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="ms" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="2,0,2,0">
                                         <StackPanel>
-                                            <TextBlock Text="M&#xC9;DIA" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
-                                            <TextBlock x:Name="TxtAvgLatency" Text="--" FontSize="16" Foreground="#4CAF50" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="&#xB5;s" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="P95" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtLatencyP95" Text="--" FontSize="16" Foreground="#FFC107" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="ms" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Column="2" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="4,0,0,0">
                                         <StackPanel>
                                             <TextBlock Text="M&#xC1;X" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
-                                            <TextBlock x:Name="TxtMaxLatency" Text="--" FontSize="16" Foreground="#FF5722" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="&#xB5;s" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtLatencyMax" Text="--" FontSize="16" Foreground="#FF5722" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="ms" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
                                 </Grid>
                                 
+                                <TextBlock x:Name="TxtLatencyExtra" Text="" FontSize="10" Foreground="#888"
+                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
+
                                 <TextBlock x:Name="TxtLatencyRecommendation" Text="" FontSize="10" Foreground="#AAA" 
                                            TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 
                                 <Button x:Name="BtnApplyRecommended" Content="APLICAR RECOMENDA&#xC7;&#xD5;ES" Height="32" 
                                         Background="#4CAF50" Foreground="White" BorderThickness="0"
                                         Click="BtnApplyRecommended_Click" FontSize="11" FontWeight="Bold" Visibility="Collapsed"/>
+
+                                <TextBlock x:Name="TxtDriverReport" Text="" FontFamily="Consolas" FontSize="10" Foreground="#9CDCFE" 
+                                           TextWrapping="Wrap" Margin="0,8,0,0"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>

@@ -459,9 +459,12 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void BtnCreateRestorePoint_Click(object sender, RoutedEventArgs e)
+        private async void BtnCreateRestorePoint_Click(object sender, RoutedEventArgs e)
         {
-            if (DeepUninstaller.TryCreateRestorePoint("KitLugia: Manual Restore Point"))
+            // SRSetRestorePointW inicializa o VSS na primeira chamada: pode levar
+            // segundos. Rodar na thread da UI travava a janela inteira.
+            bool created = await Task.Run(() => DeepUninstaller.TryCreateRestorePoint("KitLugia: Manual Restore Point"));
+            if (created)
                 MessageBox.Show("✅ Ponto de restauração criado com sucesso!", "Ponto de Restauração", MessageBoxButton.OK, MessageBoxImage.Information);
             else
                 MessageBox.Show("⚠️ Não foi possível criar o ponto de restauração.\nVerifique se o serviço 'Volume Shadow Copy' está ativo.", "Ponto de Restauração", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -2364,7 +2367,7 @@ namespace KitLugia.GUI.Pages
             BtnScanExtensions.IsEnabled = true;
         }
 
-        private void BtnExportExtensions_Click(object sender, RoutedEventArgs e)
+        private async void BtnExportExtensions_Click(object sender, RoutedEventArgs e)
         {
             string src = CboSourceBrowser.SelectedItem as string ?? "";
             if (src == "" || src == "(selecione)") return;
@@ -2374,7 +2377,11 @@ namespace KitLugia.GUI.Pages
             dlg.ShowNewFolderButton = true;
             if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
-            bool ok = BrowserExtensionManager.ExportExtensions(src, dlg.SelectedPath);
+            BtnExportExtensions.IsEnabled = false;
+            TxtExtBrowserStatus.Text = $"Exportando extensões de {src}...";
+            // Cópia de centenas de MB de arquivos: só pode rodar fora da thread da UI.
+            bool ok = await Task.Run(() => BrowserExtensionManager.ExportExtensions(src, dlg.SelectedPath));
+            BtnExportExtensions.IsEnabled = true;
             MessageBox.Show(ok
                 ? $"Extensões de {src} exportadas com sucesso para:\n{dlg.SelectedPath}"
                 : $"Falha ao exportar extensões de {src}.",
@@ -2382,12 +2389,13 @@ namespace KitLugia.GUI.Pages
                 ok ? MessageBoxImage.Information : MessageBoxImage.Error);
         }
 
-        private void BtnImportExtensions_Click(object sender, RoutedEventArgs e)
+        private async void BtnImportExtensions_Click(object sender, RoutedEventArgs e)
         {
             string target = CboTargetBrowser.SelectedItem as string ?? "";
             if (target == "" || target == "(selecione)") return;
 
-            if (BrowserExtensionManager.IsBrowserRunning(target))
+            bool running = await Task.Run(() => BrowserExtensionManager.IsBrowserRunning(target));
+            if (running)
             {
                 MessageBox.Show($"Feche {target} antes de importar extensões.", "Navegador Aberto",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -2398,11 +2406,21 @@ namespace KitLugia.GUI.Pages
             dlg.Description = $"Selecione a pasta com o backup das extensões para {target}";
             if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
-            bool ok = BrowserExtensionManager.ImportExtensions(dlg.SelectedPath, target);
-            if (ok)
+            BtnImportExtensions.IsEnabled = false;
+            TxtExtBrowserStatus.Text = $"Importando extensões para {target}...";
+            // RegisterExtensionsViaCdpPipe fecha o browser com WaitForExit(3000) por
+            // processo: bloquear a UI aqui deixava o app "travado" sem resposta.
+            bool ok = await Task.Run(() =>
             {
-                try { BrowserExtensionManager.RegisterExtensionsViaCdpPipe(target); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            }
+                bool imported = BrowserExtensionManager.ImportExtensions(dlg.SelectedPath, target);
+                if (imported)
+                {
+                    try { BrowserExtensionManager.RegisterExtensionsViaCdpPipe(target); }
+                    catch (Exception ex) { Logger.LogWarning("AppsPage", $"RegisterExtensionsViaCdpPipe falhou: {ex.Message}"); }
+                }
+                return imported;
+            });
+            BtnImportExtensions.IsEnabled = true;
             MessageBox.Show(ok
                 ? $"Extensões importadas para {target} com sucesso!"
                 : $"Falha ao importar extensões para {target}. Verifique se a pasta contém o formato correto.",

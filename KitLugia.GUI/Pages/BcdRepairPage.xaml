@@ -1,0 +1,99 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:Class="KitLugia.GUI.Pages.BcdRepairPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
+      mc:Ignorable="d"
+      d:DesignHeight="750" d:DesignWidth="1050"
+      Title="Reparar Boot / BCD">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="25,20,25,20">
+
+            <!-- CABEÇALHO -->
+            <TextBlock Text="REPARAR BOOT / BCD" FontSize="26" FontWeight="Bold"
+                       Foreground="{StaticResource AccentColor}" Margin="0,0,0,5"/>
+            <TextBlock Text="Diagnostica e reconstroi a configuração de inicialização do Windows (a mesma técnica do EaseUS BootRepair: bcdboot + bootsect, com backup e verificação)."
+                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,20"/>
+
+            <!-- STATUS -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock x:Name="TxtStatusTitle" Text="PRONTO PARA ANÁLISE"
+                                   FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+                        <TextBlock x:Name="TxtStatusSub" Text="Clique em ANALISAR para verificar firmware, partição EFI, loja BCD e arquivos de boot."
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1" x:Name="BtnAnalyze" Content="🔍 ANALISAR"
+                            Width="150" Height="40" FontWeight="Bold" Click="BtnAnalyze_Click"
+                            Style="{StaticResource GoldButtonStyle}"/>
+                </Grid>
+            </Border>
+
+            <!-- RELATÓRIO -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="RELATÓRIO" Foreground="{StaticResource TextMuted}" FontSize="11"
+                               FontWeight="Bold" Margin="0,0,0,10"/>
+                    <TextBox x:Name="TxtReport" Height="230" IsReadOnly="True" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"
+                             TextWrapping="Wrap" Foreground="White" BorderThickness="0" Background="Transparent"
+                             Text="Aguardando análise..."/>
+                </StackPanel>
+            </Border>
+
+            <!-- MAPA (disco do Windows + ESP em destaque) -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="MAPA DO DISCO" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   FontWeight="Bold" VerticalAlignment="Center"/>
+                        <controls:InfoButton Margin="8,0,0,0" VerticalAlignment="Center" ToolTipText="O disco onde está o Windows, com o Windows e a partição EFI em destaque dourado. Mesma leitura do mapa do Conversor (cores por tipo + legenda). Se a ESP não aparecer aqui, o diagnóstico também não a achou — confira se a partição EFI (FAT32, ~100 MB) existe no Gerenciar Discos."/>
+                    </StackPanel>
+                    <StackPanel x:Name="PanelBcdMap">
+                        <TextBlock Text="Clique em ANALISAR para ver o disco do Windows e a partição EFI."
+                                   Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- AÇÕES -->
+            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+                    BorderThickness="1" CornerRadius="12" Padding="25" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="REPARO" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   FontWeight="Bold" VerticalAlignment="Center"/>
+                        <controls:InfoButton Margin="8,0,0,0" VerticalAlignment="Center" ToolTipText="O QUE CADA BOTÃO FAZ:&#x0a;&#x0a;RECONSTRUIR BCD = apaga a loja BCD e recria do zero com bcdboot (a técnica oficial, mesma do EaseUS). No BIOS, regrava o MBR com bootsect. Backup automático antes + verificação depois. As entradas atuais somem (inclusive as do Kit) — por isso pede confirmação e re-checa Windows+ESP antes.&#x0a;&#x0a;RESTAURAR ARQUIVOS = só recopia os .efi para a ESP, SEM tocar na BCD. Use quando a BCD está boa mas faltam arquivos.&#x0a;&#x0a;Se a ESP não tem letra, o Kit monta sozinho e desmonta depois."/>
+                    </StackPanel>
+
+                    <Button x:Name="BtnRebuild" Content="🔧 RECONSTRUIR BCD (bcdboot)"
+                            Height="44" FontWeight="Bold" Margin="0,0,0,10" Click="BtnRebuild_Click"
+                            Style="{StaticResource GoldButtonStyle}"
+                            ToolTip="Recria a loja BCD do zero a partir da instalação do Windows (bcdboot). No BIOS, também regrava o código de boot (bootsect)."/>
+
+                    <Button x:Name="BtnRestoreFiles" Content="📁 RESTAURAR ARQUIVOS DE BOOT"
+                            Height="40" Margin="0,0,0,10" Click="BtnRestoreFiles_Click"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            ToolTip="Recopia bootmgfw.efi e os arquivos de boot do Windows para a partição EFI, sem tocar na BCD."/>
+
+                    <TextBlock Foreground="#FFAA44" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Text="⚠️ A reconstrução apaga as entradas atuais da BCD (incluindo as do Kit Lugia). Um backup é criado automaticamente em %LOCALAPPDATA%\KitLugia\BCD-Backup antes de qualquer alteração."/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

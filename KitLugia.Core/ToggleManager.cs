@@ -9,86 +9,8 @@ namespace KitLugia.Core
     public static class ToggleManager
     {
         // Salvar estado de TODAS as funções do KitLugia
-        public static void SaveAllToggles()
-        {
-            try
-            {
-                using (var configKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\KitLugia\Toggles", true))
-                {
-                    if (configKey == null) return;
-                    // 1. Salvar vulnerabilidades (Guardian)
-                    var allTweaks = Guardian.GetAllTweaksDefinition();
-                    foreach (var tweak in allTweaks)
-                    {
-                        string valueKey = $"Guardian_{tweak.Name.GetHashCode()}";
-                        configKey.SetValue(valueKey, tweak.Status.ToString(), RegistryValueKind.String);
-                    }
-
-                    // 2. Salvar tweaks de sistema (SystemTweaks)
-                    SaveSystemTweaks(configKey);
-
-                    // 3. Salvar reparos aplicados (GeneralRepairManager)
-                    SaveRepairStates(configKey);
-
-                    // 4. Salvar configurações de privacidade (OOShutUpManager)
-                    SavePrivacySettings(configKey);
-
-                    Logger.Log($"Snapshot completo salvo: {allTweaks.Count} vulnerabilidades + tweaks + reparos + privacidade");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao salvar snapshot: {ex.Message}");
-            }
-        }
 
         // Restaurar estado de TODAS as funções do KitLugia
-        public static void RestoreAllToggles()
-        {
-            try
-            {
-                using (RegistryKey? configKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\KitLugia\Toggles", true))
-                {
-                    if (configKey == null) return;
-                    int restoredCount = 0;
-
-                    // 1. Restaurar vulnerabilidades (Guardian)
-                    var allTweaks = Guardian.GetAllTweaksDefinition();
-                    foreach (var tweak in allTweaks)
-                    {
-                        string valueKey = $"Guardian_{tweak.Name.GetHashCode()}";
-                        string? savedStatus = configKey.GetValue(valueKey) as string;
-
-                        if (!string.IsNullOrEmpty(savedStatus) && Enum.TryParse<TweakStatus>(savedStatus, out var status))
-                        {
-                            if (status == TweakStatus.MODIFIED)
-                            {
-                                Guardian.ToggleTweak(tweak);
-                                restoredCount++;
-                            }
-                        }
-                    }
-
-                    // 2. Restaurar tweaks de sistema
-                    if (configKey != null)
-                        RestoreSystemTweaks(configKey);
-
-                    // 3. Restaurar reparos
-                    if (configKey != null)
-                        RestoreRepairStates(configKey);
-
-                    // 4. Restaurar configurações de privacidade
-                    if (configKey != null)
-                        RestorePrivacySettings(configKey);
-
-                    Logger.Log($"Snapshot restaurado: {restoredCount} configurações revertidas");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao restaurar snapshot: {ex.Message}");
-            }
-        }
 
         // Toggle rápido para funções específicas
         public static (bool Success, string Message) QuickToggle(string functionName, bool enable)
@@ -321,19 +243,6 @@ namespace KitLugia.Core
         }
 
         // Limpar todos os snapshots
-        public static void ClearAllSnapshots()
-        {
-            try
-            {
-                Registry.CurrentUser.DeleteSubKeyTree(@"SOFTWARE\KitLugia\Toggles");
-                Registry.CurrentUser.DeleteSubKeyTree(@"SOFTWARE\KitLugia\QuickToggles");
-                Logger.Log("Todos os snapshots foram limpos");
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erro ao limpar snapshots: {ex.Message}");
-            }
-        }
 
         // Obter lista de toggles rápidos aplicados
         private static void TogglePrivacy(bool enable)

@@ -9,26 +9,7 @@ namespace KitLugia.Core
     public static class SystemInfo
     {
         [DllImport("kernel32.dll")]
-        private static extern void GetNativeSystemInfo(out SYSTEM_INFO lpSystemInfo);
-
-        [DllImport("kernel32.dll")]
         private static extern bool GetVersionEx(ref OSVERSIONINFOEX lpVersionInfo);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct SYSTEM_INFO
-        {
-            public ushort wProcessorArchitecture;
-            public ushort wReserved;
-            public uint dwPageSize;
-            public IntPtr lpMinimumApplicationAddress;
-            public IntPtr lpMaximumApplicationAddress;
-            public UIntPtr dwActiveProcessorMask;
-            public uint dwNumberOfProcessors;
-            public uint dwProcessorType;
-            public uint dwAllocationGranularity;
-            public ushort wProcessorLevel;
-            public ushort wProcessorRevision;
-        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct OSVERSIONINFOEX
@@ -126,54 +107,6 @@ namespace KitLugia.Core
             };
 
             return _cachedVersionString;
-        }
-
-        /// <summary>
-        /// Verifica se é Windows 11 ou superior
-        /// </summary>
-        public static bool IsWindows11OrLater()
-        {
-            var version = GetWindowsVersion();
-            return version == WindowsVersion.Windows11 || version == WindowsVersion.WindowsServer;
-        }
-
-        /// <summary>
-        /// Verifica se é Windows 10 ou superior
-        /// </summary>
-        public static bool IsWindows10OrLater()
-        {
-            var version = GetWindowsVersion();
-            return version == WindowsVersion.Windows10 || version == WindowsVersion.Windows11 || version == WindowsVersion.WindowsServer;
-        }
-
-        /// <summary>
-        /// Verifica se é Windows 8.1 ou superior
-        /// </summary>
-        public static bool IsWindows81OrLater()
-        {
-            var version = GetWindowsVersion();
-            return version == WindowsVersion.Windows81 || version == WindowsVersion.Windows10 || version == WindowsVersion.Windows11 || version == WindowsVersion.WindowsServer;
-        }
-
-        /// <summary>
-        /// Verifica se é Windows Server
-        /// </summary>
-        public static bool IsWindowsServer()
-        {
-            return GetWindowsVersion() == WindowsVersion.WindowsServer;
-        }
-
-        /// <summary>
-        /// Retorna o número de processadores lógicos
-        /// </summary>
-        public static int GetProcessorCount()
-        {
-            try
-            {
-                GetNativeSystemInfo(out SYSTEM_INFO sysInfo);
-                return (int)sysInfo.dwNumberOfProcessors;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return Environment.ProcessorCount; }
         }
 
         /// <summary>

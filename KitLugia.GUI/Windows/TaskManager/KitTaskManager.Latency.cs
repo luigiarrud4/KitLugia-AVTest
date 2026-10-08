@@ -95,7 +95,7 @@ namespace KitLugia.GUI.Windows.TaskManager
 
         // ══════════════ ações ══════════════
 
-        private void BtnLatToggle_Click(object sender, RoutedEventArgs e)
+        private async void BtnLatToggle_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -106,8 +106,23 @@ namespace KitLugia.GUI.Windows.TaskManager
                 }
                 else
                 {
-                    _lat.Start();
-                    TxtStatus.Text = "🎧 Latência: escutando o sistema — deixe rodar enquanto o problema acontece.";
+                    TxtStatus.Text = "🎧 Latência: iniciando a escuta...";
+                    // StartTrace/EnableTrace do kernel ETW BLOQUEIA (e sem admin falha
+                    // esperando timeout): na thread da UI a janela ficava branca.
+                    string err = await Task.Run(() =>
+                    {
+                        try { _lat.Start(); return ""; }
+                        catch (Exception ex) { return ex.Message; }
+                    });
+                    if (!string.IsNullOrEmpty(err))
+                    {
+                        TxtStatus.Text = "Não foi possível iniciar a escuta: " + err +
+                                         "  ·  o ETW do kernel exige o Gerenciador como administrador (botão 🛡️ Admin).";
+                    }
+                    else
+                    {
+                        TxtStatus.Text = "🎧 Latência: escutando o sistema — deixe rodar enquanto o problema acontece.";
+                    }
                 }
             }
             catch (Exception ex)
@@ -116,6 +131,27 @@ namespace KitLugia.GUI.Windows.TaskManager
             }
             UpdateLatState();
             RefreshLatencyUi();
+        }
+
+        /// <summary>
+        /// Liga/desliga o timer de 1 s da aba conforme ela está VISÍVEL. Antes ele ficava
+        /// ligado para sempre depois da 1ª visita: <see cref="RefreshLatencyUi"/> + o cartão
+        /// de áudio continuavam trabalhando 1x por segundo com a aba escondida, roubando CPU
+        /// das abas que o usuário realmente estava olhando.
+        /// </summary>
+        private void SetLatencyTabActive(bool active)
+        {
+            try
+            {
+                if (_latTimer == null) return;
+                if (active)
+                {
+                    if (!_latTimer.IsEnabled) _latTimer.Start();
+                    if (_lat.IsRunning) RefreshLatencyUi();
+                }
+                else if (_latTimer.IsEnabled) _latTimer.Stop();
+            }
+            catch { }
         }
 
         private void BtnLatClear_Click(object sender, RoutedEventArgs e)
@@ -361,6 +397,12 @@ namespace KitLugia.GUI.Windows.TaskManager
                 SyncLatCores(s.PerCore);
                 SyncLatProcs(s.TopHardFaults);
                 UpdateLatEmptyHint(s);
+                // Reaplica o sort clicado (padrao de qualidade: o refresh atualiza in-place
+                // e sem isto a ordem escolhida se perdia a cada tick).
+                RefreshTmGridSort(DgLatEvents);
+                RefreshTmGridSort(DgLatDrivers);
+                RefreshTmGridSort(DgLatCores);
+                RefreshTmGridSort(DgLatProcs);
             }
             catch { /* a aba nunca derruba o gerenciador */ }
         }

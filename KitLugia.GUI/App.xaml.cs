@@ -67,6 +67,10 @@ namespace KitLugia.GUI
         {
             RegisterGlobalExceptionHandlers();
 
+            // Easter egg estilo YouTube: digitar "awesome" em qualquer campo de texto do
+            // Kit deixa as bordas de todas as janelas piscando em arco-íris.
+            KitLugia.GUI.Services.EasterEggManager.Start();
+
             // Watchdog de responsividade: mede/loga travamentos da thread de UI
             // ("app não está respondendo" sob carga). Custo: 1 probe a cada 500 ms.
             KitLugia.GUI.Services.UiFreezeWatchdog.Start();
@@ -169,11 +173,12 @@ namespace KitLugia.GUI
                 catch { }
             });
 
-            // Sempre reconfigure o auto-start em TODOS os métodos (Registry Run + pasta
-            // Startup + Task Scheduler) com o executável atual — se o usuário já ativou
-            // uma vez. O CheckAndFixStartupMethods antigo só corrigia caminhos de entradas
-            // existentes; o EnsureAutoStartMethods recria o que faltar (funciona mesmo sem
-            // AppData/settings do kit na primeira execução).
+            // Garante o auto-start em TODOS os métodos (Registry Run + pasta Startup + Task
+            // Scheduler) com o executável atual. Na PRIMEIRA execução (usuário novo, sem
+            // preferência e sem nenhuma entrada gravada) isso REGISTRA o auto-start — antes
+            // o Ensure retornava sem fazer nada e o Kit nunca nascia com o Windows, exigindo
+            // o usuário abrir o app de novo manualmente. Depois disso, reconfigura o que
+            // faltar (update de caminho, cleaner que apagou entrada, etc).
             _ = Task.Run(() => KitLugia.GUI.Services.TrayIconService.EnsureAutoStartMethods());
             _ = Task.Run(() =>
             {

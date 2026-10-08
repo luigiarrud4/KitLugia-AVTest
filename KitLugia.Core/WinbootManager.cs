@@ -27,40 +27,6 @@ namespace KitLugia.Core
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         }
 
-        /// <summary>
-        /// Verifica se a ISO foi criada pelo KitLugia ISO Editor
-        /// Detecta o arquivo .kitlugia na raiz da ISO
-        /// </summary>
-        public static async Task<bool> IsKitLugiaIso(string isoPath)
-        {
-            try
-            {
-                string driveLetter = await MountIso(isoPath);
-                if (string.IsNullOrEmpty(driveLetter))
-                {
-                    return false;
-                }
-
-                string kitlugiaIdFile = Path.Combine(driveLetter, ".kitlugia");
-                bool isKitLugia = File.Exists(kitlugiaIdFile);
-
-                await DismountIso(isoPath);
-
-                if (isKitLugia)
-                {
-                    Log("ISO detectada como KitLugia ISO (arquivo .kitlugia encontrado).");
-                    Log("Preservando autounattend.xml existente.");
-                }
-
-                return isKitLugia;
-            }
-            catch (Exception ex)
-            {
-                Log($"Erro ao verificar se é ISO do KitLugia: {ex.Message}");
-                return false;
-            }
-        }
-
         public static bool IsEfiMode()
         {
             try
@@ -986,63 +952,6 @@ namespace KitLugia.Core
         }
 
         // --- DIAGNOSTICS ---
-        public static async Task<List<string>> PerformDiagnostics(string isoPath)
-        {
-            return await Task.Run(() =>
-            {
-
-                // Típico: 5-10 erros de diagnóstico
-                var errors = new List<string>(10);
-                Log("Iniciando diagnósticos de sistema...");
-
-                // 1. Admin Check
-                try
-                {
-                    using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_OperatingSystem"))
-                    {
-                        var results = searcher.Get();
-                        Log("WMI: OK (Serviço de gerenciamento funcionando)");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    errors.Add("WMI Error: Falha ao acessar informações do sistema. Rode como Admin.");
-                    Log($"ERRO WMI: {ex.Message}");
-                }
-
-                // 2. ISO Check
-                if (!string.IsNullOrEmpty(isoPath))
-                {
-                    if (File.Exists(isoPath))
-                    {
-                        var info = new FileInfo(isoPath);
-                        Log($"ISO: Encontrada ({info.Length / 1024 / 1024} MB)");
-                    }
-                    else
-                    {
-                        errors.Add("ISO: Arquivo não encontrado no caminho especificado.");
-                        Log("ERRO ISO: Arquivo inexistente.");
-                    }
-                }
-
-                // 3. Tools Check
-                string[] tools = { "diskpart.exe", "bcdedit.exe", "robocopy.exe", "powershell.exe" };
-                foreach (var tool in tools)
-                {
-                    if (File.Exists(Path.Combine(Environment.SystemDirectory, tool)) || 
-                        File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "WindowsPowerShell", "v1.0", tool)))
-                        Log($"{tool}: OK");
-                    else
-                    {
-                        errors.Add($"{tool}: Ferramenta de sistema não encontrada.");
-                        Log($"ERRO: {tool} ausente.");
-                    }
-                }
-
-
-                return errors;
-            });
-        }
 
 
         // --- BOOT SERVICE (RAMDISK — PARA ISOS/WIM LEGADO) ---
@@ -1153,84 +1062,6 @@ namespace KitLugia.Core
         // --- BOOT SERVICE (FLAT DEPLOYMENT — SEM RAMDISK) ---
 
         /// <summary>
-        /// Cria entrada BCD flat: aponta diretamente para winload.efi na partição,
-        /// sem usar ramdisk, boot.sdi ou {ramdiskoptions}.
-        /// systemroot = caminho relativo à raiz da partição (ex: \KitLugiaPE\Windows)
-        /// </summary>
-        public static async Task<string?> CreateWinpeFlatEntry(string description, string driveLetter, string efiRelPath, string systemroot)
-        {
-            Log($"Configurando entrada BCD flat: {description}...");
-            try
-            {
-                string cleanDesc = SanitizeDescription(description);
-                // Normaliza a letra da unidade: aceita "E" ou "E:" e garante "E:" (evita "E::")
-                string part = driveLetter.Trim().TrimEnd(':') + ":";
-
-                // Limpa entradas anteriores quebradas (pelo nome)
-                await CleanupOldWinpeEntries();
-
-                var (crCode, crOut) = await RunProcessCaptured("bcdedit.exe",
-                    $"/create /d \"{cleanDesc}\" /application osloader");
-                Log($"> bcdedit /create /d \"{cleanDesc}\" /application osloader");
-                if (crCode != 0)
-                {
-                    Log($"ERRO: Falha ao criar entrada BCD (código {crCode}): {crOut}");
-                    return null;
-                }
-
-                var match = Regex.Match(crOut, @"{[a-fA-F0-9-]+}");
-                if (!match.Success)
-                {
-                    Log("ERRO: Falha ao extrair GUID da saída bcdedit.");
-                    return null;
-                }
-
-                string guid = match.Value;
-                Log($"ID Criado: {guid}");
-
-                // Comandos de configuração — cada um verifica erro
-                var cmds = new[]
-                {
-                    $"bcdedit /set {guid} device partition={part}",
-                    $"bcdedit /set {guid} osdevice partition={part}",
-                    $"bcdedit /set {guid} path {efiRelPath}",
-                    $"bcdedit /set {guid} systemroot {systemroot}",
-                    $"bcdedit /set {guid} winpe yes",
-                    $"bcdedit /set {guid} detecthal yes",
-                    $"bcdedit /set {guid} recoveryenabled No",
-                    $"bcdedit /displayorder {guid} /addlast",
-                };
-
-                bool allOk = true;
-                foreach (var cmd in cmds)
-                {
-                    var parts = cmd.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-                    string exe = parts[0];
-                    string args = parts.Length > 1 ? parts[1] : "";
-                    var (code, output) = await RunProcessCaptured(exe, args);
-                    Log($"> {cmd}");
-                    if (code != 0)
-                    {
-                        Log($"  [!] Erro (código {code}): {output}");
-                        allOk = false;
-                    }
-                }
-
-                if (allOk)
-                    Log($"BCD: Entrada flat criada com sucesso. GUID: {guid}");
-                else
-                    Log($"BCD: Entrada flat criada com avisos. GUID: {guid}");
-
-                return guid;
-            }
-            catch (Exception ex)
-            {
-                Log($"ERRO BCD: {ex.Message}");
-                return null;
-            }
-        }
-
-        /// <summary>
         /// Encontra GUIDs de entradas BCD cuja descrição (linha que contém TODAS as substrings)
         /// casa o filtro. Parsing independente de idioma — bcdedit localiza os cabeçalhos
         /// (identifier/Identificador, description/Descrição), então detecta linhas de
@@ -1238,6 +1069,20 @@ namespace KitLugia.Core
         /// </summary>
         private static async Task<List<string>> FindBcdGuidsByText(params string[] mustContain)
         {
+            // ORACLE PRIMÁRIO: registry (BcdRegistry). Sem processo, sem locale, sem binário.
+            // Se a projeção HKLM\BCD00000000 existir, o resultado dela é autoritativo
+            // (inclusive quando é VAZIO — significa de fato "não há entradas").
+            if (BcdRegistry.IsAvailable())
+            {
+                var viaRegistry = await BcdRegistry.FindGuidsByTextAsync(mustContain);
+                Log($"[BCD] Leitura via registry: {viaRegistry.Count} entrada(s) casando " +
+                    $"[{string.Join(" + ", mustContain)}]");
+                foreach (var g in viaRegistry) Log($"[BCD]   {g}");
+                return viaRegistry;
+            }
+
+            // FALLBACK: bcdedit /enum all (só quando a projeção em registry não existe).
+            Log("[BCD] Projeção HKLM\\BCD00000000 indisponível — usando bcdedit /enum all (parsing multilíngue).");
             var result = new List<string>();
             try
             {
@@ -1394,50 +1239,6 @@ namespace KitLugia.Core
             }
         }
 
-        public static async Task<string?> CreateEfiBootEntry(string description, string driveLetter, string efiPath)
-        {
-            Log($"Configurando entradas BCD para EFI (Universal Chainload): {description}...");
-            try
-            {
-                string cleanDesc = SanitizeDescription(description);
-
-                // Remove bridges Linux antigos do KitLugia (não acumula no menu de boot)
-                var oldBridges = await FindBcdGuidsByText("Linux (");
-                foreach (var old in oldBridges)
-                {
-                    Log($"Removendo bridge Linux antigo: {old}");
-                    await RunProcessCaptured("bcdedit.exe", $"/delete {old} /f");
-                }
-
-                // TENTATIVA FINAL: Usar 'osloader' apontando diretamente para o Shim/Grub específico.
-                // Se isso falhar com 0xc000007b, é bloqueio do Windows Boot Manager.
-                string createResult = await RunBcdeditLogged($"/create /d \"{cleanDesc}\" /application osloader");
-                var match = Regex.Match(createResult, @"{[a-fA-F0-9-]+}");
-                if (!match.Success) return null;
-
-                string newGuid = match.Value;
-                string cleanDrive = driveLetter.Replace(":", "");
-                
-                await RunBcdeditLogged($"/set {newGuid} device partition={cleanDrive}:");
-                await RunBcdeditLogged($"/set {newGuid} path {efiPath}");
-                
-                // Configurações padrão para chainload
-                await RunBcdeditLogged($"/set {newGuid} recoveryenabled No");
-                await RunBcdeditLogged($"/set {newGuid} osdevice partition={cleanDrive}:");
-                await RunBcdeditLogged($"/set {newGuid} systemroot \\Unidentified_System"); // Placebo para satisfazer verificações
-                
-                await RunBcdeditLogged($"/displayorder {newGuid} /addlast");
-
-                Log("BCD: Configuração EFI Shim/Grub finalizada.");
-                return newGuid;
-            }
-            catch (Exception ex)
-            {
-                Log($"ERRO BCD EFI: {ex.Message}");
-                return null;
-            }
-        }
-
         public static async Task<string?> CreateLegacyBootSectorEntry(string description, string driveLetter, string binPath)
         {
             Log($"Configurando entradas BCD para Legacy BootSector: {description}...");
@@ -1539,7 +1340,7 @@ namespace KitLugia.Core
             }
 
             await proc.WaitForExitAsync().ConfigureAwait(false);
-            return (proc.ExitCode, outputTask.Result + errorTask.Result);
+            return (proc.ExitCode, await outputTask.ConfigureAwait(false) + await errorTask.ConfigureAwait(false));
         }
 
         private static string SanitizeDescription(string description)
@@ -2525,144 +2326,6 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Estratégia "Grub-First": Torna o GRUB do Linux o bootloader principal da partição,
-        /// permitindo chainload do Windows Setup. Resolve o erro 0xc000007b definitivamente.
-        /// </summary>
-        public static async Task InstallGrubAsPrimary(string driveLetter)
-        {
-            Log("Iniciando estratégia 'Grub-First' (Inversão de Bootloader)...");
-            await Task.Run(() =>
-            {
-                try
-                {
-                    string drive = driveLetter.Replace(":", "");
-                    string bootDir = $"{drive}:\\EFI\\BOOT";
-                    
-                    if (!Directory.Exists(bootDir))
-                    {
-                        Log("Diretório EFI\\BOOT não encontrado. Cancelando inversão.");
-                        return;
-                    }
-
-                    // 1. Identificar Linux Loaders disponíveis
-                    Log("1. Identificando Linux Loaders disponíveis...");
-                    string bootx64 = Path.Combine(bootDir, "BOOTX64.EFI"); 
-                    string grubPath = Path.Combine(bootDir, "grubx64.efi");
-                    
-                    // Se não tiver grubx64.efi na raiz, procurar em subpastas de distros
-                    if (!File.Exists(grubPath))
-                    {
-                        string[] possibleGrubs = { 
-                            $"{drive}:\\EFI\\ubuntu\\grubx64.efi", 
-                            $"{drive}:\\EFI\\debian\\grubx64.efi",
-                            $"{drive}:\\EFI\\fedora\\grubx64.efi",
-                            $"{drive}:\\boot\\grub\\x86_64-efi\\grub.efi"
-                        };
-                        var found = possibleGrubs.FirstOrDefault(File.Exists);
-                        if (found != null) 
-                        {
-                            Log($"Grub encontrado em {found}. Copiando para EFI\\BOOT...");
-                            File.Copy(found, grubPath, true);
-                        }
-                    }
-
-                    // 2. Detectar se o BOOTX64.EFI atual é Microsoft (bootmgr)
-                    // Bootmgr do Windows > 1.2MB; Shim do Linux < 1MB em geral
-                    bool isMicrosoftBoot = false;
-                    if (File.Exists(bootx64))
-                    {
-                        long size = new FileInfo(bootx64).Length;
-                        if (size > 1200000) isMicrosoftBoot = true;
-                    }
-
-                    if (isMicrosoftBoot)
-                    {
-                        Log("2. Bootloader atual é Windows (Bootmgr). Realizando backup...");
-                        string winBoot = Path.Combine(bootDir, "win_boot.efi");
-                        if (!File.Exists(winBoot)) File.Move(bootx64, winBoot);
-                        
-                        // Precisa colocar Shim / Grub no lugar
-                        string[] possibleShims = { 
-                            $"{drive}:\\EFI\\ubuntu\\shimx64.efi", 
-                            $"{drive}:\\EFI\\debian\\shimx64.efi",
-                            $"{drive}:\\EFI\\fedora\\shimx64.efi"
-                        };
-                        var foundShim = possibleShims.FirstOrDefault(File.Exists);
-                        if (foundShim != null)
-                        {
-                            File.Copy(foundShim, bootx64, true);
-                            Log($"Shim Linux aplicado como Bootloader Principal ({foundShim}).");
-                        }
-                        else if (File.Exists(grubPath))
-                        {
-                            File.Copy(grubPath, bootx64, true);
-                            Log("Grub usado diretamente como Bootloader Principal (sem Shim).");
-                        }
-                        else
-                        {
-                            Log("AVISO: Nenhum Shim/Grub encontrado. Revertendo backup...");
-                            string winBoot2 = Path.Combine(bootDir, "win_boot.efi");
-                            if (File.Exists(winBoot2)) File.Move(winBoot2, bootx64);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        Log("2. Bootloader já é Linux (Shim). Nenhum backup necessário.");
-                    }
-
-                    // 3. Configurar Menu GRUB para Chainload do Windows
-                    Log("3. Configurando menu GRUB com entrada para Windows...");
-                    string windowsMenuEntry = @"
-# === KitLugia Grub-First: Windows Chainload ===
-menuentry '🪟 Windows Setup / Boot Manager' --class windows {
-    insmod chain
-    if [ -f /EFI/BOOT/win_boot.efi ]; then
-        chainloader /EFI/BOOT/win_boot.efi
-    elif [ -f /EFI/Microsoft/Boot/bootmgfw.efi ]; then
-        chainloader /EFI/Microsoft/Boot/bootmgfw.efi
-    fi
-}
-";
-                    // Procurar grub.cfg existente
-                    string[] cfgPaths = { 
-                        $"{drive}:\\boot\\grub\\grub.cfg", 
-                        $"{drive}:\\EFI\\BOOT\\grub.cfg",
-                        Path.Combine(bootDir, "grub.cfg")
-                    };
-                    
-                    string? targetCfg = cfgPaths.FirstOrDefault(File.Exists);
-                    if (targetCfg != null)
-                    {
-                        string currentContent = File.ReadAllText(targetCfg);
-                        if (!currentContent.Contains("KitLugia Grub-First"))
-                        {
-                            File.AppendAllText(targetCfg, "\n" + windowsMenuEntry);
-                            Log($"Menu Windows adicionado ao {targetCfg}");
-                        }
-                        else
-                        {
-                            Log("Menu Windows já existe no grub.cfg. Pulando.");
-                        }
-                    }
-                    else
-                    {
-                        // Criar grub.cfg mínimo
-                        string newCfg = Path.Combine(bootDir, "grub.cfg");
-                        File.WriteAllText(newCfg, windowsMenuEntry);
-                        Log($"Criado grub.cfg mínimo em {newCfg}");
-                    }
-
-                    Log("Estratégia Grub-First aplicada com sucesso! Linux é agora o bootloader principal.");
-                }
-                catch (Exception ex)
-                {
-                    Log($"Erro no Grub-First: {ex.Message}");
-                }
-            });
-        }
-
-        /// <summary>
         /// Substitui o Windows Boot Manager no ESP pelo rEFInd.
         /// rEFInd auto-detecta Windows e Linux e mostra menu gráfico.
         /// Funciona em qualquer firmware UEFI (inclusive VMware) pois
@@ -2805,11 +2468,11 @@ menuentry '🪟 Windows Setup / Boot Manager' --class windows {
             // Típico: 5-15 entradas de boot
             var entries = new List<BcdEntry>(15);
 
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 try
                 {
-                    var (enumCode, enumOutput) = RunProcessCaptured("bcdedit.exe", "/enum all /v").GetAwaiter().GetResult();
+                    var (enumCode, enumOutput) = await RunProcessCaptured("bcdedit.exe", "/enum all /v").ConfigureAwait(false);
 
                     if (enumCode != 0)
                     {
@@ -5185,6 +4848,121 @@ catch {{
             }
         }
 
+        /// <summary>
+        /// Verifica que TUDO está no lugar ANTES de agendar o reboot. Sem isso, o
+        /// Windows reinicia, o WinPE sobe e nao encontra o script/config — e o usuario
+        /// vebo uma tela preta sem nenhuma explicacao.
+        ///
+        /// Inspirado no CUILogic::StartPreOSTask do EaseUS (IsFileValid + CheckRecoverDataValid):
+        /// se algo invalido, ele NAO reinicia e mostra o erro.
+        ///
+        /// Implementado em 03/10/2026 (docs/KITLUGIA_PREOS_GAPS.md §4, item B).
+        /// </summary>
+        public static async Task<(bool ok, string report)> PreOSPreflightAsync(
+            string wimPath,
+            string bcdGuid,
+            string targetDrive,
+            string? markerPath = null)
+        {
+            var fails = new List<string>();
+            var warns = new List<string>();
+            string drive = targetDrive.Replace(":", string.Empty).Trim();
+
+            // 1. O WIM existe, tem conteudo e abre?
+            try
+            {
+                if (!File.Exists(wimPath))
+                {
+                    fails.Add($"WIM nao encontrado: {wimPath}");
+                }
+                else
+                {
+                    var fi = new FileInfo(wimPath);
+                    if (fi.Length < 1024)
+                        fails.Add($"WIM corrompido/truncado ({fi.Length} bytes): {wimPath}");
+                    else
+                    {
+                        await using var fs = File.OpenRead(wimPath);
+                        var magic = new byte[8];
+                        int read = await fs.ReadAsync(magic, 0, 8);
+                        // Assinatura WIM = "MSWIM\0\0" em ASCII
+                        string sig = Encoding.ASCII.GetString(magic, 0, Math.Max(read, 0));
+                        if (!sig.StartsWith("MSWIM", StringComparison.Ordinal))
+                            fails.Add($"Arquivo nao parece um WIM (assinatura invalida: '{sig}').");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                fails.Add($"Falha ao ler o WIM: {ex.Message}");
+            }
+
+            // 2. O boot.sdi existe? Sem ele o ramdisk nao inicializa.
+            string sdi = Path.Combine(Path.GetDirectoryName(wimPath) ?? @"C:\KL_WINPE", "boot.sdi");
+            if (!File.Exists(sdi))
+                fails.Add($"boot.sdi nao encontrado: {sdi} (o ramdisk nao inicializa sem ele)");
+
+            // 3. A entrada BCD realmente existe? (leitura por registry = sem locale, sem processo)
+            if (!string.IsNullOrWhiteSpace(bcdGuid))
+            {
+                bool exists = await BcdRegistry.EntryExistsAsync(bcdGuid);
+                if (!exists && BcdRegistry.IsAvailable())
+                    fails.Add($"Entrada BCD {bcdGuid} nao foi criada (verifique o log de bcdedit).");
+                else if (!exists)
+                    warns.Add($"Nao foi possivel confirmar a entrada BCD {bcdGuid} (registry indisponivel).");
+            }
+            else
+            {
+                warns.Add("Nenhum GUID de BCD informado — a entrada pode nao ter sido criada.");
+            }
+
+            // 4. O marcador no drive alvo esta legivel? (e' o que o startnet.cmd procura)
+            if (!string.IsNullOrWhiteSpace(markerPath))
+            {
+                try
+                {
+                    if (!File.Exists(markerPath))
+                        warns.Add($"Marcador ainda ausente: {markerPath} (o WinPE pode cair no volume errado)");
+                    else if (new FileInfo(markerPath).Length == 0)
+                        warns.Add($"Marcador vazio: {markerPath}");
+                }
+                catch (Exception ex)
+                {
+                    warns.Add($"Nao foi possivel verificar o marcador: {ex.Message}");
+                }
+            }
+
+            // 5. O volume alvo existe agora?
+            try
+            {
+                if (drive.Length > 0 && !Directory.Exists($@"{drive}:\"))
+                    warns.Add($"O drive {drive}: nao esta disponivel agora (pode ser normal se for o proprio C: do WinPE).");
+            }
+            catch { /* drive invalido: apenas segue */ }
+
+            // Relatorio
+            string report;
+            if (fails.Count > 0)
+            {
+                report = "PREFLIGHT FALHOU — o reboot foi cancelado:\n"
+                    + string.Join("\n", fails.Select(f => "  [X] " + f))
+                    + (warns.Count > 0 ? "\nAvisos:\n" + string.Join("\n", warns.Select(w => "  [!] " + w)) : string.Empty);
+            }
+            else
+            {
+                report = "Preflight OK ("
+                    + $"WIM {new FileInfo(wimPath).Length / 1024 / 1024} MB"
+                    + $", boot.sdi presente, entrada BCD {(string.IsNullOrWhiteSpace(bcdGuid) ? "n/d" : "confirmada")}"
+                    + (warns.Count > 0 ? ", " + warns.Count + " aviso(s)" : string.Empty)
+                    + ").";
+                if (warns.Count > 0)
+                    report += "\n" + string.Join("\n", warns.Select(w => "  [!] " + w));
+            }
+
+            Log("[PREFLIGHT] " + report.Replace("\n", " | "));
+            return (fails.Count == 0, report);
+        }
+
         public static async Task<(bool ok, string msg)> ScheduleWinpeShrink(string targetDrive, long shrinkMB)
         {
             try
@@ -5274,6 +5052,7 @@ catch {{
                     $"startnet={prepResult.StartnetInjected}, config={prepResult.ConfigInjected}.");
 
                 // 4. Configurar bootsequence via BCD ramdisk
+                string? shrinkBcdGuid = null;
                 try
                 {
                     // Usa o nome real do arquivo (pode ser diferente se FindWimRecursive resolveu)
@@ -5283,6 +5062,7 @@ catch {{
                         $"\\KL_WINPE\\{bcdWimName}",
                         "\\KL_WINPE\\boot.sdi",
                         fixedGuid: ShrinkBcdGuid);
+                    shrinkBcdGuid = guid;
                     if (guid != null)
                     {
                         var (bsCode, _) = await RunProcessCaptured("bcdedit.exe", $"/bootsequence {guid}");
@@ -5302,6 +5082,23 @@ catch {{
                     Log($"Aviso: não foi possível configurar bootsequence: {bcdEx.Message}");
                     Log($"O usuário precisará selecionar '{bcdDesc}' manualmente no boot.");
                 }
+
+                // 4b. PREFLIGHT — não agenda reboot se algo estiver faltando.
+                //     Sem isso o Windows reinicia, o WinPE sobe e não acha script/config:
+                //     o usuário vê uma tela preta sem nenhuma explicação (docs/KITLUGIA_PREOS_GAPS.md §4).
+                var (preOk, preReport) = await PreOSPreflightAsync(
+                    wimPath,
+                    shrinkBcdGuid ?? string.Empty,
+                    drive,
+                    $@"{drive}:\{ShrinkMarkerFile}");
+                if (!preOk)
+                {
+                    return (false,
+                        "Não foi possível agendar o shrink.\n\n" + preReport +
+                        "\n\nNada foi agendado e o PC NÃO vai reiniciar. " +
+                        "Rode o botão LIMPAR BCD e tente novamente.");
+                }
+                Log("[PREFLIGHT] " + preReport);
 
                 // 5. Agenda reboot
                 Log("Reiniciando em 10 segundos...");
@@ -5340,6 +5137,224 @@ catch {{
         /// Reusado a cada execucao - nunca acumula entradas no boot manager.
         /// </summary>
         public const string InstallerBcdGuid = "{5b7d9f1e-3c4a-4e6b-8d2f-9a1c2b3d4e5f}";
+
+        /// <summary>
+        /// startnet.cmd da CONVERSÃO MBR/GPT via WinPE (estilo EaseUS PreOS: opera com o
+        /// Windows offline, sem volume em uso).
+        /// Identificação do disco: 1) pela ASSINATURA/GUID gravada no marcador (robusto —
+        /// o número do disco no WinPE pode diferir do host); 2) fallback para o número do
+        /// host com aviso no log. Depois: diskpart convert + verificação + log persistente.
+        /// Regras cmd.exe: sem parênteses em echo dentro de bloco, ASCII puro.
+        /// </summary>
+        private static string RamdiskConvertStartnetCmd(string convertTo, string diskSig)
+        {
+            string target = convertTo.Trim().ToLowerInvariant() == "mbr" ? "mbr" : "gpt";
+            // A assinatura vai para o findstr: só hex, sem risco de injeção.
+            string sig = new string(diskSig.Where(c => Uri.IsHexDigit(c) || c == '-').ToArray());
+            if (string.IsNullOrEmpty(sig)) sig = "SEM-ASSINATURA";
+            var sb = new StringBuilder();
+            sb.AppendLine("@echo off");
+            sb.AppendLine("setlocal enabledelayedexpansion");
+            sb.AppendLine("wpeinit");
+            sb.AppendLine("echo KitLugia WinPE - Disk Convert MBR-GPT - RAMDISK");
+            sb.AppendLine("ping -n 5 127.0.0.1 > nul");
+            sb.AppendLine();
+            sb.AppendLine("set CCONV=" + target);
+            sb.AppendLine("set CSIG=" + sig);
+            sb.AppendLine("set CDISK=");
+            sb.AppendLine("set MDL=");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Acha o marcador KL_CONVERT_TARGET.dat em qualquer volume ---");
+            sb.AppendLine("echo Scanning for KL_CONVERT_TARGET.dat marker...");
+            sb.AppendLine("for %%v in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do (");
+            sb.AppendLine("  if exist %%v:\\KL_CONVERT_TARGET.dat set MDL=%%v");
+            sb.AppendLine(")");
+            sb.AppendLine("if not defined MDL goto :nomarker");
+            sb.AppendLine("echo Found marker on !MDL!:");
+            sb.AppendLine("for /f \"tokens=1,2 delims==\" %%a in (!MDL!:\\KL_CONVERT_TARGET.dat) do (");
+            sb.AppendLine("  if /i \"%%a\"==\"CONVERT\" set CCONV=%%b");
+            sb.AppendLine("  if /i \"%%a\"==\"DISK\" set CDISK=%%b");
+            sb.AppendLine(")");
+            sb.AppendLine("echo Convert=!CCONV! DiskHint=!CDISK! Sig=!CSIG!");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Identifica o disco pela assinatura via uniqueid ---");
+            sb.AppendLine("for /l %%d in (0,1,7) do (");
+            sb.AppendLine("  echo select disk %%d > X:\\uid.txt");
+            sb.AppendLine("  echo uniqueid disk >> X:\\uid.txt");
+            sb.AppendLine("  diskpart /s X:\\uid.txt > X:\\uid_%%d.txt 2>&1");
+            sb.AppendLine("  findstr /i /c:\"!CSIG!\" X:\\uid_%%d.txt >nul 2>&1");
+            sb.AppendLine("  if not errorlevel 1 set CDISK=%%d");
+            sb.AppendLine(")");
+            sb.AppendLine("if not defined CDISK goto :nodisk");
+            sb.AppendLine("echo Target disk: !CDISK!");
+            sb.AppendLine();
+            sb.AppendLine("rem --- Converte via diskpart ---");
+            sb.AppendLine("echo select disk !CDISK! > X:\\conv.txt");
+            sb.AppendLine("echo convert !CCONV! >> X:\\conv.txt");
+            sb.AppendLine("diskpart /s X:\\conv.txt > X:\\conv_out.txt 2>&1");
+            sb.AppendLine("type X:\\conv_out.txt");
+            sb.AppendLine("findstr /i /c:\"successfully converted\" X:\\conv_out.txt >nul 2>&1");
+            sb.AppendLine("if errorlevel 1 goto :convfail");
+            sb.AppendLine("echo [KitLugia WinPE Convert] > X:\\result.log");
+            sb.AppendLine("echo Status: OK >> X:\\result.log");
+            sb.AppendLine("echo Disk: !CDISK! Target: !CCONV! >> X:\\result.log");
+            sb.AppendLine("goto :savelog");
+            sb.AppendLine();
+            sb.AppendLine(":convfail");
+            sb.AppendLine("echo [KitLugia WinPE Convert] > X:\\result.log");
+            sb.AppendLine("echo Status: FAIL >> X:\\result.log");
+            sb.AppendLine("echo Disk: !CDISK! Target: !CCONV! >> X:\\result.log");
+            sb.AppendLine("goto :savelog");
+            sb.AppendLine();
+            sb.AppendLine(":nodisk");
+            sb.AppendLine("echo [KitLugia WinPE Convert] > X:\\result.log");
+            sb.AppendLine("echo Status: FAIL >> X:\\result.log");
+            sb.AppendLine("echo Reason: disk not identified >> X:\\result.log");
+            sb.AppendLine("goto :savelog");
+            sb.AppendLine();
+            sb.AppendLine(":nomarker");
+            sb.AppendLine("echo [KitLugia WinPE Convert] > X:\\result.log");
+            sb.AppendLine("echo Status: FAIL >> X:\\result.log");
+            sb.AppendLine("echo Reason: marker not found >> X:\\result.log");
+            sb.AppendLine("goto :savelog");
+            sb.AppendLine();
+            sb.AppendLine(":savelog");
+            sb.AppendLine("if defined MDL copy /y X:\\result.log !MDL!:\\KitLugia_Convert_Log.txt >nul 2>&1");
+            sb.AppendLine("if defined MDL if exist !MDL!:\\KL_CONVERT_TARGET.dat del /f /q !MDL!:\\KL_CONVERT_TARGET.dat >nul 2>&1");
+            sb.AppendLine("echo Rebooting...");
+            sb.AppendLine("wpeutil reboot");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Agenda a CONVERSÃO MBR/GPT no WinPE (reboot + diskpart com Windows offline).
+        /// Para discos que o Windows em execução não libera (disco do sistema / em uso) —
+        /// o equivalente ao PreOS do EaseUS. BitLocker, dinâmico, &gt;2 TiB e offline
+        /// continuam bloqueados (nem o WinPE resolve esses).
+        /// Mesmo padrão testado do shrink: WIM + startnet + marcador + BCD ramdisk com
+        /// GUID fixo + bootsequence + preflight + reboot 10 s.
+        /// </summary>
+        public static async Task<(bool ok, string msg)> ScheduleWinpeConvertAsync(uint diskNumber, string target)
+        {
+            try
+            {
+                string tgt = target.Trim().ToLowerInvariant() == "mbr" ? "mbr" : "gpt";
+                string klWinpe = @"C:\KL_WINPE";
+                string wimPath = Path.Combine(klWinpe, "boot.wim");
+
+                // 1. WIM (mesmo auto-prepare do shrink).
+                if (!File.Exists(wimPath))
+                {
+                    string? found = FindWimRecursive(klWinpe);
+                    if (found != null)
+                    {
+                        Log($"WIM esperado não encontrado em {wimPath}, mas encontrado em: {found}");
+                        wimPath = found;
+                    }
+                    else
+                    {
+                        Log("WinPE nao preparado. Preparando automaticamente (baixar/criar boot.wim)...");
+                        var (prepOk, prepMsg) = await PrepareWinpeBoot();
+                        if (!prepOk)
+                            return (false, $"WinPE ausente e falha ao preparar automaticamente: {prepMsg}");
+                        if (!File.Exists(wimPath))
+                            return (false, "WinPE preparado, mas boot.wim nao encontrado em C:\\KL_WINPE.");
+                    }
+                }
+                WinpeBuilder.EnsureFileWritable(wimPath);
+
+                // 2. Elegibilidade (leitura pura): só o que o WinPE resolve.
+                var plan = KitLugia.Core.DiskConverterManager.Analyze(
+                    diskNumber,
+                    tgt == "mbr" ? KitLugia.Core.DiskStyle.Mbr : KitLugia.Core.DiskStyle.Gpt);
+                var (eligible, whyNot) = KitLugia.Core.DiskConverterManager.IsWinPeConvertEligible(plan);
+                if (!eligible)
+                    return (false, $"Conversão via WinPE recusada: {whyNot}");
+
+                // 3. Marcador KL_CONVERT_TARGET.dat no C: (sempre existe no host).
+                string markerContent =
+                    $"CONVERT={tgt}\nDISK={diskNumber}\nSIGNATURE={plan.CurrentSignature}\n";
+                try
+                {
+                    await File.WriteAllTextAsync(@"C:\" + ConvertMarkerFile, markerContent);
+                    Log($"Marcador escrito: C:\\{ConvertMarkerFile}");
+                }
+                catch (Exception mex)
+                {
+                    return (false, $"Não foi possível gravar o marcador em C:\\ ({mex.Message}).");
+                }
+
+                // 4. Injeta o startnet de conversão no WIM.
+                Log("Injetando script de conversão no WIM...");
+                bool scriptOk = await WinpeBuilder.UpdateWimWithScriptAsync(
+                    wimPath, RamdiskConvertStartnetCmd(tgt, plan.CurrentSignature), "startnet.cmd");
+                if (!scriptOk)
+                    Log("Aviso: nao foi possivel injetar startnet.cmd de conversão via wimlib.");
+
+                // 5. Entrada BCD ramdisk (GUID fixo, sem acumular) + bootsequence.
+                string? convGuid = null;
+                try
+                {
+                    string? guid = await CreateRamdiskEntry(
+                        "KitLugia WinPE - Convert MBR/GPT", "C",
+                        $"\\KL_WINPE\\{Path.GetFileName(wimPath)}",
+                        "\\KL_WINPE\\boot.sdi",
+                        fixedGuid: ConvertBcdGuid);
+                    convGuid = guid;
+                    if (guid != null)
+                    {
+                        var (bsCode, _) = await RunProcessCaptured("bcdedit.exe", $"/bootsequence {guid}");
+                        Log($"Bootsequence configurado para WinPE convert (código {bsCode}).");
+                        if (bsCode != 0)
+                        {
+                            Log("Bootsequence falhou; adicionando entrada ao menu de boot como fallback.");
+                            await SaveOriginalBcdTimeout();
+                            await RunProcessCaptured("bcdedit.exe", "/timeout 10");
+                            await RunProcessCaptured("bcdedit.exe", $"/displayorder {guid} /addlast");
+                        }
+                    }
+                }
+                catch (Exception bcdEx)
+                {
+                    Log($"Aviso: não foi possível configurar bootsequence: {bcdEx.Message}");
+                }
+
+                // 6. Preflight (não agenda reboot se algo faltar).
+                var (preOk, preReport) = await PreOSPreflightAsync(
+                    wimPath, convGuid ?? string.Empty, "C", @"C:\" + ConvertMarkerFile);
+                if (!preOk)
+                {
+                    return (false,
+                        "Não foi possível agendar a conversão.\n\n" + preReport +
+                        "\n\nNada foi agendado e o PC NÃO vai reiniciar.");
+                }
+                Log("[PREFLIGHT] " + preReport);
+
+                // 7. Reboot 10 s.
+                Log("Reiniciando em 10 segundos...");
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    try
+                    {
+                        var psi = new System.Diagnostics.ProcessStartInfo("shutdown", "/r /t 10 /c \"KitLugia Convert\"")
+                        {
+                            CreateNoWindow = true,
+                            UseShellExecute = true,
+                            Verb = "runas"
+                        };
+                        using var _p = System.Diagnostics.Process.Start(psi);
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                });
+
+                return (true, $"Conversão para {tgt.ToUpper()} agendada no WinPE (disco {diskNumber}). O sistema será reiniciado em 10s; o log ficará em C:\\KitLugia_Convert_Log.txt.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao agendar conversão no WinPE: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// startnet.cmd para o modo TESTE: se existir KL_SHRINK_TARGET.dat o shrink
@@ -5931,6 +5946,18 @@ catch {{
         private const string ReinstallBcdGuid = "{4d3e5f7a-2b8c-4d9e-8f0a-1c2d3e4f5a6b}";
 
         /// <summary>
+        /// Marcador da CONVERSÃO MBR/GPT via WinPE (mesmo padrão do shrink).
+        /// Contém CONVERT=gpt|mbr + DISK=N + SIGNATURE=... (rastreabilidade; a identificação
+        /// primária no WinPE é pela assinatura/GUID do disco, não pelo número).
+        /// </summary>
+        public const string ConvertMarkerFile = "KL_CONVERT_TARGET.dat";
+
+        /// <summary>
+        /// GUID fixo da entrada BCD da conversão via WinPE (entrada única, sem acumular).
+        /// </summary>
+        private const string ConvertBcdGuid = "{6c8e0f2a-4d5e-4f1a-9b2c-6d3e4f5a6b7c}";
+
+        /// <summary>
         /// Marcador na raiz da particao ALVO do Fresh Install (o WinPE procura por ele
         /// para confirmar que achou a particao certa — mesmo padrao do KL_SHRINK_TARGET.dat).
         /// </summary>
@@ -5964,36 +5991,6 @@ catch {{
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-        }
-
-        /// <summary>
-        /// Lê o último log do WinPE disponível no sistema (X:\KitLugiaPE não persiste, então usamos C:\KitLugia_WinPE_Log.txt que o startnet.cmd também grava).
-        /// Retorna string vazia se não houver log.
-        /// </summary>
-        public static string ReadLastWinpeLog()
-        {
-            try
-            {
-                // Tenta caminho persistente preferido (LocalAppData\KitLugia\WinPE\last_run.log)
-                if (File.Exists(WinpePersistentLogPath))
-                    return File.ReadAllText(WinpePersistentLogPath);
-
-                // Fallback: C:\KitLugia_WinPE_Log.txt (raiz do sistema — gravado pelo startnet.cmd dentro do WinPE)
-                string fallbackPath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\", "KitLugia_WinPE_Log.txt");
-                if (File.Exists(fallbackPath))
-                    return File.ReadAllText(fallbackPath);
-
-                // Outro fallback: X:\KitLugiaPE\result.log (acessível somente se rodando dentro do WinPE agora)
-                string xLog = @"X:\KitLugiaPE\result.log";
-                if (File.Exists(xLog))
-                    return File.ReadAllText(xLog);
-
-                return string.Empty;
-            }
-            catch (Exception ex)
-            {
-                return $"Erro ao ler log: {ex.Message}";
-            }
         }
 
         /// <summary>
@@ -6038,33 +6035,6 @@ catch {{
             // NOTA: CleanupShrinkMarker NÃO é chamado aqui para não remover o marcador
             // antes do WinPE ter chance de usá-lo. O WinPE apaga o marcador após o shrink.
             return result;
-        }
-
-        /// <summary>
-        /// Exclui todos os logs WinPE persistentes (para começar uma nova execução limpa).
-        /// </summary>
-        public static void ClearWinpeLogs()
-        {
-            try { if (File.Exists(WinpePersistentLogPath)) File.Delete(WinpePersistentLogPath); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try
-            {
-                string fallbackPath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\", "KitLugia_WinPE_Log.txt");
-                if (File.Exists(fallbackPath)) File.Delete(fallbackPath);
-            } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            try
-            {
-                foreach (var drive in DriveInfo.GetDrives())
-                {
-                    if (drive.DriveType != DriveType.Fixed && drive.DriveType != DriveType.Removable) continue;
-                    try
-                    {
-                        string fiLog = Path.Combine(drive.RootDirectory.FullName, ReinstallLogFile);
-                        if (File.Exists(fiLog)) File.Delete(fiLog);
-                    }
-                    catch { /* volume inacessivel ou protegido */ }
-                }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
         /// <summary>
@@ -6389,6 +6359,21 @@ catch {{
                 catch (Exception bcdEx)
                 {
                     Log($"Aviso: nao foi possivel configurar bootsequence: {bcdEx.Message}");
+                }
+
+                // 5b. PREFLIGHT — nao agenda reboot se o WIM/SDI/BCD nao estiverem prontos.
+                //     Mesmo padrao do shrink (docs/KITLUGIA_PREOS_GAPS.md §4, item B).
+                {
+                    string reinstallWim = File.Exists(customWim) ? customWim : baseWim;
+                    var (preOk, preReport) = await PreOSPreflightAsync(
+                        reinstallWim, ReinstallBcdGuid, targetDrive ?? "C");
+                    if (!preOk)
+                    {
+                        return (false,
+                            "Nao foi possivel agendar o Fresh Install.\n\n" + preReport +
+                            "\n\nNada foi agendado e o PC NAO vai reiniciar.");
+                    }
+                    Log("[PREFLIGHT] " + preReport);
                 }
 
                 // 6. Agenda reboot (mesmo padrao do shrink)

@@ -285,11 +285,11 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             await EnsureDevManagersAsync();
             var t1 = Task.Run(() => StoreEngine.QueryPipOutdated(_pipPath));
             var t2 = Task.Run(() => StoreEngine.QueryNpmOutdated(_npmPath));
-            var t3 = Task.Run(() => StoreEngine.QueryDotnetToolUpdates(_dotnetPath));
+            var t3 = StoreEngine.QueryDotnetToolUpdatesAsync(_dotnetPath);
             var t4 = Task.Run(() => StoreEngine.QueryCargoUpdates(_cargoPath));
             await Task.WhenAll(t1, t2, t3, t4);
             var all = new List<KitLugia.Core.KitStore.StoreApp>();
-            all.AddRange(t1.Result); all.AddRange(t2.Result); all.AddRange(t3.Result); all.AddRange(t4.Result);
+            all.AddRange(await t1); all.AddRange(await t2); all.AddRange(await t3); all.AddRange(await t4);
             return all;
         }
 
@@ -317,11 +317,11 @@ namespace KitLugia.GUI.Pages.WindowsSettings
                     var devTask = QueryDevUpdatesAsync();
 
                     await Task.WhenAll(installedTask, upgradesTask, chocoTask, appxTask, devTask);
-                    var installed = installedTask.Result;
-                    var upgrades = upgradesTask.Result;
-                    var chocoUpgs = chocoTask.Result;
-                    var appxList = appxTask.Result;
-                    var devUpgs = devTask.Result;
+                    var installed = await installedTask;
+                    var upgrades = await upgradesTask;
+                    var chocoUpgs = await chocoTask;
+                    var appxList = await appxTask;
+                    var devUpgs = await devTask;
 
                     // Merge por Id com comparação semântica de versão
                     var map = new Dictionary<string, StoreAppVM>(StringComparer.OrdinalIgnoreCase);

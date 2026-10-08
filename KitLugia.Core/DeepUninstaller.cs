@@ -830,6 +830,135 @@ namespace KitLugia.Core
             return ProhibitedLocations.Contains(normalized);
         }
 
+        /// Filhos da raiz da unidade que NUNCA podem ser pasta de instalação.
+        /// Lista EXAUSTIVA e curta de propósito: se bloquear genericamente "qualquer
+        /// filho de C:\", apps instaladas directamente em C:\ (AMD, Git, tools) deixavam
+        /// de ser limpas. Só entram as pastas que são do sistema.
+        /// </summary>
+        private static readonly HashSet<string> SystemRootChildren = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "users", "windows", "programdata", "program files", "program files (x86)",
+            "perflogs", "$recycle.bin", "system volume information", "recovery",
+            "boot", "msocache", "config.msi", "documents and settings"
+        };
+
+        /// Pastas partilhadas dentro do Program Files que nunca pertencem a uma app.
+        /// </summary>
+        private static readonly HashSet<string> SharedProgramFolders = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "common files", "common files (x86)", "windowsapps", "modifiablewindowsapps",
+            "windows nt", "microsoft.net", "microsoft shared", "microsoft visual studio"
+        };
+
+        /// <summary>
+        /// NUNCA usar uma raiz ampla como "pasta de instalação" do scan (05/10/2026).
+        ///
+        /// BUG REAL (o que o utilizador viu ao desinstalar o OneDrive):
+        /// ScanLeftoverFiles fazia, SEM NENHUMA GUARDA:
+        ///     results.Add(installLocation);
+        ///     EnumerateFiles(installLocation, AllDirectories) -> results.Add(f)
+        /// Se o Uninstall key devolvesse algo como "C:\Program Files\OneDrive.exe",
+        /// o GetDirectoryName dava "C:\Program Files" e a varredura enumerava o
+        /// Program Files INTEIRO, recursivamente, listando o programa de todas as
+        /// outras apps.
+        ///
+        /// E o pior: a defesa da fase de limpeza (IsProhibitedLocation) compara o
+        /// caminho EXACTO, por isso bloqueava "C:\Program Files" mas deixava passar
+        /// "C:\Program Files\Mozilla\firefox.exe". A lista ficava cheia de ficheiros
+        /// de terceiros que depois eram apagados a sério.
+        ///
+        /// Cortamos na ORIGEM. As regras sao ESPECÍFICAS de propósito — a primeira
+        /// versão bloqueava "tudo dentro de uma shell folder" e thereby impedia
+        /// qualquer app em C:\Program Files\<Nome> de ser limpa (apanhado pelo
+        /// harness tests/appguard).
+        /// </summary>
+        private static bool IsTooBroadAsInstallRoot(string? fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath)) return true;
+
+            string p;
+            try { p = Path.GetFullPath(fullPath.Trim().Trim('"')); }
+            catch { return true; }
+            p = p.TrimEnd('\\');
+            if (string.IsNullOrEmpty(p)) return true;
+
+            // 1) raiz da unidade (C:\)
+            string? root = Path.GetPathRoot(p);
+            if (string.IsNullOrEmpty(root)) return true;
+            if (p.Equals(root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return true;
+
+            // 2) a propria raiz de uma shell folder (Program Files, ProgramData, AppData, perfil, Windows)
+            if (ProhibitedLocations.Contains(p)) return true;
+
+            string? parentOfP = Directory.GetParent(p)?.FullName?.TrimEnd('\\');
+            string leaf = Path.GetFileName(p) ?? "";
+            string parentLeaf = !string.IsNullOrEmpty(parentOfP) ? (Path.GetFileName(parentOfP) ?? "") : "";
+
+            // 3) filho direto da unidade que e' do sistema (C:\Users, C:\Windows, C:\ProgramData...)
+            if (SystemRootChildren.Contains(leaf) &&
+                string.Equals(parentOfP, root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // 4) pasta partilhada (Common Files, WindowsApps...)
+            if (SharedProgramFolders.Contains(leaf)) return true;
+
+            // 5) algo DENTRO de uma pasta partilhada (Common Files\Microsoft Shared\X)
+            if (SharedProgramFolders.Contains(parentLeaf)) return true;
+
+            // 6) o contentor %LOCALAPPDATA%\Programs: e' onde o Windows instala as
+            //    apps POR UTILIZADOR (Git, Python, VS Code...). A pasta em si e'
+            //    ampla demais para ser raiz de um scan - mas as apps lá dentro tem
+            //    de continuar a poder ser limpas, por isso so' o contentor e' bloqueado.
+            if (string.Equals(leaf, "programs", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrEmpty(parentOfP) && ProhibitedLocations.Contains(parentOfP))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// DEFESA EM PROFUNDIDADE (05/10/2026).
+        ///
+        /// IsProhibitedLocation compara o caminho EXACTO, por isso
+        /// "C:\Program Files" estava bloqueado mas "C:\Program Files\Mozilla\firefox.exe"
+        /// passava. Um item cujo PAIO direto e' uma raiz de sistema nunca deve ser
+        /// apagado: e' a assinatura de um scan que se enganou e despejou ficheiros
+        /// soltos na raiz de uma pasta partilhada.
+        ///
+        /// Nao substitui a guarda da origem (IsTooBroadAsInstallRoot) — esta cobre
+        /// qualquer outro ponto de entrada que ainda nao tenhamos auditado.
+        /// Trade-off aceito: uma app instalada directamente em C:\Program Files
+        /// (sem subpasta propria) deixa de ser limpa. Isso e' ma pratica e e' melhor
+        /// do que arriscar o sistema.
+        /// </summary>
+        private static bool IsDirectlyInsideCriticalRoot(string fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath)) return true;
+
+            string normalized;
+            try { normalized = Path.GetFullPath(fullPath.Trim().Trim('"')).TrimEnd('\\'); }
+            catch { return true; }
+
+            // A propria raiz da unidade (C:\) e' o caso limite: nao tem pai, por isso
+            // tem de ser rejeitada explicitamente em vez de confiar no GetParent.
+            string rootTrim = (Path.GetPathRoot(normalized) ?? "").TrimEnd('\\');
+            if (string.IsNullOrEmpty(rootTrim)) return true;
+            if (normalized.Equals(rootTrim, StringComparison.OrdinalIgnoreCase)) return true;
+
+            string? parent = Directory.GetParent(normalized)?.FullName?.TrimEnd('\\');
+            if (string.IsNullOrEmpty(parent)) return true;
+
+            // 1) o pai direto e' uma raiz de shell (Program Files, AppData, perfil, Windows)
+            if (ProhibitedLocations.Contains(parent)) return true;
+
+            // 2) ficheiro solto na raiz da unidade numa pasta de sistema (C:\Windows\foo.dll)
+            if (parent.Equals(rootTrim, StringComparison.OrdinalIgnoreCase) &&
+                SystemRootChildren.Contains(Path.GetFileName(normalized) ?? ""))
+                return true;
+
+            return false;
+        }
+
         private static bool IsKitLugiaSelfPath(string fullPath)
         {
             if (string.IsNullOrEmpty(KitLugiaInstallPath) || string.IsNullOrEmpty(fullPath)) return false;
@@ -867,42 +996,6 @@ namespace KitLugia.Core
             "NGX", "RTXDI", "Streamline"
         };
 
-        public static List<string> FindProgramFilesOrphans()
-        {
-            var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var knownLocations = GetAllInstallLocations();
-
-            string[] pfDirs =
-            {
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Programs"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs"),
-            };
-
-            foreach (var pf in pfDirs)
-            {
-                if (string.IsNullOrEmpty(pf) || !Directory.Exists(pf)) continue;
-                try
-                {
-                    foreach (var dir in Directory.GetDirectories(pf, "*", System.IO.SearchOption.TopDirectoryOnly))
-                    {
-                        string name = Path.GetFileName(dir);
-                        if (string.IsNullOrEmpty(name)) continue;
-                        if (name.StartsWith("Windows", StringComparison.OrdinalIgnoreCase)) continue;
-                        if (SystemFolderNames.Contains(name)) continue;
-
-                        bool known = knownLocations.Any(k =>
-                            dir.StartsWith(k, StringComparison.OrdinalIgnoreCase));
-                        if (!known)
-                            results.Add(dir);
-                    }
-                }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            }
-            return results.OrderBy(f => f).ToList();
-        }
-
         // -- Scanning ---------------------------------------------
 
         // Safety guard: minimum name length to prevent Sift4 false positives on short/generic names
@@ -939,15 +1032,29 @@ namespace KitLugia.Core
             // InstallLocation � add the dir AND enumerate its contents (exe, dll, etc.)
             if (!string.IsNullOrEmpty(installLocation) && Directory.Exists(installLocation))
             {
-                results.Add(installLocation);
-                try
+                // GUARRA CRITICA: nunca varrer uma raiz ampla. Sem isto, um
+                // InstallLocation malformado (ex.: o registry devolver
+                // "C:\Program Files") enumerava recursivamente a pasta inteira e
+                // metia na lista os ficheiros de TODAS as outras apps. Ver o
+                // comentário de IsTooBroadAsInstallRoot para o caso do OneDrive.
+                if (IsTooBroadAsInstallRoot(installLocation))
                 {
-                    foreach (var f in Directory.EnumerateFiles(installLocation, "*", System.IO.SearchOption.AllDirectories))
-                        results.Add(f);
-                    foreach (var d in Directory.EnumerateDirectories(installLocation, "*", System.IO.SearchOption.AllDirectories))
-                        results.Add(d);
+                    Logger.LogWarning("ScanLeftoverFiles",
+                        $"InstallLocation amplo IGNORADO para '{displayName}': '{installLocation}'. " +
+                        "A lista vai usar apenas AppData e a pesquisa com confianca.");
                 }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                else
+                {
+                    results.Add(installLocation);
+                    try
+                    {
+                        foreach (var f in Directory.EnumerateFiles(installLocation, "*", System.IO.SearchOption.AllDirectories))
+                            results.Add(f);
+                        foreach (var d in Directory.EnumerateDirectories(installLocation, "*", System.IO.SearchOption.AllDirectories))
+                            results.Add(d);
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                }
             }
             LogScanStage("  InstallLocation walk", stage);
 
@@ -1168,20 +1275,6 @@ namespace KitLugia.Core
                 _userExclusions.Add(norm);
                 SaveExclusions();
             }
-        }
-
-        public static bool RemoveUserExclusion(string pathOrSubstring)
-        {
-            LoadExclusionsIfNeeded();
-            bool removed = _userExclusions.RemoveAll(e => e.Equals(pathOrSubstring, StringComparison.OrdinalIgnoreCase)) > 0;
-            if (removed) SaveExclusions();
-            return removed;
-        }
-
-        public static void ClearUserExclusions()
-        {
-            _userExclusions.Clear();
-            SaveExclusions();
         }
 
         private static void LoadExclusionsIfNeeded()
@@ -3090,6 +3183,11 @@ namespace KitLugia.Core
 
                     // Prohibited-location check: never delete system paths
                     if (IsProhibitedLocation(file))
+                        continue;
+
+                    // Defesa em profundidade: item com o PAIO direto numa raiz de
+                    // sistema (ex.: C:\Program Files\somefile.dll) nunca e' residuo.
+                    if (IsDirectlyInsideCriticalRoot(file))
                         continue;
 
                     // System folder check (additional guard)

@@ -1,7 +1,9 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
@@ -21,6 +23,62 @@ namespace KitLugia.Core
             public string Speed { get; set; } = "";
             public bool IsUp { get; set; }
             public bool SupportsSpoofing { get; set; }
+        }
+
+        // =================================================================
+        // SNAPSHOT AO VIVO (.NET) — substitui os 2 processos PowerShell por
+        // adaptador que antes eram disparados a CADA chamada (load da página +
+        // tick de 3s = dezenas de spawns de powershell.exe por minuto).
+        // Dado equivalente: Get-NetAdapter .MacAddress / .Status -eq 'Up'.
+        // =================================================================
+
+        private static Dictionary<string, (string Mac, bool IsUp)> BuildLiveInterfaceIndex()
+        {
+            var index = new Dictionary<string, (string, bool)>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    string mac = "";
+                    try
+                    {
+                        var bytes = ni.GetPhysicalAddress().GetAddressBytes();
+                        if (bytes.Length == 6 && !bytes.All(b => b == 0))
+                            mac = string.Concat(bytes.Select(b => b.ToString("X2")));
+                    }
+                    catch { /* interface sem endereço físico legível */ }
+
+                    bool isUp = ni.OperationalStatus == OperationalStatus.Up;
+
+                    void Add(string key)
+                    {
+                        if (!string.IsNullOrWhiteSpace(key) && !index.ContainsKey(key))
+                            index[key] = (mac, isUp);
+                    }
+
+                    Add(ni.Name);                   // nome amigável (="Ethernet") = ConnectionName
+                    Add(ni.Description);            // descrição = DriverDesc
+                    Add(ni.Id.Trim('{', '}'));      // GUID = NetCfgInstanceId
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ℹ️ AdapterManager (live index): {ex.Message}");
+            }
+            return index;
+        }
+
+        private static (string Mac, bool IsUp) LookupLive(
+            Dictionary<string, (string Mac, bool IsUp)> index,
+            string connectionName, string driverDesc, string netCfgInstanceId)
+        {
+            if (!string.IsNullOrWhiteSpace(connectionName) && index.TryGetValue(connectionName, out var v))
+                return v;
+            if (!string.IsNullOrWhiteSpace(driverDesc) && index.TryGetValue(driverDesc, out v))
+                return v;
+            if (!string.IsNullOrWhiteSpace(netCfgInstanceId) && index.TryGetValue(netCfgInstanceId.Trim('{', '}'), out v))
+                return v;
+            return ("", false);
         }
 
         /// <summary>
@@ -64,6 +122,10 @@ namespace KitLugia.Core
                 var classKeyPath = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}";
                 using var classKey = localMachine.OpenSubKey(classKeyPath);
                 if (classKey == null) return adapters;
+
+                // Snapshot ao vivo UMA vez por chamada (0 PowerShell;
+                // antes: 2 spawns por adaptador, a cada chamada).
+                var liveIndex = BuildLiveInterfaceIndex();
 
                 foreach (var subKeyName in classKey.GetSubKeyNames().OrderBy(x => x))
                 {
@@ -133,31 +195,13 @@ namespace KitLugia.Core
                         var customMac = adapterKey.GetValue("NetworkAddress")?.ToString() ?? "";
                         var speed = adapterKey.GetValue("*Speed")?.ToString() ?? "";
 
-                        // SEMPRE tenta Get-NetAdapter primeiro (MAC real ao vivo)
-                        var liveMac = "";
-                        try
-                        {
-                            var macResult = SystemUtils.RunExternalProcess("powershell",
-                                $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName.Replace("'", "''")}' -ErrorAction SilentlyContinue).MacAddress\"",
-                                hidden: true);
-                            if (!string.IsNullOrWhiteSpace(macResult) && macResult.Length >= 12)
-                                liveMac = macResult.Trim().ToUpper().Replace("-", "").Replace(":", "");
-                        }
-                        catch { /* Get-NetAdapter indisponível/sem permissão — cai para o registro */ }
+                        // MAC ao vivo + Status via snapshot .NET (equivalente a
+                        // Get-NetAdapter .MacAddress/.Status, mas sem processo algum).
+                        var (liveMac, isUp) = LookupLive(liveIndex, connectionName, driverDesc, netCfgInstanceId);
 
-                        // Se falhou Get-NetAdapter, tenta registro NetworkAddress (custom)
-                        // Se ambos falham, usa "00" como placeholder
+                        // Sem MAC ao vivo (adaptador desabilitada / endereço zerado):
+                        // usa o NetworkAddress (custom) do registro.
                         var currentMac = !string.IsNullOrEmpty(liveMac) ? liveMac : customMac;
-
-                        var isUp = false;
-                        try
-                        {
-                            var statusResult = SystemUtils.RunExternalProcess("powershell",
-                                $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName.Replace("'", "''")}' -ErrorAction SilentlyContinue).Status -eq 'Up'\"",
-                                hidden: true);
-                            isUp = statusResult.Trim().Equals("True", StringComparison.OrdinalIgnoreCase);
-                        }
-                        catch { /* mesmo fallback do MAC */ }
 
                         var permanentMac = GetPermanentMac(subKeyName, netCfgInstanceId, connectionName);
                         var (supportsSpoofing, _) = CheckNetworkAddressSupport(subKeyName);
@@ -320,9 +364,21 @@ namespace KitLugia.Core
                 var result = SystemUtils.RunExternalProcess("netsh",
                     $"interface set interface name=\"{connectionName}\" admin={state}", hidden: true);
 
-                if (result.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+                // Marcadores bilíngues (pt-BR/en). O netsh retorna exit0 até para nome
+                // inexistente, então a saída é a única pista — o check antigo só tinha
+                // "não" e perdia "No more data is available" / "not found" em inglês.
+                bool failed =
+                    result.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+                    result.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
                     result.Contains("não", StringComparison.OrdinalIgnoreCase) ||
-                    result.Contains("fail", StringComparison.OrdinalIgnoreCase))
+                    result.Contains("negado", StringComparison.OrdinalIgnoreCase) ||
+                    result.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+                    result.Contains("no more data", StringComparison.OrdinalIgnoreCase) ||
+                    result.Contains("cannot", StringComparison.OrdinalIgnoreCase) ||
+                    result.Contains("invalid", StringComparison.OrdinalIgnoreCase) ||
+                    result.Contains("denied", StringComparison.OrdinalIgnoreCase);
+
+                if (failed)
                     return (false, $"Falha ao {(enable ? "habilitar" : "desabilitar")} adaptador: {result.Trim()}");
 
                 return (true, $"Adaptador {(enable ? "habilitado" : "desabilitado")} com sucesso.");
@@ -358,23 +414,16 @@ namespace KitLugia.Core
             }
         }
 
-        /// <summary>
-        /// Versão síncrona para compatibilidade.
-        /// </summary>
-        public static (bool Success, string Message) RestartAdapter(string connectionName)
-        {
-            return Task.Run(() => RestartAdapterAsync(connectionName)).GetAwaiter().GetResult();
-        }
-
         public static string GetCurrentMac(string connectionName)
         {
+            if (string.IsNullOrWhiteSpace(connectionName)) return "";
             try
             {
-                var macResult = SystemUtils.RunExternalProcess("powershell",
-                    $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName}' -ErrorAction SilentlyContinue).MacAddress\"",
-                    hidden: true);
-                if (!string.IsNullOrWhiteSpace(macResult) && macResult.Length >= 12)
-                    return macResult.Trim().ToUpper().Replace("-", "").Replace(":", "");
+                // Ao vivo via .NET — mesmo dado do Get-NetAdapter .MacAddress,
+                // porém sem spawn de PowerShell (era chamado várias vezes por auto-detect).
+                var index = BuildLiveInterfaceIndex();
+                if (index.TryGetValue(connectionName, out var live) && !string.IsNullOrEmpty(live.Mac))
+                    return live.Mac;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return "";
@@ -390,57 +439,106 @@ namespace KitLugia.Core
             return (live == expected, live);
         }
 
+        // Cache de PermanentAddress por adaptador (MAC de fábrica não muda).
+        private static readonly ConcurrentDictionary<string, string> _permanentMacCache = new();
+
+        // Tabela única: UM processo PowerShell para TODOS os adaptadores (antes: 1 por
+        // adaptador, a cada chamada). Chaves: InterfaceGuid (NetCfgInstanceId) e Name —
+        // ambos ASCII, imunes a problemas de encoding da saída do PowerShell.
+        private static readonly Lazy<Dictionary<string, string>> _permanentMacTable = new(() =>
+        {
+            var table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var (exitCode, output) = SystemUtils.RunExternalProcessWithCode("powershell",
+                    "-NoProfile -Command \"Get-NetAdapter | ForEach-Object { $_.InterfaceGuid.ToString() + '|' + $_.Name + '|' + $_.PermanentAddress }\"",
+                    hidden: true);
+                if (exitCode == 0 && !string.IsNullOrWhiteSpace(output))
+                {
+                    foreach (var line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var parts = line.Split(new[] { '|' }, 3);
+                        if (parts.Length != 3) continue;
+                        var mac = parts[2].Trim().Replace("-", "").Replace(":", "").ToUpperInvariant();
+                        if (mac.Length != 12) continue;
+                        var guid = parts[0].Trim().Trim('{', '}');
+                        if (guid.Length > 0) table.TryAdd(guid, mac);
+                        var name = parts[1].Trim();
+                        if (name.Length > 0) table.TryAdd(name, mac);
+                    }
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            return table;
+        });
+
         /// <summary>
         /// Lê o MAC permanente de fábrica do adaptador.
         /// Fontes (em ordem de confiabilidade):
-        /// 1. PowerShell Get-NetAdapter .PermanentAddress
+        /// 1. Tabela única Get-NetAdapter .PermanentAddress (1 PS por processo, cacheada)
         /// 2. Registry NetworkSetup2\Interfaces\{GUID}\Kernel\PermanentAddress
         /// 3. Registry Class key OriginalNetworkAddress
         /// </summary>
         public static string GetPermanentMac(string adapterId, string netCfgInstanceId, string connectionName)
         {
-            // Fonte 1: Get-NetAdapter (mais confiável, retorna o PermanentAddress real)
+            // Cache: o MAC de fábrica é imutável. Sem ele, cada refresh de 3s
+            // disparava 1 PowerShell POR adaptador só para ler PermanentAddress.
+            if (_permanentMacCache.TryGetValue(adapterId, out var cached))
+                return cached;
+
+            string result = "";
+
+            // Fonte 1: tabela única Get-NetAdapter (UM processo PS para TODOS os adaptadores)
             try
             {
-                var psResult = SystemUtils.RunExternalProcess("powershell",
-                    $"-NoProfile -Command \"(Get-NetAdapter -Name '{connectionName.Replace("'", "''")}' -ErrorAction SilentlyContinue).PermanentAddress\"",
-                    hidden: true);
-                if (!string.IsNullOrWhiteSpace(psResult) && psResult.Length >= 12)
-                    return psResult.Trim().ToUpper().Replace("-", "").Replace(":", "");
+                if (result.Length < 12 && !string.IsNullOrEmpty(netCfgInstanceId) &&
+                    _permanentMacTable.Value.TryGetValue(netCfgInstanceId.Trim('{', '}'), out var byGuid))
+                    result = byGuid;
+                if (result.Length < 12 && !string.IsNullOrEmpty(connectionName) &&
+                    _permanentMacTable.Value.TryGetValue(connectionName, out var byName))
+                    result = byName;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             // Fonte 2: Registry NetworkSetup2 → Kernel → PermanentAddress
-            try
+            if (result.Length < 12)
             {
-                using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                var setup2Path = $@"SYSTEM\ControlSet001\Control\NetworkSetup2\Interfaces\{netCfgInstanceId}\Kernel";
-                using var kernelKey = localMachine.OpenSubKey(setup2Path);
-                if (kernelKey != null)
+                try
                 {
-                    var permAddr = kernelKey.GetValue("PermanentAddress")?.ToString();
-                    if (!string.IsNullOrWhiteSpace(permAddr) && permAddr.Length >= 12)
-                        return permAddr.ToUpper().Replace("-", "").Replace(":", "");
+                    using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                    var setup2Path = $@"SYSTEM\ControlSet001\Control\NetworkSetup2\Interfaces\{netCfgInstanceId}\Kernel";
+                    using var kernelKey = localMachine.OpenSubKey(setup2Path);
+                    if (kernelKey != null)
+                    {
+                        var permAddr = kernelKey.GetValue("PermanentAddress")?.ToString();
+                        if (!string.IsNullOrWhiteSpace(permAddr) && permAddr.Length >= 12)
+                            result = permAddr.ToUpper().Replace("-", "").Replace(":", "");
+                    }
                 }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             // Fonte 3: OriginalNetworkAddress (backup automático do Windows antes de aplicar spoof)
-            try
+            if (result.Length < 12)
             {
-                using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                var classPath = $@"SYSTEM\CurrentControlSet\Control\Class\{{4d36e972-e325-11ce-bfc1-08002be10318}}\{adapterId}";
-                using var adapterKey = localMachine.OpenSubKey(classPath);
-                if (adapterKey != null)
+                try
                 {
-                    var original = adapterKey.GetValue("OriginalNetworkAddress")?.ToString();
-                    if (!string.IsNullOrWhiteSpace(original) && original.Length >= 12)
-                        return original.ToUpper().Replace("-", "").Replace(":", "");
+                    using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                    var classPath = $@"SYSTEM\CurrentControlSet\Control\Class\{{4d36e972-e325-11ce-bfc1-08002be10318}}\{adapterId}";
+                    using var adapterKey = localMachine.OpenSubKey(classPath);
+                    if (adapterKey != null)
+                    {
+                        var original = adapterKey.GetValue("OriginalNetworkAddress")?.ToString();
+                        if (!string.IsNullOrWhiteSpace(original) && original.Length >= 12)
+                            result = original.ToUpper().Replace("-", "").Replace(":", "");
+                    }
                 }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-            return "";
+            if (result.Length >= 12)
+                _permanentMacCache[adapterId] = result; // cacheia só acerto (falha pode ser temporária)
+            return result;
         }
 
         /// <summary>
@@ -551,24 +649,6 @@ namespace KitLugia.Core
         // =================================================================
         // OUI MIRROR MODE — mantém os primeiros 3 bytes (fabricante real)
         // =================================================================
-        public static string GenerateMirroredMac(string originalMac)
-        {
-            var clean = originalMac.Replace(":", "").Replace("-", "").ToUpperInvariant();
-            if (clean.Length < 6) return GenerateRandomMac();
-            string oui = clean[..6];
-            var rng = Random.Shared;
-            var nic = rng.Next(0x1000000).ToString("X6");
-            string mac = oui + nic;
-            // Garantir unicast (bit0=0) + locally administered (bit1=1) → 2º char = 2/6/A/E
-            char c = mac[1];
-            mac = mac[..1] + (c switch
-            {
-                '0' => '2', '1' => '3', '4' => '6', '5' => '7',
-                '8' => 'A', '9' => 'B', 'C' => 'E', 'D' => 'F',
-                _ => c
-            }) + mac[2..];
-            return mac;
-        }
 
         // =================================================================
         // AUTO-DETECT MAC — tenta MACs até um funcionar no adaptador
@@ -651,11 +731,5 @@ namespace KitLugia.Core
         // =================================================================
         // DHCP REFRESH — libera e renova IP
         // =================================================================
-        public static string BuildDhcpRefreshScript(string adapterName)
-        {
-            if (string.IsNullOrEmpty(adapterName))
-                return "ipconfig /release && ipconfig /renew";
-            return $@"ipconfig /release ""{adapterName}"" && ipconfig /renew ""{adapterName}""";
-        }
     }
 }

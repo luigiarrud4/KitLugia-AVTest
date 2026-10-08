@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,6 +45,7 @@ namespace KitLugia.GUI.Pages
         private void DashboardPage_Loaded(object sender, RoutedEventArgs e)
         {
             _ = LoadSystemInfo();
+            LoadCreatorTweaks();
         }
 
 
@@ -482,13 +484,14 @@ namespace KitLugia.GUI.Pages
                             {
                                 CpuPriority = customProfile.CpuPriority,
                                 IoPriorityLevel = customProfile.IoPriority,
-                                PagePriorityLevel = customProfile.PagePriority,
+                                // Indice do ComboBox -> escala real (1=VERY_LOW..5=NORMAL).
+                                PagePriorityLevel = Services.TrayIconService.PagePriorityFromIndex(customProfile.PagePriority),
                                 TimerBoost = customProfile.TimerResolution,
                                 EcoQoSEnabled = customProfile.EcoQoS,
                                 ProBalance = customProfile.ProBalanceEnabled,
                                 ProBalanceCpuThreshold = customProfile.ProBalanceThreshold,
                                 NetworkBoost = customProfile.NetworkBoost,
-                                ThreadMemoryPriority = customProfile.ThreadMemoryPriority,
+                                ThreadMemoryPriority = Services.TrayIconService.ThreadMemoryPriorityFromIndex(customProfile.ThreadMemoryPriority),
                                 ThreadEfficiencyMode = customProfile.ThreadEfficiencyMode,
                                 GameClassInfo = customProfile.GameClassInfo,
                                 Win32PrioritySeparation = customProfile.Win32PrioritySeparation
@@ -547,10 +550,14 @@ namespace KitLugia.GUI.Pages
             CmbGameEngine.Items.Clear();
             _customProfiles.Clear();
 
-            var v1 = new ComboBoxItem { Content = "🟢 V1 - Original Plus (Win32Priority)", Tag = "1", Foreground = System.Windows.Media.Brushes.White };
-            var v2 = new ComboBoxItem { Content = "🟡 V2 - FPS Estável Plus (P-Cores+GameMode)", Tag = "2", Foreground = System.Windows.Media.Brushes.White };
-            var v3 = new ComboBoxItem { Content = "🔴 V3 - Extremo Plus (Tudo no máximo)", Tag = "3", Foreground = System.Windows.Media.Brushes.White };
-            var v4 = new ComboBoxItem { Content = "💥 V4 - Extreme Pro (RealTime)", Tag = "4", Foreground = System.Windows.Media.Brushes.Orange };
+            // Automatico PRIMEIRO: e o padrao do servico e o recomendado. Os V1-V4 ficam
+            // como legado (o rotulo "V4 - RealTime" era mentira: o V4 removeu o RealTime).
+            var auto = new ComboBoxItem { Content = "🤖 Automático (RECOMENDADO)", Tag = "5", Foreground = System.Windows.Media.Brushes.LightGreen };
+            var v1 = new ComboBoxItem { Content = "🟢 V1 - Original Plus (legado)", Tag = "1", Foreground = System.Windows.Media.Brushes.White };
+            var v2 = new ComboBoxItem { Content = "🟡 V2 - FPS Estável Plus (legado)", Tag = "2", Foreground = System.Windows.Media.Brushes.White };
+            var v3 = new ComboBoxItem { Content = "🔴 V3 - Extremo Plus (legado)", Tag = "3", Foreground = System.Windows.Media.Brushes.White };
+            var v4 = new ComboBoxItem { Content = "💥 V4 - Performance Pro (legado)", Tag = "4", Foreground = System.Windows.Media.Brushes.Orange };
+            CmbGameEngine.Items.Add(auto);
             CmbGameEngine.Items.Add(v1);
             CmbGameEngine.Items.Add(v2);
             CmbGameEngine.Items.Add(v3);
@@ -667,8 +674,10 @@ namespace KitLugia.GUI.Pages
                     mw.TrayService.GamePriorityEnabled = ChkGameBoost.IsChecked == true;
                     mw.TrayService.SaveSettings();
 
-                    KitLugia.GUI.Services.TrayIconService.SetAutoStart(ChkStartWithWindows.IsChecked == true);
-                    
+                    // NÃO grava o auto-start aqui: esta rotina roda no "1-clique Otimizar" e
+                    // o ChkStartWithWindows pode ainda estar desmarcado (quick menu nunca
+                    // aberto) — isso chamava SetAutoStart(false) e APAGAVA as 3 vias.
+                    // O auto-start só muda por clique do usuário (ChkStartWithWindows_Click).
 
                     KitLugia.Core.Logger.Log($"🎮 Dashboard: GameBoost {(ChkGameBoost.IsChecked == true ? "ativado" : "desativado")}");
                 }
@@ -953,6 +962,8 @@ namespace KitLugia.GUI.Pages
                 TxtBenchmarkLog.Text = "";
                 BtnCancelBenchmark.IsEnabled = true;
 
+                // Descarta o CTS da analise anterior antes de criar outro
+                _latencyScanCts?.Dispose();
                 _latencyScanCts = new CancellationTokenSource();
                 
                 // Progress reporter para atualizar a UI
@@ -978,18 +989,21 @@ namespace KitLugia.GUI.Pages
 
                 if (benchmark.Success)
                 {
-                    // Mostra resultados do melhor perfil
-                    TxtCurrentLatency.Text = benchmark.Best.Measurement.CurrentLatencyUs.ToString("F1");
-                    TxtAvgLatency.Text = benchmark.Best.Measurement.AvgLatencyUs.ToString("F1");
-                    TxtMaxLatency.Text = benchmark.Best.Measurement.MaxLatencyUs.ToString("F1");
-                    
+                    // Metricas reais do melhor perfil (media / p95 / maximo em ms)
+                    var bestM = benchmark.Best.Measurement;
+                    TxtLatencyAvg.Text = FormatMs(bestM.AvgLatencyUs);
+                    TxtLatencyP95.Text = FormatMs(bestM.P95LatencyUs);
+                    TxtLatencyMax.Text = FormatMs(bestM.MaxLatencyUs);
+                    TxtLatencyExtra.Text = BuildLatencyExtra(bestM);
+
                     // Mostra relatório completo
                     TxtLatencyRecommendation.Text = $"🏆 Melhor: {benchmark.Best.Profile.Name}\n" +
-                        $"Latência: {benchmark.Best.Measurement.AvgLatencyUs:F1}µs | Score: {benchmark.Best.Score:F0}\n" +
+                        $"Despertar: {FormatMs(bestM.AvgLatencyUs)} | Score: {benchmark.Best.Score:F0} | " +
                         $"Estável: {(benchmark.Best.IsStable ? "Sim" : "Não")}\n\n" +
                         benchmark.Report;
                     
                     PanelLatencyResults.Visibility = Visibility.Visible;
+                    BtnApplyRecommended.Visibility = Visibility.Visible;
                     
                     // Atualiza toggles para refletir o perfil aplicado
                     RefreshLatencyStatus();
@@ -998,7 +1012,7 @@ namespace KitLugia.GUI.Pages
                     
                     // Mostra mensagem de sucesso
                     MessageBox.Show($"Benchmark concluído!\n\nMelhor perfil: {benchmark.Best.Profile.Name}\n" +
-                        $"Latência: {benchmark.Best.Measurement.AvgLatencyUs:F1}µs\n" +
+                        $"Despertar: {FormatMs(bestM.AvgLatencyUs)}\n" +
                         $"As configurações ótimas já foram aplicadas automaticamente.", 
                         "Benchmark Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
@@ -1036,8 +1050,6 @@ namespace KitLugia.GUI.Pages
             Logger.Log("Solicitação de cancelamento do benchmark");
         }
 
-        private Dictionary<string, string> _currentRecommendations = new();
-
         private async void BtnApplyRecommended_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1053,9 +1065,10 @@ namespace KitLugia.GUI.Pages
                     RefreshLatencyStatus();
                     
                     // Atualiza os valores na UI
-                    TxtCurrentLatency.Text = result.After.CurrentLatencyUs.ToString("F1");
-                    TxtAvgLatency.Text = result.After.AvgLatencyUs.ToString("F1");
-                    TxtMaxLatency.Text = result.After.MaxLatencyUs.ToString("F1");
+                    TxtLatencyAvg.Text = FormatMs(result.After.AvgLatencyUs);
+                    TxtLatencyP95.Text = FormatMs(result.After.P95LatencyUs);
+                    TxtLatencyMax.Text = FormatMs(result.After.MaxLatencyUs);
+                    TxtLatencyExtra.Text = BuildLatencyExtra(result.After);
                 }
                 else
                 {
@@ -1073,22 +1086,76 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private async Task AnimateProgressBarAsync(CancellationToken cancellationToken)
+        /// <summary>Analise profunda por driver (ETW): tabela estilo LatencyMon com o pior
+        /// tempo de execucao real de DPC/ISR de cada driver. Requer administrador.</summary>
+        private async void BtnDeepDrivers_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                double progress = 0;
-                while (progress < 100 && !cancellationToken.IsCancellationRequested)
-                {
-                    progress += 2;
-                    ProgressLatencyScan.Value = progress;
-                    await Task.Delay(100, cancellationToken);
-                }
+                BtnDeepDrivers.IsEnabled = false;
+                BtnDeepDrivers.Content = "ANALISANDO...";
+                PanelLatencyResults.Visibility = Visibility.Visible;
+                TxtDriverReport.Text = "Coletando DPC/ISR reais por driver via ETW (5s)...";
+
+                var report = await Task.Run(() => LatencyDriverAnalyzer.MeasureAsync(5));
+                TxtDriverReport.Text = BuildDriverReport(report);
+
+                Logger.Log($"Analise por driver concluida: sucesso={report.Success} drivers={report.Drivers.Count}");
             }
-            catch (OperationCanceledException)
+            catch (Exception ex)
             {
-                // Normal quando cancela
+                TxtDriverReport.Text = $"Falha na analise por driver: {ex.Message}";
+                Logger.LogError("BtnDeepDrivers", ex.Message);
             }
+            finally
+            {
+                BtnDeepDrivers.IsEnabled = true;
+                BtnDeepDrivers.Content = "DRIVERS (ETW)";
+            }
+        }
+
+        /// <summary>Monta a tabela de texto dos drivers medidos (top 10 por pior execucao).</summary>
+        private static string BuildDriverReport(LatencyDriverAnalyzer.DriverLatencyReport r)
+        {
+            if (!r.Success || r.Drivers.Count == 0)
+                return r.Error ?? "Nenhum driver medido (eventos ETW indisponiveis).";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"🔍 DPC/ISR por driver ({r.Seconds:F0}s de coleta, {r.EventsLost} eventos perdidos):");
+            sb.AppendLine(string.Format("  {0,-24} {1,10} {2,10} {3,10} {4,10}", "Driver", "DPC max", "DPC total", "ISR max", "ISR total"));
+            foreach (var d in r.Drivers.Take(10))
+            {
+                sb.AppendLine(string.Format("  {0,-24} {1,10} {2,10} {3,10} {4,10}",
+                    d.Name,
+                    $"{d.DpcMaxMs * 1000.0:F0}us",
+                    $"{d.DpcTotalMs:F1}ms",
+                    $"{d.IsrMaxMs * 1000.0:F0}us",
+                    $"{d.IsrTotalMs:F1}ms"));
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Formata microssegundos medidos em milissegundos: a sonda de
+        /// despertar real fica na casa dos milissegundos, nao de microssegundos.</summary>
+        private static string FormatMs(double microseconds) => $"{microseconds / 1000.0:F2} ms";
+
+        /// <summary>Linha de detalhes do kernel: amostras, DPC/ISR e resolucao do timer.</summary>
+        private static string BuildLatencyExtra(LatencyAnalyzer.LatencyMeasurement m)
+        {
+            var parts = new List<string> { $"min {FormatMs(m.MinLatencyUs)}", $"p99 {FormatMs(m.P99LatencyUs)}", $"{m.SampleCount} amostras" };
+            if (m.HasDpcData)
+            {
+                parts.Add($"DPC {m.DpcPercent:F2}%");
+                parts.Add($"ISR {m.IsrPercent:F2}%");
+                parts.Add($"{m.DpcsPerSec:F0} DPCs/s");
+                parts.Add($"pico {m.SpikeWindowMs}ms: DPC {m.WorstDpcWindowPercent:F2}% / ISR {m.WorstIsrWindowPercent:F2}%");
+            }
+            if (m.HardPageFaultsPerSec > 0)
+                parts.Add($"{m.HardPageFaultsPerSec:F0} hard faults/s");
+            if (m.Cpus.Count > 0 && m.Cpus[0].MaxMhz > 0)
+                parts.Add($"CPU {m.Cpus[0].CurrentMhz:F0}/{m.Cpus[0].MaxMhz:F0} MHz");
+            parts.Add($"timer {m.TimerResolutionMs:F2} ms");
+            return string.Join(" · ", parts);
         }
 
         #endregion
@@ -1120,6 +1187,33 @@ namespace KitLugia.GUI.Pages
             if (ChkCrUnpark.IsChecked != true) ChkCrUnpark.IsChecked = true;
         }
 
+        /// <summary>Sincroniza os checkboxes da coluna direita com o estado real do
+        /// sistema (antes a pagina abria com todos desmarcados mesmo ja aplicados).
+        /// Setar IsChecked aqui nao dispara os handlers: eles escutam Click, nao
+        /// Checked/Unchecked.</summary>
+        private void LoadCreatorTweaks()
+        {
+            try
+            {
+                ChkCrBgApps.IsChecked = SystemTweaks.IsBackgroundAppsDisabled();
+                ChkCrDiag.IsChecked = SystemTweaks.IsDiagTrackDisabled();
+                ChkCrGameBar.IsChecked = SystemTweaks.IsGameBarDisabled();
+                ChkCrGdi.IsChecked = SystemTweaks.IsGdiScalingDisabled();
+                ChkCrPcie.IsChecked = SystemTweaks.IsPcieLinkStatePowerManagementDisabled();
+                ChkCrBing.IsChecked = SystemTweaks.IsBingDisabled();
+                ChkCrPowerThrottle.IsChecked = SystemTweaks.IsPowerThrottlingDisabled();
+                ChkCrVbs.IsChecked = !SystemTweaks.IsVbsEnabled();
+                ChkCrDiskTimeout.IsChecked = SystemTweaks.IsHardDiskDisplayTimeoutDisabled();
+                ChkCrNoReboot.IsChecked = SystemTweaks.IsNoAutoRebootEnabled();
+                ChkCrFsutil.IsChecked = SystemTweaks.IsMemoryUsageEnabled();
+                ChkCrGameMode.IsChecked = SystemTweaks.IsGamingOptimized();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("DashboardTweaks", ex.Message);
+            }
+        }
+
         private void ChkCrBgApps_Click(object sender, RoutedEventArgs e)
         {
             if (ChkCrBgApps.IsChecked == true)
@@ -1148,6 +1242,8 @@ namespace KitLugia.GUI.Pages
         {
             if (ChkCrGdi.IsChecked == true)
                 SystemTweaks.DisableGdiScaling();
+            else
+                SystemTweaks.EnableGdiScaling();
         }
 
         private void ChkCrNdu_Click(object sender, RoutedEventArgs e)
@@ -1162,6 +1258,8 @@ namespace KitLugia.GUI.Pages
         {
             if (ChkCrPcie.IsChecked == true)
                 SystemTweaks.DisablePcieLinkStatePowerManagement();
+            else
+                SystemTweaks.EnablePcieLinkStatePowerManagement();
         }
 
         private void ChkCrBing_Click(object sender, RoutedEventArgs e)
@@ -1184,6 +1282,8 @@ namespace KitLugia.GUI.Pages
         {
             if (ChkCrVbs.IsChecked == true)
                 SystemTweaks.DisableVBSCodeIntegrity();
+            else
+                SystemTweaks.EnableVBSCodeIntegrity();
         }
 
         private void ChkCrDiskTimeout_Click(object sender, RoutedEventArgs e)
@@ -1229,6 +1329,32 @@ namespace KitLugia.GUI.Pages
             ChkStartWithWindows.IsChecked = enabled;
         }
 
+        /// <summary>
+        /// Auto-start do quick menu do Dashboard. Era um CheckBox SEM handler: o usuario
+        /// marcava/desmarcava e nada acontecia (a unica escrita vinha do 1-clique, que
+        /// ainda agia sobre o estado do checkbox e apagava as 3 vias por engano).
+        /// Agora o clique do usuario e a unica coisa que grava — e o estado real volta
+        /// para o checkbox (podem haver 3 vias, nem todas exigem admin).
+        /// </summary>
+        private void ChkStartWithWindows_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                bool enabled = ChkStartWithWindows.IsChecked == true;
+                Services.TrayIconService.SetAutoStart(enabled);
+
+                // Reflete o estado REAL (SetAutoStart e best-effort: a Task exige admin).
+                bool actual = Services.TrayIconService.IsAutoStartEnabled();
+                ChkStartWithWindows.IsChecked = actual;
+                ChkCrAutoStart.IsChecked = actual;
+                KitLugia.Core.Logger.Log($"⚙️ Dashboard: Auto-start {(actual ? "ativado" : "desativado")}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ChkStartWithWindows_Click", ex.Message);
+            }
+        }
+
         private void ChkCrExtremeLatency_Click(object sender, RoutedEventArgs e)
         {
             if (ChkCrExtremeLatency.IsChecked == true)
@@ -1239,7 +1365,10 @@ namespace KitLugia.GUI.Pages
 
         private void ChkCrFsutil_Click(object sender, RoutedEventArgs e)
         {
-            if (ChkCrFsutil.IsChecked == true)
+            // ToggleMemoryUsage inverte o valor atual: so chama quando o estado
+            // desejado difere do real, para o checkbox nao dessincronizar do registry.
+            bool wantEnabled = ChkCrFsutil.IsChecked == true;
+            if (wantEnabled != SystemTweaks.IsMemoryUsageEnabled())
                 SystemTweaks.ToggleMemoryUsage();
         }
 
@@ -1255,6 +1384,8 @@ namespace KitLugia.GUI.Pages
         {
             if (ChkCrUnpark.IsChecked == true)
                 SystemTweaks.UnparkCpuPowerConfig();
+            else
+                SystemTweaks.RevertUnparkCpuPowerConfig();
         }
 
         private void RefreshLatencyStatus()

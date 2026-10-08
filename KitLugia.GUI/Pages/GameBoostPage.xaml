@@ -131,9 +131,41 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0"
+                              Width="34" Height="34">
+                            <!-- HALO DO MOTOR AUTOMATICO (05/10/2026)
+                                 Sem DropShadowEffect de proposito: a versao anterior animateva
+                                 BlurRadius em tempo real e forçava re-renderizacao por frame na
+                                 GPU. O halo e' um Ellipse maior com gradiente radial e SO' a
+                                 Opacity e' animada (composicao pura), como o pulso da bola.
+                                 O code-behind mexe na Opacity do PAI (StatusGlowHost), nunca
+                                 na deste: a Opacity do pai multiplica a do filho, logo o
+                                 halo acende/apaga sem a animacao se perder. -->
+                            <Grid x:Name="StatusGlowHost" Width="34" Height="34" Opacity="0"
+                                  IsHitTestVisible="False">
+                                <Ellipse x:Name="StatusGlow" Width="34" Height="34">
+                                    <Ellipse.Fill>
+                                        <RadialGradientBrush>
+                                            <GradientStop Color="#FF3D8BFF" Offset="0.0"/>
+                                            <GradientStop Color="#663D8BFF" Offset="0.45"/>
+                                            <GradientStop Color="#003D8BFF" Offset="1.0"/>
+                                        </RadialGradientBrush>
+                                    </Ellipse.Fill>
+                                    <Ellipse.Triggers>
+                                        <EventTrigger RoutedEvent="Ellipse.Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="0.9" To="0.25" Duration="0:0:1.8"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Ellipse.Triggers>
+                                </Ellipse>
+                            </Grid>
                             <Ellipse x:Name="StatusIndicator" Width="20" Height="20" Fill="#00FF00"
-                                     Stroke="#FFFFFF" StrokeThickness="2" Margin="0,0,15,0">
+                                     Stroke="#FFFFFF" StrokeThickness="2"
+                                     VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <!-- FIX PERF: removido DropShadowEffect pulsante (BlurRadius animado 8→25
                                      Forever). Blur em tempo real força re-renderização por frame na GPU.
                                      O pulso agora é só Opacity do próprio Ellipse (barato, composição pura). -->
@@ -148,7 +180,7 @@
                                     </EventTrigger>
                                 </Ellipse.Triggers>
                             </Ellipse>
-                        </StackPanel>
+                        </Grid>
                         
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="GameBoost Pro" FontSize="20" FontWeight="Bold" Foreground="White"/>
@@ -265,8 +297,10 @@
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="&#x1F3AE; Motor do GameBoost" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
                     <TextBlock x:Name="TxtEngineDescription"
-                               Text="&#x1F7E2; V1 - Original Plus: Win32PrioritySeparation + CPU/IO/Page boost (PADR&#xC3;O) - Seguro e est&#xE1;vel"
+                               Text="&#x1F916; Autom&#xE1;tico (RECOMENDADO): escolhe tudo sozinho por cena - CPU/I-O/Page din&#xE2;micos, timer s&#xF3; no loading, revert autom&#xE1;tico ao perder o foco"
                                FontSize="12" Foreground="#AAA" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                    <TextBlock Text="V1-V4 s&#xE3;o legado: continuam dispon&#xED;veis, mas cada um fixa um valor e n&#xE3;o se adapta à cena."
+                               FontSize="10" Foreground="#777" Margin="0,4,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal">
@@ -279,10 +313,11 @@
                               Style="{StaticResource DarkComboBoxStyle}"
                               ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
                               Cursor="Hand">
-                        <ComboBoxItem Content="&#x1F7E2; V1 - Original Plus (Win32Priority)" Tag="1"/>
-                        <ComboBoxItem Content="&#x1F7E1; V2 - FPS Est&#xE1;vel Plus (P-Cores+GameMode)" Tag="2"/>
-                        <ComboBoxItem Content="&#x1F534; V3 - Extremo Plus (Tudo no m&#xE1;ximo)" Tag="3"/>
-                        <ComboBoxItem Content="&#x1F4A5; V4 - Extreme Pro (RealTime)" Tag="4"/>
+                        <ComboBoxItem Content="&#x1F916; Autom&#xE1;tico (RECOMENDADO)" Tag="5"/>
+                        <ComboBoxItem Content="&#x1F7E2; V1 - Original Plus (legado)" Tag="1"/>
+                        <ComboBoxItem Content="&#x1F7E1; V2 - FPS Est&#xE1;vel Plus (legado)" Tag="2"/>
+                        <ComboBoxItem Content="&#x1F534; V3 - Extremo Plus (legado)" Tag="3"/>
+                        <ComboBoxItem Content="&#x1F4A5; V4 - Performance Pro (legado)" Tag="4"/>
                         <ComboBoxItem Content="&#x2699;&#xFE0F; Personalizado..." Tag="custom"/>
                     </ComboBox>
                 </StackPanel>
@@ -769,22 +804,22 @@
                         
                         <!-- Page Priority -->
                         <TextBlock Text="&#x1F4C4; Page Priority (Mem&#xF3;ria Virtual):" Foreground="#DDD" Margin="0,0,0,5"/>
-                        <TextBlock Text="Prioridade de mem&#xF3;ria virtual quando h&#xE1; pouca RAM" 
-                                   FontSize="11" Foreground="#888" Margin="0,0,0,5"/>
-                        <ComboBox x:Name="CmbPagePriority" SelectedIndex="1" Height="42" FontSize="14"
+                        <TextBlock Text="Escala oficial: 1=Very Low, 2=Low, 3=Medium, 4=Below Normal, 5=Normal (PADR&#xE3;O). N&#xE3;o existe &quot;Maximum&quot; — 5 j&#xE1; &#xE9; o m&#xE1;ximo e o default do Windows."
+                                   FontSize="11" Foreground="#888" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                        <ComboBox x:Name="CmbPagePriority" SelectedIndex="0" Height="42" FontSize="14"
                                   Style="{StaticResource DarkComboBoxStyle}" Margin="0,0,0,15">
-                            <ComboBoxItem Content="Normal (Swap padr&#xE3;o)" Background="#2D2D2D" Foreground="White"/>
-                            <ComboBoxItem Content="Maximum (M&#xED;nimo swap, m&#xE1;xima performance)" Background="#2D2D2D" Foreground="White"/>
+                            <ComboBoxItem Content="Normal (5) — Padr&#xE3;o do Windows" Background="#2D2D2D" Foreground="White"/>
+                            <ComboBoxItem Content="Below Normal (4) — trimma antes" Background="#2D2D2D" Foreground="White"/>
                         </ComboBox>
-                        
+
                         <!-- Thread Memory Priority -->
                         <TextBlock Text="&#x1F9F5; Thread Memory Priority:" Foreground="#DDD" Margin="0,0,0,5"/>
-                        <TextBlock Text="Prioridade de mem&#xF3;ria para threads do processo" 
-                                   FontSize="11" Foreground="#888" Margin="0,0,0,5"/>
+                        <TextBlock Text="Mesma escala 1..5. Normal (5) evita page fault storm; Very Low (1) faz o SO trimar este processo primeiro."
+                                   FontSize="11" Foreground="#888" Margin="0,0,0,5" TextWrapping="Wrap"/>
                         <ComboBox x:Name="CmbThreadMemory" SelectedIndex="0" Height="42" FontSize="14"
                                   Style="{StaticResource DarkComboBoxStyle}" Margin="0,0,0,15">
-                            <ComboBoxItem Content="Normal (Balanceado)" Background="#2D2D2D" Foreground="White"/>
-                            <ComboBoxItem Content="Maximum (M&#xE1;xima performance de threads)" Background="#2D2D2D" Foreground="White"/>
+                            <ComboBoxItem Content="Normal (5) — Balanceado" Background="#2D2D2D" Foreground="White"/>
+                            <ComboBoxItem Content="Very Low (1) — trimma primeiro" Background="#2D2D2D" Foreground="White"/>
                         </ComboBox>
                         
                         <!-- Toggles Grid -->

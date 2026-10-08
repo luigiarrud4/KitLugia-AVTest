@@ -328,7 +328,60 @@ namespace KitLugia.Core
         /// Mede tráfego de IO por processo usando Performance Counters + conexões TCP.
         /// Chamar em intervalos regulares (1-2s) para precisão.
         /// </summary>
+        /// <summary>
+        /// TTL do snapshot de trafego.
+        ///
+        /// POR QUE (04/10/2026, medido): cada <see cref="PerformanceCounter"/> de "Process"
+        /// custa ~15 ms por NextValue() — e criar um objeto novo custa o MESMO (~16 ms),
+        /// ou seja, o cache de contadores economiza NADA. Com 19 processos com TCP ativo
+        /// sao 19 x 2 contadores = ~570 ms por amostra.
+        ///
+        /// A amostra era chamada em TODA troca de janela em foreground (via
+        /// ApplyBoostCustom -> CheckForegroundWindow, que roda na THREAD DE UI), entao
+        /// qualquer configuracao com Download Boost ligado congelava a interface por
+        /// meio segundo a cada Alt+Tab/clique. Trafego e um sinal lento: 2 s de TTL
+        /// mantem a decisao ("isso e download?") identica e corta o custo em ordens
+        /// de grandeza. O ciclo de 30 s do monitor continua com amostra nova a cada tique.
+        /// </summary>
+        private static readonly TimeSpan TrafficSnapshotTtl = TimeSpan.FromSeconds(2);
+        private static readonly object _snapshotCacheLock = new();
+        private static TrafficSnapshot? _cachedSnapshot;
+        private static DateTime _cachedSnapshotAt = DateTime.MinValue;
+
+        /// <summary>
+        /// Amostra o trafego de rede. Reaproveita a ultima amostra se ela tem menos de
+        /// <see cref="TrafficSnapshotTtl"/> — ver o comentario acima para o porque.
+        /// </summary>
         public static TrafficSnapshot SampleTraffic(uint? foregroundPid = null)
+        {
+            lock (_snapshotCacheLock)
+            {
+                if (_cachedSnapshot != null && DateTime.Now - _cachedSnapshotAt < TrafficSnapshotTtl)
+                {
+                    // Copia rasa: novo container + nova lista, mesmos itens. Assim um
+                    // chamador que adicione/limpe a lista nao corrompe o cache compartilhado.
+                    return new TrafficSnapshot
+                    {
+                        Timestamp = _cachedSnapshot.Timestamp,
+                        ForegroundPid = foregroundPid,
+                        Processes = new List<ProcessNetworkStats>(_cachedSnapshot.Processes)
+                    };
+                }
+
+                var fresh = SampleTrafficCore(foregroundPid);
+                _cachedSnapshot = fresh;
+                _cachedSnapshotAt = DateTime.Now;
+                return new TrafficSnapshot
+                {
+                    Timestamp = fresh.Timestamp,
+                    ForegroundPid = foregroundPid,
+                    Processes = new List<ProcessNetworkStats>(fresh.Processes)
+                };
+            }
+        }
+
+        /// <summary>Corpo real da amostragem (sem cache) — ver <see cref="SampleTraffic"/>.</summary>
+        private static TrafficSnapshot SampleTrafficCore(uint? foregroundPid)
         {
             var snapshot = new TrafficSnapshot
             {
@@ -456,17 +509,6 @@ namespace KitLugia.Core
             return snapshot.Processes
                 .Where(p => p.ReadSpeedMBps >= thresholdMBps)
                 .OrderByDescending(p => p.ReadSpeedMBps)
-                .ToList();
-        }
-
-        /// <summary>
-        /// Retorna processos com muitas conexões TCP.
-        /// </summary>
-        public static List<ProcessNetworkStats> GetHeavyNetworkUsers(TrafficSnapshot snapshot, int minConnections = 10)
-        {
-            return snapshot.Processes
-                .Where(p => p.ActiveConnections >= minConnections)
-                .OrderByDescending(p => p.ActiveConnections)
                 .ToList();
         }
     }

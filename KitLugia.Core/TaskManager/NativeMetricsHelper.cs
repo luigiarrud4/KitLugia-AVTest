@@ -541,39 +541,6 @@ namespace KitLugia.Core.TaskManager
             catch { return account ?? ""; }
         }
 
-        /// <summary>Lista de usuários REAIS (conta interativa — para a aba Usuários). Exclui
-        /// SYSTEM/serviços (en + pt-BR), DWM-*/UMFD-* e SIDs de máquina/GUID.</summary>
-        public static List<string> GetActiveUserNames()
-        {
-            var names = new List<string>();
-            try
-            {
-                var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { "SYSTEM", "SISTEMA", "LOCAL SERVICE", "SERVIçO LOCAL", "SERVIÇO LOCAL", "NETWORK SERVICE", "SERVIçO DE REDE", "SERVIÇO DE REDE",
-                  "ANONYMOUS LOGON", "LOGON ANôNIMO", "LOGON ANÔNIMO", "DWM-0", "DWM-1", "DWM-2", "UMFD-0", "UMFD-1", "UMFD-2", "WINDOW MANAGER", "GERENCIADOR DE JANELAS" };
-                foreach (var kv in GetUserNames())
-                {
-                    var acct = kv.Value;
-                    if (string.IsNullOrEmpty(acct)) continue;
-                    // prefixos de conta de serviço/máquina
-                    if (acct.StartsWith("NT AUTHORITY\\", StringComparison.OrdinalIgnoreCase) ||
-                        acct.StartsWith("NT SERVICE\\", StringComparison.OrdinalIgnoreCase) ||
-                        acct.StartsWith("SERVIçO\\", StringComparison.OrdinalIgnoreCase) ||
-                        acct.StartsWith("WINDOW MANAGER\\", StringComparison.OrdinalIgnoreCase) ||
-                        acct.StartsWith("GERENCIADOR DE JANELAS\\", StringComparison.OrdinalIgnoreCase)) continue;
-                    var s = ShortenUserName(acct);
-                    if (string.IsNullOrEmpty(s)) continue;
-                    if (excluded.Contains(s)) continue;
-                    if (s.StartsWith("DWM-", StringComparison.OrdinalIgnoreCase) || s.StartsWith("UMFD-", StringComparison.OrdinalIgnoreCase)) continue;
-                    // SID puro (S-1-5-...) ou GUID do UserProfileService → não é nome exibível
-                    if (s.StartsWith("S-1-", StringComparison.OrdinalIgnoreCase) || (s.Length == 36 && s.Count(c => c == '-') == 4)) continue;
-                    if (!names.Contains(s)) names.Add(s);
-                }
-            }
-            catch { }
-            return names;
-        }
-
         private static readonly Dictionary<string, string> _perfNameCache = new();
 
         /// <summary>Mapeia um nome de objeto/contador PDH em inglês para o nome localizado

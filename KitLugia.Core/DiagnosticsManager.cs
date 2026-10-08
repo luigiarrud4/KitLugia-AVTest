@@ -99,11 +99,6 @@ namespace KitLugia.Core
             SystemUtils.RunExternalProcess("cmd.exe", "/c sfc /scannow & pause", hidden: false, waitForExit: false);
         }
 
-        public static void RepairSystemComponentsDISM()
-        {
-            SystemUtils.RunExternalProcess("cmd.exe", "/c DISM /Online /Cleanup-Image /RestoreHealth & pause", hidden: false, waitForExit: false);
-        }
-
         // =========================================================
         // 2. DIAGNÃ“STICO DE DRIVERS (DRIVER VERIFIER - RESTAURADO)
         // =========================================================
@@ -199,11 +194,5 @@ namespace KitLugia.Core
         // =========================================================
         // 4. APPS PADRÃƒO
         // =========================================================
-
-        public static void ReinstallDefaultApps()
-        {
-            const string command = "Get-AppxPackage -AllUsers | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
-            SystemUtils.RunExternalProcess("cmd.exe", $"/c powershell -ExecutionPolicy Bypass -Command \"{command}\" & pause", hidden: false, waitForExit: false);
-        }
     }
 }

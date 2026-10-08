@@ -289,24 +289,6 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return "2.0.x";
         }
-
-        /// <summary>
-        /// Obt�m a vers�o real usando AssemblyVersion em vez de data de compila��o
-        /// </summary>
-        /// <param name="buildDate">Ignorado — mantido para compatibilidade</param>
-        /// <returns>Vers�o detectada (ex: "2.0.5")</returns>
-        public static async Task<string> GetRealVersionAsync(DateTime buildDate = default)
-        {
-            return await Task.FromResult(GetCurrentAssemblyVersion());
-        }
-        
-        /// <summary>
-        /// Vers�o s�ncrona — usa AssemblyVersion diretamente
-        /// </summary>
-        public static string GetRealVersion(DateTime buildDate = default)
-        {
-            return GetCurrentAssemblyVersion();
-        }
         
         /// <summary>
         /// Obt�m informa��es detalhadas da vers�o (baseada em AssemblyVersion)
@@ -317,22 +299,6 @@ namespace KitLugia.Core
             var assemblyVersion = Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString() ?? "1.0.0.0";
             var releases = await GetAllReleasesAsync();
             return (realVersion, assemblyVersion, DateTime.Now.ToString("dd/MM/yyyy HH:mm"), "AssemblyVersion", releases.Count);
-        }
-        
-        /// <summary>
-        /// Vers�o s�ncrona para compatibilidade
-        /// </summary>
-        public static (string RealVersion, string AssemblyVersion, string BuildDate, string DetectionMethod, int TotalReleases) GetVersionInfo(DateTime buildDate = default)
-        {
-            try
-            {
-                return Task.Run(() => GetVersionInfoAsync()).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"? Erro em GetVersionInfo: {ex.Message}");
-                return ("2.0.x", "1.0.0.0", DateTime.Now.ToString("dd/MM/yyyy HH:mm"), "Erro", 0);
-            }
         }
         
         /// <summary>

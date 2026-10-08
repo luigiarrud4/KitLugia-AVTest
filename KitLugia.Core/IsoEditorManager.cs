@@ -29,7 +29,7 @@ namespace KitLugia.Core
         /// </summary>
         private static async Task<(int ExitCode, string Output)> RunProcessCapturedWithStdin(string filename, string args, string? stdinContent)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 var psi = new ProcessStartInfo(filename, args)
                 {
@@ -49,8 +49,8 @@ namespace KitLugia.Core
                     var terr = process.StandardError.ReadToEndAsync();
                     process.StandardInput.Write(stdinContent);
                     process.StandardInput.Close();
-                    output = tout.GetAwaiter().GetResult();
-                    error = terr.GetAwaiter().GetResult();
+                    output = await tout.ConfigureAwait(false);
+                    error = await terr.ConfigureAwait(false);
                     process.WaitForExit();
                 }
                 else
@@ -371,9 +371,10 @@ namespace KitLugia.Core
                         return (true, $"{toRemove.Count} AppX removidos (pastas), registro SOFTWARE não editado.");
                     }
 
-                    var unloadPsi = new ProcessStartInfo("reg.exe", "unload HKLM\\zSOFTWARE")
-                    { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-                    using (var pu = Process.Start(unloadPsi)) pu?.WaitForExit(10000);
+                    // reg unload pelo helper async: o Process.Start + WaitForExit(10000) síncrono
+                    // congelava a UI por até 10 s no meio de um método que já é async (todo o
+                    // resto do fluxo usa await RunProcessCaptured).
+                    await RunProcessCaptured("reg.exe", "unload HKLM\\zSOFTWARE");
 
                     var (lCode, lOut) = await RunProcessCaptured("reg.exe", $"load HKLM\\zSOFTWARE \"{softwareLocal}\"");
                     if (lCode != 0)

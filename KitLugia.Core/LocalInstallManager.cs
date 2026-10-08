@@ -10,7 +10,7 @@ namespace KitLugia.Core
         // 1. Prepara a Partição (Shrink C: + Create New) - Baseado no EaseUS Partition Master
         public static async Task<(bool Success, string Message, string NewDrive)> PreparePartition(int sizeMb)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 try
                 {
@@ -27,7 +27,7 @@ namespace KitLugia.Core
                     
                     File.WriteAllText(scriptFile, scriptContent);
                     
-                    string output = SystemUtils.RunExternalProcess("diskpart.exe", $"/s \"{scriptFile}\"", hidden: true);
+                    string output = await SystemUtils.RunExternalProcessAsync("diskpart.exe", $"/s \"{scriptFile}\"", hidden: true).ConfigureAwait(false);
                     File.Delete(scriptFile);
 
                     // Validação robusta do resultado
@@ -41,14 +41,6 @@ namespace KitLugia.Core
         }
 
         // 2. Copia arquivos da ISO montada para a nova partição
-        public static async Task CopyInstallFiles(string sourceDrive, string targetDrive)
-        {
-            await Task.Run(() =>
-            {
-                // Usa Robocopy para cópia robusta em Modo Turbo (/MT:128 /J Unbuffered)
-                SystemUtils.RunExternalProcess("robocopy.exe", $"\"{sourceDrive}\" \"{targetDrive}\" /E /ZB /J /DCOPY:T /FFT /R:0 /W:0 /MT:128", hidden: true);
-            });
-        }
 
         // 3. Configura o Boot (BCD) - Baseado no BCDBoot da Microsoft
         public static void SetupBootEntry(string targetDrive)
@@ -78,7 +70,7 @@ namespace KitLugia.Core
         // 4. Remove partição de boot (função de limpeza)
         public static async Task<(bool Success, string Message)> RemoveBootPartition()
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 try
                 {
@@ -91,7 +83,7 @@ namespace KitLugia.Core
                     
                     File.WriteAllText(scriptFile, scriptContent);
                     
-                    string output = SystemUtils.RunExternalProcess("diskpart.exe", $"/s \"{scriptFile}\"", hidden: true);
+                    string output = await SystemUtils.RunExternalProcessAsync("diskpart.exe", $"/s \"{scriptFile}\"", hidden: true).ConfigureAwait(false);
                     File.Delete(scriptFile);
 
                     if (output.Contains("sucesso") || output.Contains("successfully"))
@@ -119,31 +111,5 @@ namespace KitLugia.Core
         }
 
         // 6. Detecção UEFI/BIOS robusta
-        public static bool IsUEFI()
-        {
-            try
-            {
-                // Método 1: Verificar firmware
-                string firmware = SystemUtils.RunExternalProcess("bcdedit", "", true);
-                if (firmware.Contains("winload.efi")) return true;
-                if (firmware.Contains("winload.exe")) return false;
-
-                // Método 2: Verificar pasta EFI
-                if (Directory.Exists(Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "EFI"))) return true;
-
-                // Método 3: Verificar registro
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\SecureBoot\State"))
-                {
-                    if (key != null) return true;
-                }
-
-                return false;
-            }
-                catch (Exception ex)
-            {
-                Logger.Log($"Erro ao detectar UEFI/BIOS: {ex.Message}");
-                return false; // Assume BIOS em caso de erro
-            }
-        }
     }
 }

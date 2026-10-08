@@ -110,6 +110,40 @@ namespace KitLugia.GUI.Windows.TaskManager
         private bool _cvsInitialized = false;
         private readonly HashSet<string> _expandedGroups = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Coluna de TEXTO (agrupa por tipo) ou METRICA (lista plana global)?
+        /// Nome/Status/Usuario fazem sentido agrupados por tipo (Aplicativos → 2o plano →
+        /// Windows); todo o resto (CPU/RAM/Disco/Rede/GPU/...) responde "quem usa mais
+        /// naquele momento" e por isso e lista plana global.
+        /// </summary>
+        private bool IsTextSortColumn(string col) =>
+            col == "DisplayName" || col == "Name" || col == "Status" || col == "UserName";
+
+        /// <summary>
+        /// Liga/desliga o agrupamento da view conforme o criterio atual.
+        /// CAUSA RAIZ do "filtro de Memoria incorreto": o OrderRows ja ordenava a source
+        /// globalmente, mas a CollectionView tinha um PropertyGroupDescription("Group")
+        /// PERMANENTE que reagrupava tudo na apresentacao (Aplicativos sempre primeiro,
+        /// mesmo com um processo de 2,5 GB em Segundo plano). Sem tirar o agrupamento da
+        /// view, nenhuma ordenacao global jamais apareceria na tela.
+        /// Chamar SEMPRE que _currentSortColumn mudar e apos criar a view no Loaded.
+        /// </summary>
+        private void ApplyGroupingMode()
+        {
+            try
+            {
+                if (!_cvsInitialized || _groupedCvs == null) return;
+                bool wantGroups = IsTextSortColumn(string.IsNullOrEmpty(_currentSortColumn) ? "CpuValue" : _currentSortColumn);
+                bool hasGroups = _groupedCvs.GroupDescriptions.Count > 0;
+                if (wantGroups == hasGroups) return;
+                if (wantGroups)
+                    _groupedCvs.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
+                else
+                    _groupedCvs.GroupDescriptions.Clear();
+            }
+            catch { }
+        }
+
         [DllImport("kernel32.dll")]
         private static extern void GetPhysicallyInstalledSystemMemory(out long totalMemoryInKb);
 
@@ -371,6 +405,9 @@ namespace KitLugia.GUI.Windows.TaskManager
                     _groupedCvs.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
                     DgProcesses.ItemsSource = _groupedCvs.View;
                     _cvsInitialized = true;
+                    // O criterio inicial e CpuValue (metrica) = lista plana global.
+                    // Aplica o modo de agrupamento correspondente antes da 1a carga.
+                    ApplyGroupingMode();
                     // Marca CPU como ordenação inicial (setinha ↓)
                     foreach (var col in DgProcesses.Columns) col.SortDirection = null;
                     var cpuCol = DgProcesses.Columns.FirstOrDefault(c => c.SortMemberPath == "CpuValue");
@@ -568,6 +605,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     _processes = value ?? new();
                     Raise(nameof(Processes));
                     Raise(nameof(ExpandIcon));
+                    RefreshVisibleProcesses();
                 }
             }
 
@@ -590,6 +628,24 @@ namespace KitLugia.GUI.Windows.TaskManager
 
             public Visibility DetailsVisibility => _isExpanded ? Visibility.Visible : Visibility.Collapsed;
             public string ExpandIcon => Processes.Count > 1 ? (IsExpanded ? "▼" : "▶") : "";
+
+            /// <summary>
+            /// Lista REALMENTE desenhada no detalhe. Um usuario pode ter centenas de processos e o
+            /// card inteiro não cabia na janela — o DataGrid descartava o container no scroll e o
+            /// card "fechava". Mostramos os <see cref="UserDetailMax"/> mais pesados e dizemos
+            /// quantos ficaram de fora, em vez de truncar sem aviso.
+            /// </summary>
+            public List<UserProcRow> VisibleProcesses
+            {
+                get => _visibleProcesses;
+                private set { if (ReferenceEquals(_visibleProcesses, value)) return; _visibleProcesses = value; Raise(nameof(VisibleProcesses)); Raise(nameof(ExtraVisibility)); }
+            }
+            private List<UserProcRow> _visibleProcesses = new();
+
+            public string ExtraLabel => Processes.Count > VisibleProcesses.Count
+                ? $"Mostrando os {VisibleProcesses.Count} processos mais pesados de {Processes.Count}. Use a busca ou a aba Processos para ver todos."
+                : "";
+            public Visibility ExtraVisibility => Processes.Count > VisibleProcesses.Count ? Visibility.Visible : Visibility.Collapsed;
 
             /// <summary>
             /// Atualiza a lista de processos do usuário SEM trocar a instância a cada
@@ -624,6 +680,14 @@ namespace KitLugia.GUI.Windows.TaskManager
                 Processes = merged;
             }
 
+            /// <summary>Recorta a lista do detalhe (chamado sempre que Processes muda).</summary>
+            public void RefreshVisibleProcesses()
+            {
+                VisibleProcesses = Processes.Count <= UserDetailMax
+                    ? Processes
+                    : Processes.Take(UserDetailMax).ToList();
+            }
+
             /// <summary>Heatmap da célula de CPU (mesmas faixas da aba Processos).</summary>
             public SolidColorBrush CpuCellBackground =>
                 CpuValue >= 60 ? FreezeCellBrush(new SolidColorBrush(Color.FromArgb(40, 0xE8, 0x11, 0x23)))
@@ -643,6 +707,9 @@ namespace KitLugia.GUI.Windows.TaskManager
         private string _usersSortColumn = "CpuValue";
         private ListSortDirection _usersSortDirection = ListSortDirection.Descending;
 
+        /// <summary>Teto de processos desenhados no detalhe de um usuário (ver VisibleProcesses).</summary>
+        private const int UserDetailMax = 24;
+
         private void BtnUserExpand_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -651,10 +718,18 @@ namespace KitLugia.GUI.Windows.TaskManager
                 r.IsExpanded = !r.IsExpanded;
                 // A lista de processos só é preenchida para quem está ABERTO — sem este
                 // empurrão o detalhe abria VAZIO por até 1 s (seta ▼ sem nada listado).
-                if (r.IsExpanded && r.Processes.Count == 0) _ = LoadUsersSafeAsync();
+                // Se já há uma carga no ar ela descarta o pedido (o guard de
+                // _usersLoadRunning), então marcamos para refazer ao terminar.
+                if (r.IsExpanded && r.Processes.Count == 0)
+                {
+                    if (Volatile.Read(ref _usersLoadRunning) != 0) _usersReloadPending = 1;
+                    else _ = LoadUsersSafeAsync();
+                }
             }
             catch { }
         }
+
+        private int _usersReloadPending;
 
         private void DgUsers_Sorting(object sender, DataGridSortingEventArgs e)
         {
@@ -681,6 +756,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 Func<UserRow, IComparable> key = _usersSortColumn switch
                 {
                     "UserName" => r => r.UserName,
+                    "Status" => r => r.Status,
                     "ProcessCount" => r => r.ProcessCount,
                     "MemValue" => r => r.MemValue,
                     _ => r => r.CpuValue,
@@ -821,7 +897,13 @@ namespace KitLugia.GUI.Windows.TaskManager
                 });
             }
             catch (Exception ex) { try { Logger.Log($"[KIT TASK MANAGER] Users: {ex.Message}"); } catch { } }
-            finally { Interlocked.Exchange(ref _usersLoadRunning, 0); }
+            finally
+            {
+                Interlocked.Exchange(ref _usersLoadRunning, 0);
+                // Um clique na seta durante a carga pede uma releitura: refaz agora.
+                if (Interlocked.Exchange(ref _usersReloadPending, 0) != 0 && !_isClosed)
+                    _ = LoadUsersSafeAsync();
+            }
         }
 
         private void DisposeCounters()
@@ -948,12 +1030,18 @@ namespace KitLugia.GUI.Windows.TaskManager
                 case "Services":
                     TabServices.Visibility = Visibility.Visible;
                     ActivateSidebarButton(BtnTabServices);
-                    if (_allServices.Count == 0) _ = LoadServicesWhenNeededSafeAsync();
+                    // Recarrega quando a lista está VAZIA ou velha: serviço que para/sobe fora do
+                    // TM ficava congelado na lista para sempre (o "botão que não atualiza").
+                    if (_allServices.Count == 0 || (DateTime.Now - _servicesLoadedAt).TotalSeconds > 15)
+                        _ = ReloadServicesSafeAsync();
+                    else UpdateServiceActionButtons();
                     break;
                 case "Startup":
                     TabStartup.Visibility = Visibility.Visible;
                     ActivateSidebarButton(BtnTabStartup);
-                    if (_allStartupApps.Count == 0) _ = LoadStartupWhenNeededSafeAsync();
+                    if (_allStartupApps.Count == 0 || (DateTime.Now - _startupLoadedAt).TotalSeconds > 60)
+                        _ = ReloadStartupSafeAsync();
+                    else UpdateStartupActionButtons();
                     break;
                 case "Latency":
                     TabLatency.Visibility = Visibility.Visible;
@@ -975,6 +1063,9 @@ namespace KitLugia.GUI.Windows.TaskManager
             // A aba Processos pode ter esmaecimentos congelados (o motor se desliga fora dela):
             // ao voltar, ele é religado se ainda houver algo a esmaecer.
             ResumeFrameAnimationsIfNeeded();
+
+            // O timer de 1 s da Latência (e a leitura de áudio) só roda com a aba ABERTA.
+            SetLatencyTabActive(TabLatency.Visibility == Visibility.Visible);
         }
 
         private static readonly SolidColorBrush _accentBrush = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4F, 0xC3, 0xF7))); // ciano — identidade própria do TM
@@ -1726,6 +1817,8 @@ namespace KitLugia.GUI.Windows.TaskManager
             col.SortDirection = _currentSortDirection;
             ApplySorting();
             SyncSortUi();
+            // O modo de agrupamento segue o criterio: metrica = lista plana global.
+            ApplyGroupingMode();
             // Aplica JA. Antes so as setas eram atualizadas e a ordem real mudava no proximo
             // tick (1s depois) — dava a impressao de que ordenar "nao funcionava".
             _ = RefreshAsync();
@@ -1816,6 +1909,7 @@ namespace KitLugia.GUI.Windows.TaskManager
 
                 ApplySorting();
                 SyncSortUi();
+                ApplyGroupingMode();
                 _ = RefreshAsync();
             }
             catch { }
@@ -1829,6 +1923,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 _currentSortDirection = _currentSortDirection == ListSortDirection.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
                 ApplySorting();
                 SyncSortUi();
+                ApplyGroupingMode();
                 _ = RefreshAsync();
             }
             catch { }
@@ -1854,10 +1949,164 @@ namespace KitLugia.GUI.Windows.TaskManager
             _ => 0,
         };
 
+        // ══════════════════════════════════════════════════════════════════
+        //  PADRAO DE QUALIDADE das abas secundarias (Latencia/Disco/Conexoes):
+        //  toda coluna clicavel tem SortMemberPath e o criterio sobrevive ao refresh.
+        //  O comparador entende os formatos do TM: numero puro, numero pt-BR ("36.794",
+        //  "3,4"), com unidade ("234,1 KB/s", "1,1 GB", "6,0%", "125 ms", "1236,9us") e
+        //  sem-dado ("—"/"N/A", que vai sempre para o fim). Sem isso o sort default do
+        //  WPF comparava TEXTO ("10" < "9") e o refresh (que reconstroi a lista)
+        //  desfazia a ordem — "clicar e nada acontece".
+        // ══════════════════════════════════════════════════════════════════
+
+        /// <summary>Criterio de ordenacao guardado por grid (sobrevive ao refresh).</summary>
+        private readonly Dictionary<string, (string Prop, ListSortDirection Dir)> _tmGridSort =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private sealed class TmValueComparer : System.Collections.IComparer
+        {
+            private readonly string _prop;
+            private readonly int _sign;
+            private readonly Dictionary<Type, System.Reflection.PropertyInfo?> _propCache = new();
+
+            public TmValueComparer(string prop, ListSortDirection dir)
+            {
+                _prop = prop;
+                _sign = dir == ListSortDirection.Ascending ? 1 : -1;
+            }
+
+            public int Compare(object? x, object? y)
+            {
+                object? vx = GetProp(x), vy = GetProp(y);
+                // Numero real na propriedade (Pid, TotalBps, IopsValue...): compara direto.
+                if (vx is double dx && vy is double dy) return _sign * dx.CompareTo(dy);
+                if (vx is IConvertible && vy is IConvertible)
+                {
+                    try
+                    {
+                        double nx = Convert.ToDouble(vx, System.Globalization.CultureInfo.InvariantCulture);
+                        double ny = Convert.ToDouble(vy, System.Globalization.CultureInfo.InvariantCulture);
+                        return _sign * nx.CompareTo(ny);
+                    }
+                    catch { }
+                }
+                string sx = vx?.ToString() ?? "", sy = vy?.ToString() ?? "";
+                bool nxOk = TryParseTmNumber(sx, out double px);
+                bool nyOk = TryParseTmNumber(sy, out double py);
+                if (nxOk && nyOk)
+                {
+                    int c = px.CompareTo(py);
+                    if (c != 0) return _sign * c;
+                }
+                else if (nxOk != nyOk)
+                {
+                    // Sem-dado ("—") vai sempre para o fim, nas duas direcoes.
+                    return nxOk ? -1 : 1;
+                }
+                return _sign * string.Compare(sx, sy, StringComparison.OrdinalIgnoreCase);
+            }
+
+            private object? GetProp(object? o)
+            {
+                if (o == null) return null;
+                var t = o.GetType();
+                if (!_propCache.TryGetValue(t, out var pi))
+                {
+                    pi = t.GetProperty(_prop);
+                    _propCache[t] = pi;
+                }
+                try { return pi?.GetValue(o); } catch { return null; }
+            }
+
+            /// <summary>Extrai (numero × magnitude) de textos do TM. "—"/vazio = NaN.</summary>
+            internal static bool TryParseTmNumber(string s, out double value)
+            {
+                value = double.NaN;
+                if (string.IsNullOrWhiteSpace(s)) return false;
+                string t = s.Trim();
+                if (t == "—" || t == "-" ||
+                    t.Equals("N/A", StringComparison.OrdinalIgnoreCase)) return false;
+                var m = System.Text.RegularExpressions.Regex.Match(t, @"^[\d\.,]+");
+                if (!m.Success) return false;
+                string num = m.Value, rest = t.Substring(m.Length).Trim().ToUpperInvariant();
+                // pt-BR: com virgula decimal, os pontos sao milhar ("36.794" = 36794).
+                // Sem virgula: "8.402" com 3 casas no fim tambem e milhar; resto e decimal.
+                if (num.Contains(','))
+                    num = num.Replace(".", "").Replace(',', '.');
+                else if (System.Text.RegularExpressions.Regex.IsMatch(num, @"^\d{1,3}(\.\d{3})+$"))
+                    num = num.Replace(".", "");
+                if (!double.TryParse(num, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double n))
+                    return false;
+                double mag = 1;
+                if (rest.StartsWith("GB")) mag = 1024.0 * 1024 * 1024;
+                else if (rest.StartsWith("MB")) mag = 1024.0 * 1024;
+                else if (rest.StartsWith("KB")) mag = 1024.0;
+                else if (rest.StartsWith("US") || rest.StartsWith("μS")) mag = 0.001; // microssegundos -> ms
+                value = n * mag;
+                return true;
+            }
+        }
+
         /// <summary>
-        /// Ordena a lista de processos pelo criterio atual. O rank do grupo vem SEMPRE
-        /// primeiro (Aplicativos → 2º plano → Windows, paridade TMOG) e o desempate usa a
-        /// posicao ANTERIOR (anti-pisca) e o nome.
+        /// Handler GENERICO de clique no cabecalho para os grids secundarios (Latencia x4,
+        /// Disco). Alterna o sentido, aplica CustomSort numerico-inteligente na view e pinta
+        /// a seta. O criterio fica guardado em _tmGridSort e e reaplicado (RefreshTmGridSort)
+        /// no fim de cada atualizacao — sem isso o refresh desfazia a ordem.
+        /// </summary>
+        private void TmGrid_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            try
+            {
+                e.Handled = true;
+                if (sender is not System.Windows.Controls.DataGrid dg) return;
+                string prop = e.Column?.SortMemberPath ?? "";
+                if (string.IsNullOrEmpty(prop)) return;
+                string key = dg.Name;
+                ListSortDirection dir = ListSortDirection.Descending;
+                if (_tmGridSort.TryGetValue(key, out var cur) && cur.Prop == prop)
+                    dir = cur.Dir == ListSortDirection.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
+                else if (prop == "Nome" || prop == "Name" || prop == "ProcessName" || prop == "Descricao")
+                    dir = ListSortDirection.Ascending;
+                _tmGridSort[key] = (prop, dir);
+                if (System.Windows.Data.CollectionViewSource.GetDefaultView(dg.ItemsSource) is System.Windows.Data.ListCollectionView view)
+                {
+                    view.CustomSort = new TmValueComparer(prop, dir);
+                    view.Refresh();
+                }
+                foreach (var c in dg.Columns) c.SortDirection = null;
+                var active = dg.Columns.FirstOrDefault(c => c.SortMemberPath == prop);
+                if (active != null) active.SortDirection = dir;
+            }
+            catch { }
+        }
+
+        /// <summary>Reaplica o sort guardado do grid (chamar no fim de cada atualizacao).</summary>
+        private void RefreshTmGridSort(System.Windows.Controls.DataGrid? dg)
+        {
+            try
+            {
+                if (dg == null) return;
+                if (!_tmGridSort.TryGetValue(dg.Name, out var cur)) return;
+                if (System.Windows.Data.CollectionViewSource.GetDefaultView(dg.ItemsSource) is not System.Windows.Data.ListCollectionView view) return;
+                if (view.CustomSort is not TmValueComparer) view.CustomSort = new TmValueComparer(cur.Prop, cur.Dir);
+                view.Refresh();
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Ordena a lista de processos pelo criterio atual.
+        ///
+        /// METRICAS (CPU/RAM/Disco/Rede/GPU/Pico/Tempo de CPU/Page faults/Commit/PID/Threads):
+        /// ordem GLOBAL pela metrica — quem usa mais RAM naquele momento aparece no topo
+        /// independente do grupo (Aplicativos/2o plano/Windows). O grupo vira so desempate.
+        /// Antes o rank do grupo era SEMPRE a chave primaria, entao um processo de 1,6 GB
+        /// em "Segundo plano" ficava ABAIXO de um de 300 MB em "Aplicativos" e o filtro
+        /// de Memoria parecia "incorreto".
+        ///
+        /// TEXTO (Nome/Status/Usuario): mantem o rank do grupo primeiro (Aplicativos →
+        /// 2o plano → Windows, paridade TMOG) e ordena alfabeticamente dentro do grupo.
         ///
         /// Cobre QUALQUER SortMemberPath: numericas via MetricOf, texto por string e as
         /// colunas Status/Usuario/Threads/PID. Antes, quem nao tinha um case caia no
@@ -1867,6 +2116,18 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             bool asc = _currentSortDirection == ListSortDirection.Ascending;
             string col = string.IsNullOrEmpty(_currentSortColumn) ? "CpuValue" : _currentSortColumn;
+
+            bool isTextColumn = IsTextSortColumn(col);
+            if (!isTextColumn)
+            {
+                // Metrica: ordem global, sem o rank do grupo na frente. Arredonda em 1 casa
+                // (anti-pisca: a metrica oscila decimos a cada segundo) e desempatas pela
+                // posicao ANTERIOR — so troca de lugar quem realmente passou a frente.
+                IOrderedEnumerable<ProcessRow> g = asc
+                    ? src.OrderBy(r => Math.Round(MetricOf(r, col), 1))
+                    : src.OrderByDescending(r => Math.Round(MetricOf(r, col), 1));
+                return g.ThenBy(r => rank(r.Group)).ThenBy(tieBreaker).ThenBy(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+            }
 
             IOrderedEnumerable<ProcessRow> q = src.OrderBy(r => rank(r.Group));
             switch (col)
@@ -2110,6 +2371,12 @@ private void ApplyFilter(string query)
             bool isFirstLoad = false;
             try { isFirstLoad = _groupedLive.Count == 0 && string.IsNullOrEmpty(query); } catch { }
 
+            // Geração do filtro: ApplyFilter é fire-and-forget (Task.Run + Dispatcher) e o
+            // refresh de 1 s dispara OUTRO ApplyFilter em paralelo. Sem esta guarda o
+            // resultado de uma busca antiga podia chegar ao Dispatcher DEPOIS da nova e a
+            // lista voltava a mostrar o filtro velho — o "às vezes o filtro não funciona".
+            int gen = Interlocked.Increment(ref _filterGeneration);
+
             _ = Task.Run(() =>
             {
                 if (!string.IsNullOrEmpty(query))
@@ -2153,6 +2420,29 @@ private void ApplyFilter(string query)
                     var groupIcon = first.ProcessIcon ?? members.Select(m => m.ProcessIcon).FirstOrDefault(i => i != null);
                     // Usuário do grupo = o dominante entre os membros (paridade TMOG: toda linha mostra usuário)
                     var domUser = members.Where(m => !string.IsNullOrEmpty(m.UserName)).GroupBy(m => m.UserName).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? "";
+                    // Agregados do grupo: TODA coluna ordenavel precisa do valor agregado aqui.
+                    // Antes GpuValue/Pico/TempoCPU/PageFaults/Commit (e Disk/Network vindos so do
+                    // first) ficavam em 0 ou no valor de 1 membro — clicar nessas colunas nao
+                    // mudava nada (tudo empatava) e o texto exibia dado de 1 processo so.
+                    // Regras: taxas e contadores SOMAM (CPU/RAM/Disco/Rede/GPU/threads/handles/
+                    // tempo/faults/commit); pico e MAX (picos acontecem em instantes diferentes).
+                    var totalDisk = g.Sum(r => r.DiskReadBytesPerSec + r.DiskWriteBytesPerSec);
+                    var totalNet = g.Sum(r => r.NetBytesPerSec);
+                    bool groupHasGpu = members.Any(m => m.Gpu != "—" && m.Gpu != "N/A");
+                    var totalGpu = groupHasGpu ? g.Sum(r => r.GpuValue) : 0;
+                    string groupGpuCell = !groupHasGpu ? "—"
+                        : (totalGpu >= 10 ? $"{totalGpu:F0}%" : $"{totalGpu:F1}%");
+                    var peakMb = members.Count > 0 ? members.Max(m => m.PeakMemValue) : 0;
+                    string peakCell = peakMb > 0.5
+                        ? (peakMb >= 1024 ? $"{peakMb / 1024:F1} GB" : $"{peakMb:F0} MB") : "—";
+                    var totalCpuSec = g.Sum(r => r.CpuTimeSec);
+                    var cpuSpan = TimeSpan.FromSeconds(totalCpuSec);
+                    string cpuTimeCell = totalCpuSec >= 1
+                        ? $"{(int)cpuSpan.TotalHours:00}:{cpuSpan.Minutes:00}:{cpuSpan.Seconds:00}" : "—";
+                    long totalPf = g.Sum(r => (long)r.PageFaultsValue);
+                    string pfCell = totalPf > 0 ? totalPf.ToString("N0") : "—";
+                    long totalThreads = members.Sum(m => long.TryParse(m.Threads, out long th) ? th : 0);
+                    long totalHandles = members.Sum(m => long.TryParse(m.Handles, out long h) ? h : 0);
                     var row = new ProcessRow
                     {
                         Name = first.Name,
@@ -2162,20 +2452,28 @@ private void ApplyFilter(string query)
                         CpuValue = totalCpu,
                         RamMB = totalRam > 1024 ? $"{totalRam / 1024:F1} GB" : $"{totalRam:F0} MB",
                         RamValue = totalRam,
-                        Handles = first.Handles,
-                        Threads = first.Threads,
+                        Handles = count > 1 ? totalHandles.ToString("N0") : first.Handles,
+                        Threads = count > 1 ? totalThreads.ToString("N0") : first.Threads,
                         Group = first.Group,
                         UserName = domUser,
                         Status = first.Status,
-                        Disk = first.Disk,
-                        DiskBytesPerSec = first.DiskBytesPerSec,
+                        Disk = count > 1 ? FormatBytesSpeed(totalDisk) : first.Disk,
+                        DiskBytesPerSec = count > 1 ? totalDisk : first.DiskBytesPerSec,
                         DiskReadBytesPerSec = g.Sum(r => r.DiskReadBytesPerSec),
                         DiskWriteBytesPerSec = g.Sum(r => r.DiskWriteBytesPerSec),
                         DiskOpsPerSec = g.Sum(r => r.DiskOpsPerSec),
-                        Network = first.Network,
-                        NetworkConnections = first.NetworkConnections,
-                        NetBytesPerSec = g.Sum(r => r.NetBytesPerSec),
-                        Gpu = first.Gpu,
+                        Network = count > 1 ? FormatBytesSpeed(totalNet) : first.Network,
+                        NetworkConnections = members.Sum(m => m.NetworkConnections),
+                        NetBytesPerSec = totalNet,
+                        Gpu = count > 1 ? groupGpuCell : first.Gpu,
+                        GpuValue = count > 1 ? totalGpu : first.GpuValue,
+                        PeakMemMB = count > 1 ? peakCell : first.PeakMemMB,
+                        PeakMemValue = count > 1 ? peakMb : first.PeakMemValue,
+                        CpuTime = count > 1 ? cpuTimeCell : first.CpuTime,
+                        CpuTimeSec = count > 1 ? totalCpuSec : first.CpuTimeSec,
+                        PageFaults = count > 1 ? pfCell : first.PageFaults,
+                        PageFaultsValue = count > 1 ? totalPf : first.PageFaultsValue,
+                        CommitMB = g.Sum(r => r.CommitMB),
                         Path = first.Path,
                         ParentPid = first.ParentPid,
                         ProtectedBadge = first.ProtectedBadge,
@@ -2237,7 +2535,10 @@ private void ApplyFilter(string query)
                     return row;
                 }).ToList();
 
-                _filteredRows = grouped;
+                // _filteredRows NAO e atribuido aqui: esta generation pode ser descartada
+                // la no Dispatcher (filtro mais novo em andamento) e a atribuicao aqui deixaria
+                // a exportacao CSV com o filtro VELHO. Ele e publicado dentro do Dispatcher,
+                // depois da guarda.
                 int total = rows.Count;
                 int apps = rows.Count(r => r.Group == "Aplicativos");
                 int bg = rows.Count(r => r.Group == "Processos em segundo plano");
@@ -2245,6 +2546,9 @@ private void ApplyFilter(string query)
 
                 Dispatcher.InvokeAsync(() =>
                 {
+                    // Chegou um filtro mais novo enquanto este era calculado: descarta.
+                    if (Volatile.Read(ref _filterGeneration) != gen) return;
+                    _filteredRows = grouped;
                     // Multi-seleção: preserva TODAS as linhas selecionadas no refresh (PID + GroupKey)
                     var selectedPids = new HashSet<int>();
                     var selectedKeys = new HashSet<string>();
@@ -2441,13 +2745,51 @@ private void ApplyFilter(string query)
 
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e) => await RefreshAsync();
 
+        private int _filterGeneration;
+
+        /// <summary>
+        /// Clique com o botão direito na lista de processos: seleciona a LINHA SOB O MOUSE
+        /// (o DataGrid não faz isso sozinho) e reescreve os itens de ação em massa. Sem isto o
+        /// menu agia sobre a seleção ANTIGA — o "menu não funciona" ao clicar numa linha.
+        /// </summary>
+        private void DgProcesses_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            try
+            {
+                if (RowUnderMouse(e.OriginalSource as DependencyObject) is DataGridRow row && row.DataContext is ProcessRow pr)
+                {
+                    bool already = DgProcesses.SelectedItems.OfType<ProcessRow>().Any(r => ReferenceEquals(r, pr));
+                    if (!already)
+                    {
+                        DgProcesses.SelectedItem = pr;
+                        try { DgProcesses.ScrollIntoView(pr); } catch { }
+                    }
+                }
+                UpdateMultiSelectionUi();
+                UpdateProcessActionButtons();
+            }
+            catch { }
+        }
+
+        /// <summary>Habilita/desabilha as ações da barra conforme há seleção (botões que "não faziam nada").</summary>
+        private void UpdateProcessActionButtons()
+        {
+            try
+            {
+                bool has = DgProcesses.SelectedItems.OfType<ProcessRow>().Any(r => !r.IsChild);
+                if (BtnFinalizar != null) BtnFinalizar.IsEnabled = has;
+                if (BtnForceStop != null) BtnForceStop.IsEnabled = has;
+            }
+            catch { }
+        }
+
         // ══════════════════════════════════════════════
         //  KEYBOARD SHORTCUTS
         // ══════════════════════════════════════════════
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.F5) { _ = RefreshAsync(); e.Handled = true; return; }
-            if (e.Key == Key.Delete) { Kill(false); e.Handled = true; return; }
+            if (e.Key == Key.Delete) { _ = KillAsync(false); e.Handled = true; return; }
             if (e.Key == Key.F && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             { TxtSearch?.Focus(); TxtSearch?.SelectAll(); e.Handled = true; return; }
             // Enter numa linha agrupada expande/recolhe (acessibilidade de teclado)
@@ -2464,7 +2806,7 @@ private void ApplyFilter(string query)
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Delete && DgProcesses?.SelectedItem != null) { Kill(false); e.Handled = true; }
+            if (e.Key == Key.Delete && DgProcesses?.SelectedItem != null) { _ = KillAsync(false); e.Handled = true; }
         }
 
         // ══════════════════════════════════════════════
@@ -2509,12 +2851,14 @@ private void ApplyFilter(string query)
                 if (MenuPriorityMulti != null) MenuPriorityMulti.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
                 if (multi)
                 {
-                    MenuKillMulti.Header = $"Finalizar {n} tarefas";
-                    MenuKillTreeMulti.Header = $"Finalizar {n} árvores";
-                    MenuSuspendMulti.Header = $"Suspender {n}";
-                    MenuResumeMulti.Header = $"Retomar {n}";
-                    MenuEcoQoSMulti.Header = $"Eficiência EcoQoS ({n})";
-                    MenuPriorityMulti.Header = $"Prioridade para {n}";
+                    // Headers dos itens "N" — o bloco acima já garante que existem, mas o
+                    // dereferenciar sem check era um NRE latente se o XAML mudasse.
+                    if (MenuKillMulti != null) MenuKillMulti.Header = $"Finalizar {n} tarefas";
+                    if (MenuKillTreeMulti != null) MenuKillTreeMulti.Header = $"Finalizar {n} árvores";
+                    if (MenuSuspendMulti != null) MenuSuspendMulti.Header = $"Suspender {n}";
+                    if (MenuResumeMulti != null) MenuResumeMulti.Header = $"Retomar {n}";
+                    if (MenuEcoQoSMulti != null) MenuEcoQoSMulti.Header = $"Eficiência EcoQoS ({n})";
+                    if (MenuPriorityMulti != null) MenuPriorityMulti.Header = $"Prioridade para {n}";
                 }
             }
             catch { }
@@ -2538,6 +2882,7 @@ private void ApplyFilter(string query)
         private void DgProcesses_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateMultiSelectionUi();
+            UpdateProcessActionButtons();
 
             var row = SelectedRow;
             if (row == null) return;
@@ -2717,6 +3062,20 @@ private void ApplyFilter(string query)
 
         private void DgProcesses_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            // Duplo clique NO CABEÇALHO (para alternar maior→menor/menor→maior) caia aqui e
+            // abria a pasta do processo selecionado — o Sorting já tratou a troca de ordem,
+            // o duplo clique no header não pode ter efeito colateral. Ignora sem Handled
+            // (o Sorting precisa do evento; só não executa a ação de linha).
+            try
+            {
+                DependencyObject? cur = e.OriginalSource as DependencyObject;
+                while (cur != null)
+                {
+                    if (cur is System.Windows.Controls.Primitives.DataGridColumnHeader) return;
+                    cur = System.Windows.Media.VisualTreeHelper.GetParent(cur);
+                }
+            }
+            catch { }
             // Estilo Gerenciador de Tarefas: duplo clique num app agrupado expande/recolhe
             // os processos abaixo dele; nos demais abre a pasta do executável.
             if (SelectedRow is ProcessRow row && !row.IsChild && row.RawChildren.Count > 0)
@@ -2731,66 +3090,107 @@ private void ApplyFilter(string query)
         // ══════════════════════════════════════════════
         //  KILL ACTIONS (with instant removal)
         // ══════════════════════════════════════════════
-        private void BtnKill_Click(object sender, RoutedEventArgs e) => Kill(false);
-        private void MenuKill_Click(object sender, RoutedEventArgs e) => Kill(false);
-        private void BtnKillTree_Click(object sender, RoutedEventArgs e) => Kill(true);
-        private void MenuKillTree_Click(object sender, RoutedEventArgs e) => Kill(true);
+        private async void BtnKill_Click(object sender, RoutedEventArgs e) => await KillAsync(false);
+        private async void MenuKill_Click(object sender, RoutedEventArgs e) => await KillAsync(false);
+        private async void BtnKillTree_Click(object sender, RoutedEventArgs e) => await KillAsync(true);
+        private async void MenuKillTree_Click(object sender, RoutedEventArgs e) => await KillAsync(true);
 
-        private void Kill(bool tree)
+        // O encerramento roda em Task.Run: KillTree faz GetChildPidsSafe (WMI-free mas
+        // percorre a arvore) e o fallback ForceStopUnlockService.Unlock abre handles de
+        // processo/driver - tudo isso congelava a interface com a selecao multiple.
+        private async Task KillAsync(bool tree)
         {
             var targets = SelectedRows;
             if (targets.Count == 0) { TxtStatus.Text = "Selecione um processo primeiro."; return; }
 
-            int ok = 0, fail = 0;
-            foreach (var row in targets)
+            TxtStatus.Text = tree ? $"Finalizando {targets.Count} processo(s) e filhos..." : $"Finalizando {targets.Count} processo(s)...";
+
+            var snapshot = targets.Where(r => r != null).ToList();
+
+            // Linha de GRUPO (ex.: "PING.EXE (6)") so tem o PID representativo: matar esse
+            // deixava N-1 vivos, que voltavam no refresh seguinte como se o botao nao tivesse
+            // feito nada. O alvo real de "Finalizar" num grupo e TODOS os membros.
+            var wanted = snapshot.SelectMany(r => KillTargets(r)).Distinct().ToList();
+            var pathByPid = new Dictionary<int, string>();
+            foreach (var r in snapshot)
             {
-                if (row == null) continue;
-                try
-                {
-                    if (tree)
-                    {
-                        KillTree(row.Pid);
-                        ok++;
-                    }
-                    else
-                    {
-                        try
-                        {
-                            using var p = Process.GetProcessById(row.Pid);
-                            if (p == null || p.HasExited) { fail++; continue; }
-                            if (!p.CloseMainWindow()) p.Kill(entireProcessTree: true);
-                            ok++;
-                        }
-                        catch (System.ComponentModel.Win32Exception)
-                        {
-                            // Try Force Stop via our engine
-                            try
-                            {
-                                string target = !string.IsNullOrEmpty(row.Path) && File.Exists(row.Path) ? row.Path : row.Name;
-                                ForceStopUnlockService.Unlock(target, new List<BlockingProcessInfo>(), deleteTarget: false);
-                                ok++;
-                            }
-                            catch { fail++; }
-                        }
-                    }
-                }
-                catch (InvalidOperationException) { fail++; }
-                catch { fail++; }
+                if (!string.IsNullOrEmpty(r.Path)) pathByPid[r.Pid] = r.Path;
+                foreach (var c in r.RawChildren)
+                    if (!string.IsNullOrEmpty(c.Path)) pathByPid[c.Pid] = c.Path;
             }
 
-            TxtStatus.Text = targets.Count == 1
+            var result = await Task.Run(() =>
+            {
+                int ok = 0, fail = 0;
+                foreach (var pid in wanted)
+                {
+                    try
+                    {
+                        if (tree)
+                        {
+                            KillTree(pid);
+                            ok++;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                using var p = Process.GetProcessById(pid);
+                                if (p == null || p.HasExited) { fail++; continue; }
+                                if (!p.CloseMainWindow()) p.Kill(entireProcessTree: true);
+                                ok++;
+                            }
+                            catch (System.ComponentModel.Win32Exception)
+                            {
+                                // Try Force Stop via our engine
+                                try
+                                {
+                                    string path = pathByPid.TryGetValue(pid, out var pv) ? pv : "";
+                                    string target = !string.IsNullOrEmpty(path) && File.Exists(path)
+                                        ? path
+                                        : (wanted.Count == 1 ? snapshot[0].Name : path);
+                                    ForceStopUnlockService.Unlock(target, new List<BlockingProcessInfo>(), deleteTarget: false);
+                                    ok++;
+                                }
+                                catch { fail++; }
+                            }
+                        }
+                    }
+                    catch (InvalidOperationException) { fail++; }
+                    catch { fail++; }
+                }
+                return (ok, fail);
+            });
+            int ok = result.ok, fail = result.fail;
+
+            TxtStatus.Text = wanted.Count == 1 && snapshot.Count == 1
                 ? (fail == 0
-                    ? (tree ? $"❌ {targets[0].Name} (PID {targets[0].Pid}) + filhos finalizados." : $"❌ {targets[0].Name} (PID {targets[0].Pid}) finalizado.")
-                    : $"{targets[0].Name}: acesso negado. Use Force Stop.")
-                : $"❌ {ok}/{targets.Count} finalizados" + (fail > 0 ? $" ({fail} com acesso negado/já encerrados)" : "");
+                    ? (tree ? $"❌ {snapshot[0].Name} (PID {snapshot[0].Pid}) + filhos finalizados." : $"❌ {snapshot[0].Name} (PID {snapshot[0].Pid}) finalizado.")
+                    : $"{snapshot[0].Name}: acesso negado. Use Force Stop.")
+                : $"❌ {ok}/{wanted.Count} processos finalizados" + (fail > 0 ? $" ({fail} com acesso negado/já encerrados)" : "");
 
             // Instant removal from UI
             lock (_lock)
             {
-                var pids = new HashSet<int>(targets.Select(t => t.Pid));
+                var pids = new HashSet<int>(wanted);
                 _allRows.RemoveAll(r => pids.Contains(r.Pid));
             }
             ApplyFilter(_lastSearchQuery);
+        }
+
+        /// <summary>
+        /// PIDs a finalizar para uma linha. Linha de GRUPO devolve TODOS os membros
+        /// (RawChildren); linha simples ou já-filho devolve o proprio PID.
+        /// </summary>
+        private static List<int> KillTargets(ProcessRow? row)
+        {
+            if (row == null) return new List<int>();
+            if (!row.IsChild && row.RawChildren.Count > 0)
+            {
+                var pids = row.RawChildren.Where(c => c.Pid > 0).Select(c => c.Pid).ToList();
+                if (pids.Count > 0) return pids;
+            }
+            return new List<int> { row.Pid };
         }
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -2921,26 +3321,67 @@ private void ApplyFilter(string query)
             var row = SelectedRow;
             if (row == null) { TxtStatus.Text = "Selecione um processo para Force Stop."; return; }
 
-            TxtStatus.Text = $"Force Stop {row.Name}...";
-            await Task.Run(() =>
+            // Mesmo agrupamento do Kill: num grupo, Force Stop tem de atingir TODOS os membros.
+            var wanted = KillTargets(row);
+            var pathByPid = new Dictionary<int, string>();
+            if (!string.IsNullOrEmpty(row.Path)) pathByPid[row.Pid] = row.Path;
+            foreach (var c in row.RawChildren)
+                if (!string.IsNullOrEmpty(c.Path)) pathByPid[c.Pid] = c.Path;
+
+            TxtStatus.Text = wanted.Count > 1
+                ? $"Force Stop {row.DisplayName} ({wanted.Count} processos)..."
+                : $"Force Stop {row.Name}...";
+
+            int done = await Task.Run(() =>
             {
-                try
+                int n = 0;
+                // FindBlockingProcesses/Unlock sao por BINARIO: N instancias do mesmo exe
+                // partilham target e bloqueios. Medido: 4 pings = 33,4 s (8,3 s cada) em
+                // serie; agrupar por caminho resolve o grupo com UMA chamada so.
+                var porAlvo = wanted.GroupBy(pid =>
                 {
-                    string target = !string.IsNullOrEmpty(row.Path) && (File.Exists(row.Path) || Directory.Exists(row.Path)) ? row.Path : row.Name;
-                    var blocking = ForceStopUnlockService.FindBlockingProcesses(target);
-                    if (blocking.Count == 0)
+                    string p = pathByPid.TryGetValue(pid, out var pv) ? pv : "";
+                    return !string.IsNullOrEmpty(p) && (File.Exists(p) || Directory.Exists(p)) ? p : row.Name;
+                });
+
+                foreach (var grp in porAlvo)
+                {
+                    var alive = new List<int>();
+                    foreach (var pid in grp)
                     {
-                        try { using var p = Process.GetProcessById(row.Pid); p.Kill(entireProcessTree: true); } catch { }
+                        try { using var p = Process.GetProcessById(pid); if (!p.HasExited) alive.Add(pid); }
+                        catch { }
                     }
-                    else ForceStopUnlockService.Unlock(target, blocking, deleteTarget: false);
+                    if (alive.Count == 0) continue;
+                    n += alive.Count;
+
+                    try
+                    {
+                        var blocking = ForceStopUnlockService.FindBlockingProcesses(grp.Key);
+                        if (blocking.Count > 0)
+                            ForceStopUnlockService.Unlock(grp.Key, blocking, deleteTarget: false);
+                    }
+                    catch (Exception ex) { Logger.Log($"[KIT TASK MANAGER] {row.Name} ({grp.Key}): {ex.Message}"); }
+
+                    foreach (var pid in alive)
+                    {
+                        try { using var p = Process.GetProcessById(pid); p.Kill(entireProcessTree: true); }
+                        catch { }
+                    }
                 }
-                catch (Exception ex) { Logger.Log($"[KIT TASK MANAGER] {row.Name}: {ex.Message}"); }
+                return n;
             });
 
             // Instant removal
-            lock (_lock) { _allRows.RemoveAll(r => r.Pid == row.Pid); }
+            lock (_lock)
+            {
+                var pids = new HashSet<int>(wanted);
+                _allRows.RemoveAll(r => pids.Contains(r.Pid));
+            }
             ApplyFilter(_lastSearchQuery);
-            TxtStatus.Text = $"❌ Force Stop {row.Name} concluído.";
+            TxtStatus.Text = wanted.Count > 1
+                ? $"❌ Force Stop {row.DisplayName}: {done}/{wanted.Count} processos encerrados."
+                : $"❌ Force Stop {row.Name} concluído.";
         }
 
         // ══════════════════════════════════════════════

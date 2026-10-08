@@ -400,7 +400,7 @@ namespace KitLugia.GUI.Pages
 
             await RunWithLoadingAsync($"Removendo {kb} (wusa /uninstall)...", async () =>
             {
-                var result = await Task.Run(() => UpdateControlManager.UninstallUpdate(kb));
+                var result = await UpdateControlManager.UninstallUpdateAsync(kb);
                 var desc = UpdateControlManager.DescribeExitCode(result.ExitCode);
                 var msg = $"{kb}: {desc}";
                 if (result.ExitCode == 0 || result.ExitCode == 3010)
@@ -444,7 +444,7 @@ namespace KitLugia.GUI.Pages
 
             await RunWithLoadingAsync("Instalando update...", async () =>
             {
-                var result = await Task.Run(() => UpdateControlManager.InstallUpdatePackage(path));
+                var result = await UpdateControlManager.InstallUpdatePackageAsync(path);
                 var msg = UpdateControlManager.DescribeExitCode(result.ExitCode);
                 if (result.ExitCode == 0 || result.ExitCode == 3010)
                     ShowInfo("Sucesso", msg);

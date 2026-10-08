@@ -52,8 +52,13 @@ namespace KitLugia.GUI.Controls
             CboCpuPriority.SelectedIndex = cpuIdx;
             CboEfficiencyMode.SelectedIndex = _config.ThreadEfficiencyMode ? 1 : 0;
             CboIoPriority.SelectedIndex = _config.IoPriorityLevel switch { 0 => 0, 1 => 1, 2 => 2, 3 => 3, _ => 1 };
-            CboPagePriority.SelectedIndex = _config.PagePriorityLevel >= 1 ? 1 : 0;
-            CboMemoryPriority.SelectedIndex = _config.ThreadMemoryPriority switch { 0 => 0, 1 => 1, 2 => 2, 3 => 3, _ => 0 };
+            // Escala oficial 1..5 (5 = Normal = default). O 0 legado e' tratado como 5.
+            CboPagePriority.SelectedIndex = (_config.PagePriorityLevel <= 1 ? 5
+                                        : _config.PagePriorityLevel >= 5 ? 5
+                                        : _config.PagePriorityLevel) - 1;
+            CboMemoryPriority.SelectedIndex = (_config.ThreadMemoryPriority <= 1 ? 5
+                                        : _config.ThreadMemoryPriority >= 5 ? 5
+                                        : _config.ThreadMemoryPriority) - 1;
 
             ChkTimerBoost.IsChecked = _config.TimerBoost;
             ChkNetworkBoost.IsChecked = _config.NetworkBoost;
@@ -104,8 +109,9 @@ namespace KitLugia.GUI.Controls
             };
             _config.ThreadEfficiencyMode = CboEfficiencyMode.SelectedIndex == 1;
             _config.IoPriorityLevel = CboIoPriority.SelectedIndex;
-            _config.PagePriorityLevel = CboPagePriority.SelectedIndex >= 1 ? 1 : 0;
-            _config.ThreadMemoryPriority = CboMemoryPriority.SelectedIndex;
+            // Indice 0..4 -> escala oficial 1..5 (SelectedIndex + 1).
+            _config.PagePriorityLevel = CboPagePriority.SelectedIndex + 1;
+            _config.ThreadMemoryPriority = CboMemoryPriority.SelectedIndex + 1;
             _config.TimerBoost = ChkTimerBoost.IsChecked == true;
             _config.NetworkBoost = ChkNetworkBoost.IsChecked == true;
             _config.ProBalance = ChkProBalance.IsChecked == true;

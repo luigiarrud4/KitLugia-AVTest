@@ -294,16 +294,6 @@ namespace KitLugia.Core.TaskManager
                 try { c?.Dispose(); } catch { }
         }
 
-        public static void ResetCounters()
-        {
-            lock (_counterLock)
-            {
-                foreach (var kv in _counters) DisposeCounterSet(kv.Value);
-                _counters.Clear();
-                _categoryError = "";
-            }
-        }
-
         /// <summary>Nomes das instâncias de disco físico ("0 D:", "1 C:", ...). Vazio = categoria indisponível.</summary>
         public static List<string> GetInstanceNames()
         {
