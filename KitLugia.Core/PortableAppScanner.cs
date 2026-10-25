@@ -144,6 +144,10 @@ namespace KitLugia.Core
 
         public static List<PortableAppEntry> Scan(Action<int, int>? progress = null, CancellationToken ct = default)
         {
+            // Cancelado ANTES de comecar (o usuario ja trocou de pagina): nao faz nem o
+            // scan de MFT (na primeira vez leva ~20 s) e devolve vazio na hora.
+            if (ct.IsCancellationRequested) return new List<PortableAppEntry>();
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var installedPaths = GetInstalledProgramPaths();
             var scanLocations = GetScanLocations();
@@ -206,22 +210,38 @@ namespace KitLugia.Core
             int done = 0;
             var gate = new object();
 
-            var po = new ParallelOptions { CancellationToken = ct };
-            Parallel.ForEach(candidates, po, c =>
+            // CANCELAMENTO NAO PODE ESCAPAR (25/10/2026). Clicar em Atualizar (ou
+            // navegar para outra pagina) no meio do scan cancela o token, e o
+            // Parallel.ForEach + os ct.ThrowIfCancellationRequested() de dentro lancam
+            // OperationCanceledException. Ela saia daqui, virava a task do chamador e
+            // chegava ao handler global/debugger como erro real:
+            //   System.OperationCanceledException ... PortableAppScanner.Scan (linha 210)
+            //   ... AppsPage.LoadPortableApps (linha 1322)
+            // Agora o cancelamento devolve o que JA foi analisado (lista parcial, sem
+            // excecao nenhuma) — o usuario vê o resultado em vez de um aviso de erro.
+            try
             {
-                var entry = c.IsMft
-                    ? AnalyzeFolderMft(c.Rec, c.FolderPath, c.Index!, installedPaths, ct)
-                    : AnalyzeFolder(c.FolderPath, installedPaths, ct);
-                if (entry != null)
+                var po = new ParallelOptions { CancellationToken = ct };
+                Parallel.ForEach(candidates, po, c =>
                 {
-                    lock (gate) results.Add(entry);
-                }
-                if (progress != null)
-                {
-                    int d = Interlocked.Increment(ref done);
-                    if ((d & 0x3F) == 0 || d == total) progress(d, total);
-                }
-            });
+                    var entry = c.IsMft
+                        ? AnalyzeFolderMft(c.Rec, c.FolderPath, c.Index!, installedPaths, ct)
+                        : AnalyzeFolder(c.FolderPath, installedPaths, ct);
+                    if (entry != null)
+                    {
+                        lock (gate) results.Add(entry);
+                    }
+                    if (progress != null)
+                    {
+                        int d = Interlocked.Increment(ref done);
+                        if ((d & 0x3F) == 0 || d == total) progress(d, total);
+                    }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.Log($"[Portatil] Scan cancelado pelo usuario ({results.Count} app(s) antes do cancelamento).");
+            }
 
             Logger.Log($"[Portatil] {results.Count} app(s) detectado(s) em {sw.Elapsed.TotalSeconds:N1}s");
             return results.OrderByDescending(r => r.Confidence)
