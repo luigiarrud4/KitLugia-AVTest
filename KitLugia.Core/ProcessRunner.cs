@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 
 namespace KitLugia.Core
@@ -10,7 +10,7 @@ namespace KitLugia.Core
             try
             {
                 // Encoding OEM (cp850/cp437/65001): ferramentas nativas emitem OEM;
-                // ler como UTF-8 fixo gerava mojibake ("[SC] ChangeServiceConfig �XITO").
+ // ler como UTF-8 fixo gerava mojibake ("[SC] ChangeServiceConfig XITO").
                 var oem = SystemUtils.GetOemEncoding();
                 using var process = new Process
                 {

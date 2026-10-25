@@ -782,6 +782,74 @@ namespace KitLugia.GUI
                     NavigateToPage(PageType.TraySettings);
                 });
             };
+            // Tray -> abre o Kit Task Manager (mesma defensiva do topbar: uma
+            // falha ao abrir o gerenciador NUNCA derruba o kit).
+            _trayService.OnOpenTaskManager += () =>
+            {
+                try
+                {
+                    var w = Windows.TaskManager.KitTaskManagerWindow.OpenOrActivate(this);
+                    w.Show();
+                    Logger.Log("[KIT TASK MANAGER] Aberto pelo menu da bandeja.");
+                }
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        Windows.TaskManager.KitTaskManagerWindow.DiscardBrokenInstance();
+                        Logger.LogError("TrayTaskManager", $"Falha ao abrir gerenciador: {ex}");
+                    }
+                    catch { }
+                }
+            };
+            // Tray -> atalhos de navegacao do menu (resolvidos aqui, porque a
+            // TAG e' o contrato entre o TrayIconService e a MainWindow).
+            _trayService.OnNavigateTo += tag =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    switch (tag)
+                    {
+                        case "busca":
+                            ShowAndActivateFromTray();
+                            FocusGlobalSearch();
+                            break;
+                        case "diagnostico":
+                            ShowAndActivateFromTray();
+                            NavigateToPage(PageType.Diagnostic);
+                            break;
+                        case "aplicativos":
+                            ShowAndActivateFromTray();
+                            NavigateToPage(PageType.Apps);
+                            break;
+                        case "reparos":
+                            ShowAndActivateFromTray();
+                            NavigateToPage(PageType.Repairs);
+                            break;
+                        case "tweaks":
+                            ShowAndActivateFromTray();
+                            NavigateToPage(PageType.Tweaks);
+                            break;
+                        // Config de RAM = pagina do monitor/limitador; Config do Kit
+                        // = a mesma que a engrenagem abre (SettingsPage).
+                        case "cfg_ram":
+                            ShowAndActivateFromTray();
+                            NavigateToPage(PageType.TraySettings);
+                            break;
+                        case "cfg_kit":
+                            try
+                            {
+                                ShowAndActivateFromTray();
+                                CleanupAndNavigate(new SettingsPage());
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError("TraySettingsKit", $"Erro: {ex.Message}");
+                            }
+                            break;
+                    }
+                });
+            };
             // Defer heavy tray init to Background priority so window appears faster
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -854,7 +922,9 @@ namespace KitLugia.GUI
                         }
                         else
                         {
-                            Logger.Log("✅ Tray Icon está saudável");
+                            // LogOnce: o TrayIconService também faz este check — sem a
+                            // chave compartilhada a linha saía duplicada no mesmo segundo.
+                            Logger.LogOnce("tray|saudavel", "✅ Tray Icon está saudável", heartbeatSeconds: 3600);
                         }
                     };
                     _healthCheckTimer.Start();
@@ -1010,14 +1080,30 @@ namespace KitLugia.GUI
         }
 
         // 🎮 Atalhos de teclado globais
-        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        /// <summary>
+        /// Foca a barra de busca global. Usado pelo atalho de teclado e pelo
+        /// item "Busca Global" do menu da bandeja.
+        /// </summary>
+        private void FocusGlobalSearch()
         {
-            // Ctrl+F: focar barra de pesquisa
-            if (e.Key == Key.F && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            try
             {
-                e.Handled = true;
+                if (SearchPopup != null && SearchPopup.IsOpen) SearchPopup.IsOpen = false;
                 TxtGlobalSearch?.Focus();
                 TxtGlobalSearch?.SelectAll();
+            }
+            catch (Exception ex) { Logger.LogWarning("MainWindow.FocusGlobalSearch", ex.Message); }
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // Ctrl+F / Ctrl+K: focar barra de pesquisa
+            // (as mensagens de "página não encontrada" do app citavam Ctrl+K,
+            //  mas so o Ctrl+F estava implementado — os dois funcionam agora)
+            if ((e.Key == Key.F || e.Key == Key.K) && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                e.Handled = true;
+                FocusGlobalSearch();
                 return;
             }
 
@@ -1801,7 +1887,7 @@ namespace KitLugia.GUI
             }
         }
 
-        // � MODO DESENVOLVEDOR: Atualiza visibilidade do menu de debug
+ // MODO DESENVOLVEDOR: Atualiza visibilidade do menu de debug
         public void UpdateDebugMenuVisibility(bool isDeveloperMode)
         {
             try
@@ -1826,7 +1912,7 @@ namespace KitLugia.GUI
             }
         }
 
-        // �🔥 LIMPEZA MANUAL: Botão para forçar limpeza de memory leaks
+ // 🔥 LIMPEZA MANUAL: Botão para forçar limpeza de memory leaks
         private async void BtnCleanMemory_Click(object sender, RoutedEventArgs e)
         {
             try

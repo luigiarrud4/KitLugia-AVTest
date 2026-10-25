@@ -1,4 +1,398 @@
 ﻿# KitLugia — AGENTS.md
+### Sessao 24/10 (cont.) - FECHAMENTO DE RELEASE: versao do updater, versao do kit e higiene de repo
+
+Pedido: "veja se tem pendencias para o kit e ja faca, vou fazer um release manual".
+
+**1. BUG DE RELEASE no updater (`GitHubUpdater.GetCurrentVersion`):** usava
+`Assembly.GetExecutingAssembly()` = o proprio **KitLugia.Core**, que nao tem `<Version>` no
+csproj. O kit publicado pelo `Deploy.ps1` recebe `-p:Version` (propriedade GLOBAL, alcanca o
+Core), por isso em producao o log mostrava "Versao atual: 2.0.29.0". Mas quem publica pelo
+**Visual Studio** nao passa nada -> o Core ficaria em **1.0.0.0** e o updater acharia TODA
+release mais nova (nag eterno; o `currentVersion` do batch de update tambem ia errado).
+Agora usa `Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()` — a MESMA ordem do
+`SmartVersionDetector.GetCurrentAssemblyVersion` (convencao do projeto).
+**Provado** com probe descartavel (`C:\klverprobe`, removido depois): entry=9.9.9.0,
+core=1.0.0.0 e o log real passou a imprimir "📦 Versao atual: 9.9.9.0" (antes: 1.0.0.0).
+
+**2. Versao do kit: 2.0.29 -> 2.0.61** (`KitLugia.GUI.csproj`: Version/AssemblyVersion/
+FileVersion). A ultima release publicada e' **v2.0.60** (cache em
+`%LOCALAPPDATA%\KitLugia\latest_release_cache.json`). Publicar pelo VS mantendo 2.0.29 faria o
+updater nunca oferecer a build nova para quem ja esta na 2.0.60. `KitLugia.Core` continua SEM
+`<Version>` (o updater nao depende mais dele; o Deploy segue mandando `-p:Version`).
+
+**3. Higiene de repo para o release:** `klbuild/` e `klrel/` (OutDir usado quando o app esta
+aberto travando a DLL) apareciam como `??` no `git status` e podiam entrar num `git add -A`;
+agora estao no `.gitignore`, junto de `KitLugia.GUI/*_wpftmp.csproj` (sobra temporaria do WPF).
+Os dois diretorios (artefatos de build) foram removidos.
+
+**4. ARMADILHA do `Deploy.ps1` no release manual (script NAO alterado — regra 2):** o
+`-CreateRelease` sem `-ReleaseTag` cria a tag `v$(Get-Date -Format 'yyyy.MM.dd')` (ex.:
+`v2026.10.25`), que o `ParseVersion` le como **2026.10.25** — MAIOR que 2.0.61, entao TODO
+cliente passaria a ver "nova versao" para sempre (instala, volta para 2.0.61, o nag volta).
+`$ReleaseTag` NAO e' derivado do `$Version`; passar SEMPRE
+`-Version 2.0.61 -CreateRelease -ReleaseTag v2.0.61 -ReleaseName "KitLugia 2.0.61"`.
+
+**Validacao:** solucao **0 erros** (148 avisos nullable pre-existentes, nenhum em
+`GitHubUpdater.cs`); `lognoise` 31/31; `PathRepairHarness` 18/18; `IslcPageVis` 38/38;
+`GpuHarness` ALL-PASS; `ClockHarness` ALL-PASS; `RamUsageHarness` ALL-PASS; `TmOrderHarness`
+ALL-PASS; `TmContextMenuHarness` ALL-PASS; `TrimProcessHarness` ALL-PASS; `CheckUiThreading`
+0 padroes novos. Encoding conferido (BOM/CRLF iguais ao HEAD; `KitTaskManager.Performance.cs`
+ja era LF puro no HEAD, sem mistura).
+
+**Pendencias que SOBRAM (nenhuma bloqueia o release):** testes que exigem reboot/VM (shrink
+via WinPE, downgrade de build, GameBarPresenceWriter no proximo boot, toggles da comunidade);
+`IntegrityCheckManager` (Core) e' codigo MORTO com um TODO que promete WMI de SMART — nenhum
+arquivo referencia a classe; e no repo existem 2 sobras de sessoes antigas que NAO devem ir no
+release: `Program.cs` na raiz (17/10) e `AGENTS.md.new` (785 KB, 19/10) — os dois entraram no
+`.gitignore` (arquivos MANTIDOS no disco, so nao caem mais num `git add -A`);
+`KitLugia.GUI/Resources/FilterCommands.cs` (TRACKED, script de sessao antiga com `class Program`
++ `Main`, ZERO referencias no codigo) e' codigo morto que compila dentro do exe.
+
+**QUIRK medido nesta sessao:** `-p:OutDir=klbuild/` RELATIVO cria `KitLugia.GUI/klbuild/` e o
+glob padrao do SDK compila a copia de `Resources\FilterCommands.cs` que vai para la -> **CS0101
+(Program definido 2x)** na `_wpftmp.csproj`, e o `dotnet run` dos harnesses morre (o build da
+solucao ainda passa, quem quebra e' o proximo que compila a GUI). Build de verificacao: OutDir
+FORA da arvore (`-p:OutDir=C:/kltmpbuild/`) + apagar `KitLugia.GUI/klbuild/`.
+
+### Sessao 24/10 - GPU com TODAS as metricas + ISLC automatico + fim do ruido de log + PATH do Sistema
+
+Pedido (prints): o painel da GPU tinha espaco sobrando e so UM grafico (a utilizacao agregada);
+os caches L1/L2/L3 apareciam lado a lado; o ISLC pedia os valores na mao; e o log real (10 min)
+tinha ~40 linhas repetidas (GameBoost AUTO, faixas, RAM Limiter, Standby) + o reparo do PATH
+despejava 1000+ caracteres de "Mantido" e mesmo assim dizia `continua MODIFIED apos a escrita`.
+
+**1. Painel da GPU (`KitTaskManager.Performance.cs` + XAML):** o `PerfBigCanvas` unico virou um
+`Grid` que hospeda o canvas antigo (CPU/mem/disco/rede) OU o novo `PnlGpuGraphs`, montado em
+codigo por `BuildGpuGraphs()`:
+- **2x2 com as 4 curvas de engine** (3D roxo, Copy azul, Video Encode laranja, Video Decode
+  verde) — cada uma com o % vivo no rotulo, historico de 60 amostras em `_gpuChartHistory`;
+- **2 barras de VRAM** (dedicada/compartilhada) proporcionais, com "usado/total";
+- o painel de detalhes ganhou a linha viva **"Memória da GPU (total)"** (dedicada+compartilhada),
+  como a "Memoria da GPU" do TM — agora sao 15 linhas (8 rows);
+- `DrawLineChart` passou a plotar em `y = h-1 .. 1` (antes 0% caia em `y=h`, sobre a borda, e a
+  linha do engine zerado DESAPARECIA);
+- Border do painel: `MaxHeight` 320 -> 380 (o TM usa o mesmo espaco com 4 curvas + 15 linhas).
+
+**2. Caches empilhados:** `BreakRow()` (avança a celula sem desenhar) + `BreakRow(); StaticRow(...)`
+para L1/L2/L3 — cada um ocupa a propria linha em vez de cair nas duas colunas.
+
+**3. ISLC AUTOMATICO (`TraySettingsPage` + `TrayIconService`):** `IslcAutoTune` (default **true**),
+3 formulas derivadas da RAM: standby = RAM/8 (1024..16384), **livre = RAM/16** (512..4096 — era
+1024 fixo), intervalo = 60 s (<=16 GB) / 30 s (<=64 GB) / 15 s. `ApplyIslcAutoTuning()` roda no
+`LoadSettings` (valores digitados a mao morrem) e a pagina mostra os 3 campos **somente leitura**
+com "Calculado automaticamente pela RAM"; desmarcar libera a calibracao manual. Nesta maquina
+(32.524 MB): 4065 / 2032 / 30 s.
+
+**4. Ruido de log (medido no log real do usuario):**
+- `ShouldLogBoost`: o `if (n == 1) return true` fazia a SEGUNDA aplicacao identica logar
+  ("⚡ GameBoost: X" 2x em 16 s) — removido, so o lembrete de 30 repeticoes fica.
+- `ShouldLogBand`: janela de 2 min por PID ainda reemitia a mesma frase (Discord 4x em 11 min).
+  Agora e' `Logger.LogOnce` com **assinatura** + 10 min (heartbeat 15 min com a contagem).
+- `GameBoost AUTO` ("faixa=Idle (mudou)" a cada ~15 s): `LogOnce` com assinatura = faixa|IO|Page
+  (o `_autoBand` e' zerado quando o app fica ocioso, entao "mudou" voltava sempre).
+- Governador de RAM: `minChangeIntervalSeconds: 120` (o estado ALTERNA esvaziado<->teto a cada
+  ciclo, e cada troca era uma "mudanca": ~10 linhas/min do opera).
+- Standby: as mensagens de skip levam MB variaveis, entao o LogOnce comparava TEXTO e vazava a
+  cada 30 s — agora assinatura = motivo + heartbeat 15 min.
+- `✅ Tray Icon está saudável` saia 2x (MainWindow + TrayIconService) -> `LogOnce` com a MESMA chave.
+- `🛟 Resgate`: as N linhas por processo viraram UMA ("3 processo(s) ... (Lightshot→BelowNormal, ...)").
+- PATH: `RepairPathEntries` nao emite mais acao "Mantido" (nada mudou) e o log do reparo leva a
+  contagem (1000+ chars -> 89 chars nesta maquina).
+
+**5. PATH do Sistema (o "corrigir" estava errado):**
+- **CAUSA RAIZ do `continua MODIFIED`:** `DiagnosePath` checava LOCAL (WrongLocation) ANTES de
+  existir. `C:\Program Files (x86)\Common Files\Oracle\Java\javapath` (pasta morta) era
+  classificado "caminho de usuario no System PATH", o reparo MANTINHA, e o scan seguinte acusava
+  `MissingDirectory` de novo — para sempre. A checagem de pasta morta subiu para ANTES do local.
+- **WrongLocation com criterio real:** o allowlist `IsWindowsSystemPath` acusava Docker, Git,
+  nodejs, ZeroTier, NVIDIA, Chocolatey, Process Lasso... Agora (System) so e' local errado o que
+  esta sob `C:\Users` (perfil de alguem); (User) so o que ja existe no PATH do sistema.
+- **`GetSystemPathValue`/`GetUserPathValue` com `DoNotExpandEnvironmentNames`:** `GetValue("Path")`
+  expandia REG_EXPAND_SZ e o reparo consolidado regravava `C:\WINDOWS\system32` no lugar de
+  `%SystemRoot%\system32` (o PATH virava literal/REG_SZ). Agora as variaveis sobrevivem.
+- O log de `continua MODIFIED` agora lista as pendencias (`PathRepair.DescribeProblems`).
+
+**6. Harnesses:** `tests/PathRepairHarness` (NOVO, read-only, 18 checks: pasta morta vira Missing,
+WrongLocation de verdade, idempotencia, PATH real sem variavel expandida, log < 400 chars);
+`GpuHarness` ganhou a secao 4.2b (6 blocos, 4 curvas desenhadas, 2 barras proporcionais);
+`IslcPageVis` ganhou o bloco "ISLC automatico" (38 checks: formulas, defaults, campos travados);
+`lognoise` ganhou o T8 (20 ciclos alternando estado -> 1 linha + heartbeat com contagem).
+
+**Validacao:** solucao **0 erros**, **136 warnings** (nenhum nos arquivos tocados); `GpuHarness`
+ALL-PASS; `ClockHarness` ALL-PASS; `RamUsageHarness` ALL-PASS; `TmOrderHarness` ALL-PASS;
+`lognoise` 31/31; `PathRepairHarness` 18/18; `IslcPageVis` 38/38; `CheckUiThreading` 0 novos.
+Prints: `screenshots/gpu_harness.png` (janela real) e `screenshots/gpu_painel.png` (detalhes).
+
+**Limitacoes:** as barras de VRAM usam o snapshot do PDH (1x/s) — em GPU sem contador de memoria
+(AMD antiga) ficam em 0; o ISLC automatico so e' recalculado no boot/reload das configuracoes
+(trocar RAM a quente nao muda o valor ate reiniciar o Kit).
+
+### Sessao 21/10 - Aba Desempenho: as MEDICOES de GPU (painel no estilo Gerenciador de Tarefas)
+
+Pedido (prints): o painel de detalhes da GPU mostrava so "Utilizacao 2% / Adaptador: GPU 0 /
+Driver versao: 616.56 / Localizacao: —" — sem engines, sem VRAM em uso, sem temperatura. O
+Gerenciador de Tarefas do Windows mostra 14 linhas (3D/Copy/Encode/Decode, VRAM
+dedicada/compartilhada, versao+data do driver, DirectX, local fisico, memoria reservada e
+temperatura). No card da lista, o TM mostra "12% (45 °C)" e o Kit so "2%".
+
+**1. Core — `KitLugia.Core/TaskManager/GpuMetrics.cs` (NOVO):** cascata de 5 fontes,
+todas medidas nesta maquina (RTX 5070 Ti):
+- **DXGI** (`GpuInfo.GetAll()`): nome, vendor/device, LUID, VRAM dedicada/compartilhada.
+- **Registro** (classe `display` + `Enum\PCI`): versao COMPLETA do driver (`32.0.16.1656`),
+  data (`20/08/2026`) e VRAM real (`qwMemorySize` = 15,9 GB) — a MESMA fonte do TM.
+- **nvidia-smi**: nome comercial, driver curto, VRAM, memoria reservada, TEMPERATURA e
+  utilization. Throttle de 2 s (o processo custa ~100 ms); estaticos em cache de 60 s.
+  Caminho resolvido por `Environment.SystemDirectory` (sem hardcode).
+- **PDH** (`GpuMonitor.GetAdapterLive()`): utilization por engine + VRAM em uso, por LUID.
+- **dxdiag** (1x, em background): versao do DirectX + feature level (FL 12.1 -> 12.2).
+- `NamesMatch()` tolera o sufixo do driver ("RTX 5070 Ti" x "RTX 5070 Ti D").
+- `ReadPciLocation()` devolve o formato do TM: "Barramento PCI 1, dispositivo 0, funcao 0".
+
+**2. Core — `GpuMonitor.cs`:** a MESMA query PDH ganhou os contadores de memoria
+(`\GPU Adapter Memory(*)\Dedicated Usage|Shared Usage|Total Committed`, PDH_FMT_LARGE =
+bytes) — UM `PdhCollectQueryData` atualiza engines E memoria. O agrupamento por LUID
+(instancia "luid_0x00000000_0x00014AEE") da 3D/Copy/Encode/Decode + VRAM em uso de CADA
+adaptador. Novo `GetAdapterLive()` + `GpuAdapterLive`. Falha na memoria NAO derruba a
+medicao de utilization (e opcional).
+
+**3. GUI (`KitTaskManager.Performance.cs`):**
+- Card da GPU no estilo TM: `"12% (45 °C)"` (verde como o resto dos cards).
+- Painel de detalhes: **14 linhas em Grid de 2 colunas x 7 linhas** (igual ao TM), com
+  linhas VIVAS (3D/Copy/Encode/Decode/VRAM dedicada/VRAM compartilhada/Temperatura) e
+  estaticas (Adaptador, driver, data, DirectX, local fisico, memoria reservada).
+  As linhas vivas usam `Run` REUTILIZADO (o texto e trocado a cada tick, a linha NAO e
+  recriada) — mesmo padrao do relogio da CPU.
+- Temperatura colorida por faixa (`GetHeatColor`, laranja/vermelho como o TM).
+
+**4. QUIRKS (o que custou tempo):**
+- **WPF CLAMPA o `Grid.Row` quando nao ha `RowDefinitions`**: com o painel recem-montado
+  sem linhas, TODAS as 14 linhas caem na celula 0 (aparecem sobrepostas). Fix: declarar
+  as 7 `RowDefinition`s explicitamente.
+- `RenderTargetBitmap` NAO forca layout: o harness precisa `UpdateLayout()` + janela
+  dimensionada, senao o print sai com o layout antigo.
+- O PDH precisa de **primer** (o 1o collect so arma o contador).
+- O LUID do PDH e o mesmo do DXGI -> e a chave de correlacao adaptador<->contador.
+
+**5. Harness novo (`tests/GpuHarness`, ALL-PASS):** 5 secoes — (1) DXGI, (2) cascata
+GpuMetrics, (3) PDH GetAdapterLive (4 engines + VRAM), (4) janela REAL (card + as 14
+linhas do painel, celulas distintas, sem sobreposicao, VRAM/temperatura batendo com a
+medicao real), (5) o dxdiag em background sobe o FL 12.1 -> 12.2. Prints:
+`%TEMP%\kitlugia_gpu_harness.png` e `%TEMP%\kitlugia_gpu_painel.png`.
+
+**Validacao:** solucao **0 erros** (136 warnings nullable pre-existentes, ZERO nos
+arquivos tocados); `GpuHarness` ALL-PASS; `ClockHarness` ALL-PASS; `RamUsageHarness`
+ALL-PASS; `TmOrderHarness` ALL-PASS; `CheckUiThreading` 0 padroes novos.
+
+**Limitacoes:** temperatura e memoria reservada so existem em NVIDIA (nvidia-smi) —
+AMD/Intel ficam "—"; o FL 12.2 so aparece DEPOIS que o dxdiag em background termina
+(comeca com FL 12.1 do probe D3D11).
+
+### Sessao 20/10 (cont. 3) - Relogio da CPU: o clock ATUAL (turbo), como o Gerenciador de Tarefas
+
+Pedido (prints): o vital "Relógio" do Resumo ficava CONGELADO em "3,50 GHz" e o card da
+CPU na aba Desempenho mostrava só "27%". O TM mostra o clock ATUAL (5,03 GHz no print
+do usuário) e o número do lado do uso.
+
+**1. CAUSA RAIZ (medida na máquina):** `CallNtPowerInformation(ProcessorInformation)`
+devolve CurrentMhz = **3500 FIXO** neste i5-14600KF — e o clock BASE, não o atual. Por
+isso o número nunca mudava. (Já tinha sido tentado `NtQuerySystemInformation(11)`, que
+não é o clock de exibição.)
+
+**2. Core** (`KitLugia.Core/TaskManager/NativeMetricsHelper.cs`) — 3 APIs novas:
+- `GetCpuBaseFrequencyMhz()` — clock NOMINAL: `CallNtPowerInformation(11)` -> campo
+  MaxMhz (+4, 24 bytes/núcleo), fallback registro `~MHz` (3494). Cache estático.
+- `GetCpuProcessorPerformancePercent()` — PDH "% Processor Performance"
+  (`\Processor Information(_Total)\% Processor Performance`): 100% = base, 143% = turbo.
+  Caminho 1: nome EM INGLÊS via `PdhAddEnglishCounterW` (índice Perflib 009 — vale em
+  qualquer locale); caminho 2: nome LOCALIZADO via `LocalizePerfName`.
+- `GetCpuCurrentFrequencyMhz()` — clock ATUAL = nominal x (%/100), com sanidade
+  (5%..400% do base: contador quebrado nunca pode virar "87 GHz" na tela).
+- `GetCpuFrequencyMhz()` passou a devolver o ATUAL, com fallback para a fonte legacy
+  (CallNtPowerInformation) e, por último, o último valor conhecido.
+- **QUIRKS:** (a) o PDH precisa de **primer** (o 1º collect só arma o contador; a 1ª
+  leitura devolve PDH_INVALID_DATA); (b) **duas leituras no mesmo instante não podem
+  gerar dois collects** — o 2º collect (intervalo curtíssimo) devolve ruído (medido
+  245% logo depois de 141%): cache de 300 ms resolve; (c) wildcard em inglês não expande
+  em locale pt-BR (já documentado no Core) — por isso o mapeamento Perflib.
+
+**3. GUI:**
+- **Resumo**: vital "Relógio" = clock ATUAL ("4,90 GHz"); a barra passa a mostrar a
+  POSIÇÃO entre base e pico; nova linha `TxtSumClockDetail` (XAML) com
+  "base 3,50 GHz · pico 4,95 GHz". O rodapé do gráfico de CPU
+  ("Frequência 4,90 GHz · 20 núcleos · uptime") também virou clock atual.
+- **Desempenho**: card da CPU = "27% · 4,92 GHz" (estilo TM); painel da CPU ganhou as
+  linhas VIVAS "Velocidade atual:" e "Pico na sessão:" (o `Run` é atualizado a cada
+  tick, sem recriar a linha) ao lado da "Velocidade base" estática; barra superior
+  "Frequência" com o clock atual.
+
+**4. Harness novo** (`tests/ClockHarness`): janela REAL fora da tela (Left=-32000).
+Prova: base plausível; % sane; clock atual == nominal x %; sob CARGA o clock SAI do
+base (4714 MHz > 3500 fixo da fonte antiga — o bug do "3,50 GHz" congelado morreu); e o
+TEXTO REAL da UI (vital "Relógio", detalhe base/pico, card "% · GHz", linhas do painel,
+barra superior). Prints: `%TEMP%\kitlugia_clock_harness.png` (Resumo) e
+`%TEMP%\kitlugia_clock_harness_perf.png` (Desempenho).
+
+**Validação:** solução **0 erros** (136 warnings nullable pré-existentes, ZERO nos
+arquivos tocados — o CS8602 da Summary.cs:227 é do `BuildCpuVerdict` antigo, linha
+inalterada); `ClockHarness` ALL-PASS; `RamUsageHarness` ALL-PASS; `TmOrderHarness`
+ALL-PASS; `TmContextMenuHarness` ALL-PASS; `TrimProcessHarness` ALL-PASS;
+`CheckUiThreading` 0 padrões novos.
+
+
+### Sessao 20/10 (cont. 2) - Aba Desempenho: a RAM mostra QUANTO está em uso, não só o %
+
+Pedido (print da aba Desempenho): o card de Memória dizia "80% de 32 GB" e a linha de
+detalhe "Em uso 80%" — o % não diz QUANTA RAM está ocupada.
+
+**1. Core** (`KitLugia.Core/TaskManager/NativeMetricsHelper.cs`):
+- Novo `TryGetPhysicalMemoryUsage(out ulong usedBytes, out ulong totalBytes)`: bytes de RAM
+  **em uso** e **total**, pela MESMA fonte do % (K32GetPerformanceInfo -> PhysicalTotal -
+  PhysicalAvailable em paginas × PageSize; fallback GlobalMemoryStatusEx ullTotalPhys -
+  ullAvailPhys). Assim o numero em GB e o % nunca se contradizem.
+
+**2. GUI** (`KitLugia.GUI/Windows/TaskManager/KitTaskManager.Performance.cs`):
+- `PerfSample` ganhou `MemUsedBytes` / `MemTotalBytes`; a coleta acontece no **WORKER**
+  (mesmo tick do %) — zero custo na UI thread. No caminho de fallback (contador
+  "Available MBytes") os bytes sao derivados do MESMO contador, entao % e GB batem.
+- `FormatMemUsage(pct, used, total)` -> "82% · 26,2 GB de 31,8 GB";
+  `FormatMemUsedText(used, total)` -> "26,2 GB de 31,8 GB".
+- Card da lista: "80% de 32 GB" -> "82% · 26,2 GB de 31,8 GB" (cabe em 215px, sem corte).
+- Linha "Em uso" do painel de detalhes: "80%" -> "82% · 26,2 GB de 31,8 GB".
+- Barra superior da aba Processos: novo `TxtMemUsageDetail` (XAML) com "26,2 GB de 31,8 GB"
+  sob o "82%" (fonte 11, cinza, TextTrimming) — o numero grande continua sendo so o %.
+
+**3. Harness novo** (`tests/RamUsageHarness`): abre a janela REAL fora da tela
+(`Left=-32000`), vai na aba Desempenho, seleciona o card de Memoria e confere o TEXTO
+REAL dos controles (card `Summary`, Run da linha "Em uso", `TxtMemUsageDetail`), alem de
+bater o % e o total contra a RAM real da maquina (`TryGetPhysicalMemoryUsage`).
+Gera print em `%TEMP%\kitlugia_ram_harness.png` (prova visual do card e do painel).
+
+**Validacao:** solucao **0 erros** (136 warnings nullable pre-existentes, ZERO nos arquivos
+tocados); `RamUsageHarness` ALL-PASS (card "82% · 26,2 GB de 31,8 GB", % e total batendo
+com a RAM real); `TmOrderHarness` ALL-PASS; `TmContextMenuHarness` ALL-PASS;
+`CheckUiThreading` 0 padroes novos.
+
+**Quirk do harness:** o parser do numero tem que aceitar "," (pt-BR) e "." (invariante) —
+converter "," para "." e parsear com InvariantCulture (o erro original do harness leu
+"26,4 GB" como 264 GB e acusou FAIL falso).
+
+### Sessao 20/10 (cont.) - CRASH do TaskManager: ArgumentOutOfRangeException no `_groupedLive.Move`
+
+Sintoma (stack do usuario): o app caia com
+`System.ArgumentOutOfRangeException: Index must be within the bounds of the List (Parameter 'index')`
+em `KitTaskManagerWindow.ApplyFilter` -> `<>c__DisplayClass535_1.<ApplyFilter>b__6()` (linha 2663,
+`_groupedLive.Move(cur, i)`). O kit roda **sempre como administrador**, entao nao era permissao.
+
+**1. CAUSA RAIZ (provada na maquina do usuario): COLISAO DE CHAVE POR CAIXA.**
+O Windows **nao distingue caixa** no nome do processo, mas o codigo misturava comparadores:
+- `existingDict` / `freshDict`: comparador **ordinal** (`Setup.exe` != `setup.exe`) -> 2 grupos;
+- `seenKeys` / `indexMap`: comparador **OrdinalIgnoreCase** -> as 2 chaves viravam **1**;
+- o `Move` usava o indice `i` da lista DESEJADA como indice da lista VIVA -> com a lista viva
+  menor que a desejada, o `Insert(i)` do `ObservableCollection.MoveItem` estourava a faixa.
+
+Confirmado na maquina: `Devin`/`devin` e `Hermes`/`hermes` rodando **ao mesmo tempo** (2 processos
+com o mesmo nome so difirindo na caixa) -> colisao garantida a cada refresh.
+
+**2. Correcoes** (`KitLugia.GUI/Windows/TaskManager/KitTaskManagerWindow.xaml.cs`):
+- Agrupamento passa a ser **case-insensitive** (igual ao Windows):
+  `rows.GroupBy(r => r.GroupKey, StringComparer.OrdinalIgnoreCase)`; a chave do grupo passa a ser
+  a `GroupKey` (ja insensivel a caixa) em vez de `$"{first.Name}|{first.Group}"` (sensivel).
+- `existingDict` / `freshDict` com `StringComparer.OrdinalIgnoreCase` — os 3 dicionarios
+  passam a falar a mesma lingua (a mistura era a causa).
+- Novo `ApplyLiveOrder(List<ProcessRow> desired)`: reordena por **SLOT VIVO real** (ignora as
+  linhas FANTASMA, que ficam onde estavam), recalcula os slots a cada `Move` e tem **guarda de
+  faixa** (`cur < 0 || target < 0 || cur >= Count || target >= Count`) + `try/catch` que registra
+  em log (`Logger.LogWarning("TaskManager", ...)`) em vez de derrubar o app. O `Move` inline
+  antigo (com `indexMap` O(n)) foi removido.
+
+**3. Harness novo** (`tests/TmOrderHarness`): reproduz o crash de forma DETERMINISTICA
+(chaves que so diferem em caixa + lista viva menor que a desejada + fantasma no meio + refresh
+real com os processos da maquina). **Prova de que o harness pega o bug**: revertendo
+temporariamente o `Move` para o codigo antigo, o harness reproduz EXATAMENTE o
+`ArgumentOutOfRangeException` reportado; com o fix, ALL-PASS (160 chaves distintas = 160 linhas
+vivas; antes eram 154).
+
+**Validacao:** solucao **0 erros** (136 warnings nullable pre-existentes, nenhum nos arquivos
+tocados); `TmOrderHarness` ALL-PASS; `TmContextMenuHarness` ALL-PASS; `TrimProcessHarness` ALL-PASS;
+`CheckUiThreading` 0 padroes novos.
+
+**4. Validacao ELEVADA (o kit roda SEMPRE como admin):** o `TrimProcessHarness` foi rodado
+**com elevacao real** (via prompt do sistema): trim de 322 MB -> 0 MB em 25 ms, processo vivo.
+Ele revelou uma mentira na mensagem: PID 4 (System) devolve `ERROR_ACCESS_DENIED` **mesmo
+como administrador** (o Windows protege o processo System), mas a mensagem dizia "sem permissao
+(execute o KitLugia como administrador)" — ou seja, mandava o usuario (que JA e admin) fazer
+uma acao que nao resolve. Corrigido:
+- `MemoryOptimizer.IsElevated()` — detecta o token elevado;
+- `MemoryOptimizer.BuildTrimAccessDeniedMessage(pid, elevado)` — mensagem coerente com o
+  nivel de elevacao (funcao PURA, testada nos DOIS ramos pelo harness):
+  - sem elevacao -> "sem permissao (execute o KitLugia como administrador)";
+  - elevado + PID 4 -> "acesso negado: o processo System (PID 4) e protegido pelo Windows";
+  - elevado + outro PID -> "acesso negado pelo Windows (processo protegido ou de outro usuario)".
+A UI (`ClearMemoryOfSelectionAsync`) mostra `res.Message` direto, entao a correcao chega na barra
+de status sem mexer no codigo da tela.
+
+### Sessao 20/10 - TaskManager: "Limpar RAM" de verdade (trim por processo) + 6 bugs de menu/status
+
+Pedido (prints): o botão "Limpar RAM" do painel de detalhe e o menu de contexto
+precisavam limpar a memória do processo escolhido, mostrando o resultado real.
+
+**1. O botão NÃO limpava nada (mentia na barra de status):**
+- `BtnClearMemory_Click` usava `MemoryOptimizer.EmptyProcessWorkingSet`, que
+  fazia `SetProcessWorkingSetSize(-1,-1)` via `Process.Handle` (PROCESS_ALL_ACCESS).
+  Medido (AGENTS.md, sessão do governador): esse caminho devolve TRUE e o working
+  set NAO cai; quem esvazia NA HORA é `EmptyWorkingSet` (psapi) — o mecanismo do
+  Firemin. E `Process.Handle` falha com "acesso negado" em processo de outro
+  usuário → o catch engolia e a UI dizia "memória limpa" sem ter limpo nada.
+- Novo `MemoryOptimizer.TrimProcessWorkingSet(pid)` → `ProcessTrimResult`
+  (Success, Message, WorkingSetBeforeMB, WorkingSetAfterMB, FreedMB):
+  handle com o mínimo (`PROCESS_SET_QUOTA|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ`),
+  `EmptyWorkingSet` e medição com `GetProcessMemoryInfo`.
+  Fallback suave: se `EmptyWorkingSet` falhar, corta o teto pela metade
+  (`SetProcessWorkingSetSizeEx`) — nunca o "reduz e re-expande" de antes.
+- **Quirk:** `PROCESS_MEMORY_COUNTERS` usa SIZE_T (8 bytes) nos campos de memória
+  → a struct tem 72 bytes em x64. Com 40 bytes a API devolve
+  ERROR_INSUFFICIENT_BUFFER e a medição volta -1 (trim funcionava, sem número).
+  E `cb` PRECISA ser preenchido antes da chamada.
+- **Provado** (`tests/TrimProcessHarness`, ALL-PASS): filho de 322 MB → 0 MB em
+  29 ms, processo VIVO; PID inexistente → "o processo já encerrou"; PID 4
+  (System) → "sem permissão (execute o KitLugia como administrador)".
+
+**2. `CloseHandleP` sem `EntryPoint` = bug que contaminava TUDO (achado pelo harness):**
+`[DllImport("kernel32.dll")] bool CloseHandleP(IntPtr)` procurava "CloseHandleP" em
+kernel32 → `EntryPointNotFoundException` em CADA chamada. Efeito: o `finally`
+explodia DEPOIS do `ok++` → o catch contava "falha" numa operação que tinha dado
+certo. O status dizia "⏸ 2/2 suspenso(s) (2 falharam: codigo 0)" e o EcoQoS
+acusava "Acesso negado." em processos onde ele FUNCIONAVA. Corrigido com
+`EntryPoint = "CloseHandle"`; o fechamento do handle do EcoQoS saiu do contador
+de falhas (falha ao fechar ≠ falha na operação).
+
+**3. Ações que agiam só no PID representativo (linha de GRUPO = N processos):**
+"Suspender", "Retomar", "EcoQoS" e "Limpar RAM" agiam em 1 processo de um grupo
+("opera.exe (24)") e a UI reportava sucesso. Agora todas usam
+`targets.SelectMany(KillTargets)` → todos os membros. EcoQoS tb passou a abrir o
+handle com `PROCESS_SET_INFORMATION` (0x0200) em vez de `Process.Handle`.
+
+**4. Menu de contexto: itens "N" nasciam VISÍVEIS.** "Finalizar N tarefas",
+"Suspender N", "Prioridade para N" etc. apareciam com "N" literal antes de existir
+multi-seleção. Agora todos nascem `Visibility="Collapsed"` e o cabeçalho real
+("Limpar memória de 2 processos") só é escrito na multi-seleção.
+
+**5. Ações que mentiam em silêncio:**
+- "Abrir local do arquivo" sem caminho: retorno mudo → agora explica ("sem caminho").
+- Suspender/Retomar ignoravam o NTSTATUS → agora contam o que falhou (com código).
+- EcoQoS "Acesso negado." sem dizer quantos → agora "EcoQoS em 2/2" ou o motivo.
+- EcoQoS abria com PROCESS_ALL_ACCESS (falha em processo de outro usuário).
+
+**6. Barra de status engolia o feedback:** o refresh reescrevia "N processos em
+Xms" a cada ciclo e a mensagem da ação sumia em <1 s. Novo `SetStatus()`:
+thread-safe (`Dispatcher.BeginInvoke` — depois de `await Task.Run` a continuação
+pode voltar ao pool) + override de 8 s (`_statusOverrideUntil`) respected pelo
+refresh.
+
+**Validacao:** solução 0 erros (136 warnings nullable pré-existentes);
+`TrimProcessHarness` ALL-PASS; `TmContextMenuHarness` ALL-PASS 3 rodadas
+seguidas (janela real, clique real no menu, grupo de 2 processos, eco);
+`CheckUiThreading` 0 novos.
 
 ### Sessao 07/10 (cont. 4) - Modo DIRETO Firemin + header da pagina RAM + 2 bugs do log real
 
@@ -11460,3 +11854,174 @@ para esses scripts.
 **Caminho correto para testes visuais:** harness C# isolado (`tests\NetPageVis`), que nao usa
 PowerShell nem sintetiza input. Se o AVG voltar a acusar, o ajuste e por conta do usuario
 (AVG > Configuracoes > Geral > Excecoes) e/ou simplesmente nao reexecutar os scripts antigos.
+
+---
+
+### Sessao 10/10 (2) - Print do usuario: 2 TextBox "vazios" + log com 4x ruido
+
+O print mostrou os dois campos de limiar do card MONITORAMENTO AVANÇADO
+vazios ("___"), com a descricao estatica ao lado mostrando os numeros.
+Investigado construindo `tests\AppLab` (novo harness que instancia a pagina
+REAL, mede e renderiza PNG).
+
+**1. CAUSA RAIZ DO TEXTO PRETO (o bug do print)**
+- O XAML tem `Text="2048"`/`Text="80"` e o `.Text` estava CORRETO.
+- `DarkTextBoxStyle` (BaseStyles.xaml:202) existe e define `Foreground=White`...
+  ... mas tem `x:Key` -> **NAO e implicito**. Os TextBox nao aplicavam estilo
+  nenhum, entao herdavam o default do WPF = **#FF000000 (PRETO)** sobre o card
+  escuro: dado certo, tinta invisivel.
+- Medido: `Foreground` #FF000000 -> #FFFFFFFF depois do fix. Prova por pixel:
+  recorte 3x do campo (PNG `campo_ram.png` mostra "2048" branco, alinhado a direita).
+- **11 TextBox afetados** no projeto. Corrigidos os 9 reais:
+  SettingsPage (TxtHighRamThreshold, TxtHighCpuThreshold), TraySettingsPage
+  (TxtIslcThreshold, TxtIslcFreeThreshold, TxtIslcMinInterval - os 3 do painel
+  ISLC desta mesma sessao, mesmo erro), StartupArgumentsDialog (TxtExecutablePath,
+  TxtArguments, TxtFinalResult).
+- **FALSO POSITIVO documentado**: AllTweaksPage/IntegrityPage/WinpeToolsPage
+  parecem sem estilo mas tem `<TextBox.Style>` como ELEMENTO FILHO. Dois scans
+  meus deram numeros diferentes (11 -> 0 -> 11) ate contar a profundidade do
+  elemento de verdade. Regra: `<TextBox.Style>` como filho conta.
+- `AppLab` agora tem **varredura global de TODO o .xaml** que falha se voltar a
+  existir campo sem `Style=`/`Foreground=` - impede a regressao em pagina nova.
+
+**2. LOG: 4 fontes de ruido corrigidas**
+- `Logger.LogOnce(key, msg, heartbeatSeconds)` (NOVO, KitLugia.Core/Logger.cs):
+  1a chamada passa; depois so passa se o TEXTO MUDAR ou se passou o heartbeat
+  (que reemite com "(xN em M min sem mudar)"). Provado: 500 repeticoes
+  identicas = 1 linha (eram 501).
+- `RAM Limiter` (a cada 500 ms): LogOnce com chave por processo. A linha ficou
+  a DECISAO ("teto X MB") e os numeros variaveis (cpu/faults) no heartbeat de 2 min.
+- `[DISK]` (a cada ~40 s): "caminho NATIVO" virou LogOnce (300 s); o dump por
+  disco (3 linhas x N discos) foi para `Logger.VerboseCheckLogs`.
+- `[APP] Task nao observada: A operacao de E/S foi anulada...` (a mais frequente):
+  `OperationCanceledException` / mensagem de cancelamento NAO e falha - toda task
+  com CancellationToken que a pagina derruba ao navegar aparecia aqui. Agora so
+  entra no log se `VerboseCheckLogs`; o resto vai para `LogError`.
+- `IslcLastSkipReason` ficava **VAZIO** quando standby < limiar (retorno
+  silencioso) -> o badge ficava em branco e nao explicava nada. Agora os 3
+  caminhos de skip (abaixo do limiar, RAM sobrando, app em foco) gravam motivo
+  + uma linha de log LogOnce.
+
+**3. HARNESS TrayIslcLab ERA FLAKY E DAVA FALSA CONFIANCA (corrigido)**
+- `WaitPurge` dormia 50 ms e checava `IsPurgeStandbyInFlight` direto: se a task
+  ainda nao tinha iniciado, o flag era false e voltava na hora -> lia
+  `IslcLastCleanMB` antes de ser escrito. Flake ~1/3 das execucoes.
+- Corrigido: esperar o flagficar 1 e DEPOIS voltar a 0 (10 s cada).
+- **FATO DO WINDOWS (aprendido aqui)**: a standby list **NAO e monotonica**.
+  Depois de um purge OK (ntStatus=0) o SO repovoa a lista com as paginas que os
+  apps voltaram a tocar: mediu-se 88 -> 141 MB depois de purgar. O codigo esta
+  certo (mede no instante certo e expoe em IslcCleanCount/IslcLastCleanMB); o
+  TESTE media de fora e por isso falhava. S3 agora usa a medida interna.
+- **FALSO PASSO removido**: com standby=0 (2a execucao, ja purgado pelo teste)
+  `IslcLastCleanMB == depois` dava `0 == 0` = "OK" sem provar nada. Agora so
+  compara quando `IslcCleanCount == 1`.
+- S2 usava `IslcThresholdMB = 64` e falhava quando o cache real estava abaixo
+  disso (a standby se repovoa). Fixo em 0.
+- Resultado: **8 execucoes consecutivas 15 OK / 0 FALHA** (era 1-2 falhas/corrida).
+
+**Validacao**
+- Build solucao: **0 erros** (149 avisos = baseline nullable).
+- `Scripts\CheckUiThreading.ps1`: 0 padroes novos, exit 0.
+- `tests\AppLab`: **20 OK / 0 FALHA** (16 visuais + 4 de LogOnce).
+- `tests\IslcPageVis`: 26 OK / 0 FALHA. `tests\TrayIslcLab`: 15 OK, 8/8 estaveis.
+- Encoding: BOM preservado onde ja havia; os 2 arquivos novos de AppLab
+  normalizados para UTF-8+BOM/CRLF (ler sempre com UTF8 explicito - Set-Content
+  do PS5.1 releria ANSI e corromperia acento).
+
+**A TESTAR no app**: engrenagem -> MONITORAMENTO AVANÇADO -> os 2 limiares devem
+aparecer brancos (2048 / 80). Deixar "Limpeza de standby" ligado > 30 s e conferir
+que o log agora tem 1 linha explicando o motivo em vez de silencio.
+---
+
+### Sessao 10/10 (3) - Rust: auditoria do plano de migracao + 3 correcoes REAIS aplicadas
+
+Pedido: "analise essas partes criticas do kit onde o rust seria bom ser usado e
+confira na web se e bom realmente, olhe essas partes do codigo citadas".
+Veio um plano de migracao (3 modulos: Memory/Disk/Registry). **Auditei o plano
+contra o codigo real + web** e apliquei o que era bom.
+
+**1. O PLANO ESTAVA ERRADO EM 3 DOS 4 ITENS (medido, nao opinado)**
+- **Boundary FFI = 2,2 ns** (P/Invoke trivial, 1.000.000 de chamadas). As
+  operacoes que o plano queria mover para Rust custam: standby list 1,5 us,
+  EmptyWorkingSet 365 us, IOCTL de layout 4,4 ms, NtQSI de processos 5,4 ms.
+  => a fronteira e **3 a 6 ordens de grandeza abaixo** da syscall. Mover
+  syscall para Rust **nao compra performance nenhuma**.
+- **O bug do "guard lies" (1300) JA FOI CORRIGIDO** (FileTakeOwnership.cs:93
+  tem `LUID { uint LowPart; int HighPart; }` + checagem do 1300 em 3 lugares).
+  Rust teria o MESMO bug: `#[repr(C)] struct Luid { value: u64 }` alinha em 8
+  e empurra `attrs` para 16 -> struct de 24 bytes em vez de 16. E bug de
+  **conhecimento de ABI**, nao de linguagem.
+- **No registry scan o Rust e a fonte NAO-CONFIAVEL**: `reg_scan_ffi` produz
+  falso positivo e o C# tem que revalidar (`AddValidatedNative`, 3 call
+  sites). A causa da divergencia era duplicacao da logica de `Confidence`:
+  C# usava `OrdinalIgnoreCase` (Unicode completo), Rust usava
+  `eq_ignore_ascii_case` (SO ASCII) + fatiamento por byte.
+- **`gptman` nao substitui o IOCTL**: ele le/escreve a TABELA GPT (outro
+  modelo de dados), nao o `DRIVE_LAYOUT_INFORMATION_EX` do Windows.
+  `fzpart` foi descartado: **licenca "non-standard"**, 16 downloads/mes,
+  0 dependentes. `disk-layout` nao existe (404).
+
+**2. ACHADO QUE MUDOU TUDO: o Rust ATUAL era MAIS LENTO que o managed**
+`regex_match_ffi`/`regex_replace_ffi`/`glob_match_ffi` **recompilavam o
+padrao a cada chamada** (`Regex::new`/`Glob::new`), enquanto o fallback
+gerenciado tem cache estatico de 15 padroes:
+
+| | antes | depois | managed |
+|---|---|---|---|
+| `NativeRegex.IsMatch` | 197.504 ns | **441 ns** | 141 ns |
+| `NativeRegex.Replace` | 208.575 ns | **1.512 ns** | 326 ns |
+| `NativeGlob.IsMatch` | 30.166 ns | **332 ns** | - |
+
+=> de **1.190x mais lento** para **3,1x** (a diferenca restante e o
+marshalling de string no P/Invoke: medido = **166 ns** por chamada, via
+sonda `probe_boundary_ffi`).
+
+**3. CORRECOES APLICADAS NO `rust_native` (o DLL so mudou de 1.216.512
+para 1.359.360 bytes)**
+- **Cache de padroes compilados** (`lib.rs`): `REGEX_CACHE`/`GLOB_CACHE` por
+  thread + `cached_regex_match`/`cached_regex_replace`/`cached_glob_match`
+  (o match acontece DENTRO do closure - devolver o Regex clonado por
+  chamada custava ~8 us). O glob guarda o MATCHER, nao o `Glob` (em globset,
+  compilar o padrao e o passo caro; `Glob::new` so faz o parse).
+- **`panic = "abort"` REMOVIDO** do `Cargo.toml` + macro `ffi_guard!` em
+  **todos os 12 exports** (catch_unwind -> codigo de erro). Com abort, um
+  panic MATAVA o processo .NET inteiro (sem catch gerenciado, sem
+  Dispatcher.UnhandledException) - ja aconteceu 2x (o `wide()` sem NUL e o
+  fatiamento UTF-8). O `mft_scan_ffi` (que le a $MFT do disco, dados NAO
+  CONFIADOS) foi envolvido sem reindentar o corpo: o real virou
+  `mft_scan_impl` e o export so faz o catch.
+- **Comparacao case-insensitive Unicode-aware** (`ci_eq`/`ci_starts_with`):
+  alinha o Rust com o `OrdinalIgnoreCase` do C#. **Corrige um bug real**:
+  "café editor" vs "CAFÉ EDITOR" devolvia **70** (errado) e agora devolve
+  **100** (igual ao C#). O resultado do scan deixa de depender de o DLL
+  estar presente no output.
+
+**4. PROVA DE NAO-REGRESSAO (`tests\RustParity`, harness novo)**
+Roda o MESMO harness com o DLL ANTIGO (backup) e o NOVO e compara:
+- **Confidence: 0 divergencias** (o antigo tinha 1: o caso com acento).
+- **regex, glob, reg_scan, safety: IDENTICOS byte a byte.**
+- **MFT: 3.188.240 entradas** (novo) vs 3.188.295 (antigo) - 55 de
+  diferenca em 3,19 milhoes, com os **prefixos identicos**
+  (00563BD6|00563B45|...): e ruido de filesystem vivo entre as duas execucoes
+  (13,7 s vs 15,5 s de intervalo). O `git diff` do mft.rs confirma que
+  **so o wrapper de panic** mudou.
+- **Seguranca**: ponteiro NULL e buffer pequeno devolvem codigo de erro, nao
+  derrubam o processo (o processo sobreviveu as duas execucoes).
+
+**Validacao**: solucao **0 erros** (136 avisos = baseline); CheckUiThreading
+0 novos; TrayIslcLab 15/15; IslcPageVis 26/26; AppLab 20/20 (5 execucoes
+estaveis - o teste do LogOnce contava TODOS os OnLogReceived e era flaky
+por log paralelo; agora conta so as mensagens com marcador unico);
+FfiBench: boundary 2,2 ns / glob 332 ns / regex 441 ns.
+
+**O QUE NAO FOI APLICADO (e por que)**: nao migrar `EmptyWorkingSet`, os
+IOCTL, o NtQSI nem o parser de struct para Rust (a fronteira e invisivel e
+o codigo esta medido em hardware real); nao mexer no `mft.rs` alem do
+wrapper (ja e o caso em que o Rust PAGOU: 100% de paridade e 15,8 s vs
+42,7 s); nao trocar o `DeepUninstaller` inteiro (o oraculo C# e o que
+revalida o scan nativo).
+
+**A TESTAR**: reiniciar o KitLugia (o processo atual tem o DLL antigo em
+memoria) e conferir: (a) o log de "Limpeza de standby" e do "RAM Limiter"
+continua igual; (b) um app com acento no nome agora e detectado pelo
+desinstalador (comportamento novo, correto).

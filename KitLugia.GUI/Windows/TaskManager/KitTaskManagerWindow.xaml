@@ -905,6 +905,7 @@
 
                                 <TextBlock Text="Relógio" FontSize="10" Foreground="#777"/>
                                 <TextBlock x:Name="TxtSumClock" Text="—" FontSize="17" FontWeight="Bold" Foreground="#DDD"/>
+                                <TextBlock x:Name="TxtSumClockDetail" Text="" FontSize="9" Foreground="#5A6472" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                                 <Border Height="5" Background="#0D131A" CornerRadius="2" Margin="0,3,0,10">
                                     <Border x:Name="BarSumClock" HorizontalAlignment="Left" Width="0" Background="#7E57C2" CornerRadius="2"/>
                                 </Border>
@@ -1629,7 +1630,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0"><TextBlock Text="CPU" FontSize="11" FontWeight="Bold" Foreground="#777"/><TextBlock x:Name="TxtCpuUsage" Text="0%" FontSize="20" FontWeight="Bold" Foreground="White"/></StackPanel>
-                            <StackPanel Grid.Column="1"><TextBlock Text="Memória" FontSize="11" FontWeight="Bold" Foreground="#777"/><TextBlock x:Name="TxtMemUsage" Text="0%" FontSize="20" FontWeight="Bold" Foreground="White"/></StackPanel>
+                            <StackPanel Grid.Column="1"><TextBlock Text="Memória" FontSize="11" FontWeight="Bold" Foreground="#777"/><TextBlock x:Name="TxtMemUsage" Text="0%" FontSize="20" FontWeight="Bold" Foreground="White"/><TextBlock x:Name="TxtMemUsageDetail" Text="" FontSize="11" Foreground="#777" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
                             <StackPanel Grid.Column="2"><TextBlock Text="Disco" FontSize="11" FontWeight="Bold" Foreground="#777"/><TextBlock x:Name="TxtDiskUsage" Text="—" FontSize="20" FontWeight="Bold" Foreground="White"/></StackPanel>
                             <StackPanel Grid.Column="3"><TextBlock Text="Rede" FontSize="11" FontWeight="Bold" Foreground="#777"/><TextBlock x:Name="TxtNetUsage" Text="—" FontSize="20" FontWeight="Bold" Foreground="White"/></StackPanel>
                             <StackPanel Grid.Column="4"><TextBlock Text="GPU" FontSize="11" FontWeight="Bold" Foreground="#777"/><TextBlock x:Name="TxtGpuUsage" Text="—" FontSize="20" FontWeight="Bold" Foreground="White"/></StackPanel>
@@ -1958,12 +1959,13 @@
                                     </ContextMenu.Resources>
                                     <MenuItem x:Name="MenuKill" Header="Finalizar tarefa" Icon="✕" InputGestureText="Del" Click="MenuKill_Click"/>
                                     <MenuItem x:Name="MenuKillTree" Header="Finalizar árvore" Icon="🌳" InputGestureText="Shift+Del" Click="MenuKillTree_Click" FontWeight="SemiBold"/>
-                                    <MenuItem x:Name="MenuKillMulti" Header="Finalizar N tarefas" Icon="✕" Click="MenuKill_Click"/>
-                                    <MenuItem x:Name="MenuKillTreeMulti" Header="Finalizar N árvores" Icon="🌳" Click="MenuKillTree_Click" FontWeight="SemiBold"/>
-                                    <MenuItem x:Name="MenuSuspendMulti" Header="Suspender N" Icon="⏸" Click="MenuSuspend_Click"/>
-                                    <MenuItem x:Name="MenuResumeMulti" Header="Retomar N" Icon="▶" Click="MenuResume_Click"/>
-                                    <MenuItem x:Name="MenuEcoQoSMulti" Header="Eficiência EcoQoS (N)" Icon="🌱" Click="MenuEcoQoS_Click"/>
-                                    <MenuItem x:Name="MenuPriorityMulti" Header="Prioridade para N" Icon="⬢">
+                                    <MenuItem x:Name="MenuKillMulti" Header="Finalizar N tarefas" Icon="✕" Click="MenuKill_Click" Visibility="Collapsed"/>
+                                    <MenuItem x:Name="MenuKillTreeMulti" Header="Finalizar N árvores" Icon="🌳" Click="MenuKillTree_Click" FontWeight="SemiBold" Visibility="Collapsed"/>
+                                    <MenuItem x:Name="MenuSuspendMulti" Header="Suspender N" Icon="⏸" Click="MenuSuspend_Click" Visibility="Collapsed"/>
+                                    <MenuItem x:Name="MenuResumeMulti" Header="Retomar N" Icon="▶" Click="MenuResume_Click" Visibility="Collapsed"/>
+                                    <MenuItem x:Name="MenuEcoQoSMulti" Header="Eficiência EcoQoS (N)" Icon="🌱" Click="MenuEcoQoS_Click" Visibility="Collapsed"/>
+                                    <MenuItem x:Name="MenuClearMemMulti" Header="Limpar memória de N processos" Icon="🧹" Click="MenuClearMem_Click" Visibility="Collapsed"/>
+                                    <MenuItem x:Name="MenuPriorityMulti" Header="Prioridade para N" Icon="⬢" Visibility="Collapsed">
                                         <MenuItem Header="Tempo real" Tag="RealTime" Click="MenuPriority_Click"/>
                                         <MenuItem Header="Alta" Tag="High" Click="MenuPriority_Click"/>
                                         <MenuItem Header="Acima do normal" Tag="AboveNormal" Click="MenuPriority_Click"/>
@@ -1977,7 +1979,7 @@
                                     <MenuItem Header="Suspender" Icon="⏸" Click="MenuSuspend_Click"/>
                                     <MenuItem Header="Retomar" Icon="▶" Click="MenuResume_Click"/>
                                     <Separator/>
-                                    <MenuItem Header="Eficiência  EcoQoS" Icon="🌱" Click="MenuEcoQoS_Click"/>
+                                    <MenuItem Header="Eficiência EcoQoS" Icon="🌱" Click="MenuEcoQoS_Click"/>
                                     <MenuItem Header="Prioridade" Icon="⬢">
                                         <MenuItem Header="Tempo real" Tag="RealTime" Click="MenuPriority_Click"/>
                                         <MenuItem Header="Alta" Tag="High" Click="MenuPriority_Click"/>
@@ -1987,6 +1989,7 @@
                                         <MenuItem Header="Baixa" Tag="Low" Click="MenuPriority_Click"/>
                                         <MenuItem Header="Ocioso" Tag="Idle" Click="MenuPriority_Click"/>
                                     </MenuItem>
+                                    <MenuItem Header="Limpar memória de trabalho" Icon="🧹" Click="MenuClearMem_Click"/>
                                     <Separator/>
                                     <MenuItem Header="Abrir local do arquivo" Icon="📁" Click="MenuOpenFolder_Click"/>
                                     <MenuItem Header="Copiar caminho" Icon="📋" Click="MenuCopyPath_Click"/>
@@ -2398,7 +2401,7 @@
 
                         <!-- Painel de detalhes do dispositivo clicado -->
                         <Border Grid.Row="1" Background="#141C28" BorderBrush="#1F2A3A" BorderThickness="1" CornerRadius="8" Margin="0,8,0,0" Padding="16"
-                                MaxHeight="320">
+                                MaxHeight="380">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -2409,9 +2412,19 @@
                                     <TextBlock x:Name="PerfDeviceTitle" Text="Selecione um componente" FontSize="17" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                     <TextBlock x:Name="PerfDeviceUtil" Text="" FontSize="22" FontWeight="Bold" Foreground="#4CAF50" Margin="14,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <Canvas x:Name="PerfBigCanvas" Grid.Row="1" Height="90" Background="#0D131A" Margin="0,4,0,10"/>
+                                <Grid Grid.Row="1" Margin="0,4,0,10">
+                                    <Canvas x:Name="PerfBigCanvas" Height="90" Background="#0D131A"/>
+                                    <!-- GPU: visao completa do Gerenciador de Tarefas (4 engines em grafico
+                                         + VRAM dedicada/compartilhada com barra), montada em codigo. -->
+                                    <Grid x:Name="PnlGpuGraphs" Height="140" Background="#0D131A" Visibility="Collapsed"/>
+                                </Grid>
                                 <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel x:Name="PnlPerfDetails" Margin="0,0,4,0"/>
+                                    <Grid x:Name="PnlPerfDetails" Margin="0,0,4,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                    </Grid>
                                 </ScrollViewer>
                             </Grid>
                         </Border>

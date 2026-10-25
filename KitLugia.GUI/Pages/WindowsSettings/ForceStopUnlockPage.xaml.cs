@@ -815,6 +815,30 @@ namespace KitLugia.GUI.Pages.WindowsSettings
             foreach (var s in selected)
                 Logger.Log($"[FORCE STOP UI] Selecionado: {s.DisplayLabel} | {s.DetailLabel}");
 
+            // O SHELL (explorer.exe) precisa ser AVISADO: reiniciar o shell e a acao que o
+            // proprio Windows oferece (Gerenciador de Tarefas > Reiniciar), mas a barra de
+            // tarefas, a area de trabalho e os icones somem por ~1-2 s e as janelas abertas
+            // do Explorador de Arquivos fecham. O usuario tem que saber disso antes.
+            if (selected.Any(s => s.IsShellBlocker)
+                && Application.Current.MainWindow is MainWindow mwShell)
+            {
+                var aviso = await mwShell.ShowConfirmationDialog(
+                    "O Windows Explorer esta segurando o arquivo\n\n" +
+                    "Para soltar o handle e preciso REINICIAR o shell (exatamente o que o " +
+                    "Gerenciador de Tarefas faz em \"Reiniciar\"):\n\n" +
+                    "• A barra de tarefas, a area de trabalho e os icones somem por 1-2 segundos e voltam.\n" +
+                    "• As janelas abertas do Explorador de Arquivos SERAO fechadas.\n" +
+                    "• Os outros programas nao sao afetados.\n" +
+                    "• Nao e reboot: nao mexe em driver, servico nem configuracao.\n\n" +
+                    "Deseja continuar?");
+                if (!aviso)
+                {
+                    Logger.Log("[FORCE STOP UI] Usuario cancelou: nao vai reiniciar o Explorer.");
+                    TxtQuickDetail.Text = "Cancelado — o Explorer nao foi reiniciado.";
+                    return;
+                }
+            }
+
             BtnQuickRelease.IsEnabled = false;
             BtnQuickRelease.Content = "⏳ Liberando...";
             TxtQuickDetail.Text = "Liberando processos...";

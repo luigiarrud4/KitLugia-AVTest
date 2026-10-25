@@ -544,6 +544,7 @@ namespace KitLugia.GUI.Services
                     {
                         // Guarda o original uma unica vez (idempotente: nao rouba o 38 de si proprio).
                         _origWin32PrioritySeparation ??= ReadWin32PrioritySeparation();
+                        _sepAplicado = true;
                         key.SetValue("Win32PrioritySeparation", 38, Microsoft.Win32.RegistryValueKind.DWord);
                     }
                     else
@@ -551,17 +552,66 @@ namespace KitLugia.GUI.Services
                         if (_origWin32PrioritySeparation is int orig)
                         {
                             key.SetValue("Win32PrioritySeparation", orig, Microsoft.Win32.RegistryValueKind.DWord);
-                            _origWin32PrioritySeparation = null;
                         }
-                        else
+                        else if (_sepAplicado)
                         {
-                            // Nunca ativamos: nao ha nada nosso para desfazer.
-                            // (Fallback antigo gravava 2 e estragava maquinas que ja vinham com 38.)
+                            // A chave NAO existia antes de nos: apagar devolve o estado
+                            // original de verdade. O "fallback antigo gravava 2 e
+                            // estragava maquinas que ja vinham com 38" so estragava
+                            // porque o null era ambiguo — aqui ja se distingue.
+                            key.DeleteValue("Win32PrioritySeparation", throwOnMissingValue: false);
                         }
+                        _origWin32PrioritySeparation = null;
+                        _sepAplicado = false;
                     }
                 }
             });
         }
+
+        /// <summary>
+        /// Restaura o Win32PrioritySeparation a um valor EXATO (usado pelo resgate
+        /// pos-crash). Com <paramref name="original"/> = null a chave e' REMOVIDA,
+        /// porque "ausente" tambem e' um estado valido — devolver um palpite
+        /// estragaria maquinas que ja vinham com 38, que e' o default do Windows
+        /// em varias delas.
+        /// </summary>
+        internal static void SetWin32PrioritySeparationPara(int? original)
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\PriorityControl", true);
+                if (key == null) return;
+                if (original is int v)
+                    key.SetValue("Win32PrioritySeparation", v, Microsoft.Win32.RegistryValueKind.DWord);
+                else
+                    key.DeleteValue("Win32PrioritySeparation", throwOnMissingValue: false);
+                _origWin32PrioritySeparation = null;
+                _sepAplicado = false;
+            }
+            catch { /* HKLM sem elevacao */ }
+        }
+
+        /// <summary>
+        /// Original guardado do Win32PrioritySeparation para o resgate pos-crash.
+        /// int.MinValue = nunca aplicamos (nada a registar).
+        /// -1            = a chave NAO existia antes (estado valido: o resgate
+        ///                 tem de REMOVER a chave, nao escrever um palpite).
+        /// outro         = valor exato que estava la.
+        ///
+        /// O "_sepAplicado" separado existe porque _orig e' int? e o null era
+        /// ambiguo: significava ao mesmo tempo "nunca apliquei" e "a chave nao
+        /// existia". Com os dois estados colados, uma maquina que nao tinha a
+        /// chave recebia o ramo "nunca ativamos" e o 38 ficava gravado para
+        /// sempre, sem ninguem para desfazer.
+        /// </summary>
+        internal static int ReadWin32PrioritySeparationGuardado()
+        {
+            if (!_sepAplicado) return int.MinValue;
+            return _origWin32PrioritySeparation ?? -1;
+        }
+
+        private static bool _sepAplicado;
 
         // === Timer Resolution (NtSetTimerResolution) ===
         [DllImport("ntdll.dll", SetLastError = true)]
@@ -866,6 +916,9 @@ namespace KitLugia.GUI.Services
 
         // RAM Limiter - Variáveis e configurações
         private DispatcherTimer? _ramLimiterTimer;
+        private int _ramLimiterBusy; // 1 = ciclo anterior ainda rodando no pool (evita empilhar ticks)
+        private int _advancedMonitorBusy; // 1 = ciclo do Monitor Avançado ainda rodando no pool
+        private int _proBalanceTickBusy; // 1 = ciclo do ProBalance ainda rodando no pool
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ProcessRamLimit> _processRamLimits = new();
         private int _ramLimiterIntervalMs = 1000; // Intervalo em milissegundos
         private readonly Dictionary<string, IntPtr> _cpuJobObjects = new();
@@ -1064,9 +1117,48 @@ namespace KitLugia.GUI.Services
         public bool ForegroundBoostEnabled { get; set; } = true;
         public bool StandbyCleanEnabled { get; set; } = false;
         public long IslcThresholdMB { get; set; } = SuggestIslcThresholdMB(); // ISLC: auto-calculado baseado na RAM do sistema
+
+        /// <summary>
+        /// ISLC AUTOMÁTICO (padrão). O usuário não digita nada: o kit deriva os três
+        /// limites da RAM total e recalcula no boot (trocar de 16 para 32 GB não deixa
+        /// os valores antigos grudados). Desligar libera os campos para calibração manual.
+        /// </summary>
+        public bool IslcAutoTune { get; set; } = true;
         public long IslcLastCleanMB { get; set; } = 0; // Standby List no ultimo clean
         public DateTime IslcLastCleanTime { get; set; } = DateTime.MinValue;
         public int IslcCleanCount { get; set; } = 0; // quantas vezes limpos
+
+        // --- Standby: os tres criterios que faltavam (ver docs/ISLC_VS_KITLUGIA_COMPARISON.md) ---
+        /// <summary>
+        /// Gate de memoria REALMENTE livre (Zero+Free), em MB. Sem ele o purge dispara
+        /// com a maquina cheia de RAM disponivel — que era o defeito original do kit.
+        /// Medido nesta maquina: free variou de 0 MB a 12,9 GB no mesmo dia.
+        /// </summary>
+        public long IslcFreeThresholdMB { get; set; } = SuggestIslcFreeThresholdMB();
+
+        /// <summary>
+        /// Intervalo minimo entre dois purges, em segundos. O ISLC nao tem
+        /// (a protecao dele e emergente: apos purgar a standby cai). Aqui e explicito,
+        /// porque "caiu" so e verdade se o purge foi medido como tendo funcionado.
+        /// </summary>
+        public int IslcMinIntervalSeconds { get; set; } = SuggestIslcMinIntervalSeconds();
+
+        /// <summary>Nao purgar com um jogo/app em primeiro plano (o kit ja faz isso no RAM Limiter).</summary>
+        public bool IslcRespectForeground { get; set; } = true;
+
+        /// <summary>Ultimo motivo pelo qual o purge NAO rodou — para o badge da UI ser honesto.</summary>
+        public string IslcLastSkipReason { get; set; } = "";
+
+        /// <summary>Ultimo NTSTATUS do purge (0 = ok). -1 = ainda nao rodou / privilegio ausente.</summary>
+        public int IslcLastNtStatus { get; set; } = -1;
+
+        /// <summary>
+        /// Guarda de reentrancia. Sem ela, uma falha silenciosa fazia o tick de 3 s
+        /// empilhar um Task.Run por vez, para sempre (o ISLC tem CanExecutePurge => !_isPurging).
+        /// </summary>
+        private int _isPurgingStandby;
+
+        public bool IsPurgeStandbyInFlight => System.Threading.Volatile.Read(ref _isPurgingStandby) != 0;
         public bool MemoryLeakDetectionEnabled { get; set; } = false;
         public bool DpcMonitorEnabled { get; set; } = false;
         public bool FocusAssistEnabled { get; set; } = false;
@@ -1699,8 +1791,292 @@ namespace KitLugia.GUI.Services
             EnableSeDebugPrivilege();
         }
 
+/// <summary>
+        /// Menu de bandeja — curto e escaneavel.
+        ///
+        /// A versao anterior tinha 18 acoes no nivel principal (com 4 blocos e 5
+        /// separadores). O usuario reclamou de "coisas demais", entao a regra
+        /// adopted foi: <b>só o que se usa 1x por dia fica na raiz</b>; o resto
+        /// vira submenu "Mais". Nada foi removido de proposito — os atalhos
+        /// continuam acessiveis, so que em um nivel abaixo.
+        ///
+        /// Raiz (7 acoes):
+        ///   Abrir KitLugia · Kit Task Manager ——
+        ///   Limpar RAM · GameBoost · Config de RAM · Config do Kit ——
+        ///   Mais ▸  ·  Sair
+        /// </summary>
+        private ContextMenuStrip BuildTrayContextMenu()
+        {
+            var menu = new ContextMenuStrip
+            {
+                Renderer = new TrayMenuRenderer(),
+                ShowImageMargin = false,
+                DropShadowEnabled = true,
+                Font = new Font("Segoe UI", 9.25f)
+            };
+
+            // --- Cabecalho: RAM ao vivo ---
+            var hdrTitle = Label("title:Kit Lugia · Gold Edition");
+            var hdrSub = Label("subtitle:coletando…");
+            menu.Items.Add(hdrTitle);
+            menu.Items.Add(hdrSub);
+            menu.Items.Add(new ToolStripSeparator());
+
+            // --- ABRIR ---
+            var itemOpen = Item("🚀  Abrir KitLugia");
+            itemOpen.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
+            itemOpen.Click += (s, e) => OnOpenMainWindow?.Invoke();
+            menu.Items.Add(itemOpen);
+
+            var itemTaskMgr = Item("📊  Kit Task Manager");
+            itemTaskMgr.ToolTipText = "Processos, disco, latência, rede, áudio e diagnóstico.";
+            itemTaskMgr.Click += (s, e) => OnOpenTaskManager?.Invoke();
+            menu.Items.Add(itemTaskMgr);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // --- MEMÓRIA ---
+            var itemClean = Item("🧹  Limpar RAM Agora");
+            itemClean.ToolTipText = "Esvazia a memória física de todos os processos agora.";
+            itemClean.Click += (s, e) => CleanRamNow();
+            menu.Items.Add(itemClean);
+
+            var itemAutoClean = Item("⚡  Auto-Limpeza");
+            itemAutoClean.ToolTipText = "Limpeza automática quando a RAM passa do limite.";
+            itemAutoClean.Checked = AutoCleanEnabled;
+            itemAutoClean.CheckOnClick = false;
+            itemAutoClean.Click += (s, e) =>
+            {
+                AutoCleanEnabled = !AutoCleanEnabled;
+                SaveSettings();
+                KitLugia.Core.Logger.Log($"Auto-Limpeza {(AutoCleanEnabled ? "ativada" : "desativada")} via Tray Icon");
+            };
+            menu.Items.Add(itemAutoClean);
+
+            var itemRamCfg = Item("⚙️  Configurações de RAM");
+            itemRamCfg.ToolTipText = "Limite de RAM, intervalo, ISLC e limites por processo.";
+            itemRamCfg.Click += (s, e) => OnNavigateTo?.Invoke("cfg_ram");
+            menu.Items.Add(itemRamCfg);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // --- GAMEBOOST (com estado + motor) ---
+            var itemGameBoost = Item("❌  GameBoost");
+            itemGameBoost.ToolTipText = "Otimização automática para o app em foco.";
+            itemGameBoost.CheckOnClick = false;
+            itemGameBoost.Click += (s, e) =>
+            {
+                GamePriorityEnabled = !GamePriorityEnabled;
+                if (GamePriorityEnabled) EnsureSeDebugPrivilege();
+                SaveSettings();
+                KitLugia.Core.Logger.Log($"GameBoost {(GamePriorityEnabled ? "ativado" : "desativado")} via Tray Icon");
+            };
+            menu.Items.Add(itemGameBoost);
+
+            // --- Configurações do kit ---
+            var itemKitCfg = Item("⚙️  Configurações do Kit");
+            itemKitCfg.ToolTipText = "Inicialização, módulos, áudio, sistema e desinstalação.";
+            itemKitCfg.Click += (s, e) => OnNavigateTo?.Invoke("cfg_kit");
+            menu.Items.Add(itemKitCfg);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // --- MAIS (submenu: o resto, fora da vista principal) ---
+            var more = new ToolStripMenuItem("⋯  Mais") { CheckOnClick = false };
+            more.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
+
+            AddNav(more, "🔎  Busca Global (Ctrl+K)", "busca", "Foca a busca global.");
+            AddNav(more, "🩺  Diagnóstico do Sistema", "diagnostico", "Gerador de diagnóstico.");
+            AddNav(more, "📦  Aplicativos / Desinstalar", "aplicativos", "Programas e desinstalador profundo.");
+            AddNav(more, "🔧  Reparos", "reparos", "Reparos guiados do Windows.");
+            AddNav(more, "🧩  Tweaks", "tweaks", "Ajustes finos de sistema.");
+            more.DropDownItems.Add(new ToolStripSeparator());
+
+            var itemTurboExplorer = Item("⚡  Turbo Explorer (F11)");
+            itemTurboExplorer.ToolTipText = "Força re-render do Explorer (acelera 'ir direto ao arquivo').";
+            itemTurboExplorer.Click += (s, e) => System.Threading.Tasks.Task.Run(() => TurboExplorerF11());
+            more.DropDownItems.Add(itemTurboExplorer);
+
+            var itemBootTray = new ToolStripMenuItem("▶️  Iniciar com o Windows") { CheckOnClick = false };
+            int bootAppCount = 0;
+            try
+            {
+                using var bootKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\StartupApps");
+                if (bootKey != null) bootAppCount = bootKey.ValueCount;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            string bootCountStr = bootAppCount > 0 ? $"{bootAppCount} apps" : "vazio";
+
+            var subAdmin = Item("🛡️  Iniciar (Admin)");
+            subAdmin.ToolTipText = $"Inicia os apps do Boot Tray como Administrador ({bootCountStr}).";
+            subAdmin.Click += (s, e) =>
+            {
+                try { StartupManager.LaunchTurboApps(); }
+                catch (Exception ex) { KitLugia.Core.Logger.LogError("BootTrayAdmin", ex.Message); }
+            };
+            itemBootTray.DropDownItems.Add(subAdmin);
+
+            var subNormal = Item("👤  Iniciar (Normal)");
+            subNormal.ToolTipText = $"Inicia os apps do Boot Tray sem elevação ({bootCountStr}).";
+            subNormal.Click += (s, e) =>
+            {
+                try { StartupManager.LaunchTurboAppsNonAdmin(); }
+                catch (Exception ex) { KitLugia.Core.Logger.LogError("BootTrayNormal", ex.Message); }
+            };
+            itemBootTray.DropDownItems.Add(subNormal);
+
+            var subManage = Item("📋  Gerenciar Boot Tray");
+            subManage.ToolTipText = "Escolhe quais apps abrem junto com o Windows.";
+            subManage.Click += (s, e) => OnOpenSettings?.Invoke();
+            itemBootTray.DropDownItems.Add(subManage);
+            more.DropDownItems.Add(itemBootTray);
+
+            var itemRestartAdmin = Item("🛡️  Reiniciar como Admin");
+            itemRestartAdmin.ToolTipText = "Fecha o kit e reabre com privilégios elevados.";
+            itemRestartAdmin.Click += (s, e) =>
+            {
+                try
+                {
+                    string exe = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
+                    Process.Start(new ProcessStartInfo { FileName = exe, UseShellExecute = true, Verb = "runas" });
+                    Dispose();
+                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            };
+            more.DropDownItems.Add(itemRestartAdmin);
+
+            menu.Items.Add(more);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // --- SAIR ---
+            var itemExit = Item("❌  Sair Completamente");
+            itemExit.Click += (s, e) =>
+            {
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ForceShutdown();
+                else
+                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+            };
+            menu.Items.Add(itemExit);
+
+            // Atualiza RAM + estado dos toggles a CADA abertura: uma leitura só
+            // quando o menu abre (zero timer, zero trabalho em repouso).
+            menu.Opening += (s, e) =>
+            {
+                try
+                {
+                    hdrSub.Text = BuildTrayStatusLine();
+
+                    bool on = AutoCleanEnabled;
+                    itemAutoClean.Checked = on;
+                    itemAutoClean.Text = on
+                        ? $"⚡  Auto-Limpeza  ({AutoCleanThresholdPercent}%)"
+                        : "⚡  Auto-Limpeza";
+
+                    ApplyGameBoostMenuState(itemGameBoost);
+                }
+                catch (Exception ex) { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            };
+
+            return menu;
+        }
+
+        /// <summary>
+        /// Estado do GameBoost no menu: ✅ verde ligado / ❌ vermelho desligado e,
+        /// ligado, o nome do motor — o Automático (🤖) recebe destaque azul.
+        /// </summary>
+        private void ApplyGameBoostMenuState(ToolStripMenuItem item)
+        {
+            bool on = GamePriorityEnabled;
+            if (!on)
+            {
+                item.Text = "❌  GameBoost";
+                item.Checked = false;      // NAO usar Checked: o WinForms pinta o
+                item.Tag = "gb:off";      // check mark dele POR CIMA do nosso
+                item.ToolTipText = "Otimização automática para o app em foco. (desligado)";
+                return;
+            }
+
+            var eng = CurrentEngine;
+            string motor = eng switch
+            {
+                GameBoostEngine.Auto => "🤖 Automático",
+                GameBoostEngine.V1_Balanced => "V1 Equilibrado",
+                GameBoostEngine.V2_StableFPS => "V2 FPS Estável",
+                GameBoostEngine.V3_Extreme => "V3 Extremo",
+                GameBoostEngine.V4_ExtremePro => "V4 Performance",
+                _ => "Personalizado"
+            };
+
+            // O icone (visto verde / X vermelho) e' desenhado pelo renderer a
+            // partir da TAG. Nao usamos Checked de proposito: com Checked=true o
+            // ToolStrip desenha o check mark padrao do Windows por cima.
+            item.Text = $"✅  GameBoost  ·  {motor}";
+            item.Checked = false;
+            // A tag carrega o estado (o que pinta) + se o motor e' o Auto
+            // (o que pinta o texto em azul).
+            item.Tag = "gb:on" + (eng == GameBoostEngine.Auto ? ":accent" : "");
+            item.ToolTipText = eng == GameBoostEngine.Auto
+                ? "Motor AUTOMÁTICO: mede a cena e aplica os melhores parâmetros. (ligado)"
+                : $"Motor {GetEngineDescription(eng)}. (ligado)";
+        }
+
+        private static ToolStripMenuItem Item(string text)
+        {
+            return new ToolStripMenuItem(text) { CheckOnClick = false };
+        }
+
+        private static ToolStripMenuItem Label(string tag)
+        {
+            // Prefixos: "title:" (6), "group:" (6), "subtitle:" (9). Corta pelo
+            // índice do ':' em vez de constante mágica.
+            int sep = tag.IndexOf(':');
+            string text = sep >= 0 ? tag.Substring(sep + 1) : tag;
+            var it = new ToolStripMenuItem(text)
+            {
+                Enabled = false,
+                CheckOnClick = false
+            };
+            it.Tag = tag;
+            return it;
+        }
+
+        private void AddNav(ToolStripMenuItem parent, string text, string tag, string tooltip)
+        {
+            var it = Item(text);
+            it.ToolTipText = tooltip;
+            it.Click += (s, e) => OnNavigateTo?.Invoke(tag);
+            parent.DropDownItems.Add(it);
+        }
+
+        private string BuildTrayStatusLine()
+        {
+            try
+            {
+                var st = KitLugia.Core.MemoryOptimizer.GetMemoryStats();
+                return $"RAM {st.UsedGB:0.0}/{st.TotalGB:0.0} GB · {st.Percent}%";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Unknown", "Exception suppressed");
+                return "—";
+            }
+        }
+
         public event System.Action? OnOpenMainWindow;
         public event System.Action? OnOpenSettings;
+
+        /// <summary>Abre o Kit Task Manager (janela propria, fora do Frame).</summary>
+        public event System.Action? OnOpenTaskManager;
+
+        /// <summary>
+        /// Navega para uma pagina do kit pelo atalho do tray. O TrayIconService nao
+        /// conhece PageType porem (o enum vive no code-behind da MainWindow) —
+        /// quem resolve e' o MainWindow, via NavigateToPage.
+        /// </summary>
+        public event System.Action<string>? OnNavigateTo;
 
         public TrayIconService()
         {
@@ -1851,133 +2227,7 @@ namespace KitLugia.GUI.Services
             }
 
             // Context Menu — build after icon is visible
-            var menu = new ContextMenuStrip();
-
-            var itemClean = new ToolStripMenuItem("🧹 Limpar RAM Agora");
-            itemClean.Click += (s, e) => CleanRamNow();
-            menu.Items.Add(itemClean);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            var itemAutoClean = new ToolStripMenuItem($"⚡ Auto-Limpeza ({AutoCleanThresholdPercent}%)");
-            itemAutoClean.Checked = AutoCleanEnabled;
-            itemAutoClean.Click += (s, e) =>
-            {
-                AutoCleanEnabled = !AutoCleanEnabled;
-                itemAutoClean.Checked = AutoCleanEnabled;
-                SaveSettings();
-            };
-            menu.Items.Add(itemAutoClean);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-
-            var itemGameBoost = new ToolStripMenuItem("🚀 GameBoost Pro");
-            itemGameBoost.Checked = GamePriorityEnabled;
-            itemGameBoost.Click += (s, e) =>
-            {
-                GamePriorityEnabled = !GamePriorityEnabled;
-                itemGameBoost.Checked = GamePriorityEnabled;
-                if (GamePriorityEnabled) EnsureSeDebugPrivilege();
-                SaveSettings();
-                KitLugia.Core.Logger.Log($"🚀 GameBoost {(GamePriorityEnabled ? "ativado" : "desativado")} via Tray Icon");
-            };
-            menu.Items.Add(itemGameBoost);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            var itemTurboExplorer = new ToolStripMenuItem("⚡ Turbo Explorer (F11)");
-            itemTurboExplorer.ToolTipText = "Envia F11 2x para a janela do Explorer mais recente — força re-render e acelera o 'ir direto ao arquivo'.";
-            itemTurboExplorer.Click += (s, e) => System.Threading.Tasks.Task.Run(() => TurboExplorerF11());
-            menu.Items.Add(itemTurboExplorer);
-
-            // Boot Tray
-            int bootAppCount = 0;
-            try
-            {
-                using var bootKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\KitLugia\StartupApps");
-                if (bootKey != null) bootAppCount = bootKey.ValueCount;
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            string bootCountStr = bootAppCount > 0 ? $"{bootAppCount} apps" : "vazio";
-            var itemBootTrayAdmin = new ToolStripMenuItem($"🛡️ Boot Tray: Iniciar (Admin)");
-            itemBootTrayAdmin.ToolTipText = $"Inicia os apps do Boot Tray com privilégios de Administrador ({bootCountStr})";
-            itemBootTrayAdmin.Click += (s, e) =>
-            {
-                try { StartupManager.LaunchTurboApps(); }
-                catch (Exception ex) { KitLugia.Core.Logger.LogError("BootTrayAdmin", ex.Message); }
-            };
-            menu.Items.Add(itemBootTrayAdmin);
-
-            var itemBootTrayNormal = new ToolStripMenuItem($"👤 Boot Tray: Iniciar (Normal - Sem Admin)");
-            itemBootTrayNormal.ToolTipText = $"Inicia os apps do Boot Tray como usuário normal via tarefa agendada ({bootCountStr})";
-            itemBootTrayNormal.Click += (s, e) =>
-            {
-                try { StartupManager.LaunchTurboAppsNonAdmin(); }
-                catch (Exception ex) { KitLugia.Core.Logger.LogError("BootTrayNormal", ex.Message); }
-            };
-            menu.Items.Add(itemBootTrayNormal);
-
-            var itemBootTrayManager = new ToolStripMenuItem($"📋 Gerenciar Boot Tray ({bootCountStr})");
-            itemBootTrayManager.Click += (s, e) => OnOpenSettings?.Invoke();
-            menu.Items.Add(itemBootTrayManager);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            var itemSettings = new ToolStripMenuItem("⚙ Configurações");
-            itemSettings.Click += (s, e) => OnOpenSettings?.Invoke();
-            menu.Items.Add(itemSettings);
-
-            var itemOpen = new ToolStripMenuItem("🚀 Abrir KitLugia");
-            itemOpen.Font = new Font(itemOpen.Font, FontStyle.Bold);
-            itemOpen.Click += (s, e) => OnOpenMainWindow?.Invoke();
-            menu.Items.Add(itemOpen);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            var itemRestartAdmin = new ToolStripMenuItem("🛡️ Iniciar como Admin");
-            itemRestartAdmin.Click += (s, e) =>
-            {
-                try
-                {
-                    string exe = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-                    Process.Start(new ProcessStartInfo { FileName = exe, UseShellExecute = true, Verb = "runas" });
-                    Dispose();
-                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
-                }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            };
-            menu.Items.Add(itemRestartAdmin);
-
-            var itemRestartNormal = new ToolStripMenuItem("👤 Iniciar como Usuário Normal");
-            itemRestartNormal.Click += async (s, e) =>
-            {
-                try
-                {
-                    string exe = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-                    KitLugia.Core.StartupManager.RegisterNonAdminTask("__KitLugiaRestart", exe, null);
-                    KitLugia.Core.StartupManager.RunNonAdminTask("__KitLugiaRestart");
-                    await System.Threading.Tasks.Task.Delay(1500);
-                    Dispose();
-                    if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownFinished)
-                        Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
-                }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            };
-            menu.Items.Add(itemRestartNormal);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            var itemExit = new ToolStripMenuItem("❌ Sair Completamente");
-            itemExit.Click += (s, e) =>
-            {
-                if (Application.Current.MainWindow is MainWindow mw)
-                    mw.ForceShutdown();
-                else
-                    Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
-            };
-            menu.Items.Add(itemExit);
-
+            var menu = BuildTrayContextMenu();
             _trayIcon.ContextMenuStrip = menu;
 
             // Double-click to open main window
@@ -2254,6 +2504,10 @@ namespace KitLugia.GUI.Services
                 key.SetValue("RamPressure", RamPressurePercent);
                 key.SetValue("StandbyClean", StandbyCleanEnabled ? 1 : 0);
                 key.SetValue("IslcThresholdMB", IslcThresholdMB);
+                key.SetValue("IslcFreeThresholdMB", IslcFreeThresholdMB);
+                key.SetValue("IslcMinIntervalSeconds", IslcMinIntervalSeconds);
+                key.SetValue("IslcAutoTune", IslcAutoTune ? 1 : 0);
+                key.SetValue("IslcRespectForeground", IslcRespectForeground ? 1 : 0);
                 key.SetValue("AntiLeak", MemoryLeakDetectionEnabled ? 1 : 0);
                 key.SetValue("FocusAssist", FocusAssistEnabled ? 1 : 0);
                 key.SetValue("TimerBoost", TimerBoost ? 1 : 0);
@@ -2605,6 +2859,13 @@ namespace KitLugia.GUI.Services
                 RamPressurePercent = ReadIntSetting(key, "RamPressure", 88);
                 StandbyCleanEnabled = ReadBoolSetting(key, "StandbyClean", false);
                 IslcThresholdMB = ReadLongSetting(key, "IslcThresholdMB", SuggestIslcThresholdMB());
+                IslcFreeThresholdMB = ReadLongSetting(key, "IslcFreeThresholdMB", SuggestIslcFreeThresholdMB());
+                IslcMinIntervalSeconds = ReadIntSetting(key, "IslcMinIntervalSeconds", SuggestIslcMinIntervalSeconds());
+                IslcAutoTune = ReadBoolSetting(key, "IslcAutoTune", true);
+                IslcRespectForeground = ReadBoolSetting(key, "IslcRespectForeground", true);
+                // AUTO (padrão): recalcula agora — os valores salvos por versões antigas
+                // (ex.: standby 4065 MB digitado à mão) não mandam mais.
+                ApplyIslcAutoTuning();
                 MemoryLeakDetectionEnabled = ReadBoolSetting(key, "AntiLeak", false);
                 FocusAssistEnabled = ReadBoolSetting(key, "FocusAssist", false);
                 TimerBoost = ReadBoolSetting(key, "TimerBoost", false);
@@ -3618,7 +3879,7 @@ namespace KitLugia.GUI.Services
                 if (pid == _currentBoostedPid) return; // Mesmo processo
 
 
-                string windowTitle = GetWindowTitle(currentHwnd);
+
 
                 // Verifica se deve aplicar boost
                 bool shouldBoost = ShouldBoostProcess(pid, currentHwnd);
@@ -3654,8 +3915,15 @@ namespace KitLugia.GUI.Services
                         SaveCrashRescue();   // fica registado para o caso de crash
 
 
-                        string logTitle = string.IsNullOrEmpty(windowTitle) ? $"Process {pid}" : windowTitle;
-                        KitLugia.Core.Logger.Log($"🎮 GameBoost (Timer): Boost aplicado ao processo PID: {pid} - {logTitle}");
+                        // Anti-spam: o TITULO DA JANELA muda a cada alt-tab, entao esta linha
+                        // virava ruido puro (4 linhas por troca de janela). Fica disponivel
+                        // com log detalhado ligado.
+                        if (KitLugia.Core.Logger.VerboseCheckLogs)
+                        {
+                            string windowTitle = GetWindowTitle(currentHwnd);
+                            string logTitle = string.IsNullOrEmpty(windowTitle) ? $"Process {pid}" : windowTitle;
+                            KitLugia.Core.Logger.Log($"🎮 GameBoost (Timer): Boost aplicado ao processo PID: {pid} - {logTitle}");
+                        }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
@@ -3715,7 +3983,7 @@ namespace KitLugia.GUI.Services
                 {
                     target.SustainedApplied = true;
                     ApplyBoostModern(pid, BoostLevel.Sustentado);
-                    KitLugia.Core.Logger.Log(
+                    ShouldLogBand(pid,
                         $"🎮 GameBoost: {proc.ProcessName} saiu do foco mas continua ativo -> faixa SUSTENTADA (AboveNormal). " +
                         "Volta a prioridade original sozinho quando ficar ocioso.");
                 }
@@ -3799,7 +4067,7 @@ namespace KitLugia.GUI.Services
                     _boostTargets.TryRemove(pid, out _);
                     _autoBand.TryRemove(pid, out _);
                     _threadEfficiencyOff.TryRemove(pid, out _);
-                    KitLugia.Core.Logger.Log(
+                    ShouldLogBand(pid,
                         $"🎮 GameBoost: {(target.Name.Length > 0 ? target.Name : "PID " + pid)} ficou ocioso — prioridade original restaurada.");
                 }
                 catch
@@ -3831,7 +4099,7 @@ namespace KitLugia.GUI.Services
             {
                 RevertBoost(kv.Key);
                 _boostTargets.TryRemove(kv.Key, out _);
-                KitLugia.Core.Logger.Log(
+                ShouldLogBand(kv.Key,
                     $"🎮 GameBoost: {kv.Value.Name} saiu da faixa sustentada (limite de {MaxSustainedTargets} processos).");
             }
         }
@@ -3856,6 +4124,13 @@ namespace KitLugia.GUI.Services
             // um limite de 64, estes nao tinham nenhum).
             _autoBand.Clear();
             _threadEfficiencyOff.Clear();
+            // dicionarios de log do GameBoost (06/10/2026): sem isso o PID do dia
+            // inteiro ficaria retido e a 1a janela de hoje repetiria o resumo antigo.
+            _lastBoostSignature.Clear();
+            _boostRepeatSuppress.Clear();
+            // (o estado do ShouldLogBand agora vive no Logger.LogOnce; limpar o mapa
+            //  antigo aqui virou lembrança do reset de sessão)
+            _boostAutoLogged.Clear();
             // Reescreve o ficheiro de resgate com o estado agora (vazio) → apaga-o.
             SaveCrashRescue();
 
@@ -4059,6 +4334,7 @@ namespace KitLugia.GUI.Services
             // GLOBAL Win32PrioritySeparation (não precisa de handle)
             if (config.Win32PrioritySeparation)
                 Win32Api.SetWin32PrioritySeparation(true);
+               SaveCrashRescue();   // sep e' global: fica registado em disco para o caso de crash
 
             // GLOBAL ThreadEfficiencyMode via pid (não precisa de handle do processo)
             //
@@ -4081,7 +4357,17 @@ namespace KitLugia.GUI.Services
                 using var proc = Process.GetProcessById((int)pid);
                 string name = proc.ProcessName;
 
-                KitLugia.Core.Logger.Log($"⚡ GameBoost [PERSONALIZADO]: {name} (PID: {pid}) aplicando configurações...");
+                // Anti-spam (06/10/2026): 1 linha por MUDANCA REAL de configuracao, nao por
+                // reaplicacao. O motor Automatico reaplica a cada troca de janela e a cada
+                // ~15 s com os MESMOS valores: eram milhares de linhas/dia sem informacao nova.
+                // As acoes continuam sendo aplicadas sempre (so o log e' suprimido).
+                bool logBoost = ShouldLogBoost(pid, BoostSignature(config));
+                if (logBoost)
+                    KitLugia.Core.Logger.Log(
+                        $"⚡ GameBoost: {name} (PID: {pid}) · CPU={config.CpuPriority}" +
+                        $" IO={SafeIoPriority(config.IoPriorityLevel)}" +
+                        $" Page={(config.PagePriorityLevel == 0 ? 5 : config.PagePriorityLevel)}" +
+                        $" Mem={config.ThreadMemoryPriority} EcoQoS={(config.EcoQoSEnabled ? "on" : "off")}");
 
                 // SEGURANÇA (03/10/2026): REALTIME foi PROIBIDO globalmente.
                 // REALTIME_PRIORITY_CLASS em processo de usuario pode impedir o scheduler de rodar
@@ -4139,7 +4425,8 @@ namespace KitLugia.GUI.Services
                     try { Win32Api.SetProcessGameClassInfo(proc.Handle, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
 
-                KitLugia.Core.Logger.Log($"✅ GameBoost [PERSONALIZADO]: {name} otimizado com sucesso!");
+                if (KitLugia.Core.Logger.VerboseCheckLogs)
+                    KitLugia.Core.Logger.Log($"✅ GameBoost [PERSONALIZADO]: {name} otimizado com sucesso!");
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
@@ -4158,6 +4445,7 @@ namespace KitLugia.GUI.Services
 
             // GLOBAL: Win32PrioritySeparation (não precisa de handle do processo)
             Win32Api.SetWin32PrioritySeparation(true);
+               SaveCrashRescue();   // sep e' global: fica registado em disco para o caso de crash
 
             CheckPcoreBenefit(pid);
             Win32Api.SetThreadEfficiencyForAllThreads(pid, false);
@@ -4199,6 +4487,7 @@ namespace KitLugia.GUI.Services
 
             // GLOBAL: Scheduler + P-Cores (não precisa de handle do processo)
             Win32Api.SetWin32PrioritySeparation(true);
+               SaveCrashRescue();   // sep e' global: fica registado em disco para o caso de crash
             CheckPcoreBenefit(pid);
             Win32Api.SetThreadEfficiencyForAllThreads(pid, false);
 
@@ -4240,6 +4529,7 @@ namespace KitLugia.GUI.Services
 
             // GLOBAL: Scheduler + P-Cores + Timer + Network (não precisa de handle)
             Win32Api.SetWin32PrioritySeparation(true);
+               SaveCrashRescue();   // sep e' global: fica registado em disco para o caso de crash
             CheckPcoreBenefit(pid);
             Win32Api.SetThreadEfficiencyForAllThreads(pid, false);
             Win32Api.BoostTimerResolution();
@@ -4396,9 +4686,22 @@ namespace KitLugia.GUI.Services
                 DownloadBoostEnabled = false
             };
 
-            KitLugia.Core.Logger.Log(
-                $"🤖 GameBoost AUTO: fg={foreground} cpu={cpuPct:P0} amostra={temAmostra} faixa={faixa}" +
-                $"{(mudouDeFaixa ? " (mudou)" : "")} -> IO={cfg.IoPriorityLevel} Page={cfg.PagePriorityLevel}");
+            // Anti-spam: so loga na 1a vez do PID ou quando a CENA muda de faixa de verdade.
+            // O heartbeat de 15 s repetindo fg/cpu/IO/Page identicos nao dizia nada de novo.
+            bool autoPrimeiraVez = !_boostAutoLogged.ContainsKey(pid);
+            if (autoPrimeiraVez) _boostAutoLogged[pid] = true;
+            if (autoPrimeiraVez || mudouDeFaixa)
+                // LogOnce com ASSINATURA: a linha carrega cpu/amostra (mudam sempre)
+                // e o `_autoBand` e zerado quando o app fica ocioso, entao o
+                // "(mudou)" voltava a cada ~15 s com a MESMA faixa Idle. O estado
+                // real e a faixa + o que foi aplicado.
+                KitLugia.Core.Logger.LogOnce(
+                    $"gboost|auto|{pid}",
+                    $"🤖 GameBoost AUTO: fg={foreground} cpu={cpuPct:P0} amostra={temAmostra} faixa={faixa}" +
+                    $" -> IO={cfg.IoPriorityLevel} Page={cfg.PagePriorityLevel}",
+                    heartbeatSeconds: 900,
+                    signature: $"{(int)faixa}|{cfg.IoPriorityLevel}|{cfg.PagePriorityLevel}",
+                    minChangeIntervalSeconds: 120);
 
             ApplyBoostCustom(pid, cfg);
 
@@ -4415,6 +4718,89 @@ namespace KitLugia.GUI.Services
         /// Evita re-enumerar todas as threads do processo em cada reaplicacao.
         /// </summary>
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, bool> _threadEfficiencyOff = new();
+
+        // ─── LOG ANTI-SPAM DO GAMEBOOST (06/10/2026) ───
+        //
+        // SINTOMA (log real): 4 linhas a CADA troca de janela/reavaliacao do motor —
+        //     🤖 GameBoost AUTO: fg=True cpu=2% ... faixa=Idle -> IO=3 Page=5
+        //     🎮 GameBoost (Timer): Boost aplicado ao processo PID: 16004 - Freebuff
+        //     ⚡ GameBoost [PERSONALIZADO]: X aplicando configuracoes...
+        //     ✅ GameBoost [PERSONALIZADO]: X otimizado com sucesso!
+        // Num dia de alt-tab isso e milhares de linhas, todas com o MESMO conteudo util:
+        // o titulo da janela muda a cada troca, mas a configuracao efetiva (CPU/IO/Page/
+        // memory/EcoQoS) NAO muda — o motor reaplica os mesmos valores a cada ~15 s.
+        //
+        // SOLUCAO: a chave de log e a ASSINATURA EFETIVA (nao o titulo da janela, que e
+        // ruido). Loga so na 1a aplicacao daquele PID ou quando a assinatura muda de
+        // verdade. As acoes continuam sendo aplicadas sempre (prioridade/IO/Page sao
+        // idempotentes e o Windows pode reverter sozinho), so o LOG e' suprimido.
+        // Um resumo por janela longa segue existindo, para o usuario nao perder a
+        // visibilidade de que o motor esta ativo.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, string> _lastBoostSignature = new();
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, int> _boostRepeatSuppress = new();
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, bool> _boostAutoLogged = new();
+        private static readonly TimeSpan BoostSummaryWindow = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// Assinatura do que o motor realmente aplica. Se nao mudou, o log repetido
+        /// nao diz nada de novo. NAO inclui o titulo da janela de proposito.
+        /// </summary>
+        private static string BoostSignature(CustomEngineConfig c)
+        {
+            return string.Join('|',
+                c.CpuPriority,
+                SafeIoPriority(c.IoPriorityLevel),
+                c.PagePriorityLevel,
+                c.ThreadMemoryPriority,
+                c.EcoQoSEnabled,
+                c.TimerBoost,
+                c.GameClassInfo);
+        }
+
+        /// <summary>
+        /// true na 1a vez que este PID e' visto, ou quando a configuracao efetiva mudou.
+        /// Faz o "reset" do estado e devolve a decisao de logar.
+        /// </summary>
+        private static bool ShouldLogBoost(uint pid, string signature)
+        {
+            if (!_lastBoostSignature.TryGetValue(pid, out var last) || !string.Equals(last, signature, StringComparison.Ordinal))
+            {
+                _lastBoostSignature[pid] = signature;
+                _boostRepeatSuppress.TryRemove(pid, out _);
+                return true;
+            }
+
+            // Mesma config: conta e suprime. A cada BoostSummaryWindow deixa passar 1
+            // linha como lembrete de que o motor continua ativo (com a contagem de
+            // repeticoes suprimidas), para o log nao virar um silencio total.
+            if (_boostRepeatSuppress.TryGetValue(pid, out var n))
+                n++;
+            else
+                n = 1;
+            _boostRepeatSuppress[pid] = n;
+
+            // ANTES: `if (n == 1) return true` deixava passar a SEGUNDA aplicacao
+            // identica (o log real mostrava a mesma linha "⚡ GameBoost: X" duas
+            // vezes em ~16 s). So o lembrete periodico faz sentido.
+            if (n % 30 == 0) return true;                             // lembrete periodico
+            return false;
+        }
+
+        /// <summary>
+        /// Log de transicao COM ASSINATURA por PID. As faixas alternam Foco &lt;-&gt;
+        /// Sustentado a cada alt-tab, entao uma janela simples de 2 min ainda
+        /// reemitia a MESMA frase varias vezes por hora (o log real tinha
+        /// "Discord saiu do foco..." 4x em 11 min). Com LogOnce a frase so volta
+        /// quando o ESTADO muda de verdade (ou no lembrete de 15 min), e o texto
+        /// leva a contagem das repeticoes suprimidas.
+        /// </summary>
+        private static bool ShouldLogBand(uint pid, string what)
+        {
+            string assinatura = what.Length > 48 ? what[..48] : what;
+            KitLugia.Core.Logger.LogOnce($"gboost|band|{pid}", what,
+                heartbeatSeconds: 900, signature: assinatura, minChangeIntervalSeconds: 600);
+            return true;
+        }
 
         /// <summary>
         /// ProBalance do motor Automatico (v2): DEMOVER O FUNDO, mas SO SOB CARGA REAL.
@@ -4802,6 +5188,17 @@ private void SaveCrashRescue(bool forcar = false)
             if (!sb.ToString().Contains($"boost|{kv.Key}|"))
                 sb.Append("boost|").Append(kv.Key).Append('|').Append((int)ProcessPriorityClass.Normal).Append('\n');
 
+        // Win32PrioritySeparation e' GLOBAL (nao por processo) e o _orig vivia so em
+        // memoria: um crash com o GameBoost ligado deixava o 38 gravado no
+        // PriorityControl para sempre, e o proximo boot nao tinha como saber o
+        // original. Persistimos o valor EXATO que estava la antes.
+        // Nao usamos "o padrao do Windows" como palpite: 38 (0x26) e' o default em
+        // varias maquinas, entao um resgate cego estragaria quem ja vinha com ele.
+        // "ausente" tambem e' um estado valido e e' guardado como -1.
+        int sepOrig = Win32Api.ReadWin32PrioritySeparationGuardado();
+        if (sepOrig != int.MinValue)
+            sb.Append("sep|").Append(sepOrig).Append('\n');
+
         string conteudo = sb.ToString();
         if (!forcar &&
             conteudo == _lastRescueContent &&
@@ -4856,11 +5253,28 @@ private static void RescueOrphanedBoostState()
 
         var linhas = File.ReadAllLines(path);
         int restaurados = 0;
+        // Um resumo por execucao (antes saiam 4 linhas "Resgate" + a contagem).
+        var resgatados = new List<string>();
         foreach (var linha in linhas)
         {
-            var p = linha.Split('|');
-            if (p.Length < 2) continue;
-            if (!uint.TryParse(p[1], out uint pid) || pid == 0) continue;
+   var p = linha.Split('|');
+   if (p.Length < 2) continue;
+   
+   // Win32PrioritySeparation global. TEM de vir ANTES da leitura de PID: o
+   // valor tambem e' um inteiro e "sep|2" seria lido como "o processo 2",
+   // mexendo no PID do SYSTEM. Nao e' uma linha de processo.
+   if (p[0] == "sep")
+   {
+   if (int.TryParse(p[1], out int sepOriginal))
+   {
+   Win32Api.SetWin32PrioritySeparationPara(sepOriginal);
+   restaurados++;
+   KitLugia.Core.Logger.Log($"✅ Resgate: Win32PrioritySeparation restaurado para {sepOriginal} (0x{sepOriginal:X})");
+   }
+   continue;
+   }
+   
+   if (!uint.TryParse(p[1], out uint pid) || pid == 0) continue;
             try
             {
                 using var proc = Process.GetProcessById((int)pid);
@@ -4871,7 +5285,7 @@ private static void RescueOrphanedBoostState()
                         proc.PriorityClass = ProcessPriorityClass.Normal;
                         Win32Api.SetThreadMemoryPriority(proc.Handle, Win32Api.MEMORY_PRIORITY_NORMAL);
                         restaurados++;
-                        KitLugia.Core.Logger.Log($"🛟 Resgate: {proc.ProcessName} (PID: {pid}) estava BelowNormal de uma execucao anterior → Normal");
+                        resgatados.Add($"{proc.ProcessName}→Normal");
                     }
                 }
                 else if (p[0] == "boost" && p.Length >= 3)
@@ -4887,7 +5301,7 @@ private static void RescueOrphanedBoostState()
                     {
                         proc.PriorityClass = original;
                         restaurados++;
-                        KitLugia.Core.Logger.Log($"🛟 Resgate: {proc.ProcessName} (PID: {pid}) ficou com prioridade alterada de uma execucao anterior → {original}");
+                        resgatados.Add($"{proc.ProcessName}→{original}");
                     }
                     // Repõe TAMBEM a memory priority: o ProBalance deixa VERY_LOW e isso
                     // nao volta sozinho so com a mudanca de prioridade de processo (o
@@ -4900,7 +5314,10 @@ private static void RescueOrphanedBoostState()
 
         ClearCrashRescueFile();
         if (restaurados > 0)
-            KitLugia.Core.Logger.Log($"🛟 Resgate pos-crash: {restaurados} processo(s) devolvido(s) ao estado original.");
+        {
+            string quais = resgatados.Count == 0 ? "" : $" ({string.Join(", ", resgatados.Take(6))}{(resgatados.Count > 6 ? $" +{resgatados.Count - 6}" : "")})";
+            KitLugia.Core.Logger.Log($"🛟 Resgate pos-crash: {restaurados} processo(s) devolvido(s) ao estado original{quais}.");
+        }
     }
     catch (Exception ex) { ConditionalLog.LogOnce("RescueOrphanedBoostState", ex); }
 }
@@ -5249,14 +5666,25 @@ private static void RescueOrphanedBoostState()
 
         private void ProBalanceTimerTick(object? sender, EventArgs e)
         {
-            try
+            // ApplyProBalance -> ApplyProBalanceCore varre TODOS os processos
+            // (GetCachedProcesses == Process.GetProcesses) com 2 syscalls por processo,
+            // P/Invoke e SaveCrashRescue() (escrita em disco) — tudo dentro de
+            // lock (_throttleLock). No Tick do DispatcherTimer isso prendia a thread de UI
+            // a cada 3 s, e como tudo esta no lock, uma thread do pool ja com o lock
+            // fazia a UI esperar tambem. Vai para o pool, com guarda de sobreposicao.
+            if (Interlocked.Exchange(ref _proBalanceTickBusy, 1) == 1) return;
+            _ = System.Threading.Tasks.Task.Run(() =>
             {
-                if (ProBalance && GamePriorityEnabled && _currentBoostedPid != 0)
+                try
                 {
-                    ApplyProBalance(_currentBoostedPid);
+                    if (ProBalance && GamePriorityEnabled && _currentBoostedPid != 0)
+                    {
+                        ApplyProBalance(_currentBoostedPid);
+                    }
                 }
-            }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                catch (Exception ex) { Logger.LogWarning("ProBalanceTimerTick", ex.Message); }
+                finally { Interlocked.Exchange(ref _proBalanceTickBusy, 0); }
+            });
         }
 
 
@@ -5325,29 +5753,174 @@ private static void RescueOrphanedBoostState()
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
+        /// <summary>
+        /// Decide se a standby list deve ser purgada, e faz isso de forma verificavel.
+        ///
+        /// Predicado = o do ISLC (standby &gt;= limite E memoria livre &lt; limite)
+        /// + as protecoes que o ISLC nao tem (intervalo minimo, foreground,
+        /// guarda de reentrancia) + medicao antes/depois, para que o contador
+        /// so suba quando o purge realmente aconteceu.
+        ///
+        /// Antes, o corpo inteiro era `if (standby &gt; threshold) purge`: sem gate
+        /// de memoria livre, sem intervalo, e com o contador incrementado dentro
+        /// do try sem conferir nada depois. Ver docs/ISLC_VS_KITLUGIA_COMPARISON.md.
+        /// </summary>
         private void CheckAndCleanStandby(int systemUsagePercent)
         {
+            // O parametro nao e usado de proposito: a decisao nao e por percentual de
+            // uso, e sim por tamanho da standby + memoria realmente livre. Fica na
+            // assinatura para nao quebrar o call site.
+            _ = systemUsagePercent;
+
+            // Le as duas grandezas com a metrica do recurso. Falha de API nao e
+            // "standby vazia": nesse caso aborta (purgar sem ler seria decidir no escuro).
+            if (!KitLugia.Core.MemoryOptimizer.TryGetStandbyListSizeMB(out long standbyMB))
+            {
+                IslcLastSkipReason = "falha ao ler a standby list";
+                return;
+            }
+
+            // NOTA DE ORDEM (bug corrigido aqui, pego pelo harness tests\TrayIslcLab):
+            // a guarda _isPurgingStandby e reservada SO depois de todos os filtros,
+            // imediatamente antes de despachar a task. Reservar antes faria cada
+            // `return` de filtro abandonar a guarda em 1 e matar o purge PERMANENTE
+            // (o unico lugar que limpava era o finally da task, que nem chegava a
+            // ser agendada). Sintoma: IslcLastSkipReason virava "purge anterior em
+            // andamento" para sempre depois do primeiro tick sem acao.
+
             try
             {
-                long standbyMB = KitLugia.Core.MemoryOptimizer.GetStandbyListSizeMB();
-                IslcLastCleanMB = standbyMB;
-
-                if (standbyMB > IslcThresholdMB)
+                if (!KitLugia.Core.MemoryOptimizer.TryGetFreePagesMB(out long freeMB))
                 {
-                    // Purge e pesado (18GB+ pode travar UI) — roda em background
-                    _ = System.Threading.Tasks.Task.Run(() =>
-                    {
-                        try
-                        {
-                            KitLugia.Core.MemoryOptimizer.PurgeStandbyList();
-                            IslcLastCleanTime = DateTime.Now;
-                            IslcCleanCount++;
-                        }
-                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                    });
+                    IslcLastSkipReason = "falha ao ler a memória livre";
+                    return;
                 }
+
+                IslcLastSkipReason = "";
+
+                if (standbyMB < IslcThresholdMB)
+                {
+                    // Sem motivo, o badge ficava VAZIO e o usuario ligava o standby
+                    // clean, esperava e nao entendia a ausencia de log. Mesmo sendo um
+                    // "nada a fazer" (nao e erro), o motivo e o que explica.
+                    IslcLastSkipReason =
+                        $"standby {standbyMB} MB < limiar {IslcThresholdMB} MB - nada a liberar";
+                    KitLugia.Core.Logger.LogOnce("islc|skip|abaixoLimiar",
+                        $"🧹 Standby: limpeza nao executada - {IslcLastSkipReason}",
+                        heartbeatSeconds: 900, signature: "abaixo do limiar");
+                    return;
+                }
+
+                if (freeMB >= IslcFreeThresholdMB)
+                {
+                    IslcLastSkipReason = $"memória livre {freeMB} MB ≥ limite {IslcFreeThresholdMB} MB — não precisa liberar cache";
+                    // Explica o "nao fez nada" uma vez por estado. Sem esta linha o
+                    // usuario liga o standby clean, espera e nao entende a ausencia
+                    // de log de limpeza; com ela, o motivo do skip fica no historico.
+                    // A mensagem tem MB variaveis (mudam a cada tick), entao comparar o
+                    // TEXTO fazia o LogOnce vazar tudo (o log real tinha uma linha a
+                    // cada 30 s). A assinatura e o MOTIVO, que nao muda.
+                    KitLugia.Core.Logger.LogOnce("islc|skip|ramLivre",
+                        $"🧹 Standby: limpeza nao executada - {IslcLastSkipReason}",
+                        heartbeatSeconds: 900, signature: "ram livre acima do limite");
+                    return;
+                }
+
+                // Intervalo minimo: o ISLC nao tem (a protecao dele e emergente e
+                // so vale se o purge funcionou, o que nem sempre e verdade).
+                if (IslcMinIntervalSeconds > 0 &&
+                    IslcLastCleanTime != DateTime.MinValue &&
+                    (DateTime.Now - IslcLastCleanTime).TotalSeconds < IslcMinIntervalSeconds)
+                {
+                    int restante = (int)Math.Ceiling(IslcMinIntervalSeconds - (DateTime.Now - IslcLastCleanTime).TotalSeconds);
+                    IslcLastSkipReason = $"intervalo mínimo ({restante}s)";
+                    return;
+                }
+
+                if (IslcRespectForeground && Win32Api.GetForegroundWindow() != IntPtr.Zero)
+                {
+                    IslcLastSkipReason = "app em primeiro plano";
+                    KitLugia.Core.Logger.LogOnce("islc|skip|foreground", "🧹 Standby: limpeza nao executada - app em primeiro plano (desmarque \"Nao limpar com app em foco\" para permitir)", 900);
+                    return;
+                }
+
+                // ---- Reserva a guarda AGORA (todos os filtros ja passaram) ----
+                if (Interlocked.CompareExchange(ref _isPurgingStandby, 1, 0) != 0)
+                {
+                    IslcLastSkipReason = "purge anterior em andamento";
+                    return;
+                }
+
+                // ---- Executa (Task.Run: a medicao pesada fica fora do tick) ----
+                // Task precisa do nome completo: o arquivo tem using de
+                // Microsoft.Win32.TaskScheduler, onde Task e o tipo da tarefa agendada.
+                long standbyAntes = standbyMB;
+                long freeAntes = freeMB;
+                _ = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        // Reconfere o intervalo dentro da task: entre a checagem acima e o inicio
+                    // desta task outro ciclo pode ter limpado a standby e definido
+                    // IslcLastCleanTime. A guarda _isPurgingStandby ja impede dois
+                    // purges simultaneos; aqui so evita o segundo logo em seguida.
+                    if (IslcMinIntervalSeconds > 0 && IslcLastCleanTime != DateTime.MinValue &&
+                        (DateTime.Now - IslcLastCleanTime).TotalSeconds < IslcMinIntervalSeconds)
+                        return;
+
+                        bool ok = KitLugia.Core.MemoryOptimizer.TryPurgeStandbyList(out int ntStatus);
+                        IslcLastNtStatus = ntStatus;
+
+                        // Mede o DEPOIS: so conta se a standby realmente caiu.
+                        bool leuDepois = KitLugia.Core.MemoryOptimizer.TryGetStandbyListSizeMB(out long standbyDepois);
+                        KitLugia.Core.MemoryOptimizer.TryGetFreePagesMB(out long freeDepois);
+
+                        IslcLastCleanTime = DateTime.Now;
+
+                        if (!ok)
+                        {
+                            IslcLastSkipReason = ntStatus == 0xC0000061 || ntStatus == -1
+                                ? "falhou: precisa rodar como administrador"
+                                : $"falhou (NTSTATUS 0x{ntStatus:X8})";
+                            KitLugia.Core.Logger.Log($"[STANDBY] Purge recusado: {IslcLastSkipReason}");
+                            return;
+                        }
+
+                        IslcLastCleanMB = standbyDepois;
+
+                        if (leuDepois && standbyDepois < standbyAntes)
+                        {
+                            // Seguro sem Interlocked: a guarda _isPurgingStandby
+                            // garante um purge por vez.
+                            IslcCleanCount++;
+                            KitLugia.Core.Logger.Log(
+                                $"🧹 Standby: {standbyAntes} → {standbyDepois} MB (liberou {standbyAntes - standbyDepois} MB, " +
+                                $"livre {freeAntes} → {freeDepois} MB)");
+                        }
+                        else
+                        {
+                            IslcLastSkipReason = "purge sem efeito mensurável";
+                            KitLugia.Core.Logger.Log(
+                                $"[STANDBY] Purge retornou ok mas standby ficou em {standbyDepois} MB (antes {standbyAntes})");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        IslcLastSkipReason = "erro: " + ex.Message;
+                        KitLugia.Core.Logger.Log($"[STANDBY] Erro no purge: {ex}");
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _isPurgingStandby, 0);
+                    }
+                });
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch (Exception ex)
+            {
+                Interlocked.Exchange(ref _isPurgingStandby, 0);
+                IslcLastSkipReason = "erro: " + ex.Message;
+                KitLugia.Core.Logger.Log($"[STANDBY] Erro ao avaliar o purge: {ex}");
+            }
         }
 
         private bool IsTaskbarWindow(IntPtr hwnd)
@@ -5532,7 +6105,9 @@ private static void RescueOrphanedBoostState()
                 // Testa se consegue atualizar o ícone
                 UpdateTrayIcon(GetMemoryUsagePercent());
 
-                KitLugia.Core.Logger.Log("✅ Tray Icon está saudável");
+                // LogOnce: o health check roda no timer e o MainWindow tem um segundo
+                // check — o log real tinha a MESMA linha duas vezes no mesmo segundo.
+                KitLugia.Core.Logger.LogOnce("tray|saudavel", "✅ Tray Icon está saudável", heartbeatSeconds: 3600);
                 return true;
             }
             catch (Exception ex)
@@ -5911,9 +6486,55 @@ private static void RescueOrphanedBoostState()
             {
                 Interval = TimeSpan.FromMilliseconds(_ramLimiterIntervalMs)
             };
-            _ramLimiterTimer.Tick += (s, e) => { ApplyProcessRamLimits(); ApplyProcessCpuLimits(); ApplyProcessEngineLimits(); };
+            _ramLimiterTimer.Tick += (s, e) => QueueRamLimiterCycle();
             _ramLimiterTimer.Start();
             KitLugia.Core.Logger.Log($"💾 RAM Limiter timer iniciado ({_ramLimiterIntervalMs}ms)");
+        }
+
+        /// <summary>
+        /// Agenda o ciclo do RAM Limiter FORA DA THREAD DE UI.
+        ///
+        /// CAUSA RAIZ DO FREEZE (medido no log real, 07/10/2026 11:47:43):
+        /// "[UI-FREEZE] Thread de UI travada por ~3512 ms (itens pendentes no pool: 0)".
+        /// Pool vazio = o trabalho NAO estava na fila, estava na thread de UI. O
+        /// DispatcherTimer chamava ApplyProcessRamLimits() em sincrono, e cada tick faz:
+        ///   - Process.GetProcessesByName() -> enumera TODOS os processos da maquina, 1x por limite
+        ///   - 2 syscalls por instancia (WorkingSet64 + GetProcessMemoryInfo via handle)
+        ///   - no Modo DIRETO: OpenProcess + EmptyWorkingSet em CADA instancia
+        ///     (o proprio log chegou a "esvaziado em 33 processo(s)")
+        /// Com 3 limites ativos isso passava de 3 s preso na UI: clicar numa linha da tabela
+        /// de DNS travava o kit inteiro.
+        ///
+        /// Mesma correcao ja aplicada no MonitorTick (RunMonitorCycle). A guarda Interlocked
+        /// impede empilhamento: se o ciclo anterior ainda roda, o tick e descartado — a medicao
+        /// e periodica, entao perder um tick nao muda resultado nenhum.
+        ///
+        /// Os 3 metodos (ApplyProcessRamLimits/CpuLimits/EngineLimits) sao 100% P/Invoke e
+        /// dicionarios com lock proprio — verificado: nenhum toca Dispatcher, Controls ou MainWindow.
+        /// </summary>
+        private void QueueRamLimiterCycle()
+        {
+            if (Interlocked.Exchange(ref _ramLimiterBusy, 1) == 1) return; // ciclo anterior ainda rodando
+
+            // Task qualificado: neste arquivo Task e ambigua com Microsoft.Win32.TaskScheduler.Task
+            // (a API do Agendador de Tarefas, usada no auto-start).
+            _ = System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    ApplyProcessRamLimits();
+                    ApplyProcessCpuLimits();
+                    ApplyProcessEngineLimits();
+                }
+                catch (Exception ex)
+                {
+                    HandleRobustnessError("RamLimiterCycle", ex);
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _ramLimiterBusy, 0);
+                }
+            });
         }
 
         /// <summary>
@@ -5923,6 +6544,71 @@ private static void RescueOrphanedBoostState()
         {
             _ramLimiterTimer?.Stop();
             _ramLimiterTimer = null;
+        }
+
+        /// <summary>
+        /// Janela de log do RAM Limiter. O corte DIRETO esvazia o processo e ele volta a
+        /// crescer, entao a medicao oscila em torno do limite naturalmente (ex: 216 -> 328
+        /// -> 412 -> 303 MB). Logar por ciclo produzia 2 linhas a cada 500 ms por processo
+        /// e afogava o log real. Agora: 1 linha por janela, com o total acumulado.
+        /// </summary>
+        private static readonly TimeSpan TrimLogWindow = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// Janela do log de ESTADO (prioridade VERY_LOW). Diferente do corte — que e' uma
+        /// acao e vale registrar — aqui o estado NAO muda: o processo e' esvaziado, cresce,
+        /// volta a ser cortado, e a hint de memoria e' reaplicada, indefinidamente. Logar
+        /// a cada minuto era repetir a mesma frase. Uma linha por 10 min, com a contagem
+        /// de reaplicacoes da janela.
+        /// </summary>
+        private static readonly TimeSpan MemPrioLogWindow = TimeSpan.FromMinutes(10);
+
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _memPrioLoggedByName =
+            new(System.StringComparer.OrdinalIgnoreCase);
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _memPrioPendingByName =
+            new(System.StringComparer.OrdinalIgnoreCase);
+
+        private void LogTrimOcasional(ProcessRamLimit limit, long totalRamMB, int limpos)
+        {
+            limit.TrimCountSinceLog++;
+            var agora = DateTime.Now;
+            if (agora - limit.LastTrimLogTime < TrimLogWindow) return; // dentro da janela: só acumula
+
+            var acumulados = limit.TrimCountSinceLog;
+            limit.TrimCountSinceLog = 0;
+            limit.LastTrimLogTime = agora;
+
+            KitLugia.Core.Logger.Log(
+                $"⚡ RAM Limiter DIRETO: {limit.ProcessName} em {totalRamMB} MB (limite {limit.LimitMB} MB) → " +
+                $"esvaziado em {limpos} processo(s)." +
+                (acumulados > 1 ? $" [+{acumulados - 1} corte(s) nos últimos {TrimLogWindow.TotalMinutes:F0} min]" : ""));
+        }
+
+        /// <summary>
+        /// VERY_LOW é aplicado/devolvido toda vez que o processo cruza o limite (o MORE LOW
+        /// normaliza e o próximo ciclo que esvazia aplica de novo), então a transição
+        /// realmente se repete. Fala uma vez por janela.
+        /// </summary>
+        private static void LogMemPrioOcasional(ProcessRamLimit limit)
+        {
+            // Agregado por NOME: 50 instancias do mesmo programa nao podem gerar 50 linhas
+            // dizendo a mesma coisa.
+            string nome = limit.ProcessName;
+            int total = _memPrioPendingByName.AddOrUpdate(nome, 1, (_, anterior) => anterior + 1);
+
+            var agora = DateTime.Now;
+            limit.LastMemPrioLogTime = agora;
+            if (_memPrioLoggedByName.TryGetValue(nome, out var ultima) &&
+                agora - ultima < MemPrioLogWindow)
+                return;
+
+            _memPrioLoggedByName[nome] = agora;
+            _memPrioPendingByName[nome] = 0;
+
+            KitLugia.Core.Logger.Log(
+                $"🧠 RAM Limiter: '{nome}' com prioridade de memória MUITO BAIXA (descarte preferencial)." +
+                (total > 1 ? $" [{total} reaplicação(ões) nesta janela de {MemPrioLogWindow.TotalMinutes:F0} min]" : "") +
+                (KitLugia.Core.Logger.VerboseCheckLogs ? $"_instances={total}" : ""));
         }
 
         /// <summary>
@@ -6012,19 +6698,51 @@ private static void RescueOrphanedBoostState()
         /// Fórmula: TotalRAM / 8 (mínimo 1024MB)
         /// </summary>
         public static long SuggestIslcThresholdMB()
+            => Math.Clamp((long)(GetTotalRamMB() / 8), 1024, 16384);
+
+        /// <summary>
+        /// Gate de "RAM realmente livre" (Zero+Free) também derivado da RAM total.
+        /// Antes era 1024 MB fixo: numa máquina de 8 GB isso é 12% de tudo (dispara
+        /// sempre), e numa de 64 GB é 1,5% (quase nunca). Total/16 mantém a
+        /// proporção: 8 GB → 512, 16 GB → 1024, 32 GB → 2048, 64 GB → 4096.
+        /// </summary>
+        public static long SuggestIslcFreeThresholdMB()
+            => Math.Clamp((long)(GetTotalRamMB() / 16), 512, 4096);
+
+        /// <summary>
+        /// Intervalo mínimo entre purges. Máquinas menores eram as que mais sofriam
+        /// com o flip-flop do cache (purga → app recarrega → purga), então esperam mais.
+        /// </summary>
+        public static int SuggestIslcMinIntervalSeconds()
+        {
+            long ramMB = GetTotalRamMB();
+            if (ramMB <= 16 * 1024) return 60;
+            if (ramMB <= 64 * 1024) return 30;
+            return 15;
+        }
+
+        private static long GetTotalRamMB()
         {
             try
             {
                 var memStatus = new Win32Api.MEMORYSTATUSEX();
                 if (Win32Api.GlobalMemoryStatusEx(memStatus))
-                {
-                    long totalRamMB = (long)(memStatus.ullTotalPhys / (1024 * 1024));
-                    // Threshold = 1/8 da RAM total (mínimo 1024MB, máximo 16384MB)
-                    return Math.Clamp(totalRamMB / 8, 1024, 16384);
-                }
+                    return (long)(memStatus.ullTotalPhys / (1024 * 1024));
             }
             catch { /* fallback */ }
-            return 1024; // default para 8GB
+            return 8 * 1024; // 8 GB
+        }
+
+        /// <summary>
+        /// Aplica os limites ISLC calculados a partir da RAM (o usuário não digita nada).
+        /// No-op quando o modo automático está desligado.
+        /// </summary>
+        public void ApplyIslcAutoTuning()
+        {
+            if (!IslcAutoTune) return;
+            IslcThresholdMB = SuggestIslcThresholdMB();
+            IslcFreeThresholdMB = SuggestIslcFreeThresholdMB();
+            IslcMinIntervalSeconds = SuggestIslcMinIntervalSeconds();
         }
 
         /// <summary>
@@ -6176,7 +6894,7 @@ private static void RescueOrphanedBoostState()
                         if (ApplyMemPriority(processes, Win32Api.MEMORY_PRIORITY_VERY_LOW))
                         {
                             limit.MemPriorityApplied = true;
-                            KitLugia.Core.Logger.Log($"🧠 RAM Limiter: '{limit.ProcessName}' com prioridade de memória MUITO BAIXA (descarte preferencial).");
+                            LogMemPrioOcasional(limit);
                         }
                     }
                     else if (!exceedsLimit && limit.MemPriorityApplied)
@@ -6223,9 +6941,7 @@ private static void RescueOrphanedBoostState()
                                 if (limpos.Count > 0)
                                 {
                                     limit.WorkingSetCeilingApplied = false; // direto não usa teto
-                                    KitLugia.Core.Logger.Log(
-                                        $"⚡ RAM Limiter DIRETO: {limit.ProcessName} em {totalRamMB} MB (limite {limit.LimitMB} MB) → " +
-                                        $"esvaziado em {limpos.Count} processo(s).");
+                                    LogTrimOcasional(limit, totalRamMB, limpos.Count);
                                 }
                                 limit.LastTrimTime = DateTime.Now;
                                 limit.ConsecutiveTrimCount++;
@@ -6389,11 +7105,26 @@ private static void RescueOrphanedBoostState()
 
                         if (tocados.Count > 0)
                         {
-                            KitLugia.Core.Logger.Log(
-                                $"🧠 RAM Limiter: {limit.ProcessName} em {totalRamMB} MB (limite {limit.LimitMB} MB) → " +
-                                $"{(esvaziou ? "esvaziado (idle) + " : "")}teto {tetoTotalMB} MB " +
-                                $"(piso {pisoTotalMB} MB, cpu {maxCpu:F1}%, faults {faultsPerSec:F0}/s, RAM livre {freeRamMB} MB) " +
-                                $"em {tocados.Count} processo(s).");
+                            // LogOnce com ASSINATURA: a mensagem tem numeros variaveis
+                            // (MB usados, cpu, faults, RAM livre) que mudam a cada
+                            // ciclo -> comparando o texto inteiro a linha vazava
+                            // TODA vez (era o que acontecia). A assinatura e o
+                            // estado real (processo + acao): a linha so reemite
+                            // quando a ACAO muda (esvaziado <-> teto) ou no
+                            // heartbeat de 2 min, com a contagem.
+                            KitLugia.Core.Logger.LogOnce(
+                                $"ramlimit|{limit.ProcessName}",
+                                $"🧠 RAM Limiter: {limit.ProcessName} (limite {limit.LimitMB} MB) → " +
+                                $"{(esvaziou ? "esvaziado + teto " : "teto ")}{tetoTotalMB} MB " +
+                                $"(piso {pisoTotalMB} MB) em {tocados.Count} proc(s). " +
+                                $"cpu {maxCpu:F1}% · faults {faultsPerSec:F0}/s · RAM livre {freeRamMB} MB",
+                                heartbeatSeconds: 300,
+                                signature: $"{(esvaziou ? "esvaziado" : "teto")}|{limit.ProcessName}|{limit.LimitMB}",
+                                // O governador ALTERNA esvaziado <-> teto a cada ciclo (o app
+                                // ganha/perde o foco e o estado do idle muda): cada troca era
+                                // uma "mudanca" e o log real tinha 10 linhas/min do mesmo app.
+                                // Com 120 s a linha so aparece quando a acao ESTABILIZA.
+                                minChangeIntervalSeconds: 120);
                         }
 
                         limit.LastTrimTime = DateTime.Now;
@@ -6809,20 +7540,34 @@ private static void RescueOrphanedBoostState()
         /// </summary>
         private void AdvancedMonitor_Tick(object? sender, EventArgs e)
         {
-            try
+            // Mesmo padrao do MonitorTick e do RAM Limiter: o ciclo vai para o POOL.
+            // UpdateProcessCache() faz Process.GetProcesses() (~350-400 processos) + 2
+            // syscalls por processo (WorkingSet64 e TotalProcessorTime) e, a cada 5 ticks,
+            // proc.Responding() — que e SendMessageTimeout por processo. Sincrono no Tick
+            // do DispatcherTimer isso trava a thread de UI (e infla para segundos quando o
+            // sistema esta carregado, que e exatamente quando o usuario precisa da UI).
+            if (Interlocked.Exchange(ref _advancedMonitorBusy, 1) == 1) return;
+            _ = System.Threading.Tasks.Task.Run(() =>
             {
-                UpdateSystemStats();
-                UpdateProcessCache();
-                AnalyzeProcessBehaviors();
-                CheckSmartAlerts();
-                UpdateTrayIconAdvanced();
-            }
-            catch (Exception ex)
-            {
-                KitLugia.Core.Logger.LogError("AdvancedMonitor_Tick", ex.Message);
-            }
+                try
+                {
+                    UpdateSystemStats();
+                    UpdateProcessCache();
+                    AnalyzeProcessBehaviors();
+                    CheckSmartAlerts();
+                    UpdateTrayIconAdvanced();
+                }
+                catch (Exception ex)
+                {
+                    HandleRobustnessError("AdvancedMonitor", ex);
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _advancedMonitorBusy, 0);
+                }
+            });
         }
-        
+
         /// <summary>
         /// Atualiza estatísticas do sistema (CPU, RAM total)
         /// </summary>
@@ -7572,6 +8317,14 @@ private static void RescueOrphanedBoostState()
             // passou do limite → EmptyWorkingSet + VERY_LOW, sem idle/storm/piso.
             // Proteções mínimas que ficam nos dois: nunca em foreground + cooldown.
             public bool DirectMode { get; set; } = false;
+
+            // ── Controle de log ──
+            // O Modo DIRETO esvazia e o app volta a crescer, entao o ciclo oscila em torno
+            // do limite e logava 2 linhas a cada 500 ms por processo. Estes 3 campos deixam
+            // o log falar uma vez por janela e reportar o resto como contador.
+            public DateTime LastTrimLogTime { get; set; } = DateTime.MinValue;
+            public int TrimCountSinceLog { get; set; } = 0;
+            public DateTime LastMemPrioLogTime { get; set; } = DateTime.MinValue;
 
             /// <summary>
             /// Retorna o mínimo seguro de working set para este processo (em MB).

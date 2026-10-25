@@ -56,7 +56,36 @@ namespace KitLugia.GUI.Windows.TaskManager
         // ler o MESMO contador duas vezes no mesmo tick devolve 0 na segunda leitura.
         private float _lastCpuPct, _lastMemPct, _lastDiskReadMBps, _lastDiskWriteMBps;
         private double _lastFreqMhz = -1, _lastTempC = -1, _lastPowerW = -1;
+        // Relógio da CPU: o clock ATUAL (turbo) muda a cada amostra; o NOMINAL é fixo
+        // (velocidade base) e o PICO é o maior clock visto nesta sessão.
+        private double _lastFreqBaseMhz = -1, _lastFreqPeakMhz = -1;
+        private double _clockPeakMhz = -1;
         private TextBlock? _perfUsageLine;   // linha "Uso:" dos detalhes, atualizada a cada tick
+        private System.Windows.Documents.Run? _perfFreqRun, _perfPeakRun; // linhas vivas do relógio
+        // Linhas VIVAS da GPU (engines, VRAM, temperatura) — estilo Gerenciador de Tarefas
+        private System.Windows.Documents.Run? _perfGpu3DRun, _perfGpuCopyRun, _perfGpuEncRun, _perfGpuDecRun;
+        private System.Windows.Documents.Run? _perfGpuDedRun, _perfGpuSharedRun, _perfGpuTempRun, _perfGpuTotalRun;
+        private System.Windows.Documents.Run? _perfGpuDxRun;   // "12 (FL 12.2)"
+        private int _selectedGpuIndex = -1;   // adaptador de GPU selecionado no painel
+        private int _perfDetailIdx;           // indice da proxima linha na grade de 2 colunas do painel
+        private Dictionary<int, GpuAdapterLive>? _lastGpuLive; // último snapshot vivo por adaptador
+
+        // ── PAINEL DA GPU estilo Gerenciador de Tarefas ────────────────────
+        // 4 gráficos de engine (3D/Copy/Encode/Decode) + 2 barras de VRAM
+        // (dedicada/compartilhada). Antes só existia UM gráfico (a utilização
+        // agregada) e as engines eram apenas texto — o TM mostra as 4 curvas
+        // separadas, que é onde dá para ver O QUE está usando a GPU.
+        private sealed class GpuChartPart
+        {
+            public Canvas Chart = null!;
+            public System.Windows.Documents.Run? Value;
+            public System.Windows.Shapes.Rectangle? Bar;
+            public Color LineColor;
+            public string Key = "";
+        }
+        private GpuChartPart? _gpuChart3D, _gpuChartCopy, _gpuChartEnc, _gpuChartDec;
+        private GpuChartPart? _gpuBarDed, _gpuBarShared;
+        private readonly Dictionary<string, Queue<float>> _gpuChartHistory = new();
 
         /// <summary>Taxa de um adaptador: usa perfmon se existir, senão delta de GetIPStatistics.</summary>
         // FIX congelamento (medido: stalls de 90-930ms por tick): NextValue de PerformanceCounter
@@ -71,11 +100,17 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             public float Cpu;
             public float Mem;
+            public ulong MemUsedBytes;   // RAM física EM USO (bytes) — mesma fonte do % de RAM
+            public ulong MemTotalBytes;  // RAM física TOTAL (bytes)
             public float DiskReadMBps;
             public float DiskWriteMBps;
             public float NetMBps;
             public float GpuPct = -1f;
+            /// <summary>Dados VIVOS por adaptador de GPU (índice → métricas PDH + temperatura).</summary>
+            public Dictionary<int, GpuAdapterLive>? GpuLive;
             public double FreqMhz;
+            public double FreqBaseMhz = -1;  // clock NOMINAL (velocidade base)
+            public double FreqPeakMhz = -1;  // maior clock visto nesta sessão
             public double TempC = -1;
             public double PowerW = -1;
             public float KernelPct;
@@ -101,6 +136,23 @@ namespace KitLugia.GUI.Windows.TaskManager
                             float avail;
                             lock (_counterLock) { avail = _memAvailable?.NextValue() ?? 0; }
                             s.Mem = _totalMemBytes > 0 ? (float)((1f - avail / (_totalMemBytes / 1024.0 / 1024.0)) * 100.0) : 0f;
+                            // Bytes coerentes com o % acima (mesmo contador "Available MBytes")
+                            if (_totalMemBytes > 0)
+                            {
+                                s.MemTotalBytes = (ulong)_totalMemBytes;
+                                long availBytes = (long)avail * 1024L * 1024L;
+                                s.MemUsedBytes = (ulong)Math.Max(0L, _totalMemBytes - availBytes);
+                            }
+                        }
+                        catch { }
+                    }
+                    // Bytes de RAM em uso (mesma fonte do %): K32GetPerformanceInfo → GlobalMemoryStatusEx
+                    if (s.MemTotalBytes == 0)
+                    {
+                        try
+                        {
+                            if (NativeMetricsHelper.TryGetPhysicalMemoryUsage(out var usedB, out var totalB))
+                            { s.MemUsedBytes = usedB; s.MemTotalBytes = totalB; }
                         }
                         catch { }
                     }
@@ -113,11 +165,57 @@ namespace KitLugia.GUI.Windows.TaskManager
                     }
                     catch { }
                     try { double f = NativeMetricsHelper.GetCpuFrequencyMhz(); s.FreqMhz = f; } catch { }
+                    try { s.FreqBaseMhz = NativeMetricsHelper.GetCpuBaseFrequencyMhz(); } catch { }
+                    // Pico observado na sessão (o TM mostra o turbo máximo alcançado)
+                    if (s.FreqMhz > 0)
+                    {
+                        lock (_counterLock)
+                        {
+                            if (s.FreqMhz > _clockPeakMhz) _clockPeakMhz = s.FreqMhz;
+                            s.FreqPeakMhz = _clockPeakMhz;
+                        }
+                    }
                     try { double? t = NativeMetricsHelper.GetCpuTemperatureC(); s.TempC = t ?? -1; } catch { }
                     try { double? w = NativeMetricsHelper.GetCpuPowerWatts(); s.PowerW = w ?? -1; } catch { }
                     try { double k = NativeMetricsHelper.GetSystemKernelPercent(); s.KernelPct = k > 0 ? (float)k : 0f; } catch { }
                     try { s.NetMBps = (float)(NetBytesPerSecNow() / (1024.0 * 1024.0)); } catch { }
                     try { s.GpuPct = (float)GpuMonitor.GetTotalGpuUtilization(); } catch { }
+
+                    // ── Métricas VIVAS por adaptador de GPU ──
+                    // PDH: engines (3D/Copy/Encode/Decode) + VRAM em uso, casados pelo LUID.
+                    // nvidia-smi: temperatura (throttle de 2s dentro do próprio Core).
+                    try
+                    {
+                        var liveByLuid = GpuMonitor.GetAdapterLive();
+                        var snap = _hwGpusSnapshot;
+                        var temps = GpuMetrics.GetNvidiaSmi();
+                        var map = new Dictionary<int, GpuAdapterLive>();
+                        for (int gi = 0; gi < snap.Length; gi++)
+                        {
+                            var a = snap[gi];
+                            var lv = new GpuAdapterLive { LuidKey = a.LuidKey };
+                            bool has = false;
+                            if (!string.IsNullOrEmpty(a.LuidKey) && liveByLuid.TryGetValue(a.LuidKey, out var src))
+                            {
+                                lv.Util3D = src.Util3D; lv.UtilCopy = src.UtilCopy;
+                                lv.UtilEncode = src.UtilEncode; lv.UtilDecode = src.UtilDecode;
+                                lv.DedicatedUsedBytes = src.DedicatedUsedBytes;
+                                lv.SharedUsedBytes = src.SharedUsedBytes;
+                                lv.TotalCommittedBytes = src.TotalCommittedBytes;
+                                has = true;
+                            }
+                            foreach (var sm in temps)
+                            {
+                                if (!GpuMetrics.NamesMatch(sm.Name, a.Name)) continue;
+                                lv.TemperatureC = sm.TemperatureC;
+                                if (lv.TemperatureC >= 0) has = true;
+                                break;
+                            }
+                            if (has) map[gi] = lv;
+                        }
+                        if (map.Count > 0) s.GpuLive = map;
+                    }
+                    catch { }
 
                     // Contadores por dispositivo (disk:% Disk Time, net:Bytes Total/sec)
                     var perDev = new Dictionary<string, float>();
@@ -200,7 +298,9 @@ namespace KitLugia.GUI.Windows.TaskManager
         private string _hwCpuVirtualization = "Desativado";
         private string _hwCpuL1 = "?", _hwCpuL2 = "?", _hwCpuL3 = "?";
         private string _hwCpuCoreClock = "?";
-        private readonly List<(string model, string driver, string date, string pci, ulong dedicatedBytes, ulong sharedBytes)> _hwGpus = new();
+        private readonly List<GpuAdapterInfo> _hwGpus = new();
+        // Snapshot atômico dos adaptadores para o WORKER (a lista é montada na UI thread).
+        private volatile GpuAdapterInfo[] _hwGpusSnapshot = Array.Empty<GpuAdapterInfo>();
         private readonly Dictionary<string, (string model, string type, string sizeGb, bool isSystemDisk, bool hasPagefile)> _hwDisks = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, (string adapter, string conn, string mac, string speed, string ip)> _hwNets = new(StringComparer.OrdinalIgnoreCase);
         private string _hwRamSpeed = "?", _hwRamFormFactor = "?", _hwRamSlotsUsed = "?", _hwRamSlotsTotal = "?";
@@ -254,134 +354,19 @@ namespace KitLugia.GUI.Windows.TaskManager
                 if (string.IsNullOrWhiteSpace(cpuName)) cpuName = $"CPU ({Environment.ProcessorCount} núcleos)";
                 var (l1, l2, l3) = ReadCpuCacheFromRegistry(); // nativo + CIM fallback interno
 
-                // ── GPUs completas — MODELO UNIVERSAL ──
-                // Fontes em cascata, funciona p/ NVIDIA, AMD, Intel e qualquer WDDM:
-                //   1) DXGI (dxgi.dll) — lista TODOS os adaptadores com VRAM dedicada real
-                //      (mesma enumeração do dxdiag; enxerga RTX 50xx, Moore Threads etc.)
-                //   2) nvidia-smi — nome/driver/VRAM exatos das NVIDIA (FreeToken usa este)
-                //   3) Registro HardwareInformation.qwMemorySize — VRAM QWORD sem saturação
-                //   4) WMI Win32_VideoController — fallback final
-                var gpus = new List<(string model, string driver, string date, string pci, ulong ded, ulong shr)>();
-                long totalMem = _totalMemBytes;
-
-                // DXGI: fonte universal
-                var dxgiList = GpuInfo.GetAll();
-
-                // nvidia-smi: dados precisos de NVIDIA (nome comercial + driver + VRAM)
-                var smiGpus = new List<(string name, string driver, ulong vramBytes)>();
-                try
-                {
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = "nvidia-smi",
-                        Arguments = "--query-gpu=name,driver_version,memory.total --format=csv,noheader,nounits",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true,
-                    };
-                    using var proc = System.Diagnostics.Process.Start(psi);
-                    if (proc != null)
-                    {
-                        string outp = proc.StandardOutput.ReadToEnd();
-                        proc.WaitForExit(3000);
-                        foreach (var line in outp.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                        {
-                            var parts = line.Split(',').Select(p => p.Trim()).ToArray();
-                            if (parts.Length < 3) continue;
-                            smiGpus.Add((parts[0], parts[1], ulong.TryParse(parts[2], out var m2) ? m2 * 1024 * 1024UL : 0));
-                        }
-                    }
-                }
-                catch { }
-
-                // CIM (WsMan, 30% mais rápido que WMI DCOM) → fallback WMI legado via NativeHardware.Cim
-                var wmiGpus = new List<(string name, string driver, string date, string pnp, ulong adapterRam)>();
-                try
-                {
-                    var rows = NativeHardware.Cim.Query("SELECT Name,DriverVersion,DriverDate,PNPDeviceID,AdapterRAM FROM Win32_VideoController");
-                    foreach (var r in rows)
-                    {
-                        string d = "—";
-                        try
-                        {
-                            var dd = r.TryGetValue("DriverDate", out var v) ? v?.ToString() : null;
-                            if (!string.IsNullOrEmpty(dd))
-                                d = System.Management.ManagementDateTimeConverter.ToDateTime(dd).ToString("dd/MM/yyyy");
-                        }
-                        catch { }
-                        ulong ram = 0;
-                        try { ram = Convert.ToUInt64(r.TryGetValue("AdapterRAM", out var av) ? av ?? (ulong)0 : (ulong)0); } catch { }
-                        wmiGpus.Add((r.TryGetValue("Name", out var nv) ? nv?.ToString() ?? "GPU" : "GPU",
-                                     r.TryGetValue("DriverVersion", out var dv) ? dv?.ToString() ?? "—" : "—",
-                                     d,
-                                     r.TryGetValue("PNPDeviceID", out var pv) ? pv?.ToString() ?? "" : "",
-                                     ram));
-                    }
-                }
-                catch { }
-
-                int smiUsed = 0;
-                if (dxgiList.Count > 0)
-                {
-                    foreach (var dg in dxgiList)
-                    {
-                        string model = dg.Name;
-                        string drv = "—";
-                        string date = "—";
-                        string pci = $"VEN {dg.VendorId:X4}:{dg.DeviceId:X4}";
-                        ulong ded = dg.DedicatedVideoMemory;
-
-                        // Enriquece com WMI (match por similaridade de nome ou vendor)
-                        var wmiBest = wmiGpus.FirstOrDefault(w =>
-                            model.Contains(w.name[..Math.Min(20, w.name.Length)], StringComparison.OrdinalIgnoreCase) ||
-                            w.name.Contains(model[..Math.Min(20, model.Length)], StringComparison.OrdinalIgnoreCase));
-                        if (wmiBest.name != null)
-                        {
-                            if (!string.IsNullOrWhiteSpace(wmiBest.driver) && wmiBest.driver != "—") drv = wmiBest.driver;
-                            date = wmiBest.date;
-                            pci = wmiBest.pnp != "" ? pci : pci;
-                        }
-
-                        // NVIDIA: nvidia-smi tem precedência (nome comercial correto)
-                        if ((dg.VendorId == 0x10DE || GpuInfo.VendorName(dg.VendorId) == "NVIDIA") && smiUsed < smiGpus.Count)
-                        {
-                            var sg = smiGpus[smiUsed++];
-                            model = sg.name;
-                            drv = sg.driver;
-                            if (sg.vramBytes > 0) ded = sg.vramBytes;
-                        }
-                        else if (ded == 0 && wmiBest.name != null)
-                        {
-                            ded = GpuInfo.TryGetVramFromRegistry(wmiBest.pnp);
-                            if (ded == 0) ded = wmiBest.adapterRam;
-                        }
-
-                        ulong shr = dg.SharedSystemMemory > 0 ? dg.SharedSystemMemory : (totalMem > 0 ? (ulong)(totalMem / 2) : 0);
-                        gpus.Add((model, drv, date, pci, ded, shr));
-                    }
-                }
-                else
-                {
-                    // Sem DXGI (raro): cai no caminho antigo WMI + registro + nvidia-smi
-                    int wmiSmiIdx = 0;
-                    foreach (var w in wmiGpus)
-                    {
-                        string model = w.name;
-                        string drv = w.driver;
-                        bool isNv = model.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) || model.Contains("GeForce", StringComparison.OrdinalIgnoreCase);
-                        ulong ded = 0;
-                        if (isNv && wmiSmiIdx < smiGpus.Count)
-                        {
-                            var sg = smiGpus[wmiSmiIdx++];
-                            model = sg.name;
-                            drv = sg.driver;
-                            ded = sg.vramBytes;
-                        }
-                        if (ded == 0) ded = GpuInfo.TryGetVramFromRegistry(w.pnp);
-                        if (ded == 0) ded = w.adapterRam;
-                        gpus.Add((model, drv, w.date, "", ded, totalMem > 0 ? (ulong)(totalMem / 2) : 0));
-                    }
-                }
+                // ── GPUs completas — CASCATA (DXGI + registro + nvidia-smi + DirectX) ──
+                // GpuMetrics.GetAdapters() monta o adaptador combinando as MESMAS fontes
+                // que o Gerenciador de Tarefas usa:
+                //   DXGI      → nome, LUID (chave PDH), VRAM dedicada/compartilhada
+                //   Registro  → versão do driver ("32.0.16.1656"), data, qwMemorySize
+                //   nvidia-smi→ nome comercial, temperatura, memória reservada
+                //   dxdiag    → "12 (FL 12.2)" (em background, sem travar a UI)
+                // Funciona para NVIDIA, AMD, Intel e qualquer GPU WDDM.
+                var gpus = GpuMetrics.GetAdapters();
+                // O dxdiag (DirectX FL) roda em background — sem travar a UI. O primeiro
+                // collect devolve o fallback D3D11 (FL 12.1); o dxdiagsobe para 12.2
+                // quando termina, e a linha viva do painel se atualiza sozinha.
+                GpuMetrics.StartDirectXProbe();
 
                 // ── Discos completos — NATIVO (IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS) + CIM fallback
                 // Sucessor WMI: NativeHardware (nativo <10ms, funciona WinPE / WmiPrvSE travado) → CIM → WMI
@@ -467,6 +452,8 @@ namespace KitLugia.GUI.Windows.TaskManager
             _hwCpuCoreClock = data.clock;
             _hwCpuL1 = data.l1; _hwCpuL2 = data.l2; _hwCpuL3 = data.l3;
             foreach (var g in data.gpus) _hwGpus.Add(g);
+            // Snapshot atômico p/ o WORKER (a lista é montada na UI thread)
+            _hwGpusSnapshot = _hwGpus.ToArray();
             foreach (var kv in data.diskInfo) _hwDisks[kv.Key] = kv.Value;
             foreach (var kv in data.netInfo) _hwNets[kv.Key] = kv.Value;
             _hwRamSpeed = data.ramSpeed; _hwRamFormFactor = data.ramFF;
@@ -534,7 +521,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             foreach (var g in data.gpus)
             {
                 var gg = g; int idx = gi;
-                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = $"gpu:{idx}", Name = gg.model, ColorHex = "#4FC3F7" }));
+                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = $"gpu:{idx}", Name = gg.Name, ColorHex = "#4FC3F7" }));
                 gi++;
             }
             if (gi == 0) await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = "gpu:-1", Name = "GPU (indisponível)", ColorHex = "#888888" }));
@@ -569,44 +556,78 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (_selectedPerfDevice == null) return;
             PerfDeviceTitle.Text = _selectedPerfDevice.Name;
             PerfBigCanvas.Children.Clear();
+            // Troca de dispositivo: os gráficos de GPU pertencem ao adaptador anterior
+            _gpuChart3D = _gpuChartCopy = _gpuChartEnc = _gpuChartDec = null;
+            _gpuBarDed = _gpuBarShared = null;
+            PnlGpuGraphs.Children.Clear();
+            PnlGpuGraphs.Visibility = Visibility.Collapsed;
+            PerfBigCanvas.Visibility = Visibility.Visible;
             RenderPerfDetails(_selectedPerfDevice);
         }
 
         private void RenderPerfDetails(PerfDeviceInfo dev)
         {
             PnlPerfDetails.Children.Clear();
+            // Duas colunas (como o Gerenciador de Tarefas): as linhas cabem sem rolagem.
+            // O indice e COMUM a todas as linhas (estaticas e vivas) para que cada uma
+            // ocupe uma celula propria — sem Grid.SetRow todas cairiam na linha 0.
+            _perfDetailIdx = 0;
+            PnlPerfDetails.RowDefinitions.Clear();
+            // Quebra de linha: avança a célula sem desenhar nada. Usado onde a
+            // informação precisa ficar EMPILHADA (caches L1/L2/L3) em vez de
+            // espalhada nas duas colunas.
+            void BreakRow()
+            {
+                if (_perfDetailIdx % 2 != 0) _perfDetailIdx++;
+            }
+            void AddDetail(TextBlock tb)
+            {
+                Grid.SetColumn(tb, _perfDetailIdx % 2);
+                Grid.SetRow(tb, _perfDetailIdx / 2);
+                EnsureDetailRow(_perfDetailIdx / 2);
+                _perfDetailIdx++;
+                PnlPerfDetails.Children.Add(tb);
+            }
             void Row(string label, out TextBlock valueBlock)
             {
-                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 0, 1), TextWrapping = TextWrapping.Wrap };
+                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
                 tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)) });
                 var val = new System.Windows.Documents.Run("…") { Foreground = System.Windows.Media.Brushes.White, FontWeight = FontWeights.SemiBold };
                 tb.Inlines.Add(val);
-                PnlPerfDetails.Children.Add(tb);
+                AddDetail(tb);
                 valueBlock = tb; // o próprio TextBlock (Tag guarda o Run do valor)
                 // guardamos o Run para atualização
                 tb.Tag = val;
             }
             void StaticRow(string label, string value)
             {
-                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 0, 1), TextWrapping = TextWrapping.Wrap };
+                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
                 tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)) });
                 tb.Inlines.Add(new System.Windows.Documents.Run(value) { Foreground = System.Windows.Media.Brushes.White });
-                PnlPerfDetails.Children.Add(tb);
+                AddDetail(tb);
             }
 
             var pid = dev.Key;
+            // Só o painel de GPU tem linhas vivas de GPU — reseta ao trocar de dispositivo
+            _selectedGpuIndex = -1;
             if (pid == "cpu")
             {
                 // Título prioriza o nome do processador
                 PerfDeviceTitle.Text = _hwCpuName;
                 Row("Uso", out _perfUsageLine);
+                // Relógio AO VIVO logo abaixo do uso (como o Gerenciador de Tarefas):
+                // o clock ATUAL (turbo) muda a cada amostra; o base é estático.
+                _perfFreqRun = AddLiveLine("Velocidade atual:");
+                _perfPeakRun = AddLiveLine("Pico na sessão:");
                 StaticRow("Velocidade base:", _hwCpuCoreClock);
                 StaticRow("Soquetes:", _hwCpuSockets);
                 StaticRow("Núcleos:", $"{Environment.ProcessorCount} lógicos");
                 StaticRow("Virtualização:", _hwCpuVirtualization);
-                StaticRow("Cache L1:", _hwCpuL1);
-                StaticRow("Cache L2:", _hwCpuL2);
-                StaticRow("Cache L3:", _hwCpuL3);
+                // Caches um abaixo do outro (pedido): lado a lado as três linhas
+                // ficavam partidas entre as colunas e não dava para comparar.
+                BreakRow(); StaticRow("Cache L1:", _hwCpuL1);
+                BreakRow(); StaticRow("Cache L2:", _hwCpuL2);
+                BreakRow(); StaticRow("Cache L3:", _hwCpuL3);
                 FillCpuLive();
             }
             else if (pid == "mem")
@@ -659,20 +680,238 @@ namespace KitLugia.GUI.Windows.TaskManager
             else if (pid.StartsWith("gpu:"))
             {
                 int idx = int.TryParse(pid[4..], out var i2) ? i2 : -1;
+                _selectedGpuIndex = idx;
                 Row("Utilização", out _perfUsageLine);
                 if (idx >= 0 && idx < _hwGpus.Count)
                 {
                     var g = _hwGpus[idx];
                     // Título completo SEM corte (o card da lista tem ellipsis, o painel não)
-                    PerfDeviceTitle.Text = g.model;
+                    PerfDeviceTitle.Text = g.Name;
                     StaticRow("Adaptador:", $"GPU {idx}");
-                    StaticRow("Driver versão:", g.driver);
-                    StaticRow("Data do driver:", g.date);
-                    StaticRow("Localização:", string.IsNullOrEmpty(g.pci) ? "—" : g.pci);
-                    StaticRow("VRAM dedicada:", g.dedicatedBytes > 0 ? $"{g.dedicatedBytes / 1024 / 1024 / 1024.0:F1} GB ({g.dedicatedBytes / 1024 / 1024:N0} MB)" : "?");
-                    StaticRow("Memória compartilhada:", g.sharedBytes > 0 ? $"{g.sharedBytes / 1024 / 1024 / 1024:F1} GB" : "?");
+                    // ── ENGINES VIVAS (as 4 curvas do Gerenciador de Tarefas) ──
+                    _perfGpu3DRun = AddLiveLine("3D:");
+                    _perfGpuCopyRun = AddLiveLine("Copy:");
+                    _perfGpuEncRun = AddLiveLine("Video Encode:");
+                    _perfGpuDecRun = AddLiveLine("Video Decode:");
+                    // ── MEMÓRIA DA GPU (VIVA: dedicada, compartilhada e o TOTAL) ──
+                    _perfGpuDedRun = AddLiveLine("Memória da GPU dedicada:");
+                    _perfGpuSharedRun = AddLiveLine("Memória da GPU compartilhada:");
+                    _perfGpuTotalRun = AddLiveLine("Memória da GPU (total):");
+                    // Temperatura VIVA (nvidia-smi; AMD/Intel não expõem)
+                    _perfGpuTempRun = AddLiveLine("Temperatura:");
+                    // ── DADOS ESTÁTICOS ──
+                    StaticRow("Versão do driver:", g.DriverVersion);
+                    StaticRow("Data do driver:", g.DriverDate);
+                    // VIVA: o dxdiag (background) sobe o FL 12.1 → 12.2 depois de pronto
+                    _perfGpuDxRun = AddLiveLine("Versão do DirectX:");
+                    StaticRow("Local físico:", g.PciLocation);
+                    StaticRow("Memória reservada para hardware:",
+                        g.ReservedBytes > 0 ? $"{g.ReservedBytes / 1024.0 / 1024.0:F0} MB" : "—");
+                    // ── PAINEL GRANDE: 4 curvas de engine + 2 barras de VRAM ──
+                    // (o TM mostra exatamente isso; espaço já era do gráfico único)
+                    PerfBigCanvas.Visibility = Visibility.Collapsed;
+                    BuildGpuGraphs();
+                    PnlGpuGraphs.Visibility = Visibility.Visible;
+                    UpdateGpuLive();
                 }
             }
+        }
+
+        /// <summary>Atualiza as linhas VIVAS da GPU (engines, VRAM e temperatura) com o último snapshot.</summary>
+        private void UpdateGpuLive()
+        {
+            int idx = _selectedGpuIndex;
+            if (idx < 0) return;
+            var g = idx < _hwGpus.Count ? _hwGpus[idx] : null;
+            GpuAdapterLive? lv = null;
+            if (_lastGpuLive != null) _lastGpuLive.TryGetValue(idx, out lv);
+
+            if (_perfGpu3DRun != null) _perfGpu3DRun.Text = $"{lv?.Util3D ?? 0:F0}%";
+            if (_perfGpuCopyRun != null) _perfGpuCopyRun.Text = $"{lv?.UtilCopy ?? 0:F0}%";
+            if (_perfGpuEncRun != null) _perfGpuEncRun.Text = $"{lv?.UtilEncode ?? 0:F0}%";
+            if (_perfGpuDecRun != null) _perfGpuDecRun.Text = $"{lv?.UtilDecode ?? 0:F0}%";
+
+            if (_perfGpuDedRun != null)
+            {
+                ulong totalDed = g?.VramTotalBytes ?? g?.DedicatedTotalBytes ?? 0;
+                _perfGpuDedRun.Text = totalDed > 0
+                    ? $"{FormatGb(lv?.DedicatedUsedBytes ?? 0)}/{FormatGb(totalDed)}"
+                    : FormatGb(lv?.DedicatedUsedBytes ?? 0);
+            }
+            if (_perfGpuSharedRun != null)
+            {
+                ulong totalShr = g?.SharedTotalBytes ?? 0;
+                _perfGpuSharedRun.Text = totalShr > 0
+                    ? $"{FormatGb(lv?.SharedUsedBytes ?? 0)}/{FormatGb(totalShr)}"
+                    : FormatGb(lv?.SharedUsedBytes ?? 0);
+            }
+            // Total da GPU (dedicada + compartilhada) — a linha "Memória da GPU" do TM:
+            // sem ela o usuário via as duas parcelas mas não o quanto a GPU inteira usa.
+            if (_perfGpuTotalRun != null)
+            {
+                ulong totalDed = g?.VramTotalBytes ?? g?.DedicatedTotalBytes ?? 0;
+                ulong totalShr = g?.SharedTotalBytes ?? 0;
+                ulong usado = lv != null && lv.TotalCommittedBytes > 0
+                    ? lv.TotalCommittedBytes
+                    : (lv?.DedicatedUsedBytes ?? 0) + (lv?.SharedUsedBytes ?? 0);
+                ulong capacidade = totalDed + totalShr;
+                _perfGpuTotalRun.Text = capacidade > 0
+                    ? $"{FormatGb(usado)}/{FormatGb(capacidade)}"
+                    : FormatGb(usado);
+            }
+            if (_perfGpuTempRun != null)
+            {
+                double t = lv?.TemperatureC ?? -1;
+                _perfGpuTempRun.Text = t >= 0 ? $"{t:F0} °C" : "—";
+                _perfGpuTempRun.Foreground = t >= 0 ? GetHeatColor((float)t, 75, 90) : System.Windows.Media.Brushes.White;
+            }
+            if (_perfGpuDxRun != null)
+            {
+                try { _perfGpuDxRun.Text = GpuMetrics.GetDirectXVersion(); } catch { }
+            }
+            // "Utilização" (a mais alta das engines — como o Gerenciador de Tarefas)
+            double util = lv?.Utilization ?? -1;
+            if (util >= 0) SetUsageLine($"{util:F0}%");
+
+            try { UpdateGpuCharts(g, lv); } catch { }
+        }
+
+        /// <summary>
+        /// Monta o painel grande da GPU no formato do Gerenciador de Tarefas:
+        /// 2x2 com as curvas das engines (3D/Copy/Video Encode/Video Decode) e,
+        /// logo abaixo, as duas barras de VRAM (dedicada e compartilhada).
+        /// O espaço já existia (era um gráfico único) — aqui ele é dividido.
+        /// </summary>
+        private void BuildGpuGraphs()
+        {
+            PnlGpuGraphs.Children.Clear();
+            PnlGpuGraphs.ColumnDefinitions.Clear();
+            PnlGpuGraphs.RowDefinitions.Clear();
+            PnlGpuGraphs.ColumnDefinitions.Add(new ColumnDefinition());
+            PnlGpuGraphs.ColumnDefinitions.Add(new ColumnDefinition());
+            for (int i = 0; i < 2; i++)
+                PnlGpuGraphs.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            PnlGpuGraphs.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            PnlGpuGraphs.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var rotulo = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+            var fundoGrafico = new SolidColorBrush(Color.FromRgb(0x0B, 0x11, 0x18));
+            var fundoTrilho = new SolidColorBrush(Color.FromRgb(0x1F, 0x2A, 0x3A));
+
+            GpuChartPart Engine(string label, string key, Color cor, int row, int col)
+            {
+                var host = new Grid { Margin = new Thickness(col == 0 ? 0 : 8, 0, col == 0 ? 8 : 0, 3) };
+                host.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                host.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                var head = new TextBlock { FontSize = 10, Foreground = rotulo };
+                head.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = rotulo });
+                var val = new System.Windows.Documents.Run("0%") { Foreground = Brushes.White, FontWeight = FontWeights.SemiBold };
+                head.Inlines.Add(val);
+
+                var cv = new Canvas { Background = fundoGrafico, Margin = new Thickness(0, 1, 0, 0) };
+                Grid.SetRow(head, 0);
+                Grid.SetRow(cv, 1);
+                host.Children.Add(head);
+                host.Children.Add(cv);
+                Grid.SetRow(host, row);
+                Grid.SetColumn(host, col);
+                PnlGpuGraphs.Children.Add(host);
+                return new GpuChartPart { Chart = cv, Value = val, Key = key, LineColor = cor };
+            }
+
+            GpuChartPart MemBar(string label, string key, Color cor, int row)
+            {
+                var host = new StackPanel { Margin = new Thickness(0, 2, 0, 1) };
+                var head = new TextBlock { FontSize = 10, Foreground = rotulo };
+                head.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = rotulo });
+                var val = new System.Windows.Documents.Run("—") { Foreground = Brushes.White, FontWeight = FontWeights.SemiBold };
+                head.Inlines.Add(val);
+
+                var track = new Canvas { Height = 5, Background = fundoTrilho, Margin = new Thickness(0, 2, 0, 0) };
+                var fill = new System.Windows.Shapes.Rectangle
+                {
+                    Height = 5,
+                    Width = 0,
+                    Fill = new SolidColorBrush(cor),
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                    RadiusX = 2,
+                    RadiusY = 2
+                };
+                track.Children.Add(fill);
+
+                host.Children.Add(head);
+                host.Children.Add(track);
+                Grid.SetRow(host, row);
+                Grid.SetColumnSpan(host, 2);
+                PnlGpuGraphs.Children.Add(host);
+                return new GpuChartPart { Chart = track, Value = val, Bar = fill, Key = key, LineColor = cor };
+            }
+
+            _gpuChart3D = Engine("3D", "gpu3d", Color.FromRgb(0xC0, 0x84, 0xFC), 0, 0);
+            _gpuChartCopy = Engine("Copy", "gpucopy", Color.FromRgb(0x4F, 0xC3, 0xF7), 0, 1);
+            _gpuChartEnc = Engine("Video Encode", "gpue", Color.FromRgb(0xF5, 0x9E, 0x0B), 1, 0);
+            _gpuChartDec = Engine("Video Decode", "gpud", Color.FromRgb(0x34, 0xD3, 0x99), 1, 1);
+            _gpuBarDed = MemBar("Memória da GPU dedicada", "gpubard", Color.FromRgb(0xC0, 0x84, 0xFC), 2);
+            _gpuBarShared = MemBar("Memória da GPU compartilhada", "gpubars", Color.FromRgb(0x4F, 0xC3, 0xF7), 3);
+        }
+
+        /// <summary>Empurra a amostra nas 4 curvas de engine e nas 2 barras de VRAM.</summary>
+        private void UpdateGpuCharts(GpuAdapterInfo? g, GpuAdapterLive? lv)
+        {
+            if (_gpuChart3D == null) return;
+
+            void Engine(GpuChartPart? part, double valor)
+            {
+                if (part == null) return;
+                if (!_gpuChartHistory.TryGetValue(part.Key, out var q))
+                {
+                    q = new Queue<float>(61);
+                    _gpuChartHistory[part.Key] = q;
+                }
+                q.Enqueue((float)Math.Clamp(valor, 0, 100));
+                if (q.Count > 60) q.Dequeue();
+                if (part.Value != null) part.Value.Text = $"{valor:F0}%";
+                DrawLineChart(part.Chart, q, part.LineColor, 100f);
+            }
+
+            Engine(_gpuChart3D, lv?.Util3D ?? 0);
+            Engine(_gpuChartCopy, lv?.UtilCopy ?? 0);
+            Engine(_gpuChartEnc, lv?.UtilEncode ?? 0);
+            Engine(_gpuChartDec, lv?.UtilDecode ?? 0);
+
+            void Mem(GpuChartPart? part, ulong usado, ulong total)
+            {
+                if (part?.Bar == null) return;
+                double frac = total > 0 ? Math.Clamp((double)usado / total, 0, 1) : 0;
+                double largura = part.Chart.ActualWidth > 1 ? part.Chart.ActualWidth : 0;
+                part.Bar.Width = Math.Max(0, largura * frac);
+                if (part.Value != null)
+                    part.Value.Text = total > 0 ? $"{FormatGb(usado)}/{FormatGb(total)}" : FormatGb(usado);
+            }
+
+            ulong totalDed = g?.VramTotalBytes ?? g?.DedicatedTotalBytes ?? 0;
+            ulong totalShr = g?.SharedTotalBytes ?? 0;
+            Mem(_gpuBarDed, lv?.DedicatedUsedBytes ?? 0, totalDed);
+            Mem(_gpuBarShared, lv?.SharedUsedBytes ?? 0, totalShr);
+        }
+
+        /// <summary>Bytes → "2,1 GB" (GB em base 1024, cultura do sistema — pt-BR).</summary>
+        private static string FormatGb(ulong bytes)
+            => $"{bytes / 1024.0 / 1024.0 / 1024.0:0.0} GB";
+
+        /// <summary>
+        /// Resumo do card da GPU no estilo do Gerenciador de Tarefas: "12% (45 °C)".
+        /// Sem temperatura (AMD/Intel) fica só o "%".
+        /// </summary>
+        private static string FormatGpuCardSummary(string key, float val, PerfSample s)
+        {
+            int gi = int.TryParse(key.Length > 4 ? key[4..] : "", out var gix) ? gix : -1;
+            GpuAdapterLive? glv = null;
+            if (s.GpuLive != null) s.GpuLive.TryGetValue(gi, out glv);
+            double temp = glv?.TemperatureC ?? -1;
+            string pct = $"{val:F0}%";
+            return temp >= 0 ? $"{pct} ({temp:F0} °C)" : pct;
         }
 
         private void FillNetLive(string instance)
@@ -788,6 +1027,8 @@ namespace KitLugia.GUI.Windows.TaskManager
                     run.Text = $"{procs}   {threads:N0}   {handles:N0}";
                     try { upRun.Text = TimeSpan.FromMilliseconds(Environment.TickCount64).ToString(@"d\.hh\:mm\:ss"); } catch { }
                     SetUsageLine($"{_lastCpuPct:F0}%");
+                    if (_lastFreqMhz > 0 && _perfFreqRun != null) _perfFreqRun.Text = $"{_lastFreqMhz / 1000.0:F2} GHz";
+                    if (_lastFreqPeakMhz > 0 && _perfPeakRun != null) _perfPeakRun.Text = $"{_lastFreqPeakMhz / 1000.0:F2} GHz";
                 }
                 catch { }
             };
@@ -799,15 +1040,57 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (_perfUsageLine?.Tag is System.Windows.Documents.Run r) r.Text = text;
         }
 
+        /// <summary>Uso da memória com o QUANTO, não só o %: "80% · 25,6 GB de 32 GB".
+        /// Sem os bytes, o painel dizia só "80%" e o card só "80% de 32 GB" — nunca
+        /// quanto de RAM estava realmente ocupado.</summary>
+        private string FormatMemUsage(float pct, ulong usedBytes, ulong totalBytes)
+        {
+            ulong total = totalBytes;
+            double used = usedBytes;
+            if (total == 0 && _totalMemBytes > 0)
+            {
+                total = (ulong)_totalMemBytes;
+                used = total * (Math.Clamp(pct, 0f, 100f) / 100.0);
+            }
+            if (total == 0) return $"{pct:F0}%";
+            return $"{pct:F0}% · {used / 1024.0 / 1024.0 / 1024.0:0.#} GB de {total / 1024.0 / 1024.0 / 1024.0:0.#} GB";
+        }
+
+        /// <summary>Formato compacto (legenda da barra superior): "25,6 GB de 32 GB".</summary>
+        private static string FormatMemUsedText(ulong usedBytes, ulong totalBytes)
+        {
+            if (usedBytes == 0) return "";
+            double usedGb = usedBytes / 1024.0 / 1024.0 / 1024.0;
+            if (totalBytes == 0) return $"{usedGb:0.#} GB";
+            return $"{usedGb:0.#} GB de {totalBytes / 1024.0 / 1024.0 / 1024.0:0.#} GB";
+        }
+
 
         private System.Windows.Documents.Run AddLiveLine(string label)
         {
-            var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 0, 1), TextWrapping = TextWrapping.Wrap };
+            var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
             tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)) });
             var val = new System.Windows.Documents.Run("…") { Foreground = System.Windows.Media.Brushes.White };
             tb.Inlines.Add(val);
+            // Mesma grade de 2 colunas do painel: o indice e compartilhado com as
+            // linhas estaticas para que nada se sobreponha.
+            Grid.SetColumn(tb, _perfDetailIdx % 2);
+            Grid.SetRow(tb, _perfDetailIdx / 2);
+            EnsureDetailRow(_perfDetailIdx / 2);
+            _perfDetailIdx++;
             PnlPerfDetails.Children.Add(tb);
             return val;
+        }
+
+        /// <summary>
+        /// Garante que a linha (Grid.Row) exista na grade do painel de detalhes.
+        /// Sem uma RowDefinition correspondente, o WPF LIMITA o Grid.Row em 0 e
+        /// todas as linhas caem na MESMA celula (texto sobreposto).
+        /// </summary>
+        private void EnsureDetailRow(int row)
+        {
+            while (PnlPerfDetails.RowDefinitions.Count <= row)
+                PnlPerfDetails.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
 
         private void UpdateMemLive()
@@ -881,7 +1164,10 @@ namespace KitLugia.GUI.Windows.TaskManager
             _lastCpuPct = cpuVal;
             _lastMemPct = ramVal;
             _lastGpuPct = s.GpuPct;
+            _lastGpuLive = s.GpuLive;
             _lastFreqMhz = s.FreqMhz;
+            _lastFreqBaseMhz = s.FreqBaseMhz;
+            _lastFreqPeakMhz = s.FreqPeakMhz;
             _lastTempC = s.TempC;
             _lastPowerW = s.PowerW;
             _lastKernelPct = s.KernelPct;
@@ -894,6 +1180,8 @@ namespace KitLugia.GUI.Windows.TaskManager
             // quando o texto muda, eliminando o flicker de re-render com o mesmo valor.
             SetMetricText(TxtCpuUsage, $"{cpuVal:F0}%", GetHeatColor(cpuVal, 80, 95));
             SetMetricText(TxtMemUsage, $"{ramVal:F0}%", GetHeatColor(ramVal, 70, 90));
+            // Legenda: o % sozinho não diz QUANTA RAM está em uso
+            SetMetricText(TxtMemUsageDetail, FormatMemUsedText(s.MemUsedBytes, s.MemTotalBytes), _brushGray);
             SetMetricText(TxtDiskUsage, FormatBytesSpeed(diskMB * 1024 * 1024), GetHeatColor(diskMB > 0 ? diskMB : 0f, 50, 200));
             SetMetricText(TxtNetUsage, FormatBytesSpeed(netMB * 1024 * 1024), netMB > 0 ? GetHeatColor(netMB, 5, 50) : _brushGray);
             SetMetricText(TxtGpuUsage, _lastGpuPct >= 0 ? $"{_lastGpuPct:F0}%" : "N/A", _lastGpuPct >= 0 ? GetHeatColor(_lastGpuPct, 70, 90) : _brushGray);
@@ -924,7 +1212,15 @@ namespace KitLugia.GUI.Windows.TaskManager
                     case var k when k.StartsWith("net:"):
                         val = s.PerDevice != null && s.PerDevice.TryGetValue(k, out var c2) ? c2 / (1024f * 1024f) : 0f;
                         max = 0; break; // autoescala
-                    case var k when k.StartsWith("gpu:"): val = Math.Max(0f, _lastGpuPct); max = 100f; break;
+                    case var k when k.StartsWith("gpu:"):
+                    {
+                        // Utilização do ADAPTADOR (a engine mais ocupada), não o total da máquina
+                        int gix = int.TryParse(k[4..], out var gi3) ? gi3 : -1;
+                        GpuAdapterLive? glv = null;
+                        if (s.GpuLive != null) s.GpuLive.TryGetValue(gix, out glv);
+                        val = glv != null ? (float)Math.Clamp(glv.Utilization, 0, 100) : Math.Max(0f, _lastGpuPct);
+                        max = 100f; break;
+                    }
                     default: continue;
                 }
                 if (!_perfHistory.TryGetValue(dev.Key, out var q)) { q = new Queue<float>(61); _perfHistory[dev.Key] = q; }
@@ -934,10 +1230,12 @@ namespace KitLugia.GUI.Windows.TaskManager
                 // resumo na lista lateral
                 dev.Summary = dev.Key switch
                 {
-                    "cpu" => $"{val:F0}% · {Environment.ProcessorCount} núcleos",
-                    "mem" => $"{val:F0}% de {Math.Max(1, _totalMemBytes / 1024 / 1024 / 1024)} GB",
+                    // Estilo Gerenciador de Tarefas: "% + clock ATUAL" ("32% 5,03 GHz").
+                    // Antes era só "40% · 20 núcleos" — sem o relógio, que é o que muda.
+                    "cpu" => $"{val:F0}% · {(s.FreqMhz > 0 ? (s.FreqMhz / 1000.0).ToString("F2") + " GHz" : "—")}",
+                    "mem" => FormatMemUsage(val, s.MemUsedBytes, s.MemTotalBytes),
                     var k when k.StartsWith("net:") => FormatBytesSpeed(val * 1024 * 1024),
-                    var k when k.StartsWith("gpu:") => _lastGpuPct >= 0 ? $"{val:F0}%" : "N/A",
+                    var k when k.StartsWith("gpu:") => FormatGpuCardSummary(k, val, s),
                     _ => $"{val:F0}% ativo"
                 };
 
@@ -950,10 +1248,17 @@ namespace KitLugia.GUI.Windows.TaskManager
                         PerfDeviceUtil.Text = $"{Math.Max(0f, val):F0}%";
                     PerfDeviceUtil.Foreground = GetHeatColor(val, 60, 90);
                     // Desenho direto no tick (~1s) — o gráfico é redesenhado por amostra.
-                    DrawLineChart(PerfBigCanvas, q, FromHex(dev.ColorHex), max);
-                    SetUsageLine(PerfDeviceUtil.Text);
+                    // GPU: quem desenha é o painel de 4 engines + barras de VRAM
+                    // (UpdateGpuCharts, chamado pelo UpdateGpuLive), não o canvas único.
+                    if (!dev.Key.StartsWith("gpu:"))
+                        DrawLineChart(PerfBigCanvas, q, FromHex(dev.ColorHex), max);
+                    // Memória: a linha "Em uso" mostra o QUANTO (GB) em uso, não só o %
+                    SetUsageLine(dev.Key == "mem" ? FormatMemUsage(val, s.MemUsedBytes, s.MemTotalBytes) : PerfDeviceUtil.Text);
                 }
             }
+
+            // Linhas VIVAS do painel de GPU (engines, VRAM, temperatura) — a cada tick
+            try { UpdateGpuLive(); } catch { }
 
             // Mini previews na lista lateral — igual ao Gerenciador de Tarefas Win11
             if (perfVisible) DrawMiniPreviews();
@@ -1024,10 +1329,15 @@ namespace KitLugia.GUI.Windows.TaskManager
             var values = data.ToArray();
             int count = values.Length;
 
+            // Mantém a curva DENTRO do canvas: com y = h exato, uma engine em 0%
+            // desenhava a linha sobre a borda inferior e ela desaparecia — e os 4
+            // gráficos da GPU precisam mostrar o "zero" como o Gerenciador de
+            // Tarefas mostra. Agora 100% fica em y=1 e 0% em y=h-1.
+            double plotH = Math.Max(1, h - 2);
             for (int i = 0; i < count; i++)
             {
                 double x = (double)i / (count - 1) * w;
-                double y = h - (values[i] / actualMax * h);
+                double y = h - 1 - (Math.Clamp(values[i], 0f, actualMax) / actualMax * plotH);
                 points.Add(new Point(x, y));
             }
 

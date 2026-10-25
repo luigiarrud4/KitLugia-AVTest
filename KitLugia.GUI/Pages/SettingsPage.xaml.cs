@@ -7,13 +7,14 @@ using System.Windows;
 using System.Windows.Controls;
 using KitLugia.Core;
 using KitLugia.GUI.Helpers;
+using KitLugia.GUI.Services;
 using Task = System.Threading.Tasks.Task;
 
 namespace KitLugia.GUI.Pages
 {
     public partial class SettingsPage : Page
     {
-        // �� CORRE�?�fO: Usar LocalApplicationData em vez de ApplicationData (Roaming)
+        //  CORRE?fO: Usar LocalApplicationData em vez de ApplicationData (Roaming)
         // LocalApplicationData não depende de Roaming e é mais seguro
         private static readonly string ConfigPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -30,14 +31,14 @@ namespace KitLugia.GUI.Pages
             InitializeComponent();
             _ = LoadSettingsAsync();
 
-            // �� LIMPEZA: Liberar recursos ao sair da página
+            // 🧹 LIMPEZA: Liberar recursos ao sair da página
             this.Unloaded += SettingsPage_Unloaded;
 
             // Adicionar eventos para os novos toggles
             AddToggleEvents();
         }
 
-        // �� CORRE�?�fO: Cleanup público para ser chamado via reflection pelo MainWindow
+        // 📁 CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
         public void Cleanup()
         {
             SaveSettings();
@@ -51,15 +52,17 @@ namespace KitLugia.GUI.Pages
             ToggleStandbyClean.Click -= OnToggleStandbyClean;
             ToggleAudioAntiStutter.Click -= OnToggleAudioAntiStutter;
             ToggleIntroAnimation.Click -= OnToggleIntroAnimation;
+            ToggleRestorePoint.Click -= OnSaveOnlyToggle;
+            ToggleAskRestorePoint.Click -= OnSaveOnlyToggle;
             IntroDurationSlider.ValueChanged -= OnIntroDurationSlider_ValueChanged;
             this.Unloaded -= SettingsPage_Unloaded;
 
-            // �� LIMPEZA: Limpa DataContext para liberar bindings
+            // 🧹 LIMPEZA: Limpa DataContext para liberar bindings
             this.DataContext = null;
 
-            // �� LIMPEZA: Força GC para liberar memória imediatamente
+            // 🧹 LIMPEZA: Força GC para liberar memória imediatamente
 
-            // �� LIMPEZA: Força Windows a liberar Working Set (reduz RAM no Task Manager)
+            // 🧹 LIMPEZA: Força Windows a liberar Working Set (reduz RAM no Task Manager)
         }
 
         private void SettingsPage_Unloaded(object sender, RoutedEventArgs e)
@@ -81,6 +84,13 @@ namespace KitLugia.GUI.Pages
             ToggleStandbyClean.Click += OnToggleStandbyClean;
             ToggleAudioAntiStutter.Click += OnToggleAudioAntiStutter;
 
+            // Estes dois NAO tinham nenhum evento: o valor era lido na carga e
+            // gravado no SaveSettings, mas nada disparava o SaveSettings ao
+            // clicar. Desmarcava, saia da pagina e a preferencia nao persistia
+            // (so voltava a ser gravada por acaso, ao mexer em outro toggle).
+            ToggleRestorePoint.Click += OnSaveOnlyToggle;
+            ToggleAskRestorePoint.Click += OnSaveOnlyToggle;
+
             // Intro Animation
             ToggleIntroAnimation.Click += OnToggleIntroAnimation;
             IntroDurationSlider.ValueChanged += OnIntroDurationSlider_ValueChanged;
@@ -88,8 +98,11 @@ namespace KitLugia.GUI.Pages
 
         private void ToggleStartup_ClickHandler(object s, RoutedEventArgs e) => ToggleStartup_Click(s, e);
         private void OnToggleNotifications(object s, RoutedEventArgs e) => SaveSettings();
+
+        /// <summary>Handler para toggles que so vivem no AppSettings (JSON).</summary>
+        private void OnSaveOnlyToggle(object s, RoutedEventArgs e) => SaveSettings();
         private void OnToggleVerboseLogging(object s, RoutedEventArgs e) => SaveSettings();
-        private void OnToggleRAMMonitor(object s, RoutedEventArgs e) => SaveSettings();
+        private void OnToggleRAMMonitor(object s, RoutedEventArgs e) => ToggleRAMMonitor_Click();
         private void OnToggleGameBoost(object s, RoutedEventArgs e) => ToggleGameBoost_Click();
         private void OnToggleTurboBoot(object s, RoutedEventArgs e) => ToggleTurboBoot_Click();
         private void OnToggleTurboShutdown(object s, RoutedEventArgs e) => ToggleTurboShutdown_Click();
@@ -106,10 +119,10 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                // �� VERIFICAR AUTO-START REAL DO SISTEMA - usa novo método que verifica o caminho
+                // [i] VERIFICAR AUTO-START REAL DO SISTEMA - usa novo método que verifica o caminho
                 ToggleStartup.IsChecked = KitLugia.GUI.Services.TrayIconService.IsAutoStartEnabled();
 
-                // �� CARREGAR ESTADO DOS M�"MÓDULOS DO TRAYSERVICE
+                //  CARREGAR ESTADO DOS MÓDULOS DO TRAYSERVICE
                 // (X da janela sempre minimiza p/ o tray — CloseToTray forçado no Core, sem toggle)
                 if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
                 {
@@ -122,6 +135,20 @@ namespace KitLugia.GUI.Pages
                         ToggleTurboBoot.IsChecked = tray.TurboBootEnabled;
                         ToggleTurboShutdown.IsChecked = tray.TurboShutdownEnabled;
                         ToggleStandbyClean.IsChecked = tray.StandbyCleanEnabled;
+                        // Fonte da verdade = o TrayIconService (igual Standby).
+                        // Ler o JSON aqui fazia o checkbox discordar da pagina de RAM.
+                        ToggleRAMMonitor.IsChecked = tray.AutoCleanEnabled;
+
+                        // MONITORAMENTO AVANÇADO: todos estes são do TrayIconService
+                        // e nao tinham NENHUMA tela — o usuario recebia alerta de
+                        // RAM/CPU sem poder desligar nem ajustar o limite.
+                        ToggleSmartAlerts.IsChecked = tray.EnableSmartAlerts;
+                        TxtHighRamThreshold.Text = tray.HighRamThresholdMB.ToString();
+                        TxtHighCpuThreshold.Text = tray.HighCpuThresholdPercent.ToString("0");
+                        ToggleAntiLeak.IsChecked = tray.MemoryLeakDetectionEnabled;
+                        ToggleBehaviorAnalysis.IsChecked = tray.EnableBehaviorAnalysis;
+                        ToggleFocusAssist.IsChecked = tray.FocusAssistEnabled;
+                        UpdateThresholdStatus();
                     }
                 }
 
@@ -148,7 +175,9 @@ namespace KitLugia.GUI.Pages
                     // X da janela sempre minimiza p/ o tray (CloseToTray forçado no Core)
                     ToggleNotifications.IsChecked = settings.ShowNotifications;
                     ToggleVerboseLogging.IsChecked = settings.VerboseLogging;
-                    ToggleRAMMonitor.IsChecked = settings.RAMMonitorEnabled;
+                    // ToggleRAMMonitor NAO e lido do JSON: a fonte da verdade e o
+                    // TrayIconService.AutoCleanEnabled (lido acima). Este campo
+                    // ficou no schema so por compatibilidade com instalacoes antigas.
                     ToggleDeveloperMode.IsChecked = settings.DeveloperMode;
                     ToggleIntroAnimation.IsChecked = settings.IntroAnimationEnabled;
                     IntroDurationSlider.Value = settings.IntroDuration;
@@ -161,7 +190,7 @@ namespace KitLugia.GUI.Pages
                 {
                     ToggleNotifications.IsChecked = true;
                     ToggleVerboseLogging.IsChecked = false;
-                    ToggleRAMMonitor.IsChecked = true;
+                    // ToggleRAMMonitor: definido pelo TrayIconService (bloco acima)
                     ToggleDeveloperMode.IsChecked = false;
                     ToggleIntroAnimation.IsChecked = true;
                     IntroDurationSlider.Value = 3.0;
@@ -276,7 +305,7 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
-                // �� Usar TrayIconService.SetAutoStart como nas outras páginas
+                // 📁 Usar TrayIconService.SetAutoStart como nas outras páginas
                 KitLugia.GUI.Services.TrayIconService.SetAutoStart(ToggleStartup.IsChecked == true);
                 
                 // Atualizar estado real
@@ -397,6 +426,105 @@ namespace KitLugia.GUI.Pages
             catch { }
         }
 
+        private void ToggleRAMMonitor_Click()
+        {
+            // O interruptor REAL do monitoramento/limpeza automatica e o
+            // TrayIconService.AutoCleanEnabled (o mesmo que a pagina de RAM usa).
+            // Antes este toggle so gravava RAMMonitorEnabled no JSON e nada lia
+            // esse campo: ligava/desligava e nao acontecia NADA.
+            try
+            {
+                bool on = ToggleRAMMonitor.IsChecked == true;
+                if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow && mainWindow.TrayService != null)
+                {
+                    mainWindow.TrayService.AutoCleanEnabled = on;
+                    mainWindow.TrayService.SaveSettings();
+                }
+                SaveSettings(); // mantem o JSON antigo em dia (compatibilidade)
+                Logger.Log($"⚙️ Monitoramento de RAM: {(on ? "ativado" : "desativado")}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ToggleRAMMonitor_Click", $"Erro: {ex.Message}");
+            }
+        }
+
+        #region Monitoramento avancado
+
+        private TrayIconService? Tray => (System.Windows.Application.Current.MainWindow as MainWindow)?.TrayService;
+
+        private void OnToggleSmartAlerts(object s, RoutedEventArgs e) => ComTray(ToggleSmartAlerts, t => t.EnableSmartAlerts = ToggleSmartAlerts.IsChecked == true, "Alertas inteligentes");
+        private void OnToggleAntiLeak(object s, RoutedEventArgs e) => ComTray(ToggleAntiLeak, t => t.MemoryLeakDetectionEnabled = ToggleAntiLeak.IsChecked == true, "Deteccao de vazamento");
+        private void OnToggleBehaviorAnalysis(object s, RoutedEventArgs e) => ComTray(ToggleBehaviorAnalysis, t => t.EnableBehaviorAnalysis = ToggleBehaviorAnalysis.IsChecked == true, "Analise de comportamento");
+        private void OnToggleFocusAssist(object s, RoutedEventArgs e) => ComTray(ToggleFocusAssist, t => t.FocusAssistEnabled = ToggleFocusAssist.IsChecked == true, "Assistencia de foco");
+
+        private void ComTray(System.Windows.Controls.Primitives.ToggleButton chk,
+                             Action<TrayIconService> aplicar, string nome)
+        {
+            try
+            {
+                var tray = Tray;
+                if (tray == null) return;
+                aplicar(tray);
+                tray.SaveSettings();
+                bool on = chk.IsChecked == true;
+                Logger.Log($"⚙️ {nome}: {(on ? "ativado" : "desativado")}");
+                UpdateThresholdStatus();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ComTray", $"{nome}: {ex.Message}");
+            }
+        }
+
+        private void TxtHighRamThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            // A propriedade ja trava em 512 MB (setter) — aqui so evitamos
+            // digitar letra e receber exception do int.Parse.
+            var t = sender as System.Windows.Controls.TextBox;
+            if (t == null) return;
+            if (!long.TryParse(t.Text, out long mb) || mb < 512) { t.Text = Tray?.HighRamThresholdMB.ToString() ?? "2048"; return; }
+            var tray = Tray;
+            if (tray == null) return;
+            tray.HighRamThresholdMB = mb;
+            tray.SaveSettings();
+            t.Text = tray.HighRamThresholdMB.ToString();
+            UpdateThresholdStatus();
+        }
+
+        private void TxtHighCpuThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var t = sender as System.Windows.Controls.TextBox;
+            if (t == null) return;
+            if (!double.TryParse(t.Text.Replace(',', '.'), out double pc) || pc < 10 || pc > 100)
+            { t.Text = Tray?.HighCpuThresholdPercent.ToString("0") ?? "80"; return; }
+            var tray = Tray;
+            if (tray == null) return;
+            tray.HighCpuThresholdPercent = pc;
+            tray.SaveSettings();
+            t.Text = tray.HighCpuThresholdPercent.ToString("0");
+            UpdateThresholdStatus();
+        }
+
+        private void UpdateThresholdStatus()
+        {
+            var tray = Tray;
+            if (tray == null) return;
+            var on = tray.EnableSmartAlerts;
+            TxtHighRamStatus.Text = on
+                ? $"Avisa acima de {tray.HighRamThresholdMB} MB em um processo. (minimo 512 MB)"
+                : "Alertas desligados — os limiares ficam guardados para quando ligar.";
+            TxtHighCpuStatus.Text = on
+                ? $"Avisa acima de {tray.HighCpuThresholdPercent:0}% de CPU em um processo. (10–100%)"
+                : "Alertas desligados — os limiares ficam guardados para quando ligar.";
+            TxtHighRamThreshold.IsEnabled = on;
+            TxtHighCpuThreshold.IsEnabled = on;
+            TxtHighRamThreshold.Opacity = on ? 1.0 : 0.45;
+            TxtHighCpuThreshold.Opacity = on ? 1.0 : 0.45;
+        }
+
+        #endregion
+
         private void ToggleStandbyClean_Click()
         {
             try
@@ -416,24 +544,24 @@ namespace KitLugia.GUI.Pages
 
         private void ToggleDeveloperMode_Checked(object sender, RoutedEventArgs e)
         {
-            Logger.Log("�Y�> Modo Desenvolvedor ATIVADO");
+            Logger.Log("✔ Modo Desenvolvedor ATIVADO");
             SaveSettings();
             
             // Mostrar mensagem
             if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
             {
-                mainWindow.ShowSuccess("�Y�> Modo Desenvolvedor", "Menu de debug agora visível. Reinicie para aplicar todas as mudanças.");
+                mainWindow.ShowSuccess("✔ Modo Desenvolvedor", "Menu de debug agora visível. Reinicie para aplicar todas as mudanças.");
             }
         }
 
         private void ToggleDeveloperMode_Unchecked(object sender, RoutedEventArgs e)
         {
-            Logger.Log("� Modo Desenvolvedor DESATIVADO");
+            Logger.Log("ℹ Modo Desenvolvedor DESATIVADO");
             SaveSettings();
             
             if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
             {
-                mainWindow.ShowInfo("� Modo Normal", "Menu de debug oculto.");
+                mainWindow.ShowInfo("ℹ Modo Normal", "Menu de debug oculto.");
             }
         }
 

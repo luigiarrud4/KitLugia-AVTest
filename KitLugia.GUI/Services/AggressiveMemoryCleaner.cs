@@ -86,35 +86,93 @@ namespace KitLugia.GUI.Services
         /// <summary>
         /// Verifica uso de memória e limpa se necessário
         /// </summary>
+        // ─── Anti-spam + backoff quando o limite e' inalcancavel (06/10/2026) ───
+        //
+        // O log repetia "Iniciando limpeza..." a cada 60 s porque (a) o log vinha antes
+        // da guarda de 30 s e (b) o heap gerenciado nunca caia abaixo do teto: 539 MB
+        // contra um limite de 200 MB. Resultado: GC forcado eterno, log eterno, e
+        // nenhuma memoria liberada. Agora:
+        //   - a guarda de throttle roda ANTES do log (o log nunca mente);
+        //   - o log de inicio e' rate-limitado;
+        //   - se N limpezas seguidas nao liberam nada, o motor PARA de tentar por um
+        //     intervalo que cresce, e avisa UMA vez que o limite esta inalcancavel.
+        private static readonly TimeSpan MinCleanupInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan StartLogWindow = TimeSpan.FromMinutes(5);
+        private static int _consecutiveNoEffect;
+        private static int _noEffectWarned;
+        private static DateTime _retryNotBefore = DateTime.MinValue;
+        private static DateTime _lastStartLog = DateTime.MinValue;
+        private static bool _cleanupInFlight;
+
+        private const int NoEffectStreakBeforeBackoff = 3;
+        private static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(15);
+
+        /// <summary>
+        /// Verifica uso de memória e limpa se necessário
+        /// </summary>
         private static void CheckMemoryAndCleanupIfNeeded()
         {
             try
             {
-                var currentMemory = GC.GetTotalMemory(false);
+                long currentMemory = GC.GetTotalMemory(false);
 
-                // Só limpa se:
-                // 1. Atingiu o limite
-                // 2. Passou pelo menos 30 segundos desde a última limpeza
-                if (currentMemory > _memoryLimitBytes &&
-                    DateTime.Now - _lastCleanup > TimeSpan.FromSeconds(30))
+                // 1. Abaixo do limite: nada a fazer (e nada a logar).
+                if (currentMemory <= _memoryLimitBytes) return;
+
+                // 2. Em backoff: o limite esta comprovadamente inalcancavel com o que
+                //    temos. Tentar de novo seria desperdicio de CPU.
+                if (DateTime.UtcNow < _retryNotBefore) return;
+
+                // 3. Throttle — ANTES do log, para a linha nunca dizer "iniciando"
+                //    quando a chamada vai ser descartada.
+                lock (_cleanupLock)
                 {
-                    Logger.Log($"🧹 Memória atual: {currentMemory / 1024 / 1024:F1}MB - Limite: {_memoryLimitMB}MB - Iniciando limpeza...");
-                    _ = PerformIntelligentCleanup();
+                    if (_cleanupInFlight) return;
+                    if (DateTime.Now - _lastCleanup < MinCleanupInterval) return;
+                    _lastCleanup = DateTime.Now;
+                    _cleanupInFlight = true;
                 }
+
+                var agora = DateTime.UtcNow;
+                if (agora - _lastStartLog >= StartLogWindow)
+                {
+                    _lastStartLog = agora;
+                    Logger.Log($"🧹 Memória gerenciada: {currentMemory / 1024 / 1024:F1}MB - Teto: {_memoryLimitMB}MB - Iniciando limpeza...");
+                }
+                else if (Logger.VerboseCheckLogs)
+                {
+                    Logger.Log($"🧹 Memória gerenciada: {currentMemory / 1024 / 1024:F1}MB acima do teto - limpeza adiada pelo intervalo mínimo.");
+                }
+
+                _ = PerformIntelligentCleanupCore();
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            catch (Exception ex) { Logger.LogWarning("Unknown", $"CheckMemory: {ex.Message}"); }
         }
 
         /// <summary>
+        /// Executa uma limpeza de memória agora (usado pelo botão "limpar agora" e pelo
+        /// timer). Respeita o intervalo mínimo entre passadas.
         /// </summary>
         public static async Task<(long MemoryBefore, long MemoryAfter, long Freed)> PerformIntelligentCleanup()
         {
+            return await PerformIntelligentCleanupCore();
+        }
+
+        /// <summary>
+        /// Executa a limpeza. O chamador pode ja ter reservado a janela (o timer faz isso
+        /// antes de logar), entao nao devolvemos a reserva aqui.
+        /// </summary>
+        private static async Task<(long MemoryBefore, long MemoryAfter, long Freed)> PerformIntelligentCleanupCore()
+        {
             lock (_cleanupLock)
             {
-                if (DateTime.Now - _lastCleanup < TimeSpan.FromSeconds(30))
-                    return (0, 0, 0); // Evita limpezas muito frequentes
-
-                _lastCleanup = DateTime.Now;
+                if (!_cleanupInFlight)
+                {
+                    if (DateTime.Now - _lastCleanup < MinCleanupInterval)
+                        return (0, 0, 0); // Evita limpezas muito frequentes
+                    _lastCleanup = DateTime.Now;
+                    _cleanupInFlight = true;
+                }
             }
 
             var before = GC.GetTotalMemory(false);
@@ -135,13 +193,39 @@ namespace KitLugia.GUI.Services
                     TotalMemoryFreed += freed;
                     CleanupCount++;
                     LastCleanupTime = DateTime.Now;
+                    _consecutiveNoEffect = 0;
+                    _retryNotBefore = DateTime.MinValue;
 
                     Logger.Log($"🧹 Limpeza concluída: {freed / 1024 / 1024:F1}MB liberado (Total: {TotalMemoryFreed / 1024 / 1024:F1}MB)");
+                }
+                else
+                {
+                    // Nada saiu. Se isso se repetir, o teto esta inalcancavel com GC:
+                    // parar de forcar a cada minuto e dizer isso uma unica vez.
+                    _consecutiveNoEffect++;
+                    if (_consecutiveNoEffect >= NoEffectStreakBeforeBackoff)
+                    {
+                        var backoff = TimeSpan.FromSeconds(Math.Min(
+                            MaxBackoff.TotalSeconds,
+                            MinCleanupInterval.TotalSeconds * Math.Pow(2, _consecutiveNoEffect - NoEffectStreakBeforeBackoff)));
+                        _retryNotBefore = DateTime.UtcNow + backoff;
+
+                        if (_noEffectWarned < 2)
+                        {
+                            _noEffectWarned++;
+                            Logger.Log(
+                                $"⚠️ Memória gerenciada ({after / 1024 / 1024:F1}MB) acima do teto de {_memoryLimitMB}MB há " +
+                                $"{_consecutiveNoEffect} limpezas sem efeito. O que está acima do teto é heap VIVO (referenciado), " +
+                                $"não lixo: forçar GC não baixa. Pausando as tentativas por {backoff.TotalMinutes:F0} min. " +
+                                $"Se quiser reduzir mesmo assim, feche as páginas abertas ou aumente o teto.");
+                        }
+                    }
                 }
 
                 return (before, after, freed);
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return (before, before, 0); }
+            catch (Exception ex) { Logger.LogWarning("Unknown", $"PerformIntelligentCleanup: {ex.Message}"); return (before, before, 0); }
+            finally { lock (_cleanupLock) { _cleanupInFlight = false; } }
         }
 
         // Mantém o método antigo para compatibilidade (chama o novo)

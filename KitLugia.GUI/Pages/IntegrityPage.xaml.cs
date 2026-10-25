@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -88,28 +88,8 @@ namespace KitLugia.GUI.Pages
                 _allTweaks = tweaks;
                 UpdatePathCardState();
 
-                // Calcula score ignorando opcionais
-                var nonOptionalTweaks = _allTweaks.Where(t => !t.IsOptional).ToList();
-                var badItems = nonOptionalTweaks.Where(t => t.Status == TweakStatus.MODIFIED).ToList();
-                int total = nonOptionalTweaks.Count;
-                int score = total > 0 ? 100 - (int)Math.Ceiling(100.0 * badItems.Count / total) : 100;
-
-                if (TxtScore != null) TxtScore.Text = score + "%";
-                UpdateScoreColor(score);
-
-                if (BtnFixAll != null && BtnRescan != null)
-                {
-                    if (score == 100)
-                    {
-                        BtnFixAll.Visibility = Visibility.Collapsed;
-                        BtnRescan.Margin = new Thickness(0, 0, 0, 0);
-                    }
-                    else
-                    {
-                        BtnFixAll.Visibility = Visibility.Visible;
-                        BtnRescan.Margin = new Thickness(15, 0, 0, 0);
-                    }
-                }
+                // Score + botões + banner (fórmula única em RecalculateScore)
+                RecalculateScore();
 
                 // Carrega todos os itens de uma vez com cache
                 var allFiltered = ApplyFilters(_allTweaks);
@@ -170,17 +150,11 @@ namespace KitLugia.GUI.Pages
                     case "SEGURANCA":
                         filtered = filtered.Where(t => t.Category.Contains("Segurança") || t.Category.Contains("Defesa"));
                         break;
-                    case "DEFESA":
-                        filtered = filtered.Where(t => t.Category.Contains("Defesa") || t.Category.Contains("Antivírus"));
-                        break;
                     case "PROTEGIDO":
                         filtered = filtered.Where(t => t.Status == TweakStatus.OK);
                         break;
                     case "MODIFICADO":
                         filtered = filtered.Where(t => t.Status == TweakStatus.MODIFIED && !t.IsOptional);
-                        break;
-                    case "NAO_ENCONTRADO":
-                        filtered = filtered.Where(t => t.Status == TweakStatus.NOT_FOUND);
                         break;
                     case "OPCIONAL":
                         filtered = filtered.Where(t => t.IsOptional);
@@ -245,6 +219,52 @@ namespace KitLugia.GUI.Pages
             if (EmptyState == null || ItemsList == null) return;
             var items = ItemsList.ItemsSource as IList;
             EmptyState.Visibility = (items == null || items.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>Nome curto de um check para o banner (sem cortar o sentido).</summary>
+        private static string PendingShortName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "?";
+            return name.Length <= 46 ? name : name.Substring(0, 45).TrimEnd() + "…";
+        }
+
+        /// <summary>
+        /// Aviso amarelo de correções aplicadas que só entram em vigor depois de
+        /// reiniciar. Sem ele o usuário corrigiria algo, veria o item sumir da lista
+        /// "Modificado" e não saberia que ainda falta reiniciar — ou pior,
+        /// acreditaria que já está protegido quando o hypervisor ainda não leu a
+        /// configuração.
+        /// </summary>
+        private void UpdatePendingBanner(IReadOnlyList<ScannableTweak> tweaks)
+        {
+            if (PendingBanner == null || TxtPendingBanner == null) return;
+
+            var pendentes = tweaks.Where(t => t.Status == TweakStatus.PENDING).ToList();
+            var naoConfirmados = tweaks.Where(t => !string.IsNullOrEmpty(t.UnconfirmedReason)).ToList();
+
+            if (pendentes.Count == 0 && naoConfirmados.Count == 0)
+            {
+                PendingBanner.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var partes = new List<string>();
+            if (pendentes.Count > 0)
+            {
+                var nomes = string.Join(", ", pendentes.Take(3).Select(t => PendingShortName(t.Name)));
+                partes.Add(pendentes.Count == 1
+                    ? $"⏳ 1 correção foi aplicada mas só vale depois de reiniciar: {nomes}. Reinicie para o check ser confirmado."
+                    : $"⏳ {pendentes.Count} correções foram aplicadas mas só valem depois de reiniciar: {nomes}{(pendentes.Count > 3 ? "…" : "")}. Reinicie para os checks serem confirmados.");
+            }
+            if (naoConfirmados.Count > 0)
+            {
+                var nomes = string.Join(", ", naoConfirmados.Take(2).Select(t => PendingShortName(t.Name)));
+                partes.Add($"❔ {naoConfirmados.Count} check(s) não puderam ser confirmados após o reinício (não é falha nem proteção): {nomes}{(naoConfirmados.Count > 2 ? "…" : "")}.");
+            }
+
+            TxtPendingBanner.Text = string.Join("  ", partes);
+            PendingBanner.Visibility = Visibility.Visible;
+
         }
 
         private void UpdateScoreColor(int score)
@@ -519,13 +539,43 @@ namespace KitLugia.GUI.Pages
         {
             if (_allTweaks == null) return;
 
+            RecalculateScore();
+
+            UpdatePathCardState();
+            ApplyFiltersAndUpdateList();
+        }
+
+        /// <summary>
+        /// Calcula o score e atualiza score + botões + banner de pendências.
+        ///
+        /// POR QUE ESTE MÉTODO EXISTE: o cálculo estava DUPLICADO em dois lugares
+        /// (o do carregamento e o pós-toggle) e só um deles foi atualizado quando
+        /// os PENDING entraram. Resultado: depois de "corrigir" um item que exige
+        /// reinício, o score voltava a contar o item como vulnerável enquanto o
+        /// banner dizia "aguardando reinício" — a tela se contradizendo. Uma
+        /// fórmula só, chamada de todo canto.
+        /// </summary>
+        private void RecalculateScore()
+        {
+            if (_allTweaks == null) return;
+
             var nonOptionalTweaks = _allTweaks.Where(t => !t.IsOptional).ToList();
-            var badItems = nonOptionalTweaks.Where(t => t.Status == TweakStatus.MODIFIED).ToList();
-            int total = nonOptionalTweaks.Count;
-            int score = total > 0 ? 100 - (int)Math.Ceiling(100.0 * badItems.Count / total) : 100;
+
+            // PENDING (corrigido, aguardando reinício) sai do
+            // DENOMINADOR: o score mede o que está comprovadamente vulnerável
+            // agora. Contar um item pendente como "ruim" puniria o usuário por
+            // algo que ele acabou de corrigir; contá-lo como "ok" seria dizer
+            // que já está protegido, o que ainda não se sabe.
+            var countableTweaks = nonOptionalTweaks
+                .Where(t => t.Status != TweakStatus.PENDING)
+                .ToList();
+            var badCountable = countableTweaks.Where(t => t.Status == TweakStatus.MODIFIED).ToList();
+            int total = countableTweaks.Count;
+            int score = total > 0 ? 100 - (int)Math.Ceiling(100.0 * badCountable.Count / total) : 100;
 
             if (TxtScore != null) TxtScore.Text = score + "%";
             UpdateScoreColor(score);
+            UpdatePendingBanner(_allTweaks);
 
             if (BtnFixAll != null && BtnRescan != null)
             {
@@ -540,9 +590,6 @@ namespace KitLugia.GUI.Pages
                     BtnRescan.Margin = new Thickness(15, 0, 0, 0);
                 }
             }
-
-            UpdatePathCardState();
-            ApplyFiltersAndUpdateList();
         }
 
         #endregion

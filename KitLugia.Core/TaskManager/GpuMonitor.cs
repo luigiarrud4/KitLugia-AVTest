@@ -15,6 +15,12 @@ namespace KitLugia.Core.TaskManager
     /// instancias criadas depois automaticamente).
     /// O dict por PID inclui engines OCIOSOS (0,0%) — mesmo comportamento do Task Manager/
     /// TMOG: engine presente = "0.0%", sem engine (exited) = "Unavail"/"—".
+    ///
+    /// ADICIONAL (2026-10): a MESMA query PDH gained os contadores de memória da GPU
+    /// ("\GPU Adapter Memory(*)\Dedicated Usage|Shared Usage|Total Committed", formato
+    /// PDH_FMT_LARGE = bytes). Como estão na mesma query, UM PdhCollectQueryDataAtualiza
+    /// engines E memória — e o agrupamento por LUID dá o 3D/Copy/Encode/Decode e o
+    /// VRAM em uso de CADA adaptador (a chave é a mesma do DXGI: luid_0xHHHHHHHH_0xHHHHHHHH).
     /// </summary>
     public static class GpuMonitor
     {
@@ -31,16 +37,17 @@ namespace KitLugia.Core.TaskManager
         [DllImport("pdh.dll")]
         private static extern uint PdhRemoveCounter(IntPtr hCounter);
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct PDH_FMT_COUNTERVALUE { public uint CStatus; public double DoubleValue; }
-
         private const uint PDH_FMT_DOUBLE = 0x00000200;
+        private const uint PDH_FMT_LARGE = 0x00000400;
         private const uint PDH_MORE_DATA = 0x800007D2;
         private const uint PDH_CSTATUS_VALID_DATA = 0x00000000;
         private const uint PDH_CSTATUS_NEW_DATA = 0x00000001;
 
         private static IntPtr _queryHandle = IntPtr.Zero;
         private static IntPtr _wildcardCounter = IntPtr.Zero; // \GPU Engine(*)\Utilization Percentage
+        private static IntPtr _dedicatedCounter = IntPtr.Zero; // \GPU Adapter Memory(*)\Dedicated Usage
+        private static IntPtr _sharedCounter = IntPtr.Zero;   // \GPU Adapter Memory(*)\Shared Usage
+        private static IntPtr _committedCounter = IntPtr.Zero; // \GPU Adapter Memory(*)\Total Committed
         private static bool _initialized = false;
         private static bool _gpuAvailable = true;
         private static volatile bool _initializing = false;
@@ -50,6 +57,9 @@ namespace KitLugia.Core.TaskManager
         // FIX: falha unica na inicializacao NAO desabilita para sempre — re-tenta apos cooldown.
         private static int _failedAttempts = 0;
         private static DateTime _nextRetryTime = DateTime.MinValue;
+
+        // Agregado por adaptador (chave = LUID no formato PDH)
+        private static readonly Dictionary<string, GpuAdapterLive> _adapterLive = new(StringComparer.OrdinalIgnoreCase);
 
         private static void EnsureInitialized()
         {
@@ -71,6 +81,11 @@ namespace KitLugia.Core.TaskManager
                     r = PdhAddEnglishCounter(_queryHandle, @"\GPU Engine(*)\Utilization Percentage", 0, out _wildcardCounter);
                     if (r == 0 && _wildcardCounter != IntPtr.Zero)
                     {
+                        // Memória da GPU — MESMA query (um collect atualiza tudo).
+                        // Falha aqui NÃO derruba a medição de utilisation (é opcional).
+                        try { PdhAddEnglishCounter(_queryHandle, @"\GPU Adapter Memory(*)\Dedicated Usage", 0, out _dedicatedCounter); } catch { }
+                        try { PdhAddEnglishCounter(_queryHandle, @"\GPU Adapter Memory(*)\Shared Usage", 0, out _sharedCounter); } catch { }
+                        try { PdhAddEnglishCounter(_queryHandle, @"\GPU Adapter Memory(*)\Total Committed", 0, out _committedCounter); } catch { }
                         PdhCollectQueryData(_queryHandle);
                         doWarmup = true;
                         _initialized = true;
@@ -117,6 +132,7 @@ namespace KitLugia.Core.TaskManager
         /// Retorna dict PID -> soma das engines e o maior engine individual (total estilo Task Manager).
         /// A leitura e confinada ao buffer devolvido pela propria PDH (ponteiros de nome apontam
         /// para dentro dele); todos os acessos sao validados contra os limites do buffer.
+        /// No MESMO passe agrega as engines por adaptador (LUID) e le a memoria da GPU.
         /// </summary>
         private static Dictionary<uint, double> ReadEngineArray()
         {
@@ -152,6 +168,7 @@ namespace KitLugia.Core.TaskManager
                     double maxInstance = 0;
                     // PDH_FMT_COUNTERVALUE_ITEM_W x64: LPWSTR szName @0, DWORD CStatus @8, pad, double @16, stride 24
                     const int itemStride = 24;
+                    var engines = new Dictionary<string, EngineAccum>(StringComparer.OrdinalIgnoreCase);
                     for (uint i = 0; i < count; i++)
                     {
                         IntPtr item = buf + (int)(i * itemStride);
@@ -165,11 +182,20 @@ namespace KitLugia.Core.TaskManager
                         if (val > maxInstance) maxInstance = val;
 
                         string name = Marshal.PtrToStringUni(namePtr) ?? "";
+
+                        // ── Agregado por adaptador (LUID + tipo de engine) ──
+                        string? luid = ExtractLuidKey(name);
+                        if (luid != null)
+                        {
+                            if (!engines.TryGetValue(luid, out var acc)) { acc = new EngineAccum(); engines[luid] = acc; }
+                            acc.Add(ExtractEngType(name), val);
+                        }
+
                         uint pid = ExtractPidFromEnginePath(name);
                         if (pid == 0) continue;
                         // SOMA por PID (multi-engine), clamp no final. Inclui 0,0 — engine presente.
-                        double acc = result.TryGetValue(pid, out var a) ? a : 0;
-                        result[pid] = acc + val;
+                        double accPid = result.TryGetValue(pid, out var a) ? a : 0;
+                        result[pid] = accPid + val;
                     }
 
                     if (result.Count > 0)
@@ -180,11 +206,139 @@ namespace KitLugia.Core.TaskManager
                         }
                         _lastTotalValue = Math.Clamp(maxInstance, 0, 100);
                     }
+
+                    // Publica o agregado por adaptador (engines + memória da GPU)
+                    PublishAdapterLive(engines);
                 }
                 finally { Marshal.FreeHGlobal(buf); }
             }
             catch { }
             return result;
+        }
+
+        /// <summary>Acumula as engines de um adaptador (3D/Copy/Video Encode/Video Decode).</summary>
+        private sealed class EngineAccum
+        {
+            public double D3, Copy, Encode, Decode;
+            public void Add(string engType, double val)
+            {
+                switch (engType)
+                {
+                    case "3D": D3 += val; break;
+                    case "Copy": Copy += val; break;
+                    case "Video Encode": Encode += val; break;
+                    case "Video Decode": Decode += val; break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Publica o estado por adaptador: engines (do array) + memória (dos contadores LARGE).
+        /// A chave é o LUID no formato das instâncias PDH ("luid_0x00000000_0x00014AEE").
+        /// </summary>
+        private static void PublishAdapterLive(Dictionary<string, EngineAccum> engines)
+        {
+            try
+            {
+                var ded = new Dictionary<string, ulong>(StringComparer.OrdinalIgnoreCase);
+                var shr = new Dictionary<string, ulong>(StringComparer.OrdinalIgnoreCase);
+                var com = new Dictionary<string, ulong>(StringComparer.OrdinalIgnoreCase);
+                ReadLargeCounter(_dedicatedCounter, ded);
+                ReadLargeCounter(_sharedCounter, shr);
+                ReadLargeCounter(_committedCounter, com);
+
+                var keys = new HashSet<string>(engines.Keys, StringComparer.OrdinalIgnoreCase);
+                foreach (var k in ded.Keys) keys.Add(k);
+                foreach (var k in shr.Keys) keys.Add(k);
+                foreach (var k in com.Keys) keys.Add(k);
+
+                lock (_adapterLive)
+                {
+                    _adapterLive.Clear();
+                    foreach (var k in keys)
+                    {
+                        engines.TryGetValue(k, out var e);
+                        _adapterLive[k] = new GpuAdapterLive
+                        {
+                            LuidKey = k,
+                            Util3D = e?.D3 ?? 0,
+                            UtilCopy = e?.Copy ?? 0,
+                            UtilEncode = e?.Encode ?? 0,
+                            UtilDecode = e?.Decode ?? 0,
+                            DedicatedUsedBytes = ded.TryGetValue(k, out var d) ? d : 0UL,
+                            SharedUsedBytes = shr.TryGetValue(k, out var s) ? s : 0UL,
+                            TotalCommittedBytes = com.TryGetValue(k, out var c) ? c : 0UL,
+                        };
+                    }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>Lê um contador PDH de valor LARGE (bytes) — item: LPWSTR @0, CStatus @8, valor @16, stride 24.</summary>
+        private static void ReadLargeCounter(IntPtr counter, Dictionary<string, ulong> target)
+        {
+            if (counter == IntPtr.Zero) return;
+            try
+            {
+                uint size = 0;
+                uint rc = PdhGetFormattedCounterArrayW(counter, PDH_FMT_LARGE, ref size, out _, IntPtr.Zero);
+                if (size == 0 || (rc != 0 && rc != PDH_MORE_DATA)) return;
+                IntPtr buf = Marshal.AllocHGlobal((int)size);
+                try
+                {
+                    rc = PdhGetFormattedCounterArrayW(counter, PDH_FMT_LARGE, ref size, out uint count, buf);
+                    if (rc != 0) return;
+                    const int itemStride = 24;
+                    for (uint i = 0; i < count; i++)
+                    {
+                        IntPtr item = buf + (int)(i * itemStride);
+                        if (item + itemStride > buf + size) break;
+                        IntPtr namePtr = Marshal.ReadIntPtr(item);
+                        if (namePtr < buf || namePtr >= buf + size) continue;
+                        uint cstatus = (uint)Marshal.ReadInt32(item, 8);
+                        if (cstatus != PDH_CSTATUS_VALID_DATA && cstatus != PDH_CSTATUS_NEW_DATA) continue;
+                        long val = Marshal.ReadInt64(item, 16);
+                        string name = Marshal.PtrToStringUni(namePtr) ?? "";
+                        string? luid = ExtractLuidKey(name);
+                        if (luid == null) continue;
+                        target[luid] = (ulong)Math.Max(0L, val);
+                    }
+                }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+            catch { }
+        }
+
+        /// <summary>Extrai a chave LUID do nome da instância: "luid_0x00000000_0x00014AEE".</summary>
+        private static string? ExtractLuidKey(string name)
+        {
+            try
+            {
+                int i = name.IndexOf("luid_", StringComparison.OrdinalIgnoreCase);
+                if (i < 0) return null;
+                int j = name.IndexOf("_phys", i + 5, StringComparison.OrdinalIgnoreCase);
+                if (j < 0) j = name.IndexOf(')', i);
+                if (j < 0) j = name.Length;
+                if (j - i <= 5) return null;
+                return name.Substring(i, j - i);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Extrai o tipo de engine do nome: "..._engtype_3D" → "3D".</summary>
+        private static string ExtractEngType(string name)
+        {
+            try
+            {
+                int i = name.IndexOf("engtype_", StringComparison.OrdinalIgnoreCase);
+                if (i < 0) return "";
+                i += 8;
+                int j = name.IndexOf(')', i);
+                if (j < 0) j = name.Length;
+                return name.Substring(i, j - i);
+            }
+            catch { return ""; }
         }
 
         /// <summary>
@@ -220,6 +374,26 @@ namespace KitLugia.Core.TaskManager
                 return _lastTotalValue;
             }
             catch { return _lastTotalValue; }
+        }
+
+        /// <summary>
+        /// Métricas VIVAS por adaptador de GPU (chave = LUID PDH): utilization 3D/Copy/
+        /// Encode/Decode + VRAM dedicada/compartilhada em uso (bytes).
+        /// </summary>
+        public static Dictionary<string, GpuAdapterLive> GetAdapterLive()
+        {
+            try
+            {
+                EnsureInitialized();
+                if (!_initialized) return new Dictionary<string, GpuAdapterLive>();
+                // Garante que o array foi lido (atualiza o agregado por adaptador)
+                ReadEngineArray();
+                lock (_adapterLive)
+                {
+                    return new Dictionary<string, GpuAdapterLive>(_adapterLive, StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            catch { return new Dictionary<string, GpuAdapterLive>(); }
         }
 
         /// <summary>Extrai o PID do caminho "\GPU Engine(pid_1234_luid_...)".</summary>
@@ -284,10 +458,36 @@ namespace KitLugia.Core.TaskManager
             lock (_initLock)
             {
                 if (_wildcardCounter != IntPtr.Zero) { try { PdhRemoveCounter(_wildcardCounter); } catch { } _wildcardCounter = IntPtr.Zero; }
+                if (_dedicatedCounter != IntPtr.Zero) { try { PdhRemoveCounter(_dedicatedCounter); } catch { } _dedicatedCounter = IntPtr.Zero; }
+                if (_sharedCounter != IntPtr.Zero) { try { PdhRemoveCounter(_sharedCounter); } catch { } _sharedCounter = IntPtr.Zero; }
+                if (_committedCounter != IntPtr.Zero) { try { PdhRemoveCounter(_committedCounter); } catch { } _committedCounter = IntPtr.Zero; }
                 if (_queryHandle != IntPtr.Zero) { try { PdhCloseQuery(_queryHandle); } catch { } _queryHandle = IntPtr.Zero; }
                 _initialized = false;
                 _initializing = false;
+                lock (_adapterLive) { _adapterLive.Clear(); }
             }
         }
+    }
+
+    /// <summary>Métricas vivas de UM adaptador de GPU (PDH).</summary>
+    public sealed class GpuAdapterLive
+    {
+        /// <summary>Chave LUID no formato PDH ("luid_0x00000000_0x00014AEE").</summary>
+        public string LuidKey { get; set; } = "";
+        public double Util3D { get; set; }
+        public double UtilCopy { get; set; }
+        public double UtilEncode { get; set; }
+        public double UtilDecode { get; set; }
+        /// <summary>VRAM dedicada em uso (bytes).</summary>
+        public ulong DedicatedUsedBytes { get; set; }
+        /// <summary>Memória de GPU compartilhada em uso (bytes).</summary>
+        public ulong SharedUsedBytes { get; set; }
+        /// <summary>Total comprometido na GPU (dedicated + shared) em bytes.</summary>
+        public ulong TotalCommittedBytes { get; set; }
+        /// <summary>Temperatura em °C (preenchida pela GUI via nvidia-smi; -1 = indisponível).</summary>
+        public double TemperatureC { get; set; } = -1;
+        /// <summary>Utilização do adaptador (a engine mais ocupada — como o Task Manager).</summary>
+        public double Utilization =>
+            Math.Max(Math.Max(Util3D, UtilCopy), Math.Max(UtilEncode, UtilDecode));
     }
 }

@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Dumper de metadados .NET baseado em System.Reflection.Metadata (in-box no SDK).
+    Nao depende de IDA, ILSpy, dnSpy nem de internet: le o PE/metadata direto.
+    Uso: dotnet run (project scripts/pe_metadata_dump) com [assembly] [modo].
+    Modos: summary | types | pinvoke | refs | resources | strings | res
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>pe_metadata_dump</AssemblyName>
+    <RootNamespace>PeMetadataDump</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+</Project>

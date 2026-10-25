@@ -119,8 +119,12 @@ namespace KitLugia.GUI.Pages
             ChkTurboBoot.IsChecked = tray.TurboBootEnabled;
             ChkTurboShutdown.IsChecked = tray.TurboShutdownEnabled;
 
-            // ISLC: mostrar threshold auto-calculado
-            TxtIslcDescription.Text = $"Threshold: {tray.IslcThresholdMB} MB (auto). Recomendado p/ 16 GB RAM (32 GB+ raramente precisa — passe o mouse no ⓘ).";
+            // ISLC: valores CALCULADOS pela RAM (o usuário não digita nada).
+            // Desmarcar o automático libera os campos para calibração manual.
+            PnlIslcSettings.Visibility = tray.StandbyCleanEnabled ? Visibility.Visible : Visibility.Collapsed;
+            ChkIslcAuto.IsChecked = tray.IslcAutoTune;
+            RefreshIslcFields(tray);
+            ChkIslcRespectForeground.IsChecked = tray.IslcRespectForeground;
 
             // Auto-Start - usa novo método que verifica o caminho
             try
@@ -303,27 +307,162 @@ namespace KitLugia.GUI.Pages
             else if (cb == ChkTurboBoot) tray.TurboBootEnabled = cb.IsChecked == true;
             else if (cb == ChkTurboShutdown) tray.TurboShutdownEnabled = cb.IsChecked == true;
 
+            if (cb == ChkStandbyClean)
+                PnlIslcSettings.Visibility = tray.StandbyCleanEnabled ? Visibility.Visible : Visibility.Collapsed;
+
             tray.SaveSettings();
         }
 
+        /// <summary>
+        /// Badge honesto: mostra os DOIS criterios e por que o purge não rodou.
+        /// Antes só comparava standby contra o threshold, o que (julgando por
+        /// G9/G12) parecia um medidor saudável de um recurso inerte.
+        /// </summary>
         private void UpdateIslcStatus()
         {
             try
             {
                 var tray = GetTrayService();
                 if (tray == null) return;
-                long standbyMB = KitLugia.Core.MemoryOptimizer.GetStandbyListSizeMB();
-                bool exceeded = standbyMB > tray.IslcThresholdMB;
-                TxtIslcBadge.Text = $"Standby: {standbyMB} MB";
-                // Verde quando OK, amarelo quando acima do threshold
-                IslcStatusBadge.Background = new System.Windows.Media.SolidColorBrush(
-                    exceeded ? System.Windows.Media.Color.FromRgb(40, 35, 10) : System.Windows.Media.Color.FromRgb(26, 48, 32));
-                IslcStatusBadge.BorderBrush = new System.Windows.Media.SolidColorBrush(
-                    exceeded ? System.Windows.Media.Color.FromRgb(200, 160, 40) : System.Windows.Media.Color.FromRgb(48, 128, 80));
-                TxtIslcBadge.Foreground = new System.Windows.Media.SolidColorBrush(
-                    exceeded ? System.Windows.Media.Color.FromRgb(255, 200, 60) : System.Windows.Media.Color.FromRgb(80, 192, 128));
+
+                bool okStandby = KitLugia.Core.MemoryOptimizer.TryGetStandbyListSizeMB(out long standbyMB);
+                bool okFree = KitLugia.Core.MemoryOptimizer.TryGetFreePagesMB(out long freeMB);
+
+                if (!okStandby || !okFree)
+                {
+                    TxtIslcBadge.Text = "Indisponível";
+                    IslcStatusBadge.Background = Brush(Rgb(40, 35, 10));
+                    IslcStatusBadge.BorderBrush = Brush(Rgb(200, 160, 40));
+                    TxtIslcBadge.Foreground = Brush(Rgb(255, 200, 60));
+                    return;
+                }
+
+                bool standbyOk = standbyMB >= tray.IslcThresholdMB;
+                bool freeOk = freeMB < tray.IslcFreeThresholdMB;
+                bool podeLimpar = standbyOk && freeOk;
+
+                TxtIslcBadge.Text = $"Standby {standbyMB} / livre {freeMB} MB";
+
+                // Cor pelo par de critérios, não só pela standby.
+                System.Windows.Media.Color bg, border, fg;
+                if (podeLimpar) { bg = Rgb(40, 35, 10); border = Rgb(200, 160, 40); fg = Rgb(255, 200, 60); }
+                else if (standbyOk) { bg = Rgb(26, 40, 48); border = Rgb(60, 130, 160); fg = Rgb(140, 210, 240); }
+                else { bg = Rgb(26, 48, 32); border = Rgb(48, 128, 80); fg = Rgb(80, 192, 128); }
+
+                IslcStatusBadge.Background = Brush(bg);
+                IslcStatusBadge.BorderBrush = Brush(border);
+                TxtIslcBadge.Foreground = Brush(fg);
+
+                // Linha de estado: por que não limpou agora (ou o que limpou).
+                if (!string.IsNullOrEmpty(tray.IslcLastSkipReason))
+                    TxtIslcLastAction.Text = $"Aguardando: {tray.IslcLastSkipReason}";
+                else if (tray.IslcCleanCount > 0)
+                    TxtIslcLastAction.Text = $"{tray.IslcCleanCount} limpeza(s) nesta sessão · última standby: {tray.IslcLastCleanMB} MB";
+                else
+                    TxtIslcLastAction.Text = "";
             }
             catch { }
+        }
+
+        private static System.Windows.Media.Color Rgb(byte r, byte g, byte b) =>
+            System.Windows.Media.Color.FromRgb(r, g, b);
+
+        private static System.Windows.Media.SolidColorBrush Brush(System.Windows.Media.Color c) =>
+            new System.Windows.Media.SolidColorBrush(c);
+
+        /// <summary>Mostra os três limites atuais e trava a edição quando o cálculo é automático.</summary>
+        private void RefreshIslcFields(TrayIconService tray)
+        {
+            TxtIslcThreshold.Text = tray.IslcThresholdMB.ToString();
+            TxtIslcFreeThreshold.Text = tray.IslcFreeThresholdMB.ToString();
+            TxtIslcMinInterval.Text = tray.IslcMinIntervalSeconds.ToString();
+
+            bool auto = tray.IslcAutoTune;
+            var cor = auto
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x90, 0x9A, 0xA8))
+                : System.Windows.Media.Brushes.White;
+            foreach (var tb in new[] { TxtIslcThreshold, TxtIslcFreeThreshold, TxtIslcMinInterval })
+            {
+                tb.IsReadOnly = auto;
+                tb.Foreground = cor;
+                tb.ToolTip = auto
+                    ? "Calculado automaticamente pela RAM instalada. Desmarque a opção acima para editar."
+                    : null;
+            }
+
+            TxtIslcDescription.Text =
+                (auto
+                    ? "Valores calculados pela RAM instalada: standby = RAM/8, livre = RAM/16. "
+                    : "Valores MANUAIS (desmarque para voltar ao cálculo automático). ") +
+                "Só limpa quando a standby passa do limite E a memória realmente livre fica abaixo do segundo limite. " +
+                "Medir antes/depois: o contador só sobe quando o cache realmente caiu.";
+        }
+
+        private void ChkIslcAuto_Changed(object sender, RoutedEventArgs e)
+        {
+            // LoadSettings escreve IsChecked (não é clique do usuário): sem esta
+            // guarda, abrir a página regravaria as configurações.
+            if (_isLoading) return;
+            var tray = GetTrayService();
+            if (tray == null) return;
+            // O handler pode disparar durante o InitializeComponent (quando os
+            // TextBoxes deste painel ainda não existem). Sem esta guarda, um
+            // NullReferenceException derrubaria a página na construção.
+            if (TxtIslcThreshold == null || TxtIslcFreeThreshold == null ||
+                TxtIslcMinInterval == null || TxtIslcDescription == null) return;
+            tray.IslcAutoTune = ChkIslcAuto.IsChecked == true;
+            if (tray.IslcAutoTune) tray.ApplyIslcAutoTuning();
+            RefreshIslcFields(tray);
+            tray.SaveSettings();
+            UpdateIslcStatus();
+        }
+
+        private void TxtIslcThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            if (tray.IslcAutoTune) { RefreshIslcFields(tray); return; }
+            if (!long.TryParse(((System.Windows.Controls.TextBox)sender).Text, out long mb) || mb < 64)
+            { ((System.Windows.Controls.TextBox)sender).Text = tray.IslcThresholdMB.ToString(); return; }
+            tray.IslcThresholdMB = mb;
+            tray.SaveSettings();
+            ((System.Windows.Controls.TextBox)sender).Text = mb.ToString();
+            UpdateIslcStatus();
+        }
+
+        private void TxtIslcFreeThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            if (tray.IslcAutoTune) { RefreshIslcFields(tray); return; }
+            if (!long.TryParse(((System.Windows.Controls.TextBox)sender).Text, out long mb) || mb < 0)
+            { ((System.Windows.Controls.TextBox)sender).Text = tray.IslcFreeThresholdMB.ToString(); return; }
+            tray.IslcFreeThresholdMB = mb;
+            tray.SaveSettings();
+            ((System.Windows.Controls.TextBox)sender).Text = mb.ToString();
+            UpdateIslcStatus();
+        }
+
+        private void TxtIslcMinInterval_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            if (tray.IslcAutoTune) { RefreshIslcFields(tray); return; }
+            if (!int.TryParse(((System.Windows.Controls.TextBox)sender).Text, out int s) || s < 0 || s > 3600)
+            { ((System.Windows.Controls.TextBox)sender).Text = tray.IslcMinIntervalSeconds.ToString(); return; }
+            tray.IslcMinIntervalSeconds = s;
+            tray.SaveSettings();
+            ((System.Windows.Controls.TextBox)sender).Text = s.ToString();
+            UpdateIslcStatus();
+        }
+
+        private void ChkIslcRespectForeground_Changed(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            tray.IslcRespectForeground = ChkIslcRespectForeground.IsChecked == true;
+            tray.SaveSettings();
+            UpdateIslcStatus();
         }
 
         private void ChkAutoStart_Click(object sender, RoutedEventArgs e)

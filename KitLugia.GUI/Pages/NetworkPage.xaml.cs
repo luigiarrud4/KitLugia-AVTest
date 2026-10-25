@@ -1013,9 +1013,13 @@ namespace KitLugia.GUI.Pages
                 TxtAutoDetectProgress.Visibility = Visibility.Visible;
                 TxtAutoDetectProgress.Text = "Iniciando auto-detect...";
 
+                // InvokeAsync (NAO Invoke): este callback roda numa thread de trabalho. O
+                // Dispatcher.Invoke e BLOQUEANTE — se a UI estiver ocupada, o worker trava
+                // esperando a UI e a UI pode esperar o worker: serializa e produz stall de
+                // segundos. InvokeAsync so enfileira e devolve controle na hora.
                 var result = await AdapterManager.AutoDetectMacAsync(
                     adp.Id, adp.ConnectionName,
-                    progress => Dispatcher.Invoke(() => TxtAutoDetectProgress.Text = progress));
+                    progress => Dispatcher.InvokeAsync(() => TxtAutoDetectProgress.Text = progress));
 
                 if (result != null)
                 {

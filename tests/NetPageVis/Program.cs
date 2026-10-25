@@ -39,6 +39,7 @@ internal static class Program
     {
         bool modoEstados = args.Contains("states");
         bool modoPagina = args.Contains("page");
+        bool modoCaret = args.Contains("caret");
 
         int iSize = Array.IndexOf(args, "--size");
         if (iSize >= 0 && iSize + 1 < args.Length)
@@ -79,6 +80,29 @@ internal static class Program
                 new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
 
             var pagina = new KitLugia.GUI.Pages.NetworkPage();
+
+            // TextBox NATIVO (template padrao do WPF, sem Style) = grupo de controle.
+            // Fica fora da tela (x negativo) mas COM layout real (Opacity 0 nao remove
+            // layout), para servir de referencia do recuo que o WPF aplica de verdade.
+            // Isso substitui "chutar" uma constante: a pergunta passa a ser "o campo DNS
+            // insere no mesmo lugar que um TextBox normal?", que e a pergunta do usuario.
+            var refBox = new TextBox
+            {
+                Padding = new Thickness(8, 6, 8, 6),
+                Height = 32,
+                FontSize = 11,
+                Text = "8.8.8.8",
+            };
+            var refHost = new Border
+            {
+                Width = 220,
+                Height = 32,
+                Opacity = 0,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(-500, 0, 0, 0),                Child = refBox,
+            };
+
             var janela = new Window
             {
                 Width = _w,
@@ -90,6 +114,20 @@ internal static class Program
                 Content = pagina,
             };
 
+            // A referencia fica numa JANELA propria: Page so aceita Window/Frame como pai,
+            // entao nao da para embrulhar a pagina + referencia no mesmo Grid.
+            var janelaRef = new Window
+            {
+                Width = 240,
+                Height = 60,
+                Left = -32000,
+                Top = -32000,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual,
+                Content = refHost,
+                Opacity = 0,
+            };
+
             bool mostrou = false;
             try { janela.Show(); mostrou = true; }
             catch (Exception ex) { Console.WriteLine($"AVISO: Show() falhou ({ex.Message}) — modo offscreen."); }
@@ -99,6 +137,9 @@ internal static class Program
                 janela.Arrange(new Rect(0, 0, _w, _h));
                 janela.UpdateLayout();
             }
+            // A janela da referencia PRECISA de Show para ter layout real (medir/arranjar
+            // nao aciona o template do TextBox da mesma forma que um layout de verdade).
+            try { janelaRef.Show(); } catch (Exception ex) { Console.WriteLine($"AVISO: janela da referencia nao abriu ({ex.Message})"); }
             Console.WriteLine(mostrou ? "janela criada fora da tela (Loaded disparou)" : "pagina apenas medida/arranjada");
 
             // Deixa o Loaded/auto-detect (e o teste automatico de DNS, quando roda) assentar.
@@ -123,12 +164,17 @@ internal static class Program
             {
                 falhas = ModoEstados(pagina, prim, sec);
             }
+            else if (modoCaret)
+            {
+                falhas = ModoCaret(pagina, prim, sec, refBox);
+            }
             else
             {
                 falhas = ModoAudit(pagina, prim, sec, salvarPagina: true, modoPagina);
             }
 
             try { janela.Close(); } catch { }
+            try { janelaRef.Close(); } catch { }
 
             Console.WriteLine();
             Console.WriteLine(falhas == 0 ? "=== OK: nenhuma falha de placeholder ===" : $"=== {falhas} FALHA(S) ===");
@@ -223,6 +269,138 @@ internal static class Program
             Console.WriteLine($"[{(ok ? " ok " : "FALHA")}] {nome,-38} placeholder: primario={(visPrim ? "sim" : "NAO")} secundario={(visSec ? "sim" : "nao")}{extra}");
             if (!ok) falhas++;
         }
+        return falhas;
+    }
+
+    /// <summary>Posição X do placeholder (TextBlock "ph") no sistema do proprio TextBox.</summary>
+    private static double PhXRel(TextBox tb)
+    {
+        tb.ApplyTemplate();
+        var ph = tb.Template?.FindName("ph", tb) as TextBlock;
+        if (ph == null) { Console.WriteLine("      [ph] NAO ENCONTRADO no template"); return double.NaN; }
+        try
+        {
+            var r = ph.TransformToAncestor(tb).TransformBounds(new Rect(0, 0, ph.ActualWidth, ph.ActualHeight));
+            return r.X;
+        }
+        catch (Exception ex) { Console.WriteLine($"      [ph] transform falhou: {ex.GetType().Name}: {ex.Message}"); return double.NaN; }
+    }
+
+    /// <summary>
+    /// Posição X do caret no sistema do proprio TextBox, para o indice pedido.
+    /// GetRectFromCharacterIndex e' API publica de TextBox e devolve o retangulo REAL do
+    /// caractere (nao e' chute de pixel), entao responde exatamente a pergunta "onde o
+    /// cursor e o texto estao sendo desenhados dentro da caixa".
+    /// </summary>
+    private static double CaretX(TextBox tb, int indice)
+    {
+        try
+        {
+            tb.CaretIndex = indice;
+            tb.UpdateLayout();
+            return tb.GetRectFromCharacterIndex(indice).X;
+        }
+        catch { return double.NaN; }
+    }
+
+    /// <summary>
+    /// MODO CARET — mede a correcao do texto "corrompido".
+    /// BUG ORIGINAL: o PART_ContentHost usava Margin="{TemplateBinding Padding}", mas o
+    /// TextBox JA aplica o Padding no host de edicao. O padding ficava DUPLICADO, entao o
+    /// caret e o texto digitado nasciam em ~2x o padding e o placeholder (que usa o
+    /// padding simples) ficava desalinhado — dois "textos" sobrepostos/errados.
+    /// Aqui medimos em DIPs reais, sem pixel:
+    ///   1) placeholder alinhado com o texto real
+    ///   2) recuo igual ao Padding.Left (1x, nao 2x)
+    ///   3) caret cresce monotonicamente com o indice (insercao no lugar certo)
+    /// </summary>
+    private static int ModoCaret(FrameworkElement pagina, TextBox prim, TextBox sec, TextBox refBox)
+    {
+        Console.WriteLine("--- MODO CARET: onde o texto/caret realmente e desenhado ---");
+        Console.WriteLine("    Referencia = TextBox NATIVO do WPF, mesmo Padding/Height/FontSize,");
+        Console.WriteLine("    hospedado fora da tela mas com layout real (grupo de controle).");
+        Console.WriteLine();
+
+        // Referencia: caret no indice 0 com o mesmo texto.
+        refBox.Text = "8.8.8.8";
+        refBox.Focus();
+        Pump(150);
+        double refX0 = CaretX(refBox, 0);
+        Console.WriteLine($"REFERENCIA (TextBox nativo)  caret[0] = {refX0:F2}   <- o que o WPF faz de verdade");
+        Console.WriteLine();
+
+        int falhas = 0;
+
+        foreach (var (nome, tb) in new[] { ("DNS PRIMARIO", prim), ("DNS SECUNDARIO", sec) })
+        {
+            Console.WriteLine($"{nome}:");
+
+            // (a) X do placeholder com o campo vazio
+            tb.Text = ""; Pump(200);
+            double phX = PhXRel(tb);
+
+            // (b) X do caret no inicio, com o campo preenchido
+            tb.Text = "8.8.8.8"; Pump(200);
+            tb.Focus(); Pump(120);
+            double c0 = CaretX(tb, 0);
+
+            Console.WriteLine($"   Padding.Left     = {tb.Padding.Left}");
+            Console.WriteLine($"   X placeholder    = {phX:F2}");
+            Console.WriteLine($"   X caret[0]       = {c0:F2}");
+            Console.WriteLine($"   X referencia[0]  = {refX0:F2}");
+
+            // (1) BUG ORIGINAL: padding DUPLICADO no host de edicao. O sintoma e o caret
+            // nascer ~2x o Padding.Left e o placeholder (padding simples) ficar fora de
+            // alinhamento -> dois "textos" sobrepostos. Se fossil == 0 agora, o bug voltou.
+            double fossil = Math.Abs(c0 - tb.Padding.Left * 2);
+            if (fossil < 1.0)
+            {
+                Console.WriteLine($"   FALHA  padding DUPLICADO: caret em {c0:F2} ~ 2x Padding.Left ({tb.Padding.Left * 2})");
+                falhas++;
+            }
+
+            // (2) o campo DNS tem de inserir no MESMO lugar que o TextBox nativo
+            if (double.IsNaN(c0) || double.IsNaN(refX0) || Math.Abs(c0 - refX0) > 1.5)
+            {
+                Console.WriteLine($"   FALHA  dif vs referencia = {Math.Abs(c0 - refX0):F2} (tol 1.5)");
+                falhas++;
+            }
+            else
+            {
+                Console.WriteLine($"   [ ok ]  mesmo recuo do TextBox nativo (dif {Math.Abs(c0 - refX0):F2})");
+            }
+
+            // (3) placeholder alinhado com o texto/caret real
+            if (double.IsNaN(phX) || double.IsNaN(c0) || Math.Abs(phX - c0) > 1.5)
+            {
+                Console.WriteLine($"   FALHA  alinhamento: |placeholder - caret| = {(Math.Abs(phX - c0)):F2} (tol 1.5)");
+                falhas++;
+            }
+            else
+            {
+                Console.WriteLine($"   [ ok ]  placeholder na MESMA coluna do texto (dif {Math.Abs(phX - c0):F2})");
+            }
+
+            // (4) caret cresce com o indice -> clique/insercao mapeia posicao certa
+            double c3 = CaretX(tb, 3);
+            double c7 = CaretX(tb, 7);
+            Console.WriteLine($"   caret[3]={c3:F2}  caret[7]={c7:F2}  (referencia: {CaretX(refBox, 3):F2} / {CaretX(refBox, 7):F2})");
+            if (double.IsNaN(c3) || double.IsNaN(c7) || !(c0 < c3 && c3 < c7))
+            {
+                Console.WriteLine("   FALHA  caret nao cresce monotonamente com o indice");
+                falhas++;
+            }
+            else
+            {
+                Console.WriteLine("   [ ok ]  caret cresce com o indice -> insercao no lugar certo");
+            }
+
+            // restore
+            tb.Text = ""; tb.CaretIndex = 0; Pump(120);
+            Console.WriteLine();
+        }
+
+        Console.WriteLine(falhas == 0 ? "=== OK: recuo/caret/placeholder corretos ===" : $"=== {falhas} FALHA(S) ===");
         return falhas;
     }
 

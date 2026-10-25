@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>IslcPageVis</AssemblyName>
+    <StartupObject>Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Caminho RELATIVO de proposito (regra 1 do AGENTS.md: o kit e movido entre maquinas) -->
+    <ProjectReference Include="..\..\KitLugia.GUI\KitLugia.GUI.csproj" />
+  </ItemGroup>
+</Project>

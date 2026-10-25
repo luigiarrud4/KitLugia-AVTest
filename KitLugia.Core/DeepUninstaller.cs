@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,7 +13,6 @@ using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.VisualBasic.FileIO;
 
 namespace KitLugia.Core
 {
@@ -55,6 +54,16 @@ namespace KitLugia.Core
             public int FilesDeleted { get; set; }
             public int RegistryDeleted { get; set; }
             public List<string> Errors { get; set; } = new();
+            // Itens que NAO foram removidos porque o usuario recusou o dialogo
+            // de confirmacao da Lixeira (SHFileOperationW.fAnyOperationsAborted).
+            // Antes nao existia essa distincao: o cancelamento era contado como
+            // FilesDeleted++ e o item ficava no disco com o relatorio dizendo
+            // "removido".
+            public List<string> FilesKept { get; set; } = new();
+            // Itens que a Lixeira recusou/falhou (volume cheio, ACL, caminho longo,
+            // item bloqueado). NADA e apagado de vez: o backup continua valido e
+            // o usuario e avisado.
+            public List<string> DeleteErrors { get; set; } = new();
             public bool ForceDeleteUsed { get; set; }
             public List<string> BackupFiles { get; set; } = new();
             public List<string> BackupRegistryFiles { get; set; } = new();
@@ -64,7 +73,7 @@ namespace KitLugia.Core
             public List<string> DataFoldersCaptured { get; set; } = new();
 
             // Byte-level baseline snapshots captured during the uninstall phase and used
-            // by the scan phase (captureBaseline flows). Internal � not surfaced to UI.
+            // by the scan phase (captureBaseline flows). Internal - not surfaced to UI.
             internal HashSet<string>? BaselineFileSet { get; set; }
             internal HashSet<string>? BaselineRegSet { get; set; }
         }
@@ -145,7 +154,7 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Fase 1 � desinstalacao. Rapida: restore point, kill de processos, snapshot de
+        /// Fase 1 - desinstalacao. Rapida: restore point, kill de processos, snapshot de
         /// baseline (se captureBaseline) e execucao do uninstaller. NAO escaneia residuos.
         /// O escaneamento pesado fica em <see cref="RunScanPhaseAsync"/>, que pode rodar em
         /// background (BackgroundTaskTracker) enquanto o usuario desinstala outros apps.
@@ -168,7 +177,7 @@ namespace KitLugia.Core
             {
                 // Pre-scan baseline (true Revo Uninstaller pattern): snapshot ALL
                 // directories in key file locations BEFORE the uninstaller ran.
-                progress?.Report("Snapshot de diret�rios (pr�-instala��o)...");
+                progress?.Report("Snapshot de diretórios (pré-instalação)...");
                 baselineFiles = SnapshotKeyFileLocations(installLocation);
                 baselineReg = new HashSet<string>(ScanLeftoverRegistry(displayName, installLocation), StringComparer.OrdinalIgnoreCase);
                 result.BaselineFileCount = baselineFiles.Count;
@@ -186,7 +195,7 @@ namespace KitLugia.Core
             {
                 try
                 {
-                    progress?.Report("Executando desinstala��o...");
+                    progress?.Report("Executando desinstalação...");
                     string quietUninstall = GenerateQuietUninstallString(effectiveUninstall, installLocation);
                     var (fileName, args) = ParseCommandLine(quietUninstall);
                     if (string.IsNullOrEmpty(fileName))
@@ -208,7 +217,7 @@ namespace KitLugia.Core
                             {
                                 if (!foundActualUninstaller)
                                 {
-                                    result.Errors.Add("Uninstall string points to main app exe � no silent uninstall available. Force-deleting.");
+                                    result.Errors.Add("Uninstall string points to main app exe - no silent uninstall available. Force-deleting.");
                                     try { proc.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                                     proc.WaitForExit(2000);
                                 }
@@ -224,7 +233,7 @@ namespace KitLugia.Core
                                 result.UninstallSuccess = InterpretExitCode(proc.ExitCode, quietUninstall, result);
                             }
                             else if (foundActualUninstaller)
-                                result.Errors.Add("Uninstaller still open � close it when done.");
+                                result.Errors.Add("Uninstaller still open - close it when done.");
                         }
                     }
                 }
@@ -238,12 +247,12 @@ namespace KitLugia.Core
                 result.Errors.Add("No uninstall string available");
             }
 
-            progress?.Report("Desinstala��o conclu�da. Escanear res�duos agora.");
+            progress?.Report("Desinstalação concluída. Escanear resíduos agora.");
             return result;
         }
 
         /// <summary>
-        /// Fase 2 � escaneamento de residuos (arquivos + registro + tarefas + env).
+        /// Fase 2 - escaneamento de residuos (arquivos + registro + tarefas + env).
         /// Pesado; pode rodar em background (BackgroundTaskTracker) sem travar a UI.
         /// Reutiliza o baseline capturado em <see cref="RunUninstallPhaseAsync"/> (ou roda
         /// em modo confirmado se captureBaseline=false). Preenche o mesmo <paramref name="result"/>.
@@ -267,14 +276,14 @@ namespace KitLugia.Core
             DateTime? installDate = GetInstallDateFromRegistry(displayName);
             LogScanStage("GetInstallDateFromRegistry", stage);
 
-            progress?.Report("Escaneando res�duos de arquivos...");
+            progress?.Report("Escaneando resíduos de arquivos...");
             stage.Restart();
             var fileSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             fileSet.UnionWith(ScanLeftoverFiles(displayName, installLocation, displayIcon, uninstallString, publisher, installDate));
             LogScanStage("ScanLeftoverFiles", stage, fileSet.Count);
 
-            // installLocation faltando (registro n�o fornece) ORIGINA o problema do review:
-            // o scan de registro por path precisava dele. Inferir dos arquivos j� achados.
+            // installLocation faltando (registro não fornece) ORIGINA o problema do review:
+            // o scan de registro por path precisava dele. Inferir dos arquivos j - achados.
             if (string.IsNullOrEmpty(installLocation))
             {
                 string? inferred = ResolveInstallLocation(displayName, fileSet, publisher);
@@ -299,7 +308,7 @@ namespace KitLugia.Core
             }
             LogScanStage("CaptureDataFoldersForApp", stage, result.DataFoldersCaptured.Count);
 
-            progress?.Report("Escaneando res�duos do registro...");
+            progress?.Report("Escaneando resíduos do registro...");
             stage.Restart();
             var regSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             regSet.UnionWith(ScanLeftoverRegistry(displayName, installLocation));
@@ -311,7 +320,7 @@ namespace KitLugia.Core
             ScanScheduledTasks(displayName, installLocation, "", fileSet, regSet);
             LogScanStage("ScanScheduledTasks", stage);
 
-            progress?.Report("Escaneando vari�veis de ambiente...");
+            progress?.Report("Escaneando variáveis de ambiente...");
             stage.Restart();
             ScanUserEnvironmentVars(displayName, installLocation, regSet);
             LogScanStage("ScanUserEnvironmentVars", stage);
@@ -339,8 +348,8 @@ namespace KitLugia.Core
             }
             else
             {
-                // Sem baseline (captureBaseline=false): todo o p�s-scan � tratado como
-                // res�duo confirmado � mais leve e r�pido, sem snapshot global.
+                // Sem baseline (captureBaseline=false): todo o p - s-scan - tratado como
+                // res - duo confirmado - mais leve e rápido, sem snapshot global.
                 result.LeftoverFiles = fileSet.OrderBy(f => f).ToList();
                 result.LeftoverRegistry = regSet.OrderBy(r => r).ToList();
                 result.BaselineFileCount = result.LeftoverFiles.Count;
@@ -348,7 +357,7 @@ namespace KitLugia.Core
             }
 
             if (!result.UninstallSuccess && result.LeftoverFiles.Count == 0 && result.LeftoverRegistry.Count == 0 && result.HeuristicFiles.Count == 0 && result.HeuristicRegistry.Count == 0)
-                result.Errors.Add("Uninstall may have failed � no leftovers detected.");
+                result.Errors.Add("Uninstall may have failed - no leftovers detected.");
 
             LogScanStage("RunScanPhaseAsync TOTAL", totalWatch);
             return await Task.FromResult(result);
@@ -356,7 +365,7 @@ namespace KitLugia.Core
 
         /// <summary>
         /// Full snapshot of top-level directories in key file system locations.
-        /// No confidence matching � captures everything for true Revo-style pre/post diff.
+        /// No confidence matching - captures everything for true Revo-style pre/post diff.
         /// </summary>
         private static HashSet<string> SnapshotKeyFileLocations(string installLocation)
         {
@@ -389,9 +398,9 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// P�s-scan LEVE e focado para apps UWP/AppX: verifica apenas as localiza��es
-        /// determin�sticas do pacote (Packages, alias de execu��o, registro AppModel),
-        /// em vez da varredura Revo-style global que � lenta e gera falsos positivos.
+        /// P - s-scan LEVE e focado para apps UWP/AppX: verifica apenas as localiza -  - es
+        /// determin - sticas do pacote (Packages, alias de execu -  - o, registro AppModel),
+        /// em vez da varredura Revo-style global que - lenta e gera falsos positivos.
         /// </summary>
         public static (List<string> Files, List<string> Registry) ScanUwpLeftovers(string packageFullName, string displayName)
         {
@@ -417,7 +426,7 @@ namespace KitLugia.Core
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
-            // 2) Alias de execu��o (stub .exe) em WindowsApps
+            // 2) Alias de execu -  - o (stub .exe) em WindowsApps
             try
             {
                 string stub = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", baseName + ".exe");
@@ -532,7 +541,7 @@ namespace KitLugia.Core
                 }
             }
 
-            // installLocation faltando (registro n�o fornece): inferir dos arquivos j� achados
+            // installLocation faltando (registro não fornece): inferir dos arquivos j - achados
             if (string.IsNullOrEmpty(installLocation))
             {
                 string? inferred = ResolveInstallLocation(displayName, fileSet, publisher);
@@ -581,7 +590,7 @@ namespace KitLugia.Core
 
             rawFiles.UnionWith(ScanLeftoverFiles(displayName, installLocation, "", "", publisher, installDate, mode));
 
-            // installLocation faltando: inferir dos arquivos j� achados antes do scan de registro
+            // installLocation faltando: inferir dos arquivos j - achados antes do scan de registro
             if (string.IsNullOrEmpty(installLocation))
             {
                 string? inferred = ResolveInstallLocation(displayName, rawFiles, publisher);
@@ -704,7 +713,7 @@ namespace KitLugia.Core
             "winword", "excel", "powerpnt", "onenote", "outlook",
         };
 
-        // KitLugia's own install path � skip these files/folders during deletion
+        // KitLugia's own install path - skip these files/folders during deletion
         private static readonly string KitLugiaInstallPath = GetKitLugiaPath();
 
         private static string GetKitLugiaPath()
@@ -797,7 +806,7 @@ namespace KitLugia.Core
                 set.Add(Path.Combine(user, "Pictures"));
                 set.Add(Path.Combine(user, "Music"));
                 set.Add(Path.Combine(user, "Videos"));
-                // Desktop removed � user profile Desktop folders are too prone to false positives
+                // Desktop removed - user profile Desktop folders are too prone to false positives
                 set.Add(Path.Combine(user, "Favorites"));
                 set.Add(Path.Combine(user, "Contacts"));
                 set.Add(Path.Combine(user, "Links"));
@@ -1029,7 +1038,7 @@ namespace KitLugia.Core
 
             List<string>? otherInstallLocations = mode == ScannerMode.Advanced ? null : GetAllInstallLocations(excludeName: displayName);
 
-            // InstallLocation � add the dir AND enumerate its contents (exe, dll, etc.)
+            // InstallLocation - add the dir AND enumerate its contents (exe, dll, etc.)
             if (!string.IsNullOrEmpty(installLocation) && Directory.Exists(installLocation))
             {
                 // GUARRA CRITICA: nunca varrer uma raiz ampla. Sem isto, um
@@ -1084,7 +1093,7 @@ namespace KitLugia.Core
             }
             LogScanStage("  ScanFolderConfidence global", stage);
 
-            // Temp � shallow
+            // Temp - shallow
             string temp = Path.GetTempPath().TrimEnd('\\');
             if (!string.IsNullOrEmpty(temp) && Directory.Exists(temp))
                 ScanFolderConfidence(temp, displayName, publisher, installDate, results, otherInstallLocations, depth: 0, maxDepth: 1);
@@ -1147,7 +1156,7 @@ namespace KitLugia.Core
             }
 
             // Apply user-defined exclusions (Revo RegExclude equivalent)
-            // GetUserExclusions() loads from the registry first � the in-memory list
+            // GetUserExclusions() loads from the registry first - the in-memory list
             // may be empty on the first scan of a session even when saved exclusions exist.
             var exclusions = GetUserExclusions();
             if (results.Count > 0 && exclusions.Count > 0)
@@ -1182,7 +1191,7 @@ namespace KitLugia.Core
         /// <summary>
         /// Revo ADCU/ADAU pattern: capture the app's data folders by NAME at uninstall time,
         /// instead of blind-scanning all of AppData after the fact. Only top-level dirs whose
-        /// leaf name matches displayName/publisher are considered (no deep walk � cheap and precise).
+        /// leaf name matches displayName/publisher are considered (no deep walk - cheap and precise).
         /// Folders that no longer exist after the uninstaller ran are naturally skipped by the caller.
         /// </summary>
         private static List<string> CaptureDataFoldersForApp(string displayName, string publisher)
@@ -1206,7 +1215,7 @@ namespace KitLugia.Core
                 if (trimmed.Length < 3) continue;
 
                 // Safety: a generic mega-publisher (Microsoft, Google, ...) must NEVER
-                // be used as a name token � "Microsoft" inside a leaf name would match
+                // be used as a name token - "Microsoft" inside a leaf name would match
                 // %AppData%\Microsoft, shared by dozens of unrelated apps. Only the
                 // app's own display name carries the discriminating power here.
                 if (publisher != null &&
@@ -1315,7 +1324,7 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
-        // Revo "Ignore files accessed in the last 24 hours" � used by scanners to skip
+        // Revo "Ignore files accessed in the last 24 hours" - used by scanners to skip
         // files/folders that are clearly still in use (recently touched by the OS).
         public static bool IsExcludedPath(string fullPath)
         {
@@ -1517,7 +1526,7 @@ namespace KitLugia.Core
                 if (parts.Length == 2 && parts[0].Equals("AppData", StringComparison.OrdinalIgnoreCase))
                     return true;
 
-                // Depth 2 under known shell roots (Desktop\file.lnk is depth 2 = OK � individual files)
+                // Depth 2 under known shell roots (Desktop\file.lnk is depth 2 = OK - individual files)
                 // Only block depth 1 for these
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -1542,11 +1551,11 @@ namespace KitLugia.Core
             bool isSystemHive = hiveName.IndexOf("LOCAL_MACHINE", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                 hiveName.IndexOf("USERS", StringComparison.OrdinalIgnoreCase) >= 0;
 
-            // SYSTEM hive: min 3 levels (SYSTEM\CurrentControlSet\Services) � 2 is too broad
+            // SYSTEM hive: min 3 levels (SYSTEM\CurrentControlSet\Services) - 2 is too broad
             if (isSystemHive && keyPath.StartsWith("SYSTEM\\", StringComparison.OrdinalIgnoreCase) && keyDepth < 3)
                 return true;
 
-            // SOFTWARE hive: min 2 levels (SOFTWARE\AppName) � 1 is just "SOFTWARE" which is too broad
+            // SOFTWARE hive: min 2 levels (SOFTWARE\AppName) - 1 is just "SOFTWARE" which is too broad
             if (keyPath.StartsWith("SOFTWARE\\", StringComparison.OrdinalIgnoreCase) && keyDepth < 2)
                 return true;
 
@@ -1631,8 +1640,7 @@ namespace KitLugia.Core
             }
             catch (Exception ex)
             {
-                // Access denied while listing a single dir climbs up the search tree �
-                // log once with the real reason (rate-limited by Logger) instead of
+                // Access denied while listing a single dir climbs up the search tree - // log once with the real reason (rate-limited by Logger) instead of
                 // spamming "Exception suppressed" for every inaccessible folder.
                 Logger.LogWarning("ScanFolderConfidence", $"Acesso negado ao listar '{baseDir}': {ex.Message}");
                 return;
@@ -1658,7 +1666,7 @@ namespace KitLugia.Core
                     // Cheap name-based gating FIRST: Confidence.Generate is pure
                     // string work, while ProbeFolderBinaries reads FileVersionInfo
                     // from real files. Only spend the probe when the folder name
-                    // shares a meaningful token with the app name � renamed folders
+                    // shares a meaningful token with the app name - renamed folders
                     // (e.g. "@zcodedesktop-updater" for zcode) still match through
                     // HasNameRelation, so content detection is preserved.
                     bool nameMatch = Confidence.Generate(displayName, dirName, publisher) >= 70;
@@ -1794,7 +1802,7 @@ namespace KitLugia.Core
                     }
                     catch
                     {
-                        // Access-denied / corrupted metadata on a single binary � not fatal.
+                        // Access-denied / corrupted metadata on a single binary - not fatal.
                         fviFailures++;
                     }
 
@@ -1825,11 +1833,11 @@ namespace KitLugia.Core
 
             if (fviFailures > 0)
                 Logger.LogWarning("ProbeFolderBinaries",
-                    $"FileVersionInfo falhou em {fviFailures} bin�rio(s) de '{Path.GetFileName(folderPath)}' (acesso negado/metadados corrompidos)");
+                    $"FileVersionInfo falhou em {fviFailures} binário(s) de '{Path.GetFileName(folderPath)}' (acesso negado/metadados corrompidos)");
 
             // HasUnrelated (the BCU penalty) is only asserted when every executable
             // in the folder was actually probed. When the probe budget cut the scan
-            // short, a file we never read could still match � so we decline the
+            // short, a file we never read could still match - so we decline the
             // penalty instead of risking a false "unrelated" rejection.
             bool fullyProbedFolders = totalExecutables <= MaxProbeFiles;
             return (verifiedMatch, fullyProbedFolders && hasExecutables && !anyFviMatch);
@@ -2135,12 +2143,12 @@ namespace KitLugia.Core
 
             // Each sub-scan below becomes its own parallel action so the total wall
             // time is bounded by the SLOWEST single scan (not the serial sum of two
-            // or more heavy walks inside one batch � the MSI batch used to take ~8s
+            // or more heavy walks inside one batch - the MSI batch used to take ~8s
             // alone because ScanMsiUserData + ScanInstallerComponentsByValues ran
             // back-to-back in the same action).
             var batches = new List<(string Label, Action Run)>();
 
-// Batch 1 � Uninstall keys (quick)
+// Batch 1 - Uninstall keys (quick)
             batches.Add(("Uninstall keys", () => AddLocal(r =>
             {
                 ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", displayName, r, installLocation);
@@ -2149,30 +2157,30 @@ namespace KitLugia.Core
                     ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall", displayName, r, installLocation);
             })));
 
-            // Batch 2 � Software hives (recursive) � each hive its own action
+            // Batch 2 - Software hives (recursive) - each hive its own action
             batches.Add(("HKLM SOFTWARE recur", () => AddLocal(r => ScanSoftwareRecursive(@"HKEY_LOCAL_MACHINE\SOFTWARE", displayName, r, commonPublishers, 0, installLocation))));
             batches.Add(("HKCU SOFTWARE recur", () => AddLocal(r => ScanSoftwareRecursive(@"HKEY_CURRENT_USER\SOFTWARE", displayName, r, ["Microsoft", "Classes", "Wow6432Node", ..commonPublishers], 0, installLocation))));
             if (Is64Bit)
                 batches.Add(("WOW6432 SOFTWARE recur", () => AddLocal(r => ScanSoftwareRecursive(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node", displayName, r, ["Microsoft", "Windows", ..commonPublishers], 0, installLocation))));
 
-            // Batch 3 � Classes hives: one action per hive path so they overlap
+            // Batch 3 - Classes hives: one action per hive path so they overlap
             foreach (var cp in classPathsNominal.Concat(classPathsExtra))
             {
                 string path = cp;
                 batches.Add(("Classes hives", () => AddLocal(r => ScanHiveForNames(path, displayName, r, installLocation))));
             }
 
-            // Batch 4 � COM hives
+            // Batch 4 - COM hives
             batches.Add(("COM hives", () => AddLocal(r => ScanComHives(displayName, installLocation, r))));
 
-            // Batch 5 � GUID hives value scan: one action per hive so they overlap
+            // Batch 5 - GUID hives value scan: one action per hive so they overlap
             foreach (var gh in guidHivesNominal.Concat(guidHivesExtra))
             {
                 string path = gh;
                 batches.Add(("GUID hives byvalue", () => AddLocal(r => ScanHiveByValues(path, installLocation, displayName, r))));
             }
 
-            // Batch 6 � ComByFilePath is the heaviest COM scan (~4.1s) ? own action;
+            // Batch 6 - ComByFilePath is the heaviest COM scan (~4.1s) ? own action;
             // the cheap AppPaths/Run/ShellExt native scans stay grouped.
             batches.Add(("ComByFilePath", () => AddLocal(r => ScanComByFilePath(installLocation, displayName, r))));
             batches.Add(("AppPaths/Run/ShellExt", () => AddLocal(r =>
@@ -2184,10 +2192,10 @@ namespace KitLugia.Core
                 ScanHiveForNames(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", displayName, r, installLocation);
             })));
 
-            // Batch 7 � MSI + SharedDLLs + InstallerFolders + InstallerComponents
+            // Batch 7 - MSI + SharedDLLs + InstallerFolders + InstallerComponents
             // ScanMsiUserData (~3.3s) + ScanInstallerComponentsByValues (~3.4s) used to run
             // back-to-back inside one action (~8s). Each walker now runs on its own action
-            // so they overlap: total � max(walks) instead of the sum.
+            // so they overlap: total - max(walks) instead of the sum.
             batches.Add(("Installer categories", () => AddLocal(r =>
             {
                 foreach (var mp in new[] { @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Products", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Features", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Installer\Patches" })
@@ -2201,7 +2209,7 @@ namespace KitLugia.Core
                 ScanInstallerComponentsByValues(installLocation, displayName, r);
             })));
 
-            // Batch 8 � AppCompat + RegisteredApplications + VirtualStore
+            // Batch 8 - AppCompat + RegisteredApplications + VirtualStore
             batches.Add(("AppCompat/RegApps/VStore", () => AddLocal(r =>
             {
                 foreach (var cp in new[] {
@@ -2216,7 +2224,7 @@ namespace KitLugia.Core
                     ScanSoftwareRecursive(vp, displayName, r, installLocation: installLocation);
             })));
 
-            // Batch 9 � Services/EventLog (native, fast) + each C# walker on its own
+            // Batch 9 - Services/EventLog (native, fast) + each C# walker on its own
             // action so UserAssist (~1.9s) + FirewallRules (~0.56s) overlap.
             batches.Add(("Services/EventLog", () => AddLocal(r =>
             {
@@ -2232,7 +2240,7 @@ namespace KitLugia.Core
                 ScanAudioPolicyConfig(installLocation, r);
             })));
 
-// Batch 10 � HKEY_USERS (can run in parallel with others)
+// Batch 10 - HKEY_USERS (can run in parallel with others)
             if (mode != ScannerMode.Safe)
             {
                 batches.Add(("HKEY_USERS", () => AddLocal(r =>
@@ -2265,7 +2273,7 @@ namespace KitLugia.Core
             }
 
             // Wrap each scan with its own stopwatch so a scan run reveals which scan
-            // burns the wall time. All actions run in parallel � the total � the
+            // burns the wall time. All actions run in parallel - the total - the
             // slowest single scan, not the serial sum of a monolithic batch.
             var timedActions = new List<Action>(batches.Count);
             foreach (var (label, run) in batches)
@@ -2327,7 +2335,7 @@ namespace KitLugia.Core
                 results.Add(lr);
 
             // Apply user-defined exclusions (Revo RegExclude equivalent for registry)
-            // GetUserExclusions() loads from the registry first � the in-memory list
+            // GetUserExclusions() loads from the registry first - the in-memory list
             // may be empty on the first scan of a session even when saved exclusions exist.
             var regExclusions = GetUserExclusions();
             if (results.Count > 0 && regExclusions.Count > 0)
@@ -2791,11 +2799,11 @@ namespace KitLugia.Core
 
         /// <summary>
         /// Resolves the install dir when the Uninstall key did not provide InstallLocation.
-        /// 1) ExtractInstallDirFromRegistryPaths � looks at registry VALUES that still
+        /// 1) ExtractInstallDirFromRegistryPaths - looks at registry VALUES that still
         ///    reference the app's exe (CLSID LocalServer32, shell command, URL protocol
         ///    command, DisplayIcon/InstallLocation in Uninstall keys). Works even when the
         ///    install folder was ALREADY DELETED (the common post-uninstall case).
-        /// 2) InferInstallDirectory � fallback from leftover folders that still exist.
+        /// 2) InferInstallDirectory - fallback from leftover folders that still exist.
         /// </summary>
         private static string? ResolveInstallLocation(string displayName, IEnumerable<string> leftoverPaths, string? publisher = null)
         {
@@ -2839,7 +2847,7 @@ namespace KitLugia.Core
 
                 int score = 0;
                 string dirName = Path.GetFileName(dir) ?? "";
-                // exe file name matches a token (e.g. ZCode.exe) � strongest
+                // exe file name matches a token (e.g. ZCode.exe) - strongest
                 string exeName = Path.GetFileNameWithoutExtension(exe) ?? "";
                 bool exeMatch = tokens.Any(tok => exeName.IndexOf(tok, StringComparison.OrdinalIgnoreCase) >= 0);
                 if (exeMatch) score += 10;
@@ -2887,7 +2895,7 @@ namespace KitLugia.Core
                 catch { /* ignore */ }
             }
 
-            // 1) CLSID LocalServer32 � the app's own COM server (survives uninstall)
+            // 1) CLSID LocalServer32 - the app's own COM server (survives uninstall)
             ScanComRoot(Registry.LocalMachine, @"SOFTWARE\Classes\CLSID");
             ScanComRoot(Registry.LocalMachine, @"SOFTWARE\WOW6432Node\Classes\CLSID");
             ScanComRoot(Registry.CurrentUser, @"SOFTWARE\Classes\CLSID");
@@ -2992,7 +3000,7 @@ namespace KitLugia.Core
 
         /// <summary>
         /// Revo-style fallback: when the registry does not provide an InstallLocation
-        /// (common for portable/user-space apps like VS Code forks � Uninstall key lacks
+        /// (common for portable/user-space apps like VS Code forks - Uninstall key lacks
         /// InstallLocation or DisplayName doesn't exact-match the list entry), infer the
         /// install dir from the leftover folders already found by the file scan.
         /// Very targeted: only accept a directory whose leaf name matches a displayName
@@ -3036,7 +3044,7 @@ namespace KitLugia.Core
                         leaf.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) >= 0)
                         score += 4;
 
-                    // 3) under a Programs folder � the most likely install root
+                    // 3) under a Programs folder - the most likely install root
                     bool underPrograms = !string.IsNullOrEmpty(localPrograms) && p.StartsWith(localPrograms + "\\", StringComparison.OrdinalIgnoreCase);
                     bool underPf = (!string.IsNullOrEmpty(pf) && p.StartsWith(pf + "\\", StringComparison.OrdinalIgnoreCase)) ||
                                    (!string.IsNullOrEmpty(pf86) && p.StartsWith(pf86 + "\\", StringComparison.OrdinalIgnoreCase));
@@ -3166,7 +3174,7 @@ namespace KitLugia.Core
         public static void PerformCleanup(List<string> filesToDelete, List<string> registryToDelete, UninstallResult result, string displayName = "", string installLocation = "", CancellationToken ct = default, IProgress<string>? progress = null)
         {
             var logEntries = new List<string>();
-            logEntries.Add($"=== KitLugia Deletion Log � {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+            logEntries.Add($"=== KitLugia Deletion Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
             logEntries.Add("");
 
             int totalItems = filesToDelete.Distinct(StringComparer.OrdinalIgnoreCase).Count() + registryToDelete.Distinct(StringComparer.OrdinalIgnoreCase).Count();
@@ -3198,66 +3206,110 @@ namespace KitLugia.Core
                     if (IsTooBroadForDeletion(file))
                         continue;
 
-                    // Backup file before deletion
-                    string? fileBackup = BackupFileItem(file);
-                    if (fileBackup != null)
-                        result.BackupFiles.Add($"{file}|{fileBackup}");
-
-                    if (Directory.Exists(file))
+                    // Backup file before deletion.
+                    // O backup e' a UNICA rede de seguranca quando o item vai
+                    // para a lixeira e o usuario esvazia-la depois. Antes, uma
+                    // falha do backup era engolida (catch { }) e a remocap
+                    // seguia como se houvesse copia de seguranca.
+                    // Backup so e' obrigatorio quando vai para a LIXEIRA: no
+                    // modo permanente o usuario ja assumiu a perda.
+                    bool backupOk = true;
+                    string? fileBackup = null;
+                    if (DeepUninstallSettings.SendToRecycleBin)
                     {
-                        // Recycle bin first approach (BCUninstaller pattern), configurable (DelToBin)
-                        if (DeepUninstallSettings.SendToRecycleBin)
+                        fileBackup = BackupFileItem(file);
+                        if (fileBackup != null)
                         {
-                            try
-                            {
-                                FileSystem.DeleteDirectory(file,
-                                    UIOption.OnlyErrorDialogs,
-                                    RecycleOption.SendToRecycleBin);
-                                result.FilesDeleted++;
-                                logEntries.Add($"REMOVED  {file} [to Recycle Bin]");
-                            }
-                            catch
-                            {
-                                // Fallback to permanent delete if recycle bin fails
-                                Directory.Delete(file, true);
-                                result.FilesDeleted++;
-                                logEntries.Add($"REMOVED  {file} [permanent]");
-                            }
+                            result.BackupFiles.Add($"{file}|{fileBackup}");
                         }
                         else
                         {
-                            Directory.Delete(file, true);
-                            result.FilesDeleted++;
-                            logEntries.Add($"REMOVED  {file} [permanent]");
+                            backupOk = false;
+                            result.DeleteErrors.Add($"{file}: backup falhou - nada foi apagado (sem rede de seguranca)");
+                            logEntries.Add($"SKIPPED  {file} [backup falhou - remoção cancelada por seguranca]");
+                            progress?.Report($"Backup falhou para {Path.GetFileName(file)} - item preservado");
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        fileBackup = BackupFileItem(file);
+                        if (fileBackup != null)
+                            result.BackupFiles.Add($"{file}|{fileBackup}");
+                    }
+
+                    if (Directory.Exists(file))
+                    {
+                        // Recycle bin via SHFileOperationW, com as MESMAS flags do
+                        // Revo (0x414 / 0x454). Antes usava VB FileSystem com
+                        // OnlyErrorDialogs, que escondia o cancelamento do
+                        // usuario e caia em delete PERMANENTE silencioso quando a
+                        // lixeira falhava (o log dizia "[permanent]" como se fosse
+                        // escolha, mas era falha). Agora o resultado e' explicito.
+                        var rDir = DeepUninstallSettings.SendToRecycleBin
+                            ? RecycleBinOp.Recycle(file, permanent: false, out string mDir)
+                            : RecycleBinOp.Recycle(file, permanent: true, out mDir);
+
+                        switch (rDir)
+                        {
+                            case RecycleBinOp.RecycleResult.Recycled:
+                                result.FilesDeleted++;
+                                logEntries.Add($"REMOVED  {file} [to Recycle Bin]");
+                                break;
+                            case RecycleBinOp.RecycleResult.DeletedPermanently:
+                                result.FilesDeleted++;
+                                logEntries.Add($"REMOVED  {file} [permanent - pedido pelo usuario]");
+                                break;
+                            case RecycleBinOp.RecycleResult.CancelledByUser:
+                                // NAO e' falha do kit: o usuario recusou. Contar
+                                // como removido seria mentira (o item continua la).
+                                result.FilesKept ??= new List<string>();
+                                result.FilesKept.Add(file);
+                                logEntries.Add($"CANCELLED {file} [o usuario recusou]");
+                                progress?.Report($"O usuario recusou remover {Path.GetFileName(file)}");
+                                break;
+                            default:
+                                // A LIXEIRA FALHOU. NAO apagar de vez em silencio:
+                                // o backup existe (BackupFileItem acima), e o
+                                // usuario precisa saber que o item ficou.
+                                result.DeleteErrors ??= new List<string>();
+                                result.DeleteErrors.Add($"{file}: lixeira indisponível ({mDir}) - nada foi apagado");
+                                logEntries.Add($"FAILED   {file} [lixeira indisponível: {mDir}]");
+                                progress?.Report($"Nao foi possivel remover {Path.GetFileName(file)} (lixeira indisponível)");
+                                break;
                         }
                     }
                     else if (File.Exists(file))
                     {
-                        if (DeepUninstallSettings.SendToRecycleBin)
+                        var rFile = DeepUninstallSettings.SendToRecycleBin
+                            ? RecycleBinOp.Recycle(file, permanent: false, out string mFile)
+                            : RecycleBinOp.Recycle(file, permanent: true, out mFile);
+
+                        switch (rFile)
                         {
-                            try
-                            {
-                                FileSystem.DeleteFile(file,
-                                    UIOption.OnlyErrorDialogs,
-                                    RecycleOption.SendToRecycleBin);
+                            case RecycleBinOp.RecycleResult.Recycled:
                                 result.FilesDeleted++;
                                 logEntries.Add($"REMOVED  {file} [to Recycle Bin]");
-                            }
-                            catch
-                            {
-                                File.Delete(file);
+                                break;
+                            case RecycleBinOp.RecycleResult.DeletedPermanently:
                                 result.FilesDeleted++;
-                                logEntries.Add($"REMOVED  {file} [permanent]");
-                            }
-                        }
-                        else
-                        {
-                            File.Delete(file);
-                            result.FilesDeleted++;
-                            logEntries.Add($"REMOVED  {file} [permanent]");
+                                logEntries.Add($"REMOVED  {file} [permanent - pedido pelo usuario]");
+                                break;
+                            case RecycleBinOp.RecycleResult.CancelledByUser:
+                                result.FilesKept ??= new List<string>();
+                                result.FilesKept.Add(file);
+                                logEntries.Add($"CANCELLED {file} [o usuario recusou]");
+                                progress?.Report($"O usuario recusou remover {Path.GetFileName(file)}");
+                                break;
+                            default:
+                                result.DeleteErrors ??= new List<string>();
+                                result.DeleteErrors.Add($"{file}: lixeira indisponível ({mFile}) - nada foi apagado");
+                                logEntries.Add($"FAILED   {file} [lixeira indisponível: {mFile}]");
+                                progress?.Report($"Nao foi possivel remover {Path.GetFileName(file)} (lixeira indisponível)");
+                                break;
                         }
                     }
-                }
+                    }
                 catch (Exception ex)
                 {
                     result.Errors.Add($"File: {file} -> {ex.Message}");
@@ -3598,6 +3650,47 @@ namespace KitLugia.Core
             return null;
         }
 
+        /// <summary>
+        /// O item de registro ainda existe? Usado pela GUI depois de excluir,
+        /// para so tirar da lista o que saiu DE VERDADE.
+        /// Reusa o mesmo parser da exclusao (ResolveHive/IsRegistryValuePath)
+        /// de proposito: um segundo parser na GUI poderia divergir e dar
+        /// "removido com sucesso" para uma chave que continua la.
+        /// </summary>
+        public static bool RegistryItemStillExists(string fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath)) return false;
+
+            // Caminho de VALOR: a chave pai existe mas o valor pode ter saído.
+            if (IsRegistryValuePath(fullPath))
+            {
+                int lastSep = fullPath.LastIndexOf('\\');
+                if (lastSep <= 0) return false;
+                var parentHive = ResolveHive(fullPath[..lastSep], out string parentSubKey);
+                if (parentHive == null || string.IsNullOrEmpty(parentSubKey)) return false;
+                string valueName = fullPath[(lastSep + 1)..];
+                try
+                {
+                    using var parentKey = parentHive.OpenSubKey(parentSubKey, writable: false);
+                    if (parentKey == null) return false;
+                    foreach (string name in parentKey.GetValueNames())
+                        if (string.Equals(name, valueName, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    return false;
+                }
+                catch { return true; } // nao conseguir provar que sumiu = presume que ficou
+            }
+
+            var hive = ResolveHive(fullPath, out string subKey);
+            if (hive == null || string.IsNullOrEmpty(subKey)) return false;
+            try
+            {
+                using var key = hive.OpenSubKey(subKey, writable: false);
+                return key != null;
+            }
+            catch { return true; } // idem
+        }
+
         private static (string fileName, string args) ParseCommandLine(string cmd)
         {
             cmd = cmd.Trim();
@@ -3624,7 +3717,10 @@ namespace KitLugia.Core
             name = NativeRegex.Replace(name, @"\s+\d+[\d.]*\d$", "");
             name = NativeRegex.Replace(name, @"\s+(Inc|LLC|Ltd|Limited|Corp|Corporation|GmbH|SAS|SRL|SA|Pty|Ltee)\.?$", "");
             name = NativeRegex.Replace(name, @"\s*\([^)]*\)$", "");
-            name = NativeRegex.Replace(name, @"[���]", "");
+            // Tira simbolos de marca (R) (TM) (C) do nome. Escrito com escape
+            // Unicode de proposito: a versao anterior tinha os 3 caracteres literais,
+            // que uma ida-e-volta de encoding corrompeu para lixo.
+            name = NativeRegex.Replace(name, @"[\u00AE\u2122\u00A9]", "");
             return name.Trim().TrimEnd('.');
         }
 
@@ -3702,7 +3798,7 @@ namespace KitLugia.Core
 
             // If the registry already points to a known uninstaller INSIDE the install dir,
             // prefer the registry version (it may have important switches).
-            // Otherwise, if we found one physically, use it � this handles cases where
+            // Otherwise, if we found one physically, use it - this handles cases where
             // the registry points to the main app exe instead of the real uninstaller.
             if (!string.IsNullOrEmpty(regFileName))
             {
@@ -3887,14 +3983,14 @@ namespace KitLugia.Core
 
         private static void ExportKeyToReg(StringBuilder sb, string fullPath, RegistryKey key, int maxItems = 500, CancellationToken ct = default)
         {
-            if (maxItems <= 0) { sb.AppendLine($"; [TRUNCATED � too many subkeys]"); return; }
+            if (maxItems <= 0) { sb.AppendLine($"; [TRUNCATED - too many subkeys]"); return; }
             ct.ThrowIfCancellationRequested();
 
             sb.AppendLine($@"[{fullPath}]");
             int count = 0;
             foreach (var valName in key.GetValueNames())
             {
-                if (count++ >= maxItems) { sb.AppendLine($"; [TRUNCATED � too many values]"); break; }
+                if (count++ >= maxItems) { sb.AppendLine($"; [TRUNCATED - too many values]"); break; }
                 ct.ThrowIfCancellationRequested();
                 var val = key.GetValue(valName);
                 if (val == null) continue;
@@ -3928,12 +4024,12 @@ namespace KitLugia.Core
             sb.AppendLine();
 
             int remaining = maxItems - count;
-            if (remaining <= 0) { sb.AppendLine($"; [TRUNCATED � no room for subkeys]"); return; }
+            if (remaining <= 0) { sb.AppendLine($"; [TRUNCATED - no room for subkeys]"); return; }
 
             int subCount = 0;
             foreach (var name in key.GetSubKeyNames())
             {
-                if (subCount++ >= remaining) { sb.AppendLine($"; [TRUNCATED � too many subkeys]"); break; }
+                if (subCount++ >= remaining) { sb.AppendLine($"; [TRUNCATED - too many subkeys]"); break; }
                 ct.ThrowIfCancellationRequested();
                 using var sk = key.OpenSubKey(name, false);
                 if (sk != null)
@@ -4166,7 +4262,7 @@ namespace KitLugia.Core
 
                 if (IsRegistryValuePath(reg))
                 {
-                    // This is a value, not a subkey � back it up and delete the single value
+                    // This is a value, not a subkey - back it up and delete the single value
                     string? backupFile = BackupRegistryValue(reg, ct);
                     if (backupFile != null)
                         result.BackupRegistryFiles.Add(backupFile);
@@ -4209,7 +4305,7 @@ namespace KitLugia.Core
             }
             catch (OperationCanceledException)
             {
-                logEntries.Add($"TIMEOUT {reg} � operation timed out, skipped");
+                logEntries.Add($"TIMEOUT {reg} - operation timed out, skipped");
             }
             catch (Exception ex)
             {
@@ -4857,7 +4953,7 @@ namespace KitLugia.Core
             using var classesKey = RegistryToolsOpenKey(basePath);
             if (classesKey == null) return;
 
-            // Protocol names look like "zcode" � short, alphanumeric. Guard against scanning
+            // Protocol names look like "zcode" - short, alphanumeric. Guard against scanning
             // the tens of thousands of ProgID/extension keys that live under Classes.
             foreach (var name in classesKey.GetSubKeyNames())
             {
@@ -4889,7 +4985,7 @@ namespace KitLugia.Core
         /// <summary>
         /// Returns true when a shell command string (e.g. a "command" default value such as
         /// "C:\...\app.exe" --args "%1") references a path inside the given install folder.
-        /// First-token path matching is deliberately simple � the prefix check on the
+        /// First-token path matching is deliberately simple - the prefix check on the
         /// absolute path is what makes it safe against false positives.
         /// </summary>
         private static bool CommandStringReferencesInstall(string? cmd, string normalizedInstall)
@@ -4910,7 +5006,7 @@ namespace KitLugia.Core
                     if (full.StartsWith(normalizedInstall, StringComparison.OrdinalIgnoreCase))
                         return true;
                 }
-                catch { /* malformed path � skip */ }
+                catch { /* malformed path - skip */ }
             }
             return false;
         }
@@ -5307,7 +5403,7 @@ namespace KitLugia.Core
         {
             name = NativeRegex.Replace(name, @"\s+(Inc|LLC|Ltd|Limited|Corp|Corporation|GmbH|SAS|SRL|SA|Pty|Ltee)\.?$", "");
             name = NativeRegex.Replace(name, @"\s*\([^)]*\)$", "");
-            name = NativeRegex.Replace(name, @"[���]", "");
+            name = NativeRegex.Replace(name, @"[\u00AE\u2122\u00A9]", "");
             name = NativeRegex.Replace(name, @"\s+", " ").Trim();
             return name;
         }
@@ -5358,12 +5454,12 @@ namespace KitLugia.Core
                 int test = sift4_distance_ffi("test", "test", 5);
                 UseNative = (test == 0);
                 if (UseNative)
-                    Logger.Log("?? Rust native DLL carregada com sucesso!");
+                    Logger.Log("Rust native DLL carregada com sucesso!");
             }
             catch
             {
                 UseNative = false;
-                Logger.Log("?? Rust native DLL n�o encontrada � usando implementa��o C#");
+                Logger.Log("Rust native DLL não encontrada - usando implementação C#");
             }
         }
 
@@ -5416,9 +5512,9 @@ namespace KitLugia.Core
             if (!UseNative)
             {
                 Logger.Log($"\n--- BENCHMARK ---");
-                Logger.Log($"C#:     {Iterations} itera��es � {pairs.Length} pares = {csMs} ms");
-                Logger.Log($"M�dia:  {csMs / (double)Iterations:F4} ms por itera��o");
-                Logger.Log($"Rust:   DLL n�o dispon�vel � n�o foi poss�vel testar");
+                Logger.Log($"C#:     {Iterations} iterações - {pairs.Length} pares = {csMs} ms");
+                Logger.Log($"Média:  {csMs / (double)Iterations:F4} ms por iteração");
+                Logger.Log($"Rust:   DLL não disponível - não foi possível testar");
                 return;
             }
 
@@ -5434,13 +5530,13 @@ namespace KitLugia.Core
             long rustMs = sw.ElapsedMilliseconds;
 
             Logger.Log($"\n--------------- BENCHMARK ---------------");
-            Logger.Log($"Iters: {Iterations} � {pairs.Length} pares = {Iterations * pairs.Length} chamadas");
+            Logger.Log($"Iters: {Iterations} - {pairs.Length} pares = {Iterations * pairs.Length} chamadas");
             Logger.Log($"");
             Logger.Log($"C#  Sift4:    {csMs,8} ms  |  {(double)Iterations * pairs.Length / csMs * 1000,8:F0} op/s");
             Logger.Log($"Rust native:  {rustMs,8} ms  |  {(double)Iterations * pairs.Length / rustMs * 1000,8:F0} op/s");
             Logger.Log($"");
             double ratio = (double)csMs / rustMs;
-            Logger.Log($"Speedup:      {ratio:F2}�  (Rust � {(ratio >= 1 ? "mais r�pido" : "mais lento")})");
+            Logger.Log($"Speedup:      {ratio:F2} - (Rust - {(ratio >= 1 ? "mais rápido" : "mais lento")})");
             Logger.Log($"===========================================");
         }
     }

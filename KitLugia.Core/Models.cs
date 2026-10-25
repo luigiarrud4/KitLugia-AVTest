@@ -8,7 +8,26 @@ namespace KitLugia.Core
 {
     // --- ENUMS ---
     public enum TweakType { Registry, Service, Mouse, Bcd, PageFile, GpuInterruptPriority }
-    public enum TweakStatus { OK, MODIFIED, ERROR, NOT_FOUND }
+    public enum TweakStatus
+    {
+        OK,
+
+        /// <summary>Vulnerável: o valor está no estado perigoso.</summary>
+        MODIFIED,
+
+        ERROR,
+
+        /// <summary>Não foi possível verificar (valor/chave inacessível).</summary>
+        NOT_FOUND,
+
+        /// <summary>
+        /// Correção APLICADA mas que só entra em vigor depois de reiniciar.
+        /// Não é verde nem vermelho: a proteção pode ou não estar valendo agora,
+        /// e afirmar qualquer um dos dois seria mentir. Fora do score até o
+        /// próximo boot decidir.
+        /// </summary>
+        PENDING
+    }
     public enum StartupStatus { Disabled, Enabled, Elevated, TurboBoot, TurboBootNormal }
     public enum ActionType { BuiltIn, GenericCommand, Script }
     public enum ServiceSafetyLevel { Safe, Caution, Dangerous, Unknown }
@@ -203,6 +222,45 @@ namespace KitLugia.Core
         public TweakStatus Status { get; set; }
         public string? KeyPath { get; set; }
         public string? ValueName { get; set; }
+
+        /// <summary>
+        /// true quando a AUSENCIA do valor deve ser tratada como falha de protecao.
+        /// Default false = o comportamento antigo (ausente => OK).
+        ///
+        /// POR QUE EXISTE: o Windows nem sempre cria o valor de um hardening, e
+        /// "valor ausente" era lido como "protegido". Foi assim que Secure Boot
+        /// DESLIGADO e HVCI DESATIVADO apareciam como PROTEGIDO: o Guardian lia
+        /// chaves que nunca existiram, caia no default e ficava verde sem nunca ter
+        /// verificado nada. Só usar nos checks em que ausencia = desprotegido de fato.
+        /// </summary>
+        public bool MissingIsHarmful { get; set; } = false;
+
+        /// <summary>
+        /// Identidade ESTÁVEL do check, independente do texto exibido.
+        ///
+        /// POR QUE EXISTE: o estado de "aguardando reinício" é
+        /// gravado em disco e precisa casar com o mesmo check no próximo boot.
+        /// Casar pelo Name (que é português e pode ser reescrito a qualquer
+        /// momento) fazia a pendência virar órfã silenciosamente. O Id é
+        /// derivado do que realmente identifica o check: tipo + chave + valor
+        /// (ou serviço).
+        ///
+        /// PREENCHIDO pelo Guardian (EnsureIds) - não é para setar à mão.
+        ///
+        /// O Id NÃO é único por design: identifica o ALVO (chave + valor), e
+        /// checks diferentes podem mirar o mesmo alvo com finalidades
+        /// diferentes. Medido nos 465 checks reais: 18 grupos compartilham Id —
+        /// o caso extremo é o PATH, com 6 checks (INCOMPLETE, DUPLICATE,
+        /// MISSING, DEV_JUNK, VULNERABLE, CORRUPTED) lendo Environment\Path e
+        /// usando HarmfulValue como sentinela para decidir o que acusar.
+        /// Auditei os 18 grupos: nenhum tem dois checks não-opcionais com
+        /// HarmfulValue oposto (esse seria o caso grave — um ficaria MODIFIED
+        /// para sempre e o score nunca chegaria a 100%).
+        /// </summary>
+        public string Id { get; set; } = "";
+
+        /// <summary>Chave usada em disco; cai no Name se o Id ainda não foi preenchido.</summary>
+        public string StoreKey => string.IsNullOrEmpty(Id) ? Name : Id;
         public object? HarmfulValue { get; set; }
         public object? DefaultValue { get; set; }
         public RegistryValueKind ValueKind { get; set; } = RegistryValueKind.DWord;
@@ -210,11 +268,31 @@ namespace KitLugia.Core
         public string? HarmfulStartMode { get; set; }
         public string? DefaultStartMode { get; set; }
 
-        /// <summary>
-        /// True para os itens que manipulam a variável PATH (System/User).
+/// <summary>
+        /// true para os itens que manipulam a variável PATH (System/User).
         /// Habilita o botão "+" (Explorador de PATH) na UI.
         /// </summary>
         public bool IsPathItem => Name.Contains("PATH", StringComparison.OrdinalIgnoreCase) && ValueName == "Path";
+
+        /// <summary>
+        /// true quando a correção só vale depois de reiniciar (HVCI, VBS, pagefile...).
+        /// Aí o check entra em PENDING (amarelo) em vez de fingir que já está
+        /// protegido. Preenchido pelo Guardian automaticamente; dá para forçar
+        /// por item quando um novo caso aparecer.
+        /// </summary>
+        public bool RequiresReboot { get; set; } = false;
+
+        /// <summary>Preenchido quando o status é PENDING: por que está aguardando reinício.</summary>
+        public string? PendingReason { get; set; }
+
+        
+        /// <summary>
+        /// Preenchido quando o check não pôde ser lido para confirmar o efeito da
+        /// correção após o reinício (ex.: HVCI numa máquina sem HVCI).
+        /// Não é falha nem proteção: é "não deu para saber". Fica
+        /// registrado para o usuário ter o rastro em vez de o evento sumir.
+        /// </summary>
+        public string? UnconfirmedReason { get; set; }
     }
     // --- WINBOOT MODELS ---
     public class DiskInfo

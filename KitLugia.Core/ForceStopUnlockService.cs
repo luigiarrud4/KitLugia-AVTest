@@ -27,6 +27,16 @@ namespace KitLugia.Core
         public bool IsSystemProcess { get; set; }
         public bool IsSelected { get; set; } = true;
 
+        /// <summary>
+        /// Verdadeiro quando o bloqueador e o SHELL (explorer.exe), nao uma janela comum.
+        /// O shell segura handles de pasta por causa de thumbnail/preview/menu de contexto,
+        /// e o Windows nao deixa fechar esses handles um a um de forma confiavel — a
+        /// solucao suportada pelo proprio Windows e REINICIAR o shell (e o que o
+        /// Gerenciador de Tarefas faz em "Reiniciar" e o que o IObit Unlocker sinaliza
+        /// com flag especial no driver).
+        /// </summary>
+        public bool IsShellBlocker { get; set; }
+
         public string DisplayLabel =>
             $"{ProcessName} (PID: {Pid})" +
             (string.IsNullOrEmpty(HandleType) ? "" : $" — {HandleType}");
@@ -44,6 +54,8 @@ namespace KitLugia.Core
         public string Message { get; set; } = "";
         public int HandlesClosed { get; set; }
         public int ProcessesKilled { get; set; }
+        /// <summary>Verdadeiro quando o shell (explorer.exe) foi reiniciado para soltar handles.</summary>
+        public bool ExplorerRestarted { get; set; }
         public List<string> Errors { get; set; } = new();
     }
 
@@ -87,36 +99,67 @@ namespace KitLugia.Core
             [In, Out] RM_PROCESS_INFO[]? rgAffectedApps,
             ref uint lpdwRebootReasons);
 
+        // ─── RM_UNIQUE_PROCESS / RM_PROCESS_INFO (restartapi.h) ───
+        //
+        // BUG GRAV CORRIGIDO (06/10/2026): a estrutura usava LayoutKind.Explicit com
+        // FieldOffset(16) para strAppName, assumindo que o FILETIME do RM_UNIQUE_PROCESS
+        // tinha alinhamento 8. Em C, FILETIME e {DWORD; DWORD} com alinhamento 4, entao o
+        // layout nativo e:
+        //     dwProcessId @0 | ProcessStartTime @4 (8 B) | strAppName @12 (512 B)
+        //     strServiceShortName @524 (128 B) | ApplicationType @652 | AppStatus @656
+        //     TSSessionId @660 | bRestartable @664   =>  Marshal.SizeOf = 668
+        // Todos os offsets estavam +4 e o SizeOf dava 676. Como o marshaller aloca
+        // SizeOf x nProcessos, o erro acumulava 8 BYTES DE DRIFT POR ELEMENTO:
+        //   - elemento 0: nome lido 4 B a frente -> "Freebuff Desktop" virava
+        //     "eebuff Desktop" (perdeu os 2 primeiros WCHAR = "Fr");
+        //   - elemento 1+: lido 8 B atras -> o PID vinha da CAUDA do elemento anterior
+        //     (PIDs como 31283014 / 6619237 / 6684774).
+        // Esses PIDs lixo iam direto para o "matar processo" — um PID invalido que por
+        // acaso estivesse vivo era um processo REAL e nao relacionado.
+        //
+        // FIX: layout Sequential (o CLR calcula os mesmos offsets nativos) com o
+        // FILETIME decomposto em 2 DWORD, para o alinhamento 4 ser o do C.
         [StructLayout(LayoutKind.Sequential)]
         private struct RM_UNIQUE_PROCESS
         {
             public int dwProcessId;
-            public System.Runtime.InteropServices.ComTypes.FILETIME ProcessStartTime;
+            public uint ftLowDateTime;      // FILETIME.dwLowDateTime
+            public uint ftHighDateTime;     // FILETIME.dwHighDateTime
         }
 
-        [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         private struct RM_PROCESS_INFO
         {
-            [FieldOffset(0)] public RM_UNIQUE_PROCESS Process;
-            [FieldOffset(16)] [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string strAppName;
-            [FieldOffset(528)] [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string strServiceShortName;
-            [FieldOffset(660)] public int ApplicationType;
-            [FieldOffset(664)] public uint AppStatus;
-            [FieldOffset(668)] public uint TSSessionId;
-            [FieldOffset(672)] [MarshalAs(UnmanagedType.Bool)] public bool bRestartable;
+            public RM_UNIQUE_PROCESS Process;                                              // @0  (12 B)
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string strAppName;         // @12 (512 B)
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string strServiceShortName;  // @524 (128 B)
+            public int ApplicationType;                                                      // @652
+            public uint AppStatus;                                                           // @656
+            public uint TSSessionId;                                                         // @660
+            [MarshalAs(UnmanagedType.Bool)] public bool bRestartable;                        // @664
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void RmWriteStatusCallback(uint nPercentComplete);
 
         // ─── SeDebugPrivilege (necessário p/ abrir/matar processos de outros usuários) ──
-        [DllImport("advapi32.dll", SetLastError = true)]
+        //
+        // BUG GRAV CORRIGIDO (06/10/2026): os métodos foram renomeados para *Dbg para não
+        // colidir com os helpers do namespace, mas DllImport SEM EntryPoint usa o NOME DO
+        // MÉTODO como entry point.advapi32.dll não exporta "OpenProcessTokenDbg" (nem
+        // LookupPrivilegeValueDbg nem AdjustTokenPrivilegesDbg), então o runtime lanzava
+        // EntryPointNotFoundException em TODA chamada — EnableDebugPrivilege() SEMPRE
+        // falhava, SeDebugPrivilege NUNCA era habilitado e o scan nativo não achava
+        // handle de processo de outro usuário. Exatamente o sintoma que o resumo
+        // abaixo descreve, que a "correção" do LUID tinha consertado e o rename quebrou
+        // de novo. Os EntryPoints reais estão fixados explicitamente agora.
+        [DllImport("advapi32.dll", EntryPoint = "OpenProcessToken", SetLastError = true)]
         private static extern bool OpenProcessTokenDbg(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
 
-        [DllImport("advapi32.dll", SetLastError = true)]
+        [DllImport("advapi32.dll", EntryPoint = "LookupPrivilegeValueA", CharSet = CharSet.Ansi, SetLastError = true)]
         private static extern bool LookupPrivilegeValueDbg(string? systemName, string name, out LUID_DBG luid);
 
-        [DllImport("advapi32.dll", SetLastError = true)]
+        [DllImport("advapi32.dll", EntryPoint = "AdjustTokenPrivileges", SetLastError = true)]
         private static extern bool AdjustTokenPrivilegesDbg(IntPtr tokenHandle, bool disableAll,
             ref TOKEN_PRIVILEGES_DBG newState, int bufferLength, IntPtr previousState, IntPtr returnLength);
 
@@ -227,6 +270,7 @@ namespace KitLugia.Core
         public static List<BlockingProcessInfo> FindBlockingProcesses(string targetPath)
         {
             Logger.Log($"[FORCE STOP] === FindBlockingProcesses iniciado para: {targetPath}");
+            int shellPid = GetExplorerShellPid();
 
             // Log admin status
             bool isAdmin = SystemUtils.IsRunningAsAdministrator();
@@ -372,6 +416,20 @@ namespace KitLugia.Core
             }
 
             Logger.Log($"[FORCE STOP] === Total de bloqueadores encontrados: {results.Count}");
+
+            // Marca o SHELL: e o unico bloqueador que a fase 2/7 nao resolve (nao e da
+            // pasta) e o unico que exige REINICIAR em vez de matar. A UI usa este
+            // marcador para avisar que a barra de tarefas vai piscar.
+            foreach (var r in results)
+            {
+                if (string.Equals(r.ProcessName, "explorer.exe", StringComparison.OrdinalIgnoreCase)
+                    && shellPid != 0 && r.Pid == shellPid)
+                {
+                    r.IsShellBlocker = true;
+                    Logger.Log($"[FORCE STOP] explorer.exe (PID {r.Pid}) marcado como SHELL — reinicio automatico aplicado se preciso.");
+                }
+            }
+
             return results.OrderByDescending(r => r.IsSystemProcess ? 0 : 1)
                           .ThenBy(r => r.HandleType)
                           .ThenBy(r => r.ProcessName)
@@ -553,6 +611,43 @@ namespace KitLugia.Core
                 }
             }
 
+            // Phase 4.5: reiniciar o SHELL (explorer.exe) se ele for o bloqueador.
+            // POR QUE AQUI E NAO NA FASE 2: o shell nao "sai como quem bloqueia" — ele e
+            // o ambiente. A fase 2/7 tentam matar processos da pasta e o explorer nao e
+            // da pasta, entao nunca sairia por la; e matar o shell SEM relancar deixa o
+            // usuario sem barra de tarefas. O IObit Unlocker faz o mesmo (flag especial
+            // para explorer.exe no driver).
+            // E a acao que o proprio Windows oferece: Gerenciador de Tarefas > Reiniciar.
+            var shellBloqueadores = targetList
+                .Where(t => string.Equals(t.ProcessName, "explorer.exe", StringComparison.OrdinalIgnoreCase))
+                .Select(t => t.Pid).Distinct().ToList();
+            if (shellBloqueadores.Count > 0)
+            {
+                int shellPid = GetExplorerShellPid();
+                // So reinicia se o bloqueador for o SHELL de verdade. Um explorer.exe
+                // avulso (atalho "Explorer") nao segura o handle que importa.
+                if (shellPid != 0 && shellBloqueadores.Contains(shellPid))
+                {
+                    Logger.Log("[FORCE STOP] Phase 4.5: explorer.exe e o bloqueador — reiniciando o shell...");
+                    var (ok, msg) = RestartExplorerShell();
+                    result.ExplorerRestarted = ok;
+                    if (ok)
+                    {
+                        result.Message += " " + msg;
+                        // Remove as entradas do explorer: o shell morreu, os handles dele sumiram.
+                        targetList = targetList.Where(t => t.Pid != shellPid).ToList();
+                    }
+                    else
+                    {
+                        result.Errors.Add(msg);
+                    }
+                }
+                else
+                {
+                    Logger.Log($"[FORCE STOP] Phase 4.5: explorer.exe detectado (PID {string.Join(",", shellBloqueadores)}) mas nao e o shell da sessao (shell={shellPid}) — nao reiniciado.");
+                }
+            }
+
             // Phase 5: Robust deletion chain with retry — SÓ se deleteTarget=true (CRÍTICO: Liberar não deve deletar)
             if (deleteTarget)
             {
@@ -698,6 +793,32 @@ namespace KitLugia.Core
                         {
                             int pid = processInfo[i].Process.dwProcessId;
                             string name = processInfo[i].strAppName;
+
+                            // SANIDADE DO PID (defesa em profundidade): o RM ja devolveu
+                            // PIDs corrompidos enquanto o layout da struct estava errado, e
+                            // um PID invalido que por acaso estivesse vivo = matar um
+                            // processo REAL e nao relacionado. So passa se o PID for
+                            // plausivel E o processo existir de fato.
+                            if (pid <= 4 || pid >= 0x7FFFFFF0)
+                            {
+                                Logger.Log($"[FORCE STOP] RM: PID invalido descartado ({pid}) em '{name}'.");
+                                continue;
+                            }
+
+                            try
+                            {
+                                using var check = Process.GetProcessById(pid);
+                            }
+                            catch (ArgumentException)
+                            {
+                                Logger.Log($"[FORCE STOP] RM: PID {pid} ('{name}') nao existe mais - descartado.");
+                                continue;
+                            }
+                            catch (InvalidOperationException)
+                            {
+                                Logger.Log($"[FORCE STOP] RM: PID {pid} ('{name}') ja encerrado - descartado.");
+                                continue;
+                            }
 
                             // Skip system processes
                             string baseName = Path.GetFileNameWithoutExtension(name);
@@ -939,8 +1060,124 @@ namespace KitLugia.Core
 
         // ─── Process Kill ────────────────────────────────────────────────
 
-        private static bool KillProcess(int pid)
+        /// <summary>
+    /// P/Invoke local (a classe Win32Api do projeto vive no KitLugia.GUI e o Core nao
+    /// pode referenciar). GetShellWindow devolve a janela de topo do shell do Windows
+    /// (a "desktop window"); com GetWindowThreadProcessId dá o PID do explorer.exe que
+    /// realmente detem o shell.
+    /// </summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetShellWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    /// <summary>
+    /// Descobre o PID do SHELL (explorer.exe) — o processo que detem o desktop, a barra
+    /// de tarefas e o menu iniciar. Usa GetShellWindow() (a janela de topo do shell), e
+    /// nao "qualquer explorer.exe": o usuario pode ter varias janelas do Explorador de
+    /// Arquivos e um explorer.exe avulso (atalho "Explorer" de outro usuario), e matar o
+    /// processo errado derrubaria so uma janela sem resolver o handle.
+    ///
+    /// Retorna 0 se nao houver shell visivel (sessao sem explorer, ou ja reiniciado).
+    /// </summary>
+    public static int GetExplorerShellPid()
+    {
+        try
         {
+            IntPtr hwnd = GetShellWindow();
+            if (hwnd == IntPtr.Zero) return 0;
+            uint pid = 0;
+            GetWindowThreadProcessId(hwnd, out pid);
+            return (int)pid;
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>Verdadeiro se o PID informado e o processo do shell.</summary>
+    public static bool IsExplorerShell(int pid)
+    {
+        int shell = GetExplorerShellPid();
+        return shell != 0 && shell == pid;
+    }
+
+    /// <summary>
+    /// Reinicia o shell do Windows (explorer.exe): encerra e relanca.
+    ///
+    /// POR QUE E SEGURO (pesquisado 08/10/2026):
+    /// - E a acao que o proprio Windows oferece: o Gerenciador de Tarefas tem "Reiniciar"
+    ///   em Windows Explorer, que faz exatamente encerrar + relancar.
+    /// - O equivalente por linha de comando e `taskkill /f /im explorer.exe` + `start
+    ///   explorer.exe`, documentado como o metodo para liberar locks do shell.
+    /// - O que acontece: barra de tarefas, area de trabalho e icones somem por ~1-2 s e
+    ///   voltam. Janelas abertas do Explorador de Arquivos FECHAM. Os outros programas
+    ///   NAO sao afetados. Nao e reboot e nao mexe em driver/servico/politica.
+    /// - Risco real (e por isso ha fallback): se nao voltar, a barra de tarefas fica
+    ///   quebrada ate reiniciar o shell — recuperado com Ctrl+Shift+Esc > Reiniciar ou
+    ///   digitando explorer.exe no CMD. Por isso confirmamos que voltou, e se nao voltou
+    ///   lancamos de novo e avisamos o usuario.
+    ///
+    /// Nao usamos o metodo "gentil" (WM_CLOSE) de proposito: no Windows 11 ele NAO
+    /// encerra o explorer (o processo continua vivo) — so o /f encerra de fato.
+    /// </summary>
+    public static (bool Restarted, string Message) RestartExplorerShell()
+    {
+        int shellPid = GetExplorerShellPid();
+        if (shellPid == 0)
+            return (false, "Nenhum shell (explorer.exe) em execucao — nada a reiniciar.");
+
+        Logger.Log($"[FORCE STOP] Explorador: reiniciando o shell (PID {shellPid}) para soltar os handles do Explorer...");
+        try
+        {
+            using var p = Process.GetProcessById(shellPid);
+            p.Kill();
+            p.WaitForExit(8000);
+        }
+        catch (Exception ex)
+        {
+            // Processo ja morreu entre a checagem e o kill: nao e erro.
+            if (!(ex is ArgumentException))
+            {
+                Logger.LogWarning("RestartExplorerShell", $"Falha ao encerrar o shell: {ex.Message}");
+                return (false, $"Falha ao encerrar o explorer.exe: {ex.Message}");
+            }
+        }
+
+        // Relanca o shell (Session 1 = desktop do usuario). Se nao voltar em ~10 s, tenta
+        // de novo e reporta — nunca deixa o usuario sem barra de tarefas em silencio.
+        for (int tentativa = 1; tentativa <= 3; tentativa++)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("RestartExplorerShell", $"Tentativa {tentativa} de relancar o shell falhou: {ex.Message}");
+            }
+
+            for (int espera = 0; espera < 20; espera++)
+            {
+                System.Threading.Thread.Sleep(500);
+                int novo = GetExplorerShellPid();
+                if (novo != 0 && novo != shellPid)
+                {
+                    Logger.Log($"[FORCE STOP] Explorador: shell de volta (PID {novo}) apos reinicio.");
+                    return (true, $"Explorer reiniciado (PID {shellPid} -> {novo}).");
+                }
+            }
+            Logger.Log($"[FORCE STOP] Explorador: shell nao voltou apos {tentativa}x 500ms (tentativa {tentativa}/3).");
+        }
+
+        Logger.LogWarning("RestartExplorerShell", "Shell nao voltou apos 3 tentativas.");
+        return (false, "O explorer.exe nao voltou automaticamente. A barra de tarefas pode estar sem shell — reinicie o Windows Explorer pelo Gerenciador de Tarefas (Ctrl+Shift+Esc > Reiniciar) ou digite explorer.exe no CMD.");
+    }
+
+    private static bool KillProcess(int pid)        {
             if (pid <= 0 || pid == Environment.ProcessId) return false;
             try
             {
