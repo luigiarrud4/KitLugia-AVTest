@@ -291,6 +291,44 @@ namespace KitLugia.Core.TaskManager
             catch { return -1; }
         }
 
+        /// <summary>
+        /// Bytes de RAM física EM USO e TOTAL (mesma fonte do %: K32GetPerformanceInfo →
+        /// GlobalMemoryStatusEx). Serve para mostrar "25,6 GB de 32 GB" junto do percentual —
+        /// o % sozinho não diz QUANTA RAM está ocupada.
+        /// </summary>
+        public static bool TryGetPhysicalMemoryUsage(out ulong usedBytes, out ulong totalBytes)
+        {
+            usedBytes = 0;
+            totalBytes = 0;
+            try
+            {
+                if (K32GetPerformanceInfo(out var pi, (uint)Marshal.SizeOf<PERFORMANCE_INFORMATION>()) && pi.cb > 0)
+                {
+                    ulong pageSize = pi.PageSize.ToUInt64();
+                    if (pageSize == 0) pageSize = (ulong)Environment.SystemPageSize;
+                    ulong totalPages = pi.PhysicalTotal.ToUInt64();
+                    ulong availPages = pi.PhysicalAvailable.ToUInt64();
+                    if (totalPages > 0)
+                    {
+                        if (availPages > totalPages) availPages = totalPages;
+                        totalBytes = totalPages * pageSize;
+                        usedBytes = (totalPages - availPages) * pageSize;
+                        return true;
+                    }
+                }
+                var ms = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
+                if (GlobalMemoryStatusEx(ref ms) && ms.ullTotalPhys > 0)
+                {
+                    ulong avail = Math.Min(ms.ullAvailPhys, ms.ullTotalPhys);
+                    totalBytes = ms.ullTotalPhys;
+                    usedBytes = ms.ullTotalPhys - avail;
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
         /// <summary>RAM física disponível em MB (o que sobra para apps); -1 = indisponível. Calibra a leitura de paginação: página dura com RAM de sobra é tráfego de dados frios, não pressão de memória.</summary>
         public static double GetAvailableRamMb()
         {
@@ -305,6 +343,143 @@ namespace KitLugia.Core.TaskManager
 
         /// <summary>Frequência média atual da CPU em MHz via CallNtPowerInformation (TMOG); -1 = indisponível.</summary>
         public static double GetCpuFrequencyMhz()
+        {
+            // Preferência: a velocidade ATUAL (turbo incluído), medida pelo Windows.
+            double cur = GetCpuCurrentFrequencyMhz();
+            if (cur > 0) return cur;
+            // Fallback: CallNtPowerInformation — no Intel moderno devolve o clock BASE
+            // fixo (3500), nunca muda. Ainda melhor que mostrar "—".
+            double legacy = GetCpuFrequencyMhzLegacy();
+            if (legacy > 0) { _lastCurrentMhz = legacy; return legacy; }
+            return _lastCurrentMhz;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  RELÓGIO DA CPU — "velocidade ATUAL" (turbo incluído), como o TM
+        // ══════════════════════════════════════════════════════════════════════
+        // CallNtPowerInformation(ProcessorInformation) devolve CurrentMhz = 3500 FIXO
+        // neste Intel — o clock BASE, que nunca muda. Era por isso que o vital
+        // "Relógio" do Resumo ficava congelado em "3,50 GHz" (justamente o número
+        // que o Gerenciador de Tarefas NÃO mostra). O contador PDH
+        // "% Processor Performance" responde em TEMPO REAL: medido 141% aqui =>
+        // 4,95 GHz, a mesma ordem do "5,03 GHz" do TM no print do usuário.
+        // Clock atual = nominal x (% / 100).
+
+        private static IntPtr _clockQuery, _clockCounter;
+        private static bool _clockTried;
+        private static double _baseMhzCache = -1;
+        private static double _lastCurrentMhz = -1;
+        private static double _lastPerfPct = -1;
+        private static long _lastPerfPctStamp;
+
+        /// <summary>Velocidade NOMINAL (base) da CPU em MHz — a "Velocidade base" do TM.</summary>
+        public static double GetCpuBaseFrequencyMhz()
+        {
+            if (_baseMhzCache > 0) return _baseMhzCache;
+            try
+            {
+                int cores = Environment.ProcessorCount;
+                IntPtr buf = Marshal.AllocHGlobal(24 * cores);
+                try
+                {
+                    // ProcessorInformation = 11; PROCESSOR_POWER_INFORMATION = 24 bytes/núcleo
+                    if (CallNtPowerInformation(11, IntPtr.Zero, 0, buf, (uint)(24 * cores)) == 0)
+                    {
+                        uint max = 0;
+                        for (int i = 0; i < cores; i++)
+                        {
+                            // +4 MaxMhz = clock nominal do núcleo
+                            uint m = (uint)Marshal.ReadInt32(buf, i * 24 + 4);
+                            if (m > max) max = m;
+                        }
+                        if (max > 0) { _baseMhzCache = max; return max; }
+                    }
+                }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+            catch { }
+            // Fallback: registro ~MHz (3494 neste hardware) — mesmo nominal, outra fonte.
+            try
+            {
+                using var rk = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+                if (rk?.GetValue("~MHz") is int mhz && mhz > 0) { _baseMhzCache = mhz; return mhz; }
+            }
+            catch { }
+            return -1;
+        }
+
+        /// <summary>
+        /// "% Processor Performance" (PDH): quanto por cento do clock NOMINAL a CPU está
+        /// usando AGORA. 100% = clock base; 143% = turbo (5,0 GHz num i5-14600KF).
+        /// -1 = contador indisponível (a 1ª amostra é só "primer" → PDH_INVALID_DATA).
+        /// </summary>
+        public static double GetCpuProcessorPerformancePercent()
+        {
+            try
+            {
+                if (!_clockTried)
+                {
+                    _clockTried = true;
+                    if (PdhOpenQueryW(null, 0, out _clockQuery) == 0)
+                    {
+                        // 1º caminho: nome EM INGLÊS (PdhAddEnglishCounterW resolve pelo
+                        // índice do Perflib 009 em qualquer locale) — mesmo truque do
+                        // "% Processor Utility" que já funciona em produção.
+                        if (PdhAddEnglishCounterW(_clockQuery, @"\Processor Information(_Total)\% Processor Performance", 0, out _clockCounter) != 0)
+                            _clockCounter = IntPtr.Zero;
+                        // 2º caminho: nome LOCALIZADO (Perflib do locale atual).
+                        if (_clockCounter == IntPtr.Zero)
+                        {
+                            string obj = LocalizePerfName("Processor Information");
+                            string ctr = LocalizePerfName("% Processor Performance");
+                            string? path = ExpandFirst($@"\{obj}(_Total)\{ctr}");
+                            if (path != null) PdhAddCounterW(_clockQuery, path, 0, out _clockCounter);
+                        }
+                    }
+                    if (_clockCounter != IntPtr.Zero) PdhCollectQueryData(_clockQuery); // primer
+                }
+                if (_clockCounter == IntPtr.Zero) return -1;
+                // Duas leituras no MESMO instante não podem gerar dois collects: o 2º
+                // collect (intervalo curtíssimo) devolve um % ruidoso — medido 245% logo
+                // depois de 141% na mesma hora. Cache curto (300 ms) resolve.
+                long now = Environment.TickCount64;
+                if (_lastPerfPct > 0 && now - _lastPerfPctStamp < 300) return _lastPerfPct;
+                if (PdhCollectQueryData(_clockQuery) != 0) return -1;
+                if (PdhGetFormattedCounterValue(_clockCounter, PDH_FMT_DOUBLE, IntPtr.Zero, out var v) != 0) return -1;
+                if (v.CStatus != 0) return -1;
+                double pct = v.DoubleValue;
+                if (pct <= 0 || pct > 400) return -1;
+                _lastPerfPct = pct;
+                _lastPerfPctStamp = now;
+                return pct;
+            }
+            catch { return -1; }
+        }
+
+        /// <summary>
+        /// Clock ATUAL da CPU em MHz (turbo incluído) — muda a cada amostra, como o TM.
+        /// -1 = indisponível (neste caso o chamador usa o fallback legacy).
+        /// </summary>
+        public static double GetCpuCurrentFrequencyMhz()
+        {
+            double baseMhz = GetCpuBaseFrequencyMhz();
+            double pct = GetCpuProcessorPerformancePercent();
+            if (baseMhz > 0 && pct > 0)
+            {
+                double cur = baseMhz * pct / 100.0;
+                // Sanidade: contador quebrado não pode virar "87 GHz" na tela.
+                if (cur >= baseMhz * 0.05 && cur <= baseMhz * 4)
+                {
+                    _lastCurrentMhz = cur;
+                    return cur;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>Clock via CallNtPowerInformation (CurrentMhz). No Intel moderno é o
+        /// clock BASE fixo — mantido como fallback de GetCpuFrequencyMhz.</summary>
+        private static double GetCpuFrequencyMhzLegacy()
         {
             try
             {

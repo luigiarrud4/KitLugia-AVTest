@@ -48,42 +48,9 @@ namespace KitLugia.Core
 
     public static class PathRepair
     {
-        private static bool IsWindowsSystemPath(PathEntry entry)
-        {
-            string sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows).ToLower().TrimEnd('\\');
-            string expanded = entry.ExpandedValue.ToLower().TrimEnd('\\');
-            string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles).ToLower().TrimEnd('\\');
-            string programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86).ToLower().TrimEnd('\\');
-
-            // Caminhos válidos do System PATH
-            string[] systemPaths = {
-                sysRoot,
-                $"{sysRoot}\\system32",
-                $"{sysRoot}\\system32\\wbem",
-                $"{sysRoot}\\system32\\windowspowershell\\v1.0",
-                $"{sysRoot}\\system32\\openssh",
-                $"{sysRoot}\\system32\\inetsrv",
-                $"{sysRoot}\\syswow64",
-                $"{sysRoot}\\system32\\drivers\\etc",
-                $"{programFiles}\\dotnet",
-                $"{programFiles}\\powershell\\7",
-                $"{programFiles}\\windows kits",
-                $"{programFiles}\\microsoft sdks",
-                $"{programFiles}\\microsoft sql server",
-                $"{programFilesX86}\\windows kits",
-                $"{programFilesX86}\\microsoft sdks",
-                $"{programFilesX86}\\microsoft sql server"
-            };
-
-            // Verifica se começa com algum dos caminhos do sistema
-            foreach (var sysPath in systemPaths)
-            {
-                if (expanded.StartsWith(sysPath))
-                    return true;
-            }
-
-            return false;
-        }
+        // (o antigo IsWindowsSystemPath era um allowlist de pastas do Windows usado
+        //  para decidir "local errado". Trocado por IsWrongLocation, que olha o
+        //  caminho REAL — ver o comentário lá embaixo.)
 
         private static bool IsDotnetSdkJunk(PathEntry entry)
         {
@@ -166,33 +133,13 @@ namespace KitLugia.Core
                     continue;
                 }
 
-                if (pathType == "User" && IsWindowsSystemPath(entry))
-                {
-                    entry.Problem = PathEntryProblem.WrongLocation;
-                    entry.ProblemDetail = "Caminho de sistema no User PATH";
-                    entry.RecommendedAction = "Mover para System PATH";
-                    entries.Add(entry);
-                    continue;
-                }
-
-                if (pathType == "System" && !IsWindowsSystemPath(entry) && !entry.CleanValue.StartsWith("%"))
-                {
-                    // Não remover caminhos que usam variáveis de ambiente do sistema
-                    if (entry.CleanValue.StartsWith("%SystemRoot%", StringComparison.OrdinalIgnoreCase) ||
-                        entry.CleanValue.StartsWith("%ProgramFiles%", StringComparison.OrdinalIgnoreCase))
-                    {
-                        entry.RecommendedAction = "Manter";
-                        entries.Add(entry);
-                        continue;
-                    }
-
-                    entry.Problem = PathEntryProblem.WrongLocation;
-                    entry.ProblemDetail = "Caminho de usuário no System PATH";
-                    entry.RecommendedAction = "Mover para User PATH";
-                    entries.Add(entry);
-                    continue;
-                }
-
+                // PASTA MORTA PRIMEIRO (bug real): a checagem de local vinha ANTES e
+                // classificava C:\Program Files (x86)\Common Files\Oracle\Java\javapath
+                // (que não existe nesta máquina) como "caminho de usuário no System" ->
+                // o reparo MANTINHA a entrada morta, o scan seguinte acusava
+                // MissingDirectory de novo e o item NUNCA saía de "MODIFIED"
+                // ("continua MODIFIED apos a escrita" no log). Uma entrada que não
+                // existe é lixo em qualquer PATH: remover é sempre seguro.
                 if (!entry.Exists)
                 {
                     if (IsDotnetTools(entry))
@@ -217,11 +164,89 @@ namespace KitLugia.Core
                     continue;
                 }
 
+                if (IsWrongLocation(entry, pathType))
+                {
+                    entry.Problem = PathEntryProblem.WrongLocation;
+                    entry.ProblemDetail = pathType == "User"
+                        ? "Já existe no PATH do sistema (duplicado)"
+                        : "Caminho sob o perfil de usuário no PATH do sistema";
+                    entry.RecommendedAction = "Manter";
+                    entries.Add(entry);
+                    continue;
+                }
+
                 entry.RecommendedAction = "Manter";
                 entries.Add(entry);
             }
 
             return entries;
+        }
+
+        /// <summary>
+        /// Entrada no PATH ERRADO — com o critério REAL, não um allowlist.
+        ///
+        /// Antes: qualquer caminho fora de uma lista fixa de pastas do Windows era
+        /// "de usuário no System". Resultado no log real: Docker, nodejs, ZeroTier,
+        /// NVIDIA, Git, Chocolatey, Process Lasso... todos apareciam como
+        /// "Mantido (caminho de usuário no System)" — mentira, e a linha de log virava
+        /// um muro de 1000+ caracteres que escondia a única ação verdadeira.
+        ///
+        /// Agora: no System PATH só é local errado o que está sob C:\Users (perfil de
+        /// alguém; outros usuários da máquina ficariam com caminho quebrado). No User
+        /// PATH só é local errado o que já está no PATH do sistema (duplicata).
+        /// </summary>
+        private static bool IsWrongLocation(PathEntry entry, string pathType)
+        {
+            string expanded = entry.ExpandedValue.TrimEnd('\\');
+            if (string.IsNullOrEmpty(expanded)) return false;
+
+            if (pathType == "System")
+                return IsUnderUserProfiles(expanded);
+
+            try
+            {
+                foreach (var raw in GetSystemPathValue().Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string sys;
+                    try { sys = Environment.ExpandEnvironmentVariables(raw).TrimEnd('\\'); } catch { continue; }
+                    if (sys.Equals(expanded, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>O caminho está sob a pasta de perfis de usuário (C:\Users\...)?</summary>
+        private static bool IsUnderUserProfiles(string expanded)
+        {
+            try
+            {
+                string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('\\');
+                if (string.IsNullOrEmpty(profile)) return false;
+                string usersRoot = Path.GetDirectoryName(profile) ?? "";
+                if (string.IsNullOrEmpty(usersRoot)) return false;
+                return expanded.StartsWith(usersRoot + "\\", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Lista curta do que ainda está errado no PATH (problema + entrada). Existe para
+        /// o log do toggle explicar POR QUE o item continua MODIFIED, em vez de dizer só
+        /// "valor nao mudou ou foi reverteido" (que não ajuda em nada).
+        /// </summary>
+        public static string DescribeProblems(string pathValue, string pathType, int max = 4)
+        {
+            try
+            {
+                var problemas = DiagnosePath(pathValue ?? "", pathType)
+                    .Where(e => e.Problem != PathEntryProblem.None)
+                    .Select(e => $"{e.Problem}: {e.CleanValue}")
+                    .Take(max)
+                    .ToList();
+                return problemas.Count == 0 ? "" : string.Join("; ", problemas);
+            }
+            catch { return ""; }
         }
 
         public static (string Path, List<string> Actions) RepairPathEntries(List<PathEntry> entries, string pathType)
@@ -267,12 +292,10 @@ namespace KitLugia.Core
                         break;
 
                     case PathEntryProblem.WrongLocation:
-                        // Caminho válido em local errado (sistema no User ou vice-versa):
-                        // NÃO remover — pode ser intencional. Apenas registra.
+                        // Entrada válida no lugar discutível: não mexe. E NÃO entra em
+                        // `actions` — "Mantido" não é ação, e eram essas linhas que
+                        // faziam o log do reparo ter 1000+ caracteres por execução.
                         repaired.Add(entry.CleanValue);
-                        actions.Add(pathType == "User"
-                            ? $"Mantido (caminho de sistema no User): {entry.CleanValue}"
-                            : $"Mantido (caminho de usuário no System): {entry.CleanValue}");
                         break;
 
                     case PathEntryProblem.Duplicate:
@@ -767,21 +790,28 @@ namespace KitLugia.Core
         public const string UserPathRegistryKey = @"Environment";
 
         public static string GetSystemPathValue()
-        {
-            try
-            {
-                return Microsoft.Win32.Registry.LocalMachine
-                    .OpenSubKey(SystemPathRegistryKey)?.GetValue("Path")?.ToString() ?? "";
-            }
-            catch { return ""; }
-        }
+            => ReadPathRaw(Microsoft.Win32.Registry.LocalMachine, SystemPathRegistryKey);
 
         public static string GetUserPathValue()
+            => ReadPathRaw(Microsoft.Win32.Registry.CurrentUser, UserPathRegistryKey);
+
+        /// <summary>
+        /// Lê o PATH CRU (sem expandir %SystemRoot%/%USERPROFILE%).
+        ///
+        /// BUG REAL: `GetValue("Path")` expande REG_EXPAND_SZ por padrão. O reparo
+        /// então regravava `C:\WINDOWS\system32` no lugar de `%SystemRoot%\system32`
+        /// e, como a string ficava sem nenhum `%`, o tipo caía para REG_SZ — o PATH
+        /// do sistema passava a ser LITERAL. Com o Windows em outra letra unidade
+        /// (ou num WIM/VHD clonado) os caminhos deixam de seguir o sistema.
+        /// DoNotExpandEnvironmentNames mantém as variáveis e o tipo.
+        /// </summary>
+        private static string ReadPathRaw(Microsoft.Win32.RegistryKey baseKey, string subKeyPath)
         {
             try
             {
-                return Microsoft.Win32.Registry.CurrentUser
-                    .OpenSubKey(UserPathRegistryKey)?.GetValue("Path")?.ToString() ?? "";
+                using var key = baseKey.OpenSubKey(subKeyPath);
+                return key?.GetValue("Path", null,
+                    Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames)?.ToString() ?? "";
             }
             catch { return ""; }
         }

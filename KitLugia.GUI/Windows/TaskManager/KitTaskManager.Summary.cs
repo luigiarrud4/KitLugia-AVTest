@@ -294,8 +294,22 @@ namespace KitLugia.GUI.Windows.TaskManager
 
             // ── Vitais ──
             SetVital(TxtSumCpu, BarSumCpu, $"{cpu:F0}%", cpu / 100.0, GetHeatColor(cpu, 80, 95));
+            // ── VITAL RELÓGIO: o clock ATUAL (turbo incluído), como o Gerenciador de Tarefas.
+            // Antes mostrava o clock BASE fixo (3,50 GHz) — nunca mudava, porque vinha do
+            // CallNtPowerInformation (que no Intel moderno devolve o nominal). Agora é o
+            // clock real medido ("% Processor Performance" x nominal).
+            // A barra mostra a posição entre a velocidade BASE e o PICO da sessão.
+            double freqBase = _lastFreqBaseMhz > 0 ? _lastFreqBaseMhz : freq;
+            double freqPeak = _lastFreqPeakMhz > 0 ? _lastFreqPeakMhz : freqBase;
+            double clockFrac = 0;
+            if (freq > 0 && freqPeak > freqBase)
+                clockFrac = Math.Clamp((freq - freqBase) / (freqPeak - freqBase), 0, 1);
             SetVital(TxtSumClock, BarSumClock, freq > 0 ? $"{(freq / 1000.0):F2} GHz" : "—",
-                freq > 0 ? freq / 5500.0 : 0, Freeze(new SolidColorBrush(Color.FromRgb(0x7E, 0x57, 0xC2))));
+                clockFrac, Freeze(new SolidColorBrush(Color.FromRgb(0x7E, 0x57, 0xC2))));
+            // Detalhe: base + pico (o número sozinho não diz se é turbo ou clock base)
+            SetText(TxtSumClockDetail, freq > 0 && freqBase > 0
+                ? $"base {(freqBase / 1000.0):F2} GHz · pico {(freqPeak / 1000.0):F2} GHz"
+                : "");
             SetVital(TxtSumTemp, BarSumTemp, temp >= 0 ? $"{temp:F0} °C" : "—",
                 temp >= 0 ? temp / 100.0 : 0, temp >= 0 ? GetHeatColor(temp, 75, 90) : Brushes.Gray);
             SetVital(TxtSumGpu, BarSumGpu, gpu >= 0 ? $"{gpu:F0}%" : "N/A",
@@ -772,9 +786,9 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (SumPrepareAction() != null) MenuPriority_Click(sender, e);
         }
 
-        private void MenuSumClearMem_Click(object sender, RoutedEventArgs e)
+        private async void MenuSumClearMem_Click(object sender, RoutedEventArgs e)
         {
-            if (SumPrepareAction() != null) BtnClearMemory_Click(sender, e);
+            if (SumPrepareAction() != null) await ClearMemoryOfSelectionAsync();
         }
 
         private void MenuSumCopyPath_Click(object sender, RoutedEventArgs e)

@@ -48,6 +48,144 @@ static RE_WS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\s+").expect("invalid regex")
 });
 
+// ── FFI: protecao contra panic ────────────────────────────────────
+// O crate era compilado com `panic = "abort"`: um panic dentro da
+// cdylib MATAVA o processo .NET inteiro (sem catch gerenciado, sem
+// Dispatcher.UnhandledException, sem log). Ja aconteceu de verdade duas
+// vezes (o `wide()` sem terminador NUL e o fatiamento em fronteira
+// UTF-8) - o AGENTS.md registra as duas.
+//
+// Agora: (1) o profile release NAO usa mais panic=abort, (2) cada export
+// involve o corpo em catch_unwind e devolve um codigo de erro. O C# ja
+// trata "indisponivel" como fallback, entao o pior caso e degradar para
+// o caminho gerenciado - nunca derrubar o app.
+macro_rules! ffi_guard {
+    ($default:expr, $body:block) => {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
+            Ok(v) => v,
+            Err(_) => $default,
+        }
+    };
+}
+
+// ── Cache de padroes compilados ────────────────────────────────────
+// MEDIDO (tests/FfiBench, nesta maquina):
+//   Regex.Replace  MANAGED (.NET, cache estatico de 15)  509 ns
+//   NativeRegex.Replace (RUST, recompilava a cada chamada) 208.575 ns
+//   -> o caminho "nativo" era 410x MAIS LENTO que o managed que ele
+//      deveria substituir.
+//
+// Causa: `Regex::new` / `Glob::new` dentro de cada export. O proprio
+// codigo Rust ja sabia a solucao (as regexes de clean_name usam
+// LazyLock) - so faltava aplicar nos exports, que sao os que o C# chama.
+//
+// Cache por thread (os padroes vem do C# e nao mudam dentro de uma
+// thread de trabalho) + limite de tamanho para nao crescer sem fim.
+thread_local! {
+    static REGEX_CACHE: std::cell::RefCell<std::collections::HashMap<String, Regex>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+    static GLOB_CACHE: std::cell::RefCell<std::collections::HashMap<String, globset::GlobMatcher>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+const PATTERN_CACHE_LIMIT: usize = 64;
+
+// O match acontece DENTRO do closure: devolver o Regex/Matcher clonado
+// por chamada custava ~8 us (o clone do objeto compilado nao e gratis).
+// Aqui o cache e consultado e usado sem clonar nada.
+fn cached_regex_match(pattern: &str, text: &str) -> Option<bool> {
+    REGEX_CACHE.with(|c| {
+        let mut map = c.borrow_mut();
+        if let Some(re) = map.get(pattern) {
+            return Some(re.is_match(text));
+        }
+        let re = Regex::new(pattern).ok()?;
+        let r = re.is_match(text);
+        if map.len() >= PATTERN_CACHE_LIMIT {
+            map.clear();
+        }
+        map.insert(pattern.to_string(), re);
+        Some(r)
+    })
+}
+
+fn cached_regex_replace(pattern: &str, text: &str, replacement: &str) -> Option<String> {
+    REGEX_CACHE.with(|c| {
+        let mut map = c.borrow_mut();
+        if let Some(re) = map.get(pattern) {
+            return Some(re.replace_all(text, replacement).into_owned());
+        }
+        let re = Regex::new(pattern).ok()?;
+        let r = re.replace_all(text, replacement).into_owned();
+        if map.len() >= PATTERN_CACHE_LIMIT {
+            map.clear();
+        }
+        map.insert(pattern.to_string(), re);
+        Some(r)
+    })
+}
+
+// So para o caminho de capture, que precisa do objeto Captures (que
+// empresta o Regex). O clone do regex::Regex e barato (Arc por dentro).
+fn cached_regex_ref(pattern: &str) -> Option<Regex> {
+    REGEX_CACHE.with(|c| {
+        let mut map = c.borrow_mut();
+        if let Some(re) = map.get(pattern) {
+            return Some(re.clone());
+        }
+        let re = Regex::new(pattern).ok()?;
+        if map.len() >= PATTERN_CACHE_LIMIT {
+            map.clear();
+        }
+        map.insert(pattern.to_string(), re.clone());
+        Some(re)
+    })
+}
+
+fn cached_glob_match(pattern: &str, path: &str) -> Option<bool> {
+    GLOB_CACHE.with(|c| {
+        let mut map = c.borrow_mut();
+        if let Some(m) = map.get(pattern) {
+            return Some(m.is_match(path));
+        }
+        // Guarda o MATCHER, nao o Glob: em globset, compilar o padrao em
+        // regex e o passo caro (Glob::new so faz o parse). Cachear o Glob e
+        // chamar compile_matcher() a cada uso nao resolvia nada (medido: 24 us).
+        let m = globset::Glob::new(pattern).ok()?.compile_matcher();
+        let r = m.is_match(path);
+        if map.len() >= PATTERN_CACHE_LIMIT {
+            map.clear();
+        }
+        map.insert(pattern.to_string(), m);
+        Some(r)
+    })
+}
+
+// ── Comparacao case-insensitive Unicode-aware ──────────────────────
+// O C# usa StringComparison.OrdinalIgnoreCase (folding Unicode COMPLETO).
+// O Rust usava `eq_ignore_ascii_case` (SO ASCII) e fatiamento por BYTE
+// (`get(..len)`) - que perdia o match em qualquer nome com acento E
+// podia cair em fronteira de caractere multi-byte (foi a origem do
+// panic corrigido em 06/08).
+//
+// Divergencia real entre as duas implementacoes = o resultado dependia
+// de o rust_native.dll estar presente no output ou nao. Este helper
+// deixa as duas de acordo: ASCII (99,9% dos casos) no caminho rapido
+// sem alocacao, nao-ASCII com lowercase Unicode como o C#.
+fn ci_eq(a: &str, b: &str) -> bool {
+    if a.is_ascii() && b.is_ascii() {
+        return a.eq_ignore_ascii_case(b);
+    }
+    a.to_lowercase() == b.to_lowercase()
+}
+
+fn ci_starts_with(a: &str, b: &str) -> bool {
+    if a.is_ascii() && b.is_ascii() {
+        return a.len() >= b.len() && a.as_bytes()[..b.len()].eq_ignore_ascii_case(b.as_bytes());
+    }
+    a.to_lowercase().starts_with(&b.to_lowercase())
+}
+
 // ── MFT scanner (raw NTFS $MFT read, Windows only) ────────────────
 
 #[cfg(windows)]
@@ -109,21 +247,20 @@ fn confidence_generate_impl(display_name: &str, folder_name: &str) -> i32 {
         return 0;
     }
 
-    if display_name.eq_ignore_ascii_case(folder_name) {
+    // C# equivalente: displayName.Equals / StartsWith com
+    // StringComparison.OrdinalIgnoreCase (folding Unicode COMPLETO).
+    // O codigo Rust usava eq_ignore_ascii_case + fatiamento por BYTE:
+    //   - so comparava ASCII -> "Café" vs "café" NAO casava (o C# casa);
+    //   - o fatiamento por byte perdia o match em fronteira multi-byte.
+    // Divergencia = o resultado dependia de o rust_native.dll estar presente
+    // no output. ci_eq/ci_starts_with alinham as duas implementacoes.
+    if ci_eq(display_name, folder_name) {
         return 100;
     }
-    if !display_name.is_empty()
-        && display_name
-            .get(..folder_name.len())
-            .is_some_and(|p| p.eq_ignore_ascii_case(folder_name))
-    {
+    if ci_starts_with(display_name, folder_name) {
         return 90;
     }
-    if !folder_name.is_empty()
-        && folder_name
-            .get(..display_name.len())
-            .is_some_and(|f| f.eq_ignore_ascii_case(display_name))
-    {
+    if ci_starts_with(folder_name, display_name) {
         return 85;
     }
 
@@ -133,7 +270,7 @@ fn confidence_generate_impl(display_name: &str, folder_name: &str) -> i32 {
     if clean_display.is_empty() || clean_folder.is_empty() {
         return 0;
     }
-    if clean_display.eq_ignore_ascii_case(&clean_folder) {
+    if ci_eq(&clean_display, &clean_folder) {
         return 80;
     }
 
@@ -183,6 +320,10 @@ pub extern "C" fn sha256_file_ffi(
     out_buf: *mut u8,
     out_capacity: i32,
 ) -> i32 {
+    // Usado pelo auto-update para validar o hash do zip: um erro aqui
+    // pode virar "hash mismatch" falso. A guarda evita que um panic
+    // num arquivo exótico derrube o app inteiro.
+    ffi_guard!(-9i32, {
     let path_str = to_rust_string(path);
     let mut file = match std::fs::File::open(&path_str) {
         Ok(f) => f,
@@ -219,6 +360,7 @@ pub extern "C" fn sha256_file_ffi(
         *out_buf.add(len) = 0;
     }
     0
+    })
 }
 
 // ── Search scoring ─────────────────────────────────────────────────
@@ -269,10 +411,12 @@ pub extern "C" fn search_score_ffi(
     desc: *const u16,
     query: *const u16,
 ) -> i32 {
-    let t = to_rust_string(title);
-    let d = to_rust_string(desc);
-    let q = to_rust_string(query);
-    search_score_impl(&t, &d, &q)
+    ffi_guard!(0i32, {
+        let t = to_rust_string(title);
+        let d = to_rust_string(desc);
+        let q = to_rust_string(query);
+        search_score_impl(&t, &d, &q)
+    })
 }
 
 // ── PATH analysis ──────────────────────────────────────────────────
@@ -365,8 +509,10 @@ fn analyze_path_problems_impl(path_value: &str) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn analyze_path_problems_ffi(path_value: *const u16) -> i32 {
-    let p = to_rust_string(path_value);
-    analyze_path_problems_impl(&p)
+    ffi_guard!(0i32, {
+        let p = to_rust_string(path_value);
+        analyze_path_problems_impl(&p)
+    })
 }
 
 // ── Blake3 hashing ────────────────────────────────────────────────
@@ -377,6 +523,7 @@ pub extern "C" fn blake3_file_ffi(
     out_buf: *mut u8,
     out_capacity: i32,
 ) -> i32 {
+    ffi_guard!(-9i32, {
     let path_str = to_rust_string(path);
     let mut file = match std::fs::File::open(&path_str) {
         Ok(f) => f,
@@ -413,6 +560,7 @@ pub extern "C" fn blake3_file_ffi(
         *out_buf.add(len) = 0;
     }
     0
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -422,6 +570,7 @@ pub extern "C" fn blake3_bytes_ffi(
     out_buf: *mut u8,
     out_capacity: i32,
 ) -> i32 {
+    ffi_guard!(-9i32, {
     if data.is_null() || length <= 0 {
         return -1;
     }
@@ -446,39 +595,45 @@ pub extern "C" fn blake3_bytes_ffi(
         *out_buf.add(len) = 0;
     }
     0
+    })
 }
 
 // ── Glob matching ─────────────────────────────────────────────────
 
 #[unsafe(no_mangle)]
 pub extern "C" fn glob_match_ffi(pattern: *const u16, path: *const u16) -> i32 {
-    let pat_str = to_rust_string(pattern);
-    let path_str = to_rust_string(path);
-    if pat_str.is_empty() || path_str.is_empty() {
-        return 0;
-    }
-    let glob = match globset::Glob::new(&pat_str) {
-        Ok(g) => g,
-        Err(_) => return 0,
-    };
-    let matcher = glob.compile_matcher();
-    matcher.is_match(&path_str) as i32
+    ffi_guard!(0i32, {
+        let pat_str = to_rust_string(pattern);
+        let path_str = to_rust_string(path);
+        if pat_str.is_empty() || path_str.is_empty() {
+            return 0;
+        }
+        // Padrao compilado e cacheado: Glob::new a cada chamada custava ~17 us
+        // (medido) contra 16 ns do .NET com o mesmo trabalho.
+        let glob = match cached_glob_match(&pat_str, &path_str) {
+            Some(g) => g,
+            None => return 0,
+        };
+        glob as i32
+    })
 }
 
 // ── Regex helpers ─────────────────────────────────────────────────
 
 #[unsafe(no_mangle)]
 pub extern "C" fn regex_match_ffi(text: *const u16, pattern: *const u16) -> i32 {
-    let text_str = to_rust_string(text);
-    let pat_str = to_rust_string(pattern);
-    if text_str.is_empty() || pat_str.is_empty() {
-        return 0;
-    }
-    let re = match Regex::new(&pat_str) {
-        Ok(r) => r,
-        Err(_) => return 0,
-    };
-    re.is_match(&text_str) as i32
+    ffi_guard!(0i32, {
+        let text_str = to_rust_string(text);
+        let pat_str = to_rust_string(pattern);
+        if text_str.is_empty() || pat_str.is_empty() {
+            return 0;
+        }
+        let matched = match cached_regex_match(&pat_str, &text_str) {
+            Some(m) => m,
+            None => return 0,
+        };
+        matched as i32
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -489,27 +644,28 @@ pub extern "C" fn regex_replace_ffi(
     out_buf: *mut u16,
     out_capacity: i32,
 ) -> i32 {
-    let text_str = to_rust_string(text);
-    let pat_str = to_rust_string(pattern);
-    let repl_str = to_rust_string(replacement);
-    if text_str.is_empty() || pat_str.is_empty() {
-        return -1;
-    }
-    let re = match Regex::new(&pat_str) {
-        Ok(r) => r,
-        Err(_) => return -1,
-    };
-    let result = re.replace_all(&text_str, repl_str.as_str());
-    let result_utf16: Vec<u16> = result.encode_utf16().collect();
-    let len = result_utf16.len();
-    if len >= out_capacity as usize {
-        return -(len as i32) - 1;
-    }
-    unsafe {
-        std::ptr::copy_nonoverlapping(result_utf16.as_ptr(), out_buf, len);
-        *out_buf.add(len) = 0;
-    }
-    len as i32
+    ffi_guard!(-1i32, {
+        let text_str = to_rust_string(text);
+        let pat_str = to_rust_string(pattern);
+        let repl_str = to_rust_string(replacement);
+        if text_str.is_empty() || pat_str.is_empty() {
+            return -1;
+        }
+        let result = match cached_regex_replace(&pat_str, &text_str, repl_str.as_str()) {
+            Some(r) => r,
+            None => return -1,
+        };
+        let result_utf16: Vec<u16> = result.encode_utf16().collect();
+        let len = result_utf16.len();
+        if len >= out_capacity as usize {
+            return -(len as i32) - 1;
+        }
+        unsafe {
+            std::ptr::copy_nonoverlapping(result_utf16.as_ptr(), out_buf, len);
+            *out_buf.add(len) = 0;
+        }
+        len as i32
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -520,45 +676,62 @@ pub extern "C" fn regex_capture_ffi(
     out_buf: *mut u16,
     out_capacity: i32,
 ) -> i32 {
-    let text_str = to_rust_string(text);
-    let pat_str = to_rust_string(pattern);
-    if text_str.is_empty() || pat_str.is_empty() {
-        return -1;
-    }
-    let final_pat: String = if case_insensitive {
-        format!("(?i){}", pat_str)
-    } else {
-        pat_str
-    };
-    let re = match Regex::new(&final_pat) {
-        Ok(r) => r,
-        Err(_) => return -1,
-    };
-    let caps = match re.captures(&text_str) {
-        Some(c) => c,
-        None => return 0,
-    };
-
-    let count = caps.len();
-    let capacity = out_capacity as usize;
-    let mut pos: usize = 0;
-
-    for i in 0..count {
-        if let Some(m) = caps.get(i) {
-            let utf16: Vec<u16> = m.as_str().encode_utf16().collect();
-            let needed = utf16.len() + 1;
-            if pos + needed > capacity {
-                return -(count as i32);
-            }
-            unsafe {
-                std::ptr::copy_nonoverlapping(utf16.as_ptr(), out_buf.add(pos), utf16.len());
-                *out_buf.add(pos + utf16.len()) = 0;
-            }
-            pos += needed;
+    ffi_guard!(-1i32, {
+        let text_str = to_rust_string(text);
+        let pat_str = to_rust_string(pattern);
+        if text_str.is_empty() || pat_str.is_empty() {
+            return -1;
         }
-    }
+        let final_pat: String = if case_insensitive {
+            format!("(?i){}", pat_str)
+        } else {
+            pat_str
+        };
+        let re = match cached_regex_ref(&final_pat) {
+            Some(r) => r,
+            None => return -1,
+        };
+        let caps = match re.captures(&text_str) {
+            Some(c) => c,
+            None => return 0,
+        };
 
-    count as i32
+        let count = caps.len();
+        let capacity = out_capacity as usize;
+        let mut pos: usize = 0;
+
+        for i in 0..count {
+            if let Some(m) = caps.get(i) {
+                let utf16: Vec<u16> = m.as_str().encode_utf16().collect();
+                let needed = utf16.len() + 1;
+                if pos + needed > capacity {
+                    return -(count as i32);
+                }
+                unsafe {
+                    std::ptr::copy_nonoverlapping(utf16.as_ptr(), out_buf.add(pos), utf16.len());
+                    *out_buf.add(pos + utf16.len()) = 0;
+                }
+                pos += needed;
+            }
+        }
+
+        count as i32
+    })
+}
+
+// ── Sonda: custo PURO do boundary com 2 strings (sem trabalho nenhum) ──
+// Serve para separar "custo do boundary" de "custo do trabalho". O C#
+// chama os exports com `string`, e o marshalling de string no P/Invoke
+// cria um buffer nativo a CADA chamada (a Microsoft documenta: "4
+// allocations" so para devolver uma string). Este export mede quanto
+// custa SO isso.
+#[unsafe(no_mangle)]
+pub extern "C" fn probe_boundary_ffi(a: *const u16, b: *const u16) -> i32 {
+    ffi_guard!(0i32, {
+        let sa = to_rust_string(a);
+        let sb = to_rust_string(b);
+        (sa.len() + sb.len()) as i32
+    })
 }
 
 // ── Exported FFI ──────────────────────────────────────────────────
@@ -569,9 +742,11 @@ pub extern "C" fn sift4_distance_ffi(
     s2: *const u16,
     max_offset: i32,
 ) -> i32 {
-    let a = to_rust_string(s1);
-    let b = to_rust_string(s2);
-    sift4_distance(&a, &b, max_offset)
+    ffi_guard!(-1i32, {
+        let a = to_rust_string(s1);
+        let b = to_rust_string(s2);
+        sift4_distance(&a, &b, max_offset)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -579,9 +754,11 @@ pub extern "C" fn confidence_generate_ffi(
     display_name: *const u16,
     folder_name: *const u16,
 ) -> i32 {
-    let display = to_rust_string(display_name);
-    let folder = to_rust_string(folder_name);
-    confidence_generate_impl(&display, &folder)
+    ffi_guard!(0i32, {
+        let display = to_rust_string(display_name);
+        let folder = to_rust_string(folder_name);
+        confidence_generate_impl(&display, &folder)
+    })
 }
 
 // ── Native Registry Scanner (wimlib-style substitute for RegistryKey) ────────
@@ -969,6 +1146,9 @@ mod native_registry {
         out_buf: *mut u16,
         out_capacity: i32,
     ) -> i32 {
+        // Guard de panic: um panic aqui (buffer invalido, hive corrompido)
+        // vira codigo de erro em vez de derrubar o processo .NET inteiro.
+        ffi_guard!(-1i32, {
         let root = super::to_rust_string(root_path);
         let display = super::to_rust_string(display_name);
         let install = super::to_rust_string(install_location);
@@ -999,5 +1179,6 @@ mod native_registry {
             }
         }
         results.len() as i32
+        })
     }
 }

@@ -380,5 +380,14 @@ KitLugia.Core/Resources/KitLugiaEFI/deps/refind/
 # Deploy test artifacts
 %TESTDIR%/
 nul
+
+# Saidas de build usadas quando o app esta aberto (DLL travada) - ver AGENTS.md
+klbuild/
+klrel/
+KitLugia.GUI/*_wpftmp.csproj
 .freebuff
 test_deploy_version.ps1
+
+# Sobras de sessoes antigas que NAO devem ir no release (ver AGENTS.md)
+/Program.cs
+/AGENTS.md.new

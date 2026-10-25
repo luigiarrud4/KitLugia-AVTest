@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -69,6 +69,8 @@ namespace KitLugia.GUI.Pages
         private BloatwareApp? _reviewBloatwareContext;
         private int _reviewFilesDeleted;
         private int _reviewRegDeleted;
+        private int _reviewAutoRemovidos;
+        private List<string> _reviewAutoMotivos = new();
         private DeepUninstaller.UninstallResult? _reviewResult;
         private TaskCompletionSource<bool>? _confirmTcs;
 
@@ -1030,13 +1032,72 @@ namespace KitLugia.GUI.Pages
             });
         }
 
-        private void EnqueueOrShowReview(ProgramViewModel program, DeepUninstaller.UninstallResult scanResult)
+        private async void EnqueueOrShowReview(ProgramViewModel program, DeepUninstaller.UninstallResult scanResult)
         {
+            // ─────────────────────────────────────────────────────────────
+            // PASSO 1 — limpeza do que e' 100% CONFIRMADO, sem perguntar.
+            // O objetivo e' o utilizador desinstalar e pronto: o que so pode
+            // ser residuo DESTE programa (pasta com o nome exato no AppData,
+            // ou ficheiros dentro da instalacao dele) vai sozinho. Tudo o que
+            // tiver duvida continua no review, como antes.
+            //
+            // O threshold e' 95 em AutoCleanup.LimiarAutomatico — de proposito
+            // altissimo. Passa por backup + Lixeira (fail-closed: se o backup
+            // falhar, o ficheiro fica) e o utilizador pode cancelar na Lixeira.
+            // ─────────────────────────────────────────────────────────────
+            int autoRemovidos = 0;
+            var motivosAuto = new List<string>();
+            try
+            {
+                if (DeepUninstallSettings.AutoCleanConfirmed && scanResult.LeftoverFiles.Count > 0)
+                {
+                    var (auto, resto) = AutoCleanup.Separar(
+                        program.DisplayName, program.InstallLocation, scanResult.LeftoverFiles);
+
+                    if (auto.Count > 0)
+                    {
+                        var res = new DeepUninstaller.UninstallResult();
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+                        await Task.Run(() => DeepUninstaller.PerformCleanup(
+                            auto, new List<string>(), res, ct: cts.Token), cts.Token);
+
+                        autoRemovidos = res.FilesDeleted;
+                        motivosAuto.AddRange(res.DeleteErrors);
+
+                        // O que NAO saiu entra no review. Se o backup falhou ou o
+                        // utilizador cancelou, o item volta para a lista — nunca
+                        // desaparece da vista sem o utilizador perceber.
+                        var aindaLa = new HashSet<string>(res.FilesKept, StringComparer.OrdinalIgnoreCase);
+
+                        scanResult.LeftoverFiles = resto
+                            .Concat(auto.Where(p => aindaLa.Contains(p)))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
+                        if (autoRemovidos > 0)
+                        {
+                            string metodo = DeepUninstallSettings.SendToRecycleBin ? "Lixeira" : "permanente";
+                            KitLugia.Core.Logger.Log(
+                                $"🧹 Limpeza automática: {autoRemovidos} de {auto.Count} item(ns) 100% confirmados de " +
+                                $"'{program.DisplayName}' removidos sozinhos (limiar {AutoCleanup.LimiarAutomatico}/100, metodo: {metodo}).");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Falhou o automatico? mostra TUDO no review. Preferimos fazer o
+                // utilizador decidir a falhar a limpeza "automatica".
+                KitLugia.Core.Logger.LogError("EnqueueOrShowReview", "AutoClean falhou: " + ex.Message);
+                motivosAuto.Add("A limpeza automática falhou — tudo foi enviado para revisão: " + ex.Message);
+            }
+
             // Se já está mostrando outro review, enfileira para abrir quando o atual fechar.
             if (ReviewPanel.Visibility == Visibility.Visible)
             {
                 _pendingReviews.Enqueue((program, scanResult));
-                ShowBackgroundTaskToast($"Scan de {program.DisplayName} concluído — em fila de revisão.");
+                ShowBackgroundTaskToast($"Scan de {program.DisplayName} concluído"
+                    + (autoRemovidos > 0 ? $" — {autoRemovidos} item(ns) já limpos" : "") + " — em fila de revisão.");
                 return;
             }
 
@@ -1047,7 +1108,9 @@ namespace KitLugia.GUI.Pages
                 .Select(r => new ScanEntry { Path = r, Safety = DeepUninstaller.ClassifyRegistrySafety(program.DisplayName, program.InstallLocation, r) })
                 .ToList();
             _reviewProgramContext = program;
-            ShowReviewPanel(program.DisplayName, scanResult, classifiedFiles, classifiedReg);
+            _reviewAutoRemovidos = autoRemovidos;
+            _reviewAutoMotivos = motivosAuto;
+            ShowReviewPanel(program.DisplayName, scanResult, classifiedFiles, classifiedReg, program.InstallLocation);
         }
 
         private void RemoveProgramAfterSuccessfulScan(ProgramViewModel program, DeepUninstaller.UninstallResult scanResult)
@@ -1256,14 +1319,17 @@ namespace KitLugia.GUI.Pages
                 _portableCts = new CancellationTokenSource();
 
                 var token = _portableCts.Token;
-                var apps = await Task.Run(() => PortableAppScanner.Scan((done, total) =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (TxtPortableProgress != null)
-                            TxtPortableProgress.Text = $"Varrendo pastas... {done}/{total}";
-                    });
-                }, token), token);
+        var apps = await Task.Run(() => PortableAppScanner.Scan((done, total) =>
+        {
+            // InvokeAsync (NAO Invoke): este callback vem de varias threads do pool
+            // (o Core usa Parallel.ForEach). O Invoke e BLOQUEANTE — cada thread ficaria
+            // presa esperando a fila do Dispatcher. InvokeAsync so enfileira.
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (TxtPortableProgress != null)
+                    TxtPortableProgress.Text = $"Varrendo pastas... {done}/{total}";
+            });
+        }, token), token);
 
                 PortableCollection = new ObservableCollection<PortableDetectedViewModel>(
                     apps.Select(a => new PortableDetectedViewModel(a)));
@@ -1886,10 +1952,10 @@ namespace KitLugia.GUI.Pages
             return items;
         }
 
-        private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult scanResult, List<ScanEntry>? classifiedFiles = null, List<ScanEntry>? classifiedReg = null)
+private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult scanResult, List<ScanEntry>? classifiedFiles = null, List<ScanEntry>? classifiedReg = null, string? installLocation = null)
         {
-            _reviewResult = scanResult;
-            _reviewFileItems = BuildFileItems(scanResult.LeftoverFiles, classifiedFiles);
+        _reviewResult = scanResult;
+        _reviewFileItems = BuildFileItems(scanResult.LeftoverFiles, classifiedFiles);
             _reviewRegItems = BuildRegistryItems(scanResult.LeftoverRegistry, classifiedReg);
             _reviewFilesDeleted = 0;
             _reviewRegDeleted = 0;
@@ -1901,6 +1967,22 @@ namespace KitLugia.GUI.Pages
 
             ReviewTitle.Text = $"Deep Cleanup — {appName}";
             ReviewSubtitle.Text = "Revise os resíduos encontrados após a desinstalação";
+
+            // Diz o que ja foi feito SOZINHO. Sem isto o utilizador nao tem
+            // como saber que o lixeira/workset levou com o resto — e ele foi
+            // o unico que pediu para o lixo 100% confirmado sumir sem perguntar.
+            if (_reviewAutoRemovidos > 0)
+            {
+                ReviewSubtitle.Text =
+                    $"🧹 {_reviewAutoRemovidos} item(ns) 100% confirmados já foram limpos sozinhos "
+                    + $"(limiar {AutoCleanup.LimiarAutomatico}/100). Abaixo só o que ainda tem dúvida.";
+            }
+            if (_reviewAutoMotivos.Count > 0)
+            {
+                ReviewInfoText.Text = "⚠️ Parte da limpeza automática não ficou resolvida:\n"
+                    + string.Join("\n", _reviewAutoMotivos.Take(3));
+            }
+
             ReviewInfoText.Text = scanResult.UninstallSuccess
                 ? "Desinstalação concluída. Resíduos encontrados:"
                 : "Desinstalação pode não ter sido totalmente bem-sucedida. Resíduos encontrados:";
@@ -1973,9 +2055,19 @@ namespace KitLugia.GUI.Pages
                 await Task.Run(() => DeepUninstaller.PerformCleanup(
                     selectedFullPaths, new List<string>(), result, ct: cleanupCts.Token));
 
-                _reviewFilesDeleted += selectedFullPaths.Count;
-                var selectedSet = new HashSet<string>(selectedFullPaths, StringComparer.OrdinalIgnoreCase);
-                _reviewFileItems = _reviewFileItems.Where(f => !selectedSet.Contains(f.FullPath)).ToList();
+                // O QUE FICOU DE PÉ decide o que sai da lista. Antes o codigo
+                // usava selectedFullPaths.Count: quando o backup falhava, a
+                // lixeira estava indisponivel ou o usuario cancelava, o Core
+                // NAO incrementava FilesDeleted, mas a GUI removia o item da
+                // lista assim mesmo e - como a falha ia para DeleteErrors e
+                // nao para Errors - ainda mostrava "removido com sucesso".
+                // O arquivo continuava no disco e sumia da tela, sem como repetir.
+                var (removidos, preservados) = SepararPorExistencia(selectedFullPaths);
+                _reviewFilesDeleted += removidos.Count;
+
+                _reviewFileItems = _reviewFileItems
+                    .Where(f => !removidos.Contains(f.FullPath, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
                 ReviewFileList.ItemsSource = null;
                 ReviewFileList.ItemsSource = _reviewFileItems;
 
@@ -1983,12 +2075,12 @@ namespace KitLugia.GUI.Pages
                 this.Cursor = System.Windows.Input.Cursors.Arrow;
                 BtnReviewDeleteFiles.IsEnabled = _reviewFileItems.Any(f => f.IsSelected && f.CanDelete);
 
-                if (result.Errors.Count > 0)
-                    MessageBox.Show($"Erros ao excluir:\n{string.Join("\n", result.Errors.Take(5))}",
-                        "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
-                else
-                    MessageBox.Show($"{selectedFullPaths.Count} arquivo(s)/pasta(s) removidos com sucesso.",
-                        "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                MostrarResultadoExclusao(
+                    "arquivo(s)/pasta(s)",
+                    selectedFullPaths.Count,
+                    removidos.Count,
+                    preservados,
+                    result);
             }
             catch (Exception ex)
             {
@@ -1999,6 +2091,92 @@ namespace KitLugia.GUI.Pages
                 _isAppOperation = false;
             }
         }
+
+        /// <summary>
+        /// Depois da exclusao, o que REALMENTAINDA sumiu do disco? O Core é
+        /// fail-closed (backup/lixeira/usuário podem recusar), então confiar em
+        /// uma contagem ou em Exceptions esconderia item preservado.
+        /// </summary>
+        private static (List<string> removidos, List<string> preservados) SepararPorExistencia(IEnumerable<string> paths)
+        {
+            var removidos = new List<string>();
+            var preservados = new List<string>();
+            foreach (var p in paths)
+            {
+                bool existe;
+                try { existe = File.Exists(p) || Directory.Exists(p); }
+                catch { existe = true; } // não conseguir provar que sumiu = presume que ficou
+                if (existe) preservados.Add(p); else removidos.Add(p);
+            }
+            return (removidos, preservados);
+        }
+
+        private static (List<string> removidos, List<string> preservados) SepararChavesPorExistencia(IEnumerable<string> paths)
+        {
+            var removidos = new List<string>();
+            var preservados = new List<string>();
+            foreach (var p in paths)
+            {
+                bool existe;
+                try { existe = DeepUninstaller.RegistryItemStillExists(p); }
+                catch { existe = true; }
+                if (existe) preservados.Add(p); else removidos.Add(p);
+            }
+            return (removidos, preservados);
+        }
+
+        /// <summary>
+        /// Mensagem honesta: quantos saíram, quantos ficaram e POR QUE.
+        /// Reúne as 3 listas do Core — Errors (exceções), DeleteErrors
+        /// (backup/lixeira) e FilesKept (usuário recusou) — porque cada uma
+        /// carregava um motivo diferente e a GUI só olhava Errors.
+        /// </summary>
+        private void MostrarResultadoExclusao(
+            string nouns, int pedidos, int removidos, List<string> preservados,
+            DeepUninstaller.UninstallResult result)
+        {
+            var motivos = new List<string>();
+            motivos.AddRange(result.DeleteErrors);
+            motivos.AddRange(result.FilesKept.Select(k => $"{k}: o usuário recusou / preservado"));
+            motivos.AddRange(result.Errors);
+
+            if (removidos == pedidos && motivos.Count == 0)
+            {
+                MessageBox.Show($"{removidos} {nouns} removido(s) com sucesso.",
+                    "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var msg = new System.Text.StringBuilder();
+            msg.AppendLine($"{removidos} de {pedidos} {nouns} removido(s).");
+            if (preservados.Count > 0)
+            {
+                msg.AppendLine();
+                msg.AppendLine($"⚠️ {preservados.Count} item(ns) continuam no lugar e seguem na lista (dá para tentar de novo):");
+                foreach (var p in preservados.Take(5))
+                    msg.AppendLine("   • " + Shorten(p, 70));
+                if (preservados.Count > 5)
+                    msg.AppendLine($"   ... e mais {preservados.Count - 5}.");
+            }
+
+            if (motivos.Count > 0)
+            {
+                msg.AppendLine();
+                msg.AppendLine("Motivos:");
+                foreach (var m in motivos.Take(8))
+                    msg.AppendLine("   • " + m);
+                if (motivos.Count > 8)
+                    msg.AppendLine($"   ... e mais {motivos.Count - 8}.");
+            }
+
+            MessageBox.Show(msg.ToString(),
+                preservados.Count > 0 ? "Parcialmente concluído" : "Aviso",
+                MessageBoxButton.OK,
+                preservados.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+
+        private static string Shorten(string s, int max)
+            => s.Length <= max ? s : s[..max] + "...";
 
         private async void BtnReviewDeleteReg_Click(object sender, RoutedEventArgs e)
         {
@@ -2032,9 +2210,13 @@ namespace KitLugia.GUI.Pages
                 await Task.Run(() => DeepUninstaller.PerformCleanup(
                     new List<string>(), selectedFullPaths, result, ct: cleanupCts.Token));
 
-                _reviewRegDeleted += selectedFullPaths.Count;
-                var selectedSet = new HashSet<string>(selectedFullPaths, StringComparer.OrdinalIgnoreCase);
-                _reviewRegItems = _reviewRegItems.Where(r => !selectedSet.Contains(r.FullPath)).ToList();
+                // Mesma regra dos arquivos: quem some de verdade sai da lista.
+                var (removidos, preservados) = SepararChavesPorExistencia(selectedFullPaths);
+                _reviewRegDeleted += removidos.Count;
+
+                _reviewRegItems = _reviewRegItems
+                    .Where(r => !removidos.Contains(r.FullPath, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
                 ReviewRegList.ItemsSource = null;
                 ReviewRegList.ItemsSource = _reviewRegItems;
 
@@ -2042,12 +2224,12 @@ namespace KitLugia.GUI.Pages
                 this.Cursor = System.Windows.Input.Cursors.Arrow;
                 BtnReviewDeleteReg.IsEnabled = _reviewRegItems.Any(r => r.IsSelected && r.CanDelete);
 
-                if (result.Errors.Count > 0)
-                    MessageBox.Show($"Erros ao excluir:\n{string.Join("\n", result.Errors.Take(5))}",
-                        "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
-                else
-                    MessageBox.Show($"{selectedFullPaths.Count} chave(s) de registro removidas com sucesso.",
-                        "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                MostrarResultadoExclusao(
+                    "chave(s) de registro",
+                    selectedFullPaths.Count,
+                    removidos.Count,
+                    preservados,
+                    result);
             }
             catch (Exception ex)
             {

@@ -92,7 +92,12 @@ namespace KitLugia.Core
             {
                 var disks = GetAllDisksNative();
                 sw.Stop();
-                Logger.Log($"[DISK] GetAllDisks: caminho NATIVO (IOCTL) - {disks.Count} disco(s) em {sw.ElapsedMilliseconds} ms");
+                // LogOnce: GetAllDisks e chamado a cada varredura (~40 s) e por
+                // varias paginas; a linha "caminho NATIVO" era identica todas as
+                // vezes e ocupava o log sem dizer nada novo.
+                Logger.LogOnce("disk|getalldisks|nativo",
+                    $"[DISK] GetAllDisks: caminho NATIVO (IOCTL) - {disks.Count} disco(s) em {sw.ElapsedMilliseconds} ms",
+                    heartbeatSeconds: 300);
                 return disks;
             }
             catch (Exception ex)
@@ -228,8 +233,14 @@ namespace KitLugia.Core
                 string parts = string.Join(" | ", diskInfo.Partitions
                     .Where(p => !p.IsUnallocated)
                     .Select(p => $"{p.DriveLetter}{p.Label}({p.Type},{p.SizeString})"));
-                Logger.Log($"[DISK]  Disco {i}: {diskInfo.Model} | {diskInfo.Interface} | {diskInfo.PartitionStyle} | {diskInfo.SizeString} | Sys={diskInfo.IsSystemDisk} ({swDisk.ElapsedMilliseconds} ms)");
-                Logger.Log($"[DISK]    {parts}");
+                // Detalhe por disco: e o que faz o log ter 3 linhas x N discos a cada
+                // varredura. So interessa quando alguem investiga o disco =>
+                // fica para o log detalhado.
+                if (Logger.VerboseCheckLogs)
+                {
+                    Logger.Log($"[DISK]  Disco {i}: {diskInfo.Model} | {diskInfo.Interface} | {diskInfo.PartitionStyle} | {diskInfo.SizeString} | Sys={diskInfo.IsSystemDisk} ({swDisk.ElapsedMilliseconds} ms)");
+                    Logger.Log($"[DISK]    {parts}");
+                }
             }
 
             if (disks.Count == 0)
@@ -237,7 +248,8 @@ namespace KitLugia.Core
             if (disks.All(d => d.Partitions.All(p => p.IsUnallocated)))
                 throw new InvalidOperationException("IOCTL nativo sem permissão de leitura de layout (sem admin?): nenhum disco trouxe partições reais — caindo no fallback");
             swTotal.Stop();
-            Logger.Log($"[DISK]  Enumeracao nativa total (volumes+boot+layout): {swTotal.ElapsedMilliseconds} ms");
+            if (Logger.VerboseCheckLogs)
+                Logger.Log($"[DISK]  Enumeracao nativa total (volumes+boot+layout): {swTotal.ElapsedMilliseconds} ms");
             return disks.OrderBy(d => d.Index).ToList();
         }
 

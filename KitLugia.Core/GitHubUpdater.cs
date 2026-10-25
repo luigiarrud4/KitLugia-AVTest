@@ -309,7 +309,13 @@ namespace KitLugia.Core
         {
             try
             {
-                var assembly = Assembly.GetExecutingAssembly();
+                // A versao que importa e' a do APP (exe), nao a desta classe.
+                // O KitLugia.Core.csproj NAO tem <Version> proprio: o kit publicado pelo
+                // Deploy.ps1 recebe -p:Version (propriedade global, vale para o Core),
+                // mas um "Publicar" do Visual Studio NAO passa nada -> o Core ficaria
+                // em 1.0.0.0 e o updater acharia TODA release mais nova (nag eterno).
+                // SmartVersionDetector.GetCurrentAssemblyVersion ja usa esta ordem.
+                var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
                 var version = assembly.GetName().Version;
                 return version ?? new Version("1.0.0");
             }

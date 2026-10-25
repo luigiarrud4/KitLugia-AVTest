@@ -38,15 +38,15 @@ namespace KitLugia.GUI.Pages
             InitializeTimer();
             this.Loaded += PrivacyPage_Loaded;
 
-            // �� LIMPEZA: Para timer ao sair da página
+ // LIMPEZA: Para timer ao sair da página
             this.Unloaded += PrivacyPage_Unloaded;
 
-            // �� CORRE�?�fO: Garantir que o filtro não é aplicado durante inicialização
+ // CORREfO: Garantir que o filtro não é aplicado durante inicialização
             _currentFilter = "All";
             _searchText = "";
         }
 
-        // �� CORRE�?�fO: Cleanup público para ser chamado via reflection pelo MainWindow
+ // CORREfO: Cleanup público para ser chamado via reflection pelo MainWindow
         public void Cleanup()
         {
             if (_refreshTimer != null)
@@ -57,13 +57,13 @@ namespace KitLugia.GUI.Pages
             this.Unloaded -= PrivacyPage_Unloaded;
             _timersStarted = false;
 
-            // �� LIMPEZA: Limpa DataContext e coleções
+ // LIMPEZA: Limpa DataContext e coleções
             Categories.Clear();
             this.DataContext = null;
 
-            // �� LIMPEZA: Força GC para liberar memória imediatamente
+ // LIMPEZA: Força GC para liberar memória imediatamente
 
-            // �� LIMPEZA: Força Windows a liberar Working Set (reduz RAM no Task Manager)
+ // LIMPEZA: Força Windows a liberar Working Set (reduz RAM no Task Manager)
         }
 
         private void PrivacyPage_Unloaded(object sender, RoutedEventArgs e)
@@ -445,7 +445,7 @@ namespace KitLugia.GUI.Pages
 
                 ApplyFilter();
 
-                // �� ATUALIZA�?�fO: Atualiza contador de "protegido" ao selecionar filtro
+ // ATUALIZAfO: Atualiza contador de "protegido" ao selecionar filtro
                 RefreshStatus();
             }
         }

@@ -54,8 +54,9 @@
                    Text="Caminho do Executável:" 
                    FontWeight="SemiBold"
                    Margin="0,0,0,5"/>
-        <TextBox Grid.Row="2" 
-                 Name="TxtExecutablePath" 
+        <TextBox Grid.Row="2"
+                 Name="TxtExecutablePath"
+                 Style="{StaticResource DarkTextBoxStyle}"
                  IsReadOnly="True"
                  TextWrapping="Wrap"
                  Height="60"
@@ -66,8 +67,9 @@
                    Text="Argumentos Adicionais (opcional):" 
                    FontWeight="SemiBold"
                    Margin="0,0,0,5"/>
-        <TextBox Grid.Row="4" 
-                 Name="TxtArguments" 
+        <TextBox Grid.Row="4"
+                 Name="TxtArguments"
+                 Style="{StaticResource DarkTextBoxStyle}"
                  Height="50"
                  Margin="0,0,0,15"/>
         
@@ -76,8 +78,9 @@
                    Text="Resultado Final:" 
                    FontWeight="SemiBold"
                    Margin="0,0,0,5"/>
-        <TextBox Grid.Row="6" 
-                 Name="TxtFinalResult" 
+        <TextBox Grid.Row="6"
+                 Name="TxtFinalResult"
+                 Style="{StaticResource DarkTextBoxStyle}"
                  IsReadOnly="True"
                  TextWrapping="Wrap"
                  Height="60"

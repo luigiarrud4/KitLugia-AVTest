@@ -190,6 +190,107 @@
                 </StackPanel>
             </Border>
 
+            <!-- Se&#xE7;&#xE3;o: Monitoramento avan&#xE7;ado (alertas e detec&#xE7;&#xE3;o) -->
+            <Border Style="{StaticResource SettingsCard}">
+                <StackPanel>
+                    <TextBlock Text="MONITORAMENTO AVAN&#xC7;ADO"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource AccentColor}"
+                               Margin="0,0,0,15"/>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Alertas inteligentes" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Avisa quando um processo passa dos limites de RAM/CPU ou trava. Ative e ajuste os limites abaixo."
+                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleSmartAlerts" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
+                                  IsChecked="True" Click="OnToggleSmartAlerts"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Limiar de RAM por processo" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock x:Name="TxtHighRamStatus" Text="" FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBox x:Name="TxtHighRamThreshold" Grid.Column="1" Width="90"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 VerticalAlignment="Center" TextAlignment="Right"
+                                 Text="2048" LostFocus="TxtHighRamThreshold_LostFocus"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Limiar de CPU por processo" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock x:Name="TxtHighCpuStatus" Text="" FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBox x:Name="TxtHighCpuThreshold" Grid.Column="1" Width="90"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 VerticalAlignment="Center" TextAlignment="Right"
+                                 Text="80" LostFocus="TxtHighCpuThreshold_LostFocus"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Detec&#xE7;&#xE3;o de vazamento" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Observa processos que crescem sem parar e avisa (consome um pouco de CPU para medir)."
+                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleAntiLeak" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
+                                  Checked="OnToggleAntiLeak" Unchecked="OnToggleAntiLeak"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="An&#xE1;lise de comportamento" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Classifica padro&#xF5;es de uso de CPU por processo (instalador, jogo, ocioso) e registra no log."
+                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleBehaviorAnalysis" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
+                                  IsChecked="True" Click="OnToggleBehaviorAnalysis"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Assist&#xEA;ncia de foco" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Silencia tarefas de limpeza do kit enquanto uma janela em tela cheia est&#xE1; em foco (jogo/v&#xED;deo)."
+                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ToggleFocusAssist" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
+                                  Checked="OnToggleFocusAssist" Unchecked="OnToggleFocusAssist"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- Se&#xE7;&#xE3;o: Sistema -->
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>

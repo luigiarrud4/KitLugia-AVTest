@@ -1,9 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Page x:Class="KitLugia.GUI.Pages.IntegrityPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:converters="clr-namespace:KitLugia.GUI.Converters"
       mc:Ignorable="d" 
       Title="Integridade do Sistema"
       Background="{StaticResource WindowBackground}"
@@ -11,6 +12,7 @@
 
     <Page.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <converters:PendingReasonConverter x:Key="PendingReason"/>
     </Page.Resources>
 
     <Grid Margin="30">
@@ -53,11 +55,24 @@
             </Grid>
         </Grid>
 
-        <!-- 1.1 Loading Progress Bar -->
-        <Border Grid.Row="1" x:Name="ProgressBarContainer" Visibility="Collapsed" Margin="0,0,0,10" Height="4" CornerRadius="2" Background="#222">
-            <Border x:Name="ProgressBarFill" Width="100" Height="4" CornerRadius="2" Background="{StaticResource AccentColor}" HorizontalAlignment="Left"/>
-        </Border>
+        <!-- 1.1 Barra de progresso + aviso de correcoes pendentes de reinicio -->
+        <StackPanel Grid.Row="1">
+            <Border x:Name="PendingBanner" Visibility="Collapsed" Margin="0,0,0,10"
+                    Background="#33FFB900" BorderBrush="#FFB8860B" BorderThickness="1" CornerRadius="6" Padding="12,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="TxtPendingBanner" Grid.Column="0" FontSize="11"
+                               Foreground="#FFD700" TextWrapping="Wrap" Margin="0,0,10,0"/>
+                                    </Grid>
+            </Border>
 
+            <Border x:Name="ProgressBarContainer" Visibility="Collapsed" Margin="0,0,0,10" Height="4" CornerRadius="2" Background="#222">
+                <Border x:Name="ProgressBarFill" Width="100" Height="4" CornerRadius="2" Background="{StaticResource AccentColor}" HorizontalAlignment="Left"/>
+            </Border>
+        </StackPanel>
         <!-- 2. BOTÕES E PESQUISA -->
         <Grid Grid.Row="2" Margin="0,0,0,15">
             <Grid.ColumnDefinitions>
@@ -120,10 +135,8 @@
                           IsHitTestVisible="True" Cursor="Hand">
                     <ComboBoxItem Tag="ALL" IsSelected="True" Content="📋 Todas as Categorias"/>
                     <ComboBoxItem Tag="SEGURANCA" Content="🛡️ Segurança"/>
-                    <ComboBoxItem Tag="DEFESA" Content="🛡️ Defesa"/>
                     <ComboBoxItem Tag="PROTEGIDO" Content="✅ Protegido"/>
                     <ComboBoxItem Tag="MODIFICADO" Content="⚠️ Modificado"/>
-                    <ComboBoxItem Tag="NAO_ENCONTRADO" Content="❌ Não Encontrado"/>
                     <ComboBoxItem Tag="OPCIONAL" Content="⚙️ Opcional"/>
                     <ComboBoxItem Tag="DESEMPENHO" Content="⚡ Desempenho"/>
                 </ComboBox>
@@ -277,10 +290,24 @@
                                     <Button Click="BtnInfo_Click" Tag="{Binding Description}"
                                             Background="Transparent" BorderThickness="0"
                                             Width="30" Height="30" Cursor="Help"
-                                            ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
-                                        <Button.ToolTip>
-                                            <ToolTip Content="{Binding Description}"/>
-                                        </Button.ToolTip>
+ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
+                    <Button.ToolTip>
+                        <ToolTip>
+                            <ToolTip.Content>
+                                <TextBlock TextWrapping="Wrap" MaxWidth="460">
+                                    <TextBlock.Text>
+                                        <MultiBinding StringFormat="{}{0}{1}">
+                                            <Binding Path="Description"/>
+                                            <!-- PENDING: por que esta amarelo. -->
+                                            <MultiBinding.Converter>
+                                                <converters:PendingReasonConverter/>
+                                            </MultiBinding.Converter>
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                            </ToolTip.Content>
+                        </ToolTip>
+                    </Button.ToolTip>
                                         <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
@@ -375,6 +402,15 @@
                                     </DataTrigger>
 
                                     <!-- ESTADO: N/A -->
+                                    
+                                    <!-- AGUARDANDO REINICIO: corrigido, so vale no proximo boot -->
+                                    <DataTrigger Binding="{Binding Status}" Value="PENDING">
+                                        <Setter TargetName="StatusBadge" Property="Background" Value="#33FFB900"/>
+                                        <Setter TargetName="TxtStatus" Property="Text" Value="⏳ AGUARDANDO REINÍCIO"/>
+                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#FFD700"/>
+                                        <Setter TargetName="BtnAction" Property="Visibility" Value="Hidden"/>
+                                    </DataTrigger>
+                                    
                                     <DataTrigger Binding="{Binding Status}" Value="NOT_FOUND">
                                         <Setter TargetName="StatusBadge" Property="Background" Value="#111111"/>
                                         <Setter TargetName="TxtStatus" Property="Text" Value="N/A"/>
@@ -383,11 +419,16 @@
                                     </DataTrigger>
                                     
                                     <!-- OPCIONAL (VBS, etc) -->
-                                    <DataTrigger Binding="{Binding IsOptional}" Value="True">
+                                    <!-- OPCIONAL (VBS, etc) - NAO sobrescreve o PENDING -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsOptional}" Value="True"/>
+                                            <Condition Binding="{Binding Status}" Value="OK"/>
+                                        </MultiDataTrigger.Conditions>
                                         <Setter TargetName="StatusBadge" Property="Background" Value="#115533"/>
-                                        <Setter TargetName="TxtStatus" Property="Text" Value="⚠️ OPCIONAL"/>
+                                        <Setter TargetName="TxtStatus" Property="Text" Value="◇ OPCIONAL"/>
                                         <Setter TargetName="TxtStatus" Property="Foreground" Value="#FFA500"/>
-                                    </DataTrigger>
+                                    </MultiDataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                 </ListBox.ItemTemplate>

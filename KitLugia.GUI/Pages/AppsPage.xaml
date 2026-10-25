@@ -262,20 +262,20 @@
                             </ListView>
                         </Border>
 
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                            <Button Content="☑ Selecionar Todos" Click="BtnSelectAllBloatware_Click" Height="35" Width="125"
-                                    Background="#2C3E50" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,0" Cursor="Hand"/>
-                            <Button Content="☐ Limpar Seleção" Click="BtnDeselectAllBloatware_Click" Height="35" Width="115"
-                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,0" Cursor="Hand"/>
-                            <Button Content="Remover Selecionados" Click="BtnRemoveBloatwareSelected_Click" Height="35" Width="140" 
-                                    Background="#C42B1C" Foreground="White" BorderBrush="#C42B1C" BorderThickness="1" Margin="0,0,10,0" Cursor="Hand"/>
-                            <Button Content="&#x1F6E1; Ponto de Restauração" Click="BtnCreateRestorePoint_Click" Height="35" Width="150" 
-                                    Background="#2C3E50" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"/>
-                            <Button Content="&#x1F3AF; Hunter" Click="BtnHunterMode_Click" Height="35" Width="90" 
-                                    Background="#2E7D32" Foreground="White" BorderBrush="#4CAF50" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"/>
-                            <Button Content="Atualizar Lista" Click="BtnRefreshBloatware_Click" Height="35" Width="120" 
-                                    Background="#333" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand"/>
-                        </StackPanel>
+                        <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,15,0,0">
+                            <Button Content="☑ Selecionar Todos" Click="BtnSelectAllBloatware_Click" Height="35" MinWidth="125"
+                                    Background="#2C3E50" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,8" Padding="12,0" Cursor="Hand"/>
+                            <Button Content="☐ Limpar Seleção" Click="BtnDeselectAllBloatware_Click" Height="35" MinWidth="115"
+                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,8" Padding="12,0" Cursor="Hand"/>
+                            <Button Content="Remover Selecionados" Click="BtnRemoveBloatwareSelected_Click" Height="35" MinWidth="140"
+                                    Background="#C42B1C" Foreground="White" BorderBrush="#C42B1C" BorderThickness="1" Margin="0,0,10,8" Padding="12,0" Cursor="Hand"/>
+                            <Button Content="&#x1F6E1; Ponto de Restauração" Click="BtnCreateRestorePoint_Click" Height="35" MinWidth="150"
+                                    Background="#2C3E50" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand" Margin="0,0,10,8" Padding="12,0"/>
+                            <Button Content="&#x1F3AF; Hunter" Click="BtnHunterMode_Click" Height="35" MinWidth="90"
+                                    Background="#2E7D32" Foreground="White" BorderBrush="#4CAF50" BorderThickness="1" Cursor="Hand" Margin="0,0,10,8" Padding="12,0"/>
+                            <Button Content="Atualizar Lista" Click="BtnRefreshBloatware_Click" Height="35" MinWidth="120"
+                                    Background="#333" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand" Margin="0,0,0,8" Padding="12,0"/>
+                        </WrapPanel>
                     </Grid>
                 </TabItem>
 
@@ -392,24 +392,24 @@
                             </ListView>
                         </Border>
 
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                            <Button Content="☑ Selecionar Todos" Click="BtnSelectAllPrograms_Click" Height="35" Width="125"
-                                    Background="#2C3E50" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,0" Cursor="Hand"/>
-                            <Button Content="☐ Limpar Seleção" Click="BtnDeselectAllPrograms_Click" Height="35" Width="115"
-                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,0" Cursor="Hand"/>
-                            <Button Content="Remover Selecionados" Click="BtnRemoveProgramsSelected_Click" Height="35" Width="140" 
-                                    Background="#C42B1C" Foreground="White" BorderBrush="#C42B1C" BorderThickness="1" Margin="0,0,10,0" Cursor="Hand"/>
-                            <Button Content="&#x1F6E1; Ponto de Restauração" Click="BtnCreateRestorePoint_Click" Height="35" Width="150" 
-                                    Background="#2C3E50" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"/>
-                            <Button Content="&#x2699;&#xFE0F; Config" Click="BtnDeepUninstallSettings_Click" Height="35" Width="80"
-                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"
+                        <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,15,0,0">
+                            <Button Content="☑ Selecionar Todos" Click="BtnSelectAllPrograms_Click" Height="35" MinWidth="125"
+                                    Background="#2C3E50" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,8" Padding="12,0" Cursor="Hand"/>
+                            <Button Content="☐ Limpar Seleção" Click="BtnDeselectAllPrograms_Click" Height="35" MinWidth="115"
+                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Margin="0,0,10,8" Padding="12,0" Cursor="Hand"/>
+                            <Button Content="Remover Selecionados" Click="BtnRemoveProgramsSelected_Click" Height="35" MinWidth="140"
+                                    Background="#C42B1C" Foreground="White" BorderBrush="#C42B1C" BorderThickness="1" Margin="0,0,10,8" Padding="12,0" Cursor="Hand"/>
+                            <Button Content="&#x1F6E1; Ponto de Restauração" Click="BtnCreateRestorePoint_Click" Height="35" MinWidth="150"
+                                    Background="#2C3E50" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand" Margin="0,0,10,8" Padding="12,0"/>
+                            <Button Content="&#x2699;&#xFE0F; Config" Click="BtnDeepUninstallSettings_Click" Height="35" MinWidth="80"
+                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Cursor="Hand" Margin="0,0,10,8" Padding="12,0"
                                     ToolTip="Configurações do desinstalador (Lixeira, matar processos, scan, seleção padrão, ignorar 24h)"/>
-                            <Button Content="&#x1F558; Histórico" Click="BtnUninstallHistory_Click" Height="35" Width="95"
-                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Cursor="Hand" Margin="0,0,10,0"
+                            <Button Content="&#x1F558; Histórico" Click="BtnUninstallHistory_Click" Height="35" MinWidth="95"
+                                    Background="#444" Foreground="White" BorderBrush="#555" BorderThickness="1" Cursor="Hand" Margin="0,0,10,8" Padding="12,0"
                                     ToolTip="Undo persistente: restaurar arquivos e chaves de registro de desinstalações anteriores (sobrevive ao reboot)"/>
-                            <Button Content="Atualizar Lista" Click="BtnRefreshPrograms_Click" Height="35" Width="120" 
-                                    Background="#333" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand"/>
-                        </StackPanel>
+                            <Button Content="Atualizar Lista" Click="BtnRefreshPrograms_Click" Height="35" MinWidth="120"
+                                    Background="#333" Foreground="White" BorderBrush="#FFD700" BorderThickness="1" Cursor="Hand" Margin="0,0,0,8" Padding="12,0"/>
+                        </WrapPanel>
                     </Grid>
                 </TabItem>
 

@@ -186,6 +186,13 @@ internal static class Program
             // reverte pelo caminho de producao
             try { svc.RevertAllBoostTargets(); } catch { }
             try { svc.RestoreAllThrottledProcesses(); } catch { }
+            // Os ajustes GLOBAIS (Win32PrioritySeparation, SystemResponsiveness,
+            // NetworkThrottlingIndex) NAO sao revertidos por RevertAllBoostTargets
+            // — essa e' a funcao por PROCESSO e mexe so no que e' por processo.
+            // Eles sao desfeitos no ShutdownGameBoost, que e' o shutdown de sessao.
+            // A medicao e' feita DEPOIS do shutdown; antes mediava um instante em
+            // que o valor global ainda era o esperado e acusava 5 falhas sem bug.
+            try { svc.ShutdownGameBoost(); } catch { }
             await Task.Delay(400);
             var depois = Tirar(h, pid);
             Console.WriteLine($"    depois  : {depois}");
@@ -196,7 +203,8 @@ internal static class Program
                   $"{baseline.Pagina} -> {depois.Pagina}");
             Check($"{eng}: memory priority voltou ao original", depois.Memoria == baseline.Memoria,
                   $"{baseline.Memoria} -> {depois.Memoria}");
-            Check($"{eng}: Win32PrioritySeparation voltou ao original", depois.Separacao == baseline.Separacao,
+            Check($"{eng}: Win32PrioritySeparation voltou ao original (apos shutdown)",
+                  depois.Separacao == baseline.Separacao,
                   $"0x{baseline.Separacao:X} -> 0x{depois.Separacao:X}");
             Check($"{eng}: SystemResponsiveness voltou ao original",
                   depois.SysResponsiveness == baseline.SysResponsiveness,

@@ -806,8 +806,28 @@ fn scan_volume(root: &str, prefixes: &[Vec<u16>]) -> Result<Vec<u8>, i32> {
 
 // FFI export. prefixes: ';'-separated relative paths (empty entry =
 // whole drive), '/' separators, NUL-terminated UTF-16.
+//
+// Este e o export que LÊ DADOS NAO-CONFIADOS (a $MFT do disco pode estar
+// corrompida, com registros malformados). Com panic=abort no profile
+// release, um panic aqui derrubava o processo .NET INTEIRO. Agora o corpo
+// real esta em mft_scan_impl e o export so envolve em catch_unwind,
+// devolvendo -1000 (erro) em vez de matar o KitLugia.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mft_scan_ffi(
+    volume_root: *const u16,
+    prefixes: *const u16,
+    out_buf: *mut u8,
+    out_capacity: i32,
+) -> i32 {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+        mft_scan_impl(volume_root, prefixes, out_buf, out_capacity)
+    })) {
+        Ok(v) => v,
+        Err(_) => -1000,
+    }
+}
+
+unsafe fn mft_scan_impl(
     volume_root: *const u16,
     prefixes: *const u16,
     out_buf: *mut u8,

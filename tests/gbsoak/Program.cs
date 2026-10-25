@@ -189,8 +189,12 @@ internal static class Program
         foreach (var kv in porEngine) Console.WriteLine($"    falhas no motor {kv.Key}: {kv.Value}");
 
         Check("NENHUM processo ficou preso em prioridade", presoPrioridade == 0, $"{presoPrioridade} ciclo(s)");
-        Check("Win32PrioritySeparation voltou ao ORIGINAL",
-              presoSeparation == 0 && sepFinal == sepOriginal, $"0x{sepOriginal:X} -> 0x{sepFinal:X}");
+        // O sep NAO e verificado aqui: e' um ajuste GLOBAL de sessao, revertido
+        // pelo ShutdownGameBoost (e nao pelo RevertAllBoostTargets, que e' por
+        // processo e por isso NAO toca em nada global — comportamento correto).
+        // A verificacao fica logo abaixo, DEPOIS do shutdown, que e' quando o
+        // valor tem de estar de volta. Antes ela falhava 100% dos ciclos sem
+        // haver bug: media um instante em que o 38 era o estado esperado.
         Check("nenhum processo ficou em BelowNormal", presoThrottle == 0, $"{presoThrottle}");
         Check("prioridade final = inicial", prioFinal == prioInicial, $"{prioInicial} -> {prioFinal}");
         Check("sem fuga de handles", leak <= 12, $"delta {leak} (tolerancia 12)");
@@ -202,6 +206,11 @@ internal static class Program
         try { prioAposShutdown = PrioridadeDe(pid); } catch { }
         Check("shutdown devolveu a prioridade original",
               prioAposShutdown == prioInicial, $"{prioInicial} -> {prioAposShutdown}");
+
+        uint sepAposShutdown = (uint)(Win32Api.ReadWin32PrioritySeparation() ?? 0);
+        Console.WriteLine($"  Win32PrioritySeparation apos shutdown: 0x{sepOriginal:X} -> 0x{sepAposShutdown:X}");
+        Check("shutdown devolveu o Win32PrioritySeparation ao ORIGINAL",
+              sepAposShutdown == sepOriginal, $"0x{sepOriginal:X} -> 0x{sepAposShutdown:X}");
 
         try { alvo.Kill(); } catch { }
         await Task.Delay(300);

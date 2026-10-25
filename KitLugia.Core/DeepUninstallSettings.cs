@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.IO;
 using System.Runtime.Versioning;
@@ -20,6 +20,7 @@ namespace KitLugia.Core
         private static bool _killProcessesBeforeUninstall = true;
         private static bool _disableScanAfterUninstall;
         private static bool _selectLeftoversByDefault = true;
+        private static bool _autoCleanConfirmed = true;
         private static bool _ignoreRecent24H;
 
         private static void EnsureLoaded()
@@ -34,6 +35,7 @@ namespace KitLugia.Core
                 _killProcessesBeforeUninstall = ReadFlag(key, "KillProcesses", true);
                 _disableScanAfterUninstall = ReadFlag(key, "DisableScan", false);
                 _selectLeftoversByDefault = ReadFlag(key, "SelectLeftovers", true);
+            _autoCleanConfirmed = ReadFlag(key, "AutoCleanConfirmed", true);
                 _ignoreRecent24H = ReadFlag(key, "IgnoreRecent24H", false);
             }
             catch { }
@@ -88,6 +90,21 @@ namespace KitLugia.Core
         {
             get { EnsureLoaded(); return _selectLeftoversByDefault; }
             set { SetFlag("SelectLeftovers", value, ref _selectLeftoversByDefault); }
+        }
+
+        /// <summary>
+        /// Apagar SOZINHO o residuo 100% confirmado (pasta do proprio programa
+        /// dentro do AppData, ou ficheiros dentro da instalacao dele), sem abrir
+        /// o review para o utilizador decidir.
+        ///
+        /// O que nao for 100% confirmado continua a ir para o review — nada mais
+        /// mudou. O threshold vive em <see cref="AutoCleanup.LimiarAutomatico"/>.
+        /// Desligar aqui volta ao comportamento antigo (tudo no review).
+        /// </summary>
+        public static bool AutoCleanConfirmed
+        {
+            get { EnsureLoaded(); return _autoCleanConfirmed; }
+            set { SetFlag("AutoCleanConfirmed", value, ref _autoCleanConfirmed); }
         }
 
         /// <summary>Ignorar residuos acessados nas ultimas 24h (provavelmente ainda em uso).</summary>

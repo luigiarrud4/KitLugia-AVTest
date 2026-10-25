@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security;
 
@@ -134,12 +135,12 @@ new() {
 new() {
             Name = "Proteção de Pilha de Hardware",
             Description = "Mecanismo de segurança que previne ataques de buffer overflow no nível de hardware. Desativar torna o sistema vulnerável a exploits de memória.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "FeatureSettingsOverrideMask", HarmfulValue = 0, DefaultValue = 3
+            Category = "Segurança Crítica", IsOptional = true, KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "SystemSettingsStackProtectionInformation", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
             Name = "Integridade de Memória (HVCI)",
             Description = "Proteção de integridade de código do hypervisor. Desativar expõe o sistema a injeção de kernel e rootkits. Sistemas sem HVCI são suscetíveis a ataques de persistência avançados.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard", ValueName = "HypervisorEnforcedCodeIntegrity", HarmfulValue = 0, DefaultValue = 1
+            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
             Name = "Proteção contra DMA",
@@ -154,7 +155,7 @@ new() {
         new() {
             Name = "Proteção de Integridade do Sistema (SIP)",
             Description = "Protege arquivos críticos do sistema contra modificação não autorizada. Ransomware pode modificar arquivos do sistema, causando corrupção e lentidão.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemProtection", ValueName = "Enable", HarmfulValue = 0, DefaultValue = 1
+            Category = "Segurança Crítica", IsOptional = true, KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemProtection", ValueName = "Enable", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
             Name = "Validação de Assinatura de Código (Code Signing)",
@@ -167,11 +168,6 @@ new() {
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", ValueName = "EnableRfg", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
-            Name = "Validação de Integridade de Boot",
-            Description = "Verifica integridade do processo de boot. Malware pode persistir através de reinicializações, causando lentidão crônica.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot", ValueName = "Verify", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
             Name = "Proteção contra Exploits de Zero-Day",
             Description = "Sistema de proteção contra exploits desconhecidos. Desativar expõe o sistema a vulnerabilidades zero-day que podem causar comprometimento completo e degradação de performance.",
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ExploitProtection", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
@@ -179,7 +175,7 @@ new() {
         new() {
             Name = "Controle de Integridade de Memória Virtual",
             Description = "Protege memória virtual contra corrupção. Desativar permite que malware corrompa estruturas de memória, causando vazamentos e lentidão progressiva.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Memory\Integrity", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
+            Category = "Segurança Crítica", IsOptional = true, KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\VBS", ValueName = "Enabled", HarmfulValue = 0, DefaultValue = 1
         },
         new() {
             Name = "Bloqueio de Acesso Remoto ao Registro",
@@ -259,7 +255,39 @@ new() {
         new() {
             Name = "Proteção UEFI Secure Boot",
             Description = "Impede que bootkits e rootkits de firmware sejam carregados durante a inicialização. Desativar permite malware persistente de nível de firmware.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot", ValueName = "SecureBootEnabled", HarmfulValue = 0, DefaultValue = 1
+            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot\State", ValueName = "UEFISecureBootEnabled", HarmfulValue = 0, DefaultValue = 1
+        },
+        // ── Checks que faltavam de verdade (06/10/2026) ──
+        // Todos verificados contra o registro real desta maquina antes de entrarem.
+        new() {
+            Name = "Assinatura SMB Obrigatória (Servidor)",
+            Description = "Exige assinatura SMB em todas as comunicações. Sem isso, um atacante na rede local consegue fazer man-in-the-middle e sequestrar sessões.",
+            Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", ValueName = "Smb2SigningEnabled", HarmfulValue = 0, DefaultValue = 1, MissingIsHarmful = true
+        },
+        new() {
+            Name = "Assinatura SMB Obrigatória (Cliente)",
+            Description = "Exige assinatura SMB também na saída. Sem isso, o tráfego para servidores de rede pode ser interceptado e alterado.",
+            Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters", ValueName = "Smb2SigningEnabled", HarmfulValue = 0, DefaultValue = 1, MissingIsHarmful = true
+        },
+        new() {
+            Name = "Hash de Senha LM Desabilitado (Somente NTLM)",
+            Description = "Impede que o Windows guarde o hash de senha em LAN Manager, que é quebrado e quebra em segundos. A ausência da chave significa que o hash LM é permitido.",
+            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa", ValueName = "NoLMHash", HarmfulValue = 0, DefaultValue = 1, MissingIsHarmful = true
+        },
+        new() {
+            Name = "Enumeração Anônima do SAM Bloqueada",
+            Description = "Impede que contas-convidadas enumerem o banco de usuários pela rede. É a proteção contra vazamento da lista de usuários.",
+            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa", ValueName = "RestrictAnonymousSAM", HarmfulValue = 0, DefaultValue = 1
+        },
+        new() {
+            Name = "Convidados treated como Anônimos Desligado",
+            Description = "Desligado, o grupo Everyone deixa de ser tratado como anônimo e o bypass de permissões em compartilhamentos de rede não abre.",
+            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa", ValueName = "EveryoneIncludesAnonymous", HarmfulValue = 1, DefaultValue = 0
+        },
+        new() {
+            Name = "RDP Não Salva Credenciais",
+            Description = "Salvar a senha do acesso remoto deixa a credencial recuperável por qualquer processo do seu usuário. Só pesa se o acesso remoto estiver ligado, por isso é opcional.",
+            Category = "Segurança Crítica", IsOptional = true, KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp", ValueName = "fPromptForPassword", HarmfulValue = 0, DefaultValue = 1
         },
 
         // ==================================================================================
@@ -1675,11 +1703,6 @@ new() {
             Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Graphics", ValueName = "HardwareAcceleration", HarmfulValue = 0, DefaultValue = 1
         },
 
-        new() {
-            Name = "Verificação de Certificados Secure Boot",
-            Description = "Verificação de integridade do Secure Boot. Desativá-lo permite que sistemas operacionais não autorizados ou modificados sejam inicializados, comprometendo a cadeia de confiança.",
-            Category = "Segurança Crítica", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot", ValueName = "SecureBootEnabled", HarmfulValue = 0, DefaultValue = 1
-        },
 
         new() {
             Name = "Segurança no Parsing de URLs do Windows",
@@ -2367,11 +2390,6 @@ new() {
         // 27. PROBLEMAS DE SEGURANÇA DE REDE AVANÇADOS
         // ==================================================================================
         new() {
-            Name = "SMB Signing (Assinatura SMB Desativada)",
-            Description = "Assinatura de pacotes SMB desativada. Permite ataques Man-in-the-Middle em compartilhamentos de rede, onde atacantes podem modificar dados em trânsito.",
-            Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", ValueName = "EnableSecuritySignature", HarmfulValue = 0, DefaultValue = 1
-        },
-        new() {
             Name = "SMB Encryption (Criptografia SMB Desativada)",
             Description = "Criptografia SBM desativada. Dados transferidos em compartilhamentos de rede não são criptografados, permitindo interceptação por sniffers na rede.",
             Category = "Segurança de Rede", KeyPath = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", ValueName = "EncryptData", HarmfulValue = 0, DefaultValue = 1
@@ -2591,6 +2609,48 @@ new() {
             return HarmfulTweaks;
         }
 
+        /// <summary>
+        /// Preenche o Id ESTÁVEL de cada check.
+        ///
+        /// POR QUE: o estado "aguardando reinício" é gravado em disco
+        /// e precisa casar com o MESMO check no próximo boot. O Name é um texto
+        /// em português que pode ser reescrito a qualquer momento — se alguém
+        /// ajusta a redação ("Integridade de Memória" -> "Integridade de memória
+        /// (HVCI)"), a pendência vira órfã e some em silêncio.
+        ///
+        /// O Id deriva do que REALMENTE identifica o check (tipo + chave + valor,
+        /// ou o nome do serviço), que não muda quando o texto muda. É o mesmo
+        /// principio do StableId do Windows.
+        /// </summary>
+        private static void EnsureIds()
+        {
+            foreach (var t in HarmfulTweaks)
+            {
+                if (!string.IsNullOrEmpty(t.Id)) continue;
+
+                string chave;
+                switch (t.Type)
+                {
+                    case TweakType.Service:
+                        chave = "svc|" + t.ServiceName + "|" + t.DefaultStartMode;
+                        break;
+                    case TweakType.Bcd:
+                        chave = "bcd|" + t.ValueName;
+                        break;
+                    case TweakType.PageFile:
+                        chave = "pgf|" + t.KeyPath + "|" + t.ValueName;
+                        break;
+                    case TweakType.Mouse:
+                        chave = "mouse|" + t.ValueName;
+                        break;
+                    default:
+                        chave = "reg|" + t.KeyPath + "|" + t.ValueName;
+                        break;
+                }
+                t.Id = chave;
+            }
+        }
+
         public static List<ScannableTweak> GetHarmfulTweaksWithStatus()
         {
             // Single-flight: scans concorrentes (Integridade + busca global +
@@ -2598,6 +2658,7 @@ new() {
             // varredura de PATH por janela de cache em vez de N em paralelo.
             lock (_scanGate)
             {
+                EnsureIds();
                 var tweaksCopy = new List<ScannableTweak>(HarmfulTweaks.Count);
 
                 using var batch = new RegistryBatch();
@@ -2643,9 +2704,14 @@ new() {
                     // o reset no finally destruiria o ganho entre scans/toggles.
                 }
 
+                // Correcoes que so valem depois de reiniciar entram em PENDING
+                // (amarelo) em vez de fingirem protecao. No proximo boot o Store
+                // confere se o efeito veio e invalida o check se nao veio.
+                PendingRepairStore.Apply(tweaksCopy);
                 return tweaksCopy;
-            }
         }
+            }
+
 
         public static (bool Success, string Message) ToggleTweak(ScannableTweak tweak)
         {
@@ -2660,6 +2726,25 @@ new() {
                 switch (tweak.Type)
                 {
                     case TweakType.Registry:
+                        // Secure Boot e' decisao da FIRMWARE (UEFI). Gravar no registro
+                        // deixava o check verde e nao ligava NADA - correcao aparente.
+                        // Aqui a ferramenta diz a verdade em vez de fingir.
+                        if (IsSecureBootCheck(tweak))
+                        {
+                            if (!TryReadSecureBootFirmware(out bool ligado, out string motivo))
+                                return (false, $"Nao foi possivel verificar o Secure Boot: {motivo}.");
+
+                            if (ligado)
+                                return (true, "Secure Boot ja esta ligado.");
+
+                            return (false,
+                                "O Secure Boot e' decisao da FIRMWARE (UEFI), nao do Windows: " +
+                                "gravar no registro deixa o check verde sem ligar a protecao. " +
+                                "Ative em Configuracoes > Recuperacao > Inicializacao Segura > " +
+                                "Solucao de problemas > Configuracoes de Inicializacao UEFI > " +
+                                "Seguranca de Inicializacao UEFI (o PC precisa reiniciar).");
+                        }
+
                         if (string.IsNullOrEmpty(tweak.KeyPath))
                             return (false, "Configuração de registro inválida.");
 
@@ -2725,7 +2810,13 @@ new() {
                             if (changed)
                             {
                                 valueToSet = repairedPath;
-                                Logger.Log($"[PATH REPAIR] PATH {pathType} reparado. Ações: {string.Join("; ", actions)}");
+                                // Resumo CURTO: `actions` só tem mudanças de verdade e o
+                                // log leva a contagem (a linha antiga chegava a 1000+
+                                // caracteres com os "Mantido" que nada faziam).
+                                string resumo = actions.Count == 0
+                                    ? "essenciais do sistema ajustados"
+                                    : $"{actions.Count} ajuste(s): {string.Join("; ", actions)}";
+                                Logger.Log($"[PATH REPAIR] PATH {pathType} reparado — {resumo}");
                             }
                             else
                             {
@@ -2799,6 +2890,37 @@ new() {
                                 return (false, $"Falha ao modificar '{tweak.Name}': {directEx.Message}");
                             }
                         }
+                        // Integridade de Memoria (HVCI) so passa a valer DEPOIS de
+                        // reiniciar e se a CPU/firmware suportarem. Sem este aviso o
+                        // usuario acha que ficou protegido na hora.
+                        //
+                        // O registro e' so a CONFIGURACAO PEDIDA; o estado real so
+                        // aparece em NtQuerySystemInformation(103), consultado no
+                        // CheckTweak. Se essa leitura estiver disponivel, dizemos o
+                        // que o kernel mostra AGORA em vez de so pedir reinicio.
+                        if (tweak.Name.Contains("HVCI", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (NativeCodeIntegrity.TryGetHvci(out bool impoe, out bool audit,
+                                                               out bool disp, out uint _, out string motHvci))
+                            {
+                                _notaPosCorrecao = tweak.Name;
+                                _avisoPosCorrecao = impoe && !audit
+                                    ? "A Integridade de Memoria JA esta ativa agora (confirmada pelo kernel)."
+                                    : (audit
+                                        ? "HVCI esta em modo de AUDITORIA: registra eventos, mas nao bloqueia. " +
+                                          "Para proteger de fato e preciso ativar no proximo boot."
+                                        : "A configuracao foi gravada, mas o kernel ainda nao esta aplicando HVCI. " +
+                                          "So passa a valer depois de reiniciar, e apenas se a CPU e a firmware suportarem.");
+                            }
+                            else
+                            {
+                                _notaPosCorrecao = tweak.Name;
+                                _avisoPosCorrecao =
+                                    "A configuracao foi gravada. Nao da para ler o estado real do HVCI aqui (" +
+                                    motHvci + "); ele so e confirmavel apos reiniciar, e depende de CPU/firmware.";
+                            }
+                        }
+
                         break;
 
                     case TweakType.Service:
@@ -2910,16 +3032,65 @@ new() {
 
                 // Para tweaks do Explorer (que usam CheckExplorerProblems), não usar CheckTweak
                 // pois CheckExplorerProblems é genérico e pode reportar problemas não relacionados.
-                if (tweak.Category == "Corrupção de Sistema" || tweak.Category == "Defesa e Antivírus" || tweak.Category == "Restrições do Sistema")
+                // SEMPRE re-verificar depois de escrever.
+                //
+                // BUG CORRIGIDO (06/10/2026): este bloco antes terminava com
+                //     if (categoria em {Corrupcao, Defender, Restricoes})
+                //         tweak.Status = TweakStatus.OK;   // <- forca verde
+                //     else CheckTweak(tweak);
+                // ou seja, nas 3 categorias o status virava PROTEGIDO SEM reler o
+                // registro. Sao 74 checks (24 + 34 + 16) que ficavam verdes depois
+                // de "corrigir" sem nunca confirmar que o valor mudou. O comentario
+                // justificava com um CheckExplorerProblems que o CheckTweak nao usa
+                // ha muito tempo: era resto de codigo antigo que ficou.
+                //
+                // Sem re-verificar, um check e' exatamente o tipo de check que nao
+                // funciona: parece corrigido e nunca foi confirmado.
+                CheckTweak(tweak);
+
+                if (tweak.Status == TweakStatus.MODIFIED)
                 {
-                    // Após escrever o valor seguro, forçar OK
-                    tweak.Status = TweakStatus.OK;
+                    // PATH: dizer QUAL entrada ainda está errada (antes só dizia
+                    // "valor nao mudou ou foi reverteido" e não dava para agir).
+                    string pendencia = "";
+                    if (tweak.Name.Contains("PATH") && tweak.ValueName == "Path")
+                    {
+                        try
+                        {
+                            var atual = Registry.GetValue(tweak.KeyPath, tweak.ValueName, null)?.ToString() ?? "";
+                            string tipo = tweak.KeyPath.Contains("SYSTEM", StringComparison.OrdinalIgnoreCase) ? "System" : "User";
+                            string problemas = PathRepair.DescribeProblems(atual, tipo);
+                            if (!string.IsNullOrEmpty(problemas)) pendencia = $" Pendências: {problemas}";
+                        }
+                        catch { }
+                    }
+                    Logger.Log($"[TOGGLE] '{tweak.Name}' continua MODIFIED apos a escrita (valor nao mudou ou foi reverteido).{pendencia}");
+                    return (false, $"'{tweak.Name}' foi gravado mas continua com o valor errado. " +
+                                   "Esse valor costuma ser gerenciado pelo proprio Windows e volta ao estado anterior.");
                 }
-                else
+
+                string msgFinal = $"{tweak.Name} foi {action}.";
+
+                // Correções que o Windows só aplica no próximo boot (HVCI, VBS,
+                // pagefile...): dizer "foi corrigido" aqui seria mentira — o
+                // hypervisor ainda não leu essa configuração. O item entra em
+                // PENDING (amarelo, fora do score) e no próximo boot o Store
+                // confere se o efeito realmente veio.
+                if (PendingRepairStore.NeedsRebootAfterFix(tweak))
                 {
-                    CheckTweak(tweak);
+                    const string motivo = "o Windows só aplica esta configuração na próxima inicialização";
+                    PendingRepairStore.MarkPending(tweak, motivo);
+                    msgFinal += " AGUARDANDO REINÍCIO: " + motivo +
+                                ". Depois de reiniciar o check é conferido de novo; " +
+                                "se o efeito não vier, o item volta ao estado normal (MODIFIED).";
                 }
-                return (true, $"{tweak.Name} foi {action}.");
+
+                if (!string.IsNullOrEmpty(_notaPosCorrecao) && _notaPosCorrecao == tweak.Name)
+                {
+                    msgFinal += " " + _avisoPosCorrecao;
+                    _notaPosCorrecao = null;
+                }
+                return (true, msgFinal);
             }
             catch (UnauthorizedAccessException uae)
             {
@@ -3190,7 +3361,8 @@ new() {
                         string m = Meaningful(sysActions);
                         if (string.IsNullOrEmpty(m)) m = "essenciais do sistema ajustados";
                         steps.Add("[SISTEMA] " + m);
-                        Logger.Log($"[PATH REPAIR] System PATH reparado. Acoes: {string.Join("; ", sysActions)}");
+                        string m2 = string.IsNullOrEmpty(m) ? "essenciais do sistema ajustados" : m;
+                        Logger.Log($"[PATH REPAIR] System PATH reparado — {m2}");
                     }
                     else
                     {
@@ -3218,7 +3390,8 @@ new() {
                         string m = Meaningful(allUser);
                         if (string.IsNullOrEmpty(m)) m = "programas instalados adicionados ao PATH";
                         steps.Add("[USUARIO] " + m);
-                        Logger.Log($"[PATH REPAIR] User PATH reparado. Acoes: {string.Join("; ", allUser)}");
+                        string m2 = string.IsNullOrEmpty(m) ? "programas instalados adicionados" : m;
+                        Logger.Log($"[PATH REPAIR] User PATH reparado — {m2}");
                     }
                     else
                     {
@@ -3253,6 +3426,103 @@ new() {
 
         #region Verificação Interna
 
+        // ─── Secure Boot: a fonte autoritativa e a FIRMWARE, nao o registro ───
+        //
+        // BUG CORRIGIDO (06/10/2026): o valor
+        // HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State\UEFISecureBootEnabled
+        // e' ESCREVIVEL. O proprio Guardian escrevia 1 nele, o check relia 1 e
+        // ficava PROTEGIDO — com o Secure Boot CONTINUANDO DESLIGADO, porque o
+        // Secure Boot e' decisao da firmware (UEFI). Esse valor so REFLETE o
+        // estado; nao o liga.
+        //
+        // A verdade e a variavel UEFI "SecureBoot", lida por
+        // GetFirmwareEnvironmentVariable. Quando a leitura nao e possivel (sem
+        // admin, ou maquina que nao expoe a variavel), o check tem de dizer que
+        // NAO CONSEGUE VERIFICAR (NOT_FOUND, que a UI ja tem como filtro) em vez
+        // de fingir que esta protegido.
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode,
+            EntryPoint = "GetFirmwareEnvironmentVariableW")]
+        private static extern bool GetFirmwareEnvironmentVariableW(
+            string lpName, byte[] lpBuffer, uint dwSize, out uint pdwAttributes);
+
+        private static string? _notaPosCorrecao;
+        private static string? _avisoPosCorrecao;
+        private static bool _jaAvisouSecureBoot;
+        private static bool _jaAvisouHvci;
+
+        private static bool TryReadSecureBootFirmware(out bool enabled, out string motivo)
+        {
+            enabled = false;
+
+            // BUG REAL (06/10/2026): o codigo pedia 1 byte e a API devolvia
+            // ERROR_INVALID_PARAMETER (87). O erro 87 era doncado como "variaveis
+            // UEFI nao acessiveis" e o Secure Boot ficava permanentemente
+            // ilegivel — a conclusao honesta estava errada por causa do TAMANHO
+            // do buffer, nao da maquina. A API quer o buffer do tamanho do valor
+            // da variavel (1 byte para SecureBoot, mas com folga), e uma
+            // segunda tentativa maior cobre implementacoes que exigem mais.
+            foreach (int tamanho in new[] { 1, 8, 64 })
+            {
+                try
+                {
+                    var buf = new byte[tamanho];
+                    uint attrs;
+                    if (GetFirmwareEnvironmentVariableW("SecureBoot", buf, (uint)tamanho, out attrs))
+                    {
+                        enabled = buf[0] == 1;
+                        motivo = "variavel UEFI SecureBoot = " + buf[0];
+                        return true;
+                    }
+
+                    int err = Marshal.GetLastWin32Error();
+
+                    // 87 = buffer pequeno demais: tenta o proximo tamanho
+                    if (err == 87 && tamanho < 64) continue;
+
+                    // 1 = variavel inexistente (Secure Boot desligado de fato)
+                    if (err == 1)
+                    {
+                        enabled = false;
+                        motivo = "a variavel UEFI SecureBoot nao existe (Secure Boot desligado ou firmware sem suporte)";
+                        return true;
+                    }
+
+                    enabled = false;
+                    motivo = err switch
+                    {
+                        5 => "acesso negado (requer Administrador)",
+                        1117 => "esta maquina nao expoe a variavel UEFI SecureBoot",
+                        _ => $"GetFirmwareEnvironmentVariable falhou (erro {err})"
+                    };
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    enabled = false;
+                    motivo = ex.Message;
+                    return false;
+                }
+            }
+
+            enabled = false;
+            motivo = "a variavel UEFI SecureBoot nao pode ser lida mesmo com buffer maior";
+            return false;
+        }
+
+        private static bool IsSecureBootCheck(ScannableTweak tweak)
+            => tweak.Type == TweakType.Registry &&
+               tweak.Name.Contains("Secure Boot", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// HVCI e' lido pelo kernel (NtQuerySystemInformation 103), nao pelo
+        /// registro — ver o bloco correspondente em CheckTweak.
+        /// </summary>
+        private static bool IsHvciCheck(ScannableTweak tweak)
+            => tweak.Type == TweakType.Registry &&
+               (tweak.Name.Contains("HVCI", StringComparison.OrdinalIgnoreCase) ||
+                (tweak.KeyPath ?? "").Contains("HypervisorEnforcedCodeIntegrity", StringComparison.OrdinalIgnoreCase));
+
+
         private static void CheckTweak(ScannableTweak tweak)
         {
             try
@@ -3261,6 +3531,64 @@ new() {
                 if (Logger.VerboseCheckLogs)
                 {
                     Logger.Log($"[CHECK] Verificando: {tweak.Name} (Tipo: {tweak.Type})");
+                }
+
+                // Secure Boot: NUNCA pelo registro (o valor e sobrescrevivel e o
+                // proprio Guardian escreve nele). Pela variavel UEFI; se nao der
+                // para ler, fica NAO VERIFICAVEL em vez de PROTEGIDO.
+                if (IsSecureBootCheck(tweak))
+                {
+                    if (TryReadSecureBootFirmware(out bool ligado, out string motivo))
+                    {
+                        tweak.Status = ligado ? TweakStatus.OK : TweakStatus.MODIFIED;
+                    }
+                    else
+                    {
+                        if (!_jaAvisouSecureBoot)
+                        {
+                            _jaAvisouSecureBoot = true;
+                            Logger.Log($"[CHECK] Secure Boot nao verificavel: {motivo}. " +
+                                       "Marcado como NAO VERIFICAVEL em vez de protegido.");
+                        }
+                        tweak.Status = TweakStatus.NOT_FOUND;
+                    }
+                    return;
+                }
+
+                // HVCI: NUNCA pelo registro (o DWORD "Enabled" pode ser escrito
+                // por qualquer programa e so vale a partir do proximo boot).
+                // Usa NtQuerySystemInformation(103), que devolve o bitmask que o
+                // KERNEL esta aplicando AGORA (0x400 HVCI impondo / 0x800 so
+                // auditoria). Sem isso, "corrigir" deixava o check verde sem
+                // provar nada — e em maquina sem HVCI o item ficava acusando
+                // para sempre.
+                if (IsHvciCheck(tweak))
+                {
+                    if (NativeCodeIntegrity.TryGetHvci(out bool impoe, out bool audit,
+                                                      out bool disponivel, out uint opcoes, out string mot))
+                    {
+                        // Audit mode registra eventos mas NAO bloqueia: para o
+                        //|score de protecao e' o mesmo que desligado.
+                        tweak.Status = (impoe && !audit) ? TweakStatus.OK : TweakStatus.MODIFIED;
+                        if (Logger.VerboseCheckLogs)
+                            Logger.Log($"[CHECK] HVCI em runtime: {NativeCodeIntegrity.Descrever()}");
+                    }
+                    else
+                    {
+                        // A API nao respondeu: NAO inventar estado. Fica
+                        // NAO VERIFICAVEL e o texto diz que o registro e so a
+                        // configuracao pedida.
+                        if (!_jaAvisouHvci)
+                        {
+                            _jaAvisouHvci = true;
+                            Logger.Log($"[CHECK] HVCI nao verificavel em runtime: {mot}. " +
+                                       "O registro so informa a CONFIGURACAO PEDIDA (vale no " +
+                                       "proximo boot e depende de CPU/firmware), entao o item " +
+                                       "fica NAO VERIFICAVEL em vez de protegido.");
+                        }
+                        tweak.Status = TweakStatus.NOT_FOUND;
+                    }
+                    return;
                 }
 
                 if (tweak.Type == TweakType.Registry && string.IsNullOrEmpty(tweak.KeyPath))
@@ -3410,7 +3738,12 @@ new() {
                     {
                         if (currentValue == null)
                         {
-                            isHarmful = false;
+                            // AUSENTE nao e o mesmo que PROTEGIDO: o Windows nem
+                            // sempre cria o valor de um hardening, e ai o check
+                            // ficava verde para sempre sem nunca ter verificado
+                            // nada. So o opt-in por tweak muda esse comportamento,
+                            // entao o resto do scan se mantem igual.
+                            isHarmful = tweak.MissingIsHarmful;
                         }
                         else
                         {
@@ -3774,5 +4107,14 @@ new() {
                 _cache.Clear();
             }
         }
+        /// <summary>
+        /// Checks cuja correção foi aplicada mas só vale depois de reiniciar
+        /// (HVCI, VBS, pagefile...). Marcados em PENDING (amarelo) em vez de
+        /// fingirem estar protegidos. Sem isso, gravar o valor no registro e
+        /// mostrar verde na hora era mentira: o Windows só aplica a configuração
+        /// no boot seguinte. No próximo boot o Store confere se o efeito veio e,
+        /// se não veio, invalida o check em vez de continuar mentindo.
+        /// </summary>
+        public static int PendingCount => PendingRepairStore.PendingCount;
     }
 }

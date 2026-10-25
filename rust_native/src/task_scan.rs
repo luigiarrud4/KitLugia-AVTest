@@ -115,6 +115,9 @@ pub extern "C" fn enumerate_processes_fast(
     buffer: *mut ProcessInfoRaw,
     max_count: i32,
 ) -> i32 {
+    // Guard de panic: o codigo abaixo le o SYSTEM_PROCESS_INFORMATION direto
+    // do kernel. Com panic=abort um panic derrubaria o processo .NET inteiro.
+    ffi_guard!(-1i32, {
     if buffer.is_null() || max_count <= 0 {
         return -1;
     }
@@ -187,6 +190,7 @@ pub extern "C" fn enumerate_processes_fast(
     }
 
     count as i32
+    })
 }
 
 /// Get a process executable path safely using OpenProcess + QueryFullProcessImageNameW.
@@ -202,6 +206,7 @@ pub extern "C" fn get_process_path_safe(
     out_buf: *mut u16,
     out_capacity: i32,
 ) -> i32 {
+    ffi_guard!(-1i32, {
     if out_buf.is_null() || out_capacity <= 0 {
         return -1;
     }
@@ -232,6 +237,7 @@ pub extern "C" fn get_process_path_safe(
 
     unsafe { win::CloseHandle(h); }
     result
+    })
 }
 
 /// Non-windows stub

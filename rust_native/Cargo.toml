@@ -11,7 +11,15 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
-panic = "abort"
+# NAO usar panic = "abort" aqui.
+# Esta cdylib e carregada DENTRO do processo .NET do KitLugia: com abort,
+# um panic em qualquer ponto da lib MATAVA o app inteiro (sem catch
+# gerenciado, sem Dispatcher.UnhandledException, sem log). Ja aconteceu
+# duas vezes (o `wide()` sem NUL e o fatiamento UTF-8).
+# Com `unwind` (padrao) o catch_unwind em cada export (macro ffi_guard)
+# transforma o panic em codigo de erro e o C# cai no fallback gerenciado.
+# Custo: binario levemente maior. Beneficio: um bug de borda degrada em
+# vez de derrubar o Kit.
 
 [dependencies]
 regex = "1"

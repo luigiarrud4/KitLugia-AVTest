@@ -88,7 +88,7 @@ namespace KitLugia.Core
         /// <summary>
         /// Encoding OEM do sistema (cp850 pt-BR / cp437 en-US / cp65001 UTF-8).
         /// Ferramentas nativas (sc.exe, bcdedit, powercfg) emitem texto OEM; ler como
-        /// UTF-8 fixo gerava mojibake no log (ex: "[SC] ChangeServiceConfig �XITO").
+ /// UTF-8 fixo gerava mojibake no log (ex: "[SC] ChangeServiceConfig XITO").
         /// </summary>
         public static Encoding GetOemEncoding()
         {

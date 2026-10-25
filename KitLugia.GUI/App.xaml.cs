@@ -56,7 +56,28 @@ namespace KitLugia.GUI
             {
                 try
                 {
-                    KitLugia.Core.Logger.Log($"[APP] Task não observada: {e.Exception?.GetBaseException()?.Message}");
+                    // Cancelamento NAO e falha. Toda task com CancellationToken que a
+                    // pagina derruba ao sair (navegar = Cleanup) aparece aqui como
+                    // "A operação de E/S foi anulada..." / "task was canceled" — isso
+                    // enchia o log dezenas de vezes por navegacao e escondia o resto.
+                    // so entra no log se o log estiver em modo detalhado.
+                    var baseEx = e.Exception?.GetBaseException();
+                    bool cancelado =
+                        baseEx is System.OperationCanceledException ||
+                        (baseEx?.Message?.IndexOf("anulada", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (baseEx?.Message?.IndexOf("canceled", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (baseEx?.Message?.IndexOf("cancelada", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                    if (cancelado)
+                    {
+                        if (KitLugia.Core.Logger.VerboseCheckLogs)
+                            KitLugia.Core.Logger.Log($"[APP] Task cancelada (esperado): {baseEx?.Message}");
+                    }
+                    else
+                    {
+                        KitLugia.Core.Logger.LogError("Task nao observada",
+                            e.Exception?.GetBaseException()?.ToString() ?? "desconhecida");
+                    }
                     e.SetObserved();
                 }
                 catch { }

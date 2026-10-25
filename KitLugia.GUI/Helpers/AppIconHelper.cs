@@ -408,22 +408,38 @@ namespace KitLugia.GUI.Helpers
         {
             if (_cachedGenericIcon != null) return _cachedGenericIcon;
 
+            BitmapSource? criado = null;
+            // DENTRO do lock so se COPIA/CRIA, nunca se chama o Dispatcher.
+            // Um Dispatcher.Invoke bloqueante aqui era um deadlock duro: a thread do pool
+            // entrava no lock e ficava esperando a thread de UI, e qualquer chamada da
+            // thread de UI ao mesmo metodo ficava esperando o lock -> congelava tudo.
             lock (_genericIconLock)
             {
                 if (_cachedGenericIcon != null) return _cachedGenericIcon;
-
-                try
-                {
-                    var app = System.Windows.Application.Current;
-                    if (app.Dispatcher.CheckAccess())
-                        _cachedGenericIcon = CreateGenericStoreIcon();
-                    else
-                        _cachedGenericIcon = app.Dispatcher.Invoke(CreateGenericStoreIcon);
-                }
-                catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
             }
 
-            return _cachedGenericIcon;
+            try
+            {
+                var app = System.Windows.Application.Current;
+                if (app == null) return null;
+                if (app.Dispatcher.CheckAccess())
+                {
+                    criado = CreateGenericStoreIcon();
+                }
+                else
+                {
+                    // FORA do lock: so enfileira e espera. Se a UI estiver ocupada, esta
+                    // thread espera — mas a UI nao esta presa no _genericIconLock.
+                    criado = app.Dispatcher.Invoke(CreateGenericStoreIcon);
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
+
+            lock (_genericIconLock)
+            {
+                _cachedGenericIcon ??= criado;
+                return _cachedGenericIcon;
+            }
         }
 
         private static BitmapSource? CreateGenericStoreIcon()

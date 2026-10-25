@@ -45,13 +45,26 @@
             </Style.Triggers>
         </Style>
 
-        <!-- TextBox com placeholder REAL (texto cinza que some ao digitar) -->
+        <!-- TextBox com placeholder REAL (texto cinza que some ao digitar).
+
+             ESTRUTURA PEGA DA DarkTextBoxStyle (Themes\BaseStyles.xaml) — o TextBox que
+             funciona no resto do Kit. As 3 diferenças que causavam o texto "corrompido":
+               1) PART_ContentHost com Margin="{TemplateBinding Padding}"  ->  o TextBox
+                  JA aplica o Padding no host de edicao internamente; repetir como Margin
+                  DOBROU o recuo, entao o caret e o texto digitado nasciam ~2x o padding
+                  e o placeholder (ph) ficava desalinhado do texto real.
+               2) faltava Focusable="false" no host.
+               3) faltava propagar Horizontal/VerticalContentAlignment (a base do Kit
+                  propaga) — sem isso o ScrollViewer estica e a linha de base do texto
+                  sai de linha com o placeholder.
+             O placeholder continua por cima do host, agora com o MESMO padding unico. -->
         <Style x:Key="DnsPlaceholderTextBoxStyle" TargetType="TextBox">
             <Setter Property="Background" Value="#161616"/>
             <Setter Property="BorderBrush" Value="#333"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="CaretBrush" Value="#FFD700"/>
+            <Setter Property="Padding" Value="8,6"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -59,10 +72,23 @@
                         <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
                             <Grid>
-                                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="ph" Text="{TemplateBinding Tag}" Margin="{TemplateBinding Padding}"
+                                <ScrollViewer x:Name="PART_ContentHost" Focusable="false"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                <!-- Placeholder alinhado com o texto/caret REAIS.
+                                     Margin.Left = 10 = Padding.Left (8) + 2px de recuo que o WPF
+                                     aplica DENTRO do host de edicao (medido: caret X=11 e
+                                     bd(border 1px) + 10 = 11). Com so o Padding (8) o
+                                     placeholder nasce em X=9, 2px a esquerda do texto — era o
+                                     resto do desalinhamento. ATENCAO: se mudar o Padding
+                                     desta style, ajustar 8-> novo valor aqui tambem.
+                                     So Margin (sem Padding no TextBlock) para o
+                                     TransformBounds medir a borda esquerda do glifo. -->
+                                <TextBlock x:Name="ph" Text="{TemplateBinding Tag}"
+                                           Margin="10,6,0,0"
                                            FontSize="{TemplateBinding FontSize}" Foreground="#666"
                                            VerticalAlignment="Center" IsHitTestVisible="False"
+                                           TextTrimming="CharacterEllipsis"
                                            Visibility="Collapsed"/>
                             </Grid>
                         </Border>

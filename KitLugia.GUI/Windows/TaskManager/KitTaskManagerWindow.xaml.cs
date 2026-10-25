@@ -1604,6 +1604,10 @@ namespace KitLugia.GUI.Windows.TaskManager
                     try
                     {
                         if (_isClosed) return;
+                        // Nao sobrescreve a mensagem de acao em andamento (ex.: trim
+                        // de RAM): sem esta guarda o resultado sumia em menos de 1 s,
+                        // porque o refresh reescreve a barra a cada ciclo.
+                        if (DateTime.UtcNow < _statusOverrideUntil) return;
                         TxtStatus.Text = $"{rows.Count} processos em {sw.ElapsedMilliseconds}ms";
                     }
                     catch { }
@@ -2406,15 +2410,19 @@ private void ApplyFilter(string query)
                     }
                 }
 
-                // Agrupa por Name+Group (mesma lógica Win11) — RawChildren guarda os PIDs individuais para expansão
-                var grouped = rows.GroupBy(r => new { r.Name, r.Group }).Select(g =>
+                // Agrupa por Name+Group (mesma lógica Win11) — RawChildren guarda os PIDs individuais para expansão.
+                // O agrupamento é CASE-INSENSITIVE, igual ao Windows: "Setup.exe" e "setup.exe" são o MESMO
+                // app. Antes (comparador ordinal) viravam 2 grupos; o dedupe da lista viva, que é
+                // OrdinalIgnoreCase, apagava um deles -> a lista viva ficava com 1 linha A MENOS que a
+                // desejada e o Move seguinte recebia índice fora de faixa (crash que derrubava o app).
+                var grouped = rows.GroupBy(r => r.GroupKey, StringComparer.OrdinalIgnoreCase).Select(g =>
                 {
                     var first = g.First();
                     var count = g.Count();
                     var totalRam = g.Sum(r => r.RamValue);
                     var totalCpu = g.Sum(r => r.CpuValue);
                     var members = g.ToList();
-                    string gkey = $"{first.Name}|{first.Group}";
+                    string gkey = g.Key;   // chave do grupo (já insensível a caixa)
                     // Ícone do grupo: primeiro membro que já tenha ícone resolvido
                     // (evita grupo sem ícone quando o 1º processo ainda não carregou).
                     var groupIcon = first.ProcessIcon ?? members.Select(m => m.ProcessIcon).FirstOrDefault(i => i != null);
@@ -2602,8 +2610,13 @@ private void ApplyFilter(string query)
                         int PrevPos(ProcessRow r) => prevPos.TryGetValue(r.GroupKey, out int p) ? p : int.MaxValue;
                         grouped = OrderRows(grouped, Rank, PrevPos);
                         _filteredRows = grouped;
-                        var existingDict = _groupedLive.GroupBy(r => r.GroupKey).ToDictionary(g => g.Key, g => g.First());
-                        var freshDict = grouped.GroupBy(r => r.GroupKey).ToDictionary(g => g.Key, g => g.First());
+                        // Chave de processo no Windows NÃO distingue caixa: tudo aqui usa
+                        // OrdinalIgnoreCase (o dedupe das fantasmas já usava) — a mistura com o
+                        // comparador ordinal é o que produzia lista viva menor que a desejada.
+                        var existingDict = _groupedLive.GroupBy(r => r.GroupKey, StringComparer.OrdinalIgnoreCase)
+                            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                        var freshDict = grouped.GroupBy(r => r.GroupKey, StringComparer.OrdinalIgnoreCase)
+                            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
                         // Processo que fechou NÃO some na hora: vira uma linha FANTASMA
                         // vermelha no lugar onde estava, esmaece (~2,5 s) e o motor de
                         // 60 fps a remove depois — igual ao TMOG.
@@ -2643,25 +2656,15 @@ private void ApplyFilter(string query)
                             if (_groupedLive[i].IsChild) continue;
                             if (!seenKeys.Add(_groupedLive[i].GroupKey)) _groupedLive.RemoveAt(i);
                         }
-                        // index map O(1) ao invés de scan O(n²) — corta 150*150 buscas por refresh
-                        var indexMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                        for (int j = 0; j < _groupedLive.Count; j++)
-                        {
-                            // mesmo nome pode coexistir (sufixados por PID) — a 1ª ocorrência manda
-                            if (!indexMap.ContainsKey(_groupedLive[j].GroupKey)) indexMap[_groupedLive[j].GroupKey] = j;
-                        }
-                        for (int i = 0; i < grouped.Count; i++)
-                        {
-                            var desired = grouped[i];
-                            if (!indexMap.TryGetValue(desired.GroupKey, out int cur)) continue;
-                            if (cur != i)
-                            {
-                                _groupedLive.Move(cur, i);
-                                // reindex após Move (só faixa afetada)
-                                int lo = Math.Min(cur, i), hi = Math.Max(cur, i);
-                                for (int k = lo; k <= hi && k < _groupedLive.Count; k++) indexMap[_groupedLive[k].GroupKey] = k;
-                            }
-                        }
+                        // ── ORDEM ─────────────────────────────────────────────────────
+                        // A ordem desejada (grouped) vale para as linhas VIVAS; as fantasmas ficam
+                        // onde estavam (é o efeito "o processo morreu aqui").
+                        // A versão anterior movia a linha viva para o índice i da lista DESEJADA —
+                        // mas i não é o índice real na _groupedLive quando há fantasma no meio (a
+                        // linha pulava de lugar) e, quando a lista viva tinha MENOS linhas que a
+                        // desejada, o Insert(i) estourava (ArgumentOutOfRangeException). Aqui os
+                        // alvos são os SLOTS vivos reais, com guarda de faixa.
+                        ApplyLiveOrder(grouped);
                         var expanded = _groupedLive.Where(r => !r.IsChild && r.IsExpanded && r.RawChildren.Count > 0).ToList();
                         // Re-inserção dos filhos com dedupe O(n) por PID: o UpdateFrom agora
                         // PRESERVA as instâncias das linhas-filhas (merge por PID), então uma
@@ -2849,6 +2852,7 @@ private void ApplyFilter(string query)
                 if (MenuResumeMulti != null) MenuResumeMulti.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
                 if (MenuEcoQoSMulti != null) MenuEcoQoSMulti.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
                 if (MenuPriorityMulti != null) MenuPriorityMulti.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
+                if (MenuClearMemMulti != null) MenuClearMemMulti.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
                 if (multi)
                 {
                     // Headers dos itens "N" — o bloco acima já garante que existem, mas o
@@ -2859,6 +2863,7 @@ private void ApplyFilter(string query)
                     if (MenuResumeMulti != null) MenuResumeMulti.Header = $"Retomar {n}";
                     if (MenuEcoQoSMulti != null) MenuEcoQoSMulti.Header = $"Eficiência EcoQoS ({n})";
                     if (MenuPriorityMulti != null) MenuPriorityMulti.Header = $"Prioridade para {n}";
+                    if (MenuClearMemMulti != null) MenuClearMemMulti.Header = $"Limpar memória de {n} processos";
                 }
             }
             catch { }
@@ -3101,9 +3106,9 @@ private void ApplyFilter(string query)
         private async Task KillAsync(bool tree)
         {
             var targets = SelectedRows;
-            if (targets.Count == 0) { TxtStatus.Text = "Selecione um processo primeiro."; return; }
+            if (targets.Count == 0) { SetStatus("Selecione um processo primeiro."); return; }
 
-            TxtStatus.Text = tree ? $"Finalizando {targets.Count} processo(s) e filhos..." : $"Finalizando {targets.Count} processo(s)...";
+            SetStatus(tree ? $"Finalizando {targets.Count} processo(s) e filhos..." : $"Finalizando {targets.Count} processo(s)...");
 
             var snapshot = targets.Where(r => r != null).ToList();
 
@@ -3163,11 +3168,11 @@ private void ApplyFilter(string query)
             });
             int ok = result.ok, fail = result.fail;
 
-            TxtStatus.Text = wanted.Count == 1 && snapshot.Count == 1
+            SetStatus(wanted.Count == 1 && snapshot.Count == 1
                 ? (fail == 0
                     ? (tree ? $"❌ {snapshot[0].Name} (PID {snapshot[0].Pid}) + filhos finalizados." : $"❌ {snapshot[0].Name} (PID {snapshot[0].Pid}) finalizado.")
                     : $"{snapshot[0].Name}: acesso negado. Use Force Stop.")
-                : $"❌ {ok}/{wanted.Count} processos finalizados" + (fail > 0 ? $" ({fail} com acesso negado/já encerrados)" : "");
+                : $"❌ {ok}/{wanted.Count} processos finalizados" + (fail > 0 ? $" ({fail} com acesso negado/já encerrados)" : ""));
 
             // Instant removal from UI
             lock (_lock)
@@ -3318,19 +3323,27 @@ private void ApplyFilter(string query)
 
         private async Task ForceStopSelectedAsync()
         {
-            var row = SelectedRow;
-            if (row == null) { TxtStatus.Text = "Selecione um processo para Force Stop."; return; }
+            var targets = SelectedRows;
+            if (targets.Count == 0) { SetStatus("Selecione um processo para Force Stop."); return; }
 
-            // Mesmo agrupamento do Kill: num grupo, Force Stop tem de atingir TODOS os membros.
-            var wanted = KillTargets(row);
+            // Mesmo agrupamento do Kill: num grupo, Force Stop tem de atingir TODOS os
+            // membros. E com multi-selecao, TODAS as linhas escolhidas (o menu nao
+            // tem um item "N" — antes so a primeira linha era encerrada).
+            var wanted = targets.SelectMany(r => KillTargets(r)).Where(p => p > 0).Distinct().ToList();
+            if (wanted.Count == 0) { SetStatus("Selecione um processo para Force Stop."); return; }
+
             var pathByPid = new Dictionary<int, string>();
-            if (!string.IsNullOrEmpty(row.Path)) pathByPid[row.Pid] = row.Path;
-            foreach (var c in row.RawChildren)
-                if (!string.IsNullOrEmpty(c.Path)) pathByPid[c.Pid] = c.Path;
+            foreach (var r in targets)
+            {
+                if (!string.IsNullOrEmpty(r.Path)) pathByPid[r.Pid] = r.Path;
+                foreach (var c in r.RawChildren)
+                    if (!string.IsNullOrEmpty(c.Path)) pathByPid[c.Pid] = c.Path;
+            }
 
-            TxtStatus.Text = wanted.Count > 1
-                ? $"Force Stop {row.DisplayName} ({wanted.Count} processos)..."
-                : $"Force Stop {row.Name}...";
+            string alvo = targets.Count == 1 ? targets[0].DisplayName : $"{targets.Count} processos";
+            SetStatus(wanted.Count > 1
+                ? $"Force Stop {alvo} ({wanted.Count} processos)..."
+                : $"Force Stop {targets[0].Name}...");
 
             int done = await Task.Run(() =>
             {
@@ -3341,7 +3354,7 @@ private void ApplyFilter(string query)
                 var porAlvo = wanted.GroupBy(pid =>
                 {
                     string p = pathByPid.TryGetValue(pid, out var pv) ? pv : "";
-                    return !string.IsNullOrEmpty(p) && (File.Exists(p) || Directory.Exists(p)) ? p : row.Name;
+                    return !string.IsNullOrEmpty(p) && (File.Exists(p) || Directory.Exists(p)) ? p : targets[0].Name;
                 });
 
                 foreach (var grp in porAlvo)
@@ -3361,7 +3374,7 @@ private void ApplyFilter(string query)
                         if (blocking.Count > 0)
                             ForceStopUnlockService.Unlock(grp.Key, blocking, deleteTarget: false);
                     }
-                    catch (Exception ex) { Logger.Log($"[KIT TASK MANAGER] {row.Name} ({grp.Key}): {ex.Message}"); }
+                    catch (Exception ex) { Logger.Log($"[KIT TASK MANAGER] {targets[0].Name} ({grp.Key}): {ex.Message}"); }
 
                     foreach (var pid in alive)
                     {
@@ -3379,9 +3392,9 @@ private void ApplyFilter(string query)
                 _allRows.RemoveAll(r => pids.Contains(r.Pid));
             }
             ApplyFilter(_lastSearchQuery);
-            TxtStatus.Text = wanted.Count > 1
-                ? $"❌ Force Stop {row.DisplayName}: {done}/{wanted.Count} processos encerrados."
-                : $"❌ Force Stop {row.Name} concluído.";
+            SetStatus(wanted.Count > 1
+                ? $"✅ Force Stop {alvo}: {done}/{wanted.Count} processos encerrados."
+                : $"✅ Force Stop {targets[0].Name} concluído.");
         }
 
         // ══════════════════════════════════════════════
@@ -3390,22 +3403,29 @@ private void ApplyFilter(string query)
         private void MenuOpenFolder_Click(object sender, RoutedEventArgs e)
         {
             var r = SelectedRow;
-            if (r == null || string.IsNullOrEmpty(r.Path)) return;
-            try { Process.Start("explorer.exe", $"/select,\"{r.Path}\""); } catch { }
+            if (r == null) return;
+            if (string.IsNullOrEmpty(r.Path))
+            {
+                // Antes: retorno silencioso — o usuario clicava e NADA acontecia.
+                SetStatus($"{r.Name}: sem caminho (processo do sistema ou acesso negado).");
+                return;
+            }
+            try { Process.Start("explorer.exe", $"/select,\"{r.Path}\""); }
+            catch (Exception ex) { SetStatus($"Não foi possível abrir a pasta: {ex.Message}"); }
         }
 
         private void MenuCopyPath_Click(object sender, RoutedEventArgs e)
         {
             var r = SelectedRow;
             if (r == null) return;
-            try { Clipboard.SetText(r.Path ?? r.Name); TxtStatus.Text = "📋 Caminho copiado."; } catch { }
+            try { Clipboard.SetText(r.Path ?? r.Name); SetStatus("📋 Caminho copiado."); } catch { }
         }
 
         private void MenuCopyPid_Click(object sender, RoutedEventArgs e)
         {
             var r = SelectedRow;
             if (r == null) return;
-            try { Clipboard.SetText(r.Pid.ToString()); TxtStatus.Text = "📋 PID copiado."; } catch { }
+            try { Clipboard.SetText(r.Pid.ToString()); SetStatus("📋 PID copiado."); } catch { }
         }
 
         // ══════════════════════════════════════════════
@@ -3431,9 +3451,9 @@ private void ApplyFilter(string query)
                 };
                 using var proc = Process.GetProcessById(row.Pid);
                 proc.PriorityClass = priority;
-                TxtStatus.Text = $"✅ Prioridade de {row.Name} alterada para {priority}";
+                SetStatus($"✅ Prioridade de {row.Name} alterada para {priority}");
             }
-            catch (Exception ex) { TxtStatus.Text = $"Erro ao alterar prioridade: {ex.Message}"; }
+            catch (Exception ex) { SetStatus($"Erro ao alterar prioridade: {ex.Message}"); }
         }
 
         private void MenuPriority_Click(object sender, RoutedEventArgs e)
@@ -3468,24 +3488,97 @@ private void ApplyFilter(string query)
                 catch { denied++; }
             }
 
-            TxtStatus.Text = targets.Count == 1
+            SetStatus(targets.Count == 1
                 ? (denied == 0
                     ? $"✅ Prioridade de {targets[0].Name} alterada para {priority}"
                     : $"Erro ao alterar prioridade de {targets[0].Name}.")
-                : $"✅ Prioridade {priority} em {ok}/{targets.Count}" + (denied > 0 ? $" ({denied} acesso negado)" : "");
+                : $"✅ Prioridade {priority} em {ok}/{targets.Count}" + (denied > 0 ? $" ({denied} acesso negado)" : ""));
         }
 
-        private void BtnClearMemory_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// "Limpar RAM" de UM processo ou de TODOS os selecionados (working set vazio,
+        /// estilo Firemin). O trabalho real roda em Task.Run: esvaziar o working set de
+        /// um processo grande leva centenas de ms e travaria a interface se fosse
+        /// sincrono. O resultado vem do Core (antes/depois + motivo da falha) para a
+        /// barra de status nao mentir quando o Windows nega o acesso.
+        /// </summary>
+        private async void BtnClearMemory_Click(object sender, RoutedEventArgs e) => await ClearMemoryOfSelectionAsync();
+
+        /// <summary>Item do menu de contexto (aba Processos) — mesma acao do botao.</summary>
+        private async void MenuClearMem_Click(object sender, RoutedEventArgs e) => await ClearMemoryOfSelectionAsync();
+
+        private async Task ClearMemoryOfSelectionAsync()
         {
-            var row = SelectedRow;
-            if (row == null) return;
+            var targets = SelectedRows;
+            if (targets.Count == 0) { SetStatus("Selecione um processo primeiro."); return; }
+
+            // Linha de GRUPO (ex.: "opera.exe (24)"): o botao age sobre o que o usuario
+            // VE, entao limpa TODAS as instancias do grupo — nao so o PID representativo.
+            var wanted = targets.SelectMany(r => KillTargets(r)).Where(p => p > 0).Distinct().ToList();
+            if (wanted.Count == 0) { SetStatus("Selecione um processo primeiro."); return; }
+
+            SetStatus(wanted.Count == 1
+                ? $"🧹 Limpando memória de {targets[0].DisplayName}..."
+                : $"🧹 Limpando memória de {wanted.Count} processos...");
+
+            var results = await Task.Run(() => wanted.Select(pid => MemoryOptimizer.TrimProcessWorkingSet(pid)).ToList());
+
+            int ok = results.Count(r => r.Success);
+            double freed = results.Sum(r => r.FreedMB);
+            var failed = results.Where(r => !r.Success).ToList();
+
+            if (results.Count == 1)
+            {
+                var r0 = results[0];
+                SetStatus(r0.Success
+                    ? $"🧹 {targets[0].Name}: {r0.WorkingSetBeforeMB:0} MB → {r0.WorkingSetAfterMB:0} MB (liberados {r0.FreedMB:0} MB)."
+                    : $"⚠️ {targets[0].Name}: {r0.Message}.");
+                return;
+            }
+
+            var msg = $"🧹 {ok}/{results.Count} processos limpos (liberados {freed:0} MB no total)";
+            if (failed.Count > 0)
+            {
+                var first = failed[0].Message;
+                msg += failed.Count == 1 ? $" — 1 falhou: {first}" : $" — {failed.Count} falharam: {first}";
+            }
+            SetStatus(msg);
+        }
+
+        /// <summary>
+        /// Escreve na barra de status a partir de qualquer thread. Depois de um
+        /// <c>await Task.Run</c> a continuacao pode voltar para o pool de threads
+        /// (sem SynchronizationContext) — tocar no TextBlock de la estourava
+        /// "acesso de thread diferente".
+        /// </summary>
+        private void SetStatus(string texto)
+        {
             try
             {
-                MemoryOptimizer.EmptyProcessWorkingSet(row.Pid);
-                TxtStatus.Text = $"🧹 Memória de {row.Name} limpa.";
+                void Aplicar()
+                {
+                    // Guarda a mensagem por alguns segundos: o refresh automatico
+                    // reescreve a barra de status ("N processos em Xms") e engolia
+                    // o feedback das acoes (limpar RAM, suspender, prioridade...).
+                    _statusOverride = texto;
+                    _statusOverrideUntil = DateTime.UtcNow.AddSeconds(StatusOverrideSegundos);
+                    TxtStatus.Text = texto;
+                }
+
+                if (Dispatcher.CheckAccess()) Aplicar();
+                else Dispatcher.BeginInvoke(new Action(Aplicar));
             }
-            catch (Exception ex) { TxtStatus.Text = $"Erro ao limpar memória: {ex.Message}"; }
+            catch { }
         }
+
+        /// <summary>Janela (s) em que a mensagem de acao sobrevive ao refresh automatico.</summary>
+        private const int StatusOverrideSegundos = 8;
+
+        /// <summary>Ultima mensagem de acao exibida na barra de status.</summary>
+        private string? _statusOverride;
+
+        /// <summary>Fim da validade do override (a barra volta ao contador do refresh).</summary>
+        private DateTime _statusOverrideUntil = DateTime.MinValue;
 
         private void MenuSuspend_Click(object sender, RoutedEventArgs e) => SuspendResume(true);
         private void MenuResume_Click(object sender, RoutedEventArgs e) => SuspendResume(false);
@@ -3501,38 +3594,52 @@ private void ApplyFilter(string query)
         private static extern int NtSuspendProcess(IntPtr processHandle);
         [DllImport("ntdll.dll")]
         private static extern int NtResumeProcess(IntPtr processHandle);
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
-        [DllImport("kernel32.dll")]
+        // SEM EntryPoint o CLR procuraria "CloseHandleP" em kernel32.dll e LANCAVA
+        // EntryPointNotFoundException — o catch do chamador contava a operacao como
+        // FALHA mesmo depois do sucesso (o status dizia "2/2 suspenso(s) (2 falharam)").
+        [DllImport("kernel32.dll", EntryPoint = "CloseHandle", SetLastError = true)]
         private static extern bool CloseHandleP(IntPtr handle);
 
         private const uint PROCESS_SUSPEND_RESUME = 0x0800;
+        /// <summary>SetProcessInformation (EcoQoS) exige PROCESS_SET_INFORMATION.</summary>
+        private const uint PROCESS_SET_INFORMATION = 0x0200;
 
         private void SuspendResume(bool suspend)
         {
             var targets = SelectedRows;
             if (targets.Count == 0) return;
-            int ok = 0, denied = 0;
-            foreach (var row in targets)
+
+            // Uma linha de GRUPO (ex.: "opera.exe (24)") representa N processos:
+            // suspender so o PID representante deixava 23 acordados e a UI
+            // reportava sucesso. Agora age em todos os membros da linha.
+            var pids = targets.SelectMany(r => KillTargets(r)).Where(p => p > 0).Distinct().ToList();
+            if (pids.Count == 0) return;
+
+            int ok = 0, denied = 0, ultimoErro = 0;
+            foreach (int pid in pids)
             {
                 try
                 {
-                    IntPtr hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, false, row.Pid);
-                    if (hProcess == IntPtr.Zero) { denied++; continue; }
+                    IntPtr hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, false, pid);
+                    if (hProcess == IntPtr.Zero) { denied++; ultimoErro = Marshal.GetLastWin32Error(); continue; }
                     try
                     {
-                        if (suspend) NtSuspendProcess(hProcess);
-                        else NtResumeProcess(hProcess);
-                        ok++;
+                        // NTSTATUS 0 = sucesso. O status era IGNORADO e a UI dizia
+                        // "suspenso" mesmo quando o Windows recusou (processo
+                        // protegido, ja no estado pedido, etc).
+                        int nt = suspend ? NtSuspendProcess(hProcess) : NtResumeProcess(hProcess);
+                        if (nt == 0) ok++; else { denied++; ultimoErro = nt; }
                     }
                     finally { CloseHandleP(hProcess); }
                 }
                 catch { denied++; }
             }
             string verb = suspend ? "suspenso(s)" : "retomado(s)";
-            TxtStatus.Text = targets.Count == 1
-                ? (denied == 0 ? $"⏸ {targets[0].Name} {verb}." : "Acesso negado.")
-                : $"⏸ {ok}/{targets.Count} {verb}" + (denied > 0 ? $" ({denied} acesso negado)" : "");
+            SetStatus(pids.Count == 1
+                ? (denied == 0 ? $"⏸ {targets[0].Name} {verb}." : $"⏸ {targets[0].Name}: falhou (codigo {ultimoErro}).")
+                : $"⏸ {ok}/{pids.Count} {verb}" + (denied > 0 ? $" ({denied} falharam: codigo {ultimoErro})" : ""));
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -3556,12 +3663,24 @@ private void ApplyFilter(string query)
         {
             var targets = SelectedRows;
             if (targets.Count == 0) return;
-            int ok = 0, denied = 0;
-            foreach (var row in targets)
+
+            // Linha de GRUPO = N processos: o EcoQoS precisa valer para todos.
+            var pids = targets.SelectMany(r => KillTargets(r)).Where(p => p > 0).Distinct().ToList();
+            if (pids.Count == 0) return;
+
+            int ok = 0, denied = 0, ultimoErro = 0;
+            foreach (int pid in pids)
             {
+                IntPtr hProc = IntPtr.Zero;
                 try
                 {
-                    using var proc = Process.GetProcessById(row.Pid);
+                    // SetProcessInformation exige PROCESS_SET_INFORMATION (0x0200).
+                    // Process.Handle do .NET abre com PROCESS_ALL_ACCESS e falhava
+                    // com "acesso negado" em processos de outro usuario — o EcoQoS
+                    // era reportado como negado mesmo quando o Windows aceitava.
+                    hProc = OpenProcess(PROCESS_SET_INFORMATION, false, pid);
+                    if (hProc == IntPtr.Zero) { denied++; ultimoErro = Marshal.GetLastWin32Error(); continue; }
+
                     var state = new PROCESS_POWER_THROTTLING_STATE
                     {
                         Version = 1,
@@ -3572,16 +3691,27 @@ private void ApplyFilter(string query)
                     try
                     {
                         Marshal.StructureToPtr(state, ptr, false);
-                        if (SetProcessInformation(proc.Handle, ProcessPowerThrottling, ptr, (uint)Marshal.SizeOf(state))) ok++;
-                        else denied++;
+                        if (SetProcessInformation(hProc, ProcessPowerThrottling, ptr, (uint)Marshal.SizeOf(state))) ok++;
+                        else { denied++; ultimoErro = Marshal.GetLastWin32Error(); }
                     }
                     finally { Marshal.FreeHGlobal(ptr); }
                 }
                 catch { denied++; }
+                finally
+                {
+                    // O fechamento do handle fica FORA do contador: uma falha aqui
+                    // (p.ex. handle ja fechado) nao significa que o EcoQoS falhou.
+                    if (hProc != IntPtr.Zero)
+                    {
+                        try { CloseHandleP(hProc); } catch { }
+                    }
+                }
             }
-            TxtStatus.Text = targets.Count == 1
-                ? (denied == 0 ? $"🌱 EcoQoS ativado para {targets[0].Name}." : "Acesso negado.")
-                : $"🌱 EcoQoS em {ok}/{targets.Count}" + (denied > 0 ? $" ({denied} acesso negado)" : "");
+            // A contagem e' de PROCESSOS (pids), nao de linhas selecionadas: uma
+            // linha de grupo ("PING.EXE (2)") afeta 2 processos e precisa dizer 2.
+            SetStatus(pids.Count == 1
+                ? (denied == 0 ? $"🌱 EcoQoS ativado para {targets[0].Name}." : $"🌱 EcoQoS falhou em {targets[0].Name} (codigo {ultimoErro}).")
+                : $"🌱 EcoQoS em {ok}/{pids.Count}" + (denied > 0 ? $" ({denied} falharam: codigo {ultimoErro})" : ""));
         }
 
         // ══════════════════════════════════════════════
@@ -3607,9 +3737,9 @@ private void ApplyFilter(string query)
                 }
 
                 File.WriteAllText(dialog.FileName, sb.ToString(), Encoding.UTF8);
-                TxtStatus.Text = $"📄 Exportado {dialog.FileName}";
+                SetStatus($"📄 Exportado {dialog.FileName}");
             }
-            catch (Exception ex) { TxtStatus.Text = $"Erro ao exportar: {ex.Message}"; }
+            catch (Exception ex) { SetStatus($"Erro ao exportar: {ex.Message}"); }
         }
 
         // ══════════════════════════════════════════════
@@ -3692,6 +3822,69 @@ private void ApplyFilter(string query)
         // ══════════════════════════════════════════════
         //  PROCESS ROW MODEL
         // ══════════════════════════════════════════════
+        /// <summary>
+        /// Reordena as linhas VIVAS da <see cref="_groupedLive"/> conforme a ordem desejada.
+        ///
+        /// A ordem desejada (<paramref name="desired"/>) é a lista de grupos do refresh; as
+        /// fantasmas ficam nos slots onde estavam (é o efeito "o processo morreu aqui").
+        ///
+        /// POR QUE NÃO USAR O ÍNDICE DA LISTA DESEJADA: a lista viva tem as linhas fantasmas
+        /// no meio, então o índice i da lista desejada não é o índice real na lista viva — a
+        /// linha ia parar no lugar errado. Pior: quando a lista viva ficava com MENOS linhas que
+        /// a desejada (duas linhas com o mesmo nome em caixa diferente: "Devin" x "devin" — o
+        /// dedupe case-insensitive apagava uma), o Move recebia índice fora de faixa e o app
+        /// inteiro caía com ArgumentOutOfRangeException a cada refresh.
+        /// </summary>
+        private void ApplyLiveOrder(List<ProcessRow> desired)
+        {
+            try
+            {
+                var liveRows = new List<ProcessRow>();
+                var liveSlots = new List<int>();
+                for (int j = 0; j < _groupedLive.Count; j++)
+                {
+                    if (_groupedLive[j].IsGhost) continue;
+                    liveRows.Add(_groupedLive[j]);
+                    liveSlots.Add(j);
+                }
+                if (liveRows.Count == 0) return;
+
+                // chave -> linha viva (case-insensitive: nome de processo no Windows não distingue caixa)
+                var byKey = new Dictionary<string, ProcessRow>(StringComparer.OrdinalIgnoreCase);
+                foreach (var r in liveRows) if (!byKey.ContainsKey(r.GroupKey)) byKey[r.GroupKey] = r;
+
+                // sequência desejada (na ordem de `desired`), sem repetir linha
+                var seq = new List<ProcessRow>(liveRows.Count);
+                var inSeq = new HashSet<ProcessRow>();
+                foreach (var g in desired)
+                {
+                    if (g == null) continue;
+                    if (!byKey.TryGetValue(g.GroupKey, out var r)) continue;
+                    if (inSeq.Add(r)) seq.Add(r);
+                }
+                // linha viva fora da sequência (chave recém-chegada) fica no fim
+                foreach (var r in liveRows) if (inSeq.Add(r)) seq.Add(r);
+
+                for (int p = 0; p < seq.Count && p < liveSlots.Count; p++)
+                {
+                    var want = seq[p];
+                    int cur = _groupedLive.IndexOf(want);
+                    int target = liveSlots[p];
+                    // Guarda de segurança: índice fora de faixa aqui derrubaria o app inteiro
+                    // (esta rotina roda a cada refresh do gerenciador).
+                    if (cur < 0 || target < 0 || cur >= _groupedLive.Count || target >= _groupedLive.Count) continue;
+                    if (cur == target) continue;
+                    _groupedLive.Move(cur, target);
+                    // O Move deslocou as linhas entre cur e target: recalcula os slots vivos.
+                    liveSlots.Clear();
+                    for (int j = 0; j < _groupedLive.Count; j++) if (!_groupedLive[j].IsGhost) liveSlots.Add(j);
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogWarning("TaskManager", $"falha ao reordenar as linhas (ordem mantida): {ex.Message}");
+            }
+        }
         public class ProcessRow : INotifyPropertyChanged
         {
             private BitmapSource? _processIcon;

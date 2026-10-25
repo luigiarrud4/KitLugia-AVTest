@@ -142,11 +142,16 @@ namespace KitLugia.Core
             {
             progress?.Invoke(10, "Detectando firmware...");
 
-            (d.IsUefi, d.FirmwareEvidence) = DetectFirmwareMode();
+            // Task.Run: DetectFirmwareMode() faz I/O (FindEspPartition) e
+            // ProbeFirmwareBootManager() = "bcdedit /enum {fwbootmgr}" com
+            // .GetAwaiter().GetResult() (timeout 10 s). Como DiagnoseAsync so tem o
+            // primeiro await na linha 154, TODO este prefixo rodava na thread de UI —
+            // clicar em ANALISAR travava a janela esperando o bcdedit.
+            (d.IsUefi, d.FirmwareEvidence) = await System.Threading.Tasks.Task.Run(DetectFirmwareMode).ConfigureAwait(false);
             d.FirmwareMode = d.IsUefi ? "UEFI" : "BIOS";
 
             progress?.Invoke(25, "Localizando partição EFI...");
-            var esp = FindEspPartition();
+            var esp = await System.Threading.Tasks.Task.Run(FindEspPartition).ConfigureAwait(false);
             if (esp == null)
             {
                 // ESP sem letra (o caso normal): monta temporariamente para ler.
@@ -287,7 +292,12 @@ namespace KitLugia.Core
             string? backupDir = null;
             if (createBackup)
             {
-                backupDir = BackupBcdStore(espLetter);
+                // Task.Run: BackupBcdStore copia os arquivos de boot da ESP e roda
+                // "bcdedit /enum all" com .GetAwaiter().GetResult() (timeout 15 s).
+                // Este if é o PRIMEIRO await opcional do método — quando a ESP já tem
+                // letra (caso normal) ele é pulado e TODO o prefixo do RebuildAsync
+                // rodava na thread de UI. Agora o backup sai para o pool.
+                backupDir = await System.Threading.Tasks.Task.Run(() => BackupBcdStore(espLetter)).ConfigureAwait(false);
                 if (backupDir != null) Logger.Log($"[BCD] Backup da loja em {backupDir}");
                 else Logger.LogWarning("BcdRepairManager", "Backup da BCD falhou — seguindo sem backup");
             }
