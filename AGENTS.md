@@ -59,7 +59,17 @@ sem `EntryPoint` faz o CLR procurar "CloseHandleNative" na kernel32 ->
 `EntryPointNotFoundException` e **handle do token vazado** (1 por tentativa de elevacao).
 Corrigido em `KitLugia.Core/ForceStopUnlockService.cs` com `EntryPoint = "CloseHandle"`.
 
-**4. Harness `tests/lognoise` (31 -> 48 checks):** T3/T4 reescritos para o novo contrato
+**3c. `OperationCanceledException` do scan de apps portateis (o usuario colou o stack):**
+`System.OperationCanceledException ... PortableAppScanner.Scan (linha 210) ... 
+AppsPage.LoadPortableApps (linha 1322)`. Era o CANCELAMENTO (Atualizar/navegar no meio do
+scan de ~20 s / 4182 candidatos) escapando: `Parallel.ForEach` + os `ct.ThrowIfCancellationRequested()`
+dentro de `AnalyzeFolder(Mft)` lancam OCE, que saia daqui e virava a task do chamador — o
+`catch (OperationCanceledException)` do LoadPortableApps protege, mas o cancelamento ainda
+podia aparecer como erro real para o usuario/debugger. Agora `Scan` CAPTURA e devolve o que
+ja foi analisado (lista parcial, sem excecao) e tem early-return se o token ja chega cancelado
+(nao faz o MFT de 20 s). `CleanupPage` chama `Scan()` sem token, entao nao muda nada la.
+
+**4. Harness `tests/lognoise` (31 -> 53 checks):** T3/T4 reescritos para o novo contrato
 (100 reaplicacoes identicas -> **1 linha**; assinatura nova -> loga na hora), T5 prova a chave
 por APP (mesmo app em caixa diferente + estado novo nao loga; outro app loga), **T9** e' guarda
 de politica em cima do FONTE (heartbeats 3600/1800/900, janelas 30/60 min, chaves
@@ -69,6 +79,8 @@ de politica em cima do FONTE (heartbeats 3600/1800/900, janelas 30/60 min, chave
 100 alt-tabs entre 3 apps e prova o objetivo do pedido: **11 linhas no total** (a primeira de
 cada app em cada evento + 2 globais) e **ZERO repeticao** ao voltar nos mesmos apps. Depois
 disso o GameBoost so' fala na mudanca real de configuracao ou no lembrete de 1 h.
+**T12** prova o cancelamento do scan portatil (token ja cancelado -> 0 app(s), 0,0 s, sem
+excecao) e que o `catch (OperationCanceledException)` continua em volta do `Parallel.ForEach`.
 tests/lognoise tambem deixou de depender do `ShouldLogBoost` (removido): se alguem recriar o
 metodo, o T3 acusa.
 
@@ -78,7 +90,7 @@ tag `v2.0.61`, entao republicar 2.0.61 deixaria os clientes atuais sem nunca ver
 Conferido no binario Release: `FileVersion 2.0.62.0`, `ProductVersion 2.0.62+<commit>`.
 
 **Validacao:** solucao **0 erros** (148 avisos nullable pre-existentes, 136 no incremental);
-Release tambem **0 erros** com a versao nova; `lognoise` **48/48**;
+Release tambem **0 erros** com a versao nova; `lognoise` **53/53**;
 `PathRepairHarness` 18/18; `IslcPageVis` 38/38; `GpuHarness`, `ClockHarness`,
 `RamUsageHarness`, `TmOrderHarness` (145 chaves), `TmContextMenuHarness`, `TrimProcessHarness`
 = ALL-PASS; `CheckUiThreading` 0 padroes novos (80 legados); encoding BOM+CRLF preservado nos

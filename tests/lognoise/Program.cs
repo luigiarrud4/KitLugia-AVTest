@@ -17,6 +17,8 @@
 //   T8  LogOnce com assinatura + intervalo minimo (RAM Limiter / Standby)
 //   T9  Politica de log do monitor de RAM e do GameBoost (fonte)
 //   T10 CloseHandleNative: EntryPoint resolvido (o log real acusava a cada force stop)
+//   T11 100 alt-tabs entre 3 apps -> 11 linhas (sem repetir estado)
+//   T12 Scan portatil: cancelamento devolve lista parcial, sem excecao
 // ===========================================================================
 using System;
 using System.Collections.Generic;
@@ -396,6 +398,48 @@ internal static class Program
         }
         KitLugia.Core.Logger.ResetLogState("gboost|netglobal");
         KitLugia.Core.Logger.ResetLogState("gboost|timerres");
+        Console.WriteLine();
+
+        // ───────────────────────── T12: cancelamento do scan portatil ──────
+        // O usuario colou (25/10) um stack de OperationCanceledException saindo de
+        // PortableAppScanner.Scan linha 210 e AppsPage.LoadPortableApps linha 1322:
+        // e' o cancelamento do scan de ~20 s (Atualizar/navegar) escapando como ERRO.
+        Console.WriteLine("T12 Scan de apps portateis: cancelamento nao vira excecao");
+        var arqPort = Path.Combine(src, "KitLugia.Core", "PortableAppScanner.cs");
+        string codigoPort = File.Exists(arqPort) ? File.ReadAllText(arqPort) : "";
+        if (codigoPort.Length > 0)
+        {
+            int iForeach = codigoPort.IndexOf("Parallel.ForEach(candidates", StringComparison.Ordinal);
+            int iCatch = codigoPort.IndexOf("catch (OperationCanceledException)", iForeach, StringComparison.Ordinal);
+            Check("o cancelamento do Parallel.ForEach e' capturado", iForeach > 0 && iCatch > iForeach,
+                "ForEach@" + iForeach + " catch@" + iCatch);
+            Check("guarda antes do scan de MFT (20 s)",
+                codigoPort.Contains("if (ct.IsCancellationRequested) return new List<PortableAppEntry>();"),
+                "early return presente");
+        }
+        else Check("fonte do PortableAppScanner encontrado", false, arqPort);
+
+        // Comportamento: token JA cancelado -> devolve lista vazia, sem lancar nada.
+        string resScan = "nao executado";
+        int qtdScan = -1;
+        var swScan = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            var ctsScan = new System.Threading.CancellationTokenSource();
+            ctsScan.Cancel();
+            var r = KitLugia.Core.PortableAppScanner.Scan(null, ctsScan.Token);
+            qtdScan = r == null ? -1 : r.Count;
+            resScan = "sem excecao";
+        }
+        catch (Exception ex)
+        {
+            resScan = ex.GetType().Name + ": " + ex.Message;
+        }
+        swScan.Stop();
+        Check("token cancelado -> nenhuma excecao", resScan == "sem excecao", resScan);
+        Check("token cancelado -> lista vazia", qtdScan == 0, "app(s)=" + qtdScan);
+        Check("retorna rapido (nao faz o MFT de 20 s)", swScan.Elapsed.TotalSeconds < 5,
+            $"{swScan.Elapsed.TotalSeconds:F1}s");
         Console.WriteLine();
 
         Console.WriteLine("  OK={0}  FALHAS={1}", _ok, _fail);
