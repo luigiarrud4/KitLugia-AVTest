@@ -932,12 +932,16 @@ namespace KitLugia.GUI
             }
 
 
+            // O token e' CAPTURADO numa local: o Shutdown/Close zera _backgroundTasksCts
+            // (ver OnClosed) e esta task ainda pode estar no Task.Delay -> reler o campo
+            // dava NullReferenceException em thread de fundo.
+            var startupCts = _backgroundTasksCts;
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(10), _backgroundTasksCts.Token); // Espera 10s para iniciar
-                    if (!_backgroundTasksCts.Token.IsCancellationRequested)
+                    await Task.Delay(TimeSpan.FromSeconds(10), startupCts.Token); // Espera 10s para iniciar
+                    if (!startupCts.Token.IsCancellationRequested)
                     {
                         await GitHubUpdater.StartAutoUpdateCheck();
                     }
@@ -946,7 +950,11 @@ namespace KitLugia.GUI
                 {
                     // Task foi cancelada, não fazer nada
                 }
-            }, _backgroundTasksCts.Token);
+                catch (NullReferenceException)
+                {
+                    // Fechamento no meio da espera.
+                }
+            }, startupCts.Token);
 
             // --- INTELLIGENT MEMORY CLEANER: Limpeza baseada em limite de memória ---
             // Teto persistido (TraySettings\KitMemoryLimitMB, padrao 200MB) — ajustavel na
@@ -962,9 +970,16 @@ namespace KitLugia.GUI
 
             // --- NAMED EVENT: Permite que uma segunda instância sinalize para mostrar a janela ---
             _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "Global\\KitLugia_ShowWindow");
+            // BUG CORRIGIDO (25/10/2026): a condicao do while relia `_backgroundTasksCts`
+            // e o OnClosed zera o campo DEPOIS de cancelar. A thread acordava do WaitOne(1s)
+            // e estourava NullReferenceException na thread de fundo a cada fechamento —
+            // o log real tinha "[APP] UnhandledException (background):
+            // System.NullReferenceException at MainWindow.<.ctor>b__62_16()" em 20/10,
+            // 22/10 e 24/10 (~01-02h, uma por encerramento). O token fica em local.
+            var showWindowToken = _backgroundTasksCts.Token;
             _showWindowMonitor = new System.Threading.Thread(() =>
             {
-                while (!_backgroundTasksCts.Token.IsCancellationRequested)
+                while (!showWindowToken.IsCancellationRequested)
                 {
                     try
                     {
@@ -3043,8 +3058,11 @@ namespace KitLugia.GUI
         {
             try
             {
-                // Espera 8s para não competir com a intro animation e carregamento inicial
-                await Task.Delay(8000, _backgroundTasksCts.Token);
+                // Espera 8s para não competir com a intro animation e carregamento inicial.
+                // Token em local: o app pode fechar nesses 8 s (o campo vira null).
+                var cts = _backgroundTasksCts;
+                if (cts == null) return;
+                await Task.Delay(8000, cts.Token);
 
                 var release = await GitHubUpdater.GetLatestReleaseAsync();
                 if (release == null) return;

@@ -9,11 +9,14 @@
 // O que este harness PROVA (nao estima):
 //   T1  RM_PROCESS_INFO tem o tamanho NATIVO (668 B) e os offsets do C
 //   T2  EnableDebugPrivilege() nao lanca EntryPointNotFoundException
-//   T3  ShouldLogBoost: 100 reaplicacoes IGUAIS -> poucas linhas (nao 100)
+//   T3  100 reaplicacoes IGUAIS do GameBoost -> 1 linha (antes: 1 a cada 30)
 //   T4  Mudanca real de assinatura -> volta a logar na hora
-//   T5  ShouldLogBand: janela por PID nas faixas
+//   T5  ShouldLogBand: estado por APLICATIVO (nao por PID)
 //   T6  VERY_LOW do RAM Limiter agrega por NOME (50 instancias -> 1 chave)
 //   T7  MemoryCleaner: a guarda de throttle vem ANTES do log + existe backoff
+//   T8  LogOnce com assinatura + intervalo minimo (RAM Limiter / Standby)
+//   T9  Politica de log do monitor de RAM e do GameBoost (fonte)
+//   T10 CloseHandleNative: EntryPoint resolvido (o log real acusava a cada force stop)
 // ===========================================================================
 using System;
 using System.Collections.Generic;
@@ -100,12 +103,18 @@ internal static class Program
         Console.WriteLine();
 
         // ───────────────────────── T3/T4: dedupe do GameBoost ──────────────
-        Console.WriteLine("T3  ShouldLogBoost - 100 reaplicacoes com a MESMA configuracao");
+        // Sessao 25/10: o gate `ShouldLogBoost` (1 linha a cada 30 reaplicacoes) foi
+        // TROCADO por Logger.LogOnce com a assinatura da configuracao — o motor
+        // Automatico reaplica a cada troca de janela e o log real tinha ~140 linhas/dia
+        // do MESMO PID. Estes testes reproduzem o contrato do call site.
+        Console.WriteLine("T3  Reaplicacao do GameBoost - 100 chamadas com a MESMA configuracao");
         var tTray = typeof(TrayIconService);
-        var mShould = tTray.GetMethod("ShouldLogBoost", BindingFlags.NonPublic | BindingFlags.Static);
         var mSig = tTray.GetMethod("BoostSignature", BindingFlags.NonPublic | BindingFlags.Static);
-        Check("helpers de log existem", mShould != null && mSig != null, "ShouldLogBoost=" + (mShould != null));
-        if (mShould == null || mSig == null) return 2;
+        var gateAntigo = tTray.GetMethod("ShouldLogBoost", BindingFlags.NonPublic | BindingFlags.Static);
+        Check("ShouldLogBoost removido (agora e' Logger.LogOnce)", gateAntigo == null,
+            gateAntigo == null ? "removido" : "AINDA EXISTE");
+        Check("BoostSignature continua (assinatura do que e' aplicado)", mSig != null, "ok");
+        if (mSig == null) return 2;
 
         uint pid = 424242;
         var cfg = new CustomEngineConfig
@@ -116,16 +125,17 @@ internal static class Program
         string sig = (string)mSig.Invoke(null, new object[] { cfg });
         Console.WriteLine("        assinatura = {0}", sig);
 
-        // 1o uso: a DECISAO de logar tem de ser true
-        bool primeira = (bool)mShould.Invoke(null, new object[] { pid, sig });
-        Check("1o uso decide logar", primeira, "ShouldLogBoost=" + primeira);
-
-        int decidemLog = 0;
-        for (int i = 0; i < 100; i++)
-            if ((bool)mShould.Invoke(null, new object[] { pid, sig })) decidemLog++;
-
-        Check("100 chamadas iguais nao viram 100 linhas", decidemLog <= 6,
-            "decidiram logar: " + decidemLog + " de 100 (reducao de " + (100 - decidemLog) + "%)");
+        string chaveBoost = "lognoise|t3|" + pid;
+        KitLugia.Core.Logger.ResetLogState(chaveBoost);
+        var boostLogs = CaptureLogs(() =>
+        {
+            for (int i = 0; i < 100; i++)
+                KitLugia.Core.Logger.LogOnce(chaveBoost,
+                    "⚡ GameBoost: opera (PID: " + pid + ") · CPU=high IO=3 Page=5 Mem=5 EcoQoS=off",
+                    heartbeatSeconds: 3600, signature: sig);
+        });
+        Check("100 reaplicacoes identicas -> 1 linha", boostLogs.Count == 1,
+            boostLogs.Count + " linha(s) (antes: ~4 com o gate de 30 reaplicacoes)");
         Console.WriteLine();
 
         Console.WriteLine("T4  Mudanca real de assinatura volta a logar");
@@ -136,19 +146,29 @@ internal static class Program
         };
         string sig2 = (string)mSig.Invoke(null, new object[] { cfg2 });
         Check("assinaturas diferentes", sig != sig2, "\"" + sig + "\"  vs  \"" + sig2 + "\"");
-        Check("config nova -> loga imediatamente", (bool)mShould.Invoke(null, new object[] { pid, sig2 }), "ok");
-        Check("voltar a config antiga tambem loga", (bool)mShould.Invoke(null, new object[] { pid, sig }), "ok");
+        var depoisMudou = CaptureLogs(() => KitLugia.Core.Logger.LogOnce(chaveBoost,
+            "⚡ GameBoost: opera (PID: " + pid + ") · CPU=high IO=2 Page=4 Mem=5 EcoQoS=off",
+            heartbeatSeconds: 3600, signature: sig2));
+        Check("config nova -> loga imediatamente", depoisMudou.Count == 1, depoisMudou.Count + " linha(s)");
+        KitLugia.Core.Logger.ResetLogState(chaveBoost);
         Console.WriteLine();
 
         // ───────────────────────── T5: janela das faixas ───────────────────
-        Console.WriteLine("T5  ShouldLogBand - janela por PID");
+        // A chave passa a ser o NOME do aplicativo (sessao 25/10): SearchHost/VoyageSteam
+        // reiniciam varias vezes por dia e cada PID novo virava um estado novo.
+        Console.WriteLine("T5  ShouldLogBand - estado por APLICATIVO (nao por PID)");
         var mBand = tTray.GetMethod("ShouldLogBand", BindingFlags.NonPublic | BindingFlags.Static);
-        uint pidB = 515151;
-        var l1 = CaptureLogs(() => mBand.Invoke(null, new object[] { pidB, "faixa 1" }));
-        var l2 = CaptureLogs(() => mBand.Invoke(null, new object[] { pidB, "faixa 2" }));
-        var l3 = CaptureLogs(() => mBand.Invoke(null, new object[] { pidB, "faixa 3" }));
-        Check("1a transicao do PID loga", l1.Count == 1, l1.Count + " linha(s)");
-        Check("repeticoes dentro da janela nao logam", l2.Count == 0 && l3.Count == 0, "2a=" + l2.Count + " 3a=" + l3.Count);
+        Check("ShouldLogBand(app, estado, texto)", mBand != null && mBand.GetParameters().Length == 3,
+            mBand == null ? "AUSENTE" : mBand.GetParameters().Length + " parametro(s)");
+        if (mBand != null)
+        {
+            var l1 = CaptureLogs(() => mBand.Invoke(null, new object[] { "lognoiseapp", "sustentado", "🎮 GameBoost: lognoiseapp saiu do foco mas continua ativo -> faixa SUSTENTADA (AboveNormal)." }));
+            var l2 = CaptureLogs(() => mBand.Invoke(null, new object[] { "LOGNOISEAPP", "ocioso", "🎮 GameBoost: lognoiseapp ficou ocioso — prioridade original restaurada." }));
+            var l3 = CaptureLogs(() => mBand.Invoke(null, new object[] { "outroapplognoise", "sustentado", "🎮 GameBoost: outroapplognoise saiu do foco mas continua ativo -> faixa SUSTENTADA (AboveNormal)." }));
+            Check("1a transicao do app loga", l1.Count == 1, l1.Count + " linha(s)");
+            Check("mesmo app (outra caixa) e outro estado -> NAO loga", l2.Count == 0, l2.Count + " linha(s)");
+            Check("outro app -> loga", l3.Count == 1, l3.Count + " linha(s)");
+        }
         Console.WriteLine();
 
         // ───────────────────────── T6: VERY_LOW agregado por nome ─────────
@@ -246,6 +266,138 @@ internal static class Program
         Console.WriteLine();
 
         Console.WriteLine("===============================================");
+        // ───────────────────────── T9: politica de log (fonte) ────────────
+        // Guarda de regressao: se alguem voltar a usar Logger.Log() cru nos pontos que
+        // inundavam o log real, o harness acusa. Os numeros sao a politica combinada.
+        Console.WriteLine("T9  Politica de log do monitor de RAM e do GameBoost (fonte)");
+        string traySrc = Path.Combine(src, "KitLugia.GUI", "Services", "TrayIconService.cs");
+        string codigoTray = File.Exists(traySrc) ? File.ReadAllText(traySrc) : "";
+        if (codigoTray.Length > 0)
+        {
+            Check("Standby: skip fala no maximo 1x/hora",
+                codigoTray.Contains("islc|skip|ramLivre") && codigoTray.Contains("heartbeatSeconds: 3600"),
+                "heartbeat 3600 presente");
+            Check("Standby: a mudanca tambem e' limitada a 1x/hora",
+                codigoTray.Contains("signature: \"ram livre acima do limite\", minChangeIntervalSeconds: 3600"),
+                "minChange 3600 presente");
+            Check("Governador de RAM: heartbeat 30 min + mudanca 15 min",
+                codigoTray.Contains("heartbeatSeconds: 1800") && codigoTray.Contains("minChangeIntervalSeconds: 900"),
+                "1800/900 presente");
+            Check("Corte DIRETO: janela de 30 min",
+                codigoTray.Contains("TrimLogWindow = TimeSpan.FromMinutes(30)"), "TrimLogWindow 30 min");
+            Check("VERY_LOW: janela de 60 min",
+                codigoTray.Contains("MemPrioLogWindow = TimeSpan.FromMinutes(60)"), "MemPrioLogWindow 60 min");
+            Check("GameBoost por PID usa LogOnce (chave gboost|apply|)",
+                codigoTray.Contains("gboost|apply|{pid}") && codigoTray.Contains("signature: BoostSignature(config)"),
+                "chave + assinatura presentes");
+            Check("Timer Resolution e rede global sao LogOnce",
+                codigoTray.Contains("gboost|timerres") && codigoTray.Contains("gboost|netglobal"),
+                "2 chaves de estado global");
+            Check("GameBoost AUTO e ProBalance folgado sao LogOnce",
+                codigoTray.Contains("gboost|auto|{pid}") && codigoTray.Contains("gboost|autopb|folgada"),
+                "2 chaves presentes");
+            Check("Storm e piso>teto sao LogOnce",
+                codigoTray.Contains("ramlimit|storm|") && codigoTray.Contains("ramlimit|piso|"),
+                "2 chaves presentes");
+        }
+        else Check("fonte do TrayIconService encontrado", false, "nao achei " + traySrc);
+        Console.WriteLine();
+
+        // ───────────────────────── T10: EntryPoint do CloseHandleNative ──
+        Console.WriteLine("T10 CloseHandleNative (o log real acusava a cada force stop)");
+        var mClose = typeof(KitLugia.Core.ForceStopUnlockService)
+            .GetMethod("CloseHandleNative", BindingFlags.NonPublic | BindingFlags.Static);
+        Check("metodo existe", mClose != null, mClose == null ? "AUSENTE" : "ok");
+        if (mClose != null)
+        {
+            var attr = mClose.GetCustomAttributes(typeof(System.Runtime.InteropServices.DllImportAttribute), false)
+                .OfType<System.Runtime.InteropServices.DllImportAttribute>().FirstOrDefault();
+            Check("EntryPoint aponta para CloseHandle", attr != null && attr.EntryPoint == "CloseHandle",
+                attr == null ? "sem DllImport" : "EntryPoint=" + (attr.EntryPoint ?? "(nome do metodo)"));
+            string res = "nao executado";
+            try
+            {
+                // CloseHandle(NULL) devolve false e NAO fecha nada — o objetivo aqui e'
+                // so provar que o CLR resolve o EntryPoint (antes: EntryPointNotFoundException).
+                mClose.Invoke(null, new object[] { IntPtr.Zero });
+                res = "resolvido (sem excecao)";
+                Check("nao lanca EntryPointNotFoundException", true, res);
+            }
+            catch (TargetInvocationException tie)
+            {
+                res = tie.InnerException?.Message ?? tie.Message;
+                Check("nao lanca EntryPointNotFoundException", false, res);
+            }
+        }
+        Console.WriteLine();
+
+        // ───────────────────────── T11: alt-tab nao infla o log ────────────
+        // Sessao 25/10: o usuario pode ficar trocando de app o dia inteiro. A promessa
+        // e' "uma linha ou nenhuma": as chaves sao fixas (por app/PID + estado) e o
+        // intervalo minimo impede que o flip-flop foco<->sustentado vire log novo.
+        Console.WriteLine("T11 Simulacao de alt-tab (100 trocas entre 3 apps)");
+        string[] apps = { "kl11alpha", "kl11beta", "kl11gamma" };
+        uint[] pids = { 910001, 910002, 910003 };
+        foreach (var a in apps) KitLugia.Core.Logger.ResetLogState("gboost|band|" + a);
+        foreach (var p in pids)
+        {
+            KitLugia.Core.Logger.ResetLogState("gboost|apply|" + p);
+            KitLugia.Core.Logger.ResetLogState("gboost|auto|" + p);
+        }
+        KitLugia.Core.Logger.ResetLogState("gboost|netglobal");
+        KitLugia.Core.Logger.ResetLogState("gboost|timerres");
+
+        var altTab = CaptureLogs(() =>
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                int k = i % 3;
+                // 1) boost do app que ganhou o foco (gboost|apply|{pid})
+                KitLugia.Core.Logger.LogOnce("gboost|apply|" + pids[k],
+                    "⚡ GameBoost: " + apps[k] + " (PID: " + pids[k] + ") · CPU=high IO=3 Page=5 Mem=5 EcoQoS=off",
+                    heartbeatSeconds: 3600, signature: "high|3|5|5|False|False|True");
+                // 2) app perdeu o foco -> faixa SUSTENTADA (ShouldLogBand real)
+                if (mBand != null)
+                    mBand.Invoke(null, new object[] { apps[k], "sustentado",
+                        "🎮 GameBoost: " + apps[k] + " saiu do foco mas continua ativo -> faixa SUSTENTADA (AboveNormal)." });
+                // 3) motor Automatico (gboost|auto|{pid})
+                KitLugia.Core.Logger.LogOnce("gboost|auto|" + pids[k],
+                    "🤖 GameBoost AUTO: fg=True cpu=" + i + "% amostra=True faixa=Loading -> IO=3 Page=5",
+                    heartbeatSeconds: 3600, signature: "1|3|5", minChangeIntervalSeconds: 1800);
+                // 4) tweaks GLOBAIS, que alternam a cada troca de foco
+                bool entra = i % 2 == 0;
+                KitLugia.Core.Logger.LogOnce("gboost|netglobal",
+                    entra ? "🌐 GameBoost V3: Network priorizado (throttling reduzido) — valor original guardado para reversão."
+                          : "🌐 GameBoost: tweak global de rede revertido ao valor original do Windows.",
+                    heartbeatSeconds: 3600, signature: entra ? "aplicado" : "revertido", minChangeIntervalSeconds: 3600);
+                KitLugia.Core.Logger.LogOnce("gboost|timerres",
+                    entra ? "⏱️ Timer Resolution: 15,62ms → 1,00ms (boosted)" : "⏱️ Timer Resolution restaurado: 15,62ms",
+                    heartbeatSeconds: 3600, signature: entra ? "aplicado" : "revertido", minChangeIntervalSeconds: 3600);
+            }
+        });
+        Console.WriteLine("        linhas geradas: {0}", altTab.Count);
+        foreach (var l in altTab) Console.WriteLine("          · " + l);
+        Check("100 alt-tabs -> no maximo 11 linhas (1 por app/evento + 2 globais)",
+            altTab.Count <= 11, altTab.Count + " linha(s) para 100 trocas");
+        Check("nenhum app repetiu o mesmo estado",
+            apps.All(a => altTab.Count(l => l.Contains(a)) <= 3),
+            string.Join(" ", apps.Select(a => a + "=" + altTab.Count(l => l.Contains(a)))));
+        Check("tweak global de rede falou 1x",
+            altTab.Count(l => l.Contains("Network priorizado") || l.Contains("tweak global de rede")) == 1,
+            altTab.Count(l => l.Contains("Network priorizado") || l.Contains("tweak global de rede")) + " linha(s)");
+        Check("Timer Resolution falou 1x",
+            altTab.Count(l => l.Contains("Timer Resolution")) == 1,
+            altTab.Count(l => l.Contains("Timer Resolution")) + " linha(s)");
+        foreach (var a in apps) KitLugia.Core.Logger.ResetLogState("gboost|band|" + a);
+        foreach (var p in pids)
+        {
+            KitLugia.Core.Logger.ResetLogState("gboost|apply|" + p);
+            KitLugia.Core.Logger.ResetLogState("gboost|auto|" + p);
+        }
+        KitLugia.Core.Logger.ResetLogState("gboost|netglobal");
+        KitLugia.Core.Logger.ResetLogState("gboost|timerres");
+        Console.WriteLine();
+
         Console.WriteLine("  OK={0}  FALHAS={1}", _ok, _fail);
         Console.WriteLine("===============================================");
         return _fail == 0 ? 0 : 1;
