@@ -1541,7 +1541,14 @@ namespace KitLugia.Core
             IntPtr hTargetProcessHandle, out IntPtr lpTargetHandle,
             uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, uint dwOptions);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
+        // BUG CORRIGIDO (25/10/2026): sem EntryPoint o P/Invoke procura a funcao
+        // "CloseHandleNative" dentro da kernel32, que nao existe -> EntryPointNotFoundException
+        // em TODAS as chamadas. O log real mostrava, a cada force stop:
+        //   "[FORCE STOP] SeDebugPrivilege ERRO: Unable to find an entry point named
+        //    'CloseHandleNative' in DLL 'kernel32.dll'."
+        // Consequencia: o handle do token nunca era fechado (vazava 1 handle por tentativa
+        // de elevacao). Mesmo bug ja documentado no MemoryOptimizer (CloseHandleP).
+        [DllImport("kernel32.dll", SetLastError = true, EntryPoint = "CloseHandle")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool CloseHandleNative(IntPtr hObject);
 

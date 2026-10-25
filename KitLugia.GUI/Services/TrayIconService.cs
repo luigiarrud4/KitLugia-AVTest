@@ -635,7 +635,13 @@ namespace KitLugia.GUI.Services
                 if (result == 0)
                 {
                     _timerResolutionChanged = true;
-                    Logger.Log($"⏱️ Timer Resolution: {_originalTimerResolution / 10000.0:F2}ms → {current / 10000.0:F2}ms (boosted)");
+                    // LogOnce (sessao 25/10): o timer global e' aplicado/revertido a CADA
+                    // troca de foco (o RevertBoost devolve e o proximo boost pede de novo).
+                    // Logando cada transicao eram ~140 linhas/dia SO deste toggle, todas
+                    // com o mesmo conteudo. Assinatura aplicado/restaurado + 30 min.
+                    Logger.LogOnce("gboost|timerres",
+                        $"⏱️ Timer Resolution: {_originalTimerResolution / 10000.0:F2}ms → {current / 10000.0:F2}ms (boosted)",
+                        heartbeatSeconds: 3600, signature: "aplicado", minChangeIntervalSeconds: 3600);
                 }
             });
         }
@@ -647,7 +653,9 @@ namespace KitLugia.GUI.Services
             {
                 NtSetTimerResolution(_originalTimerResolution, true, out int current);
                 _timerResolutionChanged = false;
-                Logger.Log($"⏱️ Timer Resolution restaurado: {current / 10000.0:F2}ms");
+                Logger.LogOnce("gboost|timerres",
+                    $"⏱️ Timer Resolution restaurado: {current / 10000.0:F2}ms",
+                    heartbeatSeconds: 3600, signature: "restaurado", minChangeIntervalSeconds: 3600);
             });
         }
 
@@ -3983,7 +3991,7 @@ namespace KitLugia.GUI.Services
                 {
                     target.SustainedApplied = true;
                     ApplyBoostModern(pid, BoostLevel.Sustentado);
-                    ShouldLogBand(pid,
+                    ShouldLogBand(proc.ProcessName, "sustentado",
                         $"🎮 GameBoost: {proc.ProcessName} saiu do foco mas continua ativo -> faixa SUSTENTADA (AboveNormal). " +
                         "Volta a prioridade original sozinho quando ficar ocioso.");
                 }
@@ -4067,7 +4075,7 @@ namespace KitLugia.GUI.Services
                     _boostTargets.TryRemove(pid, out _);
                     _autoBand.TryRemove(pid, out _);
                     _threadEfficiencyOff.TryRemove(pid, out _);
-                    ShouldLogBand(pid,
+                    ShouldLogBand(target.Name.Length > 0 ? target.Name : "PID " + pid, "ocioso",
                         $"🎮 GameBoost: {(target.Name.Length > 0 ? target.Name : "PID " + pid)} ficou ocioso — prioridade original restaurada.");
                 }
                 catch
@@ -4099,7 +4107,7 @@ namespace KitLugia.GUI.Services
             {
                 RevertBoost(kv.Key);
                 _boostTargets.TryRemove(kv.Key, out _);
-                ShouldLogBand(kv.Key,
+                ShouldLogBand(kv.Value.Name, "cap",
                     $"🎮 GameBoost: {kv.Value.Name} saiu da faixa sustentada (limite de {MaxSustainedTargets} processos).");
             }
         }
@@ -4124,11 +4132,10 @@ namespace KitLugia.GUI.Services
             // um limite de 64, estes nao tinham nenhum).
             _autoBand.Clear();
             _threadEfficiencyOff.Clear();
+            // (o estado do ShouldLogBoost/ShouldLogBand agora vive no Logger.LogOnce;
+            //  a unica memoria por PID que sobra aqui e' a do motor Automatico)
             // dicionarios de log do GameBoost (06/10/2026): sem isso o PID do dia
             // inteiro ficaria retido e a 1a janela de hoje repetiria o resumo antigo.
-            _lastBoostSignature.Clear();
-            _boostRepeatSuppress.Clear();
-            // (o estado do ShouldLogBand agora vive no Logger.LogOnce; limpar o mapa
             //  antigo aqui virou lembrança do reset de sessão)
             _boostAutoLogged.Clear();
             // Reescreve o ficheiro de resgate com o estado agora (vazio) → apaga-o.
@@ -4361,13 +4368,22 @@ namespace KitLugia.GUI.Services
                 // reaplicacao. O motor Automatico reaplica a cada troca de janela e a cada
                 // ~15 s com os MESMOS valores: eram milhares de linhas/dia sem informacao nova.
                 // As acoes continuam sendo aplicadas sempre (so o log e' suprimido).
-                bool logBoost = ShouldLogBoost(pid, BoostSignature(config));
-                if (logBoost)
-                    KitLugia.Core.Logger.Log(
-                        $"⚡ GameBoost: {name} (PID: {pid}) · CPU={config.CpuPriority}" +
+                // LogOnce por PID (sessao 25/10): o motor Automatico reaplica a cada troca
+                // de janela e a cada ~15 s. O gate antigo (ShouldLogBoost) segurava as
+                // repeticoes mas liberava 1 linha a cada 30 reaplicacoes — o log real
+                // tinha ~140 linhas/dia do MESMO PID com a MESMA configuracao. Agora a
+                // chave e' o PID + a assinatura do que foi aplicado, com lembrete de 15 min.
+                KitLugia.Core.Logger.LogOnce(
+                    $"gboost|apply|{pid}",
+                    $"⚡ GameBoost: {name} (PID: {pid}) · CPU={config.CpuPriority}" +
                         $" IO={SafeIoPriority(config.IoPriorityLevel)}" +
                         $" Page={(config.PagePriorityLevel == 0 ? 5 : config.PagePriorityLevel)}" +
-                        $" Mem={config.ThreadMemoryPriority} EcoQoS={(config.EcoQoSEnabled ? "on" : "off")}");
+                        $" Mem={config.ThreadMemoryPriority} EcoQoS={(config.EcoQoSEnabled ? "on" : "off")}",
+                    // 1 h de heartbeat: alternar de app o dia inteiro nao pode virar log.
+                    // O primeiro boost de cada PID sempre aparece; depois, so' mudanca
+                    // real de configuracao ou este lembrete horario (com a contagem).
+                    heartbeatSeconds: 3600,
+                    signature: BoostSignature(config));
 
                 // SEGURANÇA (03/10/2026): REALTIME foi PROIBIDO globalmente.
                 // REALTIME_PRIORITY_CLASS em processo de usuario pode impedir o scheduler de rodar
@@ -4701,7 +4717,9 @@ namespace KitLugia.GUI.Services
                     $" -> IO={cfg.IoPriorityLevel} Page={cfg.PagePriorityLevel}",
                     heartbeatSeconds: 900,
                     signature: $"{(int)faixa}|{cfg.IoPriorityLevel}|{cfg.PagePriorityLevel}",
-                    minChangeIntervalSeconds: 120);
+                    // Sobe de 120 s para 30 min (sessao 25/10): com 2 min o flip-flop
+                    // Idle <-> Loading de um app que oscila ainda rendia ~100 linhas/dia.
+                    minChangeIntervalSeconds: 1800);
 
             ApplyBoostCustom(pid, cfg);
 
@@ -4736,8 +4754,6 @@ namespace KitLugia.GUI.Services
         // idempotentes e o Windows pode reverter sozinho), so o LOG e' suprimido.
         // Um resumo por janela longa segue existindo, para o usuario nao perder a
         // visibilidade de que o motor esta ativo.
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, string> _lastBoostSignature = new();
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, int> _boostRepeatSuppress = new();
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, bool> _boostAutoLogged = new();
         private static readonly TimeSpan BoostSummaryWindow = TimeSpan.FromMinutes(5);
 
@@ -4758,35 +4774,6 @@ namespace KitLugia.GUI.Services
         }
 
         /// <summary>
-        /// true na 1a vez que este PID e' visto, ou quando a configuracao efetiva mudou.
-        /// Faz o "reset" do estado e devolve a decisao de logar.
-        /// </summary>
-        private static bool ShouldLogBoost(uint pid, string signature)
-        {
-            if (!_lastBoostSignature.TryGetValue(pid, out var last) || !string.Equals(last, signature, StringComparison.Ordinal))
-            {
-                _lastBoostSignature[pid] = signature;
-                _boostRepeatSuppress.TryRemove(pid, out _);
-                return true;
-            }
-
-            // Mesma config: conta e suprime. A cada BoostSummaryWindow deixa passar 1
-            // linha como lembrete de que o motor continua ativo (com a contagem de
-            // repeticoes suprimidas), para o log nao virar um silencio total.
-            if (_boostRepeatSuppress.TryGetValue(pid, out var n))
-                n++;
-            else
-                n = 1;
-            _boostRepeatSuppress[pid] = n;
-
-            // ANTES: `if (n == 1) return true` deixava passar a SEGUNDA aplicacao
-            // identica (o log real mostrava a mesma linha "⚡ GameBoost: X" duas
-            // vezes em ~16 s). So o lembrete periodico faz sentido.
-            if (n % 30 == 0) return true;                             // lembrete periodico
-            return false;
-        }
-
-        /// <summary>
         /// Log de transicao COM ASSINATURA por PID. As faixas alternam Foco &lt;-&gt;
         /// Sustentado a cada alt-tab, entao uma janela simples de 2 min ainda
         /// reemitia a MESMA frase varias vezes por hora (o log real tinha
@@ -4794,12 +4781,15 @@ namespace KitLugia.GUI.Services
         /// quando o ESTADO muda de verdade (ou no lembrete de 15 min), e o texto
         /// leva a contagem das repeticoes suprimidas.
         /// </summary>
-        private static bool ShouldLogBand(uint pid, string what)
+        private static void ShouldLogBand(string appName, string state, string what)
         {
-            string assinatura = what.Length > 48 ? what[..48] : what;
-            KitLugia.Core.Logger.LogOnce($"gboost|band|{pid}", what,
-                heartbeatSeconds: 900, signature: assinatura, minChangeIntervalSeconds: 600);
-            return true;
+            // CHAVE POR APLICATIVO, nao por PID (sessao 25/10): SearchHost/VoyageSteam
+            // reiniciam varias vezes por dia e cada PID novo era um estado novo -> o log
+            // repetia a MESMA frase do MESMO app dezenas de vezes (49 linhas/dia so do
+            // SearchHost). Agrupado pelo nome, o alt-tab e o restart caem no mesmo estado.
+            string chave = string.IsNullOrWhiteSpace(appName) ? "desconhecido" : appName.ToLowerInvariant();
+            KitLugia.Core.Logger.LogOnce($"gboost|band|{chave}", what,
+                heartbeatSeconds: 3600, signature: state, minChangeIntervalSeconds: 3600);
         }
 
         /// <summary>
@@ -4834,9 +4824,14 @@ namespace KitLugia.GUI.Services
                     if (carga < AutoProBalanceLoadGate)
                     {
                         // Maquina folgada: NAO se mexe em ninguem. E' a diferenca para V2/V3.
+                        // LogOnce: este ramo roda a cada reavaliacao do motor (troca de foco
+                        // + tick de ~15 s) enquanto a maquina esta folgada -> era uma linha a
+                        // cada poucos minutos dizendo "nao fiz nada".
                         ConditionalLog.Try("AutoProBalanceLoad",
-                            () => KitLugia.Core.Logger.Log(
-                                $"⚖️ GameBoost AUTO ProBalance: carga {carga}% < {AutoProBalanceLoadGate}% — maquina folgada, nao rebaixa ninguem"));
+                            () => KitLugia.Core.Logger.LogOnce(
+                                "gboost|autopb|folgada",
+                                $"⚖️ GameBoost AUTO ProBalance: carga {carga}% < {AutoProBalanceLoadGate}% — maquina folgada, nao rebaixa ninguem",
+                                heartbeatSeconds: 1800, signature: "folgada", minChangeIntervalSeconds: 1800));
                         return;
                     }
 
@@ -5052,7 +5047,12 @@ namespace KitLugia.GUI.Services
                     key.SetValue("SystemResponsiveness", 10, Microsoft.Win32.RegistryValueKind.DWord);
 
                     _networkBoostApplied = true;
-                    KitLugia.Core.Logger.Log("🌐 GameBoost V3: Network priorizado (throttling reduzido) — valor original guardado para reversão.");
+                    // LogOnce: o tweak global de rede entra/sai junto com o boost global
+                    // (aplicado quando o 1o app ganha foco, revertido quando o ultimo sai).
+                    // Cada alt-tab gerava o par aplicado/revertido no log.
+                    KitLugia.Core.Logger.LogOnce("gboost|netglobal",
+                        "🌐 GameBoost V3: Network priorizado (throttling reduzido) — valor original guardado para reversão.",
+                        heartbeatSeconds: 3600, signature: "aplicado", minChangeIntervalSeconds: 3600);
                 }
                 catch (Exception ex)
                 {
@@ -5089,7 +5089,9 @@ namespace KitLugia.GUI.Services
                     _networkBoostApplied = false;
                     _origNetworkThrottlingIndex = null;
                     _origSystemResponsiveness = null;
-                    KitLugia.Core.Logger.Log("🌐 GameBoost: tweak global de rede revertido ao valor original do Windows.");
+                    KitLugia.Core.Logger.LogOnce("gboost|netglobal",
+                        "🌐 GameBoost: tweak global de rede revertido ao valor original do Windows.",
+                        heartbeatSeconds: 3600, signature: "revertido", minChangeIntervalSeconds: 3600);
                 }
                 catch (Exception ex)
                 {
@@ -5645,6 +5647,11 @@ private static void RescueOrphanedBoostState()
                 try { Win32Api.SetPowerThrottling(proc.Handle, false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 try { Win32Api.SetProcessGameClassInfo(proc.Handle, false); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
+            // O processo MORREU entre a troca de janela e o revert (fechar o app em foco
+            // e' o caso normal): GetProcessById lanca ArgumentException. Isso virava o
+            // WARN "Exception suppressed [origem: TrayIconService.cs RevertBoost]" — 7
+            // linhas em 3 dias no log real, todas de processo que ja nao existia.
+            catch (ArgumentException) { }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
@@ -5807,7 +5814,7 @@ private static void RescueOrphanedBoostState()
                         $"standby {standbyMB} MB < limiar {IslcThresholdMB} MB - nada a liberar";
                     KitLugia.Core.Logger.LogOnce("islc|skip|abaixoLimiar",
                         $"🧹 Standby: limpeza nao executada - {IslcLastSkipReason}",
-                        heartbeatSeconds: 900, signature: "abaixo do limiar");
+                        heartbeatSeconds: 3600, signature: "abaixo do limiar", minChangeIntervalSeconds: 3600);
                     return;
                 }
 
@@ -5822,7 +5829,7 @@ private static void RescueOrphanedBoostState()
                     // cada 30 s). A assinatura e o MOTIVO, que nao muda.
                     KitLugia.Core.Logger.LogOnce("islc|skip|ramLivre",
                         $"🧹 Standby: limpeza nao executada - {IslcLastSkipReason}",
-                        heartbeatSeconds: 900, signature: "ram livre acima do limite");
+                        heartbeatSeconds: 3600, signature: "ram livre acima do limite", minChangeIntervalSeconds: 3600);
                     return;
                 }
 
@@ -6552,7 +6559,7 @@ private static void RescueOrphanedBoostState()
         /// -> 412 -> 303 MB). Logar por ciclo produzia 2 linhas a cada 500 ms por processo
         /// e afogava o log real. Agora: 1 linha por janela, com o total acumulado.
         /// </summary>
-        private static readonly TimeSpan TrimLogWindow = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan TrimLogWindow = TimeSpan.FromMinutes(30);
 
         /// <summary>
         /// Janela do log de ESTADO (prioridade VERY_LOW). Diferente do corte — que e' uma
@@ -6561,7 +6568,7 @@ private static void RescueOrphanedBoostState()
         /// a cada minuto era repetir a mesma frase. Uma linha por 10 min, com a contagem
         /// de reaplicacoes da janela.
         /// </summary>
-        private static readonly TimeSpan MemPrioLogWindow = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan MemPrioLogWindow = TimeSpan.FromMinutes(60);
 
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _memPrioLoggedByName =
             new(System.StringComparer.OrdinalIgnoreCase);
@@ -7018,9 +7025,15 @@ private static void RescueOrphanedBoostState()
                             // o WS nunca voltava ao limite, e tudo virava "storm").
                             if (limit.BaselineFaultsPerSec <= 0) limit.BaselineFaultsPerSec = faultsPerSec;
                             else limit.BaselineFaultsPerSec = limit.BaselineFaultsPerSec * 0.8 + faultsPerSec * 0.2;
-                            KitLugia.Core.Logger.Log(
+                            // LogOnce: em storm de verdade este ramo roda a CADA ciclo
+                            // (500 ms) e repetia a mesma frase com numeros novos.
+                            KitLugia.Core.Logger.LogOnce(
+                                $"ramlimit|storm|{limit.ProcessName}",
                                 $"⛈️ RAM Limiter: '{limit.ProcessName}' com storm de page faults " +
-                                $"({faultsPerSec:F0}/s, baseline {limit.BaselineFaultsPerSec:F0}/s) — pausando cortes (backoff x{1 << limit.StormBackoffLevel}).");
+                                $"({faultsPerSec:F0}/s, baseline {limit.BaselineFaultsPerSec:F0}/s) — pausando cortes (backoff x{1 << limit.StormBackoffLevel}).",
+                                heartbeatSeconds: 900,
+                                signature: $"storm|{limit.StormBackoffLevel}",
+                                minChangeIntervalSeconds: 300);
                             foreach (var proc in processes) try { proc.Dispose(); } catch { }
                             continue;
                         }
@@ -7069,9 +7082,13 @@ private static void RescueOrphanedBoostState()
                         long pisoTotalMB = Math.Max(limit.GetEffectiveMinMB(), limit.LimitMB * 50 / 100);
                         if (pisoTotalMB > tetoTotalMB)
                         {
-                            KitLugia.Core.Logger.Log(
+                            // LogOnce: a condicao (piso > teto) e' ESTATICA enquanto o limite
+                            // existir; o aviso saia a cada ciclo do governador.
+                            KitLugia.Core.Logger.LogOnce(
+                                $"ramlimit|piso|{limit.ProcessName}",
                                 $"⚠️ RAM Limiter: '{limit.ProcessName}' piso ({pisoTotalMB} MB) acima do teto " +
-                                $"({tetoTotalMB} MB) — teto ajustado para o piso (limite {limit.LimitMB} MB baixo demais para este app).");
+                                $"({tetoTotalMB} MB) — teto ajustado para o piso (limite {limit.LimitMB} MB baixo demais para este app).",
+                                heartbeatSeconds: 3600, signature: "piso>teto");
                             tetoTotalMB = pisoTotalMB;
                         }
                         foreach (var proc in processes)
@@ -7118,13 +7135,14 @@ private static void RescueOrphanedBoostState()
                                 $"{(esvaziou ? "esvaziado + teto " : "teto ")}{tetoTotalMB} MB " +
                                 $"(piso {pisoTotalMB} MB) em {tocados.Count} proc(s). " +
                                 $"cpu {maxCpu:F1}% · faults {faultsPerSec:F0}/s · RAM livre {freeRamMB} MB",
-                                heartbeatSeconds: 300,
+                                heartbeatSeconds: 1800,
                                 signature: $"{(esvaziou ? "esvaziado" : "teto")}|{limit.ProcessName}|{limit.LimitMB}",
                                 // O governador ALTERNA esvaziado <-> teto a cada ciclo (o app
                                 // ganha/perde o foco e o estado do idle muda): cada troca era
                                 // uma "mudanca" e o log real tinha 10 linhas/min do mesmo app.
-                                // Com 120 s a linha so aparece quando a acao ESTABILIZA.
-                                minChangeIntervalSeconds: 120);
+                                // Com 120 s ainda davam ~100 linhas/dia por app; 15 min deixa
+                                // a linha so quando a acao ESTABILIZA de verdade.
+                                minChangeIntervalSeconds: 900);
                         }
 
                         limit.LastTrimTime = DateTime.Now;

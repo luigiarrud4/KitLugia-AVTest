@@ -1,4 +1,94 @@
 ﻿# KitLugia — AGENTS.md
+### Sessao 25/10 - Ruido de log: monitor de RAM e GameBoost Pro
+
+Pedido: "agora so os logs duplicados do kit que sao desnecessarios como o do monitor de RAM
+disparando toda hora e o log do gameboostpro disparando a cada vez que o foreground muda".
+
+**0. MEDICAO no log real (23-24/10, 7613 linhas no total dos 2 dias; ~120 linhas/hora
+enquanto o app roda):** os campeoes eram
+`🧹 Standby: limpeza nao executada - memoria livre N MB >= limite` (**3039 linhas** nos 2 dias,
+~120/h = 1 a cada 30 s, uma por tick), `🧠 RAM Limiter: opera ... esvaziado+teto / teto`
+(**3129**, o flip-flop do governador), `⚡ RAM Limiter DIRETO: discord` (315), VERY_LOW do opera/discord
+(146+157), `🤖 GameBoost AUTO ... faixa=Idle (mudou)` (101), as faixas SUSTENTADAS (~160
+espalhadas por 6 apps) e os pares `⏱️ Timer Resolution` + `🌐 GameBoost VN` (138 CADA um,
+3 pares por alt-tab). O binario que gerou esse log era o de ANTES dos fixes de assinatura de
+24/10; o que ainda era `Logger.Log()` cru no fonte atual e' o que foi corrigido agora.
+
+**1. Monitor de RAM (TrayIconService):**
+- Standby skip (`islc|skip|ramLivre` e `abaixoLimiar`): heartbeat 900 s -> **3600 s** E
+  `minChangeIntervalSeconds: 3600` — agora o "nao fez nada" fala no maximo 1x/hora por motivo
+  (antes, com estado oscilando, o LogOnce ainda emitia varias por hora).
+- Governador (`ramlimit|{proc}`): heartbeat 300 -> **1800 s**, `minChangeInterval` 120 -> **900 s**.
+- `TrimLogWindow` 5 -> **30 min** (o corte DIRETO do discord rendia 315 linhas/dia).
+- `MemPrioLogWindow` 10 -> **60 min** (VERY_LOW e' estado, nao acao).
+- `⛈️ storm` e `⚠️ piso > teto` viraram `LogOnce` com assinatura (rodavam a cada ciclo de
+  500 ms enquanto a condicao durasse).
+
+**2. GameBoost Pro:**
+- `ShouldLogBoost` (gate "1 linha a cada 30 reaplicacoes") foi **REMOVIDO**. O boost agora e'
+  `Logger.LogOnce($"gboost|apply|{pid}", msg, heartbeatSeconds: 3600, signature:
+  BoostSignature(config))` — o motor Automatico reaplica a cada troca de janela e a cada ~15 s,
+  e o log real tinha ~140 linhas/dia do MESMO PID com a MESMA configuracao.
+- `ShouldLogBand` passou a ser **por APLICATIVO** (nome, nao PID) com estado explicito
+  (`sustentado`/`ocioso`/`cap`) e **3600 s**: SearchHost/VoyageSteam reiniciam varias vezes por dia
+  e cada PID novo era um estado novo (49 linhas/dia so do SearchHost). Assinatura virou o
+  ESTADO (antes era `what[..48]`, que carrega o nome do app e nao distinguia a acao).
+- Timer Resolution e tweak global de rede (comportamento global, alterna a cada alt-tab):
+  `LogOnce` nas chaves `gboost|timerres` e `gboost|netglobal`, **3600 s** (o estado alterna
+  a cada alt-tab; 1 h e' o lembrete minimo para nao inflar).
+- `🤖 GameBoost AUTO`: `minChangeInterval` 120 -> **1800 s** e heartbeat 3600 s.
+- `⚖️ GameBoost AUTO ProBalance: maquina folgada` (rodava a cada reavaliacao): `LogOnce` 1800 s.
+
+**3. BUGS reais que a revisao do log entregou (os dois NAO eram de release, eram de runtime):**
+
+**3a. NullReferenceException em thread de fundo a cada FECHAMENTO** — o log tinha
+`[APP] UnhandledException (background): System.NullReferenceException at
+KitLugia.GUI.MainWindow.<.ctor>b__62_16()` em 20/10, 22/10 e 24/10 (~01-02h, uma por
+encerramento). Causa: a thread `ShowWindowMonitor` (named event da 2a instancia) relia
+`_backgroundTasksCts.Token` na condicao do `while`, mas o fechamento faz `Cancel()` +
+`Dispose()` + `_backgroundTasksCts = null`. A thread acordava do `WaitOne(1s)` e estourava.
+Fix em `MainWindow.xaml.cs`: token em LOCAL (`showWindowToken`). Duas task irma do ctor tinham
+o mesmo padrao (`startupCts`) e o `CheckForAvailableUpdateOnStartupAsync` (8 s de espera)
+passou a checar null. O `RevertBoost` (TrayIconService) tambem parou de logar WARN
+"Exception suppressed" quando o processo ja morreu (7 em 3 dias): agora `catch (ArgumentException)`.
+
+**3b. BUG que o proprio log entregou:** `[FORCE STOP] SeDebugPrivilege ERRO: Unable to find an
+entry point named 'CloseHandleNative' in DLL 'kernel32.dll'.` em TODA tentativa. Era o MESMO
+bug do `CloseHandleP` (documentado em 20/10): `[DllImport("kernel32.dll")] CloseHandleNative`
+sem `EntryPoint` faz o CLR procurar "CloseHandleNative" na kernel32 ->
+`EntryPointNotFoundException` e **handle do token vazado** (1 por tentativa de elevacao).
+Corrigido em `KitLugia.Core/ForceStopUnlockService.cs` com `EntryPoint = "CloseHandle"`.
+
+**4. Harness `tests/lognoise` (31 -> 48 checks):** T3/T4 reescritos para o novo contrato
+(100 reaplicacoes identicas -> **1 linha**; assinatura nova -> loga na hora), T5 prova a chave
+por APP (mesmo app em caixa diferente + estado novo nao loga; outro app loga), **T9** e' guarda
+de politica em cima do FONTE (heartbeats 3600/1800/900, janelas 30/60 min, chaves
+`gboost|apply|{pid}`, `gboost|timerres`, `gboost|netglobal`, `gboost|auto|{pid}`,
+`gboost|autopb|folgada`, `ramlimit|storm|`, `ramlimit|piso|`) e **T10** prova o EntryPoint do
+`CloseHandleNative` (atributo == "CloseHandle" e chamada com NULL sem excecao). **T11** simula
+100 alt-tabs entre 3 apps e prova o objetivo do pedido: **11 linhas no total** (a primeira de
+cada app em cada evento + 2 globais) e **ZERO repeticao** ao voltar nos mesmos apps. Depois
+disso o GameBoost so' fala na mudanca real de configuracao ou no lembrete de 1 h.
+tests/lognoise tambem deixou de depender do `ShouldLogBoost` (removido): se alguem recriar o
+metodo, o T3 acusa.
+
+**5. Versao 2.0.61 -> 2.0.62** (`KitLugia.GUI.csproj`) — a v2.0.61 ja estava publicada com a
+tag `v2.0.61`, entao republicar 2.0.61 deixaria os clientes atuais sem nunca ver a atualizacao
+(o updater compara versao). Release `-p:Version` do Deploy continua alcancando o Core.
+Conferido no binario Release: `FileVersion 2.0.62.0`, `ProductVersion 2.0.62+<commit>`.
+
+**Validacao:** solucao **0 erros** (148 avisos nullable pre-existentes, 136 no incremental);
+Release tambem **0 erros** com a versao nova; `lognoise` **48/48**;
+`PathRepairHarness` 18/18; `IslcPageVis` 38/38; `GpuHarness`, `ClockHarness`,
+`RamUsageHarness`, `TmOrderHarness` (145 chaves), `TmContextMenuHarness`, `TrimProcessHarness`
+= ALL-PASS; `CheckUiThreading` 0 padroes novos (80 legados); encoding BOM+CRLF preservado nos
+3 arquivos (TrayIconService, ForceStopUnlockService, lognoise).
+
+**O que NAO mudou:** nenhuma acao dos motores foi alterada - so a POLITICA DE LOG. O governador
+continua cortando a cada 500 ms, o boost continua sendo reaplicado a cada troca de foco e o
+Standby continua decidindo por standby/livre. Diagnostico continua disponivel: os botoes de
+status (🧠/⚡) e o `VerboseCheckLogs` mostram o detalhe quando precisar.
+
 ### Sessao 24/10 (cont.) - FECHAMENTO DE RELEASE: versao do updater, versao do kit e higiene de repo
 
 Pedido: "veja se tem pendencias para o kit e ja faca, vou fazer um release manual".
