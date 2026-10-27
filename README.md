@@ -68,7 +68,7 @@ O KitLugia reúne, em uma única interface, operações que normalmente ficam es
 - Cache de browsers: Chrome, Edge, Firefox, Opera, Brave, Vivaldi
 - Registry cleaner para chaves órfãos (COM, SharedDLLs, AppPaths)
 
-**Arquivos centrais:** `CleanupManager.cs`, `BloatwareManager.cs`, `RegistryCleaner.cs`, `BrowserCacheManager.cs`
+**Arquivos centrais:** `CleanupManager.cs`, `SystemTweaks.cs` (bloatware), `RegistryCleaner.cs`, `BrowserCacheManager.cs`
 
 </details>
 
