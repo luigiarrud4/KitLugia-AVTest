@@ -115,6 +115,8 @@ O KitLugia reúne, em uma única interface, operações que normalmente ficam es
 - Preparação de VALOS (Validation OS) com shell personalizado
 - Recuperação de boot: EmergencyBoot, EmergencyUEFI, EmergencyWinRE
 
+> O artefato base do WinPE é mantido em repositório separado: [KitLugia-WinPE](https://github.com/luigiarrud4/KitLugia-WinPE) (pré-construído com WMI, PowerShell, StorageWMI, Scripting, NetFx).
+
 **Arquivos centrais:** `BootableMediaManager.cs`, `WinpeBuilder.cs`, `WinbootManager.cs`, `IsoEditorManager.cs`, `PartitionManager.cs`, `EmergencyBcdBootManager.cs`
 
 </details>
