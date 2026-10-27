@@ -71,6 +71,58 @@ namespace KitLugia.GUI.Pages
         {
             Cleanup();
         }
+
+        private async void BtnPcInfo_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayPcInfo.Visibility = Visibility.Visible;
+            TxtPcInfoFull.Text = "Carregando informações completas...";
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                using var dm = new DashboardManager();
+                var s = await dm.GetSystemSnapshotAsync(cts.Token);
+                var sb = new StringBuilder();
+                sb.AppendLine($"Nome do PC: {Environment.MachineName}");
+                sb.AppendLine($"SO: {s.OsName} (Build {Environment.OSVersion.Version})");
+                sb.AppendLine($"Arquitetura: {Environment.Is64BitOperatingSystem} (64-bit OS)");
+                sb.AppendLine($"Uptime: {s.Uptime}");
+                sb.AppendLine($"Processadores lógicos: {Environment.ProcessorCount}");
+                sb.AppendLine();
+                sb.AppendLine($"CPU: {s.CpuName}");
+                sb.AppendLine($"  Carga: {s.CpuLoad:F1}%");
+                sb.AppendLine($"  Temp: {s.CpuTemp:F1} °C");
+                sb.AppendLine();
+                sb.AppendLine($"GPU: {s.GpuName}");
+                sb.AppendLine($"  Temp: {s.GpuTemp:F1} °C");
+                sb.AppendLine($"  VRAM usada: {s.GpuVramUsed:F2} GB");
+                sb.AppendLine();
+                sb.AppendLine($"RAM: {s.RamUsed:F2} / {s.RamTotal:F2} GB");
+                sb.AppendLine();
+                sb.AppendLine("Armazenamento:");
+                foreach (var d in s.StorageDevices)
+                    sb.AppendLine($"  {d.Name} ({d.DriveLetter}) - {d.HealthStatus} (Temp: {d.Temp:F0}°C)");
+                sb.AppendLine();
+                sb.AppendLine("Adaptadores de rede físicos:");
+                try
+                {
+                    var adapters = Toolbox.GetAllNetworkAdapters();
+                    if (adapters.Count == 0) sb.AppendLine("  Nenhum detectado");
+                    foreach (var a in adapters)
+                        sb.AppendLine($"  {a.AdapterName} ({a.AdapterType}) - {a.Description} - {a.DataUsage}");
+                }
+                catch (Exception ex) { sb.AppendLine("  Falha: " + ex.Message); }
+                TxtPcInfoFull.Text = sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                TxtPcInfoFull.Text = "Falha ao ler hardware: " + ex.Message;
+            }
+        }
+
+        private void BtnClosePcInfo_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayPcInfo.Visibility = Visibility.Collapsed;
+        }
         
         private async Task LoadSystemInfo()
         {

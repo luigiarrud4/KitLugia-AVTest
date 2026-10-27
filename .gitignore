@@ -391,3 +391,10 @@ test_deploy_version.ps1
 # Sobras de sessoes antigas que NAO devem ir no release (ver AGENTS.md)
 /Program.cs
 /AGENTS.md.new
+
+# Junk / artifacts que nao fazem parte do projeto
+tm_visual_check/
+weppy-project-sync/
+screenshots/
+rust_native/target/
+deploy.bat.bak

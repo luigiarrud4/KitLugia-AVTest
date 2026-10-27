@@ -103,7 +103,7 @@
                 <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{StaticResource TextPrimary}"/>
 
                 <!-- BANNER INFORMATIVO (INFO PC) -->
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}">
+                <Border x:Name="BtnPcInfo" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}" Cursor="Hand" MouseLeftButtonDown="BtnPcInfo_Click">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -119,6 +119,7 @@
                             <TextBlock x:Name="TxtSpecs" Text="Carregando informa&#xE7;&#xF5;es..." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
                             <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,3,0,0"/>
                         </StackPanel>
+                        <TextBlock Grid.Column="2" Text="&#x279C;" FontSize="24" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     </Grid>
                 </Border>
 
@@ -1057,6 +1058,24 @@
                             Background="Transparent" BorderBrush="#F44336" Foreground="#F44336"
                             Click="BtnCancelBenchmark_Click"/>
                 </StackPanel>
+            </Border>
+        </Grid>
+        <!-- OVERLAY: INFO COMPLETA DO PC -->
+        <Grid x:Name="OverlayPcInfo" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="700" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="#1E1E1E" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="12" MaxHeight="720">
+                <Grid Margin="20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="&#x1F4BB; Informações do Sistema" FontSize="20" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="TxtPcInfoFull" Text="" FontFamily="Consolas" FontSize="12" Foreground="#E0E0E0" TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                    <Button Grid.Row="2" Content="FECHAR" Height="35" Margin="0,15,0,0" Style="{StaticResource SecondaryButtonStyle}" Click="BtnClosePcInfo_Click"/>
+                </Grid>
             </Border>
         </Grid>
     </Grid>
