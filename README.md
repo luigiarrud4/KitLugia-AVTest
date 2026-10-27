@@ -198,6 +198,101 @@ O KitLugia reúne, em uma única interface, operações que normalmente ficam es
 </details>
 ---
 
+## 🗂️ Módulos por Page (UI)
+
+Mapa page → função → módulos centrais (gerado a partir de `KitLugia.GUI/Pages/*.xaml.cs`). Cada page é um módulo funcional pronto para uso.
+
+Gerado a partir das pages existentes em `KitLugia.GUI/Pages/*.xaml.cs`. Cada página corresponde a um módulo funcional pronto para uso.
+
+## Dashboard & Diagnóstico
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| DashboardPage | Dashboard principal: infos do sistema, jogo de otimizações, perfis | DashboardManager, SystemUtils, SystemTweaks, IsoManager, LatencyAnalyzer, OptimizationOrchestrator |
+| DiagnosticPage | Diagnóstico em tempo real: memória, timers, tasks, controle de módulos | TrayIconService, AggressiveMemoryCleaner, LatencyAnalyzer, PartitionManager |
+| GlobalSearchPage | Busca global em memória por drivers, tweaks e elementos | SearchEngine, SearchProviders, DriverItem |
+
+## Otimização & Tweaks
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| TweaksPage | Ajustes avançados via registro (incl. GPUs) | SystemTweaks, Microsoft.Win32 |
+| AllTweaksPage | Catálogo de 200+ tweaks ON/OFF | SystemTweaks, Toolbox (GodMode, Take Ownership) |
+| ExmTweaksPage | Tweaks via SFC/DISM | ScannableTweak |
+| IntegrityPage | Verifica integridade de tweaks vs baseline | ScannableTweak, TweakItem |
+| OptimizationPage | Otimiza RAM/CPU/disco/rede | PerformanceOptimizer, SystemOptimizer |
+| GameBoostPage | Perfis de boost para jogos | CustomMotorProfile, boost services |
+| WinTunePage | Otimizações (Game Bar, etc.) | SystemTweaks |
+| StutterPage | Detecta travamentos em tempo real | StutterDetector |
+| ToolsPage | Ferramentas variadas (planos de energia) | PowerPlanItem |
+
+## Limpeza & Privacidade
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| CleanupPage | Limpeza de temp, registro, cache navegador, prefetch, evidências | Toolbox, BrowserCacheManager, RegistryCleaner, EvidenceCleaner, PortableAppScanner, InstallMonitor, StartupManager, DeepUninstaller |
+| PrivacyPage | Configurações de privacidade por categoria | PrivacyCategoryViewModel |
+| BloatwarePage | Lista/remove bloatware com verificação de resíduos | SystemTweaks, BloatwareApp, BackgroundTaskTracker |
+
+## Apps & Programas
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| AppsPage | Bloatware, programas instalados, apps portáteis, desinstalação profunda | SystemTweaks, DeepUninstaller, BloatwareApp, ProgramViewModel, PortableAppScanner, LeftoverJunkManager, BackgroundTaskTracker |
+| ProgramsPage | Lista programas via registro, uninstall/force remove | RegistryProgramFactory, DeepUninstaller, ProgramIconHelper, StartupManager |
+
+## Sistema & Drivers
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| DriversPage | Gerencia drivers e drivers kernel | DriverItem, KernelDriverInfo |
+| ServicesPage | Serviços, startup, tarefas agendadas, drivers kernel | StartupManager, BackgroundProcessManager, KernelDriverManager, BootOptimizerManager, ScheduledTaskInfo |
+| SecurityPage | Monitora/ajusta segurança (Defender, Firewall, VBS, RDP, telemetria) | SystemTweaks, SystemUtils, BackgroundTaskTracker |
+| NetworkPage | Rede local: DNS, adaptadores, MAC, refresh | AdapterManager.NetworkAdapterInfo |
+| ActivationPage | Ativação Windows via MAS | ActivationManager |
+
+## Disco & Partições
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| DiskConverterPage | Converte MBR↔GPT, inicializa RAW, backup/restaura MBR | DiskConverterManager |
+| PartitionsPage | Expande/reduz/move/cria/remove partições | DiskInfoEx, PartitionInfoEx |
+| ShrinkPage | Instala/remove bootloader rEFInd para dual-boot Linux | RefindManager |
+| BcdRepairPage | Diagnóstico/reparo BCD com backup | BcdRepairManager, DiskConverterManager |
+
+## Boot & Instalação
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| QuickInstallPage | Instala Windows em múltiplos modos (ISO, DISM/7-Zip) | WinbootManager, BootableMediaManager |
+| ReinstallPreservePage | Reinstala Windows preservando dados (WinPE/Storage API) | WinbootManager, PartitionManager, DiskInfoEx, PreservationOptions |
+| RufusPage | Cria mídias bootáveis (ISO, DD, multi-boot, FreeDOS) | BootableMediaManager, WinbootManager |
+| WinbootPage | Operações de boot Windows e customização WIM | WinbootManager |
+| WindowsUpdatePage | Canais insider e builds offline | OfflineInsiderManager |
+| WinpeToolsPage | Cria/personaliza imagens WinPE | helpers de log/progresso |
+| IsoEditorPage | Edita ISOs, extrai/edita editions via WIM | WimEdition |
+
+## Reparo & Manutenção
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| RepairsPage | Reparos do sistema via GeneralRepairManager | GeneralRepairManager, BackgroundTaskTracker, ValorantDiagnosticOverlay |
+| UpdatePage | Verifica/instala atualizações via GitHub | GitHubUpdater |
+
+## Utilitários & Config
+| Page | Função | Módulos centrais |
+|------|--------|------------------|
+| ScreenPage | Perfis de cor, resolução, drivers de vídeo | DisplayManager |
+| ProcessMonitorPage | Monitora processos em tempo real e otimiza | ProcessOptimizationManager, MemoryOptimizer, ProcessMonitorInfo |
+| ServerPage | Túneis Minecraft LAN (Playit.gg/localtunnel) | PlayitTunnelAdapter |
+| SettingsPage | Configurações persistentes (auto-start, notificações, dev mode) | AppSettings, AppSettingsHelper, DeveloperModeManager, TrayIconService |
+| TraySettingsPage | Configurações da bandeja (auto-start, processos, RAM) | TaskScheduler, TrayIconService |
+| AdvancedToolsPage | Acesso a ISO Editor, Winboot, Partições | PageType navigation |
+| AdvancedRamCleanSettingsPage | Config RAM clean avançada (sliders/registro) | Registry HKCU\Software\KitLugia\AdvancedRamClean |
+| AboutPage | Info do app, abrir legacy como admin | SystemInfo |
+| _PageTemplate | Template base de páginas | — |
+
+## Módulos centrais compartilhados
+- **KitLugia.Core**: núcleo (tweaks, otimizadores, managers de disco/boot/iso/partição).
+- **KitLugia.GUI.Helpers**: helpers de UI e ícones.
+- **KitLugia.GUI.Services**: serviços de boost, privacidade, settings.
+- **BackgroundTaskTracker**: rastreamento de tarefas em background.
+- **Logger / SystemInfo / NavigationHelper / MainWindow**: infraestrutura comum.
+
+---
+
 ## 🦀 Biblioteca Nativa em Rust
 
 O módulo Rust (`rust_native/`) não é uma segunda aplicação completa. Ele fornece rotinas nativas para tarefas específicas, compiladas como DLL `cdylib` e integradas via FFI:
@@ -287,7 +382,9 @@ KitLugia/
 ├── Deploy.ps1                      # Build, empacotamento e hash SHA-256
 ├── KitLugia.sln                    # Solução principal
 └── global.json                     # Versão do SDK .NET
-```---
+```
+
+---
 
 ## 🔨 Build e Execução
 
