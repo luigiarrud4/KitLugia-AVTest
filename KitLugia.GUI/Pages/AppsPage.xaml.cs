@@ -1092,25 +1092,21 @@ namespace KitLugia.GUI.Pages
                 motivosAuto.Add("A limpeza automática falhou — tudo foi enviado para revisão: " + ex.Message);
             }
 
-            // Se já está mostrando outro review, enfileira para abrir quando o atual fechar.
-            if (ReviewPanel.Visibility == Visibility.Visible)
-            {
-                _pendingReviews.Enqueue((program, scanResult));
-                ShowBackgroundTaskToast($"Scan de {program.DisplayName} concluído"
-                    + (autoRemovidos > 0 ? $" — {autoRemovidos} item(ns) já limpos" : "") + " — em fila de revisão.");
-                return;
-            }
+            // A revisão manual de resíduos foi movida para uma aba separada:
+            // não exibe mais o painel automaticamente após cada desinstalação.
+            // Os resíduos (se houver) ficam disponíveis lá para o usuário revisar
+            // quando quiser. Aqui apenas removemos o app da lista e notificamos.
+            int leftoversCount = scanResult.LeftoverFiles.Count + scanResult.LeftoverRegistry.Count;
+            FilteredProgramsCollection?.Remove(program);
+            ProgramsCollection?.Remove(program);
 
-            var classifiedFiles = scanResult.LeftoverFiles
-                .Select(f => new ScanEntry { Path = f, Safety = DeepUninstaller.ClassifyFileSafety(program.DisplayName, program.InstallLocation, f) })
-                .ToList();
-            var classifiedReg = scanResult.LeftoverRegistry
-                .Select(r => new ScanEntry { Path = r, Safety = DeepUninstaller.ClassifyRegistrySafety(program.DisplayName, program.InstallLocation, r) })
-                .ToList();
-            _reviewProgramContext = program;
-            _reviewAutoRemovidos = autoRemovidos;
-            _reviewAutoMotivos = motivosAuto;
-            ShowReviewPanel(program.DisplayName, scanResult, classifiedFiles, classifiedReg, program.InstallLocation);
+            string toastMsg = program.DisplayName + " desinstalado"
+                + (autoRemovidos > 0 ? " — " + autoRemovidos + " resíduo(s) limpo(s) automaticamente" : "")
+                + (leftoversCount > 0 ? " — " + leftoversCount + " resíduo(s) disponível(is) na aba de revisão" : " — sem resíduos");
+            ShowBackgroundTaskToast(toastMsg);
+
+            // Limpa contexto de review (não usado mais neste fluxo).
+            _reviewProgramContext = null;
         }
 
         private void RemoveProgramAfterSuccessfulScan(ProgramViewModel program, DeepUninstaller.UninstallResult scanResult)

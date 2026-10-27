@@ -50,7 +50,6 @@ O KitLugia reúne, em uma única interface, operações que normalmente ficam es
 - Checagem de SMBv1, AutoRun e proteções do kernel
 - Análise de variável PATH e integridade do shell do Explorer
 - Diagnóstico de serviços, BCD e chaves de Registro
-- Referências a CVEs reais: CVE-2026-20805, CVE-2026-21509, CVE-2026-21513, CVE-2026-21514
 - Detecção de configurações frágeis ou inconsistentes
 - Reparo de configurações, alteração de serviços (`sc.exe`), atualização de boot (`bcdedit`)
 
@@ -323,7 +322,7 @@ dotnet publish KitLugia.GUI -c Release -r win-x64 --self-contained true -p:Publi
 
 ```powershell
 .\Deploy.ps1
-gh release upload v2.0.20 ./Publish/KITLUGIA2.zip ./Publish/KITLUGIA2.zip.sha256 --clobber
+gh release upload v2.0.x ./Publish/KITLUGIA2.zip ./Publish/KITLUGIA2.zip.sha256 --clobber
 ```
 
 > Execute como administrador somente quando a operação exigir.
