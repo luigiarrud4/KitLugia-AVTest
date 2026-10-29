@@ -725,6 +725,7 @@
                         <StackPanel>
                             <TextBlock Text="&#x1F4E1; MAC Address Spoofing" FontSize="14" FontWeight="Bold" Foreground="#F48120" Margin="0,0,0,5"/>
                             <TextBlock Text="Altere o endere&#xE7;o MAC da placa de rede para evitar bloqueios por hardware ou melhorar a privacidade. O primeiro byte &#xE9; definido como 02 (obrigat&#xF3;rio para WiFi funcionar)." FontSize="11" Foreground="#808080" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                            <Button x:Name="BtnOpenMacSpoof" Content="&#x1F513; Abrir página especializada de MAC Spoof" Margin="0,0,0,12" Padding="10,4" Style="{StaticResource GoldButtonStyle}" Click="BtnOpenMacSpoof_Click"/>
 
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>

@@ -927,6 +927,12 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        private void BtnOpenMacSpoof_Click(object sender, RoutedEventArgs e)
+        {
+            var mw = Window.GetWindow(this) as MainWindow;
+            if (mw != null) NavigationHelper.NavigateTo(PageType.MacSpoof);
+        }
+
         private async void BtnRestoreMac_Click(object sender, RoutedEventArgs e)
         {
             try
