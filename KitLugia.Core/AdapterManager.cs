@@ -23,6 +23,9 @@ namespace KitLugia.Core
             public string Speed { get; set; } = "";
             public bool IsUp { get; set; }
             public bool SupportsSpoofing { get; set; }
+            public bool HasChanged { get; set; }
+            public string ChangeStatus { get; set; } = "";
+            public string OriginalMac { get; set; } = "";
         }
 
         // =================================================================
@@ -729,7 +732,59 @@ namespace KitLugia.Core
         }
 
         // =================================================================
-        // DHCP REFRESH — libera e renova IP
+        // MAC ALEATÓRIO (estilo TMAC) — gera MAC com OUI válido
         // =================================================================
+        public static string GetRandomMacAddress(bool use02Prefix = true)
+        {
+            var rng = new Random();
+            var bytes = new byte[6];
+            rng.NextBytes(bytes);
+            if (use02Prefix)
+            {
+                bytes[0] = 0x02; // locally administered, unicast
+            }
+            else
+            {
+                // OUI genérico (00:1A:2B) para parecer vendor real
+                bytes[0] = 0x00;
+                bytes[1] = 0x1A;
+                bytes[2] = 0x2B;
+            }
+            // bit 1 do primeiro byte = 0 (unicast)
+            bytes[0] &= 0xFE;
+            return string.Concat(bytes.Select(b => b.ToString("X2")));
+        }
+
+        // Reset ao MAC original (remove NetworkAddress do registro)
+        public static bool ResetToOriginalMac(NetworkAdapterInfo adapter)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(
+                    $@"SYSTEM\CurrentControlSet\Control\Class\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\{adapter.Id}",
+                    writable: true);
+                if (key == null) return false;
+                key.DeleteValue("NetworkAddress", throwOnMissingValue: false);
+                adapter.HasChanged = false;
+                adapter.ChangeStatus = "Restaurado ao MAC original";
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // Deletar adaptador do registro (estilo TMAC mnuDeleteNetworkAdapter)
+        public static bool DeleteAdapterFromRegistry(NetworkAdapterInfo adapter)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(
+                    $@"SYSTEM\CurrentControlSet\Control\Class\{{4D36E972-E325-11CE-BFC1-08002BE10318}}",
+                    writable: true);
+                if (key == null) return false;
+                key.DeleteSubKeyTree(adapter.Id, throwOnMissingSubKey: false);
+                return true;
+            }
+            catch { return false; }
+        }
     }
 }

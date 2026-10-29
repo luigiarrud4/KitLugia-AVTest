@@ -307,4 +307,7 @@
         </Setter>
     </Style>
 
+    <!-- Default TextBox style: garante hover dourado em todos os TextBox sem Style explícito -->
+    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource DarkTextBoxStyle}"/>
+
 </ResourceDictionary>
