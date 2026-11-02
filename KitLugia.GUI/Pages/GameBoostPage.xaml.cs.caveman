@@ -1,0 +1,1902 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using KitLugia.GUI.Services;
+using KitLugia.Core;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
+using Colors = System.Windows.Media.Colors;
+using MessageBox = System.Windows.MessageBox;
+using Application = System.Windows.Application;
+
+namespace KitLugia.GUI.Pages
+{
+    public partial class GameBoostPage : Page
+    {
+        private CancellationTokenSource _cts = new();
+        private List<CustomMotorProfile> _customProfiles = new();
+        private bool _isInitializing = true;
+        private bool _isRestoring = false;
+        private string? _editingProfileId = null;
+        private int _engineIndexBeforeCustom = -1; // Índice do motor antes de abrir o overlay custom
+        private bool _isLoadingSettings = false;
+        private CustomMotorProfile? _profileToDelete = null;
+
+        /// <summary>
+        /// Numero do motor Automatico no combo/servico (= GameBoostEngine.Auto).
+        /// Fonte unica: a UI tinha 0, "custom" e 1..4 espalhados e nenhum sabia deste.
+        /// </summary>
+        private const int AutoEngineNumber = 5;
+
+        public static bool AutoOpenCustomOverlayOnLoad = false;
+        // CORREÇÃO: Usar LocalApplicationData em vez de ApplicationData (Roaming)
+        // LocalApplicationData não depende de Roaming e é mais seguro
+        private readonly string _profilesFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KitLugia",
+            "custom_profiles.json");
+        private readonly string _engineConfigPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KitLugia",
+            "last_engine.json");
+        private readonly string _gameBoostSettingsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KitLugia",
+            "gameboost_settings.json");
+
+        public GameBoostPage()
+        {
+            InitializeComponent();
+            _cts = new CancellationTokenSource();
+
+            // IMPORTANTE: Inicialização começa como true (vai ser setado false depois)
+            _isInitializing = true;
+
+            // NOVO: Carrega perfis customizados salvos primeiro (necessário para RestoreEngineSelection)
+            LoadCustomProfiles();
+
+            // NOVO: Carrega configurações do GameBoost (toggle e checkboxes)
+            LoadGameBoostSettings();
+
+            // CORREÇÃO: Marca inicialização como completa
+            _isInitializing = false;
+
+            // CORREÇÃO: Inicializa timer e carrega lista inicial de processos
+            InitializeTimer();
+
+            // LIMPEZA: Para timer ao sair da página
+            this.Unloaded += GameBoostPage_Unloaded;
+        }
+
+        // NOVO: Evento Loaded - restaura seleção do motor após renderização completa
+        private void GameBoostPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // CORREÇÃO: Define SelectedIndex padrão antes de restaurar (evita SelectionChanged)
+                if (CmbEngine != null && CmbEngine.Items.Count > 0)
+                {
+                    _isRestoring = true;
+                    CmbEngine.SelectedIndex = 0;
+                    _isRestoring = false;
+                }
+
+                // NOVO: Carrega o último motor escolhido e restaura seleção
+                var lastEngineConfig = LoadLastEngine();
+                RestoreEngineSelection(lastEngineConfig);
+
+                if (AutoOpenCustomOverlayOnLoad)
+                {
+                    AutoOpenCustomOverlayOnLoad = false;
+                    OpenCustomMotorOverlay();
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao restaurar seleção no Loaded: {ex.Message}");
+            }
+        }
+
+        // CORREÇÃO: Cleanup público para ser chamado via reflection pelo MainWindow
+        public void Cleanup()
+        {
+            // Cancela todas as tasks em background
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
+
+            // Limpa todas as listas e bindings
+            _customProfiles?.Clear();
+            _customProfiles = null!;
+
+            // CORREÇÃO: Desinscreve do evento Unloaded para evitar memory leak do WPF
+            this.Unloaded -= GameBoostPage_Unloaded;
+
+            // LIMPEZA: Limpa DataContext para liberar bindings
+            this.DataContext = null;
+
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
+            // Trim sincrono na troca de aba trava em SSD lento.
+        }
+
+        // NOVO: Helper para obter TrayIconService
+        private static TrayIconService? GetTrayService()
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+                return mw.TrayService;
+            return null;
+        }
+
+        private void GameBoostPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
+
+        private void InitializeTimer()
+        {
+            // Timer de monitoramento removido - usando CurrentForegroundPid do TrayIconService
+        }
+
+        // NOVO: Obtém título da janela usando Win32 API (sem acessar processo)
+        private string GetWindowTitle(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero) return "";
+
+            try
+            {
+                int length = Win32Api.GetWindowTextLength(hwnd);
+                if (length == 0) return "";
+
+                StringBuilder sb = new StringBuilder(length + 1);
+                Win32Api.GetWindowText(hwnd, sb, sb.Capacity);
+                return sb.ToString();
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); return ""; }
+        }
+
+        private double GetCpuUsage(Process proc)
+        {
+            try
+            {
+                using var counter = new System.Diagnostics.PerformanceCounter("Process", "% Processor Time", proc.ProcessName, true);
+                counter.NextValue();
+                System.Threading.Thread.Sleep(100);
+                return counter.NextValue() / Environment.ProcessorCount;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            return 0;
+        }
+
+        /// <summary>
+        /// Cor da bola + halo conforme o motor em uso (05/10/2026).
+        ///
+        /// AZUL com halo = MOTOR AUTOMÁTICO a escolher os parâmetros (o motor novo).
+        /// VERDE         = motor legado escolhido à mão.
+        /// VERMELHO      = GameBoost desligado.
+        ///
+        /// O halo é um Ellipse separado (StatusGlow) dentro de um Grid intermédio
+        /// (StatusGlowHost) porque a Opacity do Ellipse está animada em XAML: se o
+        /// código mexesse nela, a animação ganharia a todos os writes. A Opacity do
+        /// pai multiplica a do filho, por isso acender/apagar o halo não quebra o pulso.
+        /// </summary>
+        private void AtualizarIndicadorStatus()
+        {
+            bool ativo = TglGameBoost != null && TglGameBoost.IsChecked == true;
+            bool automatico = Services.TrayIconService.CurrentEngine
+                              == Services.TrayIconService.GameBoostEngine.Auto;
+
+            if (!ativo)
+            {
+                if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                if (StatusGlowHost != null) StatusGlowHost.Opacity = 0;
+                if (TxtStatus != null) TxtStatus.Text = "Desativado";
+                return;
+            }
+
+            if (automatico)
+            {
+                if (StatusIndicator != null)
+                    // "Color" e' ambiguo nesta pagina (System.Drawing vs System.Windows.Media).
+                    StatusIndicator.Fill = new SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(0x3D, 0x8B, 0xFF));
+                if (StatusGlowHost != null) StatusGlowHost.Opacity = 1;
+                if (TxtStatus != null)
+                    TxtStatus.Text = "Motor Automático ativo — a escolher os melhores parâmetros";
+            }
+            else
+            {
+                if (StatusIndicator != null) StatusIndicator.Fill = new SolidColorBrush(Colors.LimeGreen);
+                if (StatusGlowHost != null) StatusGlowHost.Opacity = 0;
+                if (TxtStatus != null) TxtStatus.Text = "Ativo e monitorando processos";
+            }
+        }
+
+        private void TglGameBoost_Checked(object sender, RoutedEventArgs e)
+        {
+            // PROTEÇÃO: Ignora eventos durante carregamento inicial
+            if (_isLoadingSettings) return;
+
+            AtualizarIndicadorStatus();
+            KitLugia.Core.Logger.Log("🚀 GameBoost Pro ativado via interface");
+
+            // CORREÇÃO: Ativa E inicializa o GameBoost no serviço
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService != null)
+            {
+                mw.TrayService.GamePriorityEnabled = true;
+                try
+                {
+                    mw.TrayService.InitializeGameBoost();
+                }
+                catch (Exception ex)
+                {
+                    KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao inicializar: {ex.Message}");
+                }
+                mw.TrayService.SaveSettings();
+            }
+
+            SaveGameBoostSettings();
+        }
+
+        private void TglGameBoost_Unchecked(object sender, RoutedEventArgs e)
+        {
+            // PROTEÇÃO: Ignora eventos durante carregamento inicial
+            if (_isLoadingSettings) return;
+
+            AtualizarIndicadorStatus();
+            KitLugia.Core.Logger.Log("🚀 GameBoost Pro desativado via interface");
+
+            // CORREÇÃO: Desativa E encerra o GameBoost no serviço
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService != null)
+            {
+                mw.TrayService.GamePriorityEnabled = false;
+                try
+                {
+                    mw.TrayService.ShutdownGameBoost();
+                }
+                catch (Exception ex)
+                {
+                    KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao encerrar: {ex.Message}");
+                }
+                mw.TrayService.SaveSettings();
+            }
+
+            SaveGameBoostSettings();
+        }
+
+        private void LoadGameBoostSettings()
+        {
+            _isLoadingSettings = true;
+            try
+            {
+
+                var mw = Application.Current.MainWindow as MainWindow;
+
+                // Wait for TrayService to finish Initialize() so registry values are loaded
+                var trayService = mw?.TrayService;
+                if (trayService != null && !trayService.IsInitialized)
+                {
+                    // Will use defaults, values update when service is ready
+                }
+
+                // IMPORTANTE: NfO usar padrões! Só ler do serviço.
+                bool gameBoostEnabled = false; // Começa com false
+                bool autoStartEnabled = false;
+                bool unparkCpuEnabled = false;
+                bool proBalance = false;
+                bool foregroundBoost = true;
+
+                if (mw?.TrayService != null)
+                {
+                    // Lê valores atuais do serviço (já carregados do Registry)
+                    gameBoostEnabled = mw.TrayService.GamePriorityEnabled;
+                    autoStartEnabled = Services.TrayIconService.IsAutoStartEnabled();
+                    proBalance = mw.TrayService.ProBalance;
+                    foregroundBoost = mw.TrayService.ForegroundBoostEnabled;
+                }
+
+                // Tenta carregar do JSON (se existir)
+                if (File.Exists(_gameBoostSettingsPath))
+                {
+                    try
+                    {
+                        string json = File.ReadAllText(_gameBoostSettingsPath);
+                        var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                        if (settings != null)
+                        {
+
+                            if (settings.ContainsKey("gameBoostEnabled"))
+                                gameBoostEnabled = GetPropertyValue<bool>(settings["gameBoostEnabled"]);
+                            if (settings.ContainsKey("autoStartEnabled"))
+                                autoStartEnabled = GetPropertyValue<bool>(settings["autoStartEnabled"]);
+                            if (settings.ContainsKey("unparkCpuEnabled"))
+                                unparkCpuEnabled = GetPropertyValue<bool>(settings["unparkCpuEnabled"]);
+                            if (settings.ContainsKey("proBalance"))
+                                proBalance = GetPropertyValue<bool>(settings["proBalance"]);
+                            if (settings.ContainsKey("foregroundBoost"))
+                                foregroundBoost = GetPropertyValue<bool>(settings["foregroundBoost"]);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao ler JSON: {ex.Message}");
+                    }
+                }
+
+                // Isso garante que as 3 páginas (GameBoost, TraySettings, Settings) estejam sempre sincronizadas
+                // Os valores do TrayService têm prioridade sobre o JSON
+                if (mw?.TrayService != null)
+                {
+                    gameBoostEnabled = mw.TrayService.GamePriorityEnabled;
+                    proBalance = mw.TrayService.ProBalance;
+                    foregroundBoost = mw.TrayService.ForegroundBoostEnabled;
+                }
+
+                autoStartEnabled = Services.TrayIconService.IsAutoStartEnabled();
+
+                // Aplica valores à UI (ícone do tray é sempre visível — sem toggle)
+                if (TglGameBoost != null) TglGameBoost.IsChecked = gameBoostEnabled;
+                if (ChkStartWithWindows != null) ChkStartWithWindows.IsChecked = autoStartEnabled;
+                if (ChkUnparkCpu != null) ChkUnparkCpu.IsChecked = unparkCpuEnabled;
+                // X da janela sempre minimiza p/ o tray (CloseToTray forçado no Core)
+                if (ChkProBalance != null) ChkProBalance.IsChecked = proBalance;
+                if (TglForegroundBoost != null) TglForegroundBoost.IsChecked = foregroundBoost;
+                if (ChkExplorerAutoTurbo != null) ChkExplorerAutoTurbo.IsChecked = mw?.TrayService?.ExplorerAutoTurbo == true;
+
+                string gameBarPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe");
+                string backupPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe.bak");
+                bool prefersDisabled = mw?.TrayService?.GameBarPresenceWriterDisabled == true;
+                bool gameBarDisabled = File.Exists(backupPath) && !File.Exists(gameBarPath);
+
+                if (File.Exists(gameBarPath) && File.Exists(backupPath))
+                {
+                    gameBarDisabled = false;
+                    KitLugia.Core.Logger.Log("⚠️ Windows recriou GameBarPresenceWriter.exe - re-desativando...");
+
+                    // Re-aplica a renomeação agora (o .bak prova que o usuário já tinha desativado)
+                    var tray = mw?.TrayService;
+                    if (tray != null)
+                    {
+                        System.Threading.Tasks.Task.Run(() => tray.AutoFixGameBarPresenceWriter());
+                        gameBarDisabled = true; // checkbox volta para "desativado"
+                    }
+                }
+                else if (File.Exists(backupPath) && !File.Exists(gameBarPath))
+                {
+                    gameBarDisabled = true;
+                }
+
+                if (gameBarDisabled)
+                {
+                    KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter está desativado (.bak)");
+                }
+                else
+                {
+                    KitLugia.Core.Logger.Log("ℹ️ GameBarPresenceWriter está ativo (.exe)");
+                }
+
+                if (ChkGameBarPresenceWriter != null) ChkGameBarPresenceWriter.IsChecked = gameBarDisabled;
+
+                // Restaura toggles das otimizações da comunidade (Reddit)
+                if (mw?.TrayService != null)
+                {
+                    if (TglSmartScreen != null) TglSmartScreen.IsChecked = mw.TrayService.SmartScreenDisabled;
+                    if (TglEdgeUpdate != null) TglEdgeUpdate.IsChecked = mw.TrayService.EdgeUpdateDisabled;
+                    if (TglCompatTelRunner != null) TglCompatTelRunner.IsChecked = mw.TrayService.CompatTelRunnerDisabled;
+                    if (TglSearchIndexer != null) TglSearchIndexer.IsChecked = mw.TrayService.SearchIndexerDisabled;
+                    if (TglTextInputHost != null) TglTextInputHost.IsChecked = mw.TrayService.TextInputHostDisabled;
+                }
+
+                // Restaura estado do Download Boost
+                if (TglDownloadBoost != null && mw?.TrayService != null)
+                {
+                    TglDownloadBoost.IsChecked = mw.TrayService.DownloadBoostEnabled;
+                    PanelDownloadBoostOptions.Visibility = mw.TrayService.DownloadBoostEnabled ? Visibility.Visible : Visibility.Collapsed;
+                    var level = mw.TrayService.DownloadBoostLevel ?? "Auto";
+                    CboDownloadBoostMode.SelectedIndex = level switch
+                    {
+                        "Download" => 1,
+                        "Latency" => 2,
+                        "Balanced" => 3,
+                        _ => 0
+                    };
+                    TxtDownloadBoostThreshold.Text = mw.TrayService.DownloadBoostThreshold.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+                }
+
+                // Atualiza indicador de status (bola + halo conforme o motor)
+                AtualizarIndicadorStatus();
+
+                // Atualiza status do ProBalance
+                UpdateProBalanceStatusText(proBalance);
+
+                // Só lemos, não escrevemos durante o load.
+
+                // e pode interferir com o motor restaurado
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao carregar configurações: {ex.Message}");
+            }
+            finally
+            {
+                _isLoadingSettings = false;
+            }
+        }
+
+        private T GetPropertyValue<T>(object value)
+        {
+            if (value is System.Text.Json.JsonElement element)
+            {
+                if (typeof(T) == typeof(bool))
+                    return (T)(object)element.GetBoolean();
+                if (typeof(T) == typeof(int))
+                    return (T)(object)element.GetInt32();
+                if (typeof(T) == typeof(string))
+                {
+                    string? strValue = element.GetString();
+                    return (T)(object)(strValue ?? "");
+                }
+                if (typeof(T) == typeof(double))
+                    return (T)(object)element.GetDouble();
+            }
+            return (T)Convert.ChangeType(value, typeof(T));
+        }
+
+        private void SaveGameBoostSettings()
+        {
+            try
+            {
+                var mw = Application.Current.MainWindow as MainWindow;
+                if (mw?.TrayService != null)
+                {
+                    mw.TrayService.GamePriorityEnabled = TglGameBoost?.IsChecked == true;
+                    mw.TrayService.ForegroundBoostEnabled = TglForegroundBoost?.IsChecked == true;
+                    mw.TrayService.ProBalance = ChkProBalance?.IsChecked == true;
+                    mw.TrayService.ExplorerAutoTurbo = ChkExplorerAutoTurbo?.IsChecked == true;
+                    mw.TrayService.UnparkCpuEnabled = ChkUnparkCpu?.IsChecked == true;
+                    mw.TrayService.GameBarPresenceWriterDisabled = ChkGameBarPresenceWriter?.IsChecked == true;
+                    mw.TrayService.SmartScreenDisabled = TglSmartScreen?.IsChecked == true;
+                    mw.TrayService.EdgeUpdateDisabled = TglEdgeUpdate?.IsChecked == true;
+                    mw.TrayService.CompatTelRunnerDisabled = TglCompatTelRunner?.IsChecked == true;
+                    mw.TrayService.SearchIndexerDisabled = TglSearchIndexer?.IsChecked == true;
+                    mw.TrayService.TextInputHostDisabled = TglTextInputHost?.IsChecked == true;
+                    mw.TrayService.DownloadBoostEnabled = TglDownloadBoost?.IsChecked == true;
+                    var boostLevel = CboDownloadBoostMode.SelectedIndex switch
+                    {
+                        1 => "Download",
+                        2 => "Latency",
+                        3 => "Balanced",
+                        _ => "Auto"
+                    };
+                    mw.TrayService.DownloadBoostLevel = boostLevel;
+                    if (double.TryParse(TxtDownloadBoostThreshold?.Text, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double thr) && thr > 0)
+                        mw.TrayService.DownloadBoostThreshold = thr;
+                    mw.TrayService.SaveSettings();
+                }
+
+                // NÃO grava o auto-start aqui: SaveGameBoostSettings é chamado por VÁRIOS toggles
+                // (GameBoost, Unpark CPU...) e o ChkStartWithWindows pode estar null ou
+                // desmarcado — o SetAutoStart(false) resultante APAGAVA as 3 vias de
+                // inicialização. Quem muda o auto-start é só ChkStartWithWindows_Click.
+                var settings = new Dictionary<string, object>
+                {
+                    { "gameBoostEnabled", TglGameBoost?.IsChecked == true },
+                    { "trayEnabled", true },
+                    { "autoStartEnabled", ChkStartWithWindows?.IsChecked == true },
+                    { "unparkCpuEnabled", ChkUnparkCpu?.IsChecked == true },
+                    { "closeToTray", true },
+                    { "proBalance", ChkProBalance?.IsChecked == true },
+                    { "foregroundBoost", TglForegroundBoost?.IsChecked == true },
+                    { "explorerAutoTurbo", ChkExplorerAutoTurbo?.IsChecked == true },
+                    { "smartScreenDisabled", TglSmartScreen?.IsChecked == true },
+                    { "edgeUpdateDisabled", TglEdgeUpdate?.IsChecked == true },
+                    { "compatTelRunnerDisabled", TglCompatTelRunner?.IsChecked == true },
+                    { "searchIndexerDisabled", TglSearchIndexer?.IsChecked == true },
+                    { "textInputHostDisabled", TglTextInputHost?.IsChecked == true }
+                };
+
+                string json = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_gameBoostSettingsPath, json);
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao salvar configurações: {ex.Message}");
+            }
+        }
+
+        private void ChkExplorerAutoTurbo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            try
+            {
+                bool enabled = ChkExplorerAutoTurbo?.IsChecked == true;
+                var tray = (Application.Current.MainWindow as MainWindow)?.TrayService;
+                if (tray != null)
+                {
+                    tray.ExplorerAutoTurbo = enabled;
+                    tray.SaveSettings();
+                }
+                KitLugia.Core.Logger.Log($"⚡ Turbo Explorer automático: {(enabled ? "ATIVADO" : "desativado")} (GameBoostPro)");
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.ShowInfo("EXPLORER", enabled
+                        ? "Turbo Explorer automático ATIVADO — quando o explorer.exe reiniciar (login/crash), o Kit aplica o F11 re-render sozinho na 1ª pasta aberta. 'Ir direto ao arquivo' continua instantâneo após reboot."
+                        : "Turbo Explorer automático DESATIVADO — o F11 só será aplicado manualmente (item ⚡ Turbo Explorer do tray ou Ctrl+F11).");
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.LogError("ChkExplorerAutoTurbo", ex.Message);
+            }
+        }
+
+        // NOVO: Handler do toggle StartWithWindows (ToggleButton)
+        private async void ChkStartWithWindows_Click(object sender, RoutedEventArgs e)
+        {
+            // PROTEÇÃO: Ignora eventos durante carregamento inicial
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                ChkStartWithWindows.IsEnabled = false;
+                bool isChecked = ChkStartWithWindows.IsChecked == true; // Captura ANTES do Task.Run
+
+                await Task.Run(() =>
+                {
+                    Services.TrayIconService.SetAutoStart(isChecked);
+
+                    // Atualizar estado real
+                    Dispatcher.Invoke(() =>
+                    {
+                        bool actualState = Services.TrayIconService.IsAutoStartEnabled();
+                        if (actualState != isChecked)
+                        {
+                            KitLugia.Core.Logger.Log($"🎮 AutoStart: estado real {actualState} difere do solicitado {isChecked}");
+                        }
+                        ChkStartWithWindows.IsChecked = actualState;
+                        KitLugia.Core.Logger.Log($"🎮 AutoStart: {(actualState ? "ativado" : "desativado")}");
+                        SaveGameBoostSettings();
+                    });
+                });
+
+                ChkStartWithWindows.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar AutoStart: {ex.Message}");
+                ChkStartWithWindows.IsEnabled = true;
+            }
+        }
+
+        // NOVO: Handler do toggle UnparkCpu (ToggleButton)
+        private async void ChkUnparkCpu_Click(object sender, RoutedEventArgs e)
+        {
+            // PROTEÇÃO: Ignora eventos durante carregamento inicial
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                bool isEnabled = ChkUnparkCpu.IsChecked == true;
+
+                // NOVO: Desabilita toggle e mostra loading
+                ChkUnparkCpu.IsEnabled = false;
+
+                await Task.Run(() =>
+                {
+                    if (isEnabled)
+                    {
+                        // Aplica unpark CPU
+                        var result = KitLugia.Core.SystemTweaks.UnparkCpuPowerConfig();
+                        if (result.Success)
+                        {
+                            KitLugia.Core.Logger.Log($"✔️ Unpark CPU: {result.Message}");
+                            Dispatcher.Invoke(() => SaveGameBoostSettings());
+                        }
+                        else
+                        {
+                            KitLugia.Core.Logger.Log($"⚠️ Unpark CPU falhou: {result.Message}");
+                            // Reverte toggle em caso de erro
+                            Dispatcher.Invoke(() => ChkUnparkCpu.IsChecked = false);
+                        }
+                    }
+                    else
+                    {
+                        // Reverte unpark CPU
+                        var result = KitLugia.Core.SystemTweaks.RevertUnparkCpuPowerConfig();
+                        if (result.Success)
+                        {
+                            KitLugia.Core.Logger.Log($"✔️ Unpark CPU revertido: {result.Message}");
+                            Dispatcher.Invoke(() => SaveGameBoostSettings());
+                        }
+                        else
+                        {
+                            KitLugia.Core.Logger.Log($"⚠️ Revert Unpark CPU falhou: {result.Message}");
+                        }
+                    }
+                });
+
+                // NOVO: Reabilita toggle após operação
+                ChkUnparkCpu.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar Unpark CPU: {ex.Message}");
+                ChkUnparkCpu.IsEnabled = true;
+            }
+        }
+
+        private async void ChkProBalance_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                ChkProBalance.IsEnabled = false;
+                bool newState = ChkProBalance.IsChecked == true;
+                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
+
+                await Task.Run(() =>
+                {
+                    if (trayService != null)
+                    {
+                        trayService.ProBalance = newState;
+                        trayService.SaveSettings();
+
+                        Dispatcher.Invoke(() => UpdateProBalanceStatusText(newState));
+
+                        if (!newState)
+                        {
+                            trayService.RestoreAllThrottledProcesses();
+                            KitLugia.Core.Logger.Log("s-️ ProBalance desativado - Todos os processos foram restaurados ao normal");
+                        }
+                        else
+                        {
+                            KitLugia.Core.Logger.Log("s-️ ProBalance ativado - Gerenciamento de processos retomado");
+                        }
+                    }
+                });
+
+                ChkProBalance.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar ProBalance: {ex.Message}");
+                ChkProBalance.IsEnabled = true;
+            }
+        }
+
+        // NOVO: Toggle "Boost do App Ativo" - prioridade temporária do foreground com reversão
+        private void TglForegroundBoost_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                bool newState = TglForegroundBoost?.IsChecked == true;
+                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
+
+                if (trayService != null)
+                {
+                    trayService.ForegroundBoostEnabled = newState;
+                    trayService.SaveSettings();
+                    KitLugia.Core.Logger.Log($"🚀 GameBoost: Boost do App Ativo {(newState ? "ativado" : "desativado")}");
+
+                    // Re-aplica ao foreground atual (boost ou revert imediato)
+                    if (newState)
+                    {
+                        ReapplyBoostToCurrentForeground();
+                    }
+                    else
+                    {
+                        trayService.RevertCurrentBoost();
+                    }
+                }
+
+                SaveGameBoostSettings();
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar Boost do App Ativo: {ex.Message}");
+            }
+        }
+
+        private async void TglCommunityProcess_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                if (sender is not ToggleButton tgl || tgl.Tag is not string name) return;
+                bool disable = tgl.IsChecked == true;
+                var trayService = (Application.Current.MainWindow as MainWindow)?.TrayService;
+                if (trayService == null) return;
+
+                // Atualiza a preferência correspondente no service
+                switch (name)
+                {
+                    case "SmartScreen": trayService.SmartScreenDisabled = disable; break;
+                    case "EdgeUpdate": trayService.EdgeUpdateDisabled = disable; break;
+                    case "CompatTelRunner": trayService.CompatTelRunnerDisabled = disable; break;
+                    case "SearchIndexer": trayService.SearchIndexerDisabled = disable; break;
+                    case "TextInputHost": trayService.TextInputHostDisabled = disable; break;
+                }
+                trayService.SaveSettings();
+
+                await Task.Run(() => trayService.ApplyCommunityProcessToggle(name, disable));
+                KitLugia.Core.Logger.Log($"📋 Comunidade: {name} {(disable ? "desativado" : "restaurado")}");
+
+                SaveGameBoostSettings();
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar {(sender as FrameworkElement)?.Tag}: {ex.Message}");
+            }
+        }
+
+        private void BtnShowMoreProcesses_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (PanelMoreProcesses.Visibility == Visibility.Collapsed)
+                {
+                    PanelMoreProcesses.Visibility = Visibility.Visible;
+                    BtnShowMoreProcesses.Content = "\u25B2 Mostrar menos";
+                }
+                else
+                {
+                    PanelMoreProcesses.Visibility = Visibility.Collapsed;
+                    BtnShowMoreProcesses.Content = "\u25BC Mostrar mais";
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao alternar painel: {ex.Message}");
+            }
+        }
+
+        private async void ChkGameBarPresenceWriter_Click(object sender, RoutedEventArgs e)
+        {
+            // PROTEÇÃO: Ignora eventos durante carregamento inicial
+            if (_isLoadingSettings) return;
+
+            try
+            {
+                // CORREÇÃO: Captura o valor do checkbox ANTES de desabilitar (evita threading error)
+                bool isEnabled = ChkGameBarPresenceWriter.IsChecked == true;
+                ChkGameBarPresenceWriter.IsEnabled = false;
+
+                await Task.Run(() =>
+                {
+                    string gameBarPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe");
+                    string backupPath = Path.Combine(Environment.SystemDirectory, "GameBarPresenceWriter.exe.bak");
+
+                    if (isEnabled)
+                    {
+
+                        try
+                        {
+                            if (File.Exists(gameBarPath))
+                            {
+
+                                try
+                                {
+                                    SystemUtils.RunExternalProcess("taskkill", "/F /IM GameBarPresenceWriter.exe", true);
+                                    KitLugia.Core.Logger.Log("Processo GameBarPresenceWriter.exe terminado");
+                                }
+                                catch { /* Ignora se processo não estiver rodando */ }
+
+                                if (File.Exists(backupPath))
+                                {
+
+                                    try
+                                    {
+                                        SystemUtils.RunExternalProcess("takeown", $"/f \"{backupPath}\"", true);
+                                        KitLugia.Core.Logger.Log("🔑 Ownership tomado do .bak antigo");
+
+                                        SystemUtils.RunExternalProcess("icacls", $"\"{backupPath}\" /grant *S-1-3-4:F /t /c /l", true);
+                                        KitLugia.Core.Logger.Log("🔓 Permissões concedidas para Everyone no .bak");
+
+                                        File.Delete(backupPath);
+                                        KitLugia.Core.Logger.Log("✅ Arquivo .bak antigo excluído com sucesso");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        KitLugia.Core.Logger.Log($"⚠️ Erro ao excluir .bak antigo: {ex.Message}");
+                                    }
+                                }
+
+                                SystemUtils.RunExternalProcess("takeown", $"/f \"{gameBarPath}\"", true);
+                                KitLugia.Core.Logger.Log("🔑 Ownership tomado com sucesso do .exe");
+
+                                SystemUtils.RunExternalProcess("icacls", $"\"{gameBarPath}\" /grant *S-1-3-4:F /t /c /l", true);
+                                KitLugia.Core.Logger.Log("🔓 Permissões concedidas para Everyone no .exe");
+
+                                File.Move(gameBarPath, backupPath);
+                                KitLugia.Core.Logger.Log("✅ GameBarPresenceWriter.exe renomeado para .bak - Processo desativado");
+                            }
+                            else if (File.Exists(backupPath))
+                            {
+                                KitLugia.Core.Logger.Log("⚠️ GameBarPresenceWriter.exe já está desativado (arquivo .bak existe)");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            KitLugia.Core.Logger.Log($"✅ Erro ao renomear GameBarPresenceWriter.exe: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+
+                        try
+                        {
+                            if (File.Exists(backupPath))
+                            {
+
+                                if (File.Exists(gameBarPath))
+                                {
+                                    try
+                                    {
+                                        File.Delete(gameBarPath);
+                                        KitLugia.Core.Logger.Log("Y-'️ Arquivo .exe recriado excluído (restaurando do .bak)");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        KitLugia.Core.Logger.Log($"⚠️ Erro ao excluir .exe recriado: {ex.Message}");
+                                    }
+                                }
+
+                                SystemUtils.RunExternalProcess("takeown", $"/f \"{backupPath}\"", true);
+                                KitLugia.Core.Logger.Log("🔑 Ownership tomado do arquivo .bak");
+
+                                SystemUtils.RunExternalProcess("icacls", $"\"{backupPath}\" /grant *S-1-3-4:F /t /c /l", true);
+                                KitLugia.Core.Logger.Log("🔓 Permissões concedidas para Everyone");
+
+                                File.Move(backupPath, gameBarPath);
+                                KitLugia.Core.Logger.Log("🔄 GameBarPresenceWriter.exe restaurado - Processo reativado");
+                            }
+                            else if (File.Exists(gameBarPath))
+                            {
+                                KitLugia.Core.Logger.Log("⚠️ GameBarPresenceWriter.exe já está ativo (arquivo .exe existe)");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            KitLugia.Core.Logger.Log($"✅ Erro ao restaurar GameBarPresenceWriter.exe: {ex.Message}");
+                        }
+                    }
+                });
+
+                Dispatcher.Invoke(() =>
+                {
+                    ChkGameBarPresenceWriter.IsEnabled = true;
+                    SaveGameBoostSettings();
+                });
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao configurar GameBarPresenceWriter: {ex.Message}");
+                Dispatcher.Invoke(() => ChkGameBarPresenceWriter.IsEnabled = true);
+            }
+        }
+
+        private void TglDownloadBoost_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService == null) return;
+
+            bool enabled = TglDownloadBoost.IsChecked == true;
+            mw.TrayService.DownloadBoostEnabled = enabled;
+            PanelDownloadBoostOptions.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+            mw.TrayService.SaveSettings();
+            KitLugia.Core.Logger.Log($"📥 Download Boost {(enabled ? "ativado" : "desativado")}");
+        }
+
+        private void CboDownloadBoostMode_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService == null) return;
+            var level = CboDownloadBoostMode.SelectedIndex switch
+            {
+                1 => "Download",
+                2 => "Latency",
+                3 => "Balanced",
+                _ => "Auto"
+            };
+            mw.TrayService.DownloadBoostLevel = level;
+            mw.TrayService.SaveSettings();
+        }
+
+        private void TxtDownloadBoostThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingSettings) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService == null) return;
+            if (double.TryParse(TxtDownloadBoostThreshold.Text, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double val) && val > 0)
+            {
+                mw.TrayService.DownloadBoostThreshold = val;
+                mw.TrayService.SaveSettings();
+            }
+        }
+
+        private void UpdateProBalanceStatusText(bool isEnabled)
+        {
+            if (TxtProBalanceStatus == null) return;
+
+            if (isEnabled)
+            {
+                TxtProBalanceStatus.Text = "ATIVADO";
+                TxtProBalanceStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // Verde #4CAF50
+            }
+            else
+            {
+                TxtProBalanceStatus.Text = "DESATIVADO";
+                TxtProBalanceStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 67, 54)); // Vermelho #F44336
+            }
+        }
+
+        private void CmbEngine_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+
+                if (_isInitializing)
+                {
+                    return;
+                }
+
+                if (_isRestoring)
+                {
+                    return;
+                }
+
+                // Ignora eventos quando ComboBox não está pronto
+                if (CmbEngine == null || CmbEngine.SelectedItem == null)
+                {
+                    return;
+                }
+
+                if (CmbEngine.SelectedItem is ComboBoxItem selected)
+                {
+                    // Pega a tag do item selecionado
+                    if (selected.Tag == null)
+                    {
+                        return;
+                    }
+
+                    var tagValue = selected.Tag.ToString();
+
+                    if (tagValue == "custom")
+                    {
+                        OpenCustomMotorOverlay();
+                        // O overlay pode ter aplicado um perfil (SetCustomEngine põe o
+                        // motor em V1_Balanced) ou o utilizador pode ter cancelado —
+                        // nos dois casos a bola tem de sair de azul.
+                        AtualizarIndicadorStatus();
+                        return;
+                    }
+
+                    var customProfile = _customProfiles.FirstOrDefault(p => p.Id == tagValue);
+                    if (customProfile != null)
+                    {
+                        ApplyCustomMotorProfile(customProfile);
+
+                        SaveLastEngine(0, customProfile.Id);
+                        // Este return acontece ANTES do AtualizarIndicadorStatus() do
+                        // fim do metodo. Sem esta chamada, escolher um perfil
+                        // personalizado deixava a bola azul de "motor automatico".
+                        AtualizarIndicadorStatus();
+                        return;
+                    }
+
+                    if (!int.TryParse(tagValue, out int engineNumber))
+                    {
+                        return;
+                    }
+
+                    // AVISO: so para os motores LEGADO V2/V3/V4. O Automatico (5) e o padrao
+                    // recomendado e nao tem nada disso - avisar nele seria assustar sem motivo.
+                    if (engineNumber is 2 or 3 or 4)
+                    {
+                        string engineName = engineNumber switch
+                        {
+                            2 => "V2 - FPS Estável",
+                            3 => "V3 - Extremo",
+                            4 => "V4 - Extreme Pro",
+                            _ => "Desconhecido"
+                        };
+
+                        var result = System.Windows.MessageBox.Show(
+                            $"⚠️ ATENÇÃO - Motor {engineName}\n\n" +
+                            "Este motor pode causar travamentos inesperados no sistema.\n\n" +
+                            "Recomendações:\n" +
+                            "⚠️ Feche aplicativos desnecessários antes de usar\n" +
+                            "⚠️ V2: Pode causar micro-travamentos em alguns jogos\n" +
+                            "⚠️ V3: Pode causar travamentos mais frequentes\n" +
+                            "⚠️ V4: sem RealTime (removido de proposito - causava tela preta), I/O Alta + Timer + Rede\n\n" +
+                            "Use por sua conta e risco!\n\n" +
+                            "Deseja continuar?",
+                            "⚠️ Aviso de Performance",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning);
+
+                        if (result == MessageBoxResult.No)
+                        {
+                            // Nao troca: volta para o Automatico (indice 0 = recomendado).
+                            CmbEngine.SelectedIndex = 0;
+                            return;
+                        }
+                    }
+
+                    // Chama o serviço para trocar o motor
+                    Services.TrayIconService.SetEngine(engineNumber);
+
+                    // Atualiza descrição na UI (texto agora vem de ShowMotorDescription)
+                    ShowMotorDescription(engineNumber);
+
+                    // O halo azul só acende no motor AUTOMÁTICO (5): ao trocar de motor
+                    // a bola tem de mudar logo, sem esperar o próximo load de settings.
+                    AtualizarIndicadorStatus();
+
+                    // Mostra mensagem de confirmação
+                    string engineNameConfirm = engineNumber switch
+                    {
+                        1 => "V1 - ORIGINAL",
+                        2 => "V2 - FPS Estável",
+                        3 => "V3 - Extremo",
+                        4 => "V4 - Extreme Pro",
+                        _ => "Desconhecido"
+                    };
+
+                    SaveLastEngine(engineNumber, null);
+
+                    ReapplyBoostToCurrentForeground();
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"✅ GameBoost: ERRO em SelectionChanged: {ex.Message}");
+                System.Windows.MessageBox.Show($"Erro ao trocar motor: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void ReapplyBoostToCurrentForeground()
+        {
+            try
+            {
+                // Obtém o processo em foreground atual
+                var foregroundWindow = Services.Win32Api.GetForegroundWindow();
+                Services.Win32Api.GetWindowThreadProcessId(foregroundWindow, out uint foregroundPid);
+
+                if (foregroundPid > 0)
+                {
+                    string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Reaplicando Boost", "GameBoost");
+
+                    // Força re-aplicação do boost com o novo motor (em background)
+                    await Task.Run(() =>
+                    {
+                        if (_cts?.IsCancellationRequested == true) return;
+                        Services.TrayIconService.ForceReapplyBoost(foregroundPid);
+                    });
+
+                    Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Boost reaplicado com sucesso");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ Erro ao re-aplicar boost: {ex.Message}");
+            }
+        }
+
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            string currentEngine = Services.TrayIconService.GetEngineDescription(Services.TrayIconService.CurrentEngine);
+
+            MessageBox.Show(
+                $"Configurações do GameBoost Pro:\n\n" +
+                $"Motor Atual: {currentEngine}\n\n" +
+                "🤖 AUTOMÁTICO (RECOMENDADO - padrão do kit):\n" +
+                "  • Escolhe o perfil por cena, sozinho\n" +
+                "  • CPU: High · Página: Normal (o padrão)\n" +
+                "  • Honra o timer do próprio jogo (sem timer global de 1 ms)\n" +
+                "  • Rebaixa o FUNDO só quando a máquina está > 70% de CPU\n" +
+                "  • Rede: NÃO aplica o tweak global do V3\n" +
+                "  • Revert automático ao perder o foco (faixa Sustentado)\n" +
+                "  • Nunca usa RealTime nem I/O crítico\n\n" +
+                "⚠️ Sobre I/O priority: o Windows só aceita VeryLow/Normal para processos\n" +
+                "   alheios — subir para High é recusado (0xC0000061), mesmo com o\n" +
+                "   Kit elevado. Foi medido. O motor fica no Normal e segue normal.\n\n" +
+                "🟢 V1 - ORIGINAL PLUS (LEGADO):\n" +
+                "  • CPU: High Priority\n" +
+                "  • I/O: High (3)\n" +
+                "  • Página: Normal (5)\n" +
+                "  • Timer: Não boosta\n" +
+                "  • EcoQoS: Não aplica\n" +
+                "  • ProBalance: Não aplica\n" +
+                "  • Win32PrioritySeparation: ATIVADO\n\n" +
+                "🟡 V2 - FPS ESTÁVEL PLUS (LEGADO):\n" +
+                "  • CPU: High Priority\n" +
+                "  • I/O: High (3)\n" +
+                "  • Página: Normal (5)\n" +
+                "  • EcoQoS: DESATIVADO\n" +
+                "  • ProBalance: >8% CPU\n" +
+                "  • ThreadEfficiencyMode: P-Cores\n" +
+                "  • GameClassInfo: ATIVADO\n" +
+                "  • Win32PrioritySeparation: ATIVADO\n\n" +
+                "V3 - EXTREMO PLUS (Tudo no máximo):\n" +
+                "  • CPU: High Priority\n" +
+                "  • I/O: High (3)\n" +
+                "  • Página: Below Normal (4)\n" +
+                "  • Timer: 1ms (precisão balanceada)\n" +
+                "  ⚠️ Pode causar estouros em áudio virtual (Voicemeeter, VB-Cable)\n" +
+                "  • EcoQoS: DESATIVADO\n" +
+                "  • Network: Throttling OFF\n" +
+                "  • ProBalance: >3% CPU (agressivo)\n" +
+                "  • ThreadEfficiencyMode: P-Cores\n" +
+                "  • GameClassInfo: ATIVADO\n" +
+                "  • Win32PrioritySeparation: ATIVADO\n\n" +
+                "Windows 11 25H2 Optimized",
+                "GameBoost Pro Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        #region Y" CUSTOM MOTOR PROFILES
+
+        private void OpenCustomMotorOverlay()
+        {
+            _editingProfileId = null;
+            _engineIndexBeforeCustom = CmbEngine.SelectedIndex;
+
+            // Inicializa controles com valores padrão
+            TxtCustomProfileName.Text = "Meu Motor Personalizado";
+            CmbCpuPriority.SelectedIndex = 1; // High
+            CmbIoPriority.SelectedIndex = 1; // High
+            CmbPagePriority.SelectedIndex = 0; // Normal (5) — o padrao e o topo; ver escala em 5.2 do doc
+            CmbThreadMemory.SelectedIndex = 0; // Normal (5)
+
+            // Inicializa toggles com valores padrão
+            TglTimerResolution.IsChecked = false;
+            TglEcoQoS.IsChecked = false;
+            TglNetworkBoost.IsChecked = false;
+            TglProBalance.IsChecked = true;
+            TglThreadEfficiencyMode.IsChecked = false;
+            TglGameClassInfo.IsChecked = true;
+            TglWin32PrioritySeparation.IsChecked = true;
+
+            // Atualiza textos de status dos toggles
+            UpdateToggleStatus(TglTimerResolution, false);
+            UpdateToggleStatus(TglEcoQoS, false);
+            UpdateToggleStatus(TglNetworkBoost, false);
+            UpdateToggleStatus(TglProBalance, true);
+            UpdateToggleStatus(TglThreadEfficiencyMode, false);
+            UpdateToggleStatus(TglGameClassInfo, true);
+            UpdateToggleStatus(TglWin32PrioritySeparation, true);
+
+            if (!Services.Win32Api.IsCpuHybrid())
+            {
+                TglThreadEfficiencyMode.IsChecked = false;
+                TglThreadEfficiencyMode.IsEnabled = false;
+                if (TxtThreadEfficiencyStatus != null)
+                {
+                    TxtThreadEfficiencyStatus.Text = "N/A";
+                    TxtThreadEfficiencyStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 128, 128, 128));
+                }
+            }
+            else
+            {
+                TglThreadEfficiencyMode.IsEnabled = true;
+            }
+
+            SliderProBalance.Value = 5;
+            TxtProBalanceValue.Text = "5%";
+
+            // Mostra overlay
+            OverlayCustomMotor.Visibility = Visibility.Visible;
+        }
+
+        private void OpenEditCustomMotorOverlay(CustomMotorProfile profile)
+        {
+            _editingProfileId = profile.Id;
+            _engineIndexBeforeCustom = CmbEngine.SelectedIndex;
+
+            // Preenche controles com valores do perfil existente
+            TxtCustomProfileName.Text = profile.Name;
+
+            // CPU Priority
+            CmbCpuPriority.SelectedIndex = profile.CpuPriority.ToLower() switch
+            {
+                "normal" => 0,
+                "high" => 1,
+                "realtime" => 2,
+                _ => 1
+            };
+
+            // I/O Priority
+            CmbIoPriority.SelectedIndex = profile.IoPriority;
+
+            // Page Priority
+            CmbPagePriority.SelectedIndex = profile.PagePriority;
+
+            // Thread Memory Priority
+            CmbThreadMemory.SelectedIndex = profile.ThreadMemoryPriority;
+
+            // Toggles
+            TglTimerResolution.IsChecked = profile.TimerResolution;
+            TglEcoQoS.IsChecked = profile.EcoQoS;
+            TglNetworkBoost.IsChecked = profile.NetworkBoost;
+            TglProBalance.IsChecked = profile.ProBalanceEnabled;
+            TglThreadEfficiencyMode.IsChecked = profile.ThreadEfficiencyMode;
+            TglGameClassInfo.IsChecked = profile.GameClassInfo;
+            TglWin32PrioritySeparation.IsChecked = profile.Win32PrioritySeparation;
+
+            // Atualiza textos de status dos toggles
+            UpdateToggleStatus(TglTimerResolution, profile.TimerResolution);
+            UpdateToggleStatus(TglEcoQoS, profile.EcoQoS);
+            UpdateToggleStatus(TglNetworkBoost, profile.NetworkBoost);
+            UpdateToggleStatus(TglProBalance, profile.ProBalanceEnabled);
+            UpdateToggleStatus(TglThreadEfficiencyMode, profile.ThreadEfficiencyMode);
+            UpdateToggleStatus(TglGameClassInfo, profile.GameClassInfo);
+            UpdateToggleStatus(TglWin32PrioritySeparation, profile.Win32PrioritySeparation);
+
+            if (!Services.Win32Api.IsCpuHybrid())
+            {
+                TglThreadEfficiencyMode.IsChecked = false;
+                TglThreadEfficiencyMode.IsEnabled = false;
+                if (TxtThreadEfficiencyStatus != null)
+                {
+                    TxtThreadEfficiencyStatus.Text = "N/A";
+                    TxtThreadEfficiencyStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 128, 128, 128));
+                }
+            }
+            else
+            {
+                TglThreadEfficiencyMode.IsEnabled = true;
+            }
+
+            // ProBalance Threshold
+            SliderProBalance.Value = profile.ProBalanceThreshold;
+            TxtProBalanceValue.Text = $"{profile.ProBalanceThreshold}%";
+
+            // Mostra overlay
+            OverlayCustomMotor.Visibility = Visibility.Visible;
+        }
+
+        private void SliderProBalance_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (TxtProBalanceValue != null)
+            {
+                TxtProBalanceValue.Text = $"{(int)SliderProBalance.Value}%";
+            }
+        }
+
+        private void ToggleButton_Checked(object sender, RoutedEventArgs e)
+        {
+            UpdateToggleStatus(sender as ToggleButton, true);
+        }
+
+        private void ToggleButton_Unchecked(object sender, RoutedEventArgs e)
+        {
+            UpdateToggleStatus(sender as ToggleButton, false);
+        }
+
+        private void UpdateToggleStatus(ToggleButton? toggle, bool isChecked)
+        {
+            if (toggle is null) return;
+
+            var redBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 255, 107, 107));
+            var greenBrush = new SolidColorBrush(Colors.LimeGreen);
+            var turquoiseBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 78, 205, 196));
+
+            if (toggle == TglTimerResolution && TxtTimerResolutionStatus != null)
+            {
+                TxtTimerResolutionStatus.Text = isChecked ? "ATIVADO" : "DESATIVADO";
+                TxtTimerResolutionStatus.Foreground = isChecked ? greenBrush : redBrush;
+                if (PanelTimerAudioWarning != null)
+                    PanelTimerAudioWarning.Visibility = isChecked ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else if (toggle == TglEcoQoS && TxtEcoQoSStatus != null)
+            {
+                TxtEcoQoSStatus.Text = isChecked ? "ATIVADO" : "DESATIVADO";
+                TxtEcoQoSStatus.Foreground = isChecked ? greenBrush : redBrush;
+            }
+            else if (toggle == TglNetworkBoost && TxtNetworkBoostStatus != null)
+            {
+                TxtNetworkBoostStatus.Text = isChecked ? "ATIVADO" : "DESATIVADO";
+                TxtNetworkBoostStatus.Foreground = isChecked ? greenBrush : redBrush;
+            }
+            else if (toggle == TglProBalance && TxtProBalanceStatusCustom != null)
+            {
+                TxtProBalanceStatusCustom.Text = isChecked ? "ATIVADO" : "DESATIVADO";
+                TxtProBalanceStatusCustom.Foreground = isChecked ? turquoiseBrush : redBrush;
+            }
+            else if (toggle == TglThreadEfficiencyMode && TxtThreadEfficiencyStatus != null)
+            {
+                TxtThreadEfficiencyStatus.Text = isChecked ? "ATIVADO" : "DESATIVADO";
+                TxtThreadEfficiencyStatus.Foreground = isChecked ? greenBrush : redBrush;
+            }
+            else if (toggle == TglGameClassInfo && TxtGameClassInfoStatus != null)
+            {
+                TxtGameClassInfoStatus.Text = isChecked ? "ATIVADO" : "DESATIVADO";
+                TxtGameClassInfoStatus.Foreground = isChecked ? greenBrush : redBrush;
+            }
+            else if (toggle == TglWin32PrioritySeparation && TxtWin32PrioritySeparationStatus != null)
+            {
+                TxtWin32PrioritySeparationStatus.Text = isChecked ? "ATIVADO" : "DESATIVADO";
+                TxtWin32PrioritySeparationStatus.Foreground = isChecked ? greenBrush : redBrush;
+            }
+        }
+
+        private void BtnCancelCustomMotor_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayCustomMotor.Visibility = Visibility.Collapsed;
+            _editingProfileId = null;
+            _isRestoring = true;
+            if (_engineIndexBeforeCustom >= 0)
+                CmbEngine.SelectedIndex = _engineIndexBeforeCustom;
+            _isRestoring = false;
+            Services.TrayIconService.ClearCustomEngine();
+            ReapplyBoostToCurrentForeground();
+
+            // Atualiza descrição na UI
+            if (TxtEngineDescription != null)
+            {
+                int restoredEngine = (int)Services.TrayIconService.CurrentEngine;
+                ShowMotorDescription(restoredEngine);
+            }
+        }
+
+        private void BtnSaveCustomMotor_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Valida nome
+                var profileName = TxtCustomProfileName.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(profileName))
+                {
+                    MessageBox.Show("Por favor, digite um nome para o perfil.", "Nome Obrigatório",
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Coleta valores dos controles
+                var profile = new CustomMotorProfile
+                {
+                    Id = _editingProfileId ?? ("custom_" + Guid.NewGuid().ToString("N")[..8]),
+                    Name = profileName,
+                    CpuPriority = CmbCpuPriority.SelectedIndex switch
+                    {
+                        0 => "Normal",
+                        1 => "High",
+                        2 => "RealTime",
+                        _ => "High"
+                    },
+                    IoPriority = CmbIoPriority.SelectedIndex,
+                    PagePriority = CmbPagePriority.SelectedIndex,
+                    ThreadMemoryPriority = CmbThreadMemory.SelectedIndex,
+                    TimerResolution = TglTimerResolution.IsChecked == true,
+                    EcoQoS = TglEcoQoS.IsChecked == true,
+                    NetworkBoost = TglNetworkBoost.IsChecked == true,
+                    ProBalanceEnabled = TglProBalance.IsChecked == true,
+                    ProBalanceThreshold = (int)SliderProBalance.Value,
+                    ThreadEfficiencyMode = TglThreadEfficiencyMode.IsChecked == true,
+                    GameClassInfo = TglGameClassInfo.IsChecked == true,
+                    Win32PrioritySeparation = TglWin32PrioritySeparation.IsChecked == true
+                };
+
+                bool isEditing = !string.IsNullOrEmpty(_editingProfileId);
+
+                if (isEditing)
+                {
+
+                    var existingProfile = _customProfiles.FirstOrDefault(p => p.Id == _editingProfileId);
+                    if (existingProfile != null)
+                    {
+                        // Atualiza na lista
+                        _customProfiles.Remove(existingProfile);
+                        _customProfiles.Add(profile);
+
+                        // Atualiza no ComboBox (remove e readiciona)
+                        for (int i = 0; i < CmbEngine.Items.Count; i++)
+                        {
+                            if (CmbEngine.Items[i] is ComboBoxItem item && item.Tag?.ToString() == _editingProfileId)
+                            {
+                                CmbEngine.Items.RemoveAt(i);
+                                break;
+                            }
+                        }
+                        AddCustomProfileToComboBox(profile);
+
+                        MessageBox.Show($"Perfil '{profile.Name}' atualizado com sucesso!", "Perfil Atualizado",
+                                      MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                else
+                {
+
+                    _customProfiles.Add(profile);
+                    AddCustomProfileToComboBox(profile);
+
+                    MessageBox.Show($"Perfil '{profile.Name}' criado com sucesso!", "Perfil Salvo",
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+
+                // Fecha overlay
+                OverlayCustomMotor.Visibility = Visibility.Collapsed;
+
+                // Limpa estado de edição
+                _editingProfileId = null;
+
+                SaveCustomProfiles();
+
+                // Seleciona o perfil no ComboBox (isso dispara SelectionChanged que aplica o perfil)
+                SelectCustomProfile(profile.Id);
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"✅ GameBoost: Erro ao salvar perfil: {ex.Message}");
+                MessageBox.Show($"Erro ao salvar perfil: {ex.Message}", "Erro",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void AddCustomProfileToComboBox(CustomMotorProfile profile)
+        {
+            // Cria o item principal
+            var item = new ComboBoxItem
+            {
+                Content = $"⚙️ {profile.Name}",
+                Tag = profile.Id,
+                Cursor = System.Windows.Input.Cursors.Hand
+            };
+
+            // Container com botões de editar e excluir
+            var container = new Grid();
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var textBlock = new TextBlock
+            {
+                Text = $"⚙️ {profile.Name}",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 5, 0)
+            };
+            Grid.SetColumn(textBlock, 0);
+
+            // Botão Editar (ícone branco/amarelo claro)
+            var editBtn = new System.Windows.Controls.Button
+            {
+                Content = "✏️",
+                Width = 24,
+                Height = 24,
+                FontSize = 12,
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "Editar perfil",
+                Padding = new Thickness(0),
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 255, 215, 0)) // Amarelo dourado claro
+            };
+            editBtn.Click += (s, e) =>
+            {
+                e.Handled = true;
+                CmbEngine.IsDropDownOpen = false;
+                OpenEditCustomMotorOverlay(profile);
+            };
+            Grid.SetColumn(editBtn, 1);
+
+            // Botão Excluir (ícone branco/vermelho claro)
+            var deleteBtn = new System.Windows.Controls.Button
+            {
+                Content = "🗑️",
+                Width = 24,
+                Height = 24,
+                FontSize = 12,
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "Excluir perfil",
+                Padding = new Thickness(0),
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 255, 100, 100)) // Vermelho claro
+            };
+            deleteBtn.Click += (s, e) =>
+            {
+                e.Handled = true;
+                CmbEngine.IsDropDownOpen = false;
+                ShowDeleteConfirmation(profile);
+            };
+            Grid.SetColumn(deleteBtn, 2);
+
+            container.Children.Add(textBlock);
+            container.Children.Add(editBtn);
+            container.Children.Add(deleteBtn);
+
+            item.Content = container;
+            item.Tag = profile.Id;
+
+            // Insere antes do item "Personalizado" (último item)
+            CmbEngine.Items.Insert(CmbEngine.Items.Count - 1, item);
+        }
+
+        private void SelectCustomProfile(string profileId)
+        {
+            _isRestoring = true;
+            for (int i = 0; i < CmbEngine.Items.Count; i++)
+            {
+                if (CmbEngine.Items[i] is ComboBoxItem item && item.Tag?.ToString() == profileId)
+                {
+                    CmbEngine.SelectedIndex = i;
+                    break;
+                }
+            }
+            _isRestoring = false;
+        }
+
+        private void ApplyCustomMotorProfile(CustomMotorProfile profile)
+        {
+            try
+            {
+
+                // Converte para configurações do TrayIconService.
+                // O perfil guarda o INDICE do ComboBox; a escala real e' 1=VERY_LOW..5=NORMAL.
+                // Sem esta traducao, "Maximum" (indice 1) aplicava VERY_LOW — o pior valor.
+                var config = new Services.CustomEngineConfig
+                {
+                    CpuPriority = profile.CpuPriority,
+                    IoPriorityLevel = profile.IoPriority,
+                    PagePriorityLevel = Services.TrayIconService.PagePriorityFromIndex(profile.PagePriority),
+                    TimerBoost = profile.TimerResolution,
+                    EcoQoSEnabled = profile.EcoQoS,
+                    ProBalance = profile.ProBalanceEnabled,
+                    ProBalanceCpuThreshold = profile.ProBalanceThreshold,
+                    NetworkBoost = profile.NetworkBoost,
+                    ThreadMemoryPriority = Services.TrayIconService.ThreadMemoryPriorityFromIndex(profile.ThreadMemoryPriority),
+                    ThreadEfficiencyMode = profile.ThreadEfficiencyMode,
+                    GameClassInfo = profile.GameClassInfo,
+                    Win32PrioritySeparation = profile.Win32PrioritySeparation
+                };
+
+                // Configura o motor personalizado no serviço
+                Services.TrayIconService.SetCustomEngine(config);
+
+                // Atualiza descrição na UI
+                if (TxtEngineDescription != null)
+                {
+                    TxtEngineDescription.Text = $"⚙️ {profile.Name}: Perfil personalizado | CPU: {profile.CpuPriority} | ProBalance: {(profile.ProBalanceEnabled ? $"ON (> {profile.ProBalanceThreshold}%)" : "OFF")}";
+                }
+
+                // Re-aplica ao foreground (async para não travar UI)
+                ReapplyBoostToCurrentForeground();
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"✅ GameBoost: Erro ao aplicar perfil: {ex.Message}");
+                MessageBox.Show($"Erro ao aplicar perfil: {ex.Message}", "Erro",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ShowDeleteConfirmation(CustomMotorProfile profile)
+        {
+            _profileToDelete = profile;
+            TxtDeleteProfileName.Text = profile.Name;
+            OverlayConfirmDelete.Visibility = Visibility.Visible;
+        }
+
+        private void BtnCancelDelete_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayConfirmDelete.Visibility = Visibility.Collapsed;
+            _profileToDelete = null;
+        }
+
+        private void BtnConfirmDelete_Click(object sender, RoutedEventArgs e)
+        {
+            ConfirmDeleteProfile();
+            OverlayConfirmDelete.Visibility = Visibility.Collapsed;
+        }
+
+        private void ConfirmDeleteProfile()
+        {
+            if (_profileToDelete == null) return;
+
+            try
+            {
+                // Remove da lista
+                _customProfiles.Remove(_profileToDelete);
+
+                // Remove do ComboBox
+                for (int i = CmbEngine.Items.Count - 1; i >= 0; i--)
+                {
+                    if (CmbEngine.Items[i] is ComboBoxItem item && item.Tag?.ToString() == _profileToDelete.Id)
+                    {
+                        CmbEngine.Items.RemoveAt(i);
+                        break;
+                    }
+                }
+
+                SaveCustomProfiles();
+
+                // Volta para Padrão Windows
+                _isRestoring = true;
+                CmbEngine.SelectedIndex = 0;
+                _isRestoring = false;
+
+                _profileToDelete = null;
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"✅ GameBoost: Erro ao excluir perfil: {ex.Message}");
+            }
+        }
+
+        private void LoadCustomProfiles()
+        {
+            try
+            {
+                if (!File.Exists(_profilesFilePath)) return;
+
+                var json = File.ReadAllText(_profilesFilePath);
+                var profiles = JsonSerializer.Deserialize<List<CustomMotorProfile>>(json);
+
+                if (profiles != null && profiles.Count > 0)
+                {
+                    _customProfiles = profiles;
+
+                    // Adiciona cada perfil ao ComboBox
+                    foreach (var profile in _customProfiles)
+                    {
+                        AddCustomProfileToComboBox(profile);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao carregar perfis: {ex.Message}");
+            }
+        }
+
+        private void SaveCustomProfiles()
+        {
+            try
+            {
+                // Garante que o diretório existe
+                var directory = Path.GetDirectoryName(_profilesFilePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                };
+                var json = JsonSerializer.Serialize(_customProfiles, options);
+                File.WriteAllText(_profilesFilePath, json);
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao salvar perfis: {ex.Message}");
+            }
+        }
+
+        private class EngineConfig
+        {
+            public string EngineType { get; set; } = "fixed"; // "fixed" ou "custom"
+            public int EngineNumber { get; set; } = 1; // 1, 2, 3 (se fixed)
+            public string? CustomProfileId { get; set; } = null; // ID do perfil (se custom)
+        }
+
+        private EngineConfig LoadLastEngine()
+        {
+            try
+            {
+                if (!File.Exists(_engineConfigPath))
+                {
+                    // Sem config gravada = primeira execucao: o motor tem de ser o
+                    // RECOMENDADO (Automatico = 5), nao um legado que ninguem escolheu.
+                    return new EngineConfig { EngineType = "fixed", EngineNumber = AutoEngineNumber };
+                }
+
+                var json = File.ReadAllText(_engineConfigPath);
+                var config = JsonSerializer.Deserialize<EngineConfig>(json);
+
+                if (config != null)
+                {
+
+                    if (config.EngineType == "custom" || config.EngineNumber == 0)
+                    {
+                        if (!string.IsNullOrEmpty(config.CustomProfileId))
+                        {
+                            return config;
+                        }
+                    }
+                    // 1..5: o 5 (Automatico) TEM de ser aceite. Antes o intervalo era 1..4,
+                    // por isso escolher Automatico gravava 5, esta validacao REJEITAVA e o
+                    // arranque seguinte voltava silenciosamente para V1 (legado).
+                    if (config.EngineType == "fixed" && config.EngineNumber >= 1 && config.EngineNumber <= 5)
+                    {
+                        return config;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao carregar motor: {ex.Message}");
+            }
+
+            return new EngineConfig { EngineType = "fixed", EngineNumber = AutoEngineNumber };
+        }
+
+        /// <summary>
+        /// Texto longo do motor para a UI — FONTE ÚNICA.
+        ///
+        /// Antes havia 3 switches duplicados (troca de motor, saída do personalizado e
+        /// restauração no arranque) e já tinham divergido entre si: um dizia "PADRfO",
+        /// outro dizia que o V4 usava RealTime (o V4 removeu o RealTime de propósito, era
+        /// o que causava tela preta) e NENHUM conhecia o Automatico, apesar de ele ser o
+        /// padrão do serviço desde 03/10/2026.
+        /// </summary>
+        private static string MotorDescriptionText(int engineNumber) => engineNumber switch
+        {
+            1 => "🟢 V1 - Original Plus (LEGADO): Win32PrioritySeparation + CPU/IO/Page boost - Seguro e estável",
+            2 => "🟡 V2 - FPS Estável Plus (LEGADO): P-Cores + GameMode + Win32PrioritySeparation + EcoQoS OFF + ProBalance (>8%)",
+            3 => "🔴 V3 - Extremo Plus (LEGADO): P-Cores + GameMode + Timer 1ms (audio!) + Scheduler Boost + ProBalance (>3%)",
+            4 => "💥 V4 - Performance Pro (LEGADO): I/O Alta + Timer + Rede + Win32PrioritySeparation - SEM RealTime por segurança",
+            5 => "🤖 Automático (RECOMENDADO): escolhe por cena - CPU/I-O/Page dinâmicos, timer só no loading, rede do V3 desligada, revert ao perder o foco",
+            _ => "⚙️ Motor personalizado"
+        };
+
+        private void ShowMotorDescription(int engineNumber)
+        {
+            try { if (TxtEngineDescription != null) TxtEngineDescription.Text = MotorDescriptionText(engineNumber); }
+            catch { }
+        }
+
+        private void SaveLastEngine(int engineNumber, string? customProfileId = null)
+        {
+            try
+            {
+                // Garante que o diretório existe
+                var directory = Path.GetDirectoryName(_engineConfigPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var config = new EngineConfig
+                {
+                    EngineType = string.IsNullOrEmpty(customProfileId) ? "fixed" : "custom",
+                    EngineNumber = engineNumber,
+                    CustomProfileId = customProfileId
+                };
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(config, options);
+                File.WriteAllText(_engineConfigPath, json);
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao salvar motor: {ex.Message}");
+            }
+        }
+
+        private void RestoreEngineSelection(EngineConfig config)
+        {
+            try
+            {
+
+                _isRestoring = true;
+
+                if (config.EngineType == "custom" || config.EngineNumber == 0)
+                {
+                    if (!string.IsNullOrEmpty(config.CustomProfileId))
+                    {
+                        // Procura o perfil no ComboBox
+                        for (int i = 0; i < CmbEngine.Items.Count; i++)
+                        {
+                            if (CmbEngine.Items[i] is ComboBoxItem item)
+                            {
+                                var tagValue = item.Tag?.ToString();
+                                if (tagValue == config.CustomProfileId)
+                                {
+                                    CmbEngine.SelectedIndex = i;
+
+                                    // Aplica o perfil customizado
+                                    var profile = _customProfiles?.FirstOrDefault(p => p.Id == config.CustomProfileId);
+                                    if (profile != null)
+                                    {
+                                        ApplyCustomMotorProfile(profile);
+                                    }
+
+                                    _isRestoring = false;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    // Se não encontrou o perfil customizado, volta para V1 sem aplicar
+                    CmbEngine.SelectedIndex = 0;
+                    _isRestoring = false;
+                    return;
+                }
+
+                // Motor fixo (V1, V2, V3)
+                for (int i = 0; i < CmbEngine.Items.Count; i++)
+                {
+                    if (CmbEngine.Items[i] is ComboBoxItem item)
+                    {
+                        var tagValue = item.Tag?.ToString();
+                        if (tagValue == config.EngineNumber.ToString())
+                        {
+                            CmbEngine.SelectedIndex = i;
+
+                            // Atualiza a descrição também
+                            ShowMotorDescription(config.EngineNumber);
+
+                            // Aplica o motor
+                            Services.TrayIconService.SetEngine(config.EngineNumber);
+
+                            _isRestoring = false;
+                            return;
+                        }
+                    }
+                }
+
+                _isRestoring = false;
+            }
+            catch (Exception ex)
+            {
+                _isRestoring = false;
+                KitLugia.Core.Logger.Log($"⚠️ GameBoost: Erro ao restaurar seleção: {ex.Message}");
+            }
+        }
+
+        #endregion
+    }
+
+    public class CustomMotorProfile
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string CpuPriority { get; set; } = "High";
+        public int IoPriority { get; set; } = 1;
+        public int PagePriority { get; set; } = 1;
+        public bool TimerResolution { get; set; } = false;
+        public bool EcoQoS { get; set; } = false;
+        public bool ProBalanceEnabled { get; set; } = true;
+        public int ProBalanceThreshold { get; set; } = 5;
+        public bool NetworkBoost { get; set; } = false;
+        public int ThreadMemoryPriority { get; set; } = 0;
+        public bool ThreadEfficiencyMode { get; set; } = false; // false=P-cores, true=E-cores
+        public bool GameClassInfo { get; set; } = true; // Sinaliza ao Windows como jogo
+        public bool Win32PrioritySeparation { get; set; } = true; // Registry scheduler boost
+    }
+
+    public class ProcessInfo
+    {
+        public string Name { get; set; } = "";
+        public string Pid { get; set; } = "";
+        public string CpuUsage { get; set; } = "";
+        public System.Windows.Media.Brush CpuColor { get; set; } = Brushes.White;
+        public string Priority { get; set; } = "";
+        public System.Windows.Media.Brush PriorityColor { get; set; } = Brushes.Gray;
+        public bool IsForeground { get; set; }
+    }
+}

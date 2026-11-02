@@ -1,0 +1,1 @@
+{"nodes":[{"id":"src_gpt_lib","label":"gpt_lib.h","file_type":"code","source_file":"Resources/KitLugiaEFI/src/gpt_lib.h","source_location":"L1"}],"edges":[{"source":"src_gpt_lib","target":"kitlugia_types","relation":"imports","confidence":"EXTRACTED","source_file":"Resources/KitLugiaEFI/src/gpt_lib.h","source_location":"L4","weight":1}]}
