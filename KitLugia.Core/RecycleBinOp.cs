@@ -110,7 +110,7 @@ namespace KitLugia.Core
             // seguem exatamente essa regra.
             ushort flags = FOF_NOERRORUI;
             if (permanent)
-                flags |= FOF_RENAMEONCOLLISION;   // 0x408
+                flags |= FOF_RENAMEONCOLLISION;   // 0x0008
             else
                 flags |= FOF_ALLOWUNDO;           // 0x440
 
