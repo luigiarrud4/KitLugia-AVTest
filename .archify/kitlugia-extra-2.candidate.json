@@ -1,0 +1,147 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "KitStore — fluxo do StoreEngine",
+    "subtitle": "Download, verificação e instalação de pacotes.",
+    "output": ".archify/kitlugia-kitstore-workflow.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "StorePage UI"
+    },
+    {
+      "id": "engine",
+      "label": "StoreEngine"
+    },
+    {
+      "id": "net",
+      "label": "HTTP + File IO"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "Browse",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "p2",
+      "label": "Download",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "p3",
+      "label": "Install",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "start",
+    "browse",
+    "select",
+    "download",
+    "verify",
+    "install",
+    "done"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "lane": "ui",
+      "col": 0,
+      "type": "external",
+      "label": "Abre StorePage",
+      "width": 120
+    },
+    {
+      "id": "browse",
+      "lane": "engine",
+      "col": 1,
+      "type": "backend",
+      "label": "ListPackages",
+      "sublabel": "manifest local + remote",
+      "width": 150
+    },
+    {
+      "id": "select",
+      "lane": "ui",
+      "col": 2,
+      "type": "backend",
+      "label": "User seleciona pacote",
+      "width": 160
+    },
+    {
+      "id": "download",
+      "lane": "net",
+      "col": 3,
+      "type": "cloud",
+      "label": "DownloadPackage",
+      "sublabel": "HTTP GET + checksum",
+      "width": 150
+    },
+    {
+      "id": "verify",
+      "lane": "engine",
+      "col": 4,
+      "type": "backend",
+      "label": "VerifySignature",
+      "sublabel": "SHA256 + cert",
+      "width": 130
+    },
+    {
+      "id": "install",
+      "lane": "engine",
+      "col": 5,
+      "type": "backend",
+      "label": "InstallPackage",
+      "sublabel": "extract + register",
+      "width": 130
+    },
+    {
+      "id": "done",
+      "lane": "ui",
+      "col": 5,
+      "type": "external",
+      "label": "Resultado",
+      "width": 120
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "browse"
+    },
+    {
+      "id": "e2",
+      "from": "browse",
+      "to": "select"
+    },
+    {
+      "id": "e3",
+      "from": "select",
+      "to": "download"
+    },
+    {
+      "id": "e4",
+      "from": "download",
+      "to": "verify"
+    },
+    {
+      "id": "e5",
+      "from": "verify",
+      "to": "install"
+    },
+    {
+      "id": "e6",
+      "from": "install",
+      "to": "done"
+    }
+  ]
+}
