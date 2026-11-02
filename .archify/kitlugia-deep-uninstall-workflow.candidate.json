@@ -1,0 +1,169 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Deep Uninstall — fluxo principal",
+    "subtitle": "Do clique do usuário até o relatório final.",
+    "output": ".archify/kitlugia-deep-uninstall-workflow.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "UI / Usuário"
+    },
+    {
+      "id": "core",
+      "label": "KitLugia.Core"
+    },
+    {
+      "id": "native",
+      "label": "Win32 / Rust / Shell"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "Prep",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "p2",
+      "label": "Uninstall",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "p3",
+      "label": "Scan + Cleanup",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "start",
+    "kill",
+    "baseline",
+    "run_uninstaller",
+    "scan",
+    "cleanup",
+    "report"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "lane": "ui",
+      "col": 0,
+      "type": "external",
+      "label": "Deep Uninstall",
+      "width": 132
+    },
+    {
+      "id": "kill",
+      "lane": "core",
+      "col": 1,
+      "type": "backend",
+      "label": "KillProcesses",
+      "sublabel": "CloseMainWindow + Kill",
+      "width": 140
+    },
+    {
+      "id": "baseline",
+      "lane": "core",
+      "col": 2,
+      "type": "backend",
+      "label": "Snapshot Baseline",
+      "sublabel": "diretórios + registro",
+      "width": 140
+    },
+    {
+      "id": "find_uninstaller",
+      "lane": "native",
+      "col": 2,
+      "type": "backend",
+      "label": "Find Uninstaller",
+      "sublabel": "HKLM + HKCU",
+      "width": 140
+    },
+    {
+      "id": "run_uninstaller",
+      "lane": "native",
+      "col": 3,
+      "type": "backend",
+      "label": "Run Uninstaller",
+      "sublabel": "quiet ou UI",
+      "width": 132
+    },
+    {
+      "id": "scan",
+      "lane": "core",
+      "col": 4,
+      "type": "backend",
+      "label": "Scan Resíduos",
+      "sublabel": "diff baseline",
+      "width": 132
+    },
+    {
+      "id": "cleanup",
+      "lane": "core",
+      "col": 5,
+      "type": "backend",
+      "label": "PerformCleanup",
+      "sublabel": "RecycleBinOp",
+      "width": 132
+    },
+    {
+      "id": "report",
+      "lane": "ui",
+      "col": 5,
+      "type": "external",
+      "label": "Relatório",
+      "sublabel": "Leftover + Registry",
+      "width": 140
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "kill"
+    },
+    {
+      "id": "e2",
+      "from": "kill",
+      "to": "baseline"
+    },
+    {
+      "id": "e3",
+      "from": "kill",
+      "to": "find_uninstaller",
+      "variant": "dashed"
+    },
+    {
+      "id": "e4",
+      "from": "baseline",
+      "to": "run_uninstaller"
+    },
+    {
+      "id": "e5",
+      "from": "find_uninstaller",
+      "to": "run_uninstaller"
+    },
+    {
+      "id": "e6",
+      "from": "run_uninstaller",
+      "to": "scan"
+    },
+    {
+      "id": "e7",
+      "from": "scan",
+      "to": "cleanup"
+    },
+    {
+      "id": "e8",
+      "from": "cleanup",
+      "to": "report"
+    }
+  ]
+}

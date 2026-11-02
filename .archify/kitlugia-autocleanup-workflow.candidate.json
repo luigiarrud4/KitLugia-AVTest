@@ -1,0 +1,142 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "AutoCleanup — fluxo de limpeza automática",
+    "subtitle": "Score 100 = limpeza permanente; abaixo disso = manual.",
+    "output": ".archify/kitlugia-autocleanup-workflow.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    {
+      "id": "scan",
+      "label": "Scan phase"
+    },
+    {
+      "id": "score",
+      "label": "AutoCleanup"
+    },
+    {
+      "id": "clean",
+      "label": "PerformCleanup"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "Scan",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "p2",
+      "label": "Score",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "p3",
+      "label": "Cleanup",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "start",
+    "scan",
+    "classify",
+    "decide",
+    "clean",
+    "report"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "lane": "scan",
+      "col": 0,
+      "type": "external",
+      "label": "RunScanPhaseAsync",
+      "width": 140
+    },
+    {
+      "id": "scan",
+      "lane": "scan",
+      "col": 1,
+      "type": "backend",
+      "label": "Diff baseline",
+      "sublabel": "arquivos + registro",
+      "width": 120
+    },
+    {
+      "id": "classify",
+      "lane": "score",
+      "col": 2,
+      "type": "backend",
+      "label": "ClassifySafety",
+      "sublabel": "Safe/Moderate/Uncertain",
+      "width": 150
+    },
+    {
+      "id": "decide",
+      "lane": "score",
+      "col": 3,
+      "type": "backend",
+      "label": "AutoCleanConfirmed?",
+      "sublabel": "score >= 100 ?",
+      "width": 140
+    },
+    {
+      "id": "clean",
+      "lane": "clean",
+      "col": 4,
+      "type": "backend",
+      "label": "PerformCleanup",
+      "sublabel": "RecycleBinOp",
+      "width": 130
+    },
+    {
+      "id": "report",
+      "lane": "scan",
+      "col": 5,
+      "type": "external",
+      "label": "Relatório",
+      "sublabel": "FilesDeleted + RegistryDeleted",
+      "width": 140
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "scan"
+    },
+    {
+      "id": "e2",
+      "from": "scan",
+      "to": "classify"
+    },
+    {
+      "id": "e3",
+      "from": "classify",
+      "to": "decide"
+    },
+    {
+      "id": "e4",
+      "from": "decide",
+      "to": "clean",
+      "label": "sim (>=100)"
+    },
+    {
+      "id": "e5",
+      "from": "decide",
+      "to": "report",
+      "label": "não (manual)",
+      "variant": "dashed"
+    },
+    {
+      "id": "e6",
+      "from": "clean",
+      "to": "report"
+    }
+  ]
+}

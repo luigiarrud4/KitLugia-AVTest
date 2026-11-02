@@ -1,0 +1,134 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "IntegrityPage — fluxo de verificação",
+    "subtitle": "Verifica integridade de tweaks e oferece restore.",
+    "output": ".archify/kitlugia-integrity-workflow.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "IntegrityPage UI"
+    },
+    {
+      "id": "core",
+      "label": "IntegrityCheckManager"
+    },
+    {
+      "id": "act",
+      "label": "Ação"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "Scan",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "p2",
+      "label": "Verifica",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "p3",
+      "label": "Age",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "start",
+    "scan",
+    "compare",
+    "decide",
+    "restore",
+    "done"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "lane": "ui",
+      "col": 0,
+      "type": "external",
+      "label": "Verify clicked",
+      "width": 120
+    },
+    {
+      "id": "scan",
+      "lane": "core",
+      "col": 1,
+      "type": "backend",
+      "label": "CatalogCurrentState",
+      "sublabel": "hash + timestamp",
+      "width": 140
+    },
+    {
+      "id": "compare",
+      "lane": "core",
+      "col": 2,
+      "type": "backend",
+      "label": "CompareWithBaseline",
+      "sublabel": "detecta modificados",
+      "width": 150
+    },
+    {
+      "id": "decide",
+      "lane": "ui",
+      "col": 3,
+      "type": "backend",
+      "label": "ShowResults",
+      "sublabel": "Modified / Optional / Clean",
+      "width": 140
+    },
+    {
+      "id": "restore",
+      "lane": "act",
+      "col": 4,
+      "type": "backend",
+      "label": "RestoreTweak",
+      "sublabel": "Rollback + cleanup",
+      "width": 130
+    },
+    {
+      "id": "done",
+      "lane": "ui",
+      "col": 5,
+      "type": "external",
+      "label": "Refresh counts",
+      "width": 120
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "scan"
+    },
+    {
+      "id": "e2",
+      "from": "scan",
+      "to": "compare"
+    },
+    {
+      "id": "e3",
+      "from": "compare",
+      "to": "decide"
+    },
+    {
+      "id": "e4",
+      "from": "decide",
+      "to": "restore",
+      "label": "modified"
+    },
+    {
+      "id": "e5",
+      "from": "restore",
+      "to": "done"
+    }
+  ]
+}

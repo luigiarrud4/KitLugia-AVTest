@@ -1,0 +1,815 @@
+{
+  "nodes": [
+    {
+      "id": "epm_cmds",
+      "label": "epm_cmds.py",
+      "file_type": "code",
+      "source_file": "epm_cmds.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_cmds_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "epm_cmds.py",
+      "source_location": "L33"
+    },
+    {
+      "id": "epm_cmds_rationale_1",
+      "label": "Mostra TODAS as strings de comando (shell-out) que o EaseUS executa.\r \r Responde",
+      "file_type": "rationale",
+      "source_file": "epm_cmds.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_exports",
+      "label": "epm_exports.py",
+      "file_type": "code",
+      "source_file": "epm_exports.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_exports_split_name",
+      "label": "split_name()",
+      "file_type": "code",
+      "source_file": "epm_exports.py",
+      "source_location": "L32"
+    },
+    {
+      "id": "epm_exports_exports",
+      "label": "exports()",
+      "file_type": "code",
+      "source_file": "epm_exports.py",
+      "source_location": "L46"
+    },
+    {
+      "id": "epm_exports_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "epm_exports.py",
+      "source_location": "L61"
+    },
+    {
+      "id": "epm_exports_rationale_1",
+      "label": "Demangle + agrupa os EXPORTS dos binarios EaseUS (EPM 20.8) por classe.\r \r Os .d",
+      "file_type": "rationale",
+      "source_file": "epm_exports.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_exports_rationale_33",
+      "label": "Devolve (classe, metodo) a partir de um export mangled.",
+      "file_type": "rationale",
+      "source_file": "epm_exports.py",
+      "source_location": "L33"
+    },
+    {
+      "id": "epm_map",
+      "label": "epm_map.py",
+      "file_type": "code",
+      "source_file": "epm_map.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_map_pe_exports",
+      "label": "pe_exports()",
+      "file_type": "code",
+      "source_file": "epm_map.py",
+      "source_location": "L104"
+    },
+    {
+      "id": "epm_map_pe_imports",
+      "label": "pe_imports()",
+      "file_type": "code",
+      "source_file": "epm_map.py",
+      "source_location": "L126"
+    },
+    {
+      "id": "epm_map_pe_strings",
+      "label": "pe_strings()",
+      "file_type": "code",
+      "source_file": "epm_map.py",
+      "source_location": "L154"
+    },
+    {
+      "id": "epm_map_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "epm_map.py",
+      "source_location": "L182"
+    },
+    {
+      "id": "epm_map_rationale_1",
+      "label": "Mapeador completo dos binarios EaseUS WinPE (EPM 20.8) — um passe, sem re-analis",
+      "file_type": "rationale",
+      "source_file": "epm_map.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_scan_imports",
+      "label": "epm_scan_imports.py",
+      "file_type": "code",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_scan_imports_imports",
+      "label": "imports()",
+      "file_type": "code",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L32"
+    },
+    {
+      "id": "epm_scan_imports_strings_scan",
+      "label": "strings_scan()",
+      "file_type": "code",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L56"
+    },
+    {
+      "id": "epm_scan_imports_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L81"
+    },
+    {
+      "id": "epm_scan_imports_rationale_1",
+      "label": "Pre-scan dos binarios EaseUS WinPE (EPM 20.8).\r \r Objetivo: mapear COMO eles ope",
+      "file_type": "rationale",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_srcmap",
+      "label": "epm_srcmap.py",
+      "file_type": "code",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "epm_srcmap_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L24"
+    },
+    {
+      "id": "epm_srcmap_rationale_1",
+      "label": "Extrai os caminhos de FONTE vazados pelos binarios EaseUS (assert/__FILE__/PDB).",
+      "file_type": "rationale",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "ida_epm_dump",
+      "label": "ida_epm_dump.py",
+      "file_type": "code",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "ida_epm_dump_w",
+      "label": "w()",
+      "file_type": "code",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L38"
+    },
+    {
+      "id": "ida_epm_dump_decompile",
+      "label": "decompile()",
+      "file_type": "code",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L42"
+    },
+    {
+      "id": "ida_epm_dump_func_name",
+      "label": "func_name()",
+      "file_type": "code",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L52"
+    },
+    {
+      "id": "ida_epm_dump_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L56"
+    },
+    {
+      "id": "ida_epm_dump_rationale_1",
+      "label": "IDA Pro (batch) - dumper de funcoes por NOME e por XREF de string.\r \r Uso (Git B",
+      "file_type": "rationale",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L1"
+    }
+  ],
+  "edges": [
+    {
+      "source": "epm_cmds",
+      "target": "os",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_cmds.py",
+      "source_location": "L10",
+      "weight": 1
+    },
+    {
+      "source": "epm_cmds",
+      "target": "re",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_cmds.py",
+      "source_location": "L11",
+      "weight": 1
+    },
+    {
+      "source": "epm_cmds",
+      "target": "sys",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_cmds.py",
+      "source_location": "L12",
+      "weight": 1
+    },
+    {
+      "source": "epm_cmds",
+      "target": "tempfile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_cmds.py",
+      "source_location": "L13",
+      "weight": 1
+    },
+    {
+      "source": "epm_cmds",
+      "target": "epm_cmds_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_cmds.py",
+      "source_location": "L33",
+      "weight": 1
+    },
+    {
+      "source": "epm_cmds_rationale_1",
+      "target": "epm_cmds",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_cmds.py",
+      "source_location": "L1",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "os",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L13",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "re",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L14",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "sys",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L15",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "tempfile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L16",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "pefile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L18",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "epm_exports_split_name",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L32",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "epm_exports_exports",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L46",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports",
+      "target": "epm_exports_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L61",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports_main",
+      "target": "epm_exports_exports",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L69",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports_main",
+      "target": "epm_exports_split_name",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L73",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports_rationale_1",
+      "target": "epm_exports",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L1",
+      "weight": 1
+    },
+    {
+      "source": "epm_exports_rationale_33",
+      "target": "epm_exports_split_name",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_exports.py",
+      "source_location": "L33",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "os",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L14",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "re",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L15",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "sys",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L16",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "tempfile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L17",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "pefile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L19",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "epm_map_pe_exports",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L104",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "epm_map_pe_imports",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L126",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "epm_map_pe_strings",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L154",
+      "weight": 1
+    },
+    {
+      "source": "epm_map",
+      "target": "epm_map_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L182",
+      "weight": 1
+    },
+    {
+      "source": "epm_map_main",
+      "target": "epm_map_pe_exports",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L197",
+      "weight": 1
+    },
+    {
+      "source": "epm_map_main",
+      "target": "epm_map_pe_imports",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L206",
+      "weight": 1
+    },
+    {
+      "source": "epm_map_main",
+      "target": "epm_map_pe_strings",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L212",
+      "weight": 1
+    },
+    {
+      "source": "epm_map_rationale_1",
+      "target": "epm_map",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_map.py",
+      "source_location": "L1",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "os",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L8",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "re",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L9",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "sys",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L10",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "tempfile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L11",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "pefile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L13",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "epm_scan_imports_imports",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L32",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "epm_scan_imports_strings_scan",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L56",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports",
+      "target": "epm_scan_imports_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L81",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports_main",
+      "target": "epm_scan_imports_imports",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L91",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports_main",
+      "target": "epm_scan_imports_strings_scan",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L99",
+      "weight": 1
+    },
+    {
+      "source": "epm_scan_imports_rationale_1",
+      "target": "epm_scan_imports",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_scan_imports.py",
+      "source_location": "L1",
+      "weight": 1
+    },
+    {
+      "source": "epm_srcmap",
+      "target": "os",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L11",
+      "weight": 1
+    },
+    {
+      "source": "epm_srcmap",
+      "target": "re",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L12",
+      "weight": 1
+    },
+    {
+      "source": "epm_srcmap",
+      "target": "sys",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L13",
+      "weight": 1
+    },
+    {
+      "source": "epm_srcmap",
+      "target": "tempfile",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L14",
+      "weight": 1
+    },
+    {
+      "source": "epm_srcmap",
+      "target": "epm_srcmap_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L24",
+      "weight": 1
+    },
+    {
+      "source": "epm_srcmap_rationale_1",
+      "target": "epm_srcmap",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "epm_srcmap.py",
+      "source_location": "L1",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "re",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L16",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "sys",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L17",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_auto",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L19",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_funcs",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L20",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_hexrays",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L21",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_kernwin",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L22",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_nalt",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L23",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_name",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L24",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "idaapi",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L25",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "idautils",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L26",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "idc",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L27",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_epm_dump_w",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L38",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_epm_dump_decompile",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L42",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_epm_dump_func_name",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L52",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "ida_epm_dump_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L56",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump",
+      "target": "traceback",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L120",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump_main",
+      "target": "ida_epm_dump_w",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L60",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump_main",
+      "target": "ida_epm_dump_decompile",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L110",
+      "weight": 1
+    },
+    {
+      "source": "ida_epm_dump_rationale_1",
+      "target": "ida_epm_dump",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "ida_epm_dump.py",
+      "source_location": "L1",
+      "weight": 1
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "hyperedges": []
+}

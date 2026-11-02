@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "28511e36-06aa-4395-acea-3c832d3ba7f9",
+  "status": "current",
+  "command": "deliver",
+  "type": "class",
+  "input": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-registry-class.candidate.json",
+  "output": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-registry-class.html",
+  "specification": {
+    "sha256": "3e052b0e032205148936961c7f1676d5cc551ee6f1119bd2bbc543b002aa3128",
+    "bytes": 2354
+  },
+  "artifact": {
+    "sha256": "77eb0855d02e01918ee29c6996850a1c4d7bb850487ea5ba385dc85f3f767002",
+    "bytes": 833643
+  }
+}
