@@ -1,0 +1,1425 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using KitLugia.Core;
+using KitLugia.GUI.Extensions;
+using KitLugia.GUI.Helpers;
+using KitLugia.GUI.Pages;
+using KitLugia.GUI.Services;
+// Resolve ambiguidade
+using Application = System.Windows.Application;
+using MessageBox = System.Windows.MessageBox;
+using Button = System.Windows.Controls.Button;
+using MainWindow = KitLugia.GUI.MainWindow;
+namespace KitLugia.GUI.Pages
+{
+    public partial class DashboardPage : Page
+    {
+        private List<CustomMotorProfile> _customProfiles = new();
+        private readonly string _profilesFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KitLugia",
+            "custom_profiles.json");
+        private static readonly string SpecsCachePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KitLugia",
+            "system_specs.json");
+        private static SystemSpecsCache? _sessionSpecs;
+        private static readonly object _specsLock = new();
+
+        public DashboardPage()
+        {
+            InitializeComponent();
+            this.Loaded += DashboardPage_Loaded;
+            this.Unloaded += DashboardPage_Unloaded;
+        }
+
+        private void DashboardPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            _ = LoadSystemInfo();
+            LoadCreatorTweaks();
+        }
+
+        public void Cleanup()
+        {
+            _latencyScanCts?.Cancel();
+            _latencyScanCts?.Dispose();
+            _latencyScanCts = null;
+
+            this.Loaded -= DashboardPage_Loaded;
+            this.Unloaded -= DashboardPage_Unloaded;
+            this.DataContext = null;
+
+            // SEM trim aqui: trim centralizado, adiado e cancelavel no MainWindow.
+            // Trim sincrono na troca de aba trava em SSD lento.
+        }
+
+        private void DashboardPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
+
+        private void BtnPcInfo_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationHelper.NavigateTo(PageType.SystemInfo);
+        }
+
+        private void BtnClosePcInfo_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayPcInfo.Visibility = Visibility.Collapsed;
+        }
+
+        private async Task LoadSystemInfo()
+        {
+            try
+            {
+                TxtPCName.Text = Environment.MachineName;
+
+                // Já escaneamos nesta sessão? Usa os dados em memória, sem WMI
+                SystemSpecsCache? cached;
+                lock (_specsLock) { cached = _sessionSpecs; }
+                if (cached != null)
+                {
+                    TxtSpecs.Text = $"{cached.RamGB:F0} GB de RAM • {cached.OsName} • {cached.CpuName} • {cached.GpuName}";
+                    return;
+                }
+
+                // Primeira vez nesta sessão: scan WMI e salva em memória + arquivo
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                using var dashManager = new DashboardManager();
+                var snapshot = await dashManager.GetSystemSnapshotAsync(cts.Token);
+
+                string os = snapshot.OsName ?? "N/A";
+                string cpu = snapshot.CpuName ?? "N/A";
+                string gpu = snapshot.GpuName ?? "N/A";
+                double ram = snapshot.RamTotal;
+                TxtSpecs.Text = $"{ram:F0} GB de RAM • {os} • {cpu} • {gpu}";
+
+                var specs = new SystemSpecsCache
+                {
+                    PcName = Environment.MachineName,
+                    RamGB = ram,
+                    OsName = os,
+                    CpuName = cpu,
+                    GpuName = gpu,
+                    ScanDate = DateTime.Now
+                };
+
+                lock (_specsLock) { _sessionSpecs = specs; }
+                SaveSpecsCacheToFile(specs);
+            }
+            catch (Exception ex)
+            {
+                TxtSpecs.Text = "Falha ao ler hardware.";
+                Logger.Log($"[DASHBOARD] Erro ao carregar hardware: {ex.Message}");
+            }
+        }
+        private static void SaveSpecsCacheToFile(SystemSpecsCache specs)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(SpecsCachePath);
+                if (dir != null && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                var json = JsonSerializer.Serialize(specs, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(SpecsCachePath, json);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[DASHBOARD] Erro ao salvar arquivo de configuração: {ex.Message}");
+            }
+        }
+
+        // === PERFORMANCE E OTIMIZACAO ===
+        private void BtnGoToTweaks_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tweaks);
+        private void BtnGoToCleanup_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Storage);
+        private void BtnGoToBloatware_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Apps);
+        private void BtnGoToGameBoost_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.GameBoost);
+        private void BtnGoToGames_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Windows);
+        private void BtnGoToWinTune_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.WinTune);
+        private void BtnGoToShrink_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Shrink);
+        private void BtnGoToWinpeTools_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.WinpeTools);
+        private void BtnGoToReinstallPreserve_Click(object sender, RoutedEventArgs e) =>
+            NavigationHelper.NavigateTo(PageType.ReinstallPreserve);
+
+        private void BtnGoToWindowsUpdate_Click(object sender, RoutedEventArgs e) =>
+            NavigationHelper.NavigateTo(PageType.WindowsUpdate);
+        private void BtnGoToPowerPlans_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Tools, 0);
+
+        // === REDE E INTERNET ===
+        private void BtnGoToNetwork_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Network);
+
+        // === PRIVACIDADE E SEGURANCA ===
+        private void BtnGoToPrivacy_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Privacy);
+        private void BtnGoToSecurity_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Security);
+        private void BtnGoToIntegrity_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Integrity);
+
+        // === SISTEMA E REPAROS ===
+        private void BtnGoToIsoEditor_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.IsoEditor);
+        private void BtnGoToPartitions_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Partitions);
+
+        private async Task<int> RunProcessLiveAsync(string exe, string args, string taskId,
+            Action<string>? onOutput = null, CancellationToken ct = default)
+        {
+            using var p = new Process();
+            p.StartInfo.FileName = exe;
+            p.StartInfo.Arguments = args;
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.CreateNoWindow = true;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+            p.EnableRaisingEvents = true;
+
+            var lastLine = "";
+            var outputLock = new object();
+            var progressRegex = new System.Text.RegularExpressions.Regex(@"(\d+)\.\d%");
+            int lastProgress = -1;
+
+            DataReceivedEventHandler h = (_, a) =>
+            {
+                if (a.Data == null) return;
+                lock (outputLock) { lastLine = a.Data.Length > 100 ? a.Data[..100] + "..." : a.Data; }
+                onOutput?.Invoke(a.Data);
+
+                var m = progressRegex.Match(a.Data);
+                if (m.Success && int.TryParse(m.Groups[1].Value, out int pct) && pct != lastProgress)
+                {
+                    lastProgress = pct;
+                    Services.BackgroundTaskTracker.Instance.UpdateTaskProgress(taskId, $"{pct}% — {lastLine}");
+                }
+            };
+
+            p.OutputDataReceived += h;
+            p.ErrorDataReceived += h;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            p.Start();
+            p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
+
+            // Timer de progresso — atualiza a cada 5s com tempo decorrido + última linha
+            using var progressTimer = new System.Timers.Timer(5000);
+            progressTimer.AutoReset = true;
+            progressTimer.Elapsed += (_, _) =>
+            {
+                string line;
+                lock (outputLock) { line = lastLine; }
+                string elapsed = sw.Elapsed.TotalMinutes >= 1
+                    ? $"{sw.Elapsed.Minutes}m{sw.Elapsed.Seconds}s"
+                    : $"{sw.Elapsed.Seconds}s";
+                string msg = string.IsNullOrEmpty(line)
+                    ? $"⏱ {elapsed} — aguardando..."
+                    : $"⏱ {elapsed} — {line}";
+                Services.BackgroundTaskTracker.Instance.UpdateTaskProgress(taskId, msg);
+            };
+            progressTimer.Start();
+
+            try
+            {
+                await p.WaitForExitAsync(ct);
+            }
+            finally
+            {
+                progressTimer.Stop();
+                sw.Stop();
+            }
+
+            return p.ExitCode;
+        }
+
+        private async void BtnConsertarViaIso_Click(object sender, RoutedEventArgs e)
+        {
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Arquivos ISO (*.iso)|*.iso",
+                Title = "Selecione a ISO do Windows 11"
+            };
+            if (dlg.ShowDialog() != true) return;
+            string isoPath = dlg.FileName;
+
+            var btn = (Button)sender;
+            btn.IsEnabled = false;
+
+            string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask("Reparo Windows via ISO", "Dashboard");
+
+            try
+            {
+                Services.BackgroundTaskTracker.Instance.UpdateTaskProgress(taskId, "Montando ISO...");
+                var (mountOk, mountMsg, drive) = await Core.IsoManager.MountIso(isoPath);
+                if (!mountOk)
+                {
+                    mw.ShowInfo("ISO", mountMsg);
+                    return;
+                }
+
+                string sxsPath = $@"{drive}\sources\sxs";
+                if (!Directory.Exists(sxsPath))
+                {
+                    await Core.IsoManager.DismountIso(isoPath);
+                    mw.ShowInfo("ISO", "ISO inválida. Use uma ISO original do Windows 11 com a pasta sources\\sxs.");
+                    return;
+                }
+
+                mw.ShowInfo("ATENÇÃO", "Reparo em andamento — não feche o KitLugia.");
+                Services.BackgroundTaskTracker.Instance.UpdateTaskProgress(taskId, "Etapa 1/2: DISM RestoreHealth...");
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromHours(2));
+                var dismOutput = new List<string>();
+                int dismExit = await RunProcessLiveAsync("dism",
+                    $"/Online /Cleanup-Image /RestoreHealth /Source:\"{sxsPath}\" /LimitAccess",
+                    taskId, line => dismOutput.Add(line), cts.Token);
+                bool dismOk = dismExit == 0;
+
+                int sfcExit = -1;
+                if (dismOk)
+                {
+                    Services.BackgroundTaskTracker.Instance.UpdateTaskProgress(taskId, "Etapa 2/2: SFC /scannow...");
+                    using var sfcCts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                    sfcExit = await RunProcessLiveAsync("sfc", "/scannow", taskId, ct: sfcCts.Token);
+                }
+
+                await Core.IsoManager.DismountIso(isoPath);
+
+                bool sfcOk = sfcExit == 0 || sfcExit == 1;
+                string result = dismOk
+                    ? (sfcOk ? "DISM + SFC concluídos! Pode ser necessário reiniciar." : "DISM OK. SFC precisa ser executado novamente após reboot.")
+                    : "DISM falhou. Verifique se a ISO é compatível.";
+
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, dismOk && sfcOk, result);
+
+                if (dismOk && sfcOk)
+                    mw.ShowSuccess("Reparo Windows", "DISM e SFC concluídos! Reinicie o PC se solicitado.");
+                else if (dismOk)
+                    mw.ShowInfo("Reparo Windows", "DISM OK. Reinicie e execute SFC manualmente.");
+                else
+                    mw.ShowInfo("Reparo Windows", "DISM falhou. Tente outra ISO.");
+            }
+            catch (OperationCanceledException)
+            {
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, false, "Tempo limite excedido (2h).");
+                mw.ShowInfo("Reparo Windows", "Tempo limite excedido. O processo pode ter travado.");
+            }
+            catch (Exception ex)
+            {
+                Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, false, ex.Message);
+                mw.ShowInfo("Reparo Windows", $"Erro: {ex.Message}");
+            }
+            finally
+            {
+                btn.IsEnabled = true;
+            }
+        }
+
+        private void BtnGoToWinBoot_Click(object sender, RoutedEventArgs e) =>
+            NavigationHelper.NavigateTo(PageType.Winboot);
+
+        private void BtnGoToQuickInstall_Click(object sender, RoutedEventArgs e) =>
+            NavigationHelper.NavigateTo(PageType.QuickInstall);
+        private void BtnGoToRufus_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Rufus);
+        private void BtnGoToRepairs_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Repairs);
+
+        // A Central de Diagnóstico vive no Gerenciador de Tarefas (junto de Latência/Armazenamento/Áudio,
+        // onde o diagnóstico já mora). O card abre a janela já na aba certa e ela começa a coletar sozinha:
+        // quem clica aqui quer resposta, não uma tela pedindo outro clique.
+        private void BtnGoToDiagnosticCenter_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                KitLugia.GUI.Windows.TaskManager.KitTaskManagerWindow.OpenOnTab(Application.Current.MainWindow, "Diagnostic");
+            }
+            catch (Exception ex)
+            {
+                (Application.Current.MainWindow as MainWindow)?.ShowError("ERRO", $"Falha ao abrir o Gerenciador de Tarefas: {ex.Message}");
+            }
+        }
+        private void BtnGoToDrivers_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Drivers);
+        private void BtnGoToScreen_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Screen);
+        private void BtnGoToExmTweaks_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.ExmTweaks);
+
+        // === ATIVACAO E CONFIGURACOES ===
+        private void BtnGoToActivation_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Activation);
+        private void BtnGoToTraySettings_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.TraySettings);
+        private void BtnGoToUpdate_Click(object sender, RoutedEventArgs e) => NavigationHelper.NavigateTo(PageType.Update);
+
+        // --- AÇÕES DOS BOTÕES GRANDES (1-CLICK) ---
+
+        // --- AÇÕES DOS BOTÕES EXTRAS (1-CLIQUE MODIFICADO) ---
+
+        private void BtnOpenQuickMenu_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayQuickMenu.Visibility = Visibility.Visible;
+            PopulateGpuList();
+            UpdateVramRecommendations();
+            LoadTraySettingsToQuickMenu();
+            PopulateEngineComboBox();
+        }
+
+        private void LoadTraySettingsToQuickMenu()
+        {
+            try
+            {
+                var mw = Application.Current.MainWindow as MainWindow;
+                if (mw?.TrayService != null)
+                {
+                    // Ícone do tray é sempre visível — sem toggle
+                    ChkGameBoost.IsChecked = mw.TrayService.GamePriorityEnabled;
+                }
+
+                bool autoStart = Services.TrayIconService.IsAutoStartEnabled();
+                ChkStartWithWindows.IsChecked = autoStart;
+                ChkCrAutoStart.IsChecked = autoStart;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        private void UpdateVramRecommendations()
+        {
+            try
+            {
+                double ram = SystemUtils.GetTotalSystemRamGB();
+                int recommendedMb = SystemTweaks.GetRecommendedVramMb(ram);
+
+                // Mapeamento:
+                // Item 0: Padrão
+                // Item 1: 256
+                // Item 2: 512
+                // Item 3: 1024
+                // Item 4: 2048
+                // Item 5: 4096
+
+                foreach (ComboBoxItem item in CmbVram.Items)
+                {
+                    string content = item.Content.ToString() ?? "";
+                    // Limpa recomendações anteriores se houver
+                    content = content.Replace(" (Recomendado)", "");
+
+                    bool isRecommended = false;
+                    if (content.Contains("256 MB") && recommendedMb == 256) isRecommended = true;
+                    else if (content.Contains("512 MB") && recommendedMb == 512) isRecommended = true;
+                    else if (content.Contains("1024 MB") && recommendedMb == 1024) isRecommended = true;
+                    else if (content.Contains("2048 MB") && recommendedMb == 2048) isRecommended = true;
+
+                    if (isRecommended)
+                    {
+                        item.Content = content + " (Recomendado)";
+                        item.IsSelected = true; // Auto-seleciona o recomendado
+                    }
+                    else
+                    {
+                        item.Content = content;
+                    }
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        private void BtnCancelQuickMenu_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayQuickMenu.Visibility = Visibility.Collapsed;
+        }
+
+        private void PopulateGpuList()
+        {
+            try
+            {
+                CmbGpu.Items.Clear();
+                var gpuNames = SystemTweaks.GetAllGpuNames();
+
+                foreach (var name in gpuNames)
+                {
+                    CmbGpu.Items.Add(name);
+                }
+
+                if (CmbGpu.Items.Count > 0) CmbGpu.SelectedIndex = 0;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        private async void BtnApplyCustomOptimization_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayQuickMenu.Visibility = Visibility.Collapsed;
+
+            var settings = new KitLugia.Core.OptimizationSettings
+            {
+                ApplyRegistryTweaks = ChkSystemTweaks.IsChecked == true,
+                ApplyPowerPlan = ChkPowerPlan.IsChecked == true,
+                ApplyGamingOptimizations = true, // Sempre ativado no 1-clique
+                ApplyVerboseBoot = true,
+                ApplyVramTweak = true,
+                UseExtremeProfile = ChkExtremeVisuals.IsChecked == true
+            };
+
+            if (ChkTurboShutdown.IsChecked == true)
+            {
+                SystemTweaks.ToggleFastShutdown();
+            }
+
+            ApplyTraySettingsFromQuickMenu();
+
+            // Configura motor do GameBoost conforme seleção do usuário
+            // Se um motor personalizado já está ativo, não sobrescreve
+            if (!Services.TrayIconService.IsCustomEngineActive)
+            {
+                if (CmbGameEngine.SelectedItem is ComboBoxItem selectedEngine && selectedEngine.Tag != null)
+                {
+                    var tagValue = selectedEngine.Tag.ToString();
+                    if (int.TryParse(tagValue, out int engineNumber))
+                    {
+                        Services.TrayIconService.SetEngine(engineNumber);
+                        KitLugia.Core.Logger.Log($"🎮 Dashboard: GameBoost configurado para motor V{engineNumber} via Otimização Inteligente");
+                    }
+                    else
+                    {
+                        var customProfile = _customProfiles.FirstOrDefault(p => p.Id == tagValue);
+                        if (customProfile != null)
+                        {
+                            var config = new Services.CustomEngineConfig
+                            {
+                                CpuPriority = customProfile.CpuPriority,
+                                IoPriorityLevel = customProfile.IoPriority,
+                                // Indice do ComboBox -> escala real (1=VERY_LOW..5=NORMAL).
+                                PagePriorityLevel = Services.TrayIconService.PagePriorityFromIndex(customProfile.PagePriority),
+                                TimerBoost = customProfile.TimerResolution,
+                                EcoQoSEnabled = customProfile.EcoQoS,
+                                ProBalance = customProfile.ProBalanceEnabled,
+                                ProBalanceCpuThreshold = customProfile.ProBalanceThreshold,
+                                NetworkBoost = customProfile.NetworkBoost,
+                                ThreadMemoryPriority = Services.TrayIconService.ThreadMemoryPriorityFromIndex(customProfile.ThreadMemoryPriority),
+                                ThreadEfficiencyMode = customProfile.ThreadEfficiencyMode,
+                                GameClassInfo = customProfile.GameClassInfo,
+                                Win32PrioritySeparation = customProfile.Win32PrioritySeparation
+                            };
+                            Services.TrayIconService.SetCustomEngine(config);
+                            KitLugia.Core.Logger.Log($"🎮 Dashboard: GameBoost configurado para perfil customizado {customProfile.Name}");
+                        }
+                    }
+                }
+            }
+
+            // Se um motor personalizado estava ativo, confirma que permanece
+            if (Services.TrayIconService.IsCustomEngineActive)
+            {
+                KitLugia.Core.Logger.Log($"🎮 Dashboard: Motor personalizado mantido ativo via Otimização Inteligente");
+            }
+
+            // Detectar RegPath da GPU selecionada - MESMA resolução da TweaksPage
+            // (GetAllGpuInfo → PNP DeviceInstance/MatchingDeviceId). Antes usava
+            // FindGpuRegistryPathByDescription (DriverDesc fuzzy) que podia resolver uma
+            // chave diferente da lida pela TweaksPage → VRAM aplicada mas mostrada como
+            // "não aplicada" lá.
+            int index = CmbGpu.SelectedIndex;
+            var gpuInfos = SystemTweaks.GetAllGpuInfo();
+            if (index >= 0 && index < gpuInfos.Count)
+            {
+                settings.TargetGpuRegPath = gpuInfos[index].RegPath;
+            }
+
+            // Mapear VRAM
+            int vramIndex = CmbVram.SelectedIndex;
+            settings.VramSizeMb = vramIndex switch
+            {
+                1 => 256,
+                2 => 512,
+                3 => 1024,
+                4 => 2048,
+                5 => 4096,
+                _ => 0 // Automatic
+            };
+
+            try
+            {
+                await RunOptimizationFlow(settings);
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"[DASHBOARD] Erro na otimização inteligente: {ex.Message}");
+                if (Application.Current.MainWindow is MainWindow mwErr)
+                    mwErr.ShowError("ERRO", $"Falha na otimização: {ex.Message}");
+            }
+        }
+
+        private void PopulateEngineComboBox()
+        {
+            CmbGameEngine.Items.Clear();
+            _customProfiles.Clear();
+
+            // Automatico PRIMEIRO: e o padrao do servico e o recomendado. Os V1-V4 ficam
+            // como legado (o rotulo "V4 - RealTime" era mentira: o V4 removeu o RealTime).
+            var auto = new ComboBoxItem { Content = "🤖 Automático (RECOMENDADO)", Tag = "5", Foreground = System.Windows.Media.Brushes.LightGreen };
+            var v1 = new ComboBoxItem { Content = "🟢 V1 - Original Plus (legado)", Tag = "1", Foreground = System.Windows.Media.Brushes.White };
+            var v2 = new ComboBoxItem { Content = "🟡 V2 - FPS Estável Plus (legado)", Tag = "2", Foreground = System.Windows.Media.Brushes.White };
+            var v3 = new ComboBoxItem { Content = "🔴 V3 - Extremo Plus (legado)", Tag = "3", Foreground = System.Windows.Media.Brushes.White };
+            var v4 = new ComboBoxItem { Content = "💥 V4 - Performance Pro (legado)", Tag = "4", Foreground = System.Windows.Media.Brushes.Orange };
+            CmbGameEngine.Items.Add(auto);
+            CmbGameEngine.Items.Add(v1);
+            CmbGameEngine.Items.Add(v2);
+            CmbGameEngine.Items.Add(v3);
+            CmbGameEngine.Items.Add(v4);
+
+            try
+            {
+                if (File.Exists(_profilesFilePath))
+                {
+                    var json = File.ReadAllText(_profilesFilePath);
+                    var profiles = JsonSerializer.Deserialize<List<CustomMotorProfile>>(json);
+                    if (profiles != null && profiles.Count > 0)
+                    {
+                        _customProfiles = profiles;
+                        foreach (var profile in _customProfiles)
+                        {
+                            var item = new ComboBoxItem
+                            {
+                                Content = $"⚙️ {profile.Name}",
+                                Tag = profile.Id,
+                                Foreground = System.Windows.Media.Brushes.White
+                            };
+                            CmbGameEngine.Items.Add(item);
+                        }
+                    }
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            var customOption = new ComboBoxItem { Content = "⚙️ Personalizar...", Tag = "custom", Foreground = System.Windows.Media.Brushes.Gold };
+            CmbGameEngine.Items.Add(customOption);
+
+            // Restaura a seleção do motor atual
+            if (CmbGameEngine.Items.Count > 0)
+            {
+                string? currentTag = null;
+                if (Services.TrayIconService.IsCustomEngineActive)
+                {
+                    // Procura perfil customizado ativo
+                    foreach (var p in _customProfiles)
+                    {
+                        currentTag = p.Id;
+                        break;
+                    }
+                }
+                else
+                {
+                    currentTag = ((int)Services.TrayIconService.CurrentEngine).ToString();
+                }
+
+                if (currentTag != null)
+                {
+                    for (int i = 0; i < CmbGameEngine.Items.Count; i++)
+                    {
+                        if (CmbGameEngine.Items[i] is ComboBoxItem item && item.Tag?.ToString() == currentTag)
+                        {
+                            CmbGameEngine.SelectedIndex = i;
+                            return;
+                        }
+                    }
+                }
+                CmbGameEngine.SelectedIndex = 0;
+            }
+        }
+
+        private void CmbGameEngine_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CmbGameEngine.SelectedItem is ComboBoxItem selected && selected.Tag?.ToString() == "custom")
+            {
+                CmbGameEngine.SelectedIndex = 0;
+                var mw = Application.Current.MainWindow as MainWindow;
+                if (mw != null)
+                {
+                    OverlayQuickMenu.Visibility = Visibility.Collapsed;
+                    Pages.GameBoostPage.AutoOpenCustomOverlayOnLoad = true;
+                    mw.NavigateToPage(PageType.GameBoost);
+                }
+            }
+        }
+
+        private async void BtnRevertNormal_Click(object sender, RoutedEventArgs e)
+        {
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            bool confirm = await mw.ShowConfirmationDialog(
+                "Isso removerá todas as otimizações de VRAM, planos de energia e modificações de registro do Kit Lugia.\n\n" +
+                "Deseja restaurar o padrão do sistema?");
+
+            if (!confirm) return;
+
+            mw.ShowInfo("REVERTENDO", "Restaurando configurações padrão do sistema...");
+
+            var progress = new Progress<string>(s => { });
+            try
+            {
+                await OptimizationOrchestrator.RevertAllOptimizationsAsync(progress);
+                mw.ShowSuccess("SUCESSO", "Sistema restaurado! Reinicie para concluir a reversão.");
+            }
+            catch (Exception ex)
+            {
+                mw.ShowError("ERRO", $"Falha ao reverter: {ex.Message}");
+            }
+        }
+
+        private void ApplyTraySettingsFromQuickMenu()
+        {
+            try
+            {
+                var mw = Application.Current.MainWindow as MainWindow;
+                if (mw?.TrayService != null)
+                {
+                    // Ícone do tray é sempre visível — sem toggle
+                    mw.TrayService.GamePriorityEnabled = ChkGameBoost.IsChecked == true;
+                    mw.TrayService.SaveSettings();
+
+                    // NÃO grava o auto-start aqui: esta rotina roda no "1-clique Otimizar" e
+                    // o ChkStartWithWindows pode ainda estar desmarcado (quick menu nunca
+                    // aberto) — isso chamava SetAutoStart(false) e APAGAVA as 3 vias.
+                    // O auto-start só muda por clique do usuário (ChkStartWithWindows_Click).
+
+                    KitLugia.Core.Logger.Log($"🎮 Dashboard: GameBoost {(ChkGameBoost.IsChecked == true ? "ativado" : "desativado")}");
+                }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        // Lógica compartilhada de execução
+        private async Task RunOptimizationFlow(KitLugia.Core.OptimizationSettings settings)
+        {
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            string taskId = Guid.NewGuid().ToString();
+            BackgroundTaskTracker.Instance.RegisterTask(taskId, "Otimização", "Dashboard");
+
+            mw.ShowInfo("PROCESSANDO", "Aplicando otimizações selecionadas...");
+
+            var progress = new Progress<string>(s => { });
+
+            try
+            {
+                await OptimizationOrchestrator.RunOptimizationAsync(settings, progress);
+                BackgroundTaskTracker.Instance.CompleteTask(taskId, true);
+                mw.ShowSuccess("SUCESSO", "Otimização concluída com sucesso! Reinicie o computador.");
+            }
+            catch (Exception ex)
+            {
+                BackgroundTaskTracker.Instance.CompleteTask(taskId, false, ex.Message);
+                mw.ShowError("ERRO", $"Falha na otimização: {ex.Message}");
+            }
+        }
+
+        // --- GAMING LATENCY PROFILE EVENT HANDLERS ---
+
+        private void BtnOpenLatencyMenu_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayLatencyMenu.Visibility = Visibility.Visible;
+            RefreshLatencyStatus();
+        }
+
+        private void BtnCancelLatencyMenu_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayLatencyMenu.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnRevertLatency_Click(object sender, RoutedEventArgs e)
+        {
+            var result = SystemTweaks.RevertGamingLatencyProfile();
+            MessageBox.Show(result.Message, result.Success ? "Sucesso" : "Erro",
+                MessageBoxButton.OK, result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
+        }
+
+        private void BtnRevertLatencyMenu_Click(object sender, RoutedEventArgs e)
+        {
+            var result = SystemTweaks.RevertGamingLatencyProfile();
+            if (result.Success)
+            {
+                MessageBox.Show(result.Message, "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshLatencyStatus();
+            }
+            else
+            {
+                MessageBox.Show(result.Message, "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnApplyAllLatency_Click(object sender, RoutedEventArgs e)
+        {
+            int win32Value = 0x26;
+            switch (CmbWin32Priority.SelectedIndex)
+            {
+                case 0: win32Value = 0x18; break;
+                case 1: win32Value = 0x26; break;
+                case 2: win32Value = 0x2A; break;
+            }
+
+            var result = SystemTweaks.ApplyFullGamingLatencyProfile(win32Value);
+
+            if (result.Success)
+            {
+                string tweaksAplicados = string.Join("\n• ", result.Applied);
+                MessageBox.Show($"{result.Message}\n\nTweaks aplicados:\n• {tweaksAplicados}",
+                    "Gaming Latency Profile", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshLatencyStatus();
+            }
+            else
+            {
+                MessageBox.Show(result.Message, "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // --- TOGGLE METHODS COM CORES VISUAIS ---
+
+        private void BtnToggleCoreParking_Click(object sender, RoutedEventArgs e)
+        {
+            var status = SystemTweaks.CheckGamingLatencyStatus();
+            bool isCurrentlyOn = status["CoreParking"];
+
+            if (!isCurrentlyOn)
+            {
+                var result = SystemTweaks.DisableCoreParking();
+                if (result.Success) UpdateToggleVisual(BtnToggleCoreParking, IndicatorCoreParking, BorderCoreParking, true);
+                MessageBox.Show(result.Message, "Core Parking", MessageBoxButton.OK,
+                    result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
+            }
+            else
+            {
+                // Revert individual - restaura valor padrão (64)
+                try
+                {
+                    Microsoft.Win32.Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c8-3b32988b1dd4\0cc5b647-c1df-4637-891a-dec35c318583", "ValueMax", 64, Microsoft.Win32.RegistryValueKind.DWord);
+                    UpdateToggleVisual(BtnToggleCoreParking, IndicatorCoreParking, BorderCoreParking, false);
+                    MessageBox.Show("Core Parking restaurado para padrão.", "Core Parking", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erro ao restaurar: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            RefreshLatencyStatus();
+        }
+
+        private void BtnToggleTimerCoalescing_Click(object sender, RoutedEventArgs e)
+        {
+            var status = SystemTweaks.CheckGamingLatencyStatus();
+            bool isCurrentlyOn = status["TimerCoalescing"];
+
+            if (!isCurrentlyOn)
+            {
+                var result = SystemTweaks.DisableTimerCoalescing();
+                if (result.Success) UpdateToggleVisual(BtnToggleTimerCoalescing, IndicatorTimerCoalescing, BorderTimerCoalescing, true);
+                MessageBox.Show(result.Message, "Timer Coalescing", MessageBoxButton.OK,
+                    result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
+            }
+            else
+            {
+                // Revert individual - deleta a chave para voltar ao padrão
+                try
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\kernel", true);
+                    if (key != null)
+                    {
+                        key.DeleteValue("CoalescingTimerInterval", false);
+                    }
+                    UpdateToggleVisual(BtnToggleTimerCoalescing, IndicatorTimerCoalescing, BorderTimerCoalescing, false);
+                    MessageBox.Show("Timer Coalescing restaurado para padrão.", "Timer Coalescing", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erro ao restaurar: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            RefreshLatencyStatus();
+        }
+
+        private void BtnToggleInputQueue_Click(object sender, RoutedEventArgs e)
+        {
+            var status = SystemTweaks.CheckGamingLatencyStatus();
+            bool isCurrentlyOn = status["InputQueue"];
+
+            if (!isCurrentlyOn)
+            {
+                var result = SystemTweaks.OptimizeInputQueue();
+                if (result.Success) UpdateToggleVisual(BtnToggleInputQueue, IndicatorInputQueue, BorderInputQueue, true);
+                MessageBox.Show(result.Message, "Input Queue", MessageBoxButton.OK,
+                    result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
+            }
+            else
+            {
+                // Revert individual - restaura para 100 (padrão)
+                try
+                {
+                    Microsoft.Win32.Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\kbdclass\Parameters", "KeyboardDataQueueSize", 100, Microsoft.Win32.RegistryValueKind.DWord);
+                    Microsoft.Win32.Registry.SetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\mouclass\Parameters", "MouseDataQueueSize", 100, Microsoft.Win32.RegistryValueKind.DWord);
+                    UpdateToggleVisual(BtnToggleInputQueue, IndicatorInputQueue, BorderInputQueue, false);
+                    MessageBox.Show("Input Queue restaurado para padrão (100).", "Input Queue", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erro ao restaurar: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            RefreshLatencyStatus();
+        }
+
+        private void BtnToggleGlobalTimer_Click(object sender, RoutedEventArgs e)
+        {
+            var status = SystemTweaks.CheckGamingLatencyStatus();
+            bool isCurrentlyOn = status["GlobalTimerResolution"];
+
+            if (!isCurrentlyOn)
+            {
+                var result = SystemTweaks.EnableGlobalTimerResolution();
+                if (result.Success) UpdateToggleVisual(BtnToggleGlobalTimer, IndicatorGlobalTimer, BorderGlobalTimer, true);
+                MessageBox.Show(result.Message, "Global Timer Resolution", MessageBoxButton.OK,
+                    result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
+            }
+            else
+            {
+                // Revert individual
+                try
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Power", true);
+                    key?.DeleteValue("GlobalTimerResolutionRequests", false);
+                    UpdateToggleVisual(BtnToggleGlobalTimer, IndicatorGlobalTimer, BorderGlobalTimer, false);
+                    MessageBox.Show("Global Timer Resolution restaurado para padrão.", "Global Timer", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erro ao restaurar: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            RefreshLatencyStatus();
+        }
+
+        private void BtnToggleSysResp_Click(object sender, RoutedEventArgs e)
+        {
+            var status = SystemTweaks.CheckGamingLatencyStatus();
+            bool isCurrentlyOn = status["SystemResponsiveness"];
+
+            if (!isCurrentlyOn)
+            {
+                var result = SystemTweaks.SetSystemResponsivenessGaming();
+                if (result.Success) UpdateToggleVisual(BtnToggleSysResp, IndicatorSysResp, BorderSysResp, true);
+                MessageBox.Show(result.Message, "System Responsiveness", MessageBoxButton.OK,
+                    result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
+            }
+            else
+            {
+                // Revert individual - restaura para 20 (padrão)
+                try
+                {
+                    Microsoft.Win32.Registry.SetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", "SystemResponsiveness", 20, Microsoft.Win32.RegistryValueKind.DWord);
+                    UpdateToggleVisual(BtnToggleSysResp, IndicatorSysResp, BorderSysResp, false);
+                    MessageBox.Show("System Responsiveness restaurado para padrão (20).", "System Responsiveness", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erro ao restaurar: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            RefreshLatencyStatus();
+        }
+
+        private void UpdateToggleVisual(Button btn, System.Windows.Shapes.Ellipse indicator, Border container, bool isOn)
+        {
+            if (isOn)
+            {
+                btn.Content = "ON";
+                btn.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // #4CAF50
+                btn.Foreground = System.Windows.Media.Brushes.White;
+                btn.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80));
+                indicator.Fill = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // Verde
+                container.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80));
+                container.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(37, 55, 37)); // Verde escuro
+            }
+            else
+            {
+                btn.Content = "OFF";
+                btn.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(51, 51, 51)); // #333
+                btn.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(153, 153, 153)); // #999
+                btn.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(85, 85, 85)); // #555
+                indicator.Fill = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(102, 102, 102)); // #666
+                container.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(51, 51, 51)); // #333
+                container.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(37, 37, 37)); // #252525
+            }
+        }
+
+        #region Latency Analyzer Event Handlers
+
+        private CancellationTokenSource? _latencyScanCts;
+
+        private async void BtnScanLatency_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Mostra loading overlay
+                LoadingOverlayBenchmark.Visibility = Visibility.Visible;
+                ProgressBarBenchmark.Value = 0;
+                TxtBenchmarkStatus.Text = "Iniciando benchmark...";
+                TxtBenchmarkLog.Text = "";
+                BtnCancelBenchmark.IsEnabled = true;
+
+                // Descarta o CTS da analise anterior antes de criar outro
+                _latencyScanCts?.Dispose();
+                _latencyScanCts = new CancellationTokenSource();
+
+                // Progress reporter para atualizar a UI
+                var progress = new Progress<string>(msg =>
+                {
+                    TxtBenchmarkStatus.Text = msg;
+                    TxtBenchmarkLog.Text += $"[{DateTime.Now:HH:mm:ss}] {msg}\n";
+                    ScrollViewerBenchmarkLog.ScrollToBottom();
+
+                    // Atualiza progresso baseado na mensagem
+                    if (msg.Contains("PADRÃO")) ProgressBarBenchmark.Value = 25;
+                    else if (msg.Contains("CONSERVADOR")) ProgressBarBenchmark.Value = 50;
+                    else if (msg.Contains("EQUILIBRADO")) ProgressBarBenchmark.Value = 75;
+                    else if (msg.Contains("AGRESSIVO")) ProgressBarBenchmark.Value = 90;
+                    else if (msg.Contains("Aplicando")) ProgressBarBenchmark.Value = 100;
+                });
+
+                // Executa benchmark inteligente completo
+                var benchmark = await LatencyAnalyzer.RunIntelligentBenchmarkAsync(progress, _latencyScanCts.Token);
+
+                // Esconde loading
+                LoadingOverlayBenchmark.Visibility = Visibility.Collapsed;
+
+                if (benchmark.Success)
+                {
+                    // Metricas reais do melhor perfil (media / p95 / maximo em ms)
+                    var bestM = benchmark.Best.Measurement;
+                    TxtLatencyAvg.Text = FormatMs(bestM.AvgLatencyUs);
+                    TxtLatencyP95.Text = FormatMs(bestM.P95LatencyUs);
+                    TxtLatencyMax.Text = FormatMs(bestM.MaxLatencyUs);
+                    TxtLatencyExtra.Text = BuildLatencyExtra(bestM);
+
+                    // Mostra relatório completo
+                    TxtLatencyRecommendation.Text = $"🏆 Melhor: {benchmark.Best.Profile.Name}\n" +
+                        $"Despertar: {FormatMs(bestM.AvgLatencyUs)} | Score: {benchmark.Best.Score:F0} | " +
+                        $"Estável: {(benchmark.Best.IsStable ? "Sim" : "Não")}\n\n" +
+                        benchmark.Report;
+
+                    PanelLatencyResults.Visibility = Visibility.Visible;
+                    BtnApplyRecommended.Visibility = Visibility.Visible;
+
+                    // Atualiza toggles para refletir o perfil aplicado
+                    RefreshLatencyStatus();
+
+                    Logger.Log($"Benchmark completo. Melhor perfil: {benchmark.Best.Profile.Name}");
+
+                    // Mostra mensagem de sucesso
+                    MessageBox.Show($"Benchmark concluído!\n\nMelhor perfil: {benchmark.Best.Profile.Name}\n" +
+                        $"Despertar: {FormatMs(bestM.AvgLatencyUs)}\n" +
+                        $"As configurações ótimas já foram aplicadas automaticamente.",
+                        "Benchmark Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    TxtLatencyRecommendation.Text = $"Erro no benchmark: {benchmark.Report}";
+                    PanelLatencyResults.Visibility = Visibility.Visible;
+                    MessageBox.Show($"Erro no benchmark: {benchmark.Report}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                LoadingOverlayBenchmark.Visibility = Visibility.Collapsed;
+                TxtLatencyRecommendation.Text = "Benchmark cancelado pelo usuário.";
+                PanelLatencyResults.Visibility = Visibility.Visible;
+                Logger.Log("Benchmark cancelado pelo usuário");
+            }
+            catch (Exception ex)
+            {
+                LoadingOverlayBenchmark.Visibility = Visibility.Collapsed;
+                MessageBox.Show($"Erro no benchmark: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnScanLatency.IsEnabled = true;
+                BtnScanLatency.Content = "ANALISAR";
+            }
+        }
+
+        private void BtnCancelBenchmark_Click(object sender, RoutedEventArgs e)
+        {
+            _latencyScanCts?.Cancel();
+            BtnCancelBenchmark.IsEnabled = false;
+            TxtBenchmarkStatus.Text = "Cancelando...";
+            Logger.Log("Solicitação de cancelamento do benchmark");
+        }
+
+        private async void BtnApplyRecommended_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                BtnApplyRecommended.IsEnabled = false;
+                BtnApplyRecommended.Content = "APLICANDO...";
+
+                var result = await LatencyAnalyzer.AutoOptimizeAsync();
+
+                if (result.Success)
+                {
+                    MessageBox.Show(result.Message, "Otimização Concluída", MessageBoxButton.OK, MessageBoxImage.Information);
+                    RefreshLatencyStatus();
+
+                    // Atualiza os valores na UI
+                    TxtLatencyAvg.Text = FormatMs(result.After.AvgLatencyUs);
+                    TxtLatencyP95.Text = FormatMs(result.After.P95LatencyUs);
+                    TxtLatencyMax.Text = FormatMs(result.After.MaxLatencyUs);
+                    TxtLatencyExtra.Text = BuildLatencyExtra(result.After);
+                }
+                else
+                {
+                    MessageBox.Show(result.Message, "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao aplicar: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnApplyRecommended.IsEnabled = true;
+                BtnApplyRecommended.Content = "APLICAR RECOMENDAÇÕES";
+            }
+        }
+
+        /// <summary>Analise profunda por driver (ETW): tabela estilo LatencyMon com o pior
+        /// tempo de execucao real de DPC/ISR de cada driver. Requer administrador.</summary>
+        private async void BtnDeepDrivers_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                BtnDeepDrivers.IsEnabled = false;
+                BtnDeepDrivers.Content = "ANALISANDO...";
+                PanelLatencyResults.Visibility = Visibility.Visible;
+                TxtDriverReport.Text = "Coletando DPC/ISR reais por driver via ETW (5s)...";
+
+                var report = await Task.Run(() => LatencyDriverAnalyzer.MeasureAsync(5));
+                TxtDriverReport.Text = BuildDriverReport(report);
+
+                Logger.Log($"Analise por driver concluida: sucesso={report.Success} drivers={report.Drivers.Count}");
+            }
+            catch (Exception ex)
+            {
+                TxtDriverReport.Text = $"Falha na analise por driver: {ex.Message}";
+                Logger.LogError("BtnDeepDrivers", ex.Message);
+            }
+            finally
+            {
+                BtnDeepDrivers.IsEnabled = true;
+                BtnDeepDrivers.Content = "DRIVERS (ETW)";
+            }
+        }
+
+        /// <summary>Monta a tabela de texto dos drivers medidos (top 10 por pior execucao).</summary>
+        private static string BuildDriverReport(LatencyDriverAnalyzer.DriverLatencyReport r)
+        {
+            if (!r.Success || r.Drivers.Count == 0)
+                return r.Error ?? "Nenhum driver medido (eventos ETW indisponiveis).";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"🔍 DPC/ISR por driver ({r.Seconds:F0}s de coleta, {r.EventsLost} eventos perdidos):");
+            sb.AppendLine(string.Format("  {0,-24} {1,10} {2,10} {3,10} {4,10}", "Driver", "DPC max", "DPC total", "ISR max", "ISR total"));
+            foreach (var d in r.Drivers.Take(10))
+            {
+                sb.AppendLine(string.Format("  {0,-24} {1,10} {2,10} {3,10} {4,10}",
+                    d.Name,
+                    $"{d.DpcMaxMs * 1000.0:F0}us",
+                    $"{d.DpcTotalMs:F1}ms",
+                    $"{d.IsrMaxMs * 1000.0:F0}us",
+                    $"{d.IsrTotalMs:F1}ms"));
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Formata microssegundos medidos em milissegundos: a sonda de
+        /// despertar real fica na casa dos milissegundos, nao de microssegundos.</summary>
+        private static string FormatMs(double microseconds) => $"{microseconds / 1000.0:F2} ms";
+
+        /// <summary>Linha de detalhes do kernel: amostras, DPC/ISR e resolucao do timer.</summary>
+        private static string BuildLatencyExtra(LatencyAnalyzer.LatencyMeasurement m)
+        {
+            var parts = new List<string> { $"min {FormatMs(m.MinLatencyUs)}", $"p99 {FormatMs(m.P99LatencyUs)}", $"{m.SampleCount} amostras" };
+            if (m.HasDpcData)
+            {
+                parts.Add($"DPC {m.DpcPercent:F2}%");
+                parts.Add($"ISR {m.IsrPercent:F2}%");
+                parts.Add($"{m.DpcsPerSec:F0} DPCs/s");
+                parts.Add($"pico {m.SpikeWindowMs}ms: DPC {m.WorstDpcWindowPercent:F2}% / ISR {m.WorstIsrWindowPercent:F2}%");
+            }
+            if (m.HardPageFaultsPerSec > 0)
+                parts.Add($"{m.HardPageFaultsPerSec:F0} hard faults/s");
+            if (m.Cpus.Count > 0 && m.Cpus[0].MaxMhz > 0)
+                parts.Add($"CPU {m.Cpus[0].CurrentMhz:F0}/{m.Cpus[0].MaxMhz:F0} MHz");
+            parts.Add($"timer {m.TimerResolutionMs:F2} ms");
+            return string.Join(" · ", parts);
+        }
+
+        #endregion
+
+        // ============================================================
+        // HANDLERS: OTIMIZAÇÃO DO CRIADOR (COLUNA DIREITA)
+        // ============================================================
+
+        private void BtnAtivarTodosCriador_Click(object sender, RoutedEventArgs e)
+        {
+            // ATIVADOS: check = ativar
+            if (ChkCrBgApps.IsChecked != true) ChkCrBgApps.IsChecked = true;
+            if (ChkCrDiag.IsChecked != true) ChkCrDiag.IsChecked = true;
+            if (ChkCrGameBar.IsChecked != true) ChkCrGameBar.IsChecked = true;
+            if (ChkCrGdi.IsChecked != true) ChkCrGdi.IsChecked = true;
+            if (ChkCrNdu.IsChecked != true) ChkCrNdu.IsChecked = true;
+            if (ChkCrPcie.IsChecked != true) ChkCrPcie.IsChecked = true;
+            if (ChkCrBing.IsChecked != true) ChkCrBing.IsChecked = true;
+            if (ChkCrPowerThrottle.IsChecked != true) ChkCrPowerThrottle.IsChecked = true;
+            if (ChkCrVbs.IsChecked != true) ChkCrVbs.IsChecked = true;
+            if (ChkCrDiskTimeout.IsChecked != true) ChkCrDiskTimeout.IsChecked = true;
+            if (ChkCrTurboShutdown.IsChecked != true) ChkCrTurboShutdown.IsChecked = true;
+            if (ChkCrGameBoost.IsChecked != true) ChkCrGameBoost.IsChecked = true;
+            if (ChkCrNoReboot.IsChecked != true) ChkCrNoReboot.IsChecked = true;
+            if (ChkCrAutoStart.IsChecked != true) ChkCrAutoStart.IsChecked = true;
+            if (ChkCrExtremeLatency.IsChecked != true) ChkCrExtremeLatency.IsChecked = true;
+            if (ChkCrFsutil.IsChecked != true) ChkCrFsutil.IsChecked = true;
+            if (ChkCrGameMode.IsChecked != true) ChkCrGameMode.IsChecked = true;
+            if (ChkCrUnpark.IsChecked != true) ChkCrUnpark.IsChecked = true;
+        }
+
+        /// <summary>Sincroniza os checkboxes da coluna direita com o estado real do
+        /// sistema (antes a pagina abria com todos desmarcados mesmo ja aplicados).
+        /// Setar IsChecked aqui nao dispara os handlers: eles escutam Click, nao
+        /// Checked/Unchecked.</summary>
+        private void LoadCreatorTweaks()
+        {
+            try
+            {
+                ChkCrBgApps.IsChecked = SystemTweaks.IsBackgroundAppsDisabled();
+                ChkCrDiag.IsChecked = SystemTweaks.IsDiagTrackDisabled();
+                ChkCrGameBar.IsChecked = SystemTweaks.IsGameBarDisabled();
+                ChkCrGdi.IsChecked = SystemTweaks.IsGdiScalingDisabled();
+                ChkCrPcie.IsChecked = SystemTweaks.IsPcieLinkStatePowerManagementDisabled();
+                ChkCrBing.IsChecked = SystemTweaks.IsBingDisabled();
+                ChkCrPowerThrottle.IsChecked = SystemTweaks.IsPowerThrottlingDisabled();
+                ChkCrVbs.IsChecked = !SystemTweaks.IsVbsEnabled();
+                ChkCrDiskTimeout.IsChecked = SystemTweaks.IsHardDiskDisplayTimeoutDisabled();
+                ChkCrNoReboot.IsChecked = SystemTweaks.IsNoAutoRebootEnabled();
+                ChkCrFsutil.IsChecked = SystemTweaks.IsMemoryUsageEnabled();
+                ChkCrGameMode.IsChecked = SystemTweaks.IsGamingOptimized();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("DashboardTweaks", ex.Message);
+            }
+        }
+
+        private void ChkCrBgApps_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrBgApps.IsChecked == true)
+                SystemTweaks.DisableBackgroundApps();
+            else
+                SystemTweaks.EnableBackgroundApps();
+        }
+
+        private void ChkCrDiag_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrDiag.IsChecked == true)
+                SystemTweaks.DisableDiagTrack();
+            else
+                SystemTweaks.EnableDiagTrack();
+        }
+
+        private void ChkCrGameBar_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrGameBar.IsChecked == true)
+                SystemTweaks.DisableGameBar();
+            else
+                SystemTweaks.EnableGameBar();
+        }
+
+        private void ChkCrGdi_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrGdi.IsChecked == true)
+                SystemTweaks.DisableGdiScaling();
+            else
+                SystemTweaks.EnableGdiScaling();
+        }
+
+        private void ChkCrNdu_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrNdu.IsChecked == true)
+                SystemTweaks.DisableNDU();
+            else
+                SystemTweaks.EnableNDU();
+        }
+
+        private void ChkCrPcie_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrPcie.IsChecked == true)
+                SystemTweaks.DisablePcieLinkStatePowerManagement();
+            else
+                SystemTweaks.EnablePcieLinkStatePowerManagement();
+        }
+
+        private void ChkCrBing_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrBing.IsChecked == true)
+                SystemTweaks.ApplyBingTweak();
+            else
+                SystemTweaks.EnableWebSearch();
+        }
+
+        private void ChkCrPowerThrottle_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrPowerThrottle.IsChecked == true)
+                SystemTweaks.DisablePowerThrottling();
+            else
+                SystemTweaks.EnablePowerThrottling();
+        }
+
+        private void ChkCrVbs_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrVbs.IsChecked == true)
+                SystemTweaks.DisableVBSCodeIntegrity();
+            else
+                SystemTweaks.EnableVBSCodeIntegrity();
+        }
+
+        private void ChkCrDiskTimeout_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrDiskTimeout.IsChecked == true)
+                SystemTweaks.DisableHardDiskDisplayTimeout();
+            else
+                SystemTweaks.EnableHardDiskDisplayTimeout();
+        }
+
+        private void ChkCrTurboShutdown_Click(object sender, RoutedEventArgs e)
+        {
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService != null)
+            {
+                mw.TrayService.TurboShutdownEnabled = ChkCrTurboShutdown.IsChecked == true;
+                mw.TrayService.SaveSettings();
+            }
+        }
+
+        private void ChkCrGameBoost_Click(object sender, RoutedEventArgs e)
+        {
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw?.TrayService != null)
+            {
+                mw.TrayService.GamePriorityEnabled = ChkCrGameBoost.IsChecked == true;
+                mw.TrayService.SaveSettings();
+            }
+        }
+
+        private void ChkCrNoReboot_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrNoReboot.IsChecked == true)
+                SystemTweaks.EnableNoAutoReboot();
+            else
+                SystemTweaks.DisableNoAutoReboot();
+        }
+
+        private void ChkCrAutoStart_Click(object sender, RoutedEventArgs e)
+        {
+            bool enabled = ChkCrAutoStart.IsChecked == true;
+            Services.TrayIconService.SetAutoStart(enabled);
+            ChkStartWithWindows.IsChecked = enabled;
+        }
+
+        /// <summary>
+        /// Auto-start do quick menu do Dashboard. Era um CheckBox SEM handler: o usuario
+        /// marcava/desmarcava e nada acontecia (a unica escrita vinha do 1-clique, que
+        /// ainda agia sobre o estado do checkbox e apagava as 3 vias por engano).
+        /// Agora o clique do usuario e a unica coisa que grava — e o estado real volta
+        /// para o checkbox (podem haver 3 vias, nem todas exigem admin).
+        /// </summary>
+        private void ChkStartWithWindows_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                bool enabled = ChkStartWithWindows.IsChecked == true;
+                Services.TrayIconService.SetAutoStart(enabled);
+
+                // Reflete o estado REAL (SetAutoStart e best-effort: a Task exige admin).
+                bool actual = Services.TrayIconService.IsAutoStartEnabled();
+                ChkStartWithWindows.IsChecked = actual;
+                ChkCrAutoStart.IsChecked = actual;
+                KitLugia.Core.Logger.Log($"⚙️ Dashboard: Auto-start {(actual ? "ativado" : "desativado")}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ChkStartWithWindows_Click", ex.Message);
+            }
+        }
+
+        private void ChkCrExtremeLatency_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrExtremeLatency.IsChecked == true)
+                BtnApplyAllLatency_Click(sender, e);
+            else
+                SystemTweaks.RevertGamingLatencyProfile();
+        }
+
+        private void ChkCrFsutil_Click(object sender, RoutedEventArgs e)
+        {
+            // ToggleMemoryUsage inverte o valor atual: so chama quando o estado
+            // desejado difere do real, para o checkbox nao dessincronizar do registry.
+            bool wantEnabled = ChkCrFsutil.IsChecked == true;
+            if (wantEnabled != SystemTweaks.IsMemoryUsageEnabled())
+                SystemTweaks.ToggleMemoryUsage();
+        }
+
+        private void ChkCrGameMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrGameMode.IsChecked == true)
+                SystemTweaks.ApplyGamingOptimizations();
+            else
+                SystemTweaks.RevertGamingOptimizations();
+        }
+
+        private void ChkCrUnpark_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChkCrUnpark.IsChecked == true)
+                SystemTweaks.UnparkCpuPowerConfig();
+            else
+                SystemTweaks.RevertUnparkCpuPowerConfig();
+        }
+
+        private void RefreshLatencyStatus()
+        {
+            try
+            {
+                var status = SystemTweaks.CheckGamingLatencyStatus();
+
+                // Típico: 10-20 linhas de status de latência
+                var sb = new System.Text.StringBuilder(512);
+
+                // Atualiza visuais dos toggles
+                UpdateToggleVisual(BtnToggleCoreParking, IndicatorCoreParking, BorderCoreParking, status["CoreParking"]);
+                UpdateToggleVisual(BtnToggleTimerCoalescing, IndicatorTimerCoalescing, BorderTimerCoalescing, status["TimerCoalescing"]);
+                UpdateToggleVisual(BtnToggleInputQueue, IndicatorInputQueue, BorderInputQueue, status["InputQueue"]);
+                UpdateToggleVisual(BtnToggleGlobalTimer, IndicatorGlobalTimer, BorderGlobalTimer, status["GlobalTimerResolution"]);
+                UpdateToggleVisual(BtnToggleSysResp, IndicatorSysResp, BorderSysResp, status["SystemResponsiveness"]);
+
+                foreach (var item in status)
+                {
+                    string statusText = item.Value ? "✓ Ativado" : "✗ Padrão";
+                    sb.AppendLine($"{item.Key}: {statusText}");
+                }
+
+                TxtLatencyStatus.Text = sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                TxtLatencyStatus.Text = "Erro ao verificar status: " + ex.Message;
+            }
+        }
+    }
+}

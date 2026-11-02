@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "382d15b6-1ab4-4a6f-b76c-17cbfa26aa37",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-extra-0.candidate.json",
+  "output": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-extra-0.html",
+  "specification": {
+    "sha256": "82292bd4e0fd953b1b8b66e204b70bf97101a73da48aed16b7970fc412eab37d",
+    "bytes": 2124
+  },
+  "artifact": {
+    "sha256": "6dae96ef6df508b975860ebdde0c06bfd003b22c878a5c6df4344e5d8fa174a9",
+    "bytes": 830773
+  }
+}

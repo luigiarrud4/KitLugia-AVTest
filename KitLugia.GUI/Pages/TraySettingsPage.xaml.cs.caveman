@@ -1,0 +1,1168 @@
+﻿using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
+using KitLugia.Core;
+using KitLugia.GUI.Services;
+using Microsoft.Win32;
+using System.Collections.Generic;
+using System.Linq;
+using Application = System.Windows.Application;
+using Button = System.Windows.Controls.Button;
+using CheckBox = System.Windows.Controls.CheckBox;
+using TextBox = System.Windows.Controls.TextBox;
+using Cursors = System.Windows.Input.Cursors;
+using Microsoft.Win32.TaskScheduler;
+using Task = System.Threading.Tasks.Task;
+
+namespace KitLugia.GUI.Pages
+{
+    public partial class TraySettingsPage : Page
+    {
+        private DispatcherTimer? _refreshTimer;
+        private const string AutoStartRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+        private const string AutoStartValueName = "KitLugia";
+
+        private bool _isCleaningNow;
+        private bool _isLoading;
+        private int _processFilter; // 0=todos, 1=só rodando, 2=só parados
+        private KitLugia.GUI.Controls.ProcessPickerOverlay? _currentPicker;
+
+        private static readonly System.Windows.Media.FontFamily _emojiFont =
+            new System.Windows.Media.FontFamily("Segoe UI Emoji, Segoe UI, Arial");
+
+        public TraySettingsPage()
+        {
+            _isLoading = true;
+            InitializeComponent();
+            LoadSettings();
+            LoadProcessLimits();
+            _isLoading = false;
+
+            // Timer criado aqui mas só inicia no Loaded (não disputa com o layout
+            // da navegação durante a construção da página)
+            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _refreshTimer.Tick += OnRefreshTimerTick;
+
+            this.Loaded += TraySettingsPage_Loaded;
+            this.Unloaded += TraySettingsPage_Unloaded;
+        }
+
+        private bool _timersStarted;
+
+        private void TraySettingsPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_timersStarted) return; // evita timers duplicados se Loaded disparar de novo
+            _timersStarted = true;
+
+            _refreshTimer?.Start();
+            RefreshRamDisplay();
+        }
+
+        public void Cleanup()
+        {
+            // Para o timer de refresh
+            if (_refreshTimer != null)
+            {
+                _refreshTimer.Tick -= OnRefreshTimerTick;
+                _refreshTimer.Stop();
+            }
+            _refreshTimer = null;
+            this.Loaded -= TraySettingsPage_Loaded;
+            this.Unloaded -= TraySettingsPage_Unloaded;
+            _timersStarted = false;
+
+            this.DataContext = null;
+
+            if (_currentPicker != null)
+            {
+                _currentPicker.ProcessSelected -= OnPickerProcessSelected;
+                _currentPicker.OverlayClosed -= OnPickerOverlayClosed;
+            }
+        }
+
+        private void TraySettingsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
+
+        private void LoadSettings()
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            if (!tray.IsInitialized)
+            {
+                // Will use defaults, values update when service is ready
+            }
+
+            ChkAutoClean.IsChecked = tray.AutoCleanEnabled;
+            SliderThreshold.Value = tray.AutoCleanThresholdPercent;
+            SliderInterval.Value = tray.MonitorIntervalSeconds;
+            TxtThreshold.Text = $"{tray.AutoCleanThresholdPercent}%";
+            TxtInterval.Text = FormatInterval((int)SliderInterval.Value);
+
+            // Select active mode
+            switch (tray.SelectedCleaningMode)
+            {
+                case MemoryOptimizer.CleaningMode.Leve: ModeLeve.IsChecked = true; break;
+                case MemoryOptimizer.CleaningMode.Normal: ModeNormal.IsChecked = true; break;
+                case MemoryOptimizer.CleaningMode.Alta: ModeAlta.IsChecked = true; break;
+                case MemoryOptimizer.CleaningMode.Bruta: ModeBruta.IsChecked = true; break;
+            }
+
+            // Background Features (ícone do tray é sempre visível — sem toggle)
+            // X da janela sempre minimiza p/ o tray (CloseToTray forçado true no Core)
+            ChkStandbyClean.IsChecked = tray.StandbyCleanEnabled;
+            ChkTurboBoot.IsChecked = tray.TurboBootEnabled;
+            ChkTurboShutdown.IsChecked = tray.TurboShutdownEnabled;
+
+            // ISLC: valores CALCULADOS pela RAM (o usuário não digita nada).
+            // Desmarcar o automático libera os campos para calibração manual.
+            PnlIslcSettings.Visibility = tray.StandbyCleanEnabled ? Visibility.Visible : Visibility.Collapsed;
+            ChkIslcAuto.IsChecked = tray.IslcAutoTune;
+            RefreshIslcFields(tray);
+            ChkIslcRespectForeground.IsChecked = tray.IslcRespectForeground;
+
+            // Auto-Start - usa novo método que verifica o caminho
+            try
+            {
+                ChkAutoStart.IsChecked = TrayIconService.IsAutoStartEnabled();
+            }
+            catch
+            {
+                ChkAutoStart.IsChecked = false;
+            }
+
+        }
+
+        private void OnRefreshTimerTick(object? s, EventArgs e)
+        {
+            RefreshRamDisplay();
+            RefreshProcessLimitsStatus();
+            UpdateIslcStatus();
+        }
+
+        /// <summary>
+        /// Atualiza apenas os valores de RAM atual na lista de limites — sem recriar os rows.
+        /// Chamado a cada 2s pelo timer para manter os números atualizados.
+        /// </summary>
+        private void RefreshProcessLimitsStatus()
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            var limits = tray.GetProcessRamLimits().ToList();
+            if (limits.Count == 0) return;
+
+            foreach (Border row in ProcessLimitsPanel.Children.OfType<Border>())
+            {
+                if (row.Child is not Grid grid) continue;
+                if (grid.Children.Count == 0) continue;
+                if (grid.Children[0] is not StackPanel nameStack) continue;
+                if (nameStack.Children.Count < 2) continue;
+                if (nameStack.Children[0] is not TextBlock nameTb) continue;
+
+                // O DisplayName pode ser capitalizado — converte para lowercase para buscar
+                string processName = nameTb.Text.ToLowerInvariant();
+                var limit = limits.FirstOrDefault(l =>
+                    l.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase));
+                if (limit == null) continue;
+
+                if (nameStack.Children[1] is not TextBlock statusTb) continue;
+                statusTb.FontFamily = _emojiFont;
+
+                // Mesmo texto da construção (antes o refresh mostrava SÓ "Atual: X MB" e a
+                // linha "piscava" perdendo Pico/Commit a cada 2 s).
+                statusTb.Text = BuildStatusText(limit);
+
+                // excedido = vermelho, OK = cinza, foreground = dourado
+                bool exceeded = limit.LastKnownMB > limit.LimitMB;
+                statusTb.Foreground = exceeded
+                    ? new System.Windows.Media.SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(255, 85, 85))  // excedido: vermelho
+                    : limit.IsForeground
+                        ? new System.Windows.Media.SolidColorBrush(
+                            System.Windows.Media.Color.FromRgb(255, 215, 0))  // em foco: dourado
+                        : new System.Windows.Media.SolidColorBrush(
+                            System.Windows.Media.Color.FromRgb(102, 102, 102));  // OK: cinza
+
+                // Linha 3: badges do motor + estado do governador (mesmo texto da
+                // construção — antes o refresh APAGAVA a linha e os badges do gear sumiam).
+                if (nameStack.Children.Count >= 3 && nameStack.Children[2] is TextBlock govTb)
+                {
+                    govTb.Text = BuildGovText(limit);
+                }
+            }
+        }
+
+        private void RefreshRamDisplay()
+        {
+            try
+            {
+                var mem = GetMemoryStats();
+                TxtPercentMain.Text = $"{mem.Percent}%";
+                TxtTotalRam.Text = $"{mem.TotalGB:F1} GB";
+                TxtUsedRam.Text = $"{mem.UsedGB:F1} GB";
+                TxtFreeRam.Text = $"{mem.FreeGB:F1} GB";
+
+                // Color coding
+                if (mem.Percent >= 90) TxtPercentMain.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 53, 69));
+                else if (mem.Percent >= 70) TxtPercentMain.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 193, 7));
+                else TxtPercentMain.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(40, 167, 69));
+
+                // Label
+                if (mem.Percent >= 90) TxtStatusText.Text = "ESTADO: CRÍTICO";
+                else if (mem.Percent >= 70) TxtStatusText.Text = "ESTADO: ALTO";
+                else TxtStatusText.Text = "ESTADO: NORMAL";
+
+                TxtStatusText.Foreground = TxtPercentMain.Foreground;
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        // --- EVENT HANDLERS ---
+
+        private async void BtnCleanNow_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isCleaningNow) return;
+            _isCleaningNow = true;
+            try
+            {
+                var tray = GetTrayService();
+                if (tray == null) return;
+
+                string taskId = Services.BackgroundTaskTracker.Instance.RegisterTask($"Limpando RAM ({tray.SelectedCleaningMode})", "TraySettings");
+
+                if (Application.Current.MainWindow is MainWindow mw)
+                {
+                    await mw.ExecuteWithLoadingAsync($"Limpando RAM (Modo: {tray.SelectedCleaningMode})...", () =>
+                    {
+                        var memBefore = GetMemoryStats();
+                        var result = MemoryOptimizer.Optimize(tray.SelectedCleaningMode);
+                        var memAfter = GetMemoryStats();
+
+                        int freedPercent = memBefore.Percent - memAfter.Percent;
+                        double freedGB = memAfter.FreeGB - memBefore.FreeGB;
+
+                        // Atualizar UI na thread principal
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            TxtFreedLast.Text = $"Última limpeza: {DateTime.Now:HH:mm} ({(freedGB > 0 ? freedGB : 0):F2} GB)";
+                            RefreshRamDisplay();
+                            mw.ShowSuccess("Otimizado", result.Message);
+                        });
+
+                        return result;
+                    });
+
+                    Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Limpeza de RAM concluída");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[BtnCleanNow_Click] Error: {ex.Message}");
+            }
+            finally
+            {
+                _isCleaningNow = false;
+            }
+        }
+
+        private void Mode_Click(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null || !(sender is System.Windows.Controls.RadioButton rb)) return;
+
+            // Usa o Name do RadioButton para determinar o modo
+            string modeStr = "Normal";
+            if (rb.Name == "ModeLeve") modeStr = "Leve";
+            else if (rb.Name == "ModeNormal") modeStr = "Normal";
+            else if (rb.Name == "ModeAlta") modeStr = "Alta";
+            else if (rb.Name == "ModeBruta") modeStr = "Bruta";
+
+            Enum.TryParse(modeStr, out MemoryOptimizer.CleaningMode mode);
+            tray.SelectedCleaningMode = mode;
+            tray.SaveSettings();
+        }
+
+        private void ChkAutoClean_Click(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray != null)
+            {
+                tray.AutoCleanEnabled = ChkAutoClean.IsChecked == true;
+                tray.SaveSettings();
+            }
+        }
+
+        private void ChkBackgroundFeature_Click(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null || !(sender is System.Windows.Controls.CheckBox cb)) return;
+
+            if (cb == ChkStandbyClean) tray.StandbyCleanEnabled = cb.IsChecked == true;
+            else if (cb == ChkTurboBoot) tray.TurboBootEnabled = cb.IsChecked == true;
+            else if (cb == ChkTurboShutdown) tray.TurboShutdownEnabled = cb.IsChecked == true;
+
+            if (cb == ChkStandbyClean)
+                PnlIslcSettings.Visibility = tray.StandbyCleanEnabled ? Visibility.Visible : Visibility.Collapsed;
+
+            tray.SaveSettings();
+        }
+
+        /// <summary>
+        /// Badge honesto: mostra os DOIS criterios e por que o purge não rodou.
+        /// Antes só comparava standby contra o threshold, o que (julgando por
+        /// G9/G12) parecia um medidor saudável de um recurso inerte.
+        /// </summary>
+        private void UpdateIslcStatus()
+        {
+            try
+            {
+                var tray = GetTrayService();
+                if (tray == null) return;
+
+                bool okStandby = KitLugia.Core.MemoryOptimizer.TryGetStandbyListSizeMB(out long standbyMB);
+                bool okFree = KitLugia.Core.MemoryOptimizer.TryGetFreePagesMB(out long freeMB);
+
+                if (!okStandby || !okFree)
+                {
+                    TxtIslcBadge.Text = "Indisponível";
+                    IslcStatusBadge.Background = Brush(Rgb(40, 35, 10));
+                    IslcStatusBadge.BorderBrush = Brush(Rgb(200, 160, 40));
+                    TxtIslcBadge.Foreground = Brush(Rgb(255, 200, 60));
+                    return;
+                }
+
+                bool standbyOk = standbyMB >= tray.IslcThresholdMB;
+                bool freeOk = freeMB < tray.IslcFreeThresholdMB;
+                bool podeLimpar = standbyOk && freeOk;
+
+                TxtIslcBadge.Text = $"Standby {standbyMB} / livre {freeMB} MB";
+
+                // Cor pelo par de critérios, não só pela standby.
+                System.Windows.Media.Color bg, border, fg;
+                if (podeLimpar) { bg = Rgb(40, 35, 10); border = Rgb(200, 160, 40); fg = Rgb(255, 200, 60); }
+                else if (standbyOk) { bg = Rgb(26, 40, 48); border = Rgb(60, 130, 160); fg = Rgb(140, 210, 240); }
+                else { bg = Rgb(26, 48, 32); border = Rgb(48, 128, 80); fg = Rgb(80, 192, 128); }
+
+                IslcStatusBadge.Background = Brush(bg);
+                IslcStatusBadge.BorderBrush = Brush(border);
+                TxtIslcBadge.Foreground = Brush(fg);
+
+                // Linha de estado: por que não limpou agora (ou o que limpou).
+                if (!string.IsNullOrEmpty(tray.IslcLastSkipReason))
+                    TxtIslcLastAction.Text = $"Aguardando: {tray.IslcLastSkipReason}";
+                else if (tray.IslcCleanCount > 0)
+                    TxtIslcLastAction.Text = $"{tray.IslcCleanCount} limpeza(s) nesta sessão · última standby: {tray.IslcLastCleanMB} MB";
+                else
+                    TxtIslcLastAction.Text = "";
+            }
+            catch { }
+        }
+
+        private static System.Windows.Media.Color Rgb(byte r, byte g, byte b) =>
+            System.Windows.Media.Color.FromRgb(r, g, b);
+
+        private static System.Windows.Media.SolidColorBrush Brush(System.Windows.Media.Color c) =>
+            new System.Windows.Media.SolidColorBrush(c);
+
+        /// <summary>Mostra os três limites atuais e trava a edição quando o cálculo é automático.</summary>
+        private void RefreshIslcFields(TrayIconService tray)
+        {
+            TxtIslcThreshold.Text = tray.IslcThresholdMB.ToString();
+            TxtIslcFreeThreshold.Text = tray.IslcFreeThresholdMB.ToString();
+            TxtIslcMinInterval.Text = tray.IslcMinIntervalSeconds.ToString();
+
+            bool auto = tray.IslcAutoTune;
+            var cor = auto
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x90, 0x9A, 0xA8))
+                : System.Windows.Media.Brushes.White;
+            foreach (var tb in new[] { TxtIslcThreshold, TxtIslcFreeThreshold, TxtIslcMinInterval })
+            {
+                tb.IsReadOnly = auto;
+                tb.Foreground = cor;
+                tb.ToolTip = auto
+                    ? "Calculado automaticamente pela RAM instalada. Desmarque a opção acima para editar."
+                    : null;
+            }
+
+            TxtIslcDescription.Text =
+                (auto
+                    ? "Valores calculados pela RAM instalada: standby = RAM/8, livre = RAM/16. "
+                    : "Valores MANUAIS (desmarque para voltar ao cálculo automático). ") +
+                "Só limpa quando a standby passa do limite E a memória realmente livre fica abaixo do segundo limite. " +
+                "Medir antes/depois: o contador só sobe quando o cache realmente caiu.";
+        }
+
+        private void ChkIslcAuto_Changed(object sender, RoutedEventArgs e)
+        {
+            // LoadSettings escreve IsChecked (não é clique do usuário): sem esta
+            // guarda, abrir a página regravaria as configurações.
+            if (_isLoading) return;
+            var tray = GetTrayService();
+            if (tray == null) return;
+            // O handler pode disparar durante o InitializeComponent (quando os
+            // TextBoxes deste painel ainda não existem). Sem esta guarda, um
+            // NullReferenceException derrubaria a página na construção.
+            if (TxtIslcThreshold == null || TxtIslcFreeThreshold == null ||
+                TxtIslcMinInterval == null || TxtIslcDescription == null) return;
+            tray.IslcAutoTune = ChkIslcAuto.IsChecked == true;
+            if (tray.IslcAutoTune) tray.ApplyIslcAutoTuning();
+            RefreshIslcFields(tray);
+            tray.SaveSettings();
+            UpdateIslcStatus();
+        }
+
+        private void TxtIslcThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            if (tray.IslcAutoTune) { RefreshIslcFields(tray); return; }
+            if (!long.TryParse(((System.Windows.Controls.TextBox)sender).Text, out long mb) || mb < 64)
+            { ((System.Windows.Controls.TextBox)sender).Text = tray.IslcThresholdMB.ToString(); return; }
+            tray.IslcThresholdMB = mb;
+            tray.SaveSettings();
+            ((System.Windows.Controls.TextBox)sender).Text = mb.ToString();
+            UpdateIslcStatus();
+        }
+
+        private void TxtIslcFreeThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            if (tray.IslcAutoTune) { RefreshIslcFields(tray); return; }
+            if (!long.TryParse(((System.Windows.Controls.TextBox)sender).Text, out long mb) || mb < 0)
+            { ((System.Windows.Controls.TextBox)sender).Text = tray.IslcFreeThresholdMB.ToString(); return; }
+            tray.IslcFreeThresholdMB = mb;
+            tray.SaveSettings();
+            ((System.Windows.Controls.TextBox)sender).Text = mb.ToString();
+            UpdateIslcStatus();
+        }
+
+        private void TxtIslcMinInterval_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            if (tray.IslcAutoTune) { RefreshIslcFields(tray); return; }
+            if (!int.TryParse(((System.Windows.Controls.TextBox)sender).Text, out int s) || s < 0 || s > 3600)
+            { ((System.Windows.Controls.TextBox)sender).Text = tray.IslcMinIntervalSeconds.ToString(); return; }
+            tray.IslcMinIntervalSeconds = s;
+            tray.SaveSettings();
+            ((System.Windows.Controls.TextBox)sender).Text = s.ToString();
+            UpdateIslcStatus();
+        }
+
+        private void ChkIslcRespectForeground_Changed(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+            tray.IslcRespectForeground = ChkIslcRespectForeground.IsChecked == true;
+            tray.SaveSettings();
+            UpdateIslcStatus();
+        }
+
+        private void ChkAutoStart_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                bool enable = ChkAutoStart.IsChecked == true;
+
+                TrayIconService.SetAutoStart(enable);
+
+                // Verificar se funcionou atualizando o estado
+                ChkAutoStart.IsChecked = TrayIconService.IsAutoStartEnabled();
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+        }
+
+        private void SliderThreshold_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isLoading || TxtThreshold == null) return;
+            int val = (int)SliderThreshold.Value;
+            TxtThreshold.Text = $"{val}%";
+            var tray = GetTrayService();
+            if (tray != null)
+            {
+                tray.AutoCleanThresholdPercent = val;
+                tray.SaveSettings();
+            }
+        }
+
+        private void SliderInterval_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isLoading || TxtInterval == null) return;
+            int val = (int)SliderInterval.Value;
+            TxtInterval.Text = FormatInterval(val);
+            var tray = GetTrayService();
+            if (tray != null)
+            {
+                tray.MonitorIntervalSeconds = val;
+                tray.SaveSettings();
+            }
+        }
+
+        private void BtnConfigureAutoClean_Click(object sender, RoutedEventArgs e)
+        {
+            // 🖱️ Abrir página de configurações avançada de limpeza automática via NavigateToPage
+            if (Application.Current.MainWindow is MainWindow mw)
+            {
+                mw.NavigateToPage("AdvancedRamCleanSettings");
+            }
+        }
+
+        // --- HELPERS ---
+
+        private static TrayIconService? GetTrayService()
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+                return mw.TrayService;
+            return null;
+        }
+
+        private static string FormatInterval(int seconds)
+        {
+            if (seconds < 60) return $"{seconds}s";
+            return $"{seconds / 60}m {seconds % 60}s";
+        }
+
+        private struct MemoryInfo
+        {
+            public int Percent;
+            public double TotalGB;
+            public double UsedGB;
+            public double FreeGB;
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+        private MemoryInfo GetMemoryStats()
+        {
+            var m = new MEMORYSTATUSEX();
+            m.dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf(m);
+            GlobalMemoryStatusEx(ref m);
+
+            return new MemoryInfo
+            {
+                Percent = (int)m.dwMemoryLoad,
+                TotalGB = m.ullTotalPhys / (1024.0 * 1024.0 * 1024.0),
+                FreeGB = m.ullAvailPhys / (1024.0 * 1024.0 * 1024.0),
+                UsedGB = (m.ullTotalPhys - m.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0)
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // LIMITADOR DE RAM POR PROCESSO
+        // ═══════════════════════════════════════════════════════════════
+
+        private void LoadProcessLimits()
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            // Carrega o intervalo configurado
+            if (TxtRamLimiterInterval != null)
+                TxtRamLimiterInterval.Text = tray.RamLimiterIntervalMs.ToString();
+
+            // Teto de RAM do proprio Kit (limpeza automatica)
+            if (TxtKitMemoryLimit != null)
+                TxtKitMemoryLimit.Text = tray.KitMemoryLimitMB.ToString();
+
+            var limits = tray.GetProcessRamLimits().ToList();
+
+            ProcessLimitsPanel.Children.Clear();
+            TxtNoLimits.Visibility = limits.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            foreach (var limit in limits)
+            {
+                // Filtro por estado do processo
+                if (_processFilter == 1 && !IsProcessRunning(limit.ProcessName)) continue;
+                if (_processFilter == 2 && IsProcessRunning(limit.ProcessName)) continue;
+
+                ProcessLimitsPanel.Children.Add(BuildLimitRow(limit));
+            }
+        }
+
+        private static bool IsProcessRunning(string processName)
+        {
+            if (string.IsNullOrWhiteSpace(processName)) return false;
+            try
+            {
+                bool found = false;
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName(processName))
+                {
+                    if (!p.HasExited) found = true;
+                    p.Dispose();
+                }
+                return found;
+            }
+            catch { return false; }
+        }
+
+        private void CmbProcessFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ProcessLimitsPanel == null || CmbProcessFilter == null) return; // XAML ainda montando
+            _processFilter = CmbProcessFilter.SelectedIndex < 0 ? 0 : CmbProcessFilter.SelectedIndex;
+            LoadProcessLimits();
+        }
+
+        private void TxtRamLimiterInterval_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            if (int.TryParse(TxtRamLimiterInterval.Text?.Trim(), out int ms) && ms >= 500 && ms <= 30000)
+            {
+                tray.RamLimiterIntervalMs = ms;
+                tray.SaveSettings();
+                ShowNotification("✅ Intervalo atualizado", $"RAM Limiter verificará a cada {ms}ms");
+            }
+            else
+            {
+                // Valor inválido — restaura o atual
+                TxtRamLimiterInterval.Text = tray.RamLimiterIntervalMs.ToString();
+                ShowNotification("⚠️ Valor inválido", "Digite entre 500 e 30000 ms");
+            }
+        }
+
+        private void TxtKitMemoryLimit_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            if (long.TryParse(TxtKitMemoryLimit.Text?.Trim(), out long mb) && mb >= 80 && mb <= 1024)
+            {
+                tray.KitMemoryLimitMB = mb; // setter aplica ao vivo + clamp
+                tray.SaveSettings();
+                ShowNotification("✅ Teto atualizado", $"Kit vai se limpar ao passar de {tray.KitMemoryLimitMB}MB");
+            }
+            else
+            {
+                TxtKitMemoryLimit.Text = tray.KitMemoryLimitMB.ToString();
+                ShowNotification("⚠️ Valor inválido", "Digite entre 80 e 1024 MB");
+            }
+        }
+
+        private Border BuildLimitRow(TrayIconService.ProcessRamLimit limit)
+        {
+            var row = new Border
+            {
+                Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(26, 26, 26)),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(0, 0, 0, 5)
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // 0: Nome
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 1: Limite
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 2: MB
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 3: Modo (Gov/Direto)
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 4: Gear
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 5: On/Off
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 6: Remove
+
+            // Nome + status
+            string displayName = string.IsNullOrEmpty(limit.ProcessName)
+                ? "?"
+                : char.ToUpper(limit.ProcessName[0]) + limit.ProcessName.Substring(1);
+
+            var nameStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            nameStack.Children.Add(new TextBlock
+            {
+                Text = displayName,
+                Foreground = System.Windows.Media.Brushes.White,
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12
+            });
+
+            bool exceeded = limit.LastKnownMB > limit.LimitMB;
+            string statusText = BuildStatusText(limit);
+
+            var statusColor = exceeded
+                ? System.Windows.Media.Color.FromRgb(255, 85, 85)  // excedido: vermelho
+                : limit.IsForeground
+                    ? System.Windows.Media.Color.FromRgb(255, 215, 0)  // em foco: dourado
+                    : System.Windows.Media.Color.FromRgb(102, 102, 102);  // OK: cinza
+
+            nameStack.Children.Add(new TextBlock
+            {
+                Text = statusText,
+                FontFamily = _emojiFont,
+                Foreground = new System.Windows.Media.SolidColorBrush(statusColor),
+                FontSize = 10,
+                Margin = new Thickness(0, 2, 0, 0),
+                TextWrapping = TextWrapping.Wrap
+            });
+
+            // Linha 3: badges do motor por processo (config do gear ⚙️) + governador.
+            var engineTb = new TextBlock
+            {
+                Text = BuildGovText(limit),
+                FontFamily = _emojiFont,
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(212, 175, 55)),
+                FontSize = 9,
+                Margin = new Thickness(0, 1, 0, 0),
+                Tag = "engineInfo",
+                TextWrapping = TextWrapping.Wrap
+            };
+            nameStack.Children.Add(engineTb);
+            Grid.SetColumn(nameStack, 0);
+            grid.Children.Add(nameStack);
+
+            // Limite editável inline
+            var limitBox = new TextBox
+            {
+                Text = limit.LimitMB.ToString(),
+                Width = 60,
+                Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(37, 37, 37)),
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 215, 0)),
+                BorderBrush = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(68, 68, 68)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(5, 3, 5, 3),
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Tag = limit.ProcessName
+            };
+            limitBox.LostFocus += LimitBox_LostFocus;
+            Grid.SetColumn(limitBox, 1);
+            grid.Children.Add(limitBox);
+
+            grid.Children.Add(new TextBlock
+            {
+                Text = "MB",
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(102, 102, 102)),
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            });
+            Grid.SetColumn(grid.Children[^1], 2);
+
+            // Modo: Governador (🧠, com verificações) ⇄ Direto (⚡, estilo Firemin: passou
+            // do valor, limpa). 1 clique alterna e salva.
+            var modeBtn = new Button
+            {
+                Content = limit.DirectMode ? "⚡" : "🧠",
+                FontFamily = _emojiFont,
+                Width = 24,
+                Height = 24,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(
+                        (byte)(limit.DirectMode ? 255 : 153),
+                        (byte)(limit.DirectMode ? 213 : 153),
+                        (byte)(limit.DirectMode ? 79 : 153))),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Tag = limit.ProcessName,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                ToolTip = limit.DirectMode
+                    ? "Modo DIRETO (estilo Firemin): passou do limite, esvazia na hora. Clique para voltar ao Governador."
+                    : "Modo GOVERNADOR (com verificações anti-storm). Clique para modo DIRETO (limpa ao atingir, estilo Firemin).",
+                Style = (Style)FindResource("FlatIconButton")
+            };
+            modeBtn.Click += BtnProcessMode_Click;
+            Grid.SetColumn(modeBtn, 3);
+            grid.Children.Add(modeBtn);
+
+            // ⚙️ Gear – per-process engine config
+            var gearBtn = new Button
+            {
+                Content = "⚙️",
+                FontFamily = _emojiFont,
+                Width = 24,
+                Height = 24,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(153, 153, 153)),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Tag = limit.ProcessName,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                ToolTip = "Configurações avançadas do processo",
+                Style = (Style)FindResource("FlatIconButton")
+            };
+            gearBtn.Click += BtnProcessGear_Click;
+            Grid.SetColumn(gearBtn, 4);
+            grid.Children.Add(gearBtn);
+
+            // Toggle on/off
+            var toggle = new CheckBox
+            {
+                IsChecked = limit.Enabled,
+                Style = (Style)FindResource("TrayToggle"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Tag = limit.ProcessName
+            };
+            toggle.Click += ChkProcessLimitEnabled_Click;
+            Grid.SetColumn(toggle, 5);
+            grid.Children.Add(toggle);
+
+            // Botao remover
+            var removeBtn = new Button
+            {
+                Content = "✕",
+                Width = 24,
+                Height = 24,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(211, 47, 47)),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Tag = limit.ProcessName,
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)FindResource("FlatIconButton")
+            };
+            removeBtn.Click += BtnRemoveProcessLimit_Click;
+            Grid.SetColumn(removeBtn, 6);
+            grid.Children.Add(removeBtn);
+
+            row.Child = grid;
+            return row;
+        }
+
+        /// <summary>
+        /// Linha de status da linha de limite (usada na construção E no refresh — o texto
+        /// precisa ser idêntico nos dois, senão a linha "pisca" mudando a cada 2 s).
+        /// No modo DIRETO mostra só o essencial (o resto é debug do governador).
+        /// </summary>
+        private static string BuildStatusText(TrayIconService.ProcessRamLimit limit)
+        {
+            if (limit.LastKnownMB <= 0) return "Processo n\u00E3o est\u00E1 rodando";
+            bool exceeded = limit.LastKnownMB > limit.LimitMB;
+            string base_ = $"Atual: {limit.LastKnownMB} MB" +
+                   $"{(exceeded ? " \u26A0\uFE0F excedido" : " \u2713")}";
+            if (limit.DirectMode)
+                return base_ + $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}";
+            return base_ +
+                   $" \u26A1 Pico: {Math.Max(limit.PeakRamMB, limit.LastKnownMB)} MB" +
+                   (limit.CommitSizeMB > 0 ? $" \U0001F4BE Commit: {limit.CommitSizeMB} MB" : "") +
+                   $"{(limit.IsForeground ? " \U0001F3AF em foco (pausado)" : "")}";
+        }
+
+        /// <summary>
+        /// Linha 3 da linha de limite: badges do motor (gear) + estado do governador de RAM.
+        /// A parte do governador (VERY_LOW/faults/backoff/commit) é debug: só aparece com o
+        /// 🧠 ligado. No ⚡ aparece só o badge DIRETO.
+        /// </summary>
+        private static string BuildGovText(TrayIconService.ProcessRamLimit limit)
+        {
+            string badges = BuildEngineBadges(limit);
+            if (limit.DirectMode)
+                return badges + (badges.Length > 0 ? " · " : "") + "⚡ DIRETO";
+            string gov = "";
+            if (limit.LastFaultsPerSec > 0 || limit.StormBackoffLevel > 0 || limit.MemPriorityApplied)
+            {
+                gov = "🧠 gov:";
+                if (limit.MemPriorityApplied) gov += " VERY_LOW";
+                if (limit.LastFaultsPerSec >= 1) gov += $" {limit.LastFaultsPerSec:F0} faults/s";
+                if (limit.StormBackoffLevel > 0) gov += $" ⛈ backoff x{1 << limit.StormBackoffLevel}";
+                if (limit.CommitSizeMB > 0) gov += $" 💾 commit {limit.CommitSizeMB} MB";
+            }
+            else if (limit.CommitSizeMB > 0)
+            {
+                gov = $"💾 commit {limit.CommitSizeMB} MB";
+            }
+            string mid = (gov.Length > 0 && badges.Length > 0) ? " · " : "";
+            return badges + mid + gov;
+        }
+
+        /// <summary>
+        /// Resumo do motor ativo do processo (prioridade, ProBalance, cap de CPU, EcoQoS, E-cores).
+        /// </summary>
+        private static string BuildEngineBadges(TrayIconService.ProcessRamLimit limit)
+        {
+            var cfg = limit.EngineConfig;
+            if (cfg == null) return "";
+
+            var parts = new System.Collections.Generic.List<string>
+            {
+                $"\u26A1 {cfg.CpuPriority}"
+            };
+
+            if (cfg.ProBalance)
+            {
+                parts.Add(cfg.ProBalanceMode switch
+                {
+                    "EcoQoS" => "\u2696\uFE0F ProBalance EcoQoS",
+                    "HardCap" => $"\u2696\uFE0F ProBalance HardCap {cfg.ProBalanceCpuThreshold}%",
+                    _ => $"\u2696\uFE0F ProBalance (>{cfg.ProBalanceCpuThreshold}%)"
+                });
+            }
+
+            if (cfg.CpuLimitEnabled || (cfg.ProBalance && cfg.ProBalanceMode == "HardCap"))
+                parts.Add($"\U0001F4C9 {cfg.CpuLimitPercent}% CPU");
+
+            if (cfg.EcoQoSEnabled && cfg.ProBalanceMode != "EcoQoS")
+                parts.Add("\U0001F331 EcoQoS");
+            if (cfg.ThreadEfficiencyMode)
+                parts.Add("\U0001F9E5 E-cores");
+            if (cfg.TimerBoost)
+                parts.Add("\u23F1 Timer 1ms");
+            // MemPrio 5 (NORMAL) é o default — mostrar seria ruído em toda linha.
+            if (cfg.ThreadMemoryPriority != 0 && cfg.ThreadMemoryPriority != 5)
+                parts.Add($"\U0001F9E0 MemPrio {cfg.ThreadMemoryPriority}");
+
+            return string.Join(" \u00B7 ", parts);
+        }
+
+        private void LimitBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox box && box.Tag is string processName)
+            {
+                var tray = GetTrayService();
+                if (long.TryParse(box.Text, out long newLimit) && newLimit >= 50)
+                {
+                    var existing = tray?.GetProcessRamLimits().FirstOrDefault(l => l.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase));
+                    tray?.SetProcessRamLimit(processName, newLimit, existing?.Enabled ?? true);
+                }
+                else
+                {
+                    var existing = tray?.GetProcessRamLimits().FirstOrDefault(l => l.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase));
+                    box.Text = existing?.LimitMB.ToString() ?? "500";
+                }
+            }
+        }
+
+        // Abre o seletor de processos — centralizado na tela via MainWindow OverlayContainer
+        private void BtnOpenProcessPicker_Click(object sender, RoutedEventArgs e)
+        {
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            var overlayContainer = mw.FindName("OverlayContainer") as System.Windows.Controls.Grid;
+            if (overlayContainer == null) return;
+
+            // Remove overlay anterior se existir
+            var existing = overlayContainer.Children.OfType<KitLugia.GUI.Controls.ProcessPickerOverlay>().FirstOrDefault();
+            if (existing != null)
+                overlayContainer.Children.Remove(existing);
+
+            var picker = new KitLugia.GUI.Controls.ProcessPickerOverlay();
+            picker.ProcessSelected += OnPickerProcessSelected;
+            picker.OverlayClosed += OnPickerOverlayClosed;
+            _currentPicker = picker;
+
+            overlayContainer.Children.Add(picker);
+            overlayContainer.Visibility = Visibility.Visible;
+            picker.Open();
+        }
+
+        private void OnPickerProcessSelected(List<string> names, long limitMB)
+        {
+            if (_currentPicker == null) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+            var overlayContainer = mw.FindName("OverlayContainer") as System.Windows.Controls.Grid;
+            if (overlayContainer != null)
+            {
+                overlayContainer.Children.Remove(_currentPicker);
+                overlayContainer.Visibility = Visibility.Collapsed;
+            }
+            foreach (var name in names)
+                OnProcessSelected(name, limitMB);
+            _currentPicker = null;
+        }
+
+        private void OnPickerOverlayClosed()
+        {
+            if (_currentPicker == null) return;
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+            var overlayContainer = mw.FindName("OverlayContainer") as System.Windows.Controls.Grid;
+            if (overlayContainer != null)
+            {
+                overlayContainer.Children.Remove(_currentPicker);
+                overlayContainer.Visibility = Visibility.Collapsed;
+            }
+            _currentPicker = null;
+        }
+
+        // Adicionar por arquivo .exe diretamente (sem abrir o picker)
+        private void BtnAddByFile_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Selecione o executável do processo",
+                Filter = "Executáveis (*.exe)|*.exe",
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            string processName = System.IO.Path.GetFileNameWithoutExtension(dialog.FileName)
+                .ToLowerInvariant();
+
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            tray.SetProcessRamLimit(processName, 500);
+            LoadProcessLimits();
+            ShowNotification($"✅ Processo adicionado", $"{processName} → 500 MB (ajuste conforme necessário)");
+        }
+
+        private void OnProcessSelected(string processName, long limitMB)
+        {
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            tray.SetProcessRamLimit(processName, limitMB);
+            LoadProcessLimits();
+            // Mostra o mínimo seguro na notificação para o usuário saber que o app não vai quebrar
+            var tempLimit = new KitLugia.GUI.Services.TrayIconService.ProcessRamLimit { ProcessName = processName };
+            long safeMin = 60; // old default minimum
+            ShowNotification("✅ Limite configurado",
+                $"{processName} → {limitMB} MB\nMínimo seguro: {safeMin} MB (app não será interrompido abaixo disso)");
+        }
+
+        private void BtnProcessMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            string? name = btn.Tag?.ToString();
+            if (string.IsNullOrEmpty(name)) return;
+
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            bool direto = tray.ToggleProcessRamDirectMode(name);
+            // Atualiza o botão na hora (sem reconstruir a lista inteira).
+            btn.Content = direto ? "⚡" : "🧠";
+            btn.Foreground = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(
+                    (byte)(direto ? 255 : 153),
+                    (byte)(direto ? 213 : 153),
+                    (byte)(direto ? 79 : 153)));
+            btn.ToolTip = direto
+                ? "Modo DIRETO (estilo Firemin): passou do limite, esvazia na hora. Clique para voltar ao Governador."
+                : "Modo GOVERNADOR (com verificações anti-storm). Clique para modo DIRETO (limpa ao atingir, estilo Firemin).";
+            // A linha gov (3ª linha) mostra o modo: reconstrói as linhas para refletir.
+            LoadProcessLimits();
+            ShowNotification(direto ? "⚡ Modo Direto" : "🧠 Modo Governador",
+                direto ? $"'{name}': passou do valor, o kit limpa na hora."
+                       : $"'{name}': com verificações anti-storm.");
+        }
+
+        private void BtnRemoveProcessLimit_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            string? name = btn.Tag?.ToString();
+            if (string.IsNullOrEmpty(name)) return;
+
+            var tray = GetTrayService();
+            tray?.RemoveProcessRamLimit(name);
+            LoadProcessLimits();
+        }
+
+        private void ChkProcessLimitEnabled_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not CheckBox chk) return;
+            string? name = chk.Tag?.ToString();
+            if (string.IsNullOrEmpty(name)) return;
+
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            var limits = tray.GetProcessRamLimits();
+            var limit = limits.FirstOrDefault(l =>
+                l.ProcessName.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (limit != null)
+                tray.SetProcessRamLimit(name, limit.LimitMB, chk.IsChecked == true);
+        }
+
+        private void BtnProcessGear_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            string? name = btn.Tag?.ToString();
+            if (string.IsNullOrEmpty(name)) return;
+
+            var tray = GetTrayService();
+            if (tray == null) return;
+
+            var limits = tray.GetProcessRamLimits();
+            var limit = limits.FirstOrDefault(l =>
+                l.ProcessName.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (limit == null) return;
+
+            var mw = Application.Current.MainWindow as MainWindow;
+            if (mw == null) return;
+
+            var overlayContainer = mw.FindName("OverlayContainer") as System.Windows.Controls.Grid;
+            if (overlayContainer == null) return;
+
+            var config = tray.GetProcessEngineConfig(name) ?? new TrayIconService.ProcessEngineConfig();
+            var overlay = new Controls.ProcessEngineConfigOverlay(name, config);
+            overlay.ConfigSaved += (savedConfig) =>
+            {
+                tray.SetProcessEngineConfig(name, savedConfig);
+                LoadProcessLimits(); // recarrega as linhas p/ mostrar os badges do motor atualizados
+                mw.ShowSuccess("Configuração salva", $"Configurações de '{name}' atualizadas.");
+            };
+            overlayContainer.Children.Add(overlay);
+            overlayContainer.Visibility = Visibility.Visible;
+            overlay.Open();
+        }
+
+        private void ShowNotification(string title, string message)
+        {
+            if (Application.Current.MainWindow is MainWindow mw)
+                mw.ShowInfo(title, message);
+        }
+    }
+
+    /// <summary>
+    /// ViewModel para exibir limites de RAM na lista.
+    /// </summary>
+    public class ProcessLimitViewModel
+    {
+        private readonly TrayIconService.ProcessRamLimit _limit;
+
+        public ProcessLimitViewModel(TrayIconService.ProcessRamLimit limit)
+        {
+            _limit = limit;
+        }
+
+        public string ProcessName => _limit.ProcessName;
+        public bool Enabled => _limit.Enabled;
+        public string LimitText => $"{_limit.LimitMB} MB";
+        public string StatusText => _limit.LastKnownMB > 0
+            ? $"Atual: {_limit.LastKnownMB} MB{(_limit.LastKnownMB > _limit.LimitMB ? " ⚠️ excedido" : "")}"
+            : "Aguardando monitoramento...";
+        public string StatusColor => _limit.LastKnownMB > _limit.LimitMB ? "#FF5555" : "#888888";
+        public string FloorCommitText
+        {
+            get
+            {
+                if (_limit.LastKnownMB <= 0) return "";
+                return $"Last: {_limit.LastKnownMB} MB | Limit: {_limit.LimitMB} MB" +
+                    (_limit.LastKnownMB > _limit.LimitMB ? " (excedido)" : "");
+            }
+        }
+    }
+}
