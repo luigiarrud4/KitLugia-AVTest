@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="KitLugia.GUI.Windows.FailedUninstallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Desinstalação não concluída" Width="800" Height="660"
+        WindowStartupLocation="CenterOwner"
+        TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Consolas, Segoe UI Emoji"
+        TextElement.Foreground="White"
+        Background="#0F0F0F"
+        ShowInTaskbar="False"
+        ResizeMode="CanResizeWithGrip">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="6"/>
+    </WindowChrome.WindowChrome>
+    <Border BorderBrush="#FFD700" BorderThickness="1">
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" Foreground="#FFD700" TextWrapping="Wrap"/>
+                <TextBlock x:Name="ErrorText" FontSize="11" Foreground="#999999" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <TextBlock Text="Abaixo só aparecem itens com 100% de certeza de que pertencem a este programa (dentro da pasta de instalação ou pasta/registro com o nome exato do app). Tudo vai para a Lixeira, com backup — nada é apagado permanentemente."
+                           FontSize="11" Foreground="#777777" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <!-- Cards -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <!-- Card: Pastas -->
+                    <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="📁 Pastas do programa (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="FoldersHint" FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <ItemsControl x:Name="FolderList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,2" Foreground="#E6E6E6" FontSize="12" ToolTip="{Binding Path}">
+                                                <TextBlock Text="{Binding Path}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"/>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="FoldersEmpty" Text="Nenhuma pasta 100% confirmada." FontSize="11" Foreground="#666666" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Card: Arquivos -->
+                    <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="📄 Arquivos do programa (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="FilesHint" FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <ItemsControl x:Name="FileList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,2" Foreground="#E6E6E6" FontSize="12" ToolTip="{Binding Path}">
+                                                <TextBlock Text="{Binding Path}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"/>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="FilesEmpty" Text="Nenhum arquivo 100% confirmado." FontSize="11" Foreground="#666666" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Card: Registro -->
+                    <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="🗝️ Itens de registro (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="RegHint" FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <ItemsControl x:Name="RegList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,2" Foreground="#E6E6E6" FontSize="12" ToolTip="{Binding Path}">
+                                                <TextBlock Text="{Binding Path}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"/>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="RegEmpty" Text="Nenhum item de registro 100% confirmado." FontSize="11" Foreground="#666666" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Status -->
+            <TextBlock Grid.Row="2" x:Name="StatusText" FontSize="11" Foreground="#999999" Margin="0,8,0,0" TextWrapping="Wrap"/>
+
+            <!-- Footer -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                <Button x:Name="BtnClean" Content="🗑️ Limpar selecionados (0)" MinWidth="220" Height="32" Margin="0,0,8,0"
+                        Background="#FFD700" Foreground="#111111" FontWeight="SemiBold" BorderBrush="#FFD700" BorderThickness="1"
+                        Cursor="Hand" Click="BtnClean_Click"/>
+                <Button Content="Fechar" Width="90" Height="32"
+                        Background="#2A2A2A" Foreground="White" BorderBrush="#444444" BorderThickness="1"
+                        Cursor="Hand" Click="BtnClose_Click"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

@@ -280,11 +280,26 @@ namespace KitLugia.Core
 
                 bool ok = AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
                 int err = Marshal.GetLastWin32Error();
-                if (!ok || err != 0)
-                    Logger.Log($"[OWNERSHIP] SeTakeOwnershipPrivilege NAO habilitado (ok={ok}, erro={err}) — sem admin.");
-                // Mantém o retorno anterior (TRUE mesmo com 1300): quem chama continua tentando
-                // a escrita, como sempre fez; agora o privilégio de fato entra quando há admin.
-                return ok;
+
+                // AdjustTokenPrivileges devolve TRUE mesmo quando o privilégio NAO
+                // foi atribuído — o erro real vem em GetLastError como
+                // ERROR_NOT_ALL_ASSIGNED (1300). Retornar TRUE aqui fazia o
+                // chamador acreditar que tinha SeTakeOwnershipPrivilege e seguir
+                // para o SetOwner, que então falhava por acesso negado: uma falha
+                // de posse se apresentava como sucesso.
+                if (!ok)
+                {
+                    Logger.Log($"[OWNERSHIP] AdjustTokenPrivileges falhou (erro={err}).");
+                    return false;
+                }
+                if (err != 0)
+                {
+                    Logger.Log($"[OWNERSHIP] SeTakeOwnershipPrivilege NAO habilitado (erro={err}"
+                               + (err == 1300 ? " = ERROR_NOT_ALL_ASSIGNED" : "")
+                               + ") — processo sem privilégio de posse.");
+                    return false;
+                }
+                return true;
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return false; }
             finally

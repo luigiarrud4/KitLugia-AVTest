@@ -11,10 +11,10 @@
 //        gravado em disco (so o Apply no scan troca o status)
 //   T9c  Sem reinicio (TickCount crescendo), Apply mantem PENDING
 //   T9d  Reiniciado + efeito veio (CheckTweak = OK)  -> sai de PENDING
-//   T9e  Reiniciado + efeito NAO veio (CheckTweak = MODIFIED) -> INVALIDADO,
-//        status NOT_FOUND e InvalidReason preenchido
+//   T9e  Reiniciado + efeito NAO veio (CheckTweak = MODIFIED) -> volta a
+//        MODIFIED (a verdade), sai de PENDING e NAO inventa "invalidado"
 //   T9f  O arquivo de estado realmente existe no disco e e JSON valido
-//   T9g  PENDING e invalidos NAO entram no denominador do score
+//   T9g  PENDING nao entra no denominador do score
 //
 // USO:  IntegrityAudit.exe            (achou o fonte sozinho)
 //       IntegrityAudit.exe --src <repo>
@@ -36,10 +36,12 @@ using KitLugia.Core;
 /// passagem do tempo (reboot) por injecao do TickCount.
 /// </summary>
 internal static class PendingCycle
-{
-    private const string ProbeKey = @"Software\KitLugia\IntegrityPendingTest";
+{    private const string ProbeKey = @"Software\KitLugia\IntegrityPendingTest";
 
     private static int _ok, _fail;
+
+    /// <summary>Quantos checks passaram (o resumo final soma todas as fases).</summary>
+    public static int LastOk { get; private set; }
 
     private static void Check(string what, bool cond, string det = "")
     {
@@ -48,13 +50,14 @@ internal static class PendingCycle
     }
 
     private static readonly Type EntryT = typeof(PendingRepairEntry);
-    private static readonly Type InvT = typeof(InvalidatedCheck);
     private static readonly Type StateT = typeof(PendingRepairStore).Assembly
         .GetType("KitLugia.Core.IntegrityState");
 
-    private static readonly MethodInfo AddEntry = StateT.GetMethod("Add", BindingFlags.Public | BindingFlags.Instance);
     private static readonly PropertyInfo PEnd = StateT.GetProperty("Pending");
-    private static readonly PropertyInfo PInv = StateT.GetProperty("Invalidated");
+    // Lista dos "nao confirmados" (a correcao foi aplicada, reiniciou, e o
+    // check nao pode ser lido). E' o estado que substituiu o antigo
+    // "invalidado" — que nao existe mais no Core.
+    private static readonly PropertyInfo PUnc = StateT.GetProperty("Unconfirmed");
     private static readonly FieldInfo CacheF = typeof(PendingRepairStore)
         .GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
     private static readonly FieldInfo GateF = typeof(PendingRepairStore)
@@ -69,7 +72,7 @@ internal static class PendingCycle
     /// <summary>A lista Pending/Invalidated do estado interno (via reflexao).</summary>
     private static System.Collections.IList Pend(object st) => (System.Collections.IList)PEnd.GetValue(st);
 
-    private static System.Collections.IList Inv(object st) => (System.Collections.IList)PInv.GetValue(st);
+    private static System.Collections.IList Unc(object st) => (System.Collections.IList)PUnc.GetValue(st);
 
     private static int Count(System.Collections.IList l) => l == null ? 0 : l.Count;
 
@@ -95,14 +98,6 @@ internal static class PendingCycle
         EntryT.GetProperty("Reason").SetValue(e, "teste");
         EntryT.GetProperty("TickAtApply").SetValue(e, tick);
         return e;
-    }
-
-    private static object NewInv(string name, string reason)
-    {
-        var v = Activator.CreateInstance(InvT);
-        InvT.GetProperty("Name").SetValue(v, name);
-        InvT.GetProperty("Reason").SetValue(v, reason);
-        return v;
     }
 
     public static int Run()
@@ -172,7 +167,7 @@ internal static class PendingCycle
             {
                 var st = LoadState();
                 Pend(st).Clear();
-                Inv(st).Clear();
+                Unc(st).Clear();
                 SaveState(st);
             }
 
@@ -225,7 +220,7 @@ internal static class PendingCycle
             {
                 var st = LoadState();
                 Pend(st).Clear();
-                Inv(st).Clear();
+                Unc(st).Clear();
                 AddPend(st, NewEntry(probeReboot.Name, tickGravado));
                 SaveState(st);
             }
@@ -249,7 +244,7 @@ internal static class PendingCycle
             {
                 var st = LoadState();
                 Pend(st).Clear();
-                Inv(st).Clear();
+                Unc(st).Clear();
                 // TickAtApply alto + uptime curto = boot novo
                 AddPend(st, NewEntry(probe.Name, int.MaxValue - 1000));
                 SaveState(st);
@@ -271,16 +266,22 @@ internal static class PendingCycle
                 var st = LoadState();
                 Check("T9d o item saiu da lista de pendentes",
                     Count(Pend(st)) == 0);
-                Check("T9d nada foi invalidado quando o efeito veio",
-                    Count(Inv(st)) == 0);
+                Check("T9d nada foi marcado como nao confirmado quando o efeito veio",
+                    Count(Unc(st)) == 0);
             }
 
-            // ───────────── T9e: REINICIOU + efeito NAO veio -> INVALIDADO ─────────────
+            // ───────────── T9e: REINICIOU + efeito NAO veio -> volta a MODIFIED ─────────────
+            //
+            // CONTRATO ATUAL: nao existe mais "invalidado" (aquele selo laranja
+            // sumia do score e mentia para sempre: CFG/DEP/UAC ficavam presos
+            // assim mesmo estando protegidos). Se o efeito nao veio, o item
+            // volta ao estado REAL (MODIFIED), sai de PENDING e continua
+            // corrigivel pelo "Restaurar Todos".
             lock (gate)
             {
                 var st = LoadState();
                 Pend(st).Clear();
-                Inv(st).Clear();
+                Unc(st).Clear();
                 AddPend(st, NewEntry(probe.Name, int.MaxValue - 1000));
                 SaveState(st);
             }
@@ -291,61 +292,56 @@ internal static class PendingCycle
             probe.Status = TweakStatus.MODIFIED;
             var listaRuim = new List<ScannableTweak> { probe };
             lock (gate) PendingRepairStore.Apply(listaRuim);
-            Check("T9e reiniciou e o efeito NAO veio -> item invalidado",
-                !string.IsNullOrEmpty(probe.InvalidReason), "invalid=" + (probe.InvalidReason ?? "(vazio)"));
-            Check("T9e o invalidado nao fica mais como MODIFIED",
-                probe.Status != TweakStatus.MODIFIED, "status=" + probe.Status);
+            Check("T9e reiniciou e o efeito NAO veio -> continua MODIFIED (a verdade)",
+                probe.Status == TweakStatus.MODIFIED, "status=" + probe.Status);
+            Check("T9e o motivo de pendencia foi limpo",
+                string.IsNullOrEmpty(probe.PendingReason), probe.PendingReason ?? "(vazio)");
 
             lock (gate)
             {
                 var st = LoadState();
-                Check("T9e foi salvo na lista de invalidados",
-                    Count(Inv(st)) == 1);
                 Check("T9e saiu da lista de pendentes",
                     Count(Pend(st)) == 0);
+                Check("T9e leitura OK -> nao vira 'nao confirmado'",
+                    Count(Unc(st)) == 0);
             }
 
-            // invalidados reaparecem em todo scan seguinte
+            // e o item continua corrigivel no scan seguinte (nao ficou preso)
             var lista2 = new List<ScannableTweak> { probe };
             probe.Status = TweakStatus.MODIFIED;
-            probe.InvalidReason = null;
             ResetCache();
             lock (gate) PendingRepairStore.Apply(lista2);
-            Check("T9e o invalido persiste no scan seguinte",
-                probe.Status != TweakStatus.MODIFIED && !string.IsNullOrEmpty(probe.InvalidReason));
+            Check("T9e o item segue MODIFIED e corrigivel no scan seguinte",
+                probe.Status == TweakStatus.MODIFIED && string.IsNullOrEmpty(probe.PendingReason));
 
             // ───────────── T9f: o arquivo em disco tem o conteudo esperado ─────────────
             try
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(statePath));
-                var inv = doc.RootElement.GetProperty("Invalidated");
-                Check("T9f o invalido esta persistido no disco",
-                    inv.GetArrayLength() == 1,
-                    "Invalidated=" + inv.GetArrayLength());
+                var pendJson = doc.RootElement.GetProperty("Pending");
+                var uncJson = doc.RootElement.GetProperty("Unconfirmed");
+                Check("T9f o pendente resolvido saiu do arquivo em disco",
+                    pendJson.GetArrayLength() == 0,
+                    "Pending=" + pendJson.GetArrayLength() + " Unconfirmed=" + uncJson.GetArrayLength());
             }
-            catch (Exception ex) { Check("T9f o invalido esta persistido no disco", false, ex.Message); }
+            catch (Exception ex) { Check("T9f o estado em disco e' JSON valido", false, ex.Message); }
 
             // ───────────── T9g: fora do score ─────────────
-            // Regra da UI: PENDING e InvalidReason != null sao excluidos do
-            // denominador. Reimplementada aqui para travar a regra.
+            // Regra da UI: PENDING fica fora do denominador (nao e' falha nem
+            // protecao). Reimplementada aqui para travar a regra.
             var base_ = new List<ScannableTweak>
             {
                 new ScannableTweak { Name = "a", Status = TweakStatus.OK },
                 new ScannableTweak { Name = "b", Status = TweakStatus.MODIFIED },
                 new ScannableTweak { Name = "c", Status = TweakStatus.PENDING },
-                new ScannableTweak { Name = "d", Status = TweakStatus.MODIFIED, InvalidReason = "x" },
+                new ScannableTweak { Name = "d", Status = TweakStatus.MODIFIED },
             };
-            var countable = base_.Where(t => t.Status != TweakStatus.PENDING && t.InvalidReason == null).ToList();
+            var countable = base_.Where(t => t.Status != TweakStatus.PENDING).ToList();
             var badCount = countable.Count(t => t.Status == TweakStatus.MODIFIED);
             int score = countable.Count > 0 ? 100 - (int)Math.Ceiling(100.0 * badCount / countable.Count) : 100;
-            Check("T9g pendentes e invalidos ficam fora do denominador",
-                countable.Count == 2 && badCount == 1 && score == 50,
+            Check("T9g pendente fica fora do denominador (2 ruins de 3 -> 33%)",
+                countable.Count == 3 && badCount == 2 && score == 33,
                 "countable=" + countable.Count + " bad=" + badCount + " score=" + score);
-
-            // ───────────── limpeza ─────────────
-            PendingRepairStore.ClearInvalidated();
-            Check("T9f ClearInvalidated esvazia a lista",
-                PendingRepairStore.InvalidatedCount == 0);
         }
         catch (Exception ex)
         {
@@ -362,6 +358,7 @@ internal static class PendingCycle
         }
 
         Console.WriteLine("  T9: OK={0} FALHAS={1}", _ok, _fail);
+        LastOk = _ok;
         return _fail;
     }
 }

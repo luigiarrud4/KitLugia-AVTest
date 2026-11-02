@@ -86,6 +86,7 @@ namespace KitLugia.GUI.Pages
 
                 // Armazena todos os tweaks para filtragem
                 _allTweaks = tweaks;
+                BuildFilterOptions();
                 UpdatePathCardState();
 
                 // Score + botões + banner (fórmula única em RecalculateScore)
@@ -141,29 +142,63 @@ namespace KitLugia.GUI.Pages
                     t.Description.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
             }
 
-            // Filtro por categoria no ComboBox
-            if (CategoryFilter?.SelectedItem is ComboBoxItem cbi)
+            // Filtro do ComboBox. Cada opcao e' uma FACETA do proprio catalogo:
+            // estado real do check ou uma categoria que EXISTE (as opcoes de
+            // categoria sao montadas em BuildFilterOptions a partir dos dados).
+            // Antes eram tags fixas ("SEGURANCA", "DESEMPENHO") que testavam
+            // Contains num texto qualquer: "Desempenho" nao incluia
+            // "Performance Degradada"/"Memoria" e "Seguranca" deixava de fora
+            // "Seguranca de Rede" era o unico acerto por acaso; pior, opcionais
+            // eram escondidos de um filtro e mostrados no outro.
+            string tag = (CategoryFilter?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "ALL";
+            if (tag.StartsWith("CAT::", StringComparison.Ordinal))
             {
-                string tag = cbi.Tag?.ToString() ?? "ALL";
+                string categoria = tag.Substring(5);
+                filtered = filtered.Where(t => string.Equals(t.Category, categoria, StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
                 switch (tag)
                 {
-                    case "SEGURANCA":
-                        filtered = filtered.Where(t => t.Category.Contains("Segurança") || t.Category.Contains("Defesa"));
-                        break;
                     case "PROTEGIDO":
-                        filtered = filtered.Where(t => t.Status == TweakStatus.OK);
+                        // Protegido = so nao-opcionais com Status=OK. Opcionais vao
+                        // para o filtro "Opcional", nunca para "Protegido".
+                        filtered = filtered.Where(t => t.Status == TweakStatus.OK && !t.IsOptional);
                         break;
                     case "MODIFICADO":
+                        // Só não-opcionais MODIFIED. Os opcionais ficam SEMPRE no
+                        // filtro "Opcional" (badge fixa "◇ OPCIONAL"), então um
+                        // item opcional modificado não pode aparecer aqui — nem
+                        // sumir dos dois filtros.
                         filtered = filtered.Where(t => t.Status == TweakStatus.MODIFIED && !t.IsOptional);
                         break;
+                    case "PENDING":
+                        filtered = filtered.Where(t => t.Status == TweakStatus.PENDING);
+                        break;
+                    case "NAO_VERIFICAVEL":
+                        filtered = filtered.Where(t => t.Status == TweakStatus.NOT_FOUND || t.Status == TweakStatus.ERROR);
+                        break;
                     case "OPCIONAL":
+                        // Opcional = TODOS os itens com IsOptional=true (badge fixa
+                        // "◇ OPCIONAL"), com ou sem otimização aplicada. Assim o
+                        // item opcional modificado NÃO desaparece: ele continua
+                        // no filtro Opcional e o botão mostra REVERTER.
                         filtered = filtered.Where(t => t.IsOptional);
                         break;
+                    case "SEGURANCA":
+                        // "Segurança" na imagem: agrupa as categorias de defesa do sistema.
+                        filtered = filtered.Where(t =>
+                            t.Category != null &&
+                            (t.Category.Contains("Segurança", StringComparison.OrdinalIgnoreCase) ||
+                             t.Category.Contains("Security", StringComparison.OrdinalIgnoreCase)));
+                        break;
                     case "DESEMPENHO":
-                        filtered = filtered.Where(t => t.Category.Contains("Desempenho") || 
-                                                       t.Category.Contains("Performance") || 
-                                                       t.Category.Contains("Estabilidade") || 
-                                                       t.Category.Contains("Saúde do Disco"));
+                        // "Desempenho" na imagem: categoria de performance (inclui variantes).
+                        filtered = filtered.Where(t =>
+                            t.Category != null &&
+                            (t.Category.Equals("Desempenho", StringComparison.OrdinalIgnoreCase) ||
+                             t.Category.Contains("Performance", StringComparison.OrdinalIgnoreCase) ||
+                             t.Category.Contains("Memória", StringComparison.OrdinalIgnoreCase)));
                         break;
                 }
             }
@@ -299,10 +334,16 @@ namespace KitLugia.GUI.Pages
 
         private void BtnInfo_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.Tag is string description)
+            if (sender is Button btn && btn.Tag is ScannableTweak tweak)
             {
+                string description = tweak.Description;
                 if (string.IsNullOrEmpty(description)) description = "Sem descrição disponível.";
                 MessageBox.Show(description, "Detalhes de Segurança", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else if (sender is Button btn2 && btn2.Tag is string description2)
+            {
+                if (string.IsNullOrEmpty(description2)) description2 = "Sem descrição disponível.";
+                MessageBox.Show(description2, "Detalhes de Segurança", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -334,9 +375,14 @@ namespace KitLugia.GUI.Pages
 
                 if (tweak.Status == TweakStatus.OK)
                 {
-                    bool confirm = await mainWindow.ShowConfirmationDialog(
-                        $"⚠️ PERIGO: Desativar '{tweak.Name}' reduz a segurança.\nTem certeza?");
+                    // Texto do aviso depende do tipo: em item OPCIONAL o botão
+                    // "APLICAR" vai ativar a otimização (ex.: desativar o Spooler),
+                    // o que é escolha do usuário — não uma "redução de segurança".
+                    string aviso = tweak.IsOptional
+                        ? $"⚙️ OPCIONAL: CORRIGIR (aplicar otimização) em '{tweak.Name}'?\n{tweak.Description}\n\nVocê pode reverter a qualquer momento."
+                        : $"⚠️ PERIGO: Desativar '{tweak.Name}' reduz a segurança.\nTem certeza?";
 
+                    bool confirm = await mainWindow.ShowConfirmationDialog(aviso);
                     if (!confirm) return;
                 }
 
@@ -399,7 +445,8 @@ namespace KitLugia.GUI.Pages
             {
                 bool confirm = await mw.ShowConfirmationDialog(
                     "RESTAURAÇÃO TOTAL DE INTEGRIDADE\n\n" +
-                    "Isso corrigirá TODAS as vulnerabilidades detectadas.\nContinuar?");
+                    "Isso corrigirá TODAS as vulnerabilidades detectadas (itens MODIFICADOS).\n" +
+                    "Itens OPCIONAIS são mantidos como estão.\nContinuar?");
 
                 if (!confirm) return;
 
@@ -511,8 +558,64 @@ namespace KitLugia.GUI.Pages
 
         private void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // Repopular as opcoes dispara SelectionChanged: sem esta guarda a lista
+            // era filtrada no meio da remontagem (com a selecao ainda vazia).
+            if (_rebuildingFilters) return;
             if (!_isLoaded || _allTweaks == null) return;
             ApplyFiltersAndUpdateList();
+        }
+
+        private bool _rebuildingFilters;
+
+        /// <summary>
+        /// Monta as opcoes do filtro como uma LISTA SIMPLES e DIRETA, exatamente
+        /// como mostra a referencia da UI:
+        ///
+        ///   📋 Todas as Categorias   🛡️ Segurança   ✅ Protegido   ⚠️ Modificado
+        ///   ⚙️ Opcional              ⚡ Desempenho
+        ///
+        /// Antes o combo montava categorias fixas inventadas ("Seguranca",
+        /// "Desempenho") que testavam Contains num texto qualquer — nao pegava
+        /// "Performance Degradada"/"Memoria" e as categorias reais do catalogo
+        /// nunca apareciam. Agora sao as 6 opcoes da referencia, cada uma com
+        /// a contagem real do catalogo. OPCIONAL e MODIFICADO sao facetas
+        /// mutuamente exclusivas (um item opcional alterado aparece so em
+        /// "Modificado", nunca nos dois).
+        /// </summary>
+        private void BuildFilterOptions()
+        {
+            if (CategoryFilter == null || _allTweaks == null) return;
+
+            _rebuildingFilters = true;
+            try
+            {
+                string atual = (CategoryFilter.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "ALL";
+                var visiveis = _allTweaks.Where(t => !t.IsPathItem).ToList();
+
+                CategoryFilter.Items.Clear();
+                void Add(string tag, string texto) =>
+                    CategoryFilter.Items.Add(new ComboBoxItem { Tag = tag, Content = texto });
+
+                Add("ALL", $"📋 Todas as Categorias ({visiveis.Count})");
+                Add("SEGURANÇA", $"🛡️ Segurança ({visiveis.Count(t => t.Category != null &&
+                    (t.Category.Contains("Segurança", StringComparison.OrdinalIgnoreCase) ||
+                     t.Category.Contains("Security", StringComparison.OrdinalIgnoreCase))) })");
+                Add("PROTEGIDO", $"✅ Protegido ({visiveis.Count(t => t.Status == TweakStatus.OK && !t.IsOptional)})");
+                Add("MODIFICADO", $"⚠️ Modificado ({visiveis.Count(t => t.Status == TweakStatus.MODIFIED && !t.IsOptional)})");
+                Add("OPCIONAL", $"⚙️ Opcional ({visiveis.Count(t => t.IsOptional)})");
+                Add("DESEMPENHO", $"⚡ Desempenho ({visiveis.Count(t => t.Category != null &&
+                    (t.Category.Equals("Desempenho", StringComparison.OrdinalIgnoreCase) ||
+                     t.Category.Contains("Performance", StringComparison.OrdinalIgnoreCase) ||
+                     t.Category.Contains("Memória", StringComparison.OrdinalIgnoreCase))) })");
+
+                CategoryFilter.SelectedItem =
+                    CategoryFilter.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (i.Tag?.ToString() ?? "") == atual)
+                    ?? CategoryFilter.Items.OfType<ComboBoxItem>().FirstOrDefault();
+            }
+            finally
+            {
+                _rebuildingFilters = false;
+            }
         }
 
         private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
@@ -539,6 +642,7 @@ namespace KitLugia.GUI.Pages
         {
             if (_allTweaks == null) return;
 
+            BuildFilterOptions();   // refresca contagens do combo (Protegido/Modificado/Opcional/Segurança)
             RecalculateScore();
 
             UpdatePathCardState();

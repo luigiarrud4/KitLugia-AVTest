@@ -13,6 +13,8 @@
     <Page.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:PendingReasonConverter x:Key="PendingReason"/>
+        <converters:HexToBrushConverter x:Key="HexToBrush"/>
+        <converters:TweakDescriptionTooltipConverter x:Key="TweakDescriptionTooltip"/>
     </Page.Resources>
 
     <Grid Margin="30">
@@ -82,9 +84,10 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <Button x:Name="BtnFixAll" Content="🛡️ RESTAURAR TODOS (PADRÃO SEGURO)" Click="BtnFixAll_Click" 
-                    Width="280" Height="40" Background="#C42B1C" Foreground="White" FontWeight="Bold" 
-                    BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Style="{StaticResource GoldButtonStyle}"/>
+            <Button x:Name="BtnFixAll" Content="🛡️ RESTAURAR TODOS (PADRÃO SEGURO)" Click="BtnFixAll_Click"
+                    Width="280" Height="40" Background="#C42B1C" Foreground="White" FontWeight="Bold"
+                    BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Style="{StaticResource GoldButtonStyle}"
+                    ToolTip="Corrige apenas os itens MODIFICADOS (vulnerabilidades reais). Itens OPCIONAIS são mantidos como estão — eles são escolha sua e não contam para o score."/>
 
             <!-- SEARCH BOX (LUPA) -->
             <Border Grid.Column="1" Height="36" Margin="15,0,15,0" CornerRadius="18" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1">
@@ -280,34 +283,34 @@
 
                                 <!-- Nome e Categoria -->
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,10,0">
-                                    <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                        <!-- Selo de reinicialização pendente: só aparece em itens PENDING.
+                                             Fica ao lado do título para o usuário saber de relance
+                                             que a correção só valerá no próximo boot. -->
+                                        <Border Grid.Column="1" x:Name="PendingRestartSeal" Visibility="Collapsed"
+                                                Margin="8,0,0,0" VerticalAlignment="Center"
+                                                CornerRadius="3" Padding="6,2"
+                                                Background="#33FFB900" BorderBrush="#FFB900" BorderThickness="1"
+                                                ToolTip="Este item já foi corrigido, mas a mudança só vale após reiniciar o Windows.">
+                                            <TextBlock Text="🔄 REINICIALIZAÇÃO PENDENTE" Foreground="#FFD700" FontSize="10" FontWeight="Bold"/>
+                                        </Border>
+                                    </Grid>
                                     <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="11"/>
                                 </StackPanel>
 
                                 <!-- BOTÃO DE INFORMAÇÃO + EXPLORADOR DE PATH -->
                                 <StackPanel Grid.Column="2" Orientation="Horizontal"
                                             HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Button Click="BtnInfo_Click" Tag="{Binding Description}"
+                                    <Button x:Name="InfoBtn" Click="BtnInfo_Click" Tag="{Binding}"
                                             Background="Transparent" BorderThickness="0"
                                             Width="30" Height="30" Cursor="Help"
-ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
-                    <Button.ToolTip>
-                        <ToolTip>
-                            <ToolTip.Content>
-                                <TextBlock TextWrapping="Wrap" MaxWidth="460">
-                                    <TextBlock.Text>
-                                        <MultiBinding StringFormat="{}{0}{1}">
-                                            <Binding Path="Description"/>
-                                            <!-- PENDING: por que esta amarelo. -->
-                                            <MultiBinding.Converter>
-                                                <converters:PendingReasonConverter/>
-                                            </MultiBinding.Converter>
-                                        </MultiBinding>
-                                    </TextBlock.Text>
-                                </TextBlock>
-                            </ToolTip.Content>
-                        </ToolTip>
-                    </Button.ToolTip>
+                                            ToolTip="{Binding Converter={StaticResource TweakDescriptionTooltip}}"
+                                            ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
                                         <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
@@ -343,10 +346,16 @@ ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
                                     </Button>
                                 </StackPanel>
 
-                                <!-- Badge de Status -->
+                                <!-- Badge de Status: usa binding direto para StatusDisplayText/StatusBadgeBackground
+                                     (itens opcionais mostram "OPCIONAL" em vez de "PROTEGIDO") -->
                                 <Border Grid.Column="3" VerticalAlignment="Center" Margin="10,0"
                                         CornerRadius="4" Padding="10,4" MinWidth="100" x:Name="StatusBadge">
-                                    <TextBlock x:Name="TxtStatus" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtStatus" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"
+                                               Text="{Binding StatusDisplayText}"
+                                               Foreground="{Binding StatusTextColor, Converter={StaticResource HexToBrush}}"/>
+                                    <Border.Background>
+                                        <Binding Path="StatusBadgeBackground" Converter="{StaticResource HexToBrush}"/>
+                                    </Border.Background>
                                 </Border>
 
                                 <!-- Botão de Ação -->
@@ -379,26 +388,41 @@ ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
                                         <Setter TargetName="BtnPathExplore" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
 
-                                    <!-- ESTADO: MODIFICADO -->
-                                    <DataTrigger Binding="{Binding Status}" Value="MODIFIED">
-                                        <Setter TargetName="StatusBadge" Property="Background" Value="#25C42B1C"/>
-                                        <Setter TargetName="TxtStatus" Property="Text" Value="⚠️ MODIFICADO"/>
-                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#FF6F61"/>
-                                        <Setter TargetName="BtnAction" Property="Content" Value="CORRIGIR"/>
-                                        <Setter TargetName="BtnAction" Property="Background" Value="{StaticResource AccentColor}"/>
-                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
-                                        <Setter TargetName="BtnAction" Property="Foreground" Value="Black"/>
-                                    </DataTrigger>
-
-                                    <!-- ESTADO: OK/PROTEGIDO -->
-                                    <DataTrigger Binding="{Binding Status}" Value="OK">
-                                        <Setter TargetName="StatusBadge" Property="Background" Value="#154CAF50"/>
-                                        <Setter TargetName="TxtStatus" Property="Text" Value="✅ PROTEGIDO"/>
-                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#4CAF50"/>
+                                    <!-- BtnAction: só aplica quando NÃO é opcional.
+                                         Itens opcionais nunca mostram status vermelho/verde, só OPCIONAL. -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Status}" Value="OK"/>
+                                            <Condition Binding="{Binding IsOptional}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
                                         <Setter TargetName="BtnAction" Property="Content" Value="Desativar"/>
                                         <Setter TargetName="BtnAction" Property="Background" Value="Transparent"/>
                                         <Setter TargetName="BtnAction" Property="BorderBrush" Value="#333333"/>
                                         <Setter TargetName="BtnAction" Property="Foreground" Value="#777777"/>
+                                    </MultiDataTrigger>
+
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Status}" Value="MODIFIED"/>
+                                            <Condition Binding="{Binding IsOptional}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter TargetName="BtnAction" Property="Content" Value="CORRIGIR"/>
+                                        <Setter TargetName="BtnAction" Property="Background" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="Foreground" Value="Black"/>
+                                    </MultiDataTrigger>
+
+                                    <!-- OPCIONAL: badge FIXA "◇ OPCIONAL" nos estados
+                                         estáveis (OK e MODIFIED). Só o botão muda
+                                         (CORRIGIR / REVERTER). Se a badge mudasse
+                                         conforme o status, a separação dos filtros
+                                         (Protegido / Modificado / Opcional) quebraria:
+                                         um opcional modificado apareceria com badge
+                                         de modificado no filtro errado. -->
+                                    <DataTrigger Binding="{Binding IsOptional}" Value="True">
+                                        <Setter TargetName="StatusBadge" Property="Background" Value="#115533"/>
+                                        <Setter TargetName="TxtStatus" Property="Text" Value="◇ OPCIONAL"/>
+                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#FFA500"/>
                                     </DataTrigger>
 
                                     <!-- ESTADO: N/A -->
@@ -409,6 +433,8 @@ ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
                                         <Setter TargetName="TxtStatus" Property="Text" Value="⏳ AGUARDANDO REINÍCIO"/>
                                         <Setter TargetName="TxtStatus" Property="Foreground" Value="#FFD700"/>
                                         <Setter TargetName="BtnAction" Property="Visibility" Value="Hidden"/>
+                                        <!-- Selo no título: "reinicialização pendente" -->
+                                        <Setter TargetName="PendingRestartSeal" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                     
                                     <DataTrigger Binding="{Binding Status}" Value="NOT_FOUND">
@@ -418,17 +444,30 @@ ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000">
                                         <Setter TargetName="BtnAction" Property="Visibility" Value="Hidden"/>
                                     </DataTrigger>
                                     
-                                    <!-- OPCIONAL (VBS, etc) -->
-                                    <!-- OPCIONAL (VBS, etc) - NAO sobrescreve o PENDING -->
+                                    <!-- ITENS OPCIONAIS: têm botão próprio (APLICAR / REVERTER) para o usuário
+                                         escolher a otimização. Sem estes triggers o BtnAction ficava vazio. -->
                                     <MultiDataTrigger>
                                         <MultiDataTrigger.Conditions>
                                             <Condition Binding="{Binding IsOptional}" Value="True"/>
                                             <Condition Binding="{Binding Status}" Value="OK"/>
                                         </MultiDataTrigger.Conditions>
-                                        <Setter TargetName="StatusBadge" Property="Background" Value="#115533"/>
-                                        <Setter TargetName="TxtStatus" Property="Text" Value="◇ OPCIONAL"/>
-                                        <Setter TargetName="TxtStatus" Property="Foreground" Value="#FFA500"/>
+                                        <Setter TargetName="BtnAction" Property="Content" Value="CORRIGIR"/>
+                                        <Setter TargetName="BtnAction" Property="Background" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="Foreground" Value="Black"/>
                                     </MultiDataTrigger>
+
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsOptional}" Value="True"/>
+                                            <Condition Binding="{Binding Status}" Value="MODIFIED"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter TargetName="BtnAction" Property="Content" Value="REVERTER"/>
+                                        <Setter TargetName="BtnAction" Property="Background" Value="Transparent"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                    </MultiDataTrigger>
+
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                 </ListBox.ItemTemplate>

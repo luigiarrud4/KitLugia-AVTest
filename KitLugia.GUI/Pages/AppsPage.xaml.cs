@@ -934,7 +934,8 @@ namespace KitLugia.GUI.Pages
                     var r = new DeepUninstaller.UninstallResult();
                     return DeepUninstaller.RunUninstallPhaseAsync(
                         r, program.DisplayName, program.UninstallString,
-                        program.InstallLocation, program.Publisher, program.DisplayIcon, false, progress, captureBaseline: false);
+                        program.InstallLocation, program.Publisher, program.DisplayIcon, false, progress, captureBaseline: true,
+                        quietUninstallString: program.QuietUninstallString);
                 });
 
                 if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
@@ -1058,8 +1059,14 @@ namespace KitLugia.GUI.Pages
                     {
                         var res = new DeepUninstaller.UninstallResult();
                         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+                        // displayName/installLocation vao junto para o log e o
+                        // historico registrarem DE QUEM foi a limpeza automatica
+                        // (antes o historico gravava "(sem nome)").
                         await Task.Run(() => DeepUninstaller.PerformCleanup(
-                            auto, new List<string>(), res, ct: cts.Token), cts.Token);
+                            auto, new List<string>(), res,
+                            displayName: program.DisplayName,
+                            installLocation: program.InstallLocation,
+                            ct: cts.Token), cts.Token);
 
                         autoRemovidos = res.FilesDeleted;
                         motivosAuto.AddRange(res.DeleteErrors);
@@ -1092,6 +1099,16 @@ namespace KitLugia.GUI.Pages
                 motivosAuto.Add("A limpeza automática falhou — tudo foi enviado para revisão: " + ex.Message);
             }
 
+            // Se a desinstalação FALHOU, abre a janela nova listando SOMENTE o que o
+            // kit tem 100% de certeza que é deste programa (pastas/arquivos dentro da
+            // pasta de instalação ou pasta AppData com o nome exato; registro com a
+            // chave Uninstall do app ou nome exato). O utilizador decide apagar —
+            // sempre para a Lixeira, com backup, nunca permanente.
+            if (!scanResult.UninstallSuccess)
+            {
+                ShowFailedUninstallWindow(program, scanResult);
+            }
+
             // A revisão manual de resíduos foi movida para uma aba separada:
             // não exibe mais o painel automaticamente após cada desinstalação.
             // Os resíduos (se houver) ficam disponíveis lá para o usuário revisar
@@ -1122,6 +1139,38 @@ namespace KitLugia.GUI.Pages
             {
                 MessageBox.Show($"\"{program.DisplayName}\" pode não ter sido completamente desinstalado.\nNenhum resíduo foi detectado.",
                     "Atenção", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // Mesmo sem resíduo detectado, se a desinstalação falhou mostramos a
+                // janela de pós-falha (ela lista o que for 100% confirmado do programa).
+                ShowFailedUninstallWindow(program, scanResult);
+            }
+        }
+
+        /// <summary>
+        /// Abre a janela de pós-falha de desinstalação: lista pastas/arquivos e itens
+        /// de registro com 100% de certeza de pertencerem ao programa, para o
+        /// utilizador limpar manualmente (tudo vai para a Lixeira, com backup).
+        /// </summary>
+        private void ShowFailedUninstallWindow(ProgramViewModel program, DeepUninstaller.UninstallResult scanResult)
+        {
+            try
+            {
+                var candidatesFiles = scanResult.LeftoverFiles.Concat(scanResult.HeuristicFiles).ToList();
+                var candidatesReg = scanResult.LeftoverRegistry.Concat(scanResult.HeuristicRegistry).ToList();
+                var errors = string.Join("\n", scanResult.Errors.Take(3));
+
+                var wnd = new Windows.FailedUninstallWindow(
+                    program.DisplayName,
+                    program.InstallLocation,
+                    program.RegistryPath,
+                    errors,
+                    candidatesFiles,
+                    candidatesReg);
+                wnd.Owner = Window.GetWindow(this);
+                wnd.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ShowFailedUninstallWindow", ex.ToString());
             }
         }
 
@@ -1189,7 +1238,7 @@ namespace KitLugia.GUI.Pages
                 {
                     int total = selectedPrograms.Count;
                     var succeeded = new List<ProgramViewModel>();
-                    var failed = new List<(ProgramViewModel Program, string Error)>();
+                    var failed = new List<(ProgramViewModel Program, string Error, DeepUninstaller.UninstallResult Result)>();
 
                     ShowProgramsLoading();
 
@@ -1215,7 +1264,8 @@ namespace KitLugia.GUI.Pages
                         {
                             result = await Task.Run(() => DeepUninstaller.DeepUninstallProgram(
                                 program.DisplayName, program.UninstallString,
-                                program.InstallLocation, program.Publisher, program.DisplayIcon, false, batchProgress, captureBaseline: false));
+                                program.InstallLocation, program.Publisher, program.DisplayIcon, false, batchProgress, captureBaseline: true,
+                                quietUninstallString: program.QuietUninstallString));
                         }
                         catch (Exception ex)
                         {
@@ -1245,7 +1295,7 @@ namespace KitLugia.GUI.Pages
                         }
                         else
                         {
-                            failed.Add((program, error ?? (result.Errors.Count > 0 ? string.Join(" | ", result.Errors) : "exit code não indica sucesso")));
+                            failed.Add((program, error ?? (result.Errors.Count > 0 ? string.Join(" | ", result.Errors) : "exit code não indica sucesso"), result));
                         }
                     }
 
@@ -1268,6 +1318,14 @@ namespace KitLugia.GUI.Pages
                     message += "\n\nOs resíduos podem ser limpos na aba \"Resíduos\".";
 
                     MessageBox.Show(message, "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    // Para cada programa que FALHOU, abre a janela de pós-falha listando
+                    // o que o kit achou com 100% de certeza (pastas + registro) para o
+                    // utilizador limpar manualmente (Lixeira + backup).
+                    foreach (var f in failed)
+                    {
+                        ShowFailedUninstallWindow(f.Program, f.Result);
+                    }
                 }
             }
             catch (Exception ex)
@@ -1433,7 +1491,7 @@ namespace KitLugia.GUI.Pages
                         $"Deletar {app.Name}?\n\n" +
                         $"Pasta: {app.FolderPath}\n" +
                         $"Tamanho: {app.TotalSizeFormatted}\n\n" +
-                        "A pasta será永久mente excluída. Esta ação não pode ser desfeita.",
+                        $"A pasta irá para a Lixeira (poderá ser restaurada).",
                         "Deletar App Portátil"))
                     {
                         return;
@@ -1699,7 +1757,8 @@ namespace KitLugia.GUI.Pages
 
                 if (!await ShowConfirmAsync(
                     $"Limpar {total} item(ns) de resíduos?\n\n" +
-                    $"{toDeleteFiles.Count} arquivo(s)\n{toDeleteReg.Count} registro(s)",
+                    $"{toDeleteFiles.Count} arquivo(s) → Lixeira (recuperável)\n" +
+                    $"{toDeleteReg.Count} registro(s) → backup .reg + remoção permanente",
                     "Limpar Resíduos"))
                     return;
 
@@ -1707,7 +1766,22 @@ namespace KitLugia.GUI.Pages
 
                 var result = new DeepUninstaller.UninstallResult();
                 using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-                await Task.Run(() => DeepUninstaller.PerformCleanup(toDeleteFiles, toDeleteReg, result, ct: cleanupCts.Token));
+                // A limpeza em lote cobre varios apps, entao o nome vai resumido
+                // em vez de vazio — o historico mostrava "(sem nome)" e ficava
+                // impossivel saber o que tinha sido limpo.
+                var nomes = _junkItems
+                    .Select(j => j.AppName)
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                string rotuloLote = nomes.Count switch
+                {
+                    0 => "Resíduos (limpeza em lote)",
+                    1 => nomes[0],
+                    _ => $"{nomes.Count} aplicativos (limpeza em lote)",
+                };
+
+                await Task.Run(() => DeepUninstaller.PerformCleanup(toDeleteFiles, toDeleteReg, result, displayName: rotuloLote, ct: cleanupCts.Token, forceToRecycleBin: true));
 
                 // Remove deleted paths from junk entries and persist
                 var fileSet = new HashSet<string>(toDeleteFiles, StringComparer.OrdinalIgnoreCase);
@@ -1784,7 +1858,7 @@ namespace KitLugia.GUI.Pages
                         if (TxtBloatwareProgress != null)
                             TxtBloatwareProgress.Text = msg;
                     });
-                    await Task.Run(() => DeepUninstaller.PerformCleanup(selectedFiles, selectedReg, result, ct: cleanupCts.Token, progress: junkProgress));
+                    await Task.Run(() => DeepUninstaller.PerformCleanup(selectedFiles, selectedReg, result, displayName: item.AppName, ct: cleanupCts.Token, progress: junkProgress, forceToRecycleBin: true));
 
                     item.Files.RemoveAll(f => selectedFiles.Contains(f.Path));
                     item.Registry.RemoveAll(r => selectedReg.Contains(r.Path));
@@ -2035,11 +2109,11 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
                     return;
                 }
 
-                var msg = $"Excluir permanentemente {toDelete.Count} arquivo(s)/pasta(s)?";
+                var msg = $"Enviar para a Lixeira {toDelete.Count} arquivo(s)/pasta(s)?";
                 if (infoItems.Count > 0)
                     msg += $"\n\n⚠️ {infoItems.Count} item(ns) informativo(s) ignorado(s) — não serão deletados.";
-                if (MessageBox.Show(msg + "\n\nEsta ação não pode ser desfeita.",
-                    "Confirmar Exclusão", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                if (MessageBox.Show(msg + "\n\nOs itens irão para a Lixeira e poderão ser restaurados.",
+                    "Confirmar Envio para a Lixeira", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
 
                 this.Cursor = System.Windows.Input.Cursors.Wait;
@@ -2049,7 +2123,7 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
                 var result = new DeepUninstaller.UninstallResult();
                 using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
                 await Task.Run(() => DeepUninstaller.PerformCleanup(
-                    selectedFullPaths, new List<string>(), result, ct: cleanupCts.Token));
+                    selectedFullPaths, new List<string>(), result, ct: cleanupCts.Token, forceToRecycleBin: true));
 
                 // O QUE FICOU DE PÉ decide o que sai da lista. Antes o codigo
                 // usava selectedFullPaths.Count: quando o backup falhava, a
@@ -2658,16 +2732,19 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
             if (ext == null) return;
 
             var result = MessageBox.Show(
-                $"Remover extensão \"{ext.Name}\" ({ext.Id})?",
+                $"Remover extensão \"{ext.Name}\"? A pasta vai para a Lixeira.",
                 "Remover Extensão", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes) return;
 
-            try
+            // Remoção manual -> vai para a Lixeira (recuperável), com guards + backup,
+            // igual aos outros botões de limpeza. Antes era Directory.Delete direto.
+            if (Directory.Exists(ext.SourcePath))
             {
-                if (Directory.Exists(ext.SourcePath))
-                    Directory.Delete(ext.SourcePath, true);
+                var r = new DeepUninstaller.UninstallResult();
+                DeepUninstaller.PerformCleanup(
+                    new List<string> { ext.SourcePath }, new List<string>(), r,
+                    displayName: ext.Name, installLocation: ext.SourcePath, forceToRecycleBin: true);
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             var current = ExtensionsList.ItemsSource as IList<ExtensionInfo>;
             if (current != null)

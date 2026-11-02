@@ -293,6 +293,52 @@ namespace KitLugia.Core
         /// registrado para o usuário ter o rastro em vez de o evento sumir.
         /// </summary>
         public string? UnconfirmedReason { get; set; }
+
+        /// <summary>
+        /// Texto de exibição do status, considerando que itens opcionais (IsOptional=true)
+        /// NUNCA devem aparecer como "PROTEGIDO" nem "MODIFICADO": são opcionais,
+        /// o usuário escolhe se quer manter ou não, então sempre mostram "OPCIONAL"
+        /// independente do estado real (ligado ou desligado).
+        /// O botão de ação continua visível para permitir correção manual se desejar.
+        /// </summary>
+        public string StatusDisplayText => IsOptional ? "◇ OPCIONAL" : Status switch
+        {
+            TweakStatus.OK => "✅ PROTEGIDO",
+            TweakStatus.MODIFIED => "⚠️ MODIFICADO",
+            TweakStatus.PENDING => "⏳ AGUARDANDO REINÍCIO",
+            TweakStatus.ERROR => "❌ ERRO DE LEITURA",
+            TweakStatus.NOT_FOUND => "N/A",
+            _ => Status.ToString()
+        };
+
+        /// <summary>
+        /// Cor do texto do status em hex (#RRGGBB), considerando itens opcionais.
+        /// Itens opcionais sempre usam laranja, independente do estado real.
+        /// </summary>
+        public string StatusTextColor => IsOptional ? "#FFA500" : Status switch
+        {
+            TweakStatus.OK => "#4CAF50",
+            TweakStatus.MODIFIED => "#FF6F61",
+            TweakStatus.PENDING => "#FFD700",
+            TweakStatus.ERROR => "#FF6F61",
+            TweakStatus.NOT_FOUND => "#555555",
+            _ => "#AAAAAA"
+        };
+
+        /// <summary>
+        /// Cor de fundo do badge de status em hex (#RRGGBB com alfa embutido na UI),
+        /// considerando itens opcionais.
+        /// Itens opcionais sempre usam verde escuro, independente do estado real.
+        /// </summary>
+        public string StatusBadgeBackground => IsOptional ? "#1A5533" : Status switch
+        {
+            TweakStatus.OK => "#154CAF50",
+            TweakStatus.MODIFIED => "#25C42B1C",
+            TweakStatus.PENDING => "#33FFB900",
+            TweakStatus.ERROR => "#33C42B1C",
+            TweakStatus.NOT_FOUND => "#111111",
+            _ => "#333333"
+        };
     }
     // --- WINBOOT MODELS ---
     public class DiskInfo

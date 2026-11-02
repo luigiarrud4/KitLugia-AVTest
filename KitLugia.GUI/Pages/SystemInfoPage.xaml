@@ -72,54 +72,219 @@
         <!-- Info cards -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
-                    <StackPanel>
-                        <TextBlock Text="💻 Sistema" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8"/>
-                        <TextBlock x:Name="TxtPc" Text="PC: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                        <TextBlock x:Name="TxtOs" Text="SO: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                        <TextBlock x:Name="TxtArch" Text="Arquitetura: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                        <TextBlock x:Name="TxtUptime" Text="Uptime: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                        <TextBlock x:Name="TxtCores" Text="Núcleos lógicos: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                    </StackPanel>
+                <!-- Card: PC / Sistema -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="💻 PC / Sistema" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListPc">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
-                    <StackPanel>
-                        <TextBlock Text="💾 Armazenamento" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8"/>
-                        <ItemsControl x:Name="ListStorage">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
+                <!-- Card: Placa-mãe -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="🛠️ Placa-mãe" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListMotherboard">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
-                    <StackPanel>
-                        <TextBlock Text="🌐 Rede" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8"/>
-                        <ItemsControl x:Name="ListNetwork">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
+                <!-- Card: BIOS -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="⚙️ BIOS" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListBios">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
-                    <StackPanel>
-                        <TextBlock Text="🛠️ Sistema (BIOS / Placa-Mãe / SO)" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8"/>
-                        <ItemsControl x:Name="ListSystemDetail">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
+                <!-- Card: Sistema Operacional -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="🖥️ Sistema Operacional" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListOS">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock x:Name="TxtPc" Text="PC: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtOs" Text="SO: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtArch" Text="Arquitetura: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtUptime" Text="Uptime: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtCores" Text="Núcleos lógicos: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card: Armazenamento -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="💾 Armazenamento" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListStorage">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card: Rede -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="🌐 Rede" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListNetwork">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card: Áudio -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="🔊 Áudio" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListAudio">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card: Bateria -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="🔋 Bateria" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListBattery">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card: TPM -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="🔐 TPM" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListTpm">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card: Zona Térmica -->
+                <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="🌡️ Zona Térmica" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="ListThermal">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </StackPanel>
         </ScrollViewer>

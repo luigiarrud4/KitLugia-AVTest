@@ -814,7 +814,7 @@ namespace KitLugia.GUI.Pages
             if (mw != null && !await mw.ShowConfirmationDialog(
                 $"Remover {selected.Count} aplicativo(s) port&#xE1;teis?\n\n" +
                 $"Espa&#xE7;o a ser liberado: {sizeStr}\n\n" +
-                $"Isso EXCLUIR&#xC1; as pastas permanentemente."))
+                $"Isso enviará as pastas para a Lixeira (recuperável)."))
                 return;
 
             _isCleanupOperation = true;

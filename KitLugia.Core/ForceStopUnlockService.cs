@@ -1177,6 +1177,20 @@ namespace KitLugia.Core
         return (false, "O explorer.exe nao voltou automaticamente. A barra de tarefas pode estar sem shell — reinicie o Windows Explorer pelo Gerenciador de Tarefas (Ctrl+Shift+Esc > Reiniciar) ou digite explorer.exe no CMD.");
     }
 
+    /// <summary>
+    /// Force Stop público: encerra QUALQUER processo por PID — tenta `Process.Kill`
+    /// na árvore inteira e, se falhar, `NtTerminateProcess` nativo com
+    /// `SeDebugPrivilege`. Respeita as guardas internas (nunca mata processo de
+    /// sistema nem o próprio KitLugia) e detecta PPL (AV/EDR). Usado pelo Hunter
+    /// no botão Kill/Kill+Del.
+    /// </summary>
+    public static bool ForceKillProcess(int pid)
+    {
+        if (pid <= 0 || pid == Environment.ProcessId) return false;
+        EnableDebugPrivilege();
+        return KillProcess(pid);
+    }
+
     private static bool KillProcess(int pid)        {
             if (pid <= 0 || pid == Environment.ProcessId) return false;
             try

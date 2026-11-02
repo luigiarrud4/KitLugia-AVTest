@@ -145,10 +145,10 @@ namespace KitLugia.Core
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
         }
 
-        public static async Task<UninstallResult> DeepUninstallProgram(string displayName, string uninstallString, string installLocation, string publisher, string displayIcon, bool createRestorePoint = true, IProgress<string>? progress = null, bool captureBaseline = true)
+        public static async Task<UninstallResult> DeepUninstallProgram(string displayName, string uninstallString, string installLocation, string publisher, string displayIcon, bool createRestorePoint = true, IProgress<string>? progress = null, bool captureBaseline = true, string quietUninstallString = "")
         {
             var result = new UninstallResult();
-            await RunUninstallPhaseAsync(result, displayName, uninstallString, installLocation, publisher, displayIcon, createRestorePoint, progress, captureBaseline).ConfigureAwait(false);
+            await RunUninstallPhaseAsync(result, displayName, uninstallString, installLocation, publisher, displayIcon, createRestorePoint, progress, captureBaseline, quietUninstallString).ConfigureAwait(false);
             await RunScanPhaseAsync(result, displayName, uninstallString, installLocation, publisher, displayIcon, captureBaseline, progress).ConfigureAwait(false);
             return result;
         }
@@ -159,9 +159,18 @@ namespace KitLugia.Core
         /// O escaneamento pesado fica em <see cref="RunScanPhaseAsync"/>, que pode rodar em
         /// background (BackgroundTaskTracker) enquanto o usuario desinstala outros apps.
         /// </summary>
-        public static async Task<UninstallResult> RunUninstallPhaseAsync(UninstallResult result, string displayName, string uninstallString, string installLocation, string publisher, string displayIcon, bool createRestorePoint = true, IProgress<string>? progress = null, bool captureBaseline = true)
+        public static async Task<UninstallResult> RunUninstallPhaseAsync(UninstallResult result, string displayName, string uninstallString, string installLocation, string publisher, string displayIcon, bool createRestorePoint = true, IProgress<string>? progress = null, bool captureBaseline = true, string quietUninstallString = "")
         {
             progress?.Report("Preparando...");
+            // InstallLocation frequentemente falta no registro (ex.: DuoDesk 2.5.0). Deriva a
+            // pasta a partir do exe do UninstallString ANTES do kill/scan — sem ela os processos
+            // do app podem ficar vivos e os resíduos em C:\Program Files não são varridos.
+            if (string.IsNullOrEmpty(installLocation))
+            {
+                var (usExe, _) = ParseCommandLine(uninstallString);
+                if (!string.IsNullOrEmpty(usExe) && File.Exists(usExe))
+                    installLocation = Path.GetDirectoryName(usExe) ?? installLocation;
+            }
             if (createRestorePoint)
                 TryCreateRestorePoint($"KitLugia: Uninstall {displayName}");
 
@@ -188,7 +197,10 @@ namespace KitLugia.Core
 
             progress?.Report("Localizando desinstalador...");
             string? actualUninstaller = FindInstalledUninstaller(installLocation, uninstallString);
-            string effectiveUninstall = actualUninstaller ?? uninstallString;
+            // Prefere o QuietUninstallString do registro quando ele já traz flag silenciosa
+            // (ex.: "...\Uninstall DuoDesk.exe" /allusers /S) — o UninstallString puro abre GUI.
+            string effectiveUninstall = actualUninstaller
+                ?? (!string.IsNullOrEmpty(quietUninstallString) && LooksSilent(quietUninstallString) ? quietUninstallString : uninstallString);
             bool foundActualUninstaller = actualUninstaller != null;
 
             if (!string.IsNullOrEmpty(effectiveUninstall))
@@ -211,11 +223,24 @@ namespace KitLugia.Core
                         using var proc = Process.Start(psi);
                         if (proc != null)
                         {
-                            int timeoutMs = foundActualUninstaller ? 15_000 : 3_000;
+                            // Silent uninstallers (msiexec /qn, Inno /VERYSILENT, NSIS /S) can take
+                            // minutes on large MSI products (e.g. Autodesk). Killing them after 3s is
+                            // what made those apps report failure. Only the "main app exe" fallback
+                            // keeps the short kill timeout.
+                            string quietLower = quietUninstall.ToLowerInvariant();
+                            bool silentCapable = quietLower.Contains("msiexec") || quietLower.Contains("/qn") ||
+                                                 quietLower.Contains("/verysilent") || quietLower.Contains("unins000") ||
+                                                 quietLower.Contains("uninstall.exe") || quietLower.Contains("insthelper") ||
+                                                 quietLower.TrimEnd().EndsWith("/s") || quietLower.Contains("/sd");
+                            // Exe cujo NOME parece desinstalador ("Uninstall DuoDesk.exe", "unins000.exe")
+                            // também é silencioso com /S — não depende da string conter "uninstall.exe" literal.
+                            string quietExe = Path.GetFileNameWithoutExtension(fileName ?? "").ToLowerInvariant();
+                            silentCapable = silentCapable || quietExe.Contains("uninstall") || quietExe.Contains("unins");
+                            int timeoutMs = foundActualUninstaller ? 15_000 : (silentCapable ? 600_000 : 30_000);
 
                             if (!proc.WaitForExit(timeoutMs))
                             {
-                                if (!foundActualUninstaller)
+                                if (!foundActualUninstaller && !silentCapable)
                                 {
                                     result.Errors.Add("Uninstall string points to main app exe - no silent uninstall available. Force-deleting.");
                                     try { proc.Kill(); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -224,7 +249,7 @@ namespace KitLugia.Core
                                 else
                                 {
                                     result.Errors.Add("Uninstaller opened. Complete the uninstall in the window that appeared.");
-                                    for (int i = 0; i < 120 && !proc.HasExited; i++)
+                                    for (int i = 0; i < 300 && !proc.HasExited; i++)
                                         await Task.Delay(1000);
                                 }
                             }
@@ -2103,6 +2128,10 @@ namespace KitLugia.Core
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\TypeLib",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\*\shell",
+                // Applications: filhos sao nomes de exe (by-name casa com o displayName).
+                // Evidencia no Revo (sub_14018DA70): CStringArray com L"Applications".
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Applications",
+                @"HKEY_CURRENT_USER\SOFTWARE\Classes\Applications",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\CLSID",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\AppID",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\Interface",
@@ -2118,14 +2147,30 @@ namespace KitLugia.Core
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\AppID",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Interface",
                 @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\TypeLib",
+                // Hives que o Revo percorre e o Kit nao: evidencia por xref no
+                // sub_14018DA70 (decompilado) - ele referencia L"ActivatableClasses",
+                // L"SOFTWARE\\Classes\\MIME\\Database\\Content Type\\", L"Record",
+                // L"Applications" e MuiCache. Filhos sao GUIDs/nomes, entao o scan
+                // por VALOR (installLocation no dado) e' o que casa - baixo FP.
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\ActivatableClasses",
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Applications",
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Record",
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\MIME\Database\Content Type",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\CLSID",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\AppID",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\Interface",
                 @"HKEY_CURRENT_USER\SOFTWARE\Classes\TypeLib",
+                @"HKEY_CURRENT_USER\SOFTWARE\Classes\ActivatableClasses",
+                @"HKEY_CURRENT_USER\SOFTWARE\Classes\Applications",
+                @"HKEY_CURRENT_USER\SOFTWARE\Classes\MIME\Database\Content Type",
+                @"HKEY_CURRENT_USER\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
             ];
             string[] guidHivesExtra = Is64Bit
                 ? [@"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\CLSID", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\AppID", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\Interface", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\TypeLib",
                    @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\CLSID", @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\AppID", @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\Interface", @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\TypeLib",
+                   // Mesmas hives novas do nominal, espelhadas em WOW6432Node (64-bit).
+                   @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\ActivatableClasses", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\Applications", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\Record", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\WOW6432Node\MIME\Database\Content Type",
+                   @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\ActivatableClasses", @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\Applications", @"HKEY_CURRENT_USER\SOFTWARE\Classes\WOW6432Node\MIME\Database\Content Type",
                    @"HKEY_CURRENT_USER\SOFTWARE\Classes\Directory\shell", @"HKEY_CURRENT_USER\SOFTWARE\Classes\Drive\shell",
                    @"HKEY_CURRENT_USER\SOFTWARE\Classes\Directory\Background\shell", @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Drive\shell",
                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\Background\shell",
@@ -3171,11 +3216,17 @@ namespace KitLugia.Core
             return null;
         }
 
-        public static void PerformCleanup(List<string> filesToDelete, List<string> registryToDelete, UninstallResult result, string displayName = "", string installLocation = "", CancellationToken ct = default, IProgress<string>? progress = null)
-        {
-            var logEntries = new List<string>();
-            logEntries.Add($"=== KitLugia Deletion Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-            logEntries.Add("");
+        public static void PerformCleanup(List<string> filesToDelete, List<string> registryToDelete, UninstallResult result, string displayName = "", string installLocation = "", CancellationToken ct = default, IProgress<string>? progress = null, bool? forceToRecycleBin = null)
+                {
+                    var logEntries = new List<string>();
+                    logEntries.Add($"=== KitLugia Deletion Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+                    logEntries.Add("");
+
+                    // Limpeza MANUAL (usuario clicou em limpar) sempre vai para a LIXEIRA,
+                    // recuperavel, mesmo que ele tenha desligado "Enviar para a Lixeira" nas
+                    // configuracoes. O modo permanente fica restrito ao cleanup automatico
+                    // de 100% lixo, onde o gate de seguranca ja aprovou o item.
+                    bool toBin = forceToRecycleBin ?? DeepUninstallSettings.SendToRecycleBin;
 
             int totalItems = filesToDelete.Distinct(StringComparer.OrdinalIgnoreCase).Count() + registryToDelete.Distinct(StringComparer.OrdinalIgnoreCase).Count();
             int current = 0;
@@ -3206,6 +3257,12 @@ namespace KitLugia.Core
                     if (IsTooBroadForDeletion(file))
                         continue;
 
+                    // Exclusao do usuario, agora tambem na DELECAO (antes so o
+                    // scan consultava: um item excluido podia ser apagado se
+                    // chegasse por outro lote).
+                    if (IsExcludedPath(file))
+                        continue;
+
                     // Backup file before deletion.
                     // O backup e' a UNICA rede de seguranca quando o item vai
                     // para a lixeira e o usuario esvazia-la depois. Antes, uma
@@ -3215,7 +3272,7 @@ namespace KitLugia.Core
                     // modo permanente o usuario ja assumiu a perda.
                     bool backupOk = true;
                     string? fileBackup = null;
-                    if (DeepUninstallSettings.SendToRecycleBin)
+                    if (toBin)
                     {
                         fileBackup = BackupFileItem(file);
                         if (fileBackup != null)
@@ -3246,7 +3303,7 @@ namespace KitLugia.Core
                         // usuario e caia em delete PERMANENTE silencioso quando a
                         // lixeira falhava (o log dizia "[permanent]" como se fosse
                         // escolha, mas era falha). Agora o resultado e' explicito.
-                        var rDir = DeepUninstallSettings.SendToRecycleBin
+                        var rDir = toBin
                             ? RecycleBinOp.Recycle(file, permanent: false, out string mDir)
                             : RecycleBinOp.Recycle(file, permanent: true, out mDir);
 
@@ -3281,7 +3338,7 @@ namespace KitLugia.Core
                     }
                     else if (File.Exists(file))
                     {
-                        var rFile = DeepUninstallSettings.SendToRecycleBin
+                        var rFile = toBin
                             ? RecycleBinOp.Recycle(file, permanent: false, out string mFile)
                             : RecycleBinOp.Recycle(file, permanent: true, out mFile);
 
@@ -4260,6 +4317,16 @@ namespace KitLugia.Core
                     return;
                 }
 
+                // Exclusao do usuario. O comentario do scan afirmava que as
+                // exclusoes valiam "tanto no scan quanto na delecao", mas a
+                // delecao nunca consultava — o usuario excluia um item e ele
+                // era apagado assim mesmo quando vinha de outro lote.
+                if (IsExcludedPath(reg))
+                {
+                    logEntries.Add($"SKIPPED  {reg} (excluido pelo usuario)");
+                    return;
+                }
+
                 if (IsRegistryValuePath(reg))
                 {
                     // This is a value, not a subkey - back it up and delete the single value
@@ -4298,9 +4365,37 @@ namespace KitLugia.Core
                     if (backupFile != null)
                         result.BackupRegistryFiles.Add(backupFile);
 
-                    hive.DeleteSubKeyTree(keyPath, false);
+                    // Chave protegida (dono TrustedInstaller/SYSTEM) -> o delete
+                    // estourava UnauthorizedAccessException e o item ficava
+                    // orfao para sempre, com um "FAILED" no log. O Revo resolve
+                    // isso tomando posse e reaplicando o DACL (sub_140161700);
+                    // aqui a infraestrutura ja existia em RegistryOwnership e
+                    // so nao estava ligada neste caminho.
+                    //
+                    // NOTA DE SEGURANCA: a escalada roda DEPOIS do guard
+                    // IsRegPathTooBroad() acima, entao tomar posse nao vira
+                    // atalho para apagar raiz de sistema — o que era recusado
+                    // por "too broad" continua recusado. E o backup .reg ja foi
+                    // gravado antes, entao a restauracao segue valida.
+                    bool viaOwnership = false;
+                    try
+                    {
+                        hive.DeleteSubKeyTree(keyPath, false);
+                    }
+                    catch (Exception delEx) when (delEx is UnauthorizedAccessException ||
+                                                  delEx is System.Security.SecurityException)
+                    {
+                        logEntries.Add($"OWNERSHIP {reg} -> {delEx.GetType().Name}; tentando tomar posse");
+                        if (!RegistryOwnership.ForceTakeOwnership(hive, keyPath))
+                            throw;   // deixa o catch externo registrar FAILED
+                        hive.DeleteSubKeyTree(keyPath, false);
+                        viaOwnership = true;
+                    }
+
                     result.RegistryDeleted++;
-                    logEntries.Add($"REMOVED  {reg} [key]");
+                    logEntries.Add(viaOwnership
+                        ? $"REMOVED  {reg} [key, apos take-ownership]"
+                        : $"REMOVED  {reg} [key]");
                 }
             }
             catch (OperationCanceledException)
@@ -5123,12 +5218,26 @@ namespace KitLugia.Core
         /// Generates a quiet/silent uninstall string for known installer types.
         /// Falls back to the original string if the type is unknown.
         /// </summary>
+        /// <summary>True quando o comando já traz flag silenciosa (MSI /qn, NSIS /S, Inno /VERYSILENT, etc.).</summary>
+        private static bool LooksSilent(string cmd)
+        {
+            if (string.IsNullOrEmpty(cmd)) return false;
+            string l = cmd.ToLowerInvariant();
+            return l.Contains("/qn") || l.Contains("/quiet") || l.Contains("/verysilent") ||
+                   l.Contains("/suppressmsgboxes") || l.Contains("/sd") ||
+                   l.Contains("/s ") || l.TrimEnd().EndsWith("/s");
+        }
+
         private static string GenerateQuietUninstallString(string uninstallString, string installLocation)
         {
             if (string.IsNullOrEmpty(uninstallString)) return uninstallString;
 
             string lower = uninstallString.ToLowerInvariant();
             string trimmed = uninstallString.TrimEnd();
+            // Nome do exe do comando (para casar "Uninstall DuoDesk.exe", não só "uninstall.exe" literal)
+            var (cmdExe, _) = ParseCommandLine(uninstallString);
+            string exeFile = Path.GetFileName(cmdExe ?? "").ToLowerInvariant();
+            bool exeIsUninstaller = exeFile.Contains("uninstall") || exeFile.Contains("unins");
 
             // MSI-based: msiexec /x {product-code} /qn
             if (lower.Contains("msiexec") || lower.Contains(".msi"))
@@ -5148,8 +5257,7 @@ namespace KitLugia.Core
                 return $"{trimmed} /VERYSILENT /SUPPRESSMSGBOXES /NORESTART";
 
             // NSIS: /S (silent), /SD (silent with default answers)
-            if (lower.Contains("/s") || lower.Contains("uninstall.exe") ||
-                lower.Contains("insthelper"))
+            if (lower.Contains("/s") || exeIsUninstaller || lower.Contains("insthelper"))
                 return $"{trimmed} /S /SD";
 
             // InstallShield: -s /s /sms
@@ -5213,6 +5321,9 @@ namespace KitLugia.Core
             }
 
             if (exitCode == 0) return true;
+
+            // MSI: 3010 = success but reboot required; 1605 = product already absent (treat as removed).
+            if (exitCode == 3010 || exitCode == 1605) return true;
 
             result.Errors.Add($"Uninstaller exited with code {exitCode}.");
             return false;

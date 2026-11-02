@@ -19,25 +19,27 @@ namespace KitLugia.GUI.Converters
         private const string Sep = "\n\n";
 
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
-        {
-            // O segundo valor e' o proprio ScannableTweak (empacotado no MultiBinding).
-            if (values == null || values.Length < 2) return string.Empty;
+            {
+                // O primeiro valor e' a Description; o segundo e' o proprio ScannableTweak.
+                if (values == null || values.Length < 2) return string.Empty;
 
-            var tweak = values[1] as KitLugia.Core.ScannableTweak;
-            if (tweak == null) return string.Empty;
+                var description = values[0] as string ?? string.Empty;
+                var tweak = values[1] as KitLugia.Core.ScannableTweak;
 
+                string pending = string.Empty;
+                if (tweak != null)
+                {
+                    if (!string.IsNullOrEmpty(tweak.UnconfirmedReason))
+                        pending = Sep + "❔ NÃO CONFIRMADO — " + tweak.UnconfirmedReason;
+                    else if (tweak.Status == KitLugia.Core.TweakStatus.PENDING)
+                        pending = Sep + "⏳ AGUARDANDO REINÍCIO — " +
+                               (tweak.PendingReason ?? "o Windows só aplica esta configuração na próxima inicialização") +
+                               "." + Sep +
+                               "Reinicie o PC para o check ser confirmado.";
+                }
 
-            if (!string.IsNullOrEmpty(tweak.UnconfirmedReason))
-                return Sep + "❔ NÃO CONFIRMADO — " + tweak.UnconfirmedReason;
-
-            if (tweak.Status == KitLugia.Core.TweakStatus.PENDING)
-                return Sep + "⏳ AGUARDANDO REINÍCIO — " +
-                       (tweak.PendingReason ?? "o Windows só aplica esta configuração na próxima inicialização") +
-                       "." + Sep +
-                       "Reinicie o PC para o check ser confirmado.";
-
-            return string.Empty;
-        }
+                return description + pending;
+            }
 
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
             => throw new NotSupportedException();
