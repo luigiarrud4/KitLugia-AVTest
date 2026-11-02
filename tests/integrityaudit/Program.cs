@@ -338,9 +338,12 @@ internal static class Program
         // arquivo de lixo do teste anterior como se fosse o estado real.
         IntegrityStateBackup.Capture();
 
+        // T11: invariantes do catalogo (nenhum valor fabricado, sentinela morta,
+        //      alvo inexistente, harm==default ou Id contraditorio).
+        _fail += CatalogAudit.Run();
+
         _fail += PendingCycle.Run();
-        // T10: Id estavel + HVCI autoritativo (NtQuerySystemInformation 103)
-        //      + reavaliacao de invalidados.
+        // T10: Id estavel + HVCI autoritativo (NtQuerySystemInformation 103).
         _fail += StableIdCycle.Run();
 
         IntegrityStateBackup.Restore();

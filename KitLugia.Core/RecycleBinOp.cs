@@ -23,21 +23,28 @@ namespace KitLugia.Core
     ///  3. UI durante a remoção em lote. OnlyErrorDialogs pode abrir diálogo no
     ///     meio de uma fila de dezenas de itens.
     ///
-    /// O Revo (docs/REVO_UNINSTALLER_ANALYSIS.md, sub_14003BA80) usa
-    /// SHFileOperationW com fFlags = 0x414 quando DelToBin=1 e 0x454 quando
-    /// =0 — as mesmas flags aqui.
+    /// O Revo (sub_14003BA80) usa SHFileOperationW e alterna o destino por
+    /// uma unica flag: 1108 (0x454, com FOF_ALLOWUNDO) para a Lixeira e
+    /// 1044 (0x414, sem) para apagar de vez. Aqui o mecanismo e' o mesmo;
+    /// o que estava errado era a leitura (a tabela antiga do doc invertia
+    /// qual valor era Lixeira) — ver docs/KITLUGIA_VS_REVO_PARITY.md §1 e §3.
     /// </summary>
     public static class RecycleBinOp
     {
         private const uint FO_DELETE = 3;
 
-        // Flags reais (shellapi.h)
+        // Flags reais (shellapi.h).
+        //
+        // ATENCAO ao nome que existia aqui: "FOF_NODIRFLAGS = 0x0020" nao existe
+        // no header — 0x0020 e' FOF_WANTMAPPINGHANDLE. E pedir o mapping handle
+        // faz o shell alocar um hNameMappings que este codigo nunca libera
+        // (hNameMappings fica IntPtr.Zero e ninguem chama SHFreeNameMappings).
+        // A constante saiu junto com o valor.
         private const ushort FOF_RENAMEONCOLLISION = 0x0008;
-        private const ushort FOF_ALLOWUNDO = 0x0040;
         private const ushort FOF_NOCONFIRMATION = 0x0010;
+        private const ushort FOF_ALLOWUNDO = 0x0040;
         private const ushort FOF_NOCONFIRMMKDIR = 0x0200;
         private const ushort FOF_NOERRORUI = 0x0400;
-        private const ushort FOF_NODIRFLAGS = 0x0020;
 
         // Layout NATIVO x64. NUNCA usar string gerenciada com [MarshalAs(LPWStr)]
         // aqui: o marshaler usa um ponteiro temporário para a cópia gerenciada e
@@ -88,10 +95,24 @@ namespace KitLugia.Core
                 return RecycleResult.Failed;
             }
 
-            // 0x414 = ALLOWUNDO|NOERRORUI|NODIRFLAGS  (Revo, DelToBin=1)
-            // 0x454 = + RENAMEONCOLLISION            (Revo, DelToBin=0)
-            ushort flags = (ushort)(FOF_ALLOWUNDO | FOF_NOERRORUI | FOF_NODIRFLAGS);
-            if (permanent) flags |= FOF_RENAMEONCOLLISION;
+            // A UNICA flag que decide Lixeira vs. permanente e' FOF_ALLOWUNDO:
+            //   com ALLOWUNDO -> o item vai para a Lixeira (recuperavel)
+            //   sem ALLOWUNDO -> apagado de vez (irrecuperavel)
+            //
+            // CORRECAO (medida, nao suposta): a versao anterior ADICIONAVA
+            // FOF_RENAMEONCOLLISION no modo permanente mas MANTINHA
+            // FOF_ALLOWUNDO, entao o item ia para a Lixeira mesmo quando a UI
+            // dizia "nao pode ser desfeita". Conferido com arquivo de nome unico
+            // e leitura dos metadados $I* em C:\$Recycle.Bin\<SID>\:
+            //   ALLOWUNDO presente  -> achado na Lixeira
+            //   ALLOWUNDO removida  -> nao achado (apagado de vez)
+            // Os valores do Revo (1044 = 0x414 sem ALLOWUNDO, 1108 = 0x454 com)
+            // seguem exatamente essa regra.
+            ushort flags = FOF_NOERRORUI;
+            if (permanent)
+                flags |= FOF_RENAMEONCOLLISION;   // 0x408
+            else
+                flags |= FOF_ALLOWUNDO;           // 0x440
 
             IntPtr buf = IntPtr.Zero;
             try

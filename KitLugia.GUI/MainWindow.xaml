@@ -128,7 +128,8 @@
                 <!-- HAMBURGER MENU TOGGLE -->
                 <Button x:Name="BtnHamburger" Width="40" Height="32" Click="BtnHamburger_Click"
                         Background="Transparent" BorderThickness="0" Cursor="Hand"
-                        ToolTip="Abrir/Fechar Menu Lateral">
+                        ToolTip="Abrir/Fechar Menu Lateral"
+                        AutomationProperties.Name="Menu lateral">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" Padding="4">
@@ -165,7 +166,8 @@
                 </Button>
                 <Button x:Name="BtnKitTaskManager" Width="40" Height="32" Click="BtnKitTaskManager_Click"
                         Background="Transparent" BorderThickness="0" Cursor="Hand"
-                        ToolTip="Gerenciador de Tarefas do Kit — fecha apps de verdade (Force Stop + drivers)">
+                        ToolTip="Gerenciador de Tarefas do Kit — fecha apps de verdade (Force Stop + drivers)"
+                        AutomationProperties.Name="Gerenciador de Tarefas do Kit">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
@@ -233,7 +235,8 @@
                 <!-- BOT&#xC3;O GOODBYEDPI (WIFI) -->
                 <Button x:Name="BtnGoodbyeDPI" Width="40" Height="32" Click="BtnGoodbyeDPI_Click" MouseRightButtonDown="BtnGoodbyeDPI_MouseRightButtonDown"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
-                        ToolTip="GoodbyeDPI - Contorno de DPI (Cinza=Desligado, Amarelo=Ativo)&#x0a;Bot&#xE3;o direito para configura&#xE7;&#xF5;es">
+                        ToolTip="GoodbyeDPI - Contorno de DPI (Cinza=Desligado, Amarelo=Ativo)&#x0a;Bot&#xE3;o direito para configura&#xE7;&#xF5;es"
+                        AutomationProperties.Name="GoodbyeDPI">
                     <Button.ContextMenu>
                         <ContextMenu x:Name="GoodbyeDPIContextMenu">
                             <MenuItem Header="&#x1F4F6; GoodbyeDPI - Configura&#xE7;&#xF5;es" Foreground="#FFD700" FontWeight="Bold" IsEnabled="False"/>
@@ -341,7 +344,8 @@
                 <!-- BOT&#xC3;O MONITOR DE SEGUNDO PLANO -->
                 <Button x:Name="BtnBackgroundMonitor" Width="40" Height="32" Click="BtnBackgroundMonitor_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
-                        ToolTip="Monitor de Tarefas em Segundo Plano">
+                        ToolTip="Monitor de Tarefas em Segundo Plano"
+                        AutomationProperties.Name="Monitor de Tarefas em Segundo Plano">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
@@ -422,7 +426,8 @@
                 <!-- BOT&#xC3;O ATUALIZA&#xC7;&#xC3;O (REFRESH) -->
                 <Button x:Name="BtnUpdate" Width="40" Height="32" Click="BtnUpdate_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
-                        ToolTip="Verificar Atualiza&#xE7;&#xF5;es">
+                        ToolTip="Verificar Atualiza&#xE7;&#xF5;es"
+                        AutomationProperties.Name="Verificar Atualizações">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
@@ -463,7 +468,7 @@
                                         </BeginStoryboard>
                                     </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#222196F3"/>
-                                    <Setter TargetName="refreshIcon" Property="Foreground" Value="#FFFFFF"/>
+                                                                        <Setter TargetName="refreshIcon" Property="Foreground" Value="#FFFFFF"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
                                     <Trigger.EnterActions>
@@ -492,7 +497,8 @@
                 <!-- BOT&#xC3;O DO CONSOLE (>_) -->
                 <Button x:Name="BtnConsole" Width="40" Height="32" Click="BtnConsole_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
-                        ToolTip="Abrir/Fechar Terminal">
+                        ToolTip="Abrir/Fechar Terminal"
+                        AutomationProperties.Name="Terminal">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
@@ -557,7 +563,8 @@
                 <!-- BOT&#xC3;O DE NOTIFICA&#xC7;&#xD5;ES (SINO + CONTADOR) -->
                 <Button x:Name="BtnNotifications" Width="46" Height="32" Click="BtnNotifications_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,5,0" Cursor="Hand"
-                        ToolTip="Hist&#xF3;rico de Notifica&#xE7;&#xF5;es">
+                        ToolTip="Hist&#xF3;rico de Notifica&#xE7;&#xF5;es"
+                        AutomationProperties.Name="Notificações">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
@@ -633,7 +640,7 @@
                      mesmo se o mouse sair no meio da transi&#xE7;&#xE3;o (anima&#xE7;&#xF5;es com Enter/ExitActions
                      podiam ficar presas em cor intermedi&#xE1;ria). Handoff=And para trocar sem flash. -->
                 <Button Content="&#x2212;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnMinimize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
+                        BorderThickness="0" Click="BtnMinimize_Click" AutomationProperties.Name="Minimizar" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
@@ -651,7 +658,7 @@
                     </Button.Template>
                 </Button>
                 <Button Content="&#x25A1;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnMaximize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
+                        BorderThickness="0" Click="BtnMaximize_Click" AutomationProperties.Name="Maximizar" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
@@ -669,7 +676,7 @@
                     </Button.Template>
                 </Button>
                 <Button Content="&#x2715;" Width="46" Height="32" Foreground="White" Background="Transparent"
-                        BorderThickness="0" Click="BtnClose_Click" WindowChrome.IsHitTestVisibleInChrome="True">
+                        BorderThickness="0" Click="BtnClose_Click" AutomationProperties.Name="Fechar" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}">
@@ -725,6 +732,7 @@
                                 BorderThickness="0"
                                 Foreground="{StaticResource AccentColor}"
                                 ToolTip="Configura&#xE7;&#xF5;es do Kit Lugia"
+                                AutomationProperties.Name="Configurações"
                                 Click="BtnSettings_Click"
                                 Cursor="Hand">
                             <Button.Template>
@@ -794,11 +802,11 @@
                                         </TextBlock.Style>
                                     </TextBlock>
 
-                                    <TextBox x:Name="TxtGlobalSearch" Grid.Column="1" Background="Transparent" BorderThickness="0" 
-                                             Foreground="White" VerticalAlignment="Center" FontSize="13" 
-                                             CaretBrush="{StaticResource AccentColor}"
-                                             TextChanged="TxtGlobalSearch_TextChanged"
-                                             PreviewKeyDown="TxtGlobalSearch_PreviewKeyDown"/>
+                                    <TextBox x:Name="TxtGlobalSearch" Grid.Column="1" Background="Transparent" BorderThickness="0"
+                                                                                 Foreground="White" VerticalAlignment="Center" FontSize="13" 
+                                                                                 CaretBrush="{StaticResource AccentColor}"
+                                                                                 TextChanged="TxtGlobalSearch_TextChanged"
+                                                                                 PreviewKeyDown="TxtGlobalSearch_PreviewKeyDown" Style="{x:Null}"/>
                                 </Grid>
                             </Border>
 

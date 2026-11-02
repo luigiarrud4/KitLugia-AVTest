@@ -55,8 +55,14 @@ namespace KitLugia.GUI.Windows
         private static extern bool DeleteObject(IntPtr hObject);
         [DllImport("user32.dll")]
         private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+
         [DllImport("user32.dll")]
-        private static extern int GetWindowTextLength(IntPtr hWnd);
+        private static extern IntPtr GetDesktopWindow();
+        [DllImport("user32.dll")]
+        private static extern IntPtr ChildWindowFromPointEx(IntPtr hwndParent, POINT pt, uint uFlags);
+        private const uint CWP_SKIPINVISIBLE = 0x1;
+        private const uint CWP_SKIPDISABLED = 0x2;
+        private const uint CWP_SKIPTRANSPARENT = 0x4;
 
         private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
@@ -110,6 +116,8 @@ namespace KitLugia.GUI.Windows
         private bool _isHunting;
         private IntPtr _currentHwnd;
         private int _selfPid;
+        private string _curName = "";
+        private string _curPath = "";
         private DispatcherTimer? _huntTimer;
         private DispatcherTimer? _autoTimer;
         private System.Windows.Forms.Form? _overlayForm;
@@ -176,21 +184,29 @@ namespace KitLugia.GUI.Windows
             ShowCrosshair(pos.X, pos.Y);
 
             var hWnd = WindowFromPointEx(pos.X, pos.Y);
-            string name = "", path = "";
-            if (hWnd != IntPtr.Zero)
+            uint pid = 0;
+            if (hWnd != IntPtr.Zero) GetWindowThreadProcessId(hWnd, out pid);
+
+            if (hWnd == IntPtr.Zero || pid == 0 || pid == _selfPid)
             {
-                GetWindowThreadProcessId(hWnd, out uint pid);
-                if (pid != 0 && pid != _selfPid)
-                {
-                    if (hWnd != _currentHwnd)
-                    {
-                        _currentHwnd = hWnd;
-                        UpdateInfo(hWnd);
-                    }
-                    try { using (var p = Process.GetProcessById((int)pid)) { name = p.ProcessName; try { path = p.MainModule?.FileName ?? ""; } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-                }
+                _curName = ""; _curPath = "";
             }
-            ShowInfo(pos.X, pos.Y, name, path);
+            else if (hWnd != _currentHwnd)
+            {
+                _currentHwnd = hWnd;
+                UpdateInfo(hWnd);
+                // Nome/caminho so mudam quando a janela muda: antes chamava
+                // Process.GetProcessById + MainModule a CADA tick de 30ms, mesmo
+                // parado em cima da mesma janela (gasto de CPU desnecessario).
+                try
+                {
+                    using var p = Process.GetProcessById((int)pid);
+                    _curName = p.ProcessName;
+                    try { _curPath = p.MainModule?.FileName ?? ""; } catch { _curPath = ""; }
+                }
+                catch { _curName = ""; _curPath = ""; }
+            }
+            ShowInfo(pos.X, pos.Y, _curName, _curPath);
 
             if ((GetAsyncKeyState(0x02) & 0x8000) != 0)
                 StopHunting(showMenu: false);
@@ -205,6 +221,7 @@ namespace KitLugia.GUI.Windows
             _isHunting = false;
             DestroyCrosshair();
             DestroyInfo();
+            DestroyOverlay();   // sempre: antes vazava no caminho do menu (retornava antes)
 
             if (showMenu && _currentHwnd != IntPtr.Zero)
             {
@@ -214,7 +231,6 @@ namespace KitLugia.GUI.Windows
                 return;
             }
 
-            DestroyOverlay();
             FinderButton.Background = System.Windows.Media.Brushes.DodgerBlue;
             TxtStatus.Text = _currentHwnd != IntPtr.Zero ? "OK" : "Nenhuma janela";
             TxtStatus.Foreground = _currentHwnd != IntPtr.Zero
@@ -690,9 +706,18 @@ namespace KitLugia.GUI.Windows
 
         private IntPtr WindowFromPointEx(int x, int y)
         {
-            IntPtr raw = WindowFromPoint(x, y);
+            // ChildWindowFromPointEx com SKIPTRANSPARENT pula as janelas transparentes
+            // do proprio Hunter (mira, overlay e info: todas WS_EX_TRANSPARENT +
+            // topmost e que seguem o cursor). Sem isso o WindowFromPoint podia
+            // devolver o overlay/mira (pid == self) e o codigo devolvia
+            // IntPtr.Zero -> o alvo nao trocava e o Hunter ignorava a janela da
+            // frente, ficando preso no alvo anterior (ex.: Opera fullscreen atras
+            // de um app em janela na frente).
+            var pt = new POINT { X = x, Y = y };
+            IntPtr raw = ChildWindowFromPointEx(GetDesktopWindow(), pt,
+                CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT);
             if (raw == IntPtr.Zero || GetWindowThreadProcessId(raw, out _) == _selfPid)
-                raw = WindowFromPhysicalPoint(x, y);
+                raw = WindowFromPoint(x, y);
             if (raw == IntPtr.Zero || GetWindowThreadProcessId(raw, out _) == _selfPid)
                 return IntPtr.Zero;
 
@@ -710,6 +735,7 @@ namespace KitLugia.GUI.Windows
             EnumChildWindows(parent, (hwnd, _) =>
             {
                 if (!IsWindowVisible(hwnd)) return true;
+                if ((GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_TRANSPARENT) != 0) return true; // pula overlays transparentes (incl. os do Hunter)
                 GetWindowThreadProcessId(hwnd, out uint pid);
                 if (pid == _selfPid) return true;
                 GetWindowRect(hwnd, out var r);
@@ -891,17 +917,25 @@ namespace KitLugia.GUI.Windows
             var regResult = await Task.Run(() =>
             {
                 string rdn = _detectedName, rus = "", rpb = "", ril = il;
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
-                    if (key != null)
-                        foreach (var sub in key.GetSubKeyNames())
-                            try
-                            {
-                                using var sk = key.OpenSubKey(sub);
-                                var nm = sk?.GetValue("DisplayName") as string;
-                                if (nm != null && nm.IndexOf(_detectedName, StringComparison.OrdinalIgnoreCase) >= 0)
-                                { rdn = nm; rus = sk?.GetValue("UninstallString") as string ?? ""; rpb = sk?.GetValue("Publisher") as string ?? ""; var loc = sk?.GetValue("InstallLocation") as string; if (!string.IsNullOrEmpty(loc)) ril = loc; break; }
-                            }
-                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                // HKLM e HKCU: antes so o HKLM era lido, e apps por-usuario caiam no
+                // caminho "forcar remocao" mesmo tendo desinstalador proprio.
+                foreach (var hive in new[] { Microsoft.Win32.Registry.LocalMachine, Microsoft.Win32.Registry.CurrentUser })
+                {
+                    if (!string.IsNullOrEmpty(rus)) break;
+                    using var key = hive.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+                    if (key == null) continue;
+                    foreach (var sub in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var sk = key.OpenSubKey(sub);
+                            var nm = sk?.GetValue("DisplayName") as string;
+                            if (nm != null && nm.IndexOf(_detectedName, StringComparison.OrdinalIgnoreCase) >= 0)
+                            { rdn = nm; rus = sk?.GetValue("UninstallString") as string ?? ""; rpb = sk?.GetValue("Publisher") as string ?? ""; var loc = sk?.GetValue("InstallLocation") as string; if (!string.IsNullOrEmpty(loc)) ril = loc; break; }
+                        }
+                        catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    }
+                }
                 return (dn: rdn, us: rus, pb: rpb, il: ril);
             });
             string dn = regResult.dn, us = regResult.us, pb = regResult.pb;
@@ -919,7 +953,7 @@ namespace KitLugia.GUI.Windows
                     DeepUninstaller.TryCreateRestorePoint($"KitLugia: Force Delete {dn}");
 
                 var r = new DeepUninstaller.UninstallResult();
-                DeepUninstaller.PerformCleanup(new List<string> { il }, new List<string>(), r);
+                DeepUninstaller.PerformCleanup(new List<string> { il }, new List<string>(), r, displayName: dn, installLocation: il, forceToRecycleBin: true);
                 MessageBox.Show($"Forçada: {r.FilesDeleted} pasta(s), {r.RegistryDeleted} registro(s)", "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -948,7 +982,7 @@ namespace KitLugia.GUI.Windows
             var cleanRegs = dialog.SelectedRegistry;
             var cleanupResult = new DeepUninstaller.UninstallResult();
             if (dialog.HasConfirmed && (cleanFiles.Count > 0 || cleanRegs.Count > 0))
-                await Task.Run(() => DeepUninstaller.PerformCleanup(cleanFiles, cleanRegs, cleanupResult));
+                await Task.Run(() => DeepUninstaller.PerformCleanup(cleanFiles, cleanRegs, cleanupResult, displayName: dn, installLocation: il, forceToRecycleBin: true));
 
             string resultMsg = $"Deep Uninstall: {dn}\n\n" +
                 $"Desinstalador: {(dr.UninstallSuccess ? "OK" : "Pode não ter sido completo")}\n" +
@@ -964,23 +998,45 @@ namespace KitLugia.GUI.Windows
         {
             CaptureCurrentInfo();
             if (_detectedPid == 0) return;
-            await Task.Run(() =>
-            {
-                try { using (var p = Process.GetProcessById((int)_detectedPid)) { p.Kill(); p.WaitForExit(3000); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            });
+            // Force Stop do kit: encerra a arvore inteira + NtTerminateProcess nativo
+            // (fecha "qualquer coisa"), com guardas de processo de sistema/PPL.
+            // Fallback para o Kill simples se o servico nao conseguir.
+            bool ok = await Task.Run(() => ForceStopUnlockService.ForceKillProcess((int)_detectedPid));
+            if (!ok)
+                await Task.Run(() =>
+                {
+                    try { using (var p = Process.GetProcessById((int)_detectedPid)) { p.Kill(); p.WaitForExit(3000); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                });
         }
 
         private async void BtnKillDel_Click(object? sender, RoutedEventArgs e)
         {
-            await Task.Run(() =>
-            {
-                try { using (var p = Process.GetProcessById((int)_detectedPid)) { p.Kill(); p.WaitForExit(3000); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            });
-            if (!string.IsNullOrEmpty(_detectedPath))
+            CaptureCurrentInfo();   // BtnKill ja fazia; sem isso o PID podia ser obsoleto (reuso de PID mata processo errado)
+            if (_detectedPid == 0) return;
+            // Force Stop do kit (fecha "qualquer coisa"); fallback no Kill simples.
+            bool killed = await Task.Run(() => ForceStopUnlockService.ForceKillProcess((int)_detectedPid));
+            if (!killed)
                 await Task.Run(() =>
                 {
-                    try { string d = Path.GetDirectoryName(_detectedPath) ?? ""; if (Directory.Exists(d)) Directory.Delete(d, true); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                    try { using (var p = Process.GetProcessById((int)_detectedPid)) { p.Kill(); p.WaitForExit(3000); } } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 });
+            if (string.IsNullOrEmpty(_detectedPath)) return;
+
+            // ANTES: Directory.Delete(d, true) direto - apagava a pasta do processo de
+            // vez, SEM passar pelos guards (IsProhibitedLocation, IsKitLugiaSelfPath,
+            // IsTooBroadForDeletion, IsExcludedPath), sem backup e sem lixeira. Se o
+            // alvo fosse um processo de sistema (ex.: svchost em System32), tentava
+            // apagar o System32. Agora vai pelo PerformCleanup: guards + backup
+            // obrigatorio + Lixeira (limpeza manual).
+            string d = Path.GetDirectoryName(_detectedPath) ?? "";
+            if (!Directory.Exists(d)) return;
+            var r = new DeepUninstaller.UninstallResult();
+            await Task.Run(() => DeepUninstaller.PerformCleanup(
+                new List<string> { d }, new List<string>(), r,
+                displayName: _detectedName, installLocation: d, forceToRecycleBin: true));
+            MessageBox.Show(
+                $"Kill+Del em {_detectedName}\nRemovidos: {r.FilesDeleted}  Falhas: {r.DeleteErrors?.Count ?? 0}\n(arquivos foram para a Lixeira; se o backup falhasse, nada seria apagado)",
+                "Kill+Del", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void BtnOpenFolder_Click(object? sender, RoutedEventArgs e)
@@ -992,7 +1048,8 @@ namespace KitLugia.GUI.Windows
         private void BtnProperties_Click(object? sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(_detectedPath) && File.Exists(_detectedPath))
-                try { Process.Start("explorer.exe", $"/select,\"{_detectedPath}\""); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                try { Process.Start(new ProcessStartInfo(_detectedPath) { UseShellExecute = true, Verb = "properties" }); }
+                catch { try { Process.Start("explorer.exe", $"/select,\"{_detectedPath}\""); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); } }
             else if (!string.IsNullOrEmpty(_detectedName))
                 MessageBox.Show($"Nome: {_detectedName}\nCaminho: {_detectedPath}", "Propriedades", MessageBoxButton.OK, MessageBoxImage.Information);
         }

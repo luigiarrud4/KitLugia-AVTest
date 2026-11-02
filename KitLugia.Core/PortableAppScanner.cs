@@ -267,11 +267,21 @@ namespace KitLugia.Core
         {
             try
             {
-                if (!Directory.Exists(entry.FolderPath))
+                if (string.IsNullOrWhiteSpace(entry.FolderPath) || !Directory.Exists(entry.FolderPath))
                     return (false, "Pasta não encontrada.");
 
-                Directory.Delete(entry.FolderPath, true);
-                return (true, $"{entry.Name} removido com sucesso.");
+                // ANTES: Directory.Delete(folder, true) — permanente, sem backup, sem
+                // lixeira e sem guards. Agora vai pelo PerformCleanup (limpeza manual):
+                // guards (IsProhibitedLocation / IsTooBroadForDeletion / IsKitLugiaSelfPath
+                // / IsExcludedPath), backup obrigatório e envio para a LIXEIRA.
+                var r = new DeepUninstaller.UninstallResult();
+                DeepUninstaller.PerformCleanup(
+                    new List<string> { entry.FolderPath }, new List<string>(), r,
+                    displayName: entry.Name, installLocation: entry.FolderPath, forceToRecycleBin: true);
+
+                if (r.DeleteErrors != null && r.DeleteErrors.Count > 0)
+                    return (false, $"Erro ao remover {entry.Name}: {string.Join("; ", r.DeleteErrors.Take(2))}");
+                return (true, $"{entry.Name} enviado para a Lixeira ({r.FilesDeleted} item(ns)).");
             }
             catch (Exception ex)
             {

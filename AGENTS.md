@@ -1,4 +1,112 @@
+# Sessão — recalcular contagens do filtro na IntegrityPage após alterações
+
+## Problema
+- Os filtros (ComboBox) exibem contagens (ex.: "⚠️ Modificado (3)", "⚙️ Opcional (5)").
+- Após corrigir/alterar um item (toggle ou "Restaurar Todos"), as contagens não atualizavam até sair e voltar na página. O score, a lista e o banner já atualizavam via `RefreshFromAllTweaks()`.
+
+## Causa
+- `RefreshFromAllTweaks()` chamava `RecalculateScore()`, `UpdatePathCardState()` e `ApplyFiltersAndUpdateList()`, mas NÃO chamava `BuildFilterOptions()`, que é o método que reconstrói os itens do ComboBox com as contagens atuais.
+
+## Correção
+- `KitLugia.GUI/Pages/IntegrityPage.xaml.cs`: em `RefreshFromAllTweaks()`, adicionar `BuildFilterOptions();` antes de `RecalculateScore()`.
+- `BuildFilterOptions()` já preserva a seleção atual (tag) e usa `_rebuildingFilters` para evitar reentrância no `CategoryFilter_SelectionChanged`.
+- Build: 0 erros.
+
+---
+# Sessão — fix do falso "gravado mas continua com o valor errado" em itens opcionais
+
+## Bug
+- Log: `[TOGGLE] Status atual: OK, Tipo: Service` → `sc.exe config Spooler start= disabled` (ÊXITO) → `[CHECK] Serviço Spooler: Disabled -> MODIFIED` → "'Serviço de Impressão (Spooler)' continua MODIFIED apos a escrita".
+- Spooler é `IsOptional = true`, `HarmfulStartMode = Disabled`, `DefaultStartMode = Auto`.
+- O usuário clicou "CORRIGIR" (aplicar otimização = desativar) no item opcional em estado OK. A escrita funcionou, mas o pós-check do `ToggleTweak` tratava `Status == MODIFIED` como falha incondicionalmente — e para itens opcionais, MODIFIED é exatamente o estado esperado após aplicar a otimização (badge fixa "◇ OPCIONAL" + botão REVERTER).
+
+## Correção
+- `KitLugia.Core/Guardian.cs`, bloco pós-`CheckTweak(tweak)` em `ToggleTweak`:
+  - `bool wroteSafe = applySafeValue;`
+  - `bool failed = (wroteSafe && Status == MODIFIED) || (!wroteSafe && Status == OK);`
+  - só retorna a mensagem de falha se `failed` for true.
+- Agora a verificação considera o que foi escrito: valor "seguro" (applySafeValue=true) → esperado OK; valor otimizado (applySafeValue=false) → esperado MODIFIED. Windows revertendo a escrita é detectado nos dois sentidos.
+- Build: 0 erros.
+
+---
+# Sessão — IntegrityPage (badge fixa de opcionais + filtros separados)
+
+## Regra consolidada (não quebrar)
+- **Badge de opcionais é FIXA "◇ OPCIONAL"** em todos os estados (OK, MODIFIED, PENDING). Só o botão muda: CORRIGIR (OK) / REVERTER (MODIFIED). A badge NÃO vira "⚠️ MODIFICADO".
+- **Filtros mutuamente exclusivos por IsOptional, não por Status:**
+  - "Protegido" = `Status == OK && !IsOptional`
+  - "Modificado" = `Status == MODIFIED && !IsOptional` (só críticos)
+  - "Opcional" = `IsOptional` (TODOS os opcionais, com ou sem otimização)
+- Um item opcional modificado fica em "Opcional" com botão REVERTER. Nunca some nem aparece em "Modificado".
+- **"RESTAURAR TODOS" (vermelho)** corrige APENAS itens MODIFICADOS não-opcionais (vulnerabilidades reais). Itens OPCIONAIS são mantidos como estão. Visível só quando score < 100.
+- Score conta apenas não-opcionais (PENDING excluído do denominador).
+- Itens opcionais não afetam o score de integridade.
+
+## Arquivos alterados
+- `KitLugia.GUI/Pages/IntegrityPage.xaml.cs` — filtros MODIFICADO/OPCIONAL, contagens.
+- `KitLugia.GUI/Pages/IntegrityPage.xaml` — DataTrigger de badge opcional fixa (IsOptional=True, declarado antes de PENDING/NOT_FOUND para não sobrescrever estados transitórios); tooltip no BtnFixAll.
+- `KitLugia.GUI/Converters/OptionalNotModifiedConverter.cs` — tooltip reflete badge fixa.
+- `docs/INTEGRITY_PAGE_SPEC.md` — spec completa.
+- skill `kitlugia-wpf-theming` — pitfall atualizado.
+
+Build: 0 erros.
+
+---
 ﻿# KitLugia — AGENTS.md
+### Sessao 29/10 - Integridade: catalogo auditado (463 -> 215) e filtros derivados dos dados
+
+Pedido: "descubra porque o guardian e a pagina integritypage estao com os itens da lista e os
+filtros todos incorretos, passe por todos os itens da lista e corrija todos eles, inclusive
+busque na web para ver se sao validos e se funcionam no windows 11".
+
+**1. METODO (reproduzivel, sem inventar):** extracao do catalogo `HarmfulTweaks` com scanner de
+caracteres (respeita strings verbatim/comentarios) + conferencia NO REGISTRO REAL da maquina
+(chave existe? valor existe?) para os 354 checks do tipo Registry. Resultado: **248 checks nao
+podiam verificar o que o nome prometia** — valor inventado (`Corrupted`, `OrphanedEntries`,
+`TooManyDisabled`, `SMARTEnabled`, `EnableRfgs`...), chave que nao existe em nenhum Windows
+(`SystemProtection\Enable`, `ExploitProtection\Enabled`, `Servicing\Version`, `Battery\ChargeLevelLimit`,
+`Processor\PerformanceBoostMode`), sentinela que o `CheckTweak` NAO interpreta (`EMPTY_OR_WRONG`,
+`EXPLORER_OVERRIDDEN`, `EMPTY`, `LOADED`) ou duplicata com semantica contraria. Eles sempre
+apareciam PROTEGIDOS sem verificar nada (ou eram preferencia cosmeticas cobradas como falha).
+**Foram removidos 248** (195 + 43 + 10 por rodada) e o catalogo ficou com **215** checks.
+
+**2. CORRECOES de valor/interpretacao (os que ficaram e estavam errados):**
+- **LLMNR** apontava para `Policies\Microsoft\Windows\LLMNR\EnableLLMNR` (nao existe) e acusava
+  DESLIGAR como vulnerabilidade (invertido). Agora e' a politica real
+  (`Policies\Microsoft\Windows NT\DNSClient\EnableMulticast`, harm=1 = multicast ligado), com
+  nome "LLMNR Ativado".
+- **Blocklist de driver**: `DeviceGuard\DriverBlocklistEnabled` -> `Control\CI\Config\VulnerableDriverBlocklistEnable`.
+- **PUA**: `Windows Defender\Features\PUAProtection` -> politica `Policies\Microsoft\Windows Defender\PUAProtection`.
+- **Invertidos**: `DefaultInboundAction` (0=permitir e' o ruim), `recoveryenabled` (No e' o ruim),
+  `ProfileList\State` (1=perfil temporario), `NetworkProtectionMode` (2=auditoria e' o fraco),
+  `SubmitSamplesConsent` (2=nao enviar e' o ruim).
+- **Nomes honestos**: "BCD Corrompido" -> "Falhas de Boot Ignoradas"; WFP/WMI/NLA/Indexacao eram
+  "Corrompido" mas checam SERVICO desativado; "Shell Vazio".
+- **Servicos**: `BTHSSVC`->`BthServ`, `PushNotificationsUserService`->`PushToInstall`,
+  `SyncHost`->`OneSyncSvc` (nomes que nao existem viram NOT_FOUND eterno).
+- `CrashDumpEnabled` default 1 -> 7; `NoRemovePages` -> `NoRemovePage`.
+
+**3. PAGINA (filtros e estados):** o combo tinha tags FIXAS ("SEGURANCA", "DESEMPENHO") que
+testavam `Contains` num texto qualquer: nao existia nenhuma categoria chamada assim no catalogo
+(as 24 reais nunca apareciam) e "Desempenho" nao pegava "Performance Degradada"/"Memoria".
+Agora `BuildFilterOptions()` monta o combo a partir do proprio scan: **Todos/Modificados/
+Protegidos/Aguardando reinicio/Nao verificaveis/Opcionais (com contagem) + uma opcao por categoria
+existente (CAT::nome)**. `OPCIONAL` virou faceta independente (antes o filtro EXCLUIA os
+modificados, escondendo opcional vulneravel) e `MODIFICADO` mostra todos. No XAML, o trigger de
+`IsOptional` sobrescrevia MODIFICADO/PROTEGIDO: o item vulneravel aparecia como "OPCIONAL" com
+botao "Desativar". O selo OPCIONAL agora fica ao lado da CATEGORIA e o badge de status segue o
+estado real; trigger novo para `ERROR` ("ERRO DE LEITURA").
+
+**Validacao:** Core **0 erros**; GUI **0 erros** (142 avisos pre-existentes); sonda descartavel
+contra o Core real **16/16** (catalogo 215, sem sentinela/valor fabricado, scan sem ERROR,
+LLMNR/blocklist/State/firewall/network protection/recovery nas chaves certas); registro real:
+118 checks de Registry, **9 chaves ausentes** — todas politicas legitimas que so existem quando
+aplicadas (Policies\System, DeviceInstall, PointAndPrint) ou o driver SMB1 removido. Encoding
+BOM+CRLF preservado nos 3 arquivos. **Limitacao:** `tests/integrityaudit` NAO compila (codigo
+morto pre-existente: `StableIdCycle`/`PendingCycle` usam `InvalidatedCheck`, `InvalidReason`,
+`PendingRepairStore.InvalidatedCount` que nao existem no Core atual) — por isso a prova foi feita
+com sonda separada.
+
 ### Sessao 25/10 - Ruido de log: monitor de RAM e GameBoost Pro
 
 Pedido: "agora so os logs duplicados do kit que sao desnecessarios como o do monitor de RAM

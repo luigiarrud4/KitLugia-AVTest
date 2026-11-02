@@ -8,7 +8,8 @@
 //   T10c O Id e realmente usado como chave em disco (StoreKey)
 //   T10d NtQuerySystemInformation(103) responde e o bitmask e coerente
 //   T10e O check de HVCI NAO e decidido pelo registro
-//   T10f ClearInvalidated devolve os itens ao fluxo normal (reavaliacao)
+//   T10f Apos reiniciar sem conseguir ler, o item fica 'nao confirmado'
+//        (o antigo 'invalidado' nao existe mais no Core)
 //   T10g O 'nao confirmado' fica registrado em disco
 //
 // CUIDADO: so grava em HKCU\Software\KitLugia\IntegrityPendingTest e no
@@ -35,7 +36,6 @@ internal static class StableIdCycle
 
     private static readonly Type StateT = typeof(PendingRepairStore).Assembly
         .GetType("KitLugia.Core.IntegrityState");
-    private static readonly Type InvT = typeof(InvalidatedCheck);
     private static readonly FieldInfo CacheF = typeof(PendingRepairStore)
         .GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
     private static readonly FieldInfo GateF = typeof(PendingRepairStore)
@@ -52,9 +52,6 @@ internal static class StableIdCycle
         var m = typeof(PendingRepairStore).GetMethod("Save", BindingFlags.NonPublic | BindingFlags.Static);
         m.Invoke(null, new[] { s });
     }
-
-    private static System.Collections.IList Inv(object st)
-        => (System.Collections.IList)StateT.GetProperty("Invalidated").GetValue(st);
 
     private static System.Collections.IList Unc(object st)
         => (System.Collections.IList)StateT.GetProperty("Unconfirmed").GetValue(st);
@@ -138,7 +135,7 @@ internal static class StableIdCycle
             lock (gate)
             {
                 var st = LoadState();
-                Pend(st).Clear(); Inv(st).Clear(); Unc(st).Clear();
+                Pend(st).Clear(); Unc(st).Clear();
                 SaveState(st);
             }
 
@@ -213,15 +210,15 @@ internal static class StableIdCycle
                         "status=" + hvci.Status + " reg=" + reg);
             }
 
-            // ── T10f: reavaliar devolve os itens ao fluxo normal ───────────
+            // ── T10f: reiniciou sem conseguir LER -> 'nao confirmado' ─────
+            // O Core atual nao inventa "invalidado": se o check nao pode ser
+            // lido depois do reboot, o item volta ao fluxo normal e o fato de
+            // a correcao nao ter sido confirmada fica registrado (nunca como
+            // "protegido").
             lock (gate)
             {
                 var st = LoadState();
-                Pend(st).Clear(); Inv(st).Clear(); Unc(st).Clear();
-                var inv = Activator.CreateInstance(InvT);
-                InvT.GetProperty("Name").SetValue(inv, pend.Id);
-                InvT.GetProperty("Reason").SetValue(inv, "corrigida mas nao teve efeito");
-                Inv(st).Add(inv);
+                Pend(st).Clear(); Unc(st).Clear();
                 SaveState(st);
             }
             ResetCache();
@@ -229,27 +226,21 @@ internal static class StableIdCycle
             var alvoInv = new List<ScannableTweak> { pend };
             pend.Status = TweakStatus.NOT_FOUND;
             lock (gate) PendingRepairStore.Apply(alvoInv);
-            Check("T10f o invalido foi aplicado ao item", !string.IsNullOrEmpty(pend.InvalidReason));
+            Check("T10f sem pendencia marcada o item nao ganha motivo inventado",
+                string.IsNullOrEmpty(pend.UnconfirmedReason));
 
-            Check("T10f antes de reavaliar ha 1 invalido",
-                PendingRepairStore.InvalidatedCount == 1, PendingRepairStore.InvalidatedCount + "");
-
-            PendingRepairStore.ClearInvalidated();
-            Check("T10f ClearInvalidated zera a lista", PendingRepairStore.InvalidatedCount == 0);
-
-            pend.InvalidReason = null;
             pend.Status = TweakStatus.NOT_FOUND;
             ResetCache();
             var alvoDepois = new List<ScannableTweak> { pend };
             lock (gate) PendingRepairStore.Apply(alvoDepois);
-            Check("T10f depois de reavaliar o item nao fica mais invalidado",
-                string.IsNullOrEmpty(pend.InvalidReason));
+            Check("T10f scan seguinte em NOT_FOUND nao vira protecao nem falha",
+                pend.Status == TweakStatus.NOT_FOUND);
 
             // ── T10g: 'nao confirmado' fica registrado ─────────────────────
             lock (gate)
             {
                 var st = LoadState();
-                Pend(st).Clear(); Inv(st).Clear(); Unc(st).Clear();
+                Pend(st).Clear(); Unc(st).Clear();
                 var e = Activator.CreateInstance(typeof(PendingRepairEntry));
                 typeof(PendingRepairEntry).GetProperty("Name").SetValue(e, pend.Id);
                 typeof(PendingRepairEntry).GetProperty("Reason").SetValue(e, "nao deu pra ler");
