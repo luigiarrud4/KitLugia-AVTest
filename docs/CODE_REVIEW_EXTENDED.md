@@ -196,3 +196,183 @@ Arquivos com findings: 39
 - P/Invoke presente — validar parâmetros nativos.
 - Directory.Delete — verificar guards.
 - Process.Start — validar origem/argumentos.
+
+
+## KitLugia.GUI/Services/TrayIconService.cs
+- Arquivo grande (8445 linhas) — avaliar extração de helpers/serviços.
+- 179 números mágicos — avaliar constantes nomeadas.
+- 12 métodos >80 linhas (maior: 389).
+- 13 TODO/FIXME/HACK/XXX: [492, 1407, 1413, 1431, 2993]...
+- P/Invoke presente (106 declarações) — validar parâmetros nativos.
+- Process.Start — validar origem/argumentos (1 usos).
+
+
+## KitLugia.Core/DeepUninstaller.cs
+- Arquivo grande (5654 linhas) — avaliar extração de helpers/serviços.
+- 81 números mágicos — avaliar constantes nomeadas.
+- 12 métodos >80 linhas (maior: 302).
+- P/Invoke presente (8 declarações) — validar parâmetros nativos.
+- Process.Start — validar origem/argumentos (2 usos).
+
+
+## KitLugia.GUI/Windows/TaskManager/KitTaskManagerWindow.xaml.cs
+- Arquivo grande (4141 linhas) — avaliar extração de helpers/serviços.
+- 67 números mágicos — avaliar constantes nomeadas.
+- 8 métodos >80 linhas (maior: 406).
+- 5 TODO/FIXME/HACK/XXX: [2388, 3117, 3187, 3329, 3499]
+- P/Invoke presente (24 declarações) — validar parâmetros nativos.
+- Process.Start — validar origem/argumentos (1 usos).
+
+
+## KitLugia.GUI/MainWindow.xaml.cs
+- Arquivo grande (3450 linhas) — avaliar extração de helpers/serviços.
+- 84 números mágicos — avaliar constantes nomeadas.
+- 6 métodos >80 linhas (maior: 305).
+- 2 TODO/FIXME/HACK/XXX: [890, 1007]
+- P/Invoke presente (4 declarações) — validar parâmetros nativos.
+- Process.Start — validar origem/argumentos (2 usos).
+
+
+## KitLugia.Core/TaskManager/NativeMetricsHelper.cs
+- Arquivo grande (1931 linhas) — avaliar extração de helpers/serviços.
+- 69 números mágicos — avaliar constantes nomeadas.
+- 3 métodos >80 linhas (maior: 148).
+- 2 TODO/FIXME/HACK/XXX: [18, 869]
+- P/Invoke presente (74 declarações) — validar parâmetros nativos.
+
+
+## KitLugia.Core/ForceStopUnlockService.cs
+- Arquivo grande (2051 linhas) — avaliar extração de helpers/serviços.
+- 31 números mágicos — avaliar constantes nomeadas.
+- 7 métodos >80 linhas (maior: 304).
+- 1 TODO/FIXME/HACK/XXX: [149]
+- P/Invoke presente (37 declarações) — validar parâmetros nativos.
+- Process.Start — validar origem/argumentos (6 usos).
+- Directory.Delete — verificar guards (3 usos).
+
+
+## KitLugia.GUI/Pages/WindowsSettings/StoreRemakePage.xaml.cs
+- Arquivo grande (1691 linhas) — avaliar extração de helpers/serviços.
+- 39 números mágicos — avaliar constantes nomeadas.
+- 4 métodos >80 linhas (maior: 129).
+- 1 TODO/FIXME/HACK/XXX: [432]
+
+
+## KitLugia.Core/TaskManager/AudioGlitchMonitor.cs
+- Arquivo grande (1472 linhas) — avaliar extração de helpers/serviços.
+- 69 números mágicos — avaliar constantes nomeadas.
+- 2 métodos >80 linhas (maior: 154).
+- 2 TODO/FIXME/HACK/XXX: [586, 1267]
+- P/Invoke presente (10 declarações) — validar parâmetros nativos.
+
+
+## KitLugia.Core/TaskManager/LatencyMonitor.cs
+- Arquivo grande (1417 linhas) — avaliar extração de helpers/serviços.
+- 95 números mágicos — avaliar constantes nomeadas.
+- 2 métodos >80 linhas (maior: 239).
+- 6 TODO/FIXME/HACK/XXX: [117, 187, 431, 538, 708]...
+- P/Invoke presente (31 declarações) — validar parâmetros nativos.
+
+
+## KitLugia.GUI/Windows/TaskManager/KitTaskManager.Performance.cs
+- Arquivo grande (1389 linhas) — avaliar extração de helpers/serviços.
+- 53 números mágicos — avaliar constantes nomeadas.
+- 4 métodos >80 linhas (maior: 198).
+- P/Invoke presente (2 declarações) — validar parâmetros nativos.
+
+
+## KitLugia.GUI/Windows/TaskManager/KitTaskManager.Summary.cs
+- Arquivo grande (1421 linhas) — avaliar extração de helpers/serviços.
+- 71 números mágicos — avaliar constantes nomeadas.
+- 4 métodos >80 linhas (maior: 202).
+
+
+## KitLugia.Core/TaskManager/StorageDiagnostics.cs
+- Arquivo grande (1356 linhas) — avaliar extração de helpers/serviços.
+- 47 números mágicos — avaliar constantes nomeadas.
+- P/Invoke presente (10 declarações) — validar parâmetros nativos.
+
+
+## KitLugia.GUI/Windows/TaskManager/KitTaskManager.Storage.cs
+- Arquivo grande (1381 linhas) — avaliar extração de helpers/serviços.
+- 40 números mágicos — avaliar constantes nomeadas.
+- 2 métodos >80 linhas (maior: 113).
+- 1 TODO/FIXME/HACK/XXX: [1372]
+- Process.Start — validar origem/argumentos (1 usos).
+
+
+## KitLugia.Core/Diagnostics/DiagnosticCenter.cs
+- Arquivo grande (1030 linhas) — avaliar extração de helpers/serviços.
+- 52 números mágicos — avaliar constantes nomeadas.
+- 3 métodos >80 linhas (maior: 129).
+
+
+## KitLugia.GUI/Pages/WindowsSettings/ForceStopUnlockPage.xaml.cs
+- Arquivo grande (1059 linhas) — avaliar extração de helpers/serviços.
+- 46 números mágicos — avaliar constantes nomeadas.
+- 3 métodos >80 linhas (maior: 141).
+- Process.Start — validar origem/argumentos (1 usos).
+
+
+## KitLugia.GUI/Windows/TaskManager/KitTaskManager.Latency.cs
+- Arquivo grande (836 linhas) — avaliar extração de helpers/serviços.
+- 45 números mágicos — avaliar constantes nomeadas.
+- 1 métodos >80 linhas (maior: 154).
+- Process.Start — validar origem/argumentos (1 usos).
+
+
+## KitLugia.Core/PathRepair.cs
+- Arquivo grande (1000 linhas) — avaliar extração de helpers/serviços.
+- 4 métodos >80 linhas (maior: 166).
+- P/Invoke presente (2 declarações) — validar parâmetros nativos.
+
+
+## KitLugia.Core/KitStore/StoreEngine.cs
+- Arquivo grande (829 linhas) — avaliar extração de helpers/serviços.
+- 29 números mágicos — avaliar constantes nomeadas.
+- Process.Start — validar origem/argumentos (2 usos).
+
+
+## KitLugia.GUI/Pages/WinTunePage.xaml.cs
+- Arquivo grande (956 linhas) — avaliar extração de helpers/serviços.
+- 1 métodos >80 linhas (maior: 99).
+
+
+## KitLugia.GUI/Pages/WinpeToolsPage.xaml.cs
+- Arquivo grande (1021 linhas) — avaliar extração de helpers/serviços.
+- 55 números mágicos — avaliar constantes nomeadas.
+- Process.Start — validar origem/argumentos (1 usos).
+
+
+## KitLugia.Core/TaskManager/NativeHardware.cs
+- Arquivo grande (767 linhas) — avaliar extração de helpers/serviços.
+- 40 números mágicos — avaliar constantes nomeadas.
+- 1 métodos >80 linhas (maior: 94).
+- P/Invoke presente (17 declarações) — validar parâmetros nativos.
+
+
+## KitLugia.Core/DriverManager.cs
+- Arquivo grande (788 linhas) — avaliar extração de helpers/serviços.
+- 2 métodos >80 linhas (maior: 188).
+- 4 TODO/FIXME/HACK/XXX: [350, 500, 530, 537]
+- Process.Start — validar origem/argumentos (2 usos).
+- Directory.Delete — verificar guards (2 usos).
+
+
+## KitLugia.Core/IsoManager.cs
+- Arquivo grande (684 linhas) — avaliar extração de helpers/serviços.
+- 25 números mágicos — avaliar constantes nomeadas.
+- 3 métodos >80 linhas (maior: 136).
+- Process.Start — validar origem/argumentos (14 usos).
+
+
+## KitLugia.Core/OfflineInsiderManager.cs
+- Arquivo grande (509 linhas) — avaliar extração de helpers/serviços.
+- 34 números mágicos — avaliar constantes nomeadas.
+- 1 métodos >80 linhas (maior: 107).
+- Process.Start — validar origem/argumentos (2 usos).
+- Directory.Delete — verificar guards (1 usos).
+
+
+## KitLugia.GUI/Pages/SecurityPage.xaml.cs
+- Arquivo grande (714 linhas) — avaliar extração de helpers/serviços.
