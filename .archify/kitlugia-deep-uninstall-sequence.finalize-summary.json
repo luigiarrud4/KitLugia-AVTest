@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "sequence",
+  "quality": "standard",
+  "specification": {
+    "path": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-sequence.candidate.json",
+    "sha256": "e8bf6f872e99b3d1dfd75adf4c4d89f31fe7d84b9a80b0bb9f131bd75311fb39",
+    "bytes": 2506
+  },
+  "artifact": {
+    "path": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-sequence.html",
+    "sha256": "da1ffd44ea2a9e0e3ed3a91c24731848fe5e31f89392fe7df61556f5b32325ef",
+    "bytes": 831774
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "fail"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/browser-check-runtime",
+      "severity": "error",
+      "message": "browser-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-sequence.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools read pipe failed: stream ended\nChrome process: still running.\nWindows browser startup may have relaunched before connecting to the DevTools pipe. Retry from a non-elevated PowerShell opened normally, outside an elevated or compatibility-mode parent. Archify does not disable browser de-elevation or the sandbox to preserve pipe handles.\nChrome transport: Node v26.12.1, libuv 1.52.1, win32; pid=19604, exitCode=null, signalCode=null.\nChrome read pipe: readable=false, ended=true, destroyed=false, receivedBytes=0, messages=0, bufferedBytes=0.\nChrome write pipe: writable=false, ended=true, destroyed=false, completedWrites=1, writtenBytes=50, bufferedBytes=0."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-sequence.finalize.json",
+    "summaryReceipt": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-sequence.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-sequence.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-02T21:33:56.146Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2273,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}

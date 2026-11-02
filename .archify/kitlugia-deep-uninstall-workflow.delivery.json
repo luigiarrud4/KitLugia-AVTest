@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "7658c82a-b48b-444c-94b0-15ab70fcb4fa",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-workflow.candidate.json",
+  "output": "C:\\Users\\Lugia\\Downloads\\KitLugia-master (25) - Copia - Copia - Copia - Copia\\KitLugia-master - Copia - Copia\\.archify\\kitlugia-deep-uninstall-workflow.html",
+  "specification": {
+    "sha256": "28e363208b4a4f108f7b1a78fe4cbcc78bf5f86391a2c78e8825181ec8554600",
+    "bytes": 3297
+  },
+  "artifact": {
+    "sha256": "89081a4dca890746e219666dd0cb71dd61cdc513ffbe3e58764cbce855be3dc0",
+    "bytes": 836623
+  }
+}

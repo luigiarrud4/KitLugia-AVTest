@@ -1,0 +1,278 @@
+{
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/epm_cmds.py": {
+    "mtime": 1792288729572.5715,
+    "hash": "cf5f9c609b5899cb176a028b570b015b"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/epm_exports.py": {
+    "mtime": 1792288729572.5715,
+    "hash": "8951d1d4521d2cdf68d20f52630081bc"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/epm_map.py": {
+    "mtime": 1792288729573.5486,
+    "hash": "3344e6274db4a0d64c15297a53dcdb4d"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/epm_scan_imports.py": {
+    "mtime": 1792288729589.3542,
+    "hash": "596e8e2e452aa5d0c787c97b4050e1cc"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/epm_srcmap.py": {
+    "mtime": 1792288729590.3298,
+    "hash": "802173cec927c0f5eb42574802d6cade"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/ida_epm_dump.py": {
+    "mtime": 1792288729591.3064,
+    "hash": "18646c46422af3bb301766df7b42c192"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/AUDIO_RECOVERY_ROBUSTNESS.md": {
+    "mtime": 1792288729534.1296,
+    "hash": "5ef47f9646d4317be81025e2204a581a"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/CAVEMAN_COMPRESSION.md": {
+    "mtime": 1793656695370.3762,
+    "hash": "793fd2c3fa0f8d63c298f1501be856c1"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/CODE_REVIEW_EXTENDED.md": {
+    "mtime": 1793656670564.5352,
+    "hash": "4424d0d8cfee9a5f1d5949ff7767317a"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/CORE_API_AUDIT.md": {
+    "mtime": 1792288729534.1296,
+    "hash": "d59e6355848cb9020830a2d17ac5e81f"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/CRITICAL_REVIEW_PARTITION_WINPE_ISO.md": {
+    "mtime": 1792288729535.1074,
+    "hash": "3d173af8b5a9cdd0e5905828c81c2b86"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/DOWNGRADE_BUILD_PLAN.md": {
+    "mtime": 1792288729535.1074,
+    "hash": "289c4010769e5d4780fc43f1b4ec5b0c"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/EASEUS_EPM_ANALYSIS.md": {
+    "mtime": 1792288729536.6118,
+    "hash": "5fc8822d48c6f19edbceebd13a48fda9"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/EASEUS_EPM_DESKTOP.md": {
+    "mtime": 1792288729537.5957,
+    "hash": "9c8f14a92209babebd13b6fe90611145"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/EASEUS_EPM_MAP.md": {
+    "mtime": 1792288729538.5723,
+    "hash": "72f397da7b486e4c38c3ac99bb7a9282"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/EXTERNAL_REPOS_REVIEW.md": {
+    "mtime": 1792288729539.5466,
+    "hash": "6d287201dad75efbee626ea1a1ab47a0"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/FAT_DISK_API_PLAN.md": {
+    "mtime": 1792288729539.5466,
+    "hash": "e344db69c2b838c5bfcc0a5c853e58a2"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/FORCE_STOP_UNLOCK.md": {
+    "mtime": 1792288729540.5232,
+    "hash": "a32f4a6088e103a52dd9213104adb49e"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/GAMEBOOST_ENGINE_CHECKLIST.md": {
+    "mtime": 1792288729541.4983,
+    "hash": "748fd6571cd652c50ac02d6ad06099b3"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/GAMEBOOST_ENGINE_RESEARCH.md": {
+    "mtime": 1792288729541.4983,
+    "hash": "1eb8565cb63685d74640dc02ab3dfb30"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/GAMEBOOST_PROCESS_LASSO_AUDIT.md": {
+    "mtime": 1792288729542.4753,
+    "hash": "33ab1bb1d1ed93ea00ad8b1a65921f55"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/GLASSMORPHIC_DESIGN.md": {
+    "mtime": 1792288729543.4524,
+    "hash": "7474fbb577cb085adf6e7cdb46bdc621"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/HUNTER_AUDIT.md": {
+    "mtime": 1793558536600.6365,
+    "hash": "903b543f889ba49da99c4874bac90c92"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/IDA_PRO_ISLC_GUIDE.md": {
+    "mtime": 1792288729543.4524,
+    "hash": "c7128cf93048d8e09e47c2f395fe8860"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/INTEGRITY_PAGE_SPEC.md": {
+    "mtime": 1793408608303.2007,
+    "hash": "111e1088f38a5708723d7406971d873a"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/IOBIT_UNLOCKER_ANALYSIS.md": {
+    "mtime": 1792288729544.4287,
+    "hash": "6a9feb006a09f0bc87b7ce3e240d23fe"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/ISLC_ANALYSIS.md": {
+    "mtime": 1792288729545.4329,
+    "hash": "cac06f14e084a9ea10c22febb0111c14"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/ISLC_BINARY_FORENSICS.md": {
+    "mtime": 1792288729546.453,
+    "hash": "e07ecccaf164830f642c74a1c86af868"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/ISLC_VS_KITLUGIA_COMPARISON.md": {
+    "mtime": 1792292894956.8142,
+    "hash": "9d5a66f432685648cb3c47094e72bd2e"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/ISO_EDITING_UPDATE_2026.md": {
+    "mtime": 1792288729546.9812,
+    "hash": "d0dce658073cd452032a02fbbed65752"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/ISO_EDITOR_WIMLIB_PLAN.md": {
+    "mtime": 1792288729548.9456,
+    "hash": "530e120d63c5ccbc403069b20bb936df"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/KITLUGIA_PREOS_GAPS.md": {
+    "mtime": 1792288729548.9456,
+    "hash": "1d0cfa3def585f60bca59620911fe4ec"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/KITLUGIA_VS_REVO_PARITY.md": {
+    "mtime": 1793552791187.1377,
+    "hash": "addb3c032fa92b48385d2b28b32887a8"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/KITLUGIA_WINPE.md": {
+    "mtime": 1792288729549.921,
+    "hash": "d53dfdb572b082abe836fc996b39baf2"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/KIT_ISO_STUDIO_EXPANSOR.md": {
+    "mtime": 1792288729550.8987,
+    "hash": "fbdcb305ea480c0d48dd234d72f9bc28"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/KIT_ISO_STUDIO_WINDOW_STYLE.md": {
+    "mtime": 1792288729550.8987,
+    "hash": "fc470caad0ccbe15e1cfece19a9e4405"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/MICROSOFT_STORE_DEEP_DIVE.md": {
+    "mtime": 1792288729551.9578,
+    "hash": "4b0deba0a4dc50c3f5f961f0d304735e"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/MULTIISO_BOOT_ARCH.md": {
+    "mtime": 1792288729552.8848,
+    "hash": "db26069659220293e9f6b9c96a3560e9"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/NATIVE_CPP_EVALUATION.md": {
+    "mtime": 1792288729552.8848,
+    "hash": "416f2e50550a9fff8145e9d2069f6bf3"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/OOSHUTUP_WIN11_UPDATE.md": {
+    "mtime": 1792288729553.86,
+    "hash": "1517ca6e860ccfa8c29511f87ca541d4"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/OPENCODE_SKILLS_FINAL_REPORT.md": {
+    "mtime": 1793656946243.008,
+    "hash": "82bff3ccf0623c01ad1a5d2fd3248e82"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/OPENCODE_SKILLS_TEST_REPORT.md": {
+    "mtime": 1793656576760.8105,
+    "hash": "c4bee52c09a53520dff31b7a3971c23b"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/PAGES_ACTIVE_AUDIT.md": {
+    "mtime": 1792288729554.8362,
+    "hash": "7f173439bed8c4a8d39814e35b37f0d8"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/PAGES_RAM_OPTIMIZATION_PLAN.md": {
+    "mtime": 1792288729554.8362,
+    "hash": "96832edc25c194978c3b4df82e3dd04a"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/PAGES_VISUAL_AUDIT.md": {
+    "mtime": 1792288729554.8362,
+    "hash": "6358356bdbb53196795a8aa5c3a5b8d0"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/PATH_EXPLORER_GUIDE.md": {
+    "mtime": 1792288729556.3389,
+    "hash": "1a6933de50dc66a2967685adfa47808c"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/PC_MANAGER_DEEP_UNINSTALL_ANALYSIS.md": {
+    "mtime": 1792288729557.3208,
+    "hash": "17362b4b785c210b0e2f3a6e70c2e25f"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/RAM_LIMITER_INTELLIGENT.md": {
+    "mtime": 1792288729557.3208,
+    "hash": "b900272a22fcecbe5603e9ceb4e30975"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/RESIDUAL_RULE_PLAN.md": {
+    "mtime": 1792288729558.296,
+    "hash": "ee27ea6a918c11299df6a05d9cf6dff1"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/REVIEW-PENDING.md": {
+    "mtime": 1792288729559.2717,
+    "hash": "7cd26174bee54e3989528048c38ee40b"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/REVO_UNINSTALLER_ANALYSIS.md": {
+    "mtime": 1792288729559.2717,
+    "hash": "118379b390c23294946eb501cb69bf3d"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/REVO_UNINSTALLER_PLANO.md": {
+    "mtime": 1792288729560.2498,
+    "hash": "e58405c569433eed38c720dc61448ae7"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/ROADMAP_TRAY_DOWNLOAD_BOOST.md": {
+    "mtime": 1792288729561.2253,
+    "hash": "fb0864908650dce0058e0253170d6b5d"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/STARTUP_PRESSURE_ANALYSIS.md": {
+    "mtime": 1792288729562.2034,
+    "hash": "e32d1167b8f51d6f44750019309eec20"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/STORAGE_DIAGNOSTICS.md": {
+    "mtime": 1792288729562.2034,
+    "hash": "e4b9a5fe4fa9515c8f89b73e06b9e99c"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/STORE_REMAKE_ROADMAP.md": {
+    "mtime": 1792288729563.1785,
+    "hash": "b1dc7c08a5e02618350f86648b4cb45a"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/SYSTEMTWEAKS_SPLIT_CHECKLIST.md": {
+    "mtime": 1792288729564.1562,
+    "hash": "46e152f0a8e862ad345a93a4efa89f1a"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TASKMANAGER_FIXES_PLAN.md": {
+    "mtime": 1792288729564.1562,
+    "hash": "8df8d3197da4026b8eb9c385a8e0fc5f"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TASKMANAGER_UI_DEBUG.md": {
+    "mtime": 1792288729565.1345,
+    "hash": "cdcb1d6344a7e513f566187331090642"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TASK_MANAGER_PLAN.md": {
+    "mtime": 1792288729566.1387,
+    "hash": "e0a2a15d90e70619ab3ef5203df347cc"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TMOG_TASKMANAGER_ANALYSIS.md": {
+    "mtime": 1792288729566.673,
+    "hash": "b00f7eda69c9ec68075ca5518fdfa168"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TM_FIRST_LOAD.md": {
+    "mtime": 1792288729567.6846,
+    "hash": "343655ce491a9d29cab39c9197a4607c"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TM_REWRITE_PLAN.md": {
+    "mtime": 1792288729567.6846,
+    "hash": "5f33a22c84bb748a8312aa07ad0ae734"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TM_STYLE_MAP.md": {
+    "mtime": 1792288729568.6658,
+    "hash": "a7bc6d862890156523351066d53b6dec"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TM_VISUAL_AUDIT.md": {
+    "mtime": 1792288729569.643,
+    "hash": "39f0608a0509ade2d756999bf2fe0a7f"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/TWEAKS_INVENTARIO_E_ROADMAP.md": {
+    "mtime": 1792288729569.643,
+    "hash": "43c5dc8ed4ebdd862bd87bb844d15c04"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/UNIVERSAL_DOCUMENTATION.md": {
+    "mtime": 1793654768869.1995,
+    "hash": "f66d3de860bec64ee7b562cc8d1dd118"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/WIN11DEBLOAT_VS_KITLUGIA_COMPARISON.md": {
+    "mtime": 1792288729570.6184,
+    "hash": "5abe03717d3c76cc49e341e291941676"
+  },
+  "C:/Users/Lugia/Downloads/KitLugia-master (25) - Copia - Copia - Copia - Copia/KitLugia-master - Copia - Copia/docs/batch-updater.md": {
+    "mtime": 1792288729571.5957,
+    "hash": "3efddf7c8e6262911e99ff7ba7cd257f"
+  }
+}

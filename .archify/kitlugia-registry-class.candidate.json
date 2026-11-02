@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "diagram_type": "class",
+  "meta": {
+    "title": "RegistryOwnership + Guardian — integração",
+    "subtitle": "Take-ownership de chaves protegidas no fallback de deleção.",
+    "output": ".archify/kitlugia-registry-class.html",
+    "quality_profile": "standard"
+  },
+  "layout": {
+    "mode": "grid"
+  },
+  "types": [
+    {
+      "id": "guardian",
+      "label": "Guardian",
+      "kind": "class",
+      "sublabel": "Guards de路径 e registry",
+      "row": 0,
+      "col": 0,
+      "methods": [
+        {
+          "name": "IsProhibitedLocation",
+          "parameters": "string path",
+          "returns": "bool",
+          "visibility": "public"
+        },
+        {
+          "name": "IsKitLugiaSelfPath",
+          "parameters": "string path",
+          "returns": "bool",
+          "visibility": "public"
+        }
+      ]
+    },
+    {
+      "id": "regown",
+      "label": "RegistryOwnership",
+      "kind": "class",
+      "sublabel": "Take-ownership + ACL",
+      "row": 0,
+      "col": 2,
+      "methods": [
+        {
+          "name": "TakeOwnership",
+          "parameters": "string keyPath",
+          "returns": "bool",
+          "visibility": "public"
+        },
+        {
+          "name": "ForceTakeOwnership",
+          "parameters": "string keyPath",
+          "returns": "void",
+          "visibility": "public"
+        },
+        {
+          "name": "EnableTakeOwnershipPrivilege",
+          "parameters": "...",
+          "returns": "bool",
+          "visibility": "public"
+        }
+      ]
+    },
+    {
+      "id": "deepuninstaller",
+      "label": "DeepUninstaller",
+      "kind": "class",
+      "sublabel": "Chama RegistryOwnership como fallback",
+      "row": 1,
+      "col": 1,
+      "methods": [
+        {
+          "name": "SafeDeleteRegistryEntry",
+          "parameters": "...",
+          "returns": "bool",
+          "visibility": "public"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "guardian_uses",
+      "from": "deepuninstaller",
+      "to": "guardian",
+      "kind": "dependency",
+      "label": "usa"
+    },
+    {
+      "id": "reg_fallback",
+      "from": "deepuninstaller",
+      "to": "regown",
+      "kind": "dependency",
+      "label": "fallback"
+    }
+  ]
+}

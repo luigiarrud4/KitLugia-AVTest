@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "diagram_type": "class",
+  "meta": {
+    "title": "AppsPage — integração com serviços Core",
+    "subtitle": "Página principal da UI e seus dependentes.",
+    "output": ".archify/kitlugia-appspage-class.html",
+    "quality_profile": "standard"
+  },
+  "layout": {
+    "mode": "grid"
+  },
+  "types": [
+    {
+      "id": "appspage",
+      "label": "AppsPage.xaml.cs",
+      "kind": "class",
+      "sublabel": "Página principal WPF",
+      "row": 0,
+      "col": 0,
+      "methods": [
+        {
+          "name": "LoadInstalledApps",
+          "parameters": "...",
+          "returns": "void",
+          "visibility": "public"
+        },
+        {
+          "name": "DeepUninstallProgram",
+          "parameters": "...",
+          "returns": "void",
+          "visibility": "public"
+        },
+        {
+          "name": "PerformCleanup",
+          "parameters": "...",
+          "returns": "void",
+          "visibility": "public"
+        }
+      ]
+    },
+    {
+      "id": "deep",
+      "label": "DeepUninstaller",
+      "kind": "class",
+      "sublabel": "Motor de deep uninstall",
+      "row": 0,
+      "col": 2,
+      "methods": [
+        {
+          "name": "DeepUninstallProgram",
+          "parameters": "...",
+          "returns": "Task<UninstallResult>",
+          "visibility": "public"
+        }
+      ]
+    },
+    {
+      "id": "recycle",
+      "label": "RecycleBinOp",
+      "kind": "class",
+      "sublabel": "Lixeira via SHFileOperationW",
+      "row": 1,
+      "col": 1,
+      "methods": [
+        {
+          "name": "Recycle",
+          "parameters": "string, bool, out string",
+          "returns": "RecycleResult",
+          "visibility": "public"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "from": "appspage",
+      "to": "deep",
+      "kind": "dependency",
+      "label": "chama"
+    },
+    {
+      "id": "r2",
+      "from": "deep",
+      "to": "recycle",
+      "kind": "dependency",
+      "label": "usa"
+    }
+  ]
+}
