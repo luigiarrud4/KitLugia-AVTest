@@ -16,15 +16,17 @@
          Raio unico: 8.
          ============================================================ -->
 
+    <!-- Cartao de CONTEUDO: o realce do hover e' so' de cor. Nao tem cursor de
+         clique nem escala - um card destes costuma ser o bloco inteiro de uma
+         secao (a lista de tweaks tem 700 px de largura), e a escala de 1,5%
+         empurrava a borda ~7 px para fora do lugar. Pior: o Cursor="Hand" era
+         HERDADO por todo texto dentro do card, entao a mao de clique aparecia
+         sobre uma area onde nao ha nada para clicar. -->
     <Style x:Key="CardStyle" TargetType="{x:Type Border}">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
-        <Setter Property="controls:HoverZoom.Scale" Value="1.015"/>
-        <Setter Property="controls:HoverZoom.DurationMs" Value="180"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
@@ -33,9 +35,15 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Alias legivel para quem quer declarar a intencao "este card e' clicavel":
-         o realce (zoom + cor) ja vem do CardStyle. -->
-    <Style x:Key="InteractiveCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource CardStyle}"/>
+    <!-- Card que REALMENTE abre algo no clique: mesma cor do CardStyle, mais o
+         cursor de mao e um zoom suave (1,01 em 200 ms, o mesmo dos cards do
+         Dashboard). Quem nao clica nao anuncia clique. -->
+    <Style x:Key="InteractiveCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource CardStyle}">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
+        <Setter Property="controls:HoverZoom.Scale" Value="1.01"/>
+        <Setter Property="controls:HoverZoom.DurationMs" Value="200"/>
+    </Style>
 
     <Style x:Key="CompactCardStyle" TargetType="{x:Type Border}">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
