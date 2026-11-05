@@ -1,3 +1,51 @@
+# Sessao 05/11 - Padronizacao visual: backup do kit estavel, plano + checklist e F0 (tokens)
+
+Pedido: "salve o plano e faca uma checklist para comecar a trabalhar nele, so faca um backup pelo git
+para separar o kit estavel do que voce vai trabalhar. pode comecar".
+
+**0. BACKUP do kit estavel (o que separa o kit estavel do trabalho novo):** o trabalho de busca
+(23 campos padronizados + GlobalSearchPage refeita + bloco OUI removido) estava todo em
+working tree. Virou o commit **`f5c3961`** na branch `impeccable-polish`, com a tag
+**`estavel-pre-ui-padronizacao`** apontando para ele. Qualquer fase pode ser revertida com
+`git diff estavel-pre-ui-padronizacao -- KitLugia.GUI` ou `git checkout <tag> -- <arquivo>`
+(sem push - o usuario faz o release manual).
+
+**1. PLANO (`docs/UI_CONSISTENCY_PLAN.md`, novo):** diagnostico medido por leitura de markup das
+46 paginas + contagens: **3211 hex hardcoded** vs 178 `DynamicResource`; **12 FontSize** (9 a 32,
+titulos em 32/28/24 sem regra); **6 cinzas** de subtitulo (`#888` 150x, `#AAA` 93x, `#A0A0A0` 73x,
+`#666` 68x); **11 CornerRadius** (2..20); **~400 `Button.Template` inline** (ExmTweaksPage 126,
+TweaksPage 96, TM 50, NetworkPage 32, MainWindow 28); **27** XAMLs com `DropShadowEffect` e **24**
+com `Storyboard` (o `CardStyle` anima scale 1.015 + blur POR ITEM de lista); **7** paginas com
+loading e **2** implementacoes de spinner; `Themes/PageStyles.xaml` (**PageTitle/SectionHeader/
+PageStack...**) com **ZERO usos**. O plano tem 8 fases (F0 tokens -> F7 antirregressao), ordem de
+execucao, criterios de aceite e checklist com caixas.
+
+**2. F0 EXECUTADA (tokens):**
+- `KitLugia.GUI/Themes/Typography.xaml` (NOVO): `sys:Double` (`assembly=System.Runtime`, projeto em
+  net10.0-windows) com a escala de 6 degraus - `FontSizeDisplay 28`, `FontSizeTitle 18`,
+  `FontSizeSection 16`, `FontSizeBody 13`, `FontSizeSmall 12`, `FontSizeCaption 11` - e os estilos
+  base `TextBodyStyle`, `TextBodyMutedStyle`, `TextSmallStyle`, `TextCaptionStyle`.
+- `Themes/Generic.xaml`: `Typography.xaml` mesclado **DEPOIS de Brushes e ANTES de `PageStyles.xaml`**
+  (a ordem importa: `PageStyles` usa `{StaticResource FontSize*}`).
+- `Themes/Brushes.xaml`: novos tokens `Surface0 #0F0F0F`, `Surface1 #1A1A1A`, `Surface2 #252525`,
+  `BorderSubtle #333`, `BorderStrong #555`, `WarningBrush #FFC107` (aditivo, nada removido).
+- `Themes/PageStyles.xaml`: `PageTitleStyle` 32 -> `{StaticResource FontSizeDisplay}` (28, a maioria
+  das paginas ja usava 28); `SectionHeader`/`SectionAccentHeader` -> `FontSizeSection`;
+  `PageSubtitle`/`PageDescription`/`TweakLabel` (era 15) -> `FontSizeBody`; `SectionDescription`/
+  `TweakStatus` -> `FontSizeSmall`; `#808080` -> `{DynamicResource TextMuted}`.
+
+**QUIRK (landmine que so apareceria ao adotar o arquivo):** `CardContainerStyle` declarava
+`<Setter Property="Style" Value="{DynamicResource CardStyle}"/>` - setter de `Style` dentro de
+`Style` NAO e' aplicavel no WPF. O arquivo estava morto (0 usos) e ninguem levou o erro; o setter
+foi removido junto com a tokenizacao.
+
+**Validacao:** solucao **0 erros** (154 avisos nullable pre-existentes, nenhum nos arquivos
+tocados; build com `-p:OutDir=C:/kltmpbuild/`); BOM+CRLF conferido byte a byte nos 5 arquivos
+(Typography novo, PageStyles, Generic, Brushes, doc). **Nenhuma pagina foi alterada ainda** - F0
+e' so' base. Proxima fase: **F1** (cabecalho de pagina padrao + lote 1 com as 10 paginas mais
+usadas).
+
+---
 # Sessão — recalcular contagens do filtro na IntegrityPage após alterações
 
 ## Problema
