@@ -360,6 +360,7 @@ um relatório, não uma edição:
 | `tests/ui_fontsize15.py` | decide cada `FontSize="15"` (16 título / 13 corpo) com relatório antes de gravar |
 | `tests/ui_subtitle.py` | aplica `PageSubtitleStyle`, ignorando rótulo de estado e descrição de item |
 | `tests/AnimCheck` | prova o hover: aplica o estilo real, dispara `MouseEnter`/`MouseLeave` e lê o `ScaleTransform` (um PNG não mostra hover) |
+| `tests/WindowShot` | abre a `MainWindow` real fora da tela, fecha o splash e captura repouso x hover (o `UiShotHarness` só alcança as Pages) |
 | `.githooks/pre-commit` | roda o `--check` a cada commit (habilitado com `git config core.hooksPath .githooks`) |
 
 Scripts que reescrevem XAML sempre preservam o BOM do arquivo e o CRLF. O `open(..., "w")`

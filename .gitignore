@@ -402,3 +402,4 @@ deploy.bat.bak
 # capturas do harness de UI (geradas)
 tests/UiShotHarness/out*/
 tests/UiShotHarness/tmp/
+tests/WindowShot/shots/

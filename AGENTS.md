@@ -191,6 +191,19 @@ generalrepairpage") + icones vetoriais na AppsPage:**
   (storyboard de codigo) para separar "tema quebrado" de "ambiente de teste parado".
   Capturas: `UiShotHarness` **52/52**, 0 falhas, 0 excecoes; AppsPage/NetworkPage/Dashboard
   conferidas a olho.
+- **PROVA da MainWindow (`tests/WindowShot`, novo):** o `UiShotHarness` so' alcanca as Pages, entao
+  esta sonda abre a janela REAL fora da tela (`Left = -32000`), fecha o `LoadingOverlay` (sem
+  isso a captura sai so' com o splash "KIT LUGIA"), espera 2,5 s, renderiza, anima o
+  `BtnKitTaskManager` e LE o `ScaleX`: **1,100** no hover e **1,000** na volta. O recorte 3x mostra
+  o icone crescendo (16 -> 17,6 px; 571 pixels alterados so' na regiao do icone).
+  Prints: `screenshots/mainwindow.png` (janela inteira) e `screenshots/mainwindow_hover.png`
+  (repouso x hover). Roda SEM elevacao - o `TrayIconService` inicia, mas as acoes privilegiadas
+  falham em vez de agir; e' um launch de poucos segundos, nao o kit em uso.
+- **QUIRKS do WindowShot:** renderizar so' `window.Content` deixa TRANSPARENTE o que o `Background`
+  da Window cobria (a barra do topo saia como faixa branca no visualizador) - pintar o fundo da
+  janela num `DrawingVisual` antes de desenhar o `VisualBrush`; para o recorte com zoom, `VisualBrush`
+  com `Stretch=None` + `ScaleTransform`/`TranslateTransform`. E o runner/antivirus pode cortar o
+  processo no meio: o `shots/` e' descartavel (gitignored), o codigo e' quem precisa sobreviver.
 - **QUIRKS dos scripts desta rodada:** `<Style.Triggers>` tambem comeca com `<Style` (usar
   `^<Style[\s>]` na pilha); `re.sub(^...)` sem `re.M` so' casa no inicio do ARQUIVO (por isso o
   `xmlns` nao entrou no `<Page>`); tag `<Button>` multilinha exige achar o `>` final antes de
