@@ -2,6 +2,7 @@
 <Page x:Class="KitLugia.GUI.Pages.DashboardPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       Title="Sistema"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
@@ -134,7 +135,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- BOT&#xC3;O 1: OTIMIZA&#xC7;&#xC3;O INTELIGENTE (VERDE) -->
-                    <Button Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personaliza&#xE7;&#xE3;o da otimiza&#xE7;&#xE3;o inteligente.">
+                    <Button controls:HoverZoom.Enabled="False" Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personaliza&#xE7;&#xE3;o da otimiza&#xE7;&#xE3;o inteligente.">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bdr" Background="#104CAF50" BorderBrush="#334CAF50" BorderThickness="1" CornerRadius="10">
@@ -173,7 +174,7 @@
                     </Button>
 
                     <!-- BOT&#xC3;O 2: REVERTER / NORMAL (VERMELHO) -->
-                    <Button Grid.Column="2" Height="90" Click="BtnRevertNormal_Click" Cursor="Hand" ToolTip="Remove todas as otimiza&#xE7;&#xF5;es aplicadas e volta ao padr&#xE3;o do Windows.">
+                    <Button controls:HoverZoom.Enabled="False" Grid.Column="2" Height="90" Click="BtnRevertNormal_Click" Cursor="Hand" ToolTip="Remove todas as otimiza&#xE7;&#xF5;es aplicadas e volta ao padr&#xE3;o do Windows.">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bdr" Background="#10F44336" BorderBrush="#33F44336" BorderThickness="1" CornerRadius="10">
@@ -225,7 +226,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- BOT&#xC3;O 1: GAMING LATENCY PROFILE (DOURO/&#xC2;MBAR) -->
-                    <Button Grid.Column="0" Height="90" Click="BtnOpenLatencyMenu_Click" Cursor="Hand" ToolTip="Abre o menu de otimiza&#xE7;&#xE3;o de lat&#xEA;ncia para gaming (estilo Khorvie)">
+                    <Button controls:HoverZoom.Enabled="False" Grid.Column="0" Height="90" Click="BtnOpenLatencyMenu_Click" Cursor="Hand" ToolTip="Abre o menu de otimiza&#xE7;&#xE3;o de lat&#xEA;ncia para gaming (estilo Khorvie)">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bdr" Background="#10FFD700" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="10">
@@ -264,7 +265,7 @@
                     </Button>
 
                     <!-- BOT&#xC3;O 2: REVERTER LATENCY (CINZA) -->
-                    <Button Grid.Column="2" Height="90" Click="BtnRevertLatency_Click" Cursor="Hand" ToolTip="Remove todas as otimiza&#xE7;&#xF5;es de lat&#xEA;ncia e volta ao padr&#xE3;o do Windows.">
+                    <Button controls:HoverZoom.Enabled="False" Grid.Column="2" Height="90" Click="BtnRevertLatency_Click" Cursor="Hand" ToolTip="Remove todas as otimiza&#xE7;&#xF5;es de lat&#xEA;ncia e volta ao padr&#xE3;o do Windows.">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bdr" Background="#10666666" BorderBrush="#33666666" BorderThickness="1" CornerRadius="10">

@@ -322,11 +322,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="bdr" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}" RenderTransformOrigin="0.5,0.5">
+                    <!-- O Padding fica no conteudo, NAO no Border: com ele no Border o
+                         realce do hover (que mora dentro) nascia 10 px para dentro e as
+                         bordas esquerda/direita do botao ficavam sem brilho. -->
+                    <Border x:Name="bdr" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
                         <Grid>
                             <!-- realce do hover: nao troca a cor da familia, so' clareia -->
                             <Border x:Name="hl" Background="#14FFFFFF" CornerRadius="7" Visibility="Collapsed"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}">
                                 <Path Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Fill="{TemplateBinding Foreground}"
                                       Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,7,0"/>
                                 <ContentPresenter VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>

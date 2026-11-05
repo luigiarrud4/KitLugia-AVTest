@@ -169,7 +169,8 @@ generalrepairpage") + icones vetoriais na AppsPage:**
   `ScaleTransform` **por elemento** e anima ScaleX/ScaleY com CubicEase no MouseEnter/MouseLeave.
   Uso por estilo: `<Setter Property="controls:HoverZoom.Enabled" Value="True"/>` + `Scale` +
   `DurationMs`; para template inline sem Style, os atributos vao na tag do `Button`.
-- **Onde aplicado (escala/tempo):** `CardStyle` 1.015/180, `SubtleCardStyle` 1.01/200, estilo
+- **Onde aplicado (escala/tempo):** `InteractiveCardStyle` 1.01/200 (o `CardStyle` perdeu o zoom
+  no ajuste de 05/11, item 13-quater), `SubtleCardStyle` 1.01/200, estilo
   global de Button 1.05/120, `IconTextButtonStyle` 1.03/120, `SettingsCardStyle` 1.01/200,
   `NavStyles` 2x 1.02/150, `StutterPage` 1.05/150, `NetworkPage` 8 botoes 1.02/150,
   `UpdateNotification` 1 botao 1.02, `MainWindow` 7 botoes 1.1/150.
@@ -186,7 +187,7 @@ generalrepairpage") + icones vetoriais na AppsPage:**
   cortavam o rotulo - visto na captura).
 - **PROVA (`tests/AnimCheck`, novo):** carrega `Generic.xaml`, aplica o estilo num Border/Button
   real, dispara `MouseEnter`/`MouseLeave` de verdade, bombeia o Dispatcher em prioridade
-  **Render** e LE a escala: **30/30** (CardStyle 1.0->1.015, SubtleCard 1.010, global 1.050,
+  **Render** e LE a escala: **36/36** (InteractiveCard 1.0->1.010, SubtleCard 1.010, global 1.050,
   IconText 1.030, SettingsCard 1.010, volta a 1.0 nos dois sentidos). Tem um controle interno
   (storyboard de codigo) para separar "tema quebrado" de "ambiente de teste parado".
   Capturas: `UiShotHarness` **52/52**, 0 falhas, 0 excecoes; AppsPage/NetworkPage/Dashboard
@@ -209,6 +210,34 @@ generalrepairpage") + icones vetoriais na AppsPage:**
   `xmlns` nao entrou no `<Page>`); tag `<Button>` multilinha exige achar o `>` final antes de
   injetar atributo; `MouseEventArgs`/`Point` sao ambiguos com WinForms (CS0104) - qualificar
   `System.Windows.Input`/`System.Windows.Point`.
+
+**13-quater. AJUSTE DE HOVER (pedido: "os cards grandes nao precisam dessa animacao de aumentar... e
+faca o mouse nao ficar no modo de clique"; "no appspage ... as bordas da esquerda e da direita nao
+ficaram preenchidas com o brilho"; "no generalrepairspage os botoes ... a linha amarela passar do
+limite da borda"):**
+- **CURSOR DE MAO HERDADO (a causa dos tres prints):** o `CardStyle` setava `Cursor="Hand"` e
+  `Cursor` e' propriedade HERDADA - todo texto dentro de um card mostrava a mao de clique mesmo sem
+  haver clique (a lista de tweaks e' um `Border` com `CardStyle`, nao um botao). Somado a isso, o
+  zoom de 1,5% num card de ~700 px empurrava a borda ~7 px para FORA, dai o efeito de a linha
+  dourada "passar do limite" nos reparos. Agora `CardStyle` = realce **so' por cor** (Background
+  + BorderBrush) e quem realmente clica usa `InteractiveCardStyle` (Cursor=Hand + 1,01/200).
+- **CARDS-CARTAO herdavam o zoom de BOTAO (1,05):** 8 botoes com template inline e tamanho de card
+  (`RepairsPage` 460x100, `CleanupPage` 3x Height=130, `DashboardPage` 4x Height=90) recebiam a
+  escala global de botao - 1,05 num card de 460 px = 23 px de sangria. Agora levam
+  `controls:HoverZoom.Enabled="False"`: o hover deles e' o brilho do proprio template
+  (`DropShadowEffect` no trigger), que e' exatamente o que existia nas branches antigas (medido em
+  `estavel-pre-ui-padronizacao`: `RepairsPage` e `CleanupPage` tinham **ZERO** `ScaleTransform`).
+- **BRILHO DO BOTAO COM ICONE (AppsPage):** o `Padding` do `IconTextButtonStyle` morava no `Border`
+  de fora, entao o realce `hl` (`#14FFFFFF`) nascia 10 px para dentro e as bordas esquerda/direita
+  ficavam sem luz. O `Padding` foi para o `StackPanel` do conteudo: o realce mede **238 de 240 px**
+  (so' a borda de 1 px de cada lado) - prova em `tests/AnimCheck` + `icon_button_hover.png`.
+- **`CleanupPage`:** o icone de informacao (20x20, so' com ToolTip) tinha `Cursor="Hand"` -> `Help`,
+  como os outros "i" do kit.
+- **`AnimCheck` 36/36:** cases novos "CardStyle nao escala / sem Cursor=Hand",
+  "InteractiveCardStyle 1.010" e "realce cobre a largura e a altura do botao".
+**Verificacao:** solucao **0 erros**; `AnimCheck` **36/36**; `UiShotHarness` **52/52**, 0 falhas;
+`ui_style_audit --check` saida **0**; capturas out14/out15 de TweaksPage, RepairsPage,
+DashboardPage e CleanupPage conferidas.
 
 **13. NOVA ORDEM (substitui a ordem das fases, sec. 7 do plano):** E1 bugs de runtime do harness
 (BloatwarePage anima `Angle` -> InvalidOperationException; DiskConverterPage NRE na carga) ->

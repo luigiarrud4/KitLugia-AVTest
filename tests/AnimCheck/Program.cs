@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using KitLugia.GUI.Controls;
@@ -35,8 +36,10 @@ internal static class Program
 
         Console.WriteLine("=== AnimCheck — hover dos cards e dos botoes ===\n");
 
-        CheckCardStyle("CardStyle", 1.015);
+        CheckCardStatic();
+        CheckCardStyle("InteractiveCardStyle", 1.01);
         CheckCardStyle("SubtleCardStyle", 1.01);
+        CheckIconHighlight();
         CheckPumpSanity();
         CheckNoShadow();
         CheckTemplateHover();
@@ -76,6 +79,84 @@ internal static class Program
             RoutedEvent = entering ? Mouse.MouseEnterEvent : Mouse.MouseLeaveEvent
         };
         ((UIElement)element).RaiseEvent(args);
+    }
+
+    // Card de conteudo (o bloco inteiro de uma secao): realce so' de cor. Nem
+    // zoom (empurrava a borda para fora do lugar num card de 700 px) nem
+    // Cursor=Hand (a mao de clique era herdada por todo texto dentro dele).
+    private static void CheckCardStatic()
+    {
+        Console.WriteLine("[CardStyle — card de conteudo]");
+        var style = Res<Style>("CardStyle");
+        bool hasZoom = false, hasHand = false;
+        foreach (Setter s in style.Setters)
+        {
+            if (s.Property == HoverZoom.EnabledProperty && s.Value is bool b && b) hasZoom = true;
+            if (s.Property == FrameworkElement.CursorProperty && s.Value is Cursor c && c == Cursors.Hand) hasHand = true;
+        }
+        Check(!hasZoom, "CardStyle: sem zoom (card de conteudo nao cresce no hover)");
+        Check(!hasHand, "CardStyle: sem Cursor=Hand (nao promete clique)");
+
+        var border = new Border { Width = 300, Height = 120 };
+        border.Style = style;
+        var window = Host(border);
+
+        Check(!HoverZoom.GetEnabled(border), "CardStyle: comportamento desligado no card real");
+        Hover(border, true);
+        Pump(400);
+        double scale = border.RenderTransform is ScaleTransform t ? t.ScaleX : 1.0;
+        Check(Math.Abs(scale - 1.0) < 0.001, $"CardStyle: hover NAO muda a escala (lido {scale:F3})");
+
+        window.Close();
+        Console.WriteLine();
+    }
+
+    // O realce do hover do botao de acao tem que preencher o botao inteiro: o
+    // Padding morava no Border de fora, entao o brilho nascia 10 px para dentro
+    // e as bordas esquerda/direita ficavam sem luz.
+    private static void CheckIconHighlight()
+    {
+        Console.WriteLine("[IconTextButtonStyle — brilho do hover]");
+        var button = new Button
+        {
+            Content = "Selecionar Todos",
+            Width = 240,
+            Height = 32,
+            Style = Res<Style>("IconTextButtonStyle"),
+            Tag = Res<Geometry>("IconSelectAll"),
+            // mesma familia verde do "Selecionar Todos" da AppsPage
+            Background = new SolidColorBrush(Color.FromArgb(0x1F, 0x4C, 0xAF, 0x50)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x4D, 0x4C, 0xAF, 0x50)),
+            Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A))
+        };
+        var window = Host(button, 340, 120);
+        button.ApplyTemplate();
+        window.UpdateLayout();
+
+        if (button.Template.FindName("hl", button) is not Border hl)
+        {
+            Fail("IconTextButtonStyle: realce 'hl' nao existe no template");
+            window.Close();
+            Console.WriteLine();
+            return;
+        }
+
+        hl.Visibility = Visibility.Visible;
+        window.UpdateLayout();
+
+        double hInset = button.ActualWidth - hl.ActualWidth;
+        double vInset = button.ActualHeight - hl.ActualHeight;
+        Check(hInset <= 4.0, $"realce cobre a largura (botao {button.ActualWidth:F0} px, realce {hl.ActualWidth:F0} px, sobra {hInset:F0} px)");
+        Check(vInset <= 4.0, $"realce cobre a altura (sobra {vInset:F0} px)");
+
+        // Path: qualificado por causa do System.Windows.Shapes.Path (shapes), que
+        // sombreia System.IO.Path neste arquivo.
+        string png = System.IO.Path.Combine(AppContext.BaseDirectory, "icon_button_hover.png");
+        SavePng(button, png, 3);
+        Console.WriteLine("  PNG    " + png);
+
+        window.Close();
+        Console.WriteLine();
     }
 
     private static void CheckCardStyle(string key, double expectedScale)
@@ -196,6 +277,29 @@ internal static class Program
         CheckButtonHover("IconTextButtonStyle", Res<Style>("IconTextButtonStyle"), Res<Geometry>("IconSelectAll"));
         CheckButtonHover("SettingsCardStyle (cards do Dashboard)", Res<Style>("SettingsCardStyle"), null);
         Console.WriteLine();
+    }
+
+    // Recorte ampliado: um print 1:1 nao mostra se o brilho encosta na borda.
+    private static void SavePng(FrameworkElement element, string path, double zoom)
+    {
+        int w = (int)(element.ActualWidth * zoom);
+        int h = (int)(element.ActualHeight * zoom);
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x10)), null, new Rect(0, 0, w, h));
+            dc.PushTransform(new ScaleTransform(zoom, zoom));
+            dc.DrawRectangle(new VisualBrush(element) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top },
+                             null, new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+            dc.Pop();
+        }
+
+        var bmp = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        bmp.Render(visual);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bmp));
+        using var fs = System.IO.File.Create(path);
+        encoder.Save(fs);
     }
 
     private static void Pump(int ms)

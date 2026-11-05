@@ -225,6 +225,20 @@ Regra a partir de agora: **escala no hover se faz com `controls:HoverZoom`** (co
 danexado, transform criado por elemento), nunca com `Storyboard` apontando para um transform
 declarado no estilo. Cor por hover continua sendo `Setter` no trigger, que funciona.
 
+## 5.2 Hover: card nao promete clique (05/11)
+
+Tres prints mostraram o mesmo erro de contrato: `Cursor` e' propriedade **herdada**, e o
+`CardStyle` (um `Border`) punha `Cursor="Hand"` - a mao de clique aparecia sobre o card inteiro da
+lista de tweaks, onde so' o toggle clica. O zoom de 1,5% piorava: num card de ~700 px a borda saia
+~7 px do lugar (o mesmo motivo de a linha dourada dos reparos parecer passar do limite).
+
+- `CardStyle` = realce **so' por cor**; `InteractiveCardStyle` = card que clica (Cursor + 1,01/200).
+- Cards grandes com template inline (`RepairsPage`, `CleanupPage`, `DashboardPage`) **nao** herdam
+  mais o zoom de botao (1,05): `HoverZoom.Enabled="False"`, e o hover fica com o brilho que o
+  proprio template ja' declarava - igual as branches antigas, que nao tinham escala nenhuma ali.
+- `IconTextButtonStyle`: o `Padding` saiu do `Border` e foi para o conteudo, entao o realce cobre a
+  largura inteira (**238 de 240 px**) em vez de nascer 10 px para dentro.
+
 ### F0 — Tokens ✅
 - [x] `Surface0`/`Surface1`/`Surface2`, `BorderSubtle`/`BorderStrong`, `WarningBrush` em `Brushes.xaml`
 - [x] `Themes/Typography.xaml` com a escala (`sys:Double`) e todos os estilos de texto

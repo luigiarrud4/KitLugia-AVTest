@@ -2,6 +2,7 @@
 <Page x:Class="KitLugia.GUI.Pages.CleanupPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       Title="Limpeza"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
@@ -25,7 +26,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- CARD 1: Arquivos Tempor&#xE1;rios -->
-                <Button Grid.Column="0" Height="130" Click="BtnCleanTemp_Click">
+                <Button controls:HoverZoom.Enabled="False" Grid.Column="0" Height="130" Click="BtnCleanTemp_Click">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Style="{StaticResource CardStyle}" Padding="15">
@@ -46,7 +47,7 @@
                 </Button>
 
                 <!-- CARD 2: Windows Update -->
-                <Button Grid.Column="2" Height="130" Click="BtnCleanUpdate_Click">
+                <Button controls:HoverZoom.Enabled="False" Grid.Column="2" Height="130" Click="BtnCleanUpdate_Click">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Style="{StaticResource CardStyle}" Padding="15">
@@ -67,7 +68,7 @@
                 </Button>
 
                 <!-- CARD 3: Shaders -->
-                <Button Grid.Column="4" Height="130" Click="BtnCleanShaders_Click">
+                <Button controls:HoverZoom.Enabled="False" Grid.Column="4" Height="130" Click="BtnCleanShaders_Click">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Style="{StaticResource CardStyle}" Padding="15">
@@ -431,7 +432,7 @@
                                            Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
                                 <!-- &#xCD;cone de informa&#xE7;&#xE3;o -->
                                 <Border Background="#2A2A2A" CornerRadius="10" Width="20" Height="20"
-                                        Margin="8,0,0,0" VerticalAlignment="Center" Cursor="Hand"
+                                        Margin="8,0,0,0" VerticalAlignment="Center" Cursor="Help"
                                     ToolTip="O auditor de registro lista entradas suspeitas para revis&#xE3;o. Por padr&#xE3;o, os achados ficam como Manual para evitar remover integra&#xE7;&#xF5;es de apps, menus de contexto e associa&#xE7;&#xF5;es de arquivo. Use Copiar para pesquisar antes de qualquer limpeza.">
                                     <TextBlock Text="&#x2139;" FontSize="11" Foreground="{StaticResource AccentColor}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
