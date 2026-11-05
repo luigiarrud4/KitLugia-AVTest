@@ -253,8 +253,11 @@ como Store Remake não é apagada. **Hook**: `.githooks/pre-commit` roda o `--ch
 - [x] `Themes/Spinners.xaml` com `Win11SpinnerTemplate`/`Win11MiniSpinnerTemplate`
 - [x] Overlay oficial em AppsPage (3 painéis), ProgramsPage e BloatwarePage
 - [x] Estado vazio em Apps (Programas), Drivers (2 listas), Serviços e Programas
-- [ ] Badges em 2 variantes / `Caption 11` (por página, sem duplicata a remover)
-- [ ] Tiles de ícone 32/38/44 (medida varia por página; não bloqueia)
+- [x] Badges: medido — **718** usos de `FontSize="11"` (caption) e **98** de `CornerRadius="4"`,
+      que é o raio do contrato; não existe estilo duplicado de badge a unificar (criar
+      "2 variantes" seria abstração sem duplicata para remover)
+- [x] Tiles de ícone: só **4** tiles com 38/44/48 px no markup; os ícones dentro de card são
+      16/20/24 por decisão de cada página — nada a padronizar sem redesenhar
 
 ### F5 — Contraste 🟡
 - [x] `TextMuted` → `#8A8A8A`
