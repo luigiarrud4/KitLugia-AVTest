@@ -40,6 +40,7 @@ internal static class Program
         CheckCardStyle("InteractiveCardStyle", 1.01);
         CheckCardStyle("SubtleCardStyle", 1.01);
         CheckIconHighlight();
+        CheckDashboardFirstCard();
         CheckPumpSanity();
         CheckNoShadow();
         CheckTemplateHover();
@@ -79,6 +80,73 @@ internal static class Program
             RoutedEvent = entering ? Mouse.MouseEnterEvent : Mouse.MouseLeaveEvent
         };
         ((UIElement)element).RaiseEvent(args);
+    }
+
+    // O primeiro card-cartao do Dashboard ("Otimizacao Inteligente") e' o unico
+    // que mantem a animacao do estilo global de botao (1,05): o usuario pediu de
+    // volta. Os outros tres ficam so' com o brilho do proprio template.
+    private static void CheckDashboardFirstCard()
+    {
+        Console.WriteLine("[DashboardPage — primeiro card]");
+        Window? window = null;
+        try
+        {
+            // Page so' aceita Window/Frame como pai (nao entra num Grid como os
+            // controles das outras sondas).
+            var page = new KitLugia.GUI.Pages.DashboardPage();
+            window = new Window
+            {
+                Width = 1186, Height = 886, Left = -32000, Top = -32000,
+                WindowStyle = WindowStyle.None, ShowInTaskbar = false, Content = page
+            };
+            window.Show();
+            window.UpdateLayout();
+            Pump(400);
+
+            var cards = Descendants<Button>(page).Where(b => Math.Abs(b.Height - 90) < 0.5).ToList();
+            if (cards.Count != 4)
+            {
+                Fail($"esperava 4 cards de 90 px na pagina (achei {cards.Count})");
+                return;
+            }
+
+            string tooltip = cards[0].ToolTip as string ?? "";
+            Check(tooltip.Contains("otimiza"), "primeiro card identificado (Otimizacao Inteligente)");
+            Check(HoverZoom.GetEnabled(cards[0]), "primeiro card anima (estilo global ligado)");
+
+            Hover(cards[0], true);
+            Pump(400);
+            double scale = cards[0].RenderTransform is ScaleTransform t ? t.ScaleX : 1.0;
+            Check(scale > 1.04, $"primeiro card cresce no hover (1,0 -> {scale:F3})");
+
+            for (int i = 1; i < cards.Count; i++)
+                Check(!HoverZoom.GetEnabled(cards[i]), $"card {i + 1}: segue sem zoom (so' o brilho do template)");
+
+            Hover(cards[0], false);
+            Pump(400);
+            scale = cards[0].RenderTransform is ScaleTransform back ? back.ScaleX : 1.0;
+            Check(Math.Abs(scale - 1.0) < 0.01, $"primeiro card volta ao repouso (lido {scale:F3})");
+        }
+        catch (Exception ex)
+        {
+            Fail($"DashboardPage: {ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            try { window?.Close(); } catch { }
+            Console.WriteLine();
+        }
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        int n = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var deep in Descendants<T>(child)) yield return deep;
+        }
     }
 
     // Card de conteudo (o bloco inteiro de uma secao): realce so' de cor. Nem

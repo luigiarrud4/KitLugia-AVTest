@@ -135,7 +135,9 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- BOT&#xC3;O 1: OTIMIZA&#xC7;&#xC3;O INTELIGENTE (VERDE) -->
-                    <Button controls:HoverZoom.Enabled="False" Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personaliza&#xE7;&#xE3;o da otimiza&#xE7;&#xE3;o inteligente.">
+                    <!-- Este e' o unico card-cartao que mantem o zoom do estilo global
+                         de botao (1,05) no hover, alem do brilho verde do template. -->
+                    <Button Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personaliza&#xE7;&#xE3;o da otimiza&#xE7;&#xE3;o inteligente.">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bdr" Background="#104CAF50" BorderBrush="#334CAF50" BorderThickness="1" CornerRadius="10">
