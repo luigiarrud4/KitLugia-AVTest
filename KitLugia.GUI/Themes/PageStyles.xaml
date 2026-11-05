@@ -1,48 +1,37 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Style x:Key="PageTitleStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeDisplay}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="Margin" Value="0,0,0,10"/>
+    <!-- ============================================================
+         Layout das paginas. Os estilos de TEXTO ficam em Typography.xaml
+         (ver o quirk do StaticResource no Setter documentado la).
+         ============================================================ -->
+
+    <Style x:Key="PageContentStyle" TargetType="{x:Type ScrollViewer}">
+        <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="Padding" Value="0"/>
     </Style>
 
-    <Style x:Key="PageSubtitleStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        <Setter Property="Margin" Value="0,0,0,30"/>
-        <Setter Property="TextWrapping" Value="Wrap"/>
+    <!-- Raiz de conteudo: margem unica de pagina. -->
+    <Style x:Key="PageStackStyle" TargetType="{x:Type StackPanel}">
+        <Setter Property="Margin" Value="32,28,32,40"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
 
-    <Style x:Key="SectionHeaderStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSection}"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="Margin" Value="0,0,0,15"/>
+    <Style x:Key="SeparatorStyle" TargetType="{x:Type Separator}">
+        <Setter Property="Background" Value="{DynamicResource BorderSubtle}"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Height" Value="1"/>
     </Style>
 
-    <Style x:Key="SectionAccentHeaderStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSection}"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
-        <Setter Property="Margin" Value="0,0,0,15"/>
-    </Style>
-
-    <Style x:Key="SectionDescriptionStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        <Setter Property="Margin" Value="0,2,0,0"/>
-        <Setter Property="TextWrapping" Value="Wrap"/>
-    </Style>
-
+    <!-- Container de card com padding padrao (nao e' clicavel). -->
     <Style x:Key="CardContainerStyle" TargetType="{x:Type Border}">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="20"/>
-        <Setter Property="Margin" Value="0,0,0,25"/>
+        <Setter Property="Margin" Value="0,0,0,20"/>
     </Style>
 
     <Style x:Key="CompactCardContainerStyle" TargetType="{x:Type Border}">
@@ -51,43 +40,7 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="15"/>
-        <Setter Property="Margin" Value="0,0,0,20"/>
-    </Style>
-
-    <Style x:Key="TweakLabelStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-
-    <Style x:Key="TweakStatusStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-        <Setter Property="Margin" Value="0,0,10,0"/>
-    </Style>
-
-    <Style x:Key="PageContentStyle" TargetType="{x:Type ScrollViewer}">
-        <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
-    </Style>
-
-    <Style x:Key="PageStackStyle" TargetType="{x:Type StackPanel}">
-        <Setter Property="Margin" Value="40,30,40,50"/>
-        <Setter Property="MaxWidth" Value="900"/>
-        <Setter Property="HorizontalAlignment" Value="Left"/>
-    </Style>
-
-    <Style x:Key="SeparatorStyle" TargetType="{x:Type Separator}">
-        <Setter Property="Background" Value="{DynamicResource CardBorder}"/>
-        <Setter Property="Margin" Value="0"/>
-        <Setter Property="Height" Value="1"/>
-    </Style>
-
-    <Style x:Key="PageDescriptionStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextDescription}"/>
-        <Setter Property="Margin" Value="0,0,0,30"/>
-        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
     </Style>
 
 </ResourceDictionary>

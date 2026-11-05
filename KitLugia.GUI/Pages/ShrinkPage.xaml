@@ -17,8 +17,8 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,15">
-            <TextBlock Text="&#x2B55; rEFInd Boot Manager" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
-            <TextBlock Text="Gerenciador de boot UEFI — auto-detecção de sistemas, temas, Secure Boot" FontSize="14" Foreground="{StaticResource TextMuted}" Margin="0,5,0,0"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x2B55; rEFInd Boot Manager"/>
+            <TextBlock Text="Gerenciador de boot UEFI — auto-detecção de sistemas, temas, Secure Boot" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,5,0,0"/>
         </StackPanel>
 
         <!-- Main Content -->
@@ -62,7 +62,7 @@
                         <!-- Features Card -->
                         <Border Background="#1A1A2A" CornerRadius="8" Padding="15" Margin="0,0,0,12" BorderBrush="#5555AA" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="&#x1F4A1; Sobre o rEFInd" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
+                                <TextBlock Text="&#x1F4A1; Sobre o rEFInd" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
                                 <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#B0B0B0" Margin="0,0,0,8">
 rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot Manager no ESP e oferece um menu gráfico para escolher o SO na inicializacao.
                                 </TextBlock>
@@ -71,43 +71,43 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Auto-detecção de EFI boot loaders em discos internos, externos e rede" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Auto-detecção de EFI boot loaders em discos internos, externos e rede" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Suporte a Secure Boot via Shim / MOK" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Suporte a Secure Boot via Shim / MOK" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Temas personalizados com icons PNG/JPEG/ICNS, banner e fontes escalaveis" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Temas personalizados com icons PNG/JPEG/ICNS, banner e fontes escalaveis" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Boot direto de kernels Linux com stub EFI + initramfs" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Boot direto de kernels Linux com stub EFI + initramfs" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Drivers EFI para ext4fs, Btrfs, NTFS, HFS+, ISO-9660" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Drivers EFI para ext4fs, Btrfs, NTFS, HFS+, ISO-9660" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Boot de rede via iPXE (PXE/HTTP)" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Boot de rede via iPXE (PXE/HTTP)" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator>
                                     <BulletDecorator.Bullet>
                                         <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
-                                    <TextBlock Text="Timeout configurável, entrada padrão, protetor de tela" FontSize="10" Foreground="#CCC" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Timeout configurável, entrada padrão, protetor de tela" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                             </StackPanel>
                         </Border>
@@ -115,8 +115,8 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                         <!-- How it works -->
                         <Border Background="#1A2A1A" CornerRadius="8" Padding="15" Margin="0,0,0,12" BorderBrush="#4CAF50" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="&#x1F4CB; Como funciona" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
-                                <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#B0B0B0" Margin="0,0,0,6">
+                                <TextBlock Text="&#x1F4CB; Como funciona" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#B0B0B0" Margin="0,0,0,6">
 1. INSTALAR: Substitui bootmgfw.efi no ESP pelo rEFInd.
    O Windows Boot Manager original é renomeado para bootmgfw.efi.original.
 
@@ -132,8 +132,8 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                         <!-- Tips -->
                         <Border Background="#2A2A1A" CornerRadius="8" Padding="15" BorderBrush="#AAAA55" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="&#x26A0; Dicas" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
-                                <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#B0B0B0">
+                                <TextBlock Text="&#x26A0; Dicas" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#B0B0B0">
 - Nao desligue o PC durante a instalacao/remocao do rEFInd
 - Se BitLocker estiver ativo, pode ser necessario pausa-lo antes
 - Para personalizar, edite refind.conf no ESP (EFI/refind/)

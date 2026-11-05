@@ -11,7 +11,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30,30,30,50" MaxWidth="900">
 
-            <TextBlock Text="Calibra&#xE7;&#xE3;o e Tela" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Calibra&#xE7;&#xE3;o e Tela" Margin="0,0,0,10"/>
             <TextBlock Text="Gerencie perfis de cores e corrija resets causados por updates de driver." Foreground="#A0A0A0" Margin="0,0,0,30"/>
 
             <!-- PAINEL DE INFORMA&#xC7;&#xD5;ES -->
@@ -59,7 +59,7 @@
                                             <TextBlock Text="&#x1F4BE;" FontSize="20" Margin="0,0,10,0"/>
                                             <StackPanel>
                                                 <TextBlock Text="SALVAR" FontWeight="Bold" Foreground="White"/>
-                                                <TextBlock Text="Backup atual" FontSize="10" Foreground="#AAA"/>
+                                                <TextBlock Text="Backup atual" FontSize="11" Foreground="#AAA"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>
@@ -83,7 +83,7 @@
                                             <TextBlock Text="&#x21BA;" FontSize="20" Margin="0,0,10,0" Foreground="Black" FontWeight="Bold"/>
                                             <StackPanel>
                                                 <TextBlock Text="RESTAURAR" FontWeight="Bold" Foreground="Black"/>
-                                                <TextBlock Text="Aplicar backup" FontSize="10" Foreground="#333"/>
+                                                <TextBlock Text="Aplicar backup" FontSize="11" Foreground="#333"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>
@@ -105,7 +105,7 @@
                                             <TextBlock Text="&#x1F5D1;&#xFE0F;" FontSize="20" Margin="0,0,10,0"/>
                                             <StackPanel>
                                                 <TextBlock Text="RESETAR" FontWeight="Bold" Foreground="White"/>
-                                                <TextBlock Text="Padr&#xE3;o Windows" FontSize="10" Foreground="#FFCCCC"/>
+                                                <TextBlock Text="Padr&#xE3;o Windows" FontSize="11" Foreground="#FFCCCC"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>

@@ -10,7 +10,7 @@
 
             <!-- Cabe&#xE7;alho -->
             <StackPanel Margin="0,0,0,25">
-                <TextBlock Text="Automa&#xE7;&#xE3;o de Sistema" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Automa&#xE7;&#xE3;o de Sistema"/>
                 <TextBlock Text="Configure regras autom&#xE1;ticas para manter seu PC r&#xE1;pido sem interven&#xE7;&#xE3;o manual." 
                            Foreground="{StaticResource TextSecondary}" Margin="0,6,0,0"/>
             </StackPanel>

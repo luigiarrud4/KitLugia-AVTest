@@ -47,7 +47,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Gerenciador de Drivers" Foreground="White" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,20"/>
+        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Drivers" Margin="0,0,0,20"/>
 
         <TabControl x:Name="MainTabs" Grid.Row="1" Background="Transparent" BorderThickness="0">
 
@@ -259,28 +259,28 @@
                             <StackPanel>
                                 <TextBlock Text="Total" Foreground="#888" FontSize="11" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="TxtKernelTotal" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
-                                <TextBlock Text="Type 1/2 (Kernel)" Foreground="#666" FontSize="10"/>
+                                <TextBlock Text="Type 1/2 (Kernel)" Foreground="#666" FontSize="11"/>
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="1" Background="#1A1A1A" BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock Text="Microsoft" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
                                 <TextBlock x:Name="TxtKernelMs" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
-                                <TextBlock Text="Inbox / assinado MS" Foreground="#666" FontSize="10"/>
+                                <TextBlock Text="Inbox / assinado MS" Foreground="#666" FontSize="11"/>
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="2" Background="#1A1A1A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock Text="Terceiros" Foreground="#FFD700" FontSize="11" FontWeight="Bold"/>
                                 <TextBlock x:Name="TxtKernelThird" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
-                                <TextBlock Text="AVG/LDPlayer/VMware..." Foreground="#666" FontSize="10"/>
+                                <TextBlock Text="AVG/LDPlayer/VMware..." Foreground="#666" FontSize="11"/>
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="3" Background="#1A1A1A" BorderBrush="#FF3333" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock Text="⚠ Boot/System" Foreground="#FF5555" FontSize="11" FontWeight="Bold"/>
                                 <TextBlock x:Name="TxtKernelRisk" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
-                                <TextBlock Text="Terceiros em Boot/System" Foreground="#666" FontSize="10"/>
+                                <TextBlock Text="Terceiros em Boot/System" Foreground="#666" FontSize="11"/>
                             </StackPanel>
                         </Border>
                         <StackPanel Grid.Column="4" VerticalAlignment="Center" Margin="12,0,0,0">
@@ -562,7 +562,7 @@
                                 </Grid>
                             </Border>
 
-                            <TextBlock Text="&#x26A0;&#xFE0F; AVISO IMPORTANTE" Foreground="#FF5555" FontWeight="Bold" FontSize="14" Margin="0,0,0,15"/>
+                            <TextBlock Text="&#x26A0;&#xFE0F; AVISO IMPORTANTE" Foreground="#FF5555" FontWeight="Bold" FontSize="13" Margin="0,0,0,15"/>
                             <TextBlock Text="O Driver Verifier &#xE9; uma ferramenta avan&#xE7;ada que pode causar instabilidade no sistema. Se o PC entrar em boot loop:" Foreground="#CCC" TextWrapping="Wrap" FontSize="13" Margin="0,0,0,10"/>
                             <TextBlock Text="1. Entre em Modo de Seguran&#xE7;a (F8 ou Shift+Restart)" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
                             <TextBlock Text="2. Volte aqui e clique em DESATIVAR" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
@@ -572,7 +572,7 @@
                         <!-- Dicas Laterais -->
                         <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="20" VerticalAlignment="Top">
                             <StackPanel>
-                                <TextBlock Text="Como Usar" FontWeight="Bold" Foreground="{StaticResource AccentColor}" FontSize="14" Margin="0,0,0,15"/>
+                                <TextBlock Text="Como Usar" FontWeight="Bold" Foreground="{StaticResource AccentColor}" FontSize="13" Margin="0,0,0,15"/>
 
                                 <TextBlock Text="1. Ative o Verifier" Foreground="White" Margin="0,0,0,5"/>
                                 <TextBlock Text="O Windows pedir&#xE1; reinicializa&#xE7;&#xE3;o." Foreground="#777" FontSize="11" Margin="0,0,0,15"/>

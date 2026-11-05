@@ -34,7 +34,7 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Integridade e Seguranca" FontSize="32" FontWeight="SemiBold" Foreground="White"/>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Integridade e Seguranca"/>
                 <TextBlock Text="Monitoramento ativo de vulnerabilidades e configurações críticas." Foreground="#AAA" Margin="0,5,0,0"/>
             </StackPanel>
 
@@ -43,7 +43,7 @@
                 <Border Width="90" Height="90" CornerRadius="45" BorderThickness="4" x:Name="BorderScore">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock x:Name="TxtScore" Text="100%" FontSize="26" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
-                        <TextBlock Text="SCORE" FontSize="10" Foreground="#AAA" HorizontalAlignment="Center" FontWeight="Bold"/>
+                        <TextBlock Text="SCORE" FontSize="11" Foreground="#AAA" HorizontalAlignment="Center" FontWeight="Bold"/>
                     </StackPanel>
                 </Border>
                 <!-- Loading overlay -->
@@ -51,7 +51,7 @@
                         Visibility="Collapsed" IsHitTestVisible="True">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="⏳" FontSize="28" HorizontalAlignment="Center"/>
-                        <TextBlock Text="SCAN" FontSize="9" Foreground="#AAA" HorizontalAlignment="Center" FontWeight="Bold"/>
+                        <TextBlock Text="SCAN" FontSize="11" Foreground="#AAA" HorizontalAlignment="Center" FontWeight="Bold"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -105,7 +105,7 @@
                             HorizontalAlignment="Right" Margin="0,0,6,0"
                             Background="Transparent" BorderThickness="0" Cursor="Hand"
                             Visibility="Collapsed" Click="BtnClearSearch_Click">
-                        <TextBlock Text="✕" Foreground="#666" FontSize="10"/>
+                        <TextBlock Text="✕" Foreground="#666" FontSize="11"/>
                     </Button>
                 </Grid>
             </Border>
@@ -145,7 +145,7 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="PATH do Sistema e do Usuário" Foreground="White" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
                         <Border x:Name="PathStatusBadge" CornerRadius="4" Padding="8,3" Margin="10,0,0,0" Background="#154CAF50" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtPathStatus" Text="✅ OK" FontSize="10" FontWeight="Bold" Foreground="#4CAF50"/>
+                            <TextBlock x:Name="TxtPathStatus" Text="✅ OK" FontSize="11" FontWeight="Bold" Foreground="#4CAF50"/>
                         </Border>
                     </StackPanel>
                     <TextBlock x:Name="TxtPathDetail" Text="Um clique corrige TUDO de uma vez: entradas duplicadas, pastas inexistentes, essenciais do Windows e programas instalados fora do PATH (winget, git, node, dotnet, npm, 7-Zip, cargo...)."
@@ -268,7 +268,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
                                         <!-- Selo de reinicialização pendente: só aparece em itens PENDING.
                                              Fica ao lado do título para o usuário saber de relance
                                              que a correção só valerá no próximo boot. -->
@@ -277,7 +277,7 @@
                                                 CornerRadius="3" Padding="6,2"
                                                 Background="#33FFB900" BorderBrush="#FFB900" BorderThickness="1"
                                                 ToolTip="Este item já foi corrigido, mas a mudança só vale após reiniciar o Windows.">
-                                            <TextBlock Text="🔄 REINICIALIZAÇÃO PENDENTE" Foreground="#FFD700" FontSize="10" FontWeight="Bold"/>
+                                            <TextBlock Text="🔄 REINICIALIZAÇÃO PENDENTE" Foreground="#FFD700" FontSize="11" FontWeight="Bold"/>
                                         </Border>
                                     </Grid>
                                     <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="11"/>

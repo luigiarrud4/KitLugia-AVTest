@@ -18,8 +18,8 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Gerenciador de Programas" FontSize="28" FontWeight="SemiBold" Foreground="White"/>
-                <TextBlock x:Name="ProgramCountText" Text="Programas: 0" FontSize="14" Foreground="#FFD700" Margin="15,8,0,0" FontWeight="SemiBold"/>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Programas"/>
+                <TextBlock x:Name="ProgramCountText" Text="Programas: 0" FontSize="13" Foreground="#FFD700" Margin="15,8,0,0" FontWeight="SemiBold"/>
             </StackPanel>
             <TextBlock Text="Programas instalados no Windows. Gerencie instala&#xE7;&#xF5;es normais." Foreground="#AAA" Margin="0,5,0,0"/>
             <TextBlock Text="Baseado em Bulk Crap Uninstaller (BCU) - Licen&#xE7;a Apache 2.0" Foreground="#FF6F61" FontSize="11" Margin="0,5,0,0"/>
@@ -49,7 +49,7 @@
                         </EventTrigger>
                     </Ellipse.Triggers>
                 </Ellipse>
-                <TextBlock Text="Carregando programas..." Foreground="White" Margin="0,15,0,0" FontSize="14" FontWeight="SemiBold"/>
+                <TextBlock Text="Carregando programas..." Foreground="White" Margin="0,15,0,0" FontSize="13" FontWeight="SemiBold"/>
             </StackPanel>
         </Border>
 

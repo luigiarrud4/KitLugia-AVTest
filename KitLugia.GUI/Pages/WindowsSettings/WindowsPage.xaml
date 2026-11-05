@@ -115,15 +115,15 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="Microsoft Store Remake" FontSize="16" FontWeight="Bold" Foreground="#4CC2FF"/>
                                             <Border Background="#0078D4" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="NOVO" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                <TextBlock Text="NOVO" FontSize="11" FontWeight="Bold" Foreground="White"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="Tentativa de corrigir os problemas da Microsoft Store para oferecer uma experiência melhor ao usuário" FontSize="11" Foreground="#7AA8D6" TextWrapping="Wrap" Margin="0,3,0,0"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                            <TextBlock Text="winget" FontSize="10" Foreground="#4CC2FF" Background="#0A2A4A" Padding="6,2" Margin="0,0,6,0"/>
-                                            <TextBlock Text="choco" FontSize="10" Foreground="#FFB900" Background="#2A2300" Padding="6,2" Margin="0,0,6,0"/>
-                                            <TextBlock Text="MS Store" FontSize="10" Foreground="#7FBA00" Background="#102A10" Padding="6,2" Margin="0,0,6,0"/>
-                                            <TextBlock Text="Force Stop + TaskManager" FontSize="10" Foreground="#FF8C00" Background="#2A1A00" Padding="6,2"/>
+                                            <TextBlock Text="winget" FontSize="11" Foreground="#4CC2FF" Background="#0A2A4A" Padding="6,2" Margin="0,0,6,0"/>
+                                            <TextBlock Text="choco" FontSize="11" Foreground="#FFB900" Background="#2A2300" Padding="6,2" Margin="0,0,6,0"/>
+                                            <TextBlock Text="MS Store" FontSize="11" Foreground="#7FBA00" Background="#102A10" Padding="6,2" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Force Stop + TaskManager" FontSize="11" Foreground="#FF8C00" Background="#2A1A00" Padding="6,2"/>
                                         </StackPanel>
                                     </StackPanel>
                                     <TextBlock Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#0078D4" VerticalAlignment="Center" Margin="0,0,4,0"/>

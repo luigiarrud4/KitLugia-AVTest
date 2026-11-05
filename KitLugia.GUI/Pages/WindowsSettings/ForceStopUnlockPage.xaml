@@ -35,7 +35,7 @@
         <StackPanel Margin="40,30,40,50" MaxWidth="850" HorizontalAlignment="Left">
 
             <!-- TITLE -->
-            <TextBlock Text="&#x1F4C1; Operações de Arquivo" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x1F4C1; Operações de Arquivo" Margin="0,0,0,8"/>
             <TextBlock Text="Force Stop Unlock + Take Ownership — clique direito inteligente. A página começa no Force Stop; troque para Take Ownership no topo para assumir permissões." Foreground="#A0A0A0" Margin="0,0,0,18" TextWrapping="Wrap" FontSize="13"/>
 
             <!-- TOGGLE TOPO: seletor rápido (espelha as abas) -->
@@ -151,7 +151,7 @@
                                                             <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                                             <TextBlock Text="{Binding DisplayLabel}" FontSize="12" Foreground="#DDD" VerticalAlignment="Center"/>
                                                             <Border CornerRadius="3" Background="#222244" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding HandleType}" FontSize="9" Foreground="#8888CC"/>
+                                                                <TextBlock Text="{Binding HandleType}" FontSize="11" Foreground="#8888CC"/>
                                                             </Border>
                                                         </StackPanel>
                                                     </Border>
@@ -202,7 +202,7 @@
 
                             <Border Grid.Column="0" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
                                 <StackPanel>
-                                    <TextBlock Text="&#x1F6E0;&#xFE0F; Handle Tool" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock Text="&#x1F6E0;&#xFE0F; Handle Tool" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
                                     <TextBlock x:Name="TxtHandleStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
                                     <TextBlock Text="handle64.exe (Sysinternals) — para identificar handles individuais" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
                                 </StackPanel>
@@ -210,7 +210,7 @@
 
                             <Border Grid.Column="2" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
                                 <StackPanel>
-                                    <TextBlock Text="&#x1F4CB; Menu de Contexto" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock Text="&#x1F4CB; Menu de Contexto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
                                     <TextBlock x:Name="TxtMenuStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
                                     <TextBlock Text="Clique direito em qualquer arquivo ou pasta no Explorer" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
                                 </StackPanel>
@@ -220,7 +220,7 @@
                         <!-- HOW IT WORKS -->
                         <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="&#x2139;&#xFE0F; Como Funciona" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock Text="&#x2139;&#xFE0F; Como Funciona" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
                                 <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="20">
                                     <Run Text="1. "/><Run Text="Restart Manager API" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" — fecha handles sem matar processos (mais limpo)"/>
                                     <LineBreak/>
@@ -289,9 +289,9 @@
                                         <TextBlock x:Name="TxtTakeOwnDetail" Text="" FontSize="11" Foreground="#888" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         <Grid Margin="0,10,0,0">
                                             <ProgressBar x:Name="TakeOwnProgress" Height="6" Visibility="Collapsed" IsIndeterminate="True" Foreground="#FFD700" Background="#222" Minimum="0" Maximum="100" Value="0"/>
-                                            <TextBlock x:Name="TxtTakeOwnProgress" Text="" FontSize="10" Foreground="#FFD700" HorizontalAlignment="Right" Margin="0,-16,0,0" Visibility="Collapsed"/>
+                                            <TextBlock x:Name="TxtTakeOwnProgress" Text="" FontSize="11" Foreground="#FFD700" HorizontalAlignment="Right" Margin="0,-16,0,0" Visibility="Collapsed"/>
                                         </Grid>
-                                        <TextBlock x:Name="TxtTakeOwnCurrentFile" Text="" FontSize="10" Foreground="#666" Margin="0,4,0,0" Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="TxtTakeOwnCurrentFile" Text="" FontSize="11" Foreground="#666" Margin="0,4,0,0" Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -330,14 +330,14 @@
                             </Grid.ColumnDefinitions>
                             <Border Grid.Column="0" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
                                 <StackPanel>
-                                    <TextBlock Text="&#x1F512; Permissões" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock Text="&#x1F512; Permissões" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
                                     <TextBlock x:Name="TxtTakeOwnMenuStatus" Text="Verificando..." FontSize="12" Foreground="#888"/>
                                     <TextBlock Text="Assume propriedade + FullControl para Administradores" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="2" CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16">
                                 <StackPanel>
-                                    <TextBlock Text="&#x26A1; Tecnologia" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
+                                    <TextBlock Text="&#x26A1; Tecnologia" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,6"/>
                                     <TextBlock Text="In-process (SeTakeOwnershipPrivilege + ACL nativo). Sem takeown.exe/icacls." FontSize="12" Foreground="#888" TextWrapping="Wrap"/>
                                     <TextBlock Text="Recursivo instantâneo, com progresso" FontSize="11" Foreground="#666" Margin="0,4,0,0"/>
                                 </StackPanel>
@@ -347,7 +347,7 @@
                         <!-- HOW IT WORKS TAKEOWN -->
                         <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="&#x2139;&#xFE0F; Como Funciona (Take Ownership)" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock Text="&#x2139;&#xFE0F; Como Funciona (Take Ownership)" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
                                 <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="20">
                                     <Run Text="1. "/><Run Text="Habilita privilégios" FontWeight="SemiBold" Foreground="#DDD"/><Run Text=" SeTakeOwnership/SeBackup/SeRestore"/>
                                     <LineBreak/>
@@ -366,7 +366,7 @@
             <!-- REQUIREMENTS (fora das abas, comum) -->
             <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#3A3A50" BorderThickness="1" Padding="16" Margin="0,16,0,16">
                 <StackPanel>
-                    <TextBlock Text="&#x26A0;&#xFE0F; Requisitos" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+                    <TextBlock Text="&#x26A0;&#xFE0F; Requisitos" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
                     <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12" LineHeight="20">
                         <Run Text="&#x2022; "/><Run Text="Windows 10 ou superior" Foreground="#CCC"/>
                         <LineBreak/>
@@ -441,10 +441,10 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" Foreground="White"/>
                                                 <Border CornerRadius="3" Background="#222244" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Root}" FontSize="9" Foreground="#8888CC"/>
+                                                    <TextBlock Text="{Binding Root}" FontSize="11" Foreground="#8888CC"/>
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Command}" FontSize="10" Foreground="#555" Margin="0,2,0,0" TextWrapping="Wrap" MaxHeight="24"/>
+                                            <TextBlock Text="{Binding Command}" FontSize="11" Foreground="#555" Margin="0,2,0,0" TextWrapping="Wrap" MaxHeight="24"/>
                                         </StackPanel>
 
                                         <Border Grid.Column="2" CornerRadius="3" Padding="5,1" VerticalAlignment="Center">
@@ -458,7 +458,7 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
-                                            <TextBlock FontSize="9" FontWeight="SemiBold">
+                                            <TextBlock FontSize="11" FontWeight="SemiBold">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
                                                         <Setter Property="Text" Value="3rd Party"/>

@@ -119,7 +119,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Working Set (0x01)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Mem&#xF3;ria ativa dos processos em execu&#xE7;&#xE3;o. Limpar pode liberar mem&#xF3;ria mas pode afetar performance." FontSize="10" Foreground="#888" TextWrapping="Wrap"/>
+                            <TextBlock Text="Mem&#xF3;ria ativa dos processos em execu&#xE7;&#xE3;o. Limpar pode liberar mem&#xF3;ria mas pode afetar performance." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkWorkingSet" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="True"/>
                     </Grid>
@@ -131,7 +131,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="System File Cache (0x02)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Cache do sistema de arquivos. Limpar pode acelerar o sistema mas pode desacelerar leituras futuras." FontSize="10" Foreground="#888" TextWrapping="Wrap"/>
+                            <TextBlock Text="Cache do sistema de arquivos. Limpar pode acelerar o sistema mas pode desacelerar leituras futuras." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkSystemFileCache" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="True"/>
                     </Grid>
@@ -143,7 +143,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Standby List (sem prioridade) (0x04)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="P&#xE1;ginas em cache sem prioridade. Seguro de limpar, libera mem&#xF3;ria cacheada do sistema." FontSize="10" Foreground="#888" TextWrapping="Wrap"/>
+                            <TextBlock Text="P&#xE1;ginas em cache sem prioridade. Seguro de limpar, libera mem&#xF3;ria cacheada do sistema." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkStandbyPriority0" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="True"/>
                     </Grid>
@@ -155,7 +155,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Standby List (com prioridade) (0x08)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="P&#xE1;ginas em cache com prioridade 0-7. Limpar pode liberar mais mem&#xF3;ria mas pode afetar apps em uso." FontSize="10" Foreground="#888" TextWrapping="Wrap"/>
+                            <TextBlock Text="P&#xE1;ginas em cache com prioridade 0-7. Limpar pode liberar mais mem&#xF3;ria mas pode afetar apps em uso." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkStandbyList" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="False"/>
                     </Grid>
@@ -167,7 +167,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Modified Page List (0x10)" FontWeight="SemiBold" FontSize="13" Foreground="#D32F2F"/>
-                            <TextBlock Text="&#x26A0;&#xFE0F; P&#xE1;ginas modificadas aguardando grava&#xE7;&#xE3;o em disco. PERIGOSO - pode causar travamentos e perda de dados." FontSize="10" Foreground="#D32F2F" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x26A0;&#xFE0F; P&#xE1;ginas modificadas aguardando grava&#xE7;&#xE3;o em disco. PERIGOSO - pode causar travamentos e perda de dados." FontSize="11" Foreground="#D32F2F" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkModifiedList" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="False"/>
                     </Grid>
@@ -179,7 +179,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Combine Memory Lists (0x20)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Combina listas de mem&#xF3;ria para limpeza mais eficiente. Apenas Windows 10+." FontSize="10" Foreground="#888" TextWrapping="Wrap"/>
+                            <TextBlock Text="Combina listas de mem&#xF3;ria para limpeza mais eficiente. Apenas Windows 10+." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkCombineLists" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="True"/>
                     </Grid>
@@ -191,7 +191,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Registry Cache (0x40)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Cache do registro do Windows. Limpar pode liberar mem&#xF3;ria mas pode desacelerar opera&#xE7;&#xF5;es do registro." FontSize="10" Foreground="#888" TextWrapping="Wrap"/>
+                            <TextBlock Text="Cache do registro do Windows. Limpar pode liberar mem&#xF3;ria mas pode desacelerar opera&#xE7;&#xF5;es do registro." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkRegistryCache" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="True"/>
                     </Grid>
@@ -203,7 +203,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Modified File Cache (0x80)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                            <TextBlock Text="Cache de arquivos modificados. Limpar libera mem&#xF3;ria mas pode desacelerar grava&#xE7;&#xF5;es futuras." FontSize="10" Foreground="#888" TextWrapping="Wrap"/>
+                            <TextBlock Text="Cache de arquivos modificados. Limpar libera mem&#xF3;ria mas pode desacelerar grava&#xE7;&#xF5;es futuras." FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ChkModifiedFileCache" Grid.Column="1" Style="{StaticResource AdvancedToggle}" IsChecked="True"/>
                     </Grid>

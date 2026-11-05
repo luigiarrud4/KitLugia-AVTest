@@ -7,7 +7,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
 
-            <TextBlock Text="Instalação Rápida do Windows" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Instalação Rápida do Windows" Margin="0,0,0,5"/>
             <TextBlock Text="Extrai ISO com 7-Zip e aplica com DISM.&#x0a;Modo Padrão: backup+restore (preserva tudo). Modo Original: limpo como o .bat.&#x0a;Funciona no Windows atual ou WinPE." Foreground="#A0A0A0" Margin="0,0,0,30" TextWrapping="Wrap"/>
 
             <!-- CARD 1: ISO -->

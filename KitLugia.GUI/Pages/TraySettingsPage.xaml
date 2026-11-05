@@ -505,7 +505,7 @@
                                        FontSize="12" FontWeight="Bold" Foreground="#666"
                                        FontFamily="Segoe UI Emoji, Segoe UI"/>
                             <Border Background="#3a86ff" CornerRadius="4" Padding="6,1" Margin="8,1,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="v2" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="v2" FontSize="11" FontWeight="Bold" Foreground="White"/>
                             </Border>
                             <controls:InfoButton Margin="8,0,0,0" VerticalAlignment="Center" ToolTipText="COMO FUNCIONA (2 modos — o botão ⚡/🧠 de cada linha alterna):&#x0a;&#x0a;⚡ DIRETO (padrão, estilo Firemin): passou do valor, o Kit esvazia a RAM do processo na hora. Simples e obediente: 200 MB é 200 MB. Use este na maioria dos casos.&#x0a;&#x0a;🧠 GOVERNADOR: com verificações. Só esvazia app quieto; se o app está em uso, espera; se der avalanche de page faults, pausa sozinho (⛈ backoff) e tenta depois. Use este SE o Direto causar engasgos (ex.: áudio cortando, micro-travadas ao voltar ao app).&#x0a;&#x0a;Nos dois modos o Kit nunca mexe na janela em foco. A linha mostra o estado: VERY_LOW (descarte preferencial), faults/s, backoff e commit."/>
                         </StackPanel>

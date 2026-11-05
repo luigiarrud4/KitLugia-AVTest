@@ -16,7 +16,7 @@
 
             <!-- Header -->
             <StackPanel Margin="0,0,0,30">
-                <TextBlock Text="Gerenciador de Privacidade" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10"/>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Privacidade" Margin="0,0,0,10"/>
                 <TextBlock Text="Controle a telemetria, rastreamento e dados enviados para a Microsoft." Foreground="{StaticResource TextSecondary}"/>
             </StackPanel>
 
@@ -243,7 +243,7 @@
                                                 </Ellipse>
 
                                                 <StackPanel Grid.Column="1" Margin="0,0,10,0">
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="White" FontSize="14"/>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
                                                     <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextMuted}" FontSize="12" TextWrapping="Wrap"/>
                                                 </StackPanel>
 

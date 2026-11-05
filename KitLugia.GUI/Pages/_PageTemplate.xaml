@@ -33,7 +33,7 @@
         <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
 
             <!-- TÍTULO -->
-            <TextBlock Text="T&#xED;tulo da P&#xE1;gina" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="T&#xED;tulo da P&#xE1;gina" Margin="0,0,0,10"/>
             <TextBlock Text="Descri&#xE7;&#xE3;o curta do que esta p&#xE1;gina faz." Foreground="#A0A0A0" Margin="0,0,0,30"/>
 
             <!-- CARD DE EXEMPLO -->

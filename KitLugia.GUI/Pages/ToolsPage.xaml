@@ -107,7 +107,7 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30,30,30,50" MaxWidth="900">
-            <TextBlock Text="Ferramentas e Utilit&#xE1;rios" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Ferramentas e Utilit&#xE1;rios" Margin="0,0,0,10"/>
             <TextBlock Text="Fun&#xE7;&#xF5;es avan&#xE7;adas para reparo e configura&#xE7;&#xE3;o do sistema." Foreground="#A0A0A0" Margin="0,0,0,20"/>
 
             <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
@@ -132,7 +132,7 @@
                                                 <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <TextBlock Text="{Binding Name}" Grid.Column="0" VerticalAlignment="Center" FontSize="14" 
+                                            <TextBlock Text="{Binding Name}" Grid.Column="0" VerticalAlignment="Center" FontSize="13" 
                                                    TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
                                                    Padding="0,0,10,0"/>
 

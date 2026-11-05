@@ -35,7 +35,7 @@
                         <Path x:Name="ArcCpu" Stroke="{StaticResource AccentColor}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
                         <TextBlock x:Name="TxtCpuPct" Text="0%" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock x:Name="TxtCpuName" Text="-" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
+                    <TextBlock x:Name="TxtCpuName" Text="-" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
                     <TextBlock x:Name="TxtCpuTemp" Text="Temp: -°C" FontSize="11" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,2"/>
                 </StackPanel>
             </Border>
@@ -50,7 +50,7 @@
                         <TextBlock x:Name="TxtRamPct" Text="0%" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
                     <TextBlock x:Name="TxtRam" Text="- / - GB" FontSize="11" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
-                    <TextBlock x:Name="TxtRamUsed" Text="Usado: -" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,2"/>
+                    <TextBlock x:Name="TxtRamUsed" Text="Usado: -" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,2"/>
                 </StackPanel>
             </Border>
 
@@ -63,7 +63,7 @@
                         <Path x:Name="ArcGpu" Stroke="#4CAF50" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
                         <TextBlock x:Name="TxtGpuPct" Text="-" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock x:Name="TxtGpuName" Text="-" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
+                    <TextBlock x:Name="TxtGpuName" Text="-" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
                     <TextBlock x:Name="TxtGpuTemp" Text="Temp: -°C" FontSize="11" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,2"/>
                 </StackPanel>
             </Border>
@@ -81,7 +81,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="💻 PC / Sistema" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="💻 PC / Sistema" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListPc">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -102,7 +102,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🛠️ Placa-mãe" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🛠️ Placa-mãe" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListMotherboard">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -123,7 +123,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="⚙️ BIOS" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="⚙️ BIOS" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListBios">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -144,7 +144,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🖥️ Sistema Operacional" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🖥️ Sistema Operacional" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListOS">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -170,7 +170,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="💾 Armazenamento" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="💾 Armazenamento" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListStorage">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -191,7 +191,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🌐 Rede" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🌐 Rede" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListNetwork">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -212,7 +212,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🔊 Áudio" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🔊 Áudio" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListAudio">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -233,7 +233,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🔋 Bateria" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🔋 Bateria" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListBattery">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -254,7 +254,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🔐 TPM" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🔐 TPM" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListTpm">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -275,7 +275,7 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🌡️ Zona Térmica" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🌡️ Zona Térmica" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListThermal">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>

@@ -135,7 +135,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="WinPE pronto para boot — necessário para mover dados e instalar o Windows offline." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                <TextBlock Text="WinPE pronto para boot — necessário para mover dados e instalar o Windows offline." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Border x:Name="BdrWinpeStatus" Background="#222233" BorderBrush="#4488FF" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,0,10,0">
@@ -158,7 +158,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="2. SELECIONAR ISO DO WINDOWS" FontSize="15" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock x:Name="TxtIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="10" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                             </StackPanel>
                             <Button Grid.Column="1" x:Name="BtnLoadIso" Content="CARREGAR ISO" Click="BtnLoadIso_Click"
                                     Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Width="140"/>
@@ -216,7 +216,7 @@
                             <Border Background="#11FF3D00" BorderBrush="#33FF3D00" BorderThickness="1" CornerRadius="6" Padding="10">
                                 <StackPanel>
                                     <TextBlock Text="⚠️ ATENÇÃO" FontSize="11" FontWeight="Bold" Foreground="#FFAA44"/>
-                                    <TextBlock Text="O WinPE será acionado e o PC será reiniciado. A imagem do Windows será aplicada DIRETAMENTE na partição alvo, preservando seus dados (backup automático na própria partição)." Foreground="#CCCCCC" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    <TextBlock Text="O WinPE será acionado e o PC será reiniciado. A imagem do Windows será aplicada DIRETAMENTE na partição alvo, preservando seus dados (backup automático na própria partição)." Foreground="#CCCCCC" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -231,7 +231,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="4. INICIAR" FontSize="15" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock x:Name="TxtReadyStatus" Text="Carregue um ISO e selecione as opções acima." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtReadyStatus" Text="Carregue um ISO e selecione as opções acima." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                             </StackPanel>
                             <Button x:Name="BtnStart" Grid.Column="1" Content="INICIAR FRESH INSTALL"
                                     Click="BtnStart_Click"
@@ -251,7 +251,7 @@
                             <StackPanel Grid.Row="0" Orientation="Horizontal">
                                 <StackPanel>
                                     <TextBlock Text="LOG DA OPERAÇÃO" FontSize="13" FontWeight="Bold" Foreground="White"/>
-                                    <TextBlock Text="Resultados da última execução (WinPE persistente)." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                                    <TextBlock Text="Resultados da última execução (WinPE persistente)." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                                 </StackPanel>
                                 <Button x:Name="BtnRefreshLog" Content="ATUALIZAR LOG" Click="BtnRefreshLog_Click"
                                         Margin="12,0,0,0" VerticalAlignment="Top" Padding="10,4" FontSize="10"
@@ -273,40 +273,40 @@
                     <StackPanel>
                         <TextBlock Text="Como funciona" FontSize="15" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 1 — Preparar WinPE</Run>
                             <LineBreak/>
                             Baixa e configura o ambiente WinPE offline.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 2 — Carregar ISO</Run>
                             <LineBreak/>
                             Selecione o ISO do Windows que será instalado.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 3 — Detectar Partição</Run>
                             <LineBreak/>
                             Disco/partição alvo e ESP são resolvidos pela Storage API
                             (sem depender de letra fixa).
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 4 — Aplicar Imagem Direto</Run>
                             <LineBreak/>
                             WinPE monta o alvo como Z:, faz backup na própria
                             partição e aplica o Windows novo via wimlib/DISM.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 5 — Merge Registry</Run>
                             <LineBreak/>
                             Se ativado, mescla o registry antigo com o novo
                             para preservar programas instalados.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 6 — Restaurar + Reboot</Run>
                             <LineBreak/>
                             Dados são devolvidos e o PC reinicia no Windows novo
@@ -316,7 +316,7 @@
                         <Separator Background="#222" Margin="0,0,0,8"/>
 
                         <TextBlock Text="Estratégias" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" FontSize="11" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,4">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4">
                             <Run FontWeight="Bold" Foreground="#88FF88">A — Segura:</Run> Users, dados, drivers.
                             <LineBreak/>
                             <Run FontWeight="Bold" Foreground="#FFAA44">B — Registry HKCU:</Run> Personalização, WiFi, bookmarks.
@@ -370,7 +370,7 @@
                     <TextBlock x:Name="TxtConfirmSummary" Text="" Foreground="White" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                     <Border Background="#11FF3D00" BorderBrush="#33FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,12">
-                        <TextBlock Text="O WinPE será acionado e o PC será reiniciado. Esta operação substitui o Windows atual." Foreground="#FFAA44" FontSize="10" TextWrapping="Wrap"/>
+                        <TextBlock Text="O WinPE será acionado e o PC será reiniciado. Esta operação substitui o Windows atual." Foreground="#FFAA44" FontSize="11" TextWrapping="Wrap"/>
                     </Border>
 
                     <CheckBox x:Name="ChkConfirm" Content="Sim, eu entendi. Quero continuar." Foreground="#FFAA44" FontSize="11" Margin="0,0,0,12" Checked="ChkConfirm_Checked" Unchecked="ChkConfirm_Unchecked"/>

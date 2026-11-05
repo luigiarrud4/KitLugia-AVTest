@@ -69,7 +69,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Resultados da Pesquisa" FontSize="28" FontWeight="SemiBold" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Resultados da Pesquisa"/>
             <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                 <TextBlock Text="Encontrados: " Foreground="#888"/>
                 <TextBlock x:Name="TxtResultCount" Text="0 itens" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
@@ -149,7 +149,7 @@
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" MaxWidth="420"/>
                                     <Border Background="#22FFD700" CornerRadius="4" Padding="6,1" Margin="8,1,0,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding TypeLabel}" Foreground="{StaticResource AccentColor}" FontSize="9" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding TypeLabel}" Foreground="{StaticResource AccentColor}" FontSize="11" FontWeight="Bold"/>
                                     </Border>
                                 </StackPanel>
                                 <TextBlock Text="{Binding Description}" Foreground="#8A8A8A" FontSize="11"
