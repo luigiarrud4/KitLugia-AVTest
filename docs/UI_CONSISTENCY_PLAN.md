@@ -10,6 +10,8 @@
 | Branch | `impeccable-polish` |
 | Commit de referência | `f5c3961` (tag **`estavel-pre-ui-padronizacao`**) — busca padronizada, antes da UI |
 | F0 | commit `cbc159e` — tokens de tipografia e superfície |
+| Últimos commits | `1b6f468` (títulos/cards/fontes/harness), `d9ae0ac` (estado vazio + bug da lista), `0938ba8` (doc) |
+| Revisão | 05/11 — carregamento decidido (2 variantes), nova ordem em E1–E7 (seção 7) |
 | Escopo | `KitLugia.GUI` (XAML + code-behind de UI). Nenhuma mudança de comportamento dos motores. |
 
 Reverter uma fase = `git diff estavel-pre-ui-padronizacao -- KitLugia.GUI` / `git checkout <tag> -- <arquivo>`.
@@ -84,11 +86,32 @@ Números grandes de painel (20/22/24/32) continuam permitidos como **métrica**,
 - **Zero** animação em campo de entrada.
 - **Zero** animação em item de lista virtualizada (hover = cor).
 
+### Carregamento e feedback — 2 variantes oficiais
+
+As páginas divergem aqui porque estávamos **testando** qual encaixava melhor. Os testes
+acabaram: ficam duas variantes oficiais e o resto é exceção aceita (não é dívida).
+
+| Variante | Quando usar | Anatomia |
+|---|---|---|
+| **A. Overlay de área** — `Win11SpinnerTemplate` | conteúdo que ainda está chegando dentro de uma área (lista, aba, painel) | scrim `#CC000000` + raio 8; rodela de 5 pontos dourados 44 px girando em 1,4 s (`Win11MiniSpinnerTemplate` 24 px para faixas); texto branco **16** (`13` quando o overlay é de faixa); linha de progresso `#FFD700` 12 opcional |
+| **B. Toast de progresso** — `Controls/LugiaToast` ("notificação cinza") | operação longa que **não** deve bloquear a tela (instalar, atualizar, baixar) | card 350, raio 6, fundo escuro em gradiente `#CC2A2010 → #F00A0A0A`, borda dourada translúcida, entra deslizando da direita; vira verde/vermelho na conclusão |
+
+Regra de escolha: **se o usuário ainda pode clicar em outra coisa → toast (B); se a área
+está vazia esperando dado → overlay (A).** Nunca os dois para a mesma operação.
+
+Consequência técnica: `Win11SpinnerTemplate`/`Win11MiniSpinnerTemplate` hoje moram **dentro**
+de `AppsPage.xaml`; passam para `Themes/Spinners.xaml` para as demais páginas usarem a
+variante A sem copiar markup.
+
 ### Exceções intencionais (documentar, não "corrigir")
 
 - Gerenciador de Tarefas: paleta azul (`#1F2A3A`, `#2C3A4E`).
 - Console/terminal: monoespaçada com `#AAA`.
 - Store Remake: barra de comando própria.
+- Carregamento próprio, mantido por decisão de 05/11: `MainWindow.LoadingOverlay` (card
+  300x120 com borda accent, no boot), `IntegrityPage` (badge circular 90x90), `DriversPage`
+  (overlay + barra de progresso de análise), `ServicesPage` (`StartupLoadingOverlay`),
+  `StoreRemakePage` e `KitTaskManagerWindow` (tela de load própria).
 
 ---
 
@@ -122,12 +145,17 @@ hover só por cor, raio 8. A animação de escala ficou isolada em `InteractiveC
 Novo `SurfacePanelStyle` (painel estático com `Surface1`/`BorderSubtle`).
 Efeitos inline dentro das páginas (sombras pontuais) seguem como estão.
 
-### F4 — Textos, badges, estados e ícones 🟡 parcial
+### F4 — Estados e carregamento 🟡 parcial
 Novo `Controls/EmptyStateView.xaml` (ícone, título, dica + `Update(contagem)`), adotado na
 `AllTweaksPage`. Durante a adoção apareceu um **bug real**: `_isLoaded` era marcado **depois** de
 `ApplyFilter()`, então a lista só aparecia depois que o usuário mexia num filtro (a captura mostrava
 0 de 108 tweaks; agora mostra os 108 na primeira entrada).
-`Controls/LoadingOverlay.xaml` já existe (4 páginas usam) e 8 páginas ainda têm spinner inline.
+
+**Carregamento (revisado em 05/11):** não há mais busca — as duas variantes oficiais estão
+no contrato acima (overlay estilo AppsPage + toast cinza). O trabalho que sobra é **mecânico**:
+promover o spinner da `AppsPage` para `Themes/Spinners.xaml` e apontar para lá as páginas que já
+têm o mesmo desejo de overlay. Os carregamentos próprios de MainWindow, Integrity, Drivers,
+Services, Store Remake e Task Manager **ficam como estão**.
 Badges e tiles seguem por página.
 
 ### F5 — Contraste e legibilidade 🟡 parcial
@@ -198,11 +226,14 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 - [x] Raio unificado em 8 nos cards
 - [ ] Sombras inline pontuais dentro das páginas
 
-### F4 — Estados e ícones 🟡
+### F4 — Estados e carregamento 🟡
 - [x] `Controls/EmptyStateView` (ícone/título/dica + `Update`) e adoção na `AllTweaksPage`
 - [x] Bug da lista vazia na primeira carga (`_isLoaded` marcado depois do `ApplyFilter`)
+- [x] Decisão 05/11: 2 variantes oficiais de carregamento (overlay da AppsPage + toast cinza);
+      os demais ficam como exceção aceita
+- [ ] `Themes/Spinners.xaml` com `Win11SpinnerTemplate`/`Win11MiniSpinnerTemplate` (hoje dentro da `AppsPage`)
+- [ ] Adotar o overlay oficial em Bloatware/Programas/Portáteis (mesma anatomia, uma definição)
 - [ ] Adotar o estado vazio em Apps, Drivers, Serviços, Programas
-- [ ] Overlay de carregamento único (8 páginas com spinner inline → `LoadingOverlay`)
 - [ ] Badges em 2 variantes / `Caption 11`
 - [ ] Tiles de ícone 32/38/44
 
@@ -221,3 +252,61 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 ### F7 — Antirregressão ✅
 - [x] `ui_style_audit.py --check` com código de saída
 - [x] Relatório de hex por arquivo (base da allowlist)
+
+---
+
+## 7. Revisão de 05/11 — o que fazer a seguir
+
+Feita depois de 4 commits e de olhar as **52 páginas** renderizadas. O que sobrou no plano não
+pesa igual: alguns itens são cosméticos e de risco alto (mexer em 400 templates sem ganho
+visível), outros são baratos e consertam o que o usuário vê de errado. A ordem abaixo troca o
+"ordem das fases" por **impacto visível ÷ risco**.
+
+| Ordem | Etapa | Escopo | Esforço | Risco | Por que aqui |
+|---|---|---|---|---|---|
+| **E1** | Bugs de runtime do harness | `BloatwarePage` (storyboard anima `Angle`) e `DiskConverterPage` (NRE na carga) | ~2 arquivos | baixo | São **crashes reais**, não estética: o harness absorve a exceção e a página sai pela metade |
+| **E2** | Carregamento oficial em 1 lugar | `Themes/Spinners.xaml` + adotar em Bloatware/Programas/Portáteis | 0,5 dia | baixo | O padrão que você aprovou deixa de existir só dentro da `AppsPage` |
+| **E3** | F2 — botões por família, em 3 lotes | `NetworkPage` (32), `TweaksPage` (96), `ExmTweaksPage` (126) | 3–4 dias | médio | Maior fonte de inconsistência **visível**: paletas e alturas diferentes lado a lado |
+| **E4** | Estados vazios | Apps, Drivers, Serviços, Programas (`EmptyStateView`) | 1–2 dias | baixo | Página vazia sem explicação é o defeito que mais parece "quebrado" |
+| **E5** | F5 — resto da tipografia + foco | 260 usos de `15` decididos por página; `FocusVisualStyle` global | 1–2 dias | baixo/médio | Legibilidade e teclado; o grosso (419) já foi |
+| **E6** | F1 — subtítulos por página | 46 cabeçalhos, 5 por lote com captura | 1 dia | baixo | Fecha o cabeçalho sem reescrever layout |
+| **E7** | F7 — endurecer e liberar | allowlist de hex por página, hook de pré-commit, versão + tag do release | 1 dia | baixo | Impede a volta do que já foi feito |
+
+### Como executar E3 (o lote que assusta)
+
+Os ~400 templates inline **não** são 400 trabalhos: são poucas famílias repetidas. O passo 1 é
+um relatório, não uma edição:
+
+1. Script lista cada `<Button.Template>` com uma **impressão digital** do conteúdo (cores +
+   raio + altura). Templates idênticos caem no mesmo grupo — uma página com 96 cópias iguais é
+   **uma** edição.
+2. Cada grupo recebe um estilo nomeado em `Themes/Buttons.xaml` (`GhostButtonStyle`,
+   `ChipButtonStyle`, `IconButtonStyle`, `DangerButtonStyle`) — os 6 estilos que já existem
+   (`Gold`, `Green`, `Recycle`, `Delete`, `Secondary`, `Action`) ficam como base.
+3. Um lote = uma página: trocar, compilar, capturar, comparar com `out6/`. Página aprovada entra
+   no commit; página estranha volta.
+
+### O que NÃO vale fazer (decidido agora)
+
+- **Substituição em massa dos 2.133 hex.** A maioria é dourado de destaque por página; trocar às
+  cegas apaga a identidade de páginas como Store Remake. O valor está na **allowlist** por arquivo
+  (E7), não na substituição.
+- **`Controls/PageHeader` para reescrever 46 cabeçalhos.** Cada um tem layout próprio; o ganho
+  visual é pequeno e o risco de regressão é alto. Fica só para página nova.
+- **Unificar os carregamentos que você aprovou manter.** Estão documentados como exceção (contrato,
+  seção 2) e não entram no checklist como pendência.
+- **Remover `DropShadowEffect` inline** de páginas isoladas: pontual, some na comparação de
+  52 capturas, e cada remoção é um reteste.
+- **Mexer na paleta do Gerenciador de Tarefas** (azul, espelha o Windows).
+
+### Definição de pronto por etapa
+
+| Etapa | Pronto quando |
+|---|---|
+| E1 | As duas páginas capturam sem exceção na UI e sem mudança de layout no PNG |
+| E2 | `Spinners.xaml` mesclado; nenhuma página copia o template; PNG da `AppsPage` idêntico ao de `out6/` |
+| E3 | Nenhum `<Button.Template>` inline nas 4 páginas-alvo; altura 32 e uma paleta por função |
+| E4 | Lista vazia mostra ícone + título + dica + ação, com contagem real |
+| E5 | `--check` sem `FontSize` fora da escala; `Tab` mostra foco em todo controle focável |
+| E6 | Subtítulo de página no estilo, sem confundir com rótulo de estado |
+| E7 | `--check` roda em pré-commit; release com versão nova e `-ReleaseTag vX.Y.Z` |
