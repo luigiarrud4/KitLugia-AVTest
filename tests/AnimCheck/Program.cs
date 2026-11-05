@@ -82,9 +82,10 @@ internal static class Program
         ((UIElement)element).RaiseEvent(args);
     }
 
-    // O primeiro card-cartao do Dashboard ("Otimizacao Inteligente") e' o unico
-    // que mantem a animacao do estilo global de botao (1,05): o usuario pediu de
-    // volta. Os outros tres ficam so' com o brilho do proprio template.
+    // O primeiro card clicavel do Dashboard e' o banner de informacoes do sistema
+    // (Border "BtnPcInfo" com CardStyle): e' o unico que volta a animar no hover
+    // (1,015 em 180 ms, como o CardStyle fazia antes). Os quatro cards-cartao de
+    // 90 px continuam so' com o brilho do proprio template.
     private static void CheckDashboardFirstCard()
     {
         Console.WriteLine("[DashboardPage — primeiro card]");
@@ -103,29 +104,31 @@ internal static class Program
             window.UpdateLayout();
             Pump(400);
 
+            var banner = page.FindName("BtnPcInfo") as Border;
+            if (banner is null) { Fail("banner BtnPcInfo nao encontrado na DashboardPage"); return; }
+
+            Check(HoverZoom.GetEnabled(banner), "banner de informacoes do sistema anima no hover");
+            Check(Math.Abs(HoverZoom.GetScale(banner) - 1.015) < 0.0001,
+                $"banner usa a escala original do CardStyle (lido {HoverZoom.GetScale(banner):F3})");
+
+            Hover(banner, true);
+            Pump(400);
+            double scale = banner.RenderTransform is ScaleTransform t ? t.ScaleX : 1.0;
+            Check(scale > 1.012, $"banner cresce no hover (1,0 -> {scale:F3})");
+
+            Hover(banner, false);
+            Pump(400);
+            scale = banner.RenderTransform is ScaleTransform back ? back.ScaleX : 1.0;
+            Check(Math.Abs(scale - 1.0) < 0.01, $"banner volta ao repouso (lido {scale:F3})");
+
             var cards = Descendants<Button>(page).Where(b => Math.Abs(b.Height - 90) < 0.5).ToList();
             if (cards.Count != 4)
             {
-                Fail($"esperava 4 cards de 90 px na pagina (achei {cards.Count})");
+                Fail($"esperava 4 cards-cartao de 90 px na pagina (achei {cards.Count})");
                 return;
             }
-
-            string tooltip = cards[0].ToolTip as string ?? "";
-            Check(tooltip.Contains("otimiza"), "primeiro card identificado (Otimizacao Inteligente)");
-            Check(HoverZoom.GetEnabled(cards[0]), "primeiro card anima (estilo global ligado)");
-
-            Hover(cards[0], true);
-            Pump(400);
-            double scale = cards[0].RenderTransform is ScaleTransform t ? t.ScaleX : 1.0;
-            Check(scale > 1.04, $"primeiro card cresce no hover (1,0 -> {scale:F3})");
-
-            for (int i = 1; i < cards.Count; i++)
-                Check(!HoverZoom.GetEnabled(cards[i]), $"card {i + 1}: segue sem zoom (so' o brilho do template)");
-
-            Hover(cards[0], false);
-            Pump(400);
-            scale = cards[0].RenderTransform is ScaleTransform back ? back.ScaleX : 1.0;
-            Check(Math.Abs(scale - 1.0) < 0.01, $"primeiro card volta ao repouso (lido {scale:F3})");
+            for (int i = 0; i < cards.Count; i++)
+                Check(!HoverZoom.GetEnabled(cards[i]), $"card-cartao {i + 1}: segue sem zoom (so' o brilho do template)");
         }
         catch (Exception ex)
         {
