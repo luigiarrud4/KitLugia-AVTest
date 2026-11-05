@@ -3,6 +3,7 @@
 
     <!-- GLOBAL: substitui o template azul padrão do WPF por um hover escuro sutil -->
     <Style TargetType="{x:Type Button}">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource KitFocusVisual}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -54,6 +55,29 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- Icone-botao de linha (info, engrenagem, lixeira): transparente, sem borda.
+         Substitui os 127 templates que estavam copiados dentro de TweaksPage,
+         ExmTweaksPage, NetworkPage, GameBoostPage e IntegrityPage. O hover antigo
+         desses templates setava Opacity=1 num botao que ja' era 1 (no-op) - agora
+         usa o mesmo hover cinza do estilo global. -->
+    <ControlTemplate x:Key="IconButtonTemplate" TargetType="{x:Type Button}">
+        <Border x:Name="bdr" Background="Transparent" CornerRadius="4">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bdr" Property="Background" Value="#15FFFFFF"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="bdr" Property="Background" Value="#30FFD700"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="bdr" Property="Opacity" Value="0.4"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
 
     <Style x:Key="GoldButtonStyle" TargetType="{x:Type Button}">
         <Setter Property="Background" Value="{DynamicResource GoldGradient}"/>

@@ -104,6 +104,9 @@ internal static class Program
         app.DispatcherUnhandledException += (_, e) =>
         {
             Console.WriteLine($"   [excecao na UI absorvida] {e.Exception.GetType().Name}: {e.Exception.Message}");
+            // As 3 primeiras linhas do stack dizem QUAL handler estourou - sem isso so' se ve o tipo.
+            var linhas = (e.Exception.StackTrace ?? "").Split('\n');
+            foreach (var l in linhas.Take(3)) Console.WriteLine("      " + l.Trim());
             e.Handled = true;
         };
         TaskScheduler.UnobservedTaskException += (_, e) => e.SetObserved();

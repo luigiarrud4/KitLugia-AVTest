@@ -15,8 +15,7 @@
         <!-- Cabeçalho -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x26A1; Adicionar ao Menu de Contexto"/>
-            <TextBlock Text="Super comandos turbinados com toda a tecnologia do Kit — IPC, Restart Manager, PowerShell nativo. Adicione ou remova com 1 clique; tudo reversível."
-                       Foreground="#A0A0A0" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Text="Super comandos turbinados com toda a tecnologia do Kit — IPC, Restart Manager, PowerShell nativo. Adicione ou remova com 1 clique; tudo reversível." Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
         <!-- Grade de cards -->

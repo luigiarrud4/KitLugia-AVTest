@@ -54,8 +54,9 @@ namespace KitLugia.GUI.Pages
             _timersStarted = false;
 
 
+            // A lista NAO e' anulada: `Unloaded` chama Cleanup() e depois LogActivity(),
+            // e o `= null!` fazia o log pos-Cleanup estourar NullReferenceException.
             _activityLog.Clear();
-            _activityLog = null!;
 
 
             this.DataContext = null;

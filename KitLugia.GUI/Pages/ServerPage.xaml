@@ -71,7 +71,7 @@
                             <TextBlock x:Name="StatusIcon" Text="🌐" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                            <TextBlock x:Name="StatusText" Text="Pronto" FontSize="17" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock x:Name="StatusText" Text="Pronto" FontSize="16" FontWeight="Bold" Foreground="White"/>
                             <TextBlock x:Name="StatusDetail" Text="Abra o Minecraft e clique em Detectar" FontSize="11" Foreground="#A0A0A0"/>
                         </StackPanel>
                         <Button x:Name="BtnToggle" Grid.Column="2" Width="170" Height="40" Style="{StaticResource GoldButtonStyle}" Content="▶ Iniciar" Click="BtnToggle_Click" FontSize="12"/>
@@ -122,8 +122,8 @@
                         <TextBlock Grid.Column="0" Text="📋 Log" FontSize="13" FontWeight="Bold" Foreground="#FFD700"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
                             <TextBlock x:Name="TxtLogCount" Text="0" FontSize="11" Foreground="#808080" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <Button Content="📋 Copiar" Style="{StaticResource SecButton}" Width="70" Height="25" FontSize="10" Click="BtnCopyLog_Click" Margin="0,0,4,0"/>
-                            <Button Content="🗑️" Style="{StaticResource SecButton}" Width="30" Height="25" FontSize="10" Click="BtnClearLog_Click"/>
+                            <Button Content="📋 Copiar" Style="{StaticResource SecButton}" Width="70" Height="25" FontSize="11" Click="BtnCopyLog_Click" Margin="0,0,4,0"/>
+                            <Button Content="🗑️" Style="{StaticResource SecButton}" Width="30" Height="25" FontSize="11" Click="BtnClearLog_Click"/>
                         </StackPanel>
                     </Grid>
                     <Border Background="#1E1E1E" BorderBrush="#404040" BorderThickness="1" CornerRadius="4">
@@ -137,7 +137,7 @@
             <!-- GUIA -->
             <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="8">
                 <StackPanel Margin="15">
-                    <TextBlock Text="📖 Guia Rápido" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,10"/>
+                    <TextBlock Text="📖 Guia Rápido" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,10"/>
                     <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#C0C0C0" LineHeight="18">
                         <Run Text="🎮 PASSO 1: "/><Run Text="Abra o Minecraft e entre no seu mundo" FontWeight="Bold" Foreground="White"/><LineBreak/>
                         <Run Text="🎮 PASSO 2: "/><Run Text="Pressione ESC → 'Abrir para LAN'" FontWeight="Bold" Foreground="White"/><LineBreak/>

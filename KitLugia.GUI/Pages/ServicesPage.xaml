@@ -4,6 +4,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       mc:Ignorable="d" 
       Title="ServicesPage"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial" d:DesignHeight="700" d:DesignWidth="950">
@@ -359,7 +360,7 @@
                                     </Grid>
                                 </Viewbox>
                                 <TextBlock x:Name="TxtStartupLoadingStatus" Text="Carregando..."
-                                          Foreground="White" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                          Foreground="White" FontSize="13" HorizontalAlignment="Center" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -615,6 +616,12 @@
                             </DataGrid.ContextMenu>
                         </DataGrid>
                     </Border>
+
+                    <!-- Estado vazio (F4): cobre a tabela quando o filtro zera -->
+                    <controls:EmptyStateView x:Name="EmptyServices" Grid.Row="2" Panel.ZIndex="10"
+                                             Visibility="Collapsed" Icon="&#x2699;&#xFE0F;"
+                                             Title="Nenhum servi&#xE7;o encontrado"
+                                             Hint="Ajuste o filtro ou a busca."/>
                     <Grid Grid.Row="3" Margin="0,10,0,0">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                             <Button Content="▶ Iniciar Selecionado" Click="BtnStartService_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150" Margin="0,0,10,0" Foreground="#4CAF50"/>

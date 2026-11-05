@@ -52,7 +52,7 @@
                         <controls:InfoButton Grid.Column="0" ToolTipText="Descri&#xE7;&#xE3;o detalhada do tweak para o tooltip."/>
 
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="Nome do Tweak" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Nome do Tweak" FontSize="16" Foreground="White"/>
                             <TextBlock Text="Descri&#xE7;&#xE3;o curta do tweak." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
 
@@ -73,7 +73,7 @@
                         <controls:InfoButton Grid.Column="0" ToolTipText="Informa&#xE7;&#xE3;o adicional."/>
 
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="Item Informativo" FontSize="15" Foreground="White"/>
+                            <TextBlock Text="Item Informativo" FontSize="16" Foreground="White"/>
                             <TextBlock Text="Descri&#xE7;&#xE3;o." FontSize="12" Foreground="#808080" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Grid>

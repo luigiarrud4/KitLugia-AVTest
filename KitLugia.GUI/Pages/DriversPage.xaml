@@ -4,6 +4,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       mc:Ignorable="d" 
       Title="Drivers"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial" d:DesignHeight="700" d:DesignWidth="950">
@@ -77,7 +78,7 @@
 
                         <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="15" MinHeight="140">
                             <StackPanel>
-                                <TextBlock Text="&#x1F4E5; Instalar Driver" Foreground="White" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="&#x1F4E5; Instalar Driver" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
                                 <TextBlock Text="Instala drivers de arquivos CAB, ZIP ou de uma pasta espec&#xED;fica." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Grid VerticalAlignment="Bottom">
                                     <Grid.ColumnDefinitions>
@@ -96,7 +97,7 @@
                                 <DropShadowEffect Color="#FFD700" BlurRadius="10" Opacity="0.1" ShadowDepth="0"/>
                             </Border.Effect>
                             <StackPanel>
-                                <TextBlock Text="&#x1F4BE; Backup Completo" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="&#x1F4BE; Backup Completo" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
                                 <TextBlock Text="Cria backup de todos os drivers instalados para restaura&#xE7;&#xE3;o r&#xE1;pida." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="Criar Backup" Click="BtnBackup_Click" Style="{StaticResource GoldButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
                             </StackPanel>
@@ -104,7 +105,7 @@
 
                         <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="15" MinHeight="140">
                             <StackPanel>
-                                <TextBlock Text="&#x1F4C4; Exportar Lista" Foreground="White" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="&#x1F4C4; Exportar Lista" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
                                 <TextBlock Text="Exporta a lista de drivers para arquivo TXT para an&#xE1;lise." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="Exportar TXT" Click="BtnExportList_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
                             </StackPanel>
@@ -131,6 +132,12 @@
                         <!-- Status -->
                         <TextBlock x:Name="TxtStatus" Grid.Column="1" Text="Pronto." Foreground="#888" VerticalAlignment="Center" FontSize="12" Margin="0,0,15,0"/>
                     </Grid>
+
+                    <!-- Estado vazio (F4) -->
+                    <controls:EmptyStateView x:Name="EmptyDrivers" Grid.Row="2" Panel.ZIndex="5"
+                                             Visibility="Collapsed" Icon="&#x1F50C;"
+                                             Title="Nenhum driver encontrado"
+                                             Hint="Ajuste o filtro ou clique em Analisar."/>
 
                     <!-- TABELA DE DRIVERS -->
                     <Border Grid.Row="2" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
@@ -326,6 +333,12 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- Estado vazio (F4) -->
+                    <controls:EmptyStateView x:Name="EmptyKernel" Grid.Row="2" Panel.ZIndex="5"
+                                             Visibility="Collapsed" Icon="&#x2699;&#xFE0F;"
+                                             Title="Nenhum driver de inicializacao"
+                                             Hint="A lista fica vazia quando nada corresponde ao filtro."/>
+
                     <!-- TABELA -->
                     <Border Grid.Row="2" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
                         <DataGrid x:Name="GridKernel" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None" Background="#111" RowBackground="#111" AlternatingRowBackground="#1A1A1A">
@@ -520,7 +533,7 @@
                                 <DropShadowEffect Color="#FF5555" BlurRadius="10" Opacity="0.15" ShadowDepth="0"/>
                             </Border.Effect>
                             <StackPanel>
-                                <TextBlock Text="&#x26A0;&#xFE0F; ATIVAR VERIFIER" Foreground="#FF5555" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="&#x26A0;&#xFE0F; ATIVAR VERIFIER" Foreground="#FF5555" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
                                 <TextBlock Text="For&#xE7;a o Windows a travar (BSOD) se encontrar erro no driver. Use apenas para diagnosticar telas azuis." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="ATIVAR (Estresse)" Click="BtnEnableVerifier_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" Foreground="#FF5555" BorderBrush="#FF5555" VerticalAlignment="Bottom"/>
                             </StackPanel>
@@ -531,7 +544,7 @@
                                 <DropShadowEffect Color="#FFD700" BlurRadius="10" Opacity="0.1" ShadowDepth="0"/>
                             </Border.Effect>
                             <StackPanel>
-                                <TextBlock Text="&#x2705; DESATIVAR / RESETAR" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="15" Margin="0,0,0,5"/>
+                                <TextBlock Text="&#x2705; DESATIVAR / RESETAR" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
                                 <TextBlock Text="Desativa o Verifier e restaura o boot normal. Use se o PC entrar em loop de reinicializa&#xE7;&#xE3;o." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="DESATIVAR" Click="BtnDisableVerifier_Click" Style="{StaticResource GoldButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
                             </StackPanel>

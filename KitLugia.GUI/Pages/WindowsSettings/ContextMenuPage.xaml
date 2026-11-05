@@ -208,7 +208,7 @@
                         <DataGridTemplateColumn Header="Ação" Width="70">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Button Content="&#x2716;" Width="28" Height="24" FontSize="10"
+                                    <Button Content="&#x2716;" Width="28" Height="24" FontSize="11"
                                             Padding="0" Cursor="Hand"
                                             Visibility="{Binding CanRemove, Converter={StaticResource BoolToVis}}"
                                             Tag="{Binding Entry}"

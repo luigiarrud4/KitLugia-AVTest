@@ -147,7 +147,7 @@
                     <Button x:Name="BtnCleanup" Content="&#x1F9F9; LIMPAR LIXO" Width="130" Height="38" Margin="0,0,8,0" Click="BtnCleanup_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                     <Button x:Name="BtnIsoStudio" Content="&#x1F9EC; ESTÚDIO" Width="130" Height="38" Margin="0,0,8,0" Click="BtnIsoStudio_Click" Style="{StaticResource SecondaryButtonStyle}" ToolTip="Abre o KIT ISO STUDIO — expansor para personalização avançada que não cabe no estilo padrão"/>
                     <Button x:Name="BtnBack" Content="&#x2190; VOLTAR" Width="110" Height="38" Margin="0,0,8,0" Click="BtnCancelConfig_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                    <Button x:Name="BtnCreate" Content="&#x1F680; INICIAR CRIA&#xC7;&#xC3;O" Width="170" Height="38" FontSize="14" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
+                    <Button x:Name="BtnCreate" Content="&#x1F680; INICIAR CRIA&#xC7;&#xC3;O" Width="170" Height="38" FontSize="13" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -307,7 +307,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="ⓘ" FontSize="16" Foreground="#FFD700" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Este painel usa layout expandido (2 colunas, scroll, cards) para comportar muito mais opções que o card padrão do kit"/>
-                                <Button Content="✕" Width="32" Height="32" Click="BtnCloseIsoStudio_Click" Background="#222" Foreground="White" BorderThickness="0" Cursor="Hand" FontSize="14" ToolTip="Fechar"/>
+                                <Button Content="✕" Width="32" Height="32" Click="BtnCloseIsoStudio_Click" Background="#222" Foreground="White" BorderThickness="0" Cursor="Hand" FontSize="13" ToolTip="Fechar"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -375,7 +375,7 @@
                                     <StackPanel>
                                         <TextBlock Text="🔧 Registro Avançado" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
                                         <TextBlock Text="Cole .reg — será injetado offline via wimlib no registro do WIM" FontSize="11" Foreground="#888" Margin="0,0,0,8"/>
-                                        <TextBox x:Name="TxtStudioReg" Height="90" AcceptsReturn="True" TextWrapping="Wrap" Background="#0F0F0F" Foreground="#CCC" BorderBrush="#333" FontFamily="Consolas" FontSize="10" Padding="8" VerticalScrollBarVisibility="Auto" Text="Windows Registry Editor Version 5.00&#x0a;&#x0a;[HKEY_LOCAL_MACHINE\SOFTWARE\Exemplo]&#x0a;&quot;Valor&quot;=dword:00000001"/>
+                                        <TextBox x:Name="TxtStudioReg" Height="90" AcceptsReturn="True" TextWrapping="Wrap" Background="#0F0F0F" Foreground="#CCC" BorderBrush="#333" FontFamily="Consolas" FontSize="11" Padding="8" VerticalScrollBarVisibility="Auto" Text="Windows Registry Editor Version 5.00&#x0a;&#x0a;[HKEY_LOCAL_MACHINE\SOFTWARE\Exemplo]&#x0a;&quot;Valor&quot;=dword:00000001"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <Button Content="Importar .reg" Width="110" Height="28" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
                                             <Button Content="Limpar" Width="80" Height="28" Margin="8,0,0,0" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
@@ -482,7 +482,7 @@
                                 <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"/>
                             </ScrollViewer>
                             <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="&#x1F4CB; Copiar log"
-                                       Foreground="#555" FontSize="9" Cursor="Hand"
+                                       Foreground="#555" FontSize="11" Cursor="Hand"
                                        HorizontalAlignment="Right" Margin="0,4,0,0"
                                        MouseDown="TxtCopyOpLog_MouseDown"/>
                         </Grid>

@@ -1158,6 +1158,7 @@ namespace KitLugia.GUI.Pages
 
             GridServices.ItemsSource = filtered;
             if (TxtServiceCount != null) TxtServiceCount.Text = $"{filtered.Count} Serviços";
+            EmptyServices?.Update(filtered.Count);
 
             // Stats ao vivo (sempre sobre a lista COMPLETA, não filtrada)
             UpdateServiceStats();

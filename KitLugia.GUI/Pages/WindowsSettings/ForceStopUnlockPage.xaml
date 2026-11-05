@@ -36,7 +36,7 @@
 
             <!-- TITLE -->
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x1F4C1; Operações de Arquivo" Margin="0,0,0,8"/>
-            <TextBlock Text="Force Stop Unlock + Take Ownership — clique direito inteligente. A página começa no Force Stop; troque para Take Ownership no topo para assumir permissões." Foreground="#A0A0A0" Margin="0,0,0,18" TextWrapping="Wrap" FontSize="13"/>
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Text="Force Stop Unlock + Take Ownership — clique direito inteligente. A página começa no Force Stop; troque para Take Ownership no topo para assumir permissões." Margin="0,0,0,18" TextWrapping="Wrap"/>
 
             <!-- TOGGLE TOPO: seletor rápido (espelha as abas) -->
             <Border CornerRadius="8" Background="#1A1A28" BorderBrush="#2A2A40" BorderThickness="1" Padding="6" Margin="0,0,0,16" HorizontalAlignment="Left">

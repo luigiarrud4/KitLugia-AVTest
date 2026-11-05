@@ -15,7 +15,7 @@
         <!-- TITULO -->
         <StackPanel Grid.Row="0" Margin="0,0,0,15">
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="Todos os Tweaks"/>
-            <TextBlock x:Name="TxtSubtitle" Text="Navegue por todos os tweaks dispon&#xED;veis no sistema" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" x:Name="TxtSubtitle" Text="Navegue por todos os tweaks dispon&#xED;veis no sistema" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- FILTROS -->

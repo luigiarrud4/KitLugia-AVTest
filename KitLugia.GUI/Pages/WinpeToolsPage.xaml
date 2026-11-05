@@ -84,7 +84,7 @@
                     <!-- STEP 1: PREPARAR WINPE -->
                     <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="1. PREPARAR WINPE" FontSize="16" FontWeight="Bold" Foreground="White"/>
                             <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,8"/>
                             <WrapPanel Orientation="Horizontal">
                                 <Button x:Name="BtnPrepareWinpe" Content="PREPARAR" Click="BtnPrepareWinpe_Click"
@@ -114,7 +114,7 @@
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="2. SELECIONAR PARTICAO" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                <TextBlock Text="2. SELECIONAR PARTICAO" FontSize="16" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtPartCount" Text="" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
 
@@ -157,7 +157,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding DiskLabel}" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding DriveLetter}" FontWeight="Bold" FontSize="15" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding DriveLetter}" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="2" Text="{Binding Label}" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Grid.Column="3" Text="{Binding SizeString}" FontSize="12" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="4" Text="{Binding FreeSpaceString}" Foreground="#88FF88" FontSize="11" VerticalAlignment="Center"/>
@@ -207,11 +207,11 @@
                                 <TextBlock Text="Resultados da última execução do shrink via WinPE." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <Button x:Name="BtnCopyLog" Content="COPIAR LOG" Click="BtnCopyLog_Click" Style="{StaticResource GoldButtonStyle}" Height="32" FontSize="10" FontWeight="Bold" Width="100" Margin="0,0,6,0"/>
+                                <Button x:Name="BtnCopyLog" Content="COPIAR LOG" Click="BtnCopyLog_Click" Style="{StaticResource GoldButtonStyle}" Height="32" FontSize="11" FontWeight="Bold" Width="100" Margin="0,0,6,0"/>
                                 <Button Content="VER LOGS" Click="BtnCheckWinpeLogs_Click" Style="{StaticResource SecondaryButtonStyle}" Height="32" FontSize="11" Width="90"/>
                             </StackPanel>
                         </Grid>
-                        <TextBox x:Name="TxtWinpeLog" Grid.Row="1" IsReadOnly="True" FontFamily="Consolas" FontSize="9"
+                        <TextBox x:Name="TxtWinpeLog" Grid.Row="1" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
                                  Foreground="#0F0" Background="#0A0A0A" BorderThickness="0" MinHeight="60" MaxHeight="120"
                                  TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Focusable="True"
                                  Text="Nenhum log." Margin="0,8,0,0">
@@ -244,14 +244,14 @@
                                     <TextBlock x:Name="TxtCustomIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                                 <Button x:Name="BtnLoadCustomIso" Grid.Column="2" Content="Carregar ISO" Click="BtnLoadCustomIso_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="10" Width="100"/>
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="11" Width="100"/>
                             </Grid>
                             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                                 <Button x:Name="BtnPrepareCustomWinpe" Content="PREPARAR CUSTOM" Click="BtnPrepareCustomWinpe_Click"
-                                        Style="{StaticResource GoldButtonStyle}" Height="30" FontSize="10" FontWeight="Bold" Width="140"
+                                        Style="{StaticResource GoldButtonStyle}" Height="30" FontSize="11" FontWeight="Bold" Width="140"
                                         IsEnabled="False" Margin="0,0,8,0"/>
                                 <Button x:Name="BtnRemoveCustomWinpe" Content="REMOVER" Click="BtnRemoveCustomWinpe_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="10" Foreground="#FF8888" BorderBrush="#552222" Width="90"/>
+                                        Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="11" Foreground="#FF8888" BorderBrush="#552222" Width="90"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -262,7 +262,7 @@
             <Border Grid.Column="1" Style="{StaticResource SubtleCardStyle}" Padding="15">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="Como usar" FontSize="15" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
+                        <TextBlock Text="Como usar" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
                         <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12">
                             1. Clique PREPARAR WINPE
                                Baixa + customiza + cria boot RAMDISK
@@ -335,7 +335,7 @@
                                 <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"/>
                             </ScrollViewer>
                             <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="📋 Copiar log"
-                                       Foreground="#555" FontSize="9" Cursor="Hand"
+                                       Foreground="#555" FontSize="11" Cursor="Hand"
                                        HorizontalAlignment="Right" Margin="0,4,0,0"
                                        MouseDown="TxtCopyOpLog_MouseDown"/>
                         </Grid>

@@ -885,6 +885,14 @@ namespace KitLugia.GUI.Pages
                 {
                     ProgramsList.ItemsSource = FilteredProgramsCollection;
                 }
+
+                if (EmptyProgramsTab != null)
+                {
+                    EmptyProgramsTab.Hint = string.IsNullOrWhiteSpace(searchText)
+                        ? "Nenhum programa instalado foi reconhecido. Clique em Atualizar."
+                        : $"Nada encontrado para \"{TxtSearchPrograms.Text.Trim()}\".";
+                    EmptyProgramsTab.Update(FilteredProgramsCollection?.Count ?? 0);
+                }
             }
         }
 

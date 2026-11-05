@@ -18,7 +18,7 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,15">
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x2B55; rEFInd Boot Manager"/>
-            <TextBlock Text="Gerenciador de boot UEFI — auto-detecção de sistemas, temas, Secure Boot" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,5,0,0"/>
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Text="Gerenciador de boot UEFI — auto-detecção de sistemas, temas, Secure Boot" Margin="0,5,0,0"/>
         </StackPanel>
 
         <!-- Main Content -->
@@ -154,7 +154,7 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                         </Grid.RowDefinitions>
                         <TextBlock Text="&#x1F4DD; LOG" FontSize="11" Foreground="#AAA" Margin="10,8,10,5"/>
                         <ScrollViewer Grid.Row="1" Margin="5" x:Name="LogScroll">
-                            <TextBox x:Name="TxtLog" IsReadOnly="True" FontFamily="Consolas" FontSize="10"
+                            <TextBox x:Name="TxtLog" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
                                      Foreground="#0F0" Background="#111" BorderThickness="0"
                                      TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                                      AcceptsReturn="True"/>

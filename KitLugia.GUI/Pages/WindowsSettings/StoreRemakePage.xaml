@@ -242,11 +242,11 @@
                                 </Border>
                                 <!-- Nome + editor -->
                                 <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
                                     <TextBlock Text="{Binding Publisher}" FontSize="11" Foreground="#7A7A7A" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                                 <!-- Id -->
-                                <TextBlock Grid.Column="2" Text="{Binding Id}" FontSize="10.5" Foreground="#8A9AB0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Id}"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Id}" FontSize="11" Foreground="#8A9AB0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Id}"/>
                                 <!-- Versão -->
                                 <TextBlock Grid.Column="3" Text="{Binding DisplayVersion}" FontSize="11" Foreground="#C0C0C0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 <!-- Nova versão -->
@@ -266,7 +266,7 @@
                                     <Button Content="Atualizar" Tag="{Binding}" Style="{StaticResource PrimaryBtn}" Padding="10,4" FontSize="11" Margin="0,0,6,0" Visibility="{Binding UpdateBtnVisibility}" Click="BtnUpdateOne_Click" ToolTip="Atualizar para a nova versão"/>
                                     <Button Content="Force" Tag="{Binding}" Style="{StaticResource GhostBtn}" Padding="7,4" FontSize="11" Margin="0,0,6,0" Visibility="{Binding UpdateBtnVisibility}" Click="BtnForceUpdateOne_Click" ToolTip="Mata processos em execução e atualiza"/>
                                     <Button Content="&#xE74D;" Tag="{Binding}" FontFamily="Segoe MDL2 Assets" Style="{StaticResource GhostBtn}" Padding="7,4" FontSize="11" Visibility="{Binding UninstallBtnVisibility}" Click="BtnUninstallOne_Click" ToolTip="Desinstalar"/>
-                                    <Button Content="&#xE712;" Tag="{Binding}" FontFamily="Segoe MDL2 Assets" Style="{StaticResource GhostBtn}" Padding="6,4" FontSize="10" Click="BtnDetails_Click" ToolTip="Detalhes do pacote"/>
+                                    <Button Content="&#xE712;" Tag="{Binding}" FontFamily="Segoe MDL2 Assets" Style="{StaticResource GhostBtn}" Padding="6,4" FontSize="11" Click="BtnDetails_Click" ToolTip="Detalhes do pacote"/>
                                 </StackPanel>
                             </Grid>
                         </DataTemplate>
@@ -287,7 +287,7 @@
                     <TextBlock x:Name="TxtLog" Text="Pronto." FontSize="11" Foreground="#6A6A6A" TextWrapping="Wrap" FontFamily="Consolas"/>
                 </ScrollViewer>
                 <TextBlock x:Name="TxtStatusCounts" Grid.Column="1" Text="" FontSize="11" Foreground="#8A8A8A" VerticalAlignment="Center" Margin="10,0"/>
-                <Button x:Name="BtnCopyLog" Grid.Column="2" Content="Copiar" FontSize="10" Style="{StaticResource GhostBtn}" Padding="8,3" Click="BtnCopyLog_Click" ToolTip="Copiar log (também visível no log do Kit)"/>
+                <Button x:Name="BtnCopyLog" Grid.Column="2" Content="Copiar" FontSize="11" Style="{StaticResource GhostBtn}" Padding="8,3" Click="BtnCopyLog_Click" ToolTip="Copiar log (também visível no log do Kit)"/>
             </Grid>
         </Border>
 
@@ -348,7 +348,7 @@
                                     <TextBlock x:Name="DetailVersion" Text="" FontSize="11" Foreground="#6A7A90" Margin="8,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </StackPanel>
-                            <Button Grid.Column="2" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="14" Width="32" Height="32" Style="{StaticResource GhostBtn}" Padding="0" VerticalAlignment="Top" Click="DetailClose_Click"/>
+                            <Button Grid.Column="2" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="13" Width="32" Height="32" Style="{StaticResource GhostBtn}" Padding="0" VerticalAlignment="Top" Click="DetailClose_Click"/>
                         </Grid>
                         <Grid Margin="0,0,0,16">
                             <Grid.ColumnDefinitions>

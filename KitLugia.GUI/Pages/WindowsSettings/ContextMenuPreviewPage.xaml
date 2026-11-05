@@ -9,7 +9,7 @@
         <StackPanel Margin="40,30,40,50" MaxWidth="860" HorizontalAlignment="Left">
 
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x1F9EA; Preview 1:1 do Menu de Contexto" Margin="0,0,0,6"/>
-            <TextBlock Text="Selecione o tipo de item e veja o menu exatamente como no Windows Explorer." Foreground="#A0A0A0" FontSize="13" Margin="0,0,0,25"/>
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Text="Selecione o tipo de item e veja o menu exatamente como no Windows Explorer." Margin="0,0,0,25"/>
 
             <Grid Margin="0,0,0,20">
                 <Grid.ColumnDefinitions>

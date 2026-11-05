@@ -20,8 +20,7 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x1F504; Atualiza&#xE7;&#xF5;es"/>
-            <TextBlock Text="Verifique e instale as vers&#xF5;es mais recentes do KitLugia" 
-                       FontSize="14" Foreground="{StaticResource TextMuted}" Margin="0,5,0,0"/>
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Text="Verifique e instale as vers&#xF5;es mais recentes do KitLugia" Margin="0,5,0,0"/>
         </StackPanel>
 
         <!-- Main Content -->
@@ -113,7 +112,7 @@
                 <Button x:Name="CheckButton" Grid.Column="0" Content="&#x1F50D; Verificar Agora" 
                         Padding="20,12" Margin="0,0,10,0"
                         Background="White" Foreground="Black"
-                        BorderThickness="1" BorderBrush="#CCCCCC" FontSize="14"
+                        BorderThickness="1" BorderBrush="#CCCCCC" FontSize="13"
                         Cursor="Hand"
                         Click="CheckButton_Click">
                     <Button.Style>
@@ -216,12 +215,12 @@
                         <StackPanel Grid.Column="0" HorizontalAlignment="Left">
                             <TextBlock Text="Velocidade" FontSize="11" Foreground="#888888"/>
                             <TextBlock x:Name="TxtProgressSpeed" Text="-- MB/s"
-                                       FontSize="14" FontWeight="SemiBold" Foreground="#43A047"/>
+                                       FontSize="13" FontWeight="SemiBold" Foreground="#43A047"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                             <TextBlock Text="Transferido" FontSize="11" Foreground="#888888"/>
                             <TextBlock x:Name="TxtProgressSize" Text="-- / --"
-                                       FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                       FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

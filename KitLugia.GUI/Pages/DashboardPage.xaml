@@ -917,7 +917,7 @@
                             </StackPanel>
                             <Button x:Name="BtnToggleCoreParking" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
-                                    Click="BtnToggleCoreParking_Click" FontSize="10" FontWeight="Bold"/>
+                                    Click="BtnToggleCoreParking_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
@@ -936,7 +936,7 @@
                             </StackPanel>
                             <Button x:Name="BtnToggleTimerCoalescing" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
-                                    Click="BtnToggleTimerCoalescing_Click" FontSize="10" FontWeight="Bold"/>
+                                    Click="BtnToggleTimerCoalescing_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
@@ -955,7 +955,7 @@
                             </StackPanel>
                             <Button x:Name="BtnToggleInputQueue" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
-                                    Click="BtnToggleInputQueue_Click" FontSize="10" FontWeight="Bold"/>
+                                    Click="BtnToggleInputQueue_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
@@ -974,7 +974,7 @@
                             </StackPanel>
                             <Button x:Name="BtnToggleGlobalTimer" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
-                                    Click="BtnToggleGlobalTimer_Click" FontSize="10" FontWeight="Bold"/>
+                                    Click="BtnToggleGlobalTimer_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
@@ -993,7 +993,7 @@
                             </StackPanel>
                             <Button x:Name="BtnToggleSysResp" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
-                                    Click="BtnToggleSysResp_Click" FontSize="10" FontWeight="Bold"/>
+                                    Click="BtnToggleSysResp_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 

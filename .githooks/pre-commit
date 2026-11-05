@@ -1,0 +1,15 @@
+#!/bin/sh
+# F7 do docs/UI_CONSISTENCY_PLAN.md.
+# Reprova o commit se houver titulo/subtitulo de pagina fora dos estilos do tema
+# (PageTitleStyle/PageSubtitleStyle) ou hex hardcoded acima da allowlist por arquivo.
+# Habilitar: git config core.hooksPath .githooks
+if command -v py >/dev/null 2>&1; then
+    if ! py -3 tests/ui_style_audit.py --check; then
+        echo ""
+        echo "Commit bloqueado pelo ui_style_audit (veja o relatorio acima)."
+        echo "Se a mudanca for intencional, atualize a allowlist:"
+        echo "  py -3 tests/ui_style_audit.py --baseline"
+        exit 1
+    fi
+fi
+exit 0

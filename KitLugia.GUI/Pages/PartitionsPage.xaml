@@ -352,7 +352,7 @@
                                 <StackPanel>
                                     <TextBlock Text="💡 Dica de Segurança" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="12" Margin="0,0,0,4"/>
                                     <TextBlock Text="Partições críticas (C:, EFI, Recuperação) são protegidas contra formatação e exclusão acidental." 
-                                              Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap"/>
+                                              Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -419,7 +419,7 @@
 
                     <!-- Footer Buttons (Always at bottom, outside ScrollViewer) -->
                     <StackPanel Grid.Row="2" x:Name="PanelOpFooter" Orientation="Horizontal" HorizontalAlignment="Center" Visibility="Collapsed" Margin="0,5,0,0">
-                        <Button Content="✅ FECHAR" Click="BtnCloseOverlay_Click" Style="{StaticResource GoldButtonStyle}" Width="180" Height="42" FontWeight="Bold" FontSize="14"/>
+                        <Button Content="✅ FECHAR" Click="BtnCloseOverlay_Click" Style="{StaticResource GoldButtonStyle}" Width="180" Height="42" FontWeight="Bold" FontSize="13"/>
                     </StackPanel>
 
                     <!-- Live Aesthetic Log (Corner Pinned) -->
@@ -558,7 +558,7 @@
                             <CheckBox x:Name="ChkEmergencyPreBoot" Content="🚨 Emergency Pre-Boot (WinRE + DISM)"
                                       Foreground="#FFFF5555" FontWeight="Bold" FontSize="13" Margin="0,0,0,8" Checked="ChkEmergencyPreBoot_Checked" Unchecked="ChkEmergencyPreBoot_Unchecked"/>
                             <TextBlock x:Name="TxtEmergencyWarning" Text="Usa WinRE modificado via DISM para reduzir sem as limitações do Windows. ⚠️ O sistema será REINICIADO automaticamente."
-                                      Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="20,0,0,0" Visibility="Collapsed"/>
+                                      Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="20,0,0,0" Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
 
