@@ -109,10 +109,28 @@ anterior adicionava BOM em 30 arquivos que nao tinham e sujou o diff.
 (o projeto referencia WinForms); a classe foi declarada como `System.Windows.Controls.UserControl`
 e o `using System.Windows.Controls` removido.
 
-**Pendente do plano:** F2 (templates inline restantes: ExmTweaks 126, Tweaks 96, NetworkPage 32,
-MainWindow 28), F4 (overlay unico - 8 paginas com spinner inline, `Controls/LoadingOverlay` existe
-e e' usado em 4 - e adocao do estado vazio em Apps/Drivers/Servicos/Programas), 15 -> escala e
-foco visivel (F5), subtitulos por pagina e `PageHeader` (F1).
+**12. REVISAO 05/11 (pedido: "os loadings diferentes existiam porque testavamos qual encaixava;
+gostei do da AppsPage e do toast cinza; mantenha os outros; reveja o plano"):** a busca de
+carregamento ACABOU. O contrato (`docs/UI_CONSISTENCY_PLAN.md`, sec. 2) passa a ter **2 variantes
+oficiais**: (A) **overlay de area** = `Win11SpinnerTemplate` (rodela de 5 pontos 7px dourados numa
+Grid 44x44, `RotateTransform` 0->360 em 1,4 s) sobre scrim `#CC000000` raio 8 + texto branco 16 +
+linha de progresso `#FFD700` 12 opcional; (B) **toast de progresso** = `Controls/LugiaToast`
+(card 350, raio 6, gradiente `#CC2A2010`->`#F00A0A0A`, borda dourada, slide da direita). Regra:
+ainda da' para clicar -> toast; area esperando dado -> overlay; nunca os dois. **Ficam como
+excecao aceita** (nao e' divida): `MainWindow.LoadingOverlay` (card 300x120 com borda accent),
+`IntegrityPage` (badge circular 90), `DriversPage` (overlay + barra), `ServicesPage`,
+`StoreRemakePage`, `KitTaskManagerWindow`. QUIRK medido: `Win11SpinnerTemplate` e
+`Win11MiniSpinnerTemplate` moram DENTRO de `AppsPage.xaml` (linhas 48 e 81) - nenhuma outra pagina
+herda; por isso E2 e' so' promover para `Themes/Spinners.xaml`.
+
+**13. NOVA ORDEM (substitui a ordem das fases, sec. 7 do plano):** E1 bugs de runtime do harness
+(BloatwarePage anima `Angle` -> InvalidOperationException; DiskConverterPage NRE na carga) ->
+E2 spinner oficial em 1 arquivo -> E3 F2 botoes em 3 lotes (NetworkPage 32, TweaksPage 96,
+ExmTweaksPage 126) por IMPRESSAO DIGITAL de template (96 copias iguais = 1 edicao) -> E4 estados
+vazios -> E5 resto do 15 + foco -> E6 subtitulos -> E7 allowlist/hook/release. **Decidido NAO
+fazer:** substituicao em massa dos 2.133 hex (apaga a identidade de paginas como Store Remake),
+`PageHeader` reescrevendo 46 cabecalhos, unificar os loadings aprovados, remover sombras inline
+pontuais, mexer na paleta azul do TaskManager.
 
 ---
 # Sessão — recalcular contagens do filtro na IntegrityPage após alterações
