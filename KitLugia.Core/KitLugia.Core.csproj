@@ -30,7 +30,9 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\BitsumHighestPerformance.pow" />
-    
+    <!-- Base de OUIs (16.294 vendors / 21.362 prefixos) extraída do oui.db do TMAC v6 -->
+    <EmbeddedResource Include="Resources\oui-vendors.txt.gz" />
+
     <Content Include="Resources\BootGoodies\**" Exclude="Resources\BootGoodies\antix\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

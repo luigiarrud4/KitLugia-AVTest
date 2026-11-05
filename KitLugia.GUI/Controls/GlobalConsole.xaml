@@ -63,9 +63,9 @@
 
                     <!-- Busca -->
                     <Border Grid.Column="1" Background="#0F0F0F" BorderBrush="#333" BorderThickness="1" CornerRadius="2" Margin="4,0" VerticalAlignment="Center" Height="20">
-                        <TextBox x:Name="TxtSearch" Background="Transparent" BorderThickness="0" Foreground="#AAA"
-                                 FontFamily="Consolas" FontSize="11" VerticalContentAlignment="Center"
-                                 Padding="4,1" TextChanged="TxtSearch_TextChanged"
+                        <TextBox x:Name="TxtSearch" Style="{StaticResource SearchInputStyle}"
+                                 MinHeight="0" FontFamily="Consolas" FontSize="11" Foreground="#AAA"
+                                 Tag="Filtrar log..." TextChanged="TxtSearch_TextChanged"
                                  ToolTip="Digite para filtrar as linhas do log (filtra as linhas em memória)"/>
                     </Border>
 

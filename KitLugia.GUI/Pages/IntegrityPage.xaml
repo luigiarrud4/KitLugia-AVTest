@@ -93,33 +93,13 @@
             <Border Grid.Column="1" Height="36" Margin="15,0,15,0" CornerRadius="18" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="🔍" VerticalAlignment="Center" Margin="12,0,0,0" FontSize="14" Opacity="0.5"/>
-                    <TextBox x:Name="SearchBox" Grid.Column="1" 
-                             Text="" 
-                             VerticalAlignment="Center" Margin="5,0,12,0"
-                             Background="Transparent" Foreground="White" BorderThickness="0"
-                             FontSize="13" CaretBrush="White"
-                             TextChanged="SearchBox_TextChanged">
-                        <TextBox.Style>
-                            <Style TargetType="TextBox">
-                                <Setter Property="Text" Value=""/>
-                                <Style.Triggers>
-                                    <Trigger Property="Text" Value="">
-                                        <Setter Property="Opacity" Value="0.5"/>
-                                    </Trigger>
-                                    <Trigger Property="Text" Value="">
-                                        <Setter Property="ToolTip" Value="Pesquisar por nome ou categoria..."/>
-                                    </Trigger>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Opacity" Value="1"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBox.Style>
-                    </TextBox>
+                    <TextBox x:Name="SearchBox" Grid.Column="0"
+                             Style="{StaticResource SearchInputStyle}"
+                             Tag="Pesquisar por nome ou categoria..."
+                             TextChanged="SearchBox_TextChanged"/>
                     <!-- Botão limpar pesquisa -->
                     <Button Grid.Column="1" x:Name="BtnClearSearch" Width="22" Height="22" 
                             HorizontalAlignment="Right" Margin="0,0,6,0"

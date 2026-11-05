@@ -292,19 +292,63 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Gera um endereço MAC aleatório com aparência de fabricante real.
+        /// Gera um endereço MAC aleatório no estilo TMAC: OUI REAL de um vendor
+        /// (base de 21.362 prefixos extraída do oui.db do TMAC v6) + 3 octetos aleatórios.
         /// Primeiro byte = 0x02 (unicast + locally administered, obrigatório para WiFi).
-        /// Bytes 2-3 usam os 4 últimos hex digits de um OUI real (parece do fabricante).
-        /// Últimos 3 bytes aleatórios.
         /// Formato: 12 caracteres hexa sem separadores (ex: 021E4FA1B2C3).
+        /// Usado quando o usuário ESCOLHE um fabricante na lista (opção estilo TMAC).
         /// </summary>
         public static string GenerateRandomMac()
         {
+            return OuiCatalog.GenerateMac(Random.Shared, use02Prefix: true);
+        }
+
+        /// <summary>
+        /// MAC aleatório GENÉRICO (comportamento original/fallback do KitLugia):
+        /// 1º octeto = 0x02 (locally administered, obrigatório para WiFi) + 5 octetos
+        /// totalmente aleatórios, SEM OUI de vendor. Máxima compatibilidade com
+        /// drivers — usado pelo botão "Gerar Novo MAC". Se um MAC com OUI de
+        /// fabricante não funcionar (adaptador não reconecta), é este o fallback.
+        /// </summary>
+        public static string GenerateRandomMacPlain()
+        {
+            var mac = new byte[6];
+            mac[0] = 0x02;
+            Random.Shared.NextBytes(mac.AsSpan(1, 5));
+            return Convert.ToHexString(mac);
+        }
+
+        /// <summary>
+        /// Gera um MAC com o OUI de um vendor específico (estilo TMAC com vendor escolhido).
+        /// </summary>
+        /// <param name="ouiPrefix">OUI de 3 bytes em hex, ex: "847E40".</param>
+        /// <param name="use02Prefix">Força o 1º octeto para 0x02 (locally administered).</param>
+        public static string GenerateMacFromOui(string ouiPrefix, bool use02Prefix = true)
+        {
             var rng = Random.Shared;
-            var ouiPrefix = _realOuiPrefixes[rng.Next(_realOuiPrefixes.Length)];
-            var ouiSuffix = ouiPrefix.Substring(2);
-            var nic = rng.Next(0x1000000).ToString("X6");
-            return "02" + ouiSuffix + nic;
+            var mac = new byte[6];
+            var oui = (ouiPrefix ?? string.Empty).Replace("-", string.Empty).Replace(":", string.Empty).ToUpperInvariant();
+            if (oui.Length >= 6)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    if (!byte.TryParse(oui.Substring(i * 2, 2), System.Globalization.NumberStyles.HexNumber, null, out var b))
+                        b = 0;
+                    mac[i] = b;
+                }
+            }
+            else
+            {
+                var fb = OuiCatalog.RandomOuiPrefix(rng);
+                for (int i = 0; i < 3; i++)
+                    mac[i] = Convert.ToByte(fb.Substring(i * 2, 2), 16);
+            }
+            rng.NextBytes(mac.AsSpan(3, 3));
+            if (use02Prefix)
+                mac[0] = 0x02; // modo -r02 do TMAC: primeiro octeto exatamente 02
+            else
+                mac[0] &= 0xFE;
+            return Convert.ToHexString(mac);
         }
 
         /// <summary>
@@ -731,28 +775,39 @@ namespace KitLugia.Core
             return null;
         }
 
-        // =================================================================
-        // MAC ALEATÓRIO (estilo TMAC) — gera MAC com OUI válido
+        // MECANISMO DO TMAC (descoberto via engenharia reversa do TMAC.exe):
+        //
+        // 1. TMAC mantem base de vendors OUI em oui.db (5.3 MB) com milhares
+        //    de OUIs reais (Texas Instruments, Hewlett Packard, etc.)
+        //    Funcoes: LoadVendors, ParseOUI, GetVendor, NICVendor (classe VB6)
+        //
+        // 2. Geracao em 2 etapas usando VB6 Rnd() (rtcRandomize + rtcRandomNext):
+        //    Etapa 1: rtcRandomize (seed) -> rtcRandomNext -> indice aleatorio
+        //             no array de vendors OUI (vbaUbound para limite)
+        //             Se indice invalido, repete (loop loc_463B0C)
+        //    Etapa 2: rtcRandomNext novamente para gerar 3 octetos aleatorios
+        //
+        // 3. Combina: OUI do vendor (3 bytes) + 3 octetos aleatorios = MAC (6 bytes)
+        //
+        // 4. O bit 0x02 (locally administered) pode ser setado no 1o octeto
+        //    para indicar MAC local (ex: 4E:7E:40:... comeca com 4E)
+        //
+        // IMPLEMENTACAO DO KITLUGIA (baseada no mecanismo do TMAC):
+        // - OuiCatalog: 16.294 vendors / 21.362 OUI reais extraidos do oui.db do TMAC v6
+        // - Random.Shared do .NET (equivalente ao rtcRandomNext do VB6)
+        // - OUI real de vendor + 3 octetos aleatorios (igual ao TMAC)
+        // - use02Prefix=true: 1o octeto = 0x02 (locally administered, obrigatorio p/ WiFi)
+        // - use02Prefix=false: mantem o OUI do vendor intacto (unicast)
+        //
+        // Confianca: MECANISMO TMAC = CONFIRMADO via .asm
+        // Confianca: CATALOGO OUI = CONFIRMADO (parse do oui.db: 21.362 registros)
         // =================================================================
         public static string GetRandomMacAddress(bool use02Prefix = true)
         {
-            var rng = new Random();
-            var bytes = new byte[6];
-            rng.NextBytes(bytes);
-            if (use02Prefix)
-            {
-                bytes[0] = 0x02; // locally administered, unicast
-            }
-            else
-            {
-                // OUI genérico (00:1A:2B) para parecer vendor real
-                bytes[0] = 0x00;
-                bytes[1] = 0x1A;
-                bytes[2] = 0x2B;
-            }
-            // bit 1 do primeiro byte = 0 (unicast)
-            bytes[0] &= 0xFE;
-            return string.Concat(bytes.Select(b => b.ToString("X2")));
+            // Mecanismo TMAC: OUI real de vendor (base oui.db) + 3 octetos aleatorios.
+            // use02Prefix=true  -> 1o octeto = 0x02 (locally administered, p/ WiFi)
+            // use02Prefix=false -> mantem o OUI do vendor intacto (unicast)
+            return OuiCatalog.GenerateMac(Random.Shared, use02Prefix);
         }
 
         // Reset ao MAC original (remove NetworkAddress do registro)

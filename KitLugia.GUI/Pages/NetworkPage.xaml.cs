@@ -797,7 +797,9 @@ namespace KitLugia.GUI.Pages
         // =========================================================
         private void BtnGenerateMac_Click(object sender, RoutedEventArgs e)
         {
-            _generatedMac = AdapterManager.GenerateRandomMac();
+            // Comportamento ORIGINAL/fallback: MAC aleatorio generico (02 + 5 bytes),
+            // sem OUI de vendor — maxima compatibilidade.
+            _generatedMac = AdapterManager.GenerateRandomMacPlain();
             var formatted = FormatMacDisplay(_generatedMac);
             TxtNewMac.Text = formatted;
             TxtNewMac.Foreground = _colorActive;

@@ -120,23 +120,9 @@
 
                         <!-- Busca e Contador -->
                         <StackPanel Orientation="Horizontal">
-                            <Border Background="#20FFFFFF" CornerRadius="4" Height="30" Width="250" Margin="0,0,15,0">
-                                <Grid>
-                                    <TextBlock Text="&#x1F50D; Filtrar drivers..." Foreground="#888" VerticalAlignment="Center" Margin="10,0" IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtFilter}" Value="">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <TextBox x:Name="TxtFilter" Background="Transparent" BorderThickness="0" Foreground="White" VerticalAlignment="Center" Margin="5,0" TextChanged="TxtFilter_TextChanged"/>
-                                </Grid>
-                            </Border>
+                            <TextBox x:Name="TxtFilter" Width="250" Height="30" MinHeight="0" Margin="0,0,15,0"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Filtrar drivers..."
+                                     TextChanged="TxtFilter_TextChanged"/>
 
                             <!-- Contador de Drivers -->
                             <TextBlock x:Name="TxtCount" Text="Carregando..." Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
@@ -320,23 +306,9 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal">
-                            <Border Background="#20FFFFFF" CornerRadius="4" Height="30" Width="240" Margin="0,0,10,0">
-                                <Grid>
-                                    <TextBlock Text="🔍 Filtrar (nome, path)..." Foreground="#888" VerticalAlignment="Center" Margin="10,0" IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtKernelFilter}" Value="">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <TextBox x:Name="TxtKernelFilter" Background="Transparent" BorderThickness="0" Foreground="White" VerticalAlignment="Center" Margin="5,0" TextChanged="TxtKernelFilter_TextChanged"/>
-                                </Grid>
-                            </Border>
+                            <TextBox x:Name="TxtKernelFilter" Width="240" Height="30" MinHeight="0" Margin="0,0,10,0"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Filtrar (nome, path)..."
+                                     TextChanged="TxtKernelFilter_TextChanged"/>
                             <ComboBox x:Name="CboKernelStart" Width="130" Height="30" Margin="0,0,8,0" SelectionChanged="CboKernelStart_SelectionChanged">
                                 <ComboBoxItem Content="Todos Start" IsSelected="True"/>
                                 <ComboBoxItem Content="Boot (0)"/>

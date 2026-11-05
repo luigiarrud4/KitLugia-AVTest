@@ -163,8 +163,9 @@
                                 <TextBlock x:Name="BloatwareIconProgressText" Text="&#xCD;cones carregados: 0/0" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
                             </StackPanel>
                             <TextBlock Text="Aplicativos nativos do Windows. Gerencie instala&#xE7;&#xF5;es padr&#xE3;o." Foreground="#AAA" Margin="0,3,0,0"/>
-                            <TextBox x:Name="TxtSearchBloatware" TextChanged="TxtSearchBloatware_TextChanged" 
-                                     Background="#252525" Foreground="White" BorderBrush="#333" BorderThickness="1" Padding="10,8" Margin="0,10,0,0" FontSize="14"/>
+                            <TextBox x:Name="TxtSearchBloatware" TextChanged="TxtSearchBloatware_TextChanged"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar bloatware por nome ou pacote..."
+                                     Margin="0,10,0,0"/>
                         </StackPanel>
 
                         <Border x:Name="BloatwareLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
@@ -295,8 +296,9 @@
                             </StackPanel>
                             <TextBlock Text="Programas instalados no Windows. Gerencie instala&#xE7;&#xF5;es normais." Foreground="#AAA" Margin="0,3,0,0"/>
                             <TextBlock Text="Baseado em Bulk Crap Uninstaller (BCU) - Licen&#xE7;a Apache 2.0" Foreground="#FF6F61" FontSize="10" Margin="0,2,0,0"/>
-                            <TextBox x:Name="TxtSearchPrograms" TextChanged="TxtSearchPrograms_TextChanged" 
-                                     Background="#252525" Foreground="White" BorderBrush="#333" BorderThickness="1" Padding="10,8" Margin="0,10,0,0" FontSize="14"/>
+                            <TextBox x:Name="TxtSearchPrograms" TextChanged="TxtSearchPrograms_TextChanged"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar programa por nome ou fabricante..."
+                                     Margin="0,10,0,0"/>
                         </StackPanel>
 
                         <Border x:Name="ProgramsLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
@@ -428,8 +430,9 @@
                                 <TextBlock x:Name="PortableIconProgressText" Text="" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
                             </StackPanel>
                             <TextBlock Text="Apps em pastas locais sem registro no Windows. Podem ser removidos manualmente." Foreground="#AAA" Margin="0,3,0,0"/>
-                            <TextBox x:Name="TxtSearchPortable" TextChanged="TxtSearchPortable_TextChanged" 
-                                     Background="#252525" Foreground="White" BorderBrush="#333" BorderThickness="1" Padding="10,8" Margin="0,10,0,0" FontSize="14"/>
+                            <TextBox x:Name="TxtSearchPortable" TextChanged="TxtSearchPortable_TextChanged"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar app portátil por nome ou pasta..."
+                                     Margin="0,10,0,0"/>
                         </StackPanel>
 
                         <Border x:Name="PortableLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">

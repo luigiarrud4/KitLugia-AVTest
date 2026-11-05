@@ -26,32 +26,17 @@
                 <ColumnDefinition Width="160"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="10,5">
+            <Border Grid.Column="0" Style="{StaticResource SearchBarBorderStyle}" Padding="0">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="&#x1F50D;" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox x:Name="TxtSearch" Grid.Column="1" Text="" Background="Transparent" BorderThickness="0" 
-                             Foreground="White" FontSize="13" VerticalAlignment="Center"
-                             TextChanged="TxtSearch_TextChanged">
-                        <TextBox.Style>
-                            <Style TargetType="TextBox">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="Foreground" Value="White"/>
-                                <Style.Triggers>
-                                    <Trigger Property="Text" Value="">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBox.Style>
-                    </TextBox>
-                    <Button x:Name="BtnClearSearch" Grid.Column="2" Content="&#x2716;" Background="Transparent" 
+                    <TextBox x:Name="TxtSearch" Grid.Column="0" Style="{StaticResource SearchInputStyle}"
+                             Tag="Buscar tweak por nome ou categoria..." TextChanged="TxtSearch_TextChanged"/>
+                    <Button x:Name="BtnClearSearch" Grid.Column="1" Content="&#x2716;" Background="Transparent"
                             BorderThickness="0" Foreground="#666" Cursor="Hand" Visibility="Collapsed"
-                            Click="BtnClearSearch_Click" FontSize="12" Width="24" Height="24"/>
+                            Click="BtnClearSearch_Click" FontSize="12" Width="24" Height="24" Margin="0,0,4,0"/>
                 </Grid>
             </Border>
 

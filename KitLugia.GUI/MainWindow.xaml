@@ -780,35 +780,10 @@
 
                         <!-- BARRA DE PESQUISA -->
                         <Grid Grid.Row="1" Margin="0,0,0,15">
-                            <Border Background="#20FFFFFF" CornerRadius="6" Height="34" BorderBrush="{StaticResource CardBorder}" BorderThickness="1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="30"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="&#x1F50D;" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
-
-                                    <TextBlock Text="Procurar tweak..." Grid.Column="1" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" 
-                                               FontSize="12" FontStyle="Italic" IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtGlobalSearch}" Value="">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-
-                                    <TextBox x:Name="TxtGlobalSearch" Grid.Column="1" Background="Transparent" BorderThickness="0"
-                                                                                 Foreground="White" VerticalAlignment="Center" FontSize="13" 
-                                                                                 CaretBrush="{StaticResource AccentColor}"
-                                                                                 TextChanged="TxtGlobalSearch_TextChanged"
-                                                                                 PreviewKeyDown="TxtGlobalSearch_PreviewKeyDown" Style="{x:Null}"/>
-                                </Grid>
-                            </Border>
+                            <TextBox x:Name="TxtGlobalSearch"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Procurar tweak..."
+                                     TextChanged="TxtGlobalSearch_TextChanged"
+                                     PreviewKeyDown="TxtGlobalSearch_PreviewKeyDown"/>
 
                             <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=TxtGlobalSearch}" 
                                    StaysOpen="False" AllowsTransparency="True" PopupAnimation="Slide" VerticalOffset="5">

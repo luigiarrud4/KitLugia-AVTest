@@ -386,28 +386,10 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        // Event handlers para pesquisa
-        private void TxtSearch_GotFocus(object sender, RoutedEventArgs e)
-        {
-            if (TxtSearch.Text == "🔍 Pesquisar configurações...")
-                TxtSearch.Text = "";
-        }
-
-        private void TxtSearch_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(TxtSearch.Text))
-                TxtSearch.Text = "🔍 Pesquisar configurações...";
-        }
-
+        // Event handler para pesquisa (o placeholder agora vem do Tag da barra —
+        // SearchTextBoxStyle —, então o campo nunca carrega texto falso).
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // Não aplicar filtro se for o placeholder
-            if (TxtSearch.Text == "🔍 Pesquisar configurações...")
-            {
-                _searchText = "";
-                return;
-            }
-
             _searchText = TxtSearch.Text;
             ApplyFilter();
         }

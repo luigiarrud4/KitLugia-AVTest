@@ -119,9 +119,9 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBox x:Name="TxtSearch" Grid.Column="0" Style="{StaticResource DarkTextBoxStyle}"
-                         Tag="&#x1F50D;  Buscar item, escopo ou DLL..."
-                         TextChanged="TxtSearch_TextChanged" Height="36" VerticalContentAlignment="Center"/>
+                <TextBox x:Name="TxtSearch" Grid.Column="0" Style="{StaticResource SearchTextBoxStyle}"
+                         Tag="Buscar item, escopo ou DLL..."
+                         TextChanged="TxtSearch_TextChanged" Height="36" MinHeight="0" VerticalContentAlignment="Center"/>
 
                 <ComboBox x:Name="CmbFilter" Grid.Column="1" Width="220" Height="36" Margin="12,0,0,0"
                           Style="{StaticResource DarkComboBoxStyle}" SelectionChanged="CmbFilter_SelectionChanged">
