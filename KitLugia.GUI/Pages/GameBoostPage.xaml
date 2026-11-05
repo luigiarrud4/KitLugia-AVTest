@@ -238,7 +238,7 @@
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="UNPARK CPU" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                         <TextBlock Text="Desparquear CPUs para menor lat&#xEA;ncia (via powercfg)" FontSize="11" Foreground="#888"/>
-                        <TextBlock Text="&#x26A1; Similar ao PowerSettingsExplorer" FontSize="10" Foreground="#FFD700" Margin="0,2,0,0"/>
+                        <TextBlock Text="&#x26A1; Similar ao PowerSettingsExplorer" FontSize="11" Foreground="#FFD700" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ToggleButton x:Name="ChkUnparkCpu" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
                                   Checked="ChkUnparkCpu_Click" Unchecked="ChkUnparkCpu_Click"/>
@@ -252,7 +252,7 @@
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="TURBO EXPLORER AUTOM&#xC1;TICO (F11)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                         <TextBlock Text="Quando o explorer.exe reiniciar (login/crash), aplica o F11 re-render na 1&#xAA; pasta aberta" FontSize="11" Foreground="#888"/>
-                        <TextBlock Text="&#x1F4C1; 'Ir direto ao arquivo' instant&#xE2;neo ap&#xF3;s reboot — sem precisar apertar Ctrl+F11" FontSize="10" Foreground="#FFD700" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Text="&#x1F4C1; 'Ir direto ao arquivo' instant&#xE2;neo ap&#xF3;s reboot — sem precisar apertar Ctrl+F11" FontSize="11" Foreground="#FFD700" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                     <ToggleButton x:Name="ChkExplorerAutoTurbo" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
                                   Checked="ChkExplorerAutoTurbo_Click" Unchecked="ChkExplorerAutoTurbo_Click"/>
@@ -572,7 +572,7 @@
                 <Border Grid.Column="0" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="0,0,10,0">
                     <StackPanel>
                         <TextBlock Text="&#x1F53A;" FontSize="24" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                        <TextBlock Text="Foreground Boost" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}"
+                        <TextBlock Text="Foreground Boost" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}"
                                    TextAlignment="Center" Margin="0,0,0,5"/>
                         <TextBlock Text="App ativo recebe prioridade High automaticamente" FontSize="11" Foreground="#888"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
@@ -583,7 +583,7 @@
                 <Border Grid.Column="1" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="5,0,5,0">
                     <StackPanel>
                         <TextBlock Text="&#x1F53B;" FontSize="24" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                        <TextBlock Text="Background Throttle" FontSize="14" FontWeight="Bold" Foreground="#FF6B6B"
+                        <TextBlock Text="Background Throttle" FontSize="13" FontWeight="Bold" Foreground="#FF6B6B"
                                    TextAlignment="Center" Margin="0,0,0,5"/>
                         <TextBlock Text="Processos background CPU-intensive s&#xE3;o reduzidos (Below Normal)" FontSize="11" Foreground="#888"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
@@ -594,7 +594,7 @@
                 <Border Grid.Column="2" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="10,0,0,0">
                     <StackPanel>
                         <TextBlock Text="&#x26A1;" FontSize="24" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                        <TextBlock Text="Otimiza&#xE7;&#xF5;es Avan&#xE7;adas" FontSize="14" FontWeight="Bold" Foreground="#4ECDC4"
+                        <TextBlock Text="Otimiza&#xE7;&#xF5;es Avan&#xE7;adas" FontSize="13" FontWeight="Bold" Foreground="#4ECDC4"
                                    TextAlignment="Center" Margin="0,0,0,5"/>
                         <TextBlock Text="EcoQoS + Thread Memory Priority + Timer Resolution (1ms)" FontSize="11" Foreground="#888"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
@@ -713,7 +713,7 @@
                                        Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
                             <Border Background="#DDFF9800" CornerRadius="6" Padding="8,4" HorizontalAlignment="Right" VerticalAlignment="Top"
                                     Margin="0,-8,0,0">
-                                <TextBlock Text="Em Desenvolvimento" FontSize="10" FontWeight="SemiBold" Foreground="White"/>
+                                <TextBlock Text="Em Desenvolvimento" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
                             </Border>
                         </Grid>
                         <TextBlock Text="Apps Otimizados" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
@@ -727,7 +727,7 @@
                                        Foreground="#FF6B6B" HorizontalAlignment="Center"/>
                             <Border Background="#DDFF9800" CornerRadius="6" Padding="8,4" HorizontalAlignment="Right" VerticalAlignment="Top"
                                     Margin="0,-8,0,0">
-                                <TextBlock Text="Em Desenvolvimento" FontSize="10" FontWeight="SemiBold" Foreground="White"/>
+                                <TextBlock Text="Em Desenvolvimento" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
                             </Border>
                         </Grid>
                         <TextBlock Text="Processos Reduzidos" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
@@ -749,7 +749,7 @@
                                        Foreground="#00FF00" HorizontalAlignment="Center"/>
                             <Border Background="#DDFF9800" CornerRadius="6" Padding="8,4" HorizontalAlignment="Right" VerticalAlignment="Top"
                                     Margin="0,-8,0,0">
-                                <TextBlock Text="Em Desenvolvimento" FontSize="10" FontWeight="SemiBold" Foreground="White"/>
+                                <TextBlock Text="Em Desenvolvimento" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
                             </Border>
                         </Grid>
                         <TextBlock Text="Tempo de Resposta" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
@@ -867,7 +867,7 @@
                                                 </Button>
                                                 <TextBlock Text="&#x23F1;&#xFE0F; Timer Resolution" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                                             </StackPanel>
-                                            <TextBlock Text="Melhora precis&#xE3;o de timers" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Melhora precis&#xE3;o de timers" TextWrapping="Wrap" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                             <TextBlock x:Name="TxtTimerResolutionStatus" Text="DESATIVADO" 
@@ -919,7 +919,7 @@
                                             </Button>
                                             <TextBlock Text="&#x1F331; EcoQoS" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                                         </StackPanel>
-                                        <TextBlock Text="Remove limitador de energia" TextWrapping="Wrap" FontSize="10" Foreground="#D4AF37" Margin="0,2,0,0"/>
+                                        <TextBlock Text="Remove limitador de energia" TextWrapping="Wrap" FontSize="11" Foreground="#D4AF37" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock x:Name="TxtEcoQoSStatus" Text="DESATIVADO" 
@@ -961,7 +961,7 @@
                                             </Button>
                                             <TextBlock Text="&#x1F310; Acelera&#xE7;&#xE3;o de Rede" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                                         </StackPanel>
-                                        <TextBlock Text="Prioridade de pacotes de rede" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
+                                        <TextBlock Text="Prioridade de pacotes de rede" TextWrapping="Wrap" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock x:Name="TxtNetworkBoostStatus" Text="DESATIVADO" 
@@ -1003,7 +1003,7 @@
                                             </Button>
                                             <TextBlock Text="&#x2696;&#xFE0F; ProBalance" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                                         </StackPanel>
-                                        <TextBlock Text="Reduz processos em background" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
+                                        <TextBlock Text="Reduz processos em background" TextWrapping="Wrap" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock x:Name="TxtProBalanceStatusCustom" Text="ATIVADO" 
@@ -1045,7 +1045,7 @@
                                             </Button>
                                             <TextBlock Text="&#x1F5A5;&#xFE0F; Apenas P-Cores" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                                         </StackPanel>
-                                        <TextBlock Text="For&#xE7;a threads para P-cores (CPU h&#xED;brida)" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
+                                        <TextBlock Text="For&#xE7;a threads para P-cores (CPU h&#xED;brida)" TextWrapping="Wrap" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock x:Name="TxtThreadEfficiencyStatus" Text="DESATIVADO" 
@@ -1087,7 +1087,7 @@
                                             </Button>
                                             <TextBlock Text="&#x1F3AE; API Game Mode" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                                         </StackPanel>
-                                        <TextBlock Text="Sinaliza ao Windows que &#xE9; um jogo" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
+                                        <TextBlock Text="Sinaliza ao Windows que &#xE9; um jogo" TextWrapping="Wrap" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock x:Name="TxtGameClassInfoStatus" Text="ATIVADO" 
@@ -1129,7 +1129,7 @@
                                             </Button>
                                             <TextBlock Text="&#x26A1; Acelera&#xE7;&#xE3;o do Agendador" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                                         </StackPanel>
-                                        <TextBlock Text="Registry: Scheduler favorece foreground" TextWrapping="Wrap" FontSize="10" Foreground="#888" Margin="0,2,0,0"/>
+                                        <TextBlock Text="Registry: Scheduler favorece foreground" TextWrapping="Wrap" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock x:Name="TxtWin32PrioritySeparationStatus" Text="ATIVADO" 

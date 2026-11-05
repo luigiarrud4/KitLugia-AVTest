@@ -41,7 +41,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-        <TextBlock Text="Gerenciador de Processos" Foreground="White" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,20"/>
+        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Processos" Margin="0,0,0,20"/>
 
         <TabControl x:Name="MainTabs" Grid.Row="1" Background="Transparent" BorderThickness="0">
 
@@ -213,7 +213,7 @@
 
                                 <TextBlock Grid.Row="0" Text="&#x2699; Editar Argumentos de Inicialização" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
 
-                                <TextBlock Grid.Row="1" FontSize="14" Foreground="#CCC" Margin="0,0,0,8">
+                                <TextBlock Grid.Row="1" FontSize="13" Foreground="#CCC" Margin="0,0,0,8">
                                     <Run FontWeight="SemiBold" Foreground="#AAA" Text="Aplicativo: "/><Run x:Name="TxtEditAppName" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
                                 </TextBlock>
 
@@ -723,7 +723,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="&#xDA;ltimo Tempo de Inicializa&#xE7;&#xE3;o:" Foreground="#AAA" FontSize="14"/>
+                                <TextBlock Text="&#xDA;ltimo Tempo de Inicializa&#xE7;&#xE3;o:" Foreground="#AAA" FontSize="13"/>
                                 <TextBlock x:Name="TxtBootTime" Text="Calculando..." Foreground="White" FontSize="28" FontWeight="Bold" Margin="0,5,0,0"/>
                                 <TextBlock x:Name="TxtBootDate" Text="" Foreground="#666" FontSize="12"/>
                             </StackPanel>

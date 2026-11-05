@@ -41,9 +41,61 @@ foi removido junto com a tokenizacao.
 
 **Validacao:** solucao **0 erros** (154 avisos nullable pre-existentes, nenhum nos arquivos
 tocados; build com `-p:OutDir=C:/kltmpbuild/`); BOM+CRLF conferido byte a byte nos 5 arquivos
-(Typography novo, PageStyles, Generic, Brushes, doc). **Nenhuma pagina foi alterada ainda** - F0
-e' so' base. Proxima fase: **F1** (cabecalho de pagina padrao + lote 1 com as 10 paginas mais
-usadas).
+(Typography novo, PageStyles, Generic, Brushes, doc).
+
+**3. F6 (HARNESS DE CAPTURA, `tests/UiShotHarness`, NOVO):** sem render nao da' para auditar
+visual de 46 paginas. Mesmo padrao do `NetPageVis`: carrega `pack:///KitLugia.GUI;component/
+Themes/Generic.xaml`, instancia cada Page, janela em -32000, `UpdateLayout`, fundo #101010 no
+`RenderTargetBitmap` e salva PNG. Modos `--only/--list/--selfcheck/--size/--pump/--out`;
+indice em `_index.csv`. **52 paginas capturadas, 0 falhas.** QUIRK: `ServicesPage(int tabIndex = 0)`
+nao tem ctor sem parametros (reflection devolve null) - a descoberta aceita ctor com TODOS os
+parametros opcionais e invoca com os defaults (5 paginas a mais apareceram so' por isso).
+
+**4. QUIRK FATAL do `StaticResource` (custou uma rodada inteira):** `{StaticResource FontSize*}`
+dentro do `Setter` de um estilo declarado em **OUTRO** dicionario mesclado resolve para
+`DependencyProperty.UnsetValue`: o estilo aplica SEM FontSize e o texto cai para 14 (o titulo
+"encolheu" na captura). Diagnostico objetivo via `UiShotHarness --selfcheck`, que imprime o
+valor do token, os setters do estilo e o FontSize real de um TextBlock. Correcao: os estilos de
+texto passaram para o MESMO arquivo dos tokens (`Typography.xaml`); `PageStyles.xaml` ficou so'
+com layout (`PageContent/PageStack/Separator/CardContainer`). Teste rapido para qualquer token
+novo: `--selfcheck` deve imprimir `FontSize = 28 (Double)`.
+
+**5. F1 (titulos, por ESTILO e nao por controle):** 30 titulos migrados para
+`PageTitleStyle` por `tests/ui_style_audit.py --apply` (uma linha por arquivo: `FontSize`/
+`FontWeight`/`Foreground` locais saem, entra `Style="{StaticResource PageTitleStyle}"`; margin
+local preservada). Nao foi criado `Controls/PageHeader`: reescrever 46 cabecalhos heterogeneos
+sem verificacao seria pior que o problema. Subtitulo NAO e' automatico - em varias paginas o
+primeiro TextBlock cinza de 13-15px e' rotulo de estado ("---", "Status: -", "0 tweaks").
+
+**6. F3 (cards):** `CardStyle`/`SubtleCardStyle`/`CompactCardStyle` SEM `DropShadowEffect` e SEM
+storyboard (hover so' por cor, raio 8). A escala 1.015 foi isolada em `InteractiveCardStyle`
+(card clicavel isolado). Novo `SurfacePanelStyle` (Surface1/BorderSubtle). Motivo medido: o
+`CardStyle` animava scale + blur POR ITEM de lista virtualizada.
+
+**7. F5 (contraste/tipografia):** `TextMuted` #858585 -> **#8A8A8A**; **419** `FontSize`
+normalizados em 42 paginas por script (9/10 -> 11, 14 -> 13). Capturas out4 confirmam sem
+corte em TweaksPage/AppsPage/Dashboard/ServicesPage/IntegrityPage/NetworkPage. Restam 260 usos
+de 15 (sub-cabecalho: 16 secao ou 13 corpo, decisao por pagina).
+
+**8. F2 (botoes, parcial):** as 3 barras de acao da `AppsPage` (13 botoes) usavam 4 paletas
+(azul #2C3E50, cinza #444, vermelho #C42B1C, verde #2E7D32) com altura 35 - agora
+`SecondaryButtonStyle`/`DeleteButtonStyle` e altura 32. Os ~400 templates inline
+(ExmTweaks 126, Tweaks 96, NetworkPage 32, MainWindow 28) seguem: cada um e' um ControlTemplate
+proprio, troca pagina a pagina com captura.
+
+**9. F7 (antirregressao):** `tests/ui_style_audit.py` - `--check` lista titulo/subtitulo fora do
+estilo, FontSize fora da escala e hex hardcoded por arquivo, e **sai com codigo 2** em violacao;
+`--apply` normaliza titulos. Estado atual: 0 titulo textual fora do padrao; 2133 hex (allowlist
+futura); `15=260` e `20/22/24/26/32` (metricas) ainda fora da escala.
+
+**ACHADOS que o harness entregou (pre-existentes, fora do escopo):** `BloatwarePage` estoura
+`InvalidOperationException` animando a propriedade `Angle` (caminho invalido no storyboard);
+`DiskConverterPage` lanca `NullReferenceException` no load; `AllTweaksPage` com 0 itens deixa a
+area da lista em branco (o aviso fica so' no subtitulo).
+
+**Pendente do plano:** F2 (templates inline restantes), F4 (componente de estado vazio + overlay
+unico: 8 paginas com spinner inline, `Controls/LoadingOverlay` ja' existe e e' usado em 4),
+15 -> escala e foco visivel (F5), subtitulos por pagina e `PageHeader` (F1).
 
 ---
 # Sessão — recalcular contagens do filtro na IntegrityPage após alterações

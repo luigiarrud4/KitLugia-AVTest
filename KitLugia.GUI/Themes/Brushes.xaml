@@ -31,7 +31,7 @@
 
     <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="TextSecondary" Color="#E0E0E0"/>
-    <SolidColorBrush x:Key="TextMuted" Color="#858585"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#8A8A8A"/>
     <SolidColorBrush x:Key="TextDescription" Color="#A0A0A0"/>
     <SolidColorBrush x:Key="TextGold" Color="#FFD700"/>
 

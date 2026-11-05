@@ -151,9 +151,9 @@
 
                                         <!-- Texto -->
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
-                                            <TextBlock Text="OTIMIZA&#xC7;&#xC3;O INTELIGENTE" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="OTIMIZA&#xC7;&#xC3;O INTELIGENTE" FontWeight="Bold" Foreground="White" FontSize="13"/>
                                             <TextBlock Text="Personalizar &amp; Aplicar" Foreground="#81C784" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
-                                            <TextBlock Text="Escolha sua GPU e n&#xED;vel de VRAM dedicada." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="Escolha sua GPU e n&#xED;vel de VRAM dedicada." Foreground="#999" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -190,9 +190,9 @@
 
                                         <!-- Texto -->
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
-                                            <TextBlock Text="REVERTER / NORMAL" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="REVERTER / NORMAL" FontWeight="Bold" Foreground="White" FontSize="13"/>
                                             <TextBlock Text="Restaurar Padr&#xF5;es" Foreground="#E57373" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
-                                            <TextBlock Text="Remove VRAM, Tweaks e Planos de Energia." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="Remove VRAM, Tweaks e Planos de Energia." Foreground="#999" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -242,9 +242,9 @@
 
                                         <!-- Texto -->
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
-                                            <TextBlock Text="GAMING LATENCY" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="GAMING LATENCY" FontWeight="Bold" Foreground="White" FontSize="13"/>
                                             <TextBlock Text="Baixa Lat&#xEA;ncia" Foreground="#FFD700" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
-                                            <TextBlock Text="Otimiza DPC/ISR, timers e input para m&#xED;nima lat&#xEA;ncia." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="Otimiza DPC/ISR, timers e input para m&#xED;nima lat&#xEA;ncia." Foreground="#999" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -281,9 +281,9 @@
 
                                         <!-- Texto -->
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
-                                            <TextBlock Text="REVERTER LATENCY" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                                            <TextBlock Text="REVERTER LATENCY" FontWeight="Bold" Foreground="White" FontSize="13"/>
                                             <TextBlock Text="Padr&#xE3;o Windows" Foreground="#999" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
-                                            <TextBlock Text="Restaura Win32Priority, Core Parking e timers." Foreground="#999" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="Restaura Win32Priority, Core Parking e timers." Foreground="#999" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -537,7 +537,7 @@
                                 <Separator Background="#333" Margin="0,0,0,8"/>
 
                                 <TextBlock Text="TWEAKS QUE INICIAM JUNTO COM O PC" Foreground="#FFD54F" FontSize="11" FontWeight="Bold" Margin="0,0,0,3"/>
-                                <TextBlock Text="Melhorias mantidas em segundo plano ap&#xF3;s otimiza&#xE7;&#xE3;o inicial." Foreground="#AAA" FontSize="9" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                                <TextBlock Text="Melhorias mantidas em segundo plano ap&#xF3;s otimiza&#xE7;&#xE3;o inicial." Foreground="#AAA" FontSize="11" Margin="0,0,0,6" TextWrapping="Wrap"/>
                                 
                                 <CheckBox x:Name="ChkStartWithWindows" Content="1. Iniciar com o Windows (SILENCIOSO)" Foreground="White" Margin="0,0,0,6" Click="ChkStartWithWindows_Click"/>
                                 <CheckBox x:Name="ChkGameBoost" Content="2. GameBoost (Prioridade M&#xE1;xima para Jogos)" Foreground="White" Margin="0,0,0,6"/>
@@ -551,7 +551,7 @@
                         <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Margin="8,0,0,0">
                             <StackPanel>
                                 <TextBlock Text="Otimiza&#xE7;&#xE3;o do Criador" FontSize="16" FontWeight="Bold" Foreground="#FFB74D" Margin="0,0,0,2"/>
-                                <TextBlock Text="Todas as configura&#xE7;&#xF5;es que eu uso no meu dia a dia." Foreground="#A0A0A0" FontSize="10" Margin="0,0,0,8"/>
+                                <TextBlock Text="Todas as configura&#xE7;&#xF5;es que eu uso no meu dia a dia." Foreground="#A0A0A0" FontSize="11" Margin="0,0,0,8"/>
 
                                 <Button x:Name="BtnAtivarTodosCriador" Content="&#x25B6; ATIVAR TODOS" Height="28" FontSize="11" FontWeight="Bold"
                                         Style="{StaticResource GoldButtonStyle}" Margin="0,0,0,10"
@@ -824,8 +824,8 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="&#x1F4CA; An&#xE1;lise de Lat&#xEA;ncia" Foreground="#FFD700" FontSize="14" FontWeight="Bold"/>
-                                    <TextBlock Text="Me&#xE7;a DPC/ISR e obtenha recomenda&#xE7;&#xF5;es" FontSize="10" Foreground="#888"/>
+                                    <TextBlock Text="&#x1F4CA; An&#xE1;lise de Lat&#xEA;ncia" Foreground="#FFD700" FontSize="13" FontWeight="Bold"/>
+                                    <TextBlock Text="Me&#xE7;a DPC/ISR e obtenha recomenda&#xE7;&#xF5;es" FontSize="11" Foreground="#888"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                                     <Button x:Name="BtnDeepDrivers" Content="DRIVERS (ETW)" Height="30" Width="112"
@@ -848,38 +848,38 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Grid.Column="0" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="0,0,4,0">
                                         <StackPanel>
-                                            <TextBlock Text="M&#xC9;DIA" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="M&#xC9;DIA" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                             <TextBlock x:Name="TxtLatencyAvg" Text="--" FontSize="16" Foreground="#4CAF50" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="ms" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="ms" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="2,0,2,0">
                                         <StackPanel>
-                                            <TextBlock Text="P95" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="P95" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                             <TextBlock x:Name="TxtLatencyP95" Text="--" FontSize="16" Foreground="#FFC107" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="ms" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="ms" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Column="2" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="4,0,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="M&#xC1;X" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="M&#xC1;X" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                             <TextBlock x:Name="TxtLatencyMax" Text="--" FontSize="16" Foreground="#FF5722" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="ms" FontSize="9" Foreground="#666" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="ms" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
                                 </Grid>
                                 
-                                <TextBlock x:Name="TxtLatencyExtra" Text="" FontSize="10" Foreground="#888"
+                                <TextBlock x:Name="TxtLatencyExtra" Text="" FontSize="11" Foreground="#888"
                                            TextWrapping="Wrap" Margin="0,0,0,8"/>
 
-                                <TextBlock x:Name="TxtLatencyRecommendation" Text="" FontSize="10" Foreground="#AAA" 
+                                <TextBlock x:Name="TxtLatencyRecommendation" Text="" FontSize="11" Foreground="#AAA" 
                                            TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 
                                 <Button x:Name="BtnApplyRecommended" Content="APLICAR RECOMENDA&#xC7;&#xD5;ES" Height="32" 
                                         Background="#4CAF50" Foreground="White" BorderThickness="0"
                                         Click="BtnApplyRecommended_Click" FontSize="11" FontWeight="Bold" Visibility="Collapsed"/>
 
-                                <TextBlock x:Name="TxtDriverReport" Text="" FontFamily="Consolas" FontSize="10" Foreground="#9CDCFE" 
+                                <TextBlock x:Name="TxtDriverReport" Text="" FontFamily="Consolas" FontSize="11" Foreground="#9CDCFE" 
                                            TextWrapping="Wrap" Margin="0,8,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -889,7 +889,7 @@
 
                     <!-- Win32PrioritySeparation SELETOR -->
                     <TextBlock Text="Win32PrioritySeparation (Scheduling):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5" FontWeight="SemiBold"/>
-                    <TextBlock Text="Controla a prioridade de aplica&#xE7;&#xF5;es em foreground" FontSize="10" Foreground="#666" Margin="0,0,0,8"/>
+                    <TextBlock Text="Controla a prioridade de aplica&#xE7;&#xF5;es em foreground" FontSize="11" Foreground="#666" Margin="0,0,0,8"/>
                     <ComboBox x:Name="CmbWin32Priority" Height="35" Margin="0,0,0,15" 
                                SelectedIndex="1">
                         <ComboBoxItem Content="0x18 (24) - Padr&#xE3;o Windows" Foreground="White"/>
@@ -913,7 +913,7 @@
                             <Ellipse x:Name="IndicatorCoreParking" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="Core Parking Disable" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="Mant&#xE9;m todos os cores CPU ativos" FontSize="10" Foreground="#888"/>
+                                <TextBlock Text="Mant&#xE9;m todos os cores CPU ativos" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleCoreParking" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
@@ -932,7 +932,7 @@
                             <Ellipse x:Name="IndicatorTimerCoalescing" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="Timer Coalescing Disable" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="Timers de alta precis&#xE3;o (melhor para jogos)" FontSize="10" Foreground="#888"/>
+                                <TextBlock Text="Timers de alta precis&#xE3;o (melhor para jogos)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleTimerCoalescing" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
@@ -951,7 +951,7 @@
                             <Ellipse x:Name="IndicatorInputQueue" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="Input Queue Optimize" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="Aumenta buffer de mouse/teclado (30 vs 100)" FontSize="10" Foreground="#888"/>
+                                <TextBlock Text="Aumenta buffer de mouse/teclado (30 vs 100)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleInputQueue" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
@@ -970,7 +970,7 @@
                             <Ellipse x:Name="IndicatorGlobalTimer" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="Global Timer Resolution" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="Permite apps pedir timers precisos (1ms)" FontSize="10" Foreground="#888"/>
+                                <TextBlock Text="Permite apps pedir timers precisos (1ms)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleGlobalTimer" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
@@ -989,7 +989,7 @@
                             <Ellipse x:Name="IndicatorSysResp" Grid.Column="0" Width="10" Height="10" Fill="#666" Margin="0,0,10,0"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="SystemResponsiveness Gaming" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="0 = M&#xE1;xima performance (desativa background)" FontSize="10" Foreground="#888"/>
+                                <TextBlock Text="0 = M&#xE1;xima performance (desativa background)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleSysResp" Grid.Column="2" Content="OFF" Height="26" Width="50" 
                                     Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
@@ -1001,7 +1001,7 @@
 
                     <!-- STATUS DOS TWEAKS -->
                     <TextBlock Text="Status Atual:" Foreground="#AAA" FontSize="11" Margin="0,0,0,8"/>
-                    <TextBlock x:Name="TxtLatencyStatus" Text="Verificando..." FontSize="10" Foreground="#888" Margin="0,0,0,15" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtLatencyStatus" Text="Verificando..." FontSize="11" Foreground="#888" Margin="0,0,0,15" TextWrapping="Wrap"/>
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1048,7 +1048,7 @@
                     <!-- Log Console -->
                     <Border Background="#0A0A0A" CornerRadius="4" Padding="10" Margin="0,10,0,0" Height="120">
                         <ScrollViewer x:Name="ScrollViewerBenchmarkLog" VerticalScrollBarVisibility="Auto">
-                            <TextBlock x:Name="TxtBenchmarkLog" Text="" FontSize="10" 
+                            <TextBlock x:Name="TxtBenchmarkLog" Text="" FontSize="11" 
                                        Foreground="#4CAF50" FontFamily="Consolas" TextWrapping="Wrap"/>
                         </ScrollViewer>
                     </Border>

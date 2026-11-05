@@ -82,7 +82,7 @@
                 <!-- ISO Selection Card -->
                 <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource SubtleCardStyle}">
                     <StackPanel>
-                        <TextBlock Text="&#x1F4C0; IMAGEM ISO" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
+                        <TextBlock Text="&#x1F4C0; IMAGEM ISO" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
                         <TextBlock Text="Selecione o arquivo ISO de instala&#xE7;&#xE3;o:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -171,14 +171,14 @@
 
                     <!-- Info da ISO -->
                     <Border Grid.Row="1" Background="#2A2A2A" Padding="15" CornerRadius="5" Margin="0,0,0,15">
-                        <TextBlock x:Name="TxtConfigIsoInfo" Text="ISO n&#xE3;o selecionada" Foreground="#FFD700" FontSize="14" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="TxtConfigIsoInfo" Text="ISO n&#xE3;o selecionada" Foreground="#FFD700" FontSize="13" TextWrapping="Wrap"/>
                     </Border>
 
                     <!-- Checkboxes de Op&#xE7;&#xF5;es -->
                     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <!-- Destino da ISO -->
-                            <TextBlock Text="&#x1F4C1; DESTINO DA ISO" FontSize="14" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,10"/>
+                            <TextBlock Text="&#x1F4C1; DESTINO DA ISO" FontSize="13" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,10"/>
                             <Grid Margin="0,0,0,20">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -189,7 +189,7 @@
                             </Grid>
 
                             <!-- Edi&#xE7;&#xE3;o e Compress&#xE3;o (Modo Rapido) -->
-                            <TextBlock Text="&#x1F504; EDI&#xC7;&#xC3;O &amp; COMPRESS&#xC3;O (wimlib - R&#xC1;PIDO)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,10"/>
+                            <TextBlock Text="&#x1F504; EDI&#xC7;&#xC3;O &amp; COMPRESS&#xC3;O (wimlib - R&#xC1;PIDO)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,10"/>
                             <Grid Margin="0,0,0,5">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -218,7 +218,7 @@
                             <TextBlock Text="ESD tamb&#xE9;m vira install.wim normal aqui (permite tweaks depois). R&#xE1;pido." Foreground="#4CAF50" FontSize="11" Margin="25,0,0,15"/>
 
                             <!-- Tweaks de registro (Modo Rapido) -->
-                            <TextBlock Text="&#x2699;&#xFE0F; TWEAKS DE REGISTRO (wimlib - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <TextBlock Text="&#x2699;&#xFE0F; TWEAKS DE REGISTRO (wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
                             <CheckBox x:Name="ChkBypassRequirements" Content="Bypass de Requisitos de Sistema (TPM, CPU, RAM, Secure Boot)" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <CheckBox x:Name="ChkDisableTelemetry" Content="Desabilitar Telemetria" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <CheckBox x:Name="ChkDisableOneDrive" Content="Desabilitar OneDrive" Style="{StaticResource DarkCheckBoxStyle}"/>
@@ -229,7 +229,7 @@
                             <CheckBox x:Name="ChkDisableReservedStorage" Content="Desabilitar Reserved Storage" Style="{StaticResource DarkCheckBoxStyle}"/>
 
                             <!-- Arquivos soltos (Modo Rapido) -->
-                            <TextBlock Text="&#x1F4C2; ARQUIVOS SOLTOS (wimlib - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <TextBlock Text="&#x1F4C2; ARQUIVOS SOLTOS (wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
                             <CheckBox x:Name="ChkDisableSponsoredApps" Content="Desabilitar Apps Patrocinados (ei.cfg sem vers&#xE3;o/edition + setup)" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <CheckBox x:Name="ChkRemoveDefaultStorePackages" Content="Remover apps padr&#xE3;o da Store (pol&#xED;tica RemoveDefaultMicrosoftStorePackages - 24H2/25H2)" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <CheckBox x:Name="ChkDisableChat" Content="Desabilitar &#xCD;cone do Chat" Style="{StaticResource DarkCheckBoxStyle}"/>
@@ -237,22 +237,22 @@
                             <TextBlock Text="&#x26A0;&#xFE0F; Chat/patrocinados aplicados via registro+arquivos soltos (r&#xE1;pido, no-mount)." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
 
                             <!-- Automacao pos-setup (2026) -->
-                            <TextBlock Text="&#x1F916; AUTOMA&#xC7;&#xC3;O P&#xD3;S-SETUP (2026 - wimlib - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <TextBlock Text="&#x1F916; AUTOMA&#xC7;&#xC3;O P&#xD3;S-SETUP (2026 - wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
                             <CheckBox x:Name="ChkSetupComplete" Content="SetupComplete.cmd: rodar KitLugiaSetup automaticamente no 1&#xBA; boot (p&#xF3;s-setup, SYSTEM)" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <CheckBox x:Name="ChkConXLegacyFix" Content="Fix Setup 24H2/25H2 (ConX): for&#xE7;ar setup.exe com /legacy no boot.wim" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <TextBlock Text="SetupComplete.cmd (MS Learn 2026) roda com privil&#xE9;gio SYSTEM logo ap&#xF3;s o setup; o fix ConX restaura instala&#xE7;&#xE3;o desatendida nas vers&#xF5;es 24H2/25H2." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
 
                             <!-- Op&#xE7;&#xF5;es de customiza&#xE7;&#xE3;o (wimlib + pnputil, SEM montar) -->
-                            <TextBlock Text="&#x23F3; CUSTOMIZA&#xC7;&#xC3;O (wimlib + pnputil - SEM MONTAR)" FontSize="14" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
+                            <TextBlock Text="&#x23F3; CUSTOMIZA&#xC7;&#xC3;O (wimlib + pnputil - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
                             <CheckBox x:Name="ChkInjectDrivers" Content="Injetar Drivers do Sistema Atual" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <TextBlock Text="Exporta drivers do sistema (pnputil) para $WinPEDriver$ - o Setup.exe do WinPE injeta no driverstore" Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
                             <CheckBox x:Name="ChkDebloatPreset" Content="Remover Bloatware (AppX)" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <TextBlock Text="Remove 40+ apps bloatware: Copilot, Xbox, Clipchamp, Bing, Solitaire, Phone Link, etc." Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
                             <CheckBox x:Name="ChkCleanupWinSxS" Content="Otimizar WIM (wimlib optimize - remove espaco dos updates)" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <TextBlock Text="Reconstrucao estrutural em segundos (sem recompressao - o export ja comprimiu)" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="25,0,0,5"/>
+                            <TextBlock Text="Reconstrucao estrutural em segundos (sem recompressao - o export ja comprimiu)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,5"/>
 
                             <!-- Outras op&#xE7;&#xF5;es (mista) -->
-                            <TextBlock Text="&#x1F4C1; OUTRAS OP&#xC7;&#xD5;ES" FontSize="14" FontWeight="Bold" Foreground="#FFD700" Margin="0,5,0,5"/>
+                            <TextBlock Text="&#x1F4C1; OUTRAS OP&#xC7;&#xD5;ES" FontSize="13" FontWeight="Bold" Foreground="#FFD700" Margin="0,5,0,5"/>
                             <CheckBox x:Name="ChkDisableUpdateOOBE" Content="Desabilitar Windows Update no OOBE" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <CheckBox x:Name="ChkDisableTeams" Content="Prevenir Instala&#xE7;&#xE3;o do Teams" Style="{StaticResource DarkCheckBoxStyle}"/>
                             <CheckBox x:Name="ChkDisableOutlook" Content="Prevenir Instala&#xE7;&#xE3;o do Novo Outlook" Style="{StaticResource DarkCheckBoxStyle}"/>
@@ -300,7 +300,7 @@
                                     <TextBlock Text="🧬" FontSize="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                     <TextBlock Text="KIT ISO STUDIO" FontSize="18" FontWeight="ExtraBold" Foreground="#FFD700" VerticalAlignment="Center"/>
                                     <Border Background="#FFD700" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock Text="EXPANSOR" FontSize="9" FontWeight="Bold" Foreground="Black"/>
+                                        <TextBlock Text="EXPANSOR" FontSize="11" FontWeight="Bold" Foreground="Black"/>
                                     </Border>
                                 </StackPanel>
                                 <TextBlock Text="Expansor integrado — foge do estilo do kit para caber dezenas de personalizações reais da ISO" FontSize="11" Foreground="#AAA" Margin="0,4,0,0" TextWrapping="Wrap"/>
@@ -325,7 +325,7 @@
                                 <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
                                         <TextBlock Text="🧩 AppX Granular (40+ pacotes)" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
-                                        <TextBlock Text="Desmarque individualmente — muito além do preset &quot;Remover Bloatware&quot;" FontSize="10" Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Desmarque individualmente — muito além do preset &quot;Remover Bloatware&quot;" FontSize="11" Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                         <WrapPanel>
                                             <CheckBox Content="Copilot" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
                                             <CheckBox Content="Xbox" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
@@ -345,7 +345,7 @@
                                 <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
                                         <TextBlock Text="💾 Drivers &amp; Boot" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
-                                        <TextBlock Text="Injeção real via $WinPEDriver$ + boot BIOS+UEFI" FontSize="10" Foreground="#888" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Injeção real via $WinPEDriver$ + boot BIOS+UEFI" FontSize="11" Foreground="#888" Margin="0,0,0,8"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -374,7 +374,7 @@
                                 <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
                                         <TextBlock Text="🔧 Registro Avançado" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
-                                        <TextBlock Text="Cole .reg — será injetado offline via wimlib no registro do WIM" FontSize="10" Foreground="#888" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Cole .reg — será injetado offline via wimlib no registro do WIM" FontSize="11" Foreground="#888" Margin="0,0,0,8"/>
                                         <TextBox x:Name="TxtStudioReg" Height="90" AcceptsReturn="True" TextWrapping="Wrap" Background="#0F0F0F" Foreground="#CCC" BorderBrush="#333" FontFamily="Consolas" FontSize="10" Padding="8" VerticalScrollBarVisibility="Auto" Text="Windows Registry Editor Version 5.00&#x0a;&#x0a;[HKEY_LOCAL_MACHINE\SOFTWARE\Exemplo]&#x0a;&quot;Valor&quot;=dword:00000001"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <Button Content="Importar .reg" Width="110" Height="28" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
@@ -392,7 +392,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Margin="0,0,6,0">
-                                                <TextBlock Text="Idioma base" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                                <TextBlock Text="Idioma base" Foreground="#888" FontSize="11" Margin="0,0,0,4"/>
                                                 <ComboBox Height="30" SelectedIndex="0" Style="{StaticResource DarkComboBoxStyle}">
                                                     <ComboBoxItem Content="pt-BR"/>
                                                     <ComboBoxItem Content="en-US"/>
@@ -400,7 +400,7 @@
                                                 </ComboBox>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                                                <TextBlock Text="TimeZone" Foreground="#888" FontSize="10" Margin="0,0,0,4"/>
+                                                <TextBlock Text="TimeZone" Foreground="#888" FontSize="11" Margin="0,0,0,4"/>
                                                 <ComboBox Height="30" SelectedIndex="0" Style="{StaticResource DarkComboBoxStyle}">
                                                     <ComboBoxItem Content="E. South America"/>
                                                     <ComboBoxItem Content="Eastern US"/>
@@ -426,7 +426,7 @@
                     <!-- Footer Studio -->
                     <Border Grid.Row="2" Background="#111" CornerRadius="0,0,14,14" Padding="14" BorderBrush="#222" BorderThickness="0,1,0,0">
                         <Grid>
-                            <TextBlock Text="💡 Dica: este expansor cabe muito mais — use o scroll. Tudo sincroniza com o painel padrão antes de INICIAR CRIAÇÃO." FontSize="10" Foreground="#888" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
+                            <TextBlock Text="💡 Dica: este expansor cabe muito mais — use o scroll. Tudo sincroniza com o painel padrão antes de INICIAR CRIAÇÃO." FontSize="11" Foreground="#888" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Button Content="FECHAR" Width="110" Height="36" Click="BtnCloseIsoStudio_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
                                 <Button Content="✅ APLICAR E FECHAR" Width="170" Height="36" Click="BtnApplyIsoStudio_Click" Style="{StaticResource GoldButtonStyle}" FontWeight="Bold"/>
@@ -479,7 +479,7 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"/>
                             </ScrollViewer>
                             <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="&#x1F4CB; Copiar log"
                                        Foreground="#555" FontSize="9" Cursor="Hand"

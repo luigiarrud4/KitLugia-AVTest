@@ -9,7 +9,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
 
-            <TextBlock Text="Desempenho e Tweaks" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Desempenho e Tweaks" Margin="0,0,0,10"/>
             <TextBlock Text="Altera&#xE7;&#xF5;es avan&#xE7;adas no registro. Mudan&#xE7;as exigem reinicializa&#xE7;&#xE3;o." Foreground="#A0A0A0" Margin="0,0,0,30"/>
 
             <!-- Manter Tweaks Apos Reboot -->
@@ -160,7 +160,7 @@
                         </StackPanel>
                         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="15,0,0,0">
                             <TextBlock Text="GPU alvo para tweaks de agendamento" Foreground="#A0A0A0" FontSize="11"/>
-                            <TextBlock Text="A VRAM abaixo mostra TODAS as GPUs com toggle individual." Foreground="#8877AA" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="A VRAM abaixo mostra TODAS as GPUs com toggle individual." Foreground="#8877AA" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
 
@@ -1346,7 +1346,7 @@
                         <StackPanel Grid.Column="0">
                             <StackPanel Orientation="Horizontal">
                                 <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
-                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                    <TextBlock Text="SLIDE" FontSize="11" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
                                 </Border>
                                 <TextBlock Text="Overdrive de Mouse &amp; Teclado" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
@@ -1393,7 +1393,7 @@
                         <StackPanel Grid.Column="0">
                             <StackPanel Orientation="Horizontal">
                                 <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
-                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                    <TextBlock Text="SLIDE" FontSize="11" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
                                 </Border>
                                 <TextBlock Text="Exterm&#xED;nio de Power Saving USB" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
@@ -1440,7 +1440,7 @@
                         <StackPanel Grid.Column="0">
                             <StackPanel Orientation="Horizontal">
                                 <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
-                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                    <TextBlock Text="SLIDE" FontSize="11" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
                                 </Border>
                                 <TextBlock Text="Lat&#xEA;ncia Extrema de Rede &amp; GPU" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
@@ -1487,7 +1487,7 @@
                         <StackPanel Grid.Column="0">
                             <StackPanel Orientation="Horizontal">
                                 <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
-                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                    <TextBlock Text="SLIDE" FontSize="11" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
                                 </Border>
                                 <TextBlock Text="Desativar PCIe Link State Power Management" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
@@ -1534,7 +1534,7 @@
                         <StackPanel Grid.Column="0">
                             <StackPanel Orientation="Horizontal">
                                 <Border Background="#FFAA00" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
-                                    <TextBlock Text="SLIDE" FontSize="10" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
+                                    <TextBlock Text="SLIDE" FontSize="11" FontWeight="Bold" Foreground="Black" VerticalAlignment="Center"/>
                                 </Border>
                                 <TextBlock Text="Desativar Timeout de Disco e Tela" FontSize="15" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
@@ -1638,7 +1638,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="RmCacheLoc e um valor do Resource Manager do driver NVIDIA (lido por nvlddmkm/RM.dll). Guias de otimização o configuram com o numero de nucleos LOGICOS da CPU. E aplicado na Class\{4d36e968...}\00xx e em todos os Video\{GUID}\0000 NVIDIA (requer admin). So tem efeito com GPU NVIDIA - AMD/Intel ignoram o valor."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="14" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="13" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="Transparent">
@@ -1653,7 +1653,7 @@
                             </Button.Template>
                         </Button>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="RmCacheLoc (NVIDIA)" FontSize="14" Foreground="White"/>
+                            <TextBlock Text="RmCacheLoc (NVIDIA)" FontSize="13" Foreground="White"/>
                             <TextBlock x:Name="InfoRmCacheLoc" Text="Configurado com o numero de nucleos logicos." FontSize="11" Foreground="#A0A0A0" Margin="0,2,0,0"/>
                         </StackPanel>
                         <Border Grid.Column="2" VerticalAlignment="Center" Padding="8,3" CornerRadius="4" Background="#0A2838" BorderBrush="#1A6B80" BorderThickness="1" Margin="0,0,15,0">
@@ -2271,7 +2271,7 @@
                             </ControlTemplate>
                         </ToggleButton.Template>
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="PrivacyChevron" Text="▶" FontSize="14" Foreground="#E86A96" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="PrivacyChevron" Text="▶" FontSize="13" Foreground="#E86A96" VerticalAlignment="Center" Margin="0,0,10,0"/>
                             <TextBlock Text="PRIVACIDADE &amp; TELEMETRIA — Tweaks modernos (Atlas OS / MS Learn)" FontSize="16" FontWeight="Bold" Foreground="#F08CB4"/>
                         </StackPanel>
                     </ToggleButton>

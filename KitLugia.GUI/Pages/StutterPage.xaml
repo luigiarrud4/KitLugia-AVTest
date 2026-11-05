@@ -177,19 +177,19 @@
                         <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock x:Name="TxtMonProcCpu" Text="0%" FontSize="16" FontWeight="Bold" Foreground="#88CC88" HorizontalAlignment="Center"/>
-                                <TextBlock Text="CPU" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                <TextBlock Text="CPU" FontSize="11" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock x:Name="TxtMonProcMem" Text="0 MB" FontSize="16" FontWeight="Bold" Foreground="#8888FF" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Memória" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                <TextBlock Text="Memória" FontSize="11" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Background="#1A1A1A" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock x:Name="TxtMonProcThreads" Text="0" FontSize="16" FontWeight="Bold" Foreground="#FFD700" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Threads" FontSize="10" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                <TextBlock Text="Threads" FontSize="11" Foreground="#888" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
                     </WrapPanel>
@@ -277,7 +277,7 @@
             <Border x:Name="PanelRecommendations" Background="#1A1A2A" CornerRadius="8" Padding="12"
                     BorderBrush="#33FFD700" BorderThickness="1" Margin="0,0,0,12" Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock Text="Recomendacoes" FontSize="14" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                    <TextBlock Text="Recomendacoes" FontSize="13" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,8"/>
                     <ItemsControl x:Name="RecList" ItemsSource="{Binding}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>

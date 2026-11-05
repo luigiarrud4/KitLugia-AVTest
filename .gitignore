@@ -398,3 +398,6 @@ weppy-project-sync/
 screenshots/
 rust_native/target/
 deploy.bat.bak
+
+# capturas do harness de UI (geradas)
+tests/UiShotHarness/out*/

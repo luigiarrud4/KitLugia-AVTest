@@ -111,7 +111,7 @@
                                     Click="BtnWinboot_Click" Style="{StaticResource GoldButtonStyle}" 
                                     Background="#FF4444" BorderBrush="#FF4444" Height="45"/>
 
-                            <TextBlock Text="&#x26A0;&#xFE0F; REQUER BACKUP - ALTO RISCO" Foreground="#FF6666" FontSize="10" 
+                            <TextBlock Text="&#x26A0;&#xFE0F; REQUER BACKUP - ALTO RISCO" Foreground="#FF6666" FontSize="11" 
                                       HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>
                         </StackPanel>
                     </Grid>

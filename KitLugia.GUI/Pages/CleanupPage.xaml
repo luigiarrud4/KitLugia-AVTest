@@ -8,7 +8,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30,30,30,50" MaxWidth="1000">
 
-            <TextBlock Text="Limpeza de Sistema" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,6" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Limpeza de Sistema" Margin="0,0,0,6"/>
             <TextBlock Text="Libere espa&#xE7;o removendo arquivos tempor&#xE1;rios, caches e hist&#xF3;rico de navegadores."
                        Foreground="#888" Margin="0,0,0,25"/>
 
@@ -133,7 +133,7 @@
                     <!-- CompactOS com aviso claro -->
                     <Button Content="&#x1F4BD; CompactOS" Height="38" Margin="0,0,0,4"
                             Click="BtnCompactOS_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" FontSize="10" Foreground="#808080">
+                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" FontSize="11" Foreground="#808080">
                         <Run Text="&#x26A0;&#xFE0F; CompactOS comprime o Windows para liberar espa&#xE7;o. Leva 30-60 min, abre janela CMD. Pode ser &#xFA;til para o WinBoot em discos pequenos. N&#xE3;o use em SSDs lentos."/>
                     </TextBlock>
                     <Button Content="&#x1F4A1; Inicializa&#xE7;&#xE3;o Avan&#xE7;ada" Height="38" Margin="0,0,0,8"
@@ -245,7 +245,7 @@
                                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
-                                            <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#666"/>
+                                            <TextBlock Text="{Binding Description}" FontSize="11" Foreground="#666"/>
                                         </StackPanel>
                                         <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11"
                                                    Foreground="#888" VerticalAlignment="Center"/>
@@ -307,16 +307,16 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
                                                 <Border Background="{Binding ConfidenceColor}" CornerRadius="3" Padding="4,1" Margin="6,0,0,0">
-                                                    <TextBlock Text="{Binding ConfidenceLabel}" FontSize="9" Foreground="White"/>
+                                                    <TextBlock Text="{Binding ConfidenceLabel}" FontSize="11" Foreground="White"/>
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding FolderPath}" FontSize="9" Foreground="#555"
+                                            <TextBlock Text="{Binding FolderPath}" FontSize="11" Foreground="#555"
                                                        TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
                                             <TextBlock Text="{Binding TotalSizeFormatted}" FontSize="12"
                                                        Foreground="{StaticResource AccentColor}" HorizontalAlignment="Right"/>
-                                            <TextBlock Text="{Binding LastModifiedFormatted}" FontSize="9"
+                                            <TextBlock Text="{Binding LastModifiedFormatted}" FontSize="11"
                                                        Foreground="#666" HorizontalAlignment="Right"/>
                                         </StackPanel>
                                         <Button Grid.Column="3" Content="&#x1F4C2;" Style="{StaticResource SecondaryButtonStyle}"
@@ -388,17 +388,17 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding TypeIcon}" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <TextBlock Text="{Binding TypeIcon}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Type}" FontSize="10" FontWeight="Bold"
+                                                    <TextBlock Text="{Binding Type}" FontSize="11" FontWeight="Bold"
                                                                Foreground="{Binding TypeColor}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2" Margin="8,0">
                                                     <TextBlock Text="{Binding Path}" FontSize="11" Foreground="White"
                                                                TextTrimming="CharacterEllipsis" MaxWidth="500"/>
-                                                    <TextBlock Text="{Binding Details}" FontSize="9" Foreground="#666"/>
+                                                    <TextBlock Text="{Binding Details}" FontSize="11" Foreground="#666"/>
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="3" Text="{Binding TimestampFormatted}" FontSize="9"
+                                                <TextBlock Grid.Column="3" Text="{Binding TimestampFormatted}" FontSize="11"
                                                            Foreground="#555" VerticalAlignment="Center"/>
                                             </Grid>
                                         </Border>
@@ -474,7 +474,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding CanClean}"
                                                           VerticalAlignment="Center" Margin="0,0,6,0" Click="ChkIssue_Click"/>
-                                                <TextBlock Text="{Binding CategoryIcon}" FontSize="14"
+                                                <TextBlock Text="{Binding CategoryIcon}" FontSize="13"
                                                            VerticalAlignment="Center" Margin="0,0,6,0"/>
                                                 <StackPanel Grid.Column="2">
                                                     <TextBlock Text="{Binding Description}" FontSize="12" Foreground="White" TextWrapping="Wrap"/>
@@ -483,15 +483,15 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="{Binding Category}" FontSize="10" Foreground="#666" Margin="0,0,10,0"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding RegistryPath}" FontSize="9" Foreground="#444"/>
+                                                        <TextBlock Text="{Binding Category}" FontSize="11" Foreground="#666" Margin="0,0,10,0"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding RegistryPath}" FontSize="11" Foreground="#444"/>
                                                     </Grid>
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="3" Text="{Binding SafeLabel}" FontSize="10"
+                                                <TextBlock Grid.Column="3" Text="{Binding SafeLabel}" FontSize="11"
                                                            Foreground="{Binding SafeColor}" VerticalAlignment="Center" Margin="8,0,6,0"/>
                                                 <Border Grid.Column="4" Background="#20FFFFFF" CornerRadius="3" Padding="2" VerticalAlignment="Center"
                                                         ToolTip="{Binding RiskWarning}">
-                                                    <TextBlock Text="&#x2139;" FontSize="10" Foreground="#888" Padding="2,0"/>
+                                                    <TextBlock Text="&#x2139;" FontSize="11" Foreground="#888" Padding="2,0"/>
                                                 </Border>
                                             </Grid>
                                             <Border.ContextMenu>

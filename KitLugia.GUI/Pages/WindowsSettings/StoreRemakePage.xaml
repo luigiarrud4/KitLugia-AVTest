@@ -94,11 +94,11 @@
                 <TextBlock Text="&#xE719;" FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="#4CC2FF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-                <TextBlock x:Name="TxtPageTitle" Text="Descobrir pacotes" FontSize="28" FontWeight="SemiBold" Foreground="White"/>
+                <TextBlock Style="{StaticResource PageTitleStyle}" x:Name="TxtPageTitle" Text="Descobrir pacotes"/>
                 <TextBlock x:Name="TxtPageSubtitle" Text="Busque no winget, Chocolatey e Microsoft Store e instale com um clique" FontSize="12" Opacity="0.6" Foreground="White"/>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock x:Name="TxtWingetStatus" Text="winget: ..." FontSize="10" Foreground="#7AA8D6" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock x:Name="TxtWingetStatus" Text="winget: ..." FontSize="11" Foreground="#7AA8D6" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <Button Content="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="34" Height="34" Style="{StaticResource GhostBtn}" Padding="0" Click="BtnPopOut_Click" ToolTip="Abrir em janela separada" Margin="0,0,6,0"/>
                 <Button Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="34" Height="34" Style="{StaticResource GhostBtn}" Padding="0" Click="BtnBack_Click" ToolTip="Voltar ao Kit" Margin="0,0,6,0"/>
                 <Button Content="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="34" Height="34" Style="{StaticResource GhostBtn}" Padding="0" Click="BtnRefresh_Click" ToolTip="Atualizar lista"/>
@@ -115,7 +115,7 @@
             <!-- Botão principal de ação (muda por aba: Atualizar tudo / pacote selecionado) -->
             <Button x:Name="MainToolbarButton" Grid.Column="0" Height="40" MinWidth="150" Style="{StaticResource PrimaryBtn}" Margin="0,0,8,0" Click="MainToolbarButton_Click" ToolTip="Executa a ação principal da aba atual">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="MainToolbarIcon" Text="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                    <TextBlock x:Name="MainToolbarIcon" Text="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Margin="0,0,7,0"/>
                     <TextBlock x:Name="MainToolbarText" Text="Instalar selecionado" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -243,7 +243,7 @@
                                 <!-- Nome + editor -->
                                 <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
-                                    <TextBlock Text="{Binding Publisher}" FontSize="10" Foreground="#7A7A7A" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Publisher}" FontSize="11" Foreground="#7A7A7A" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                                 <!-- Id -->
                                 <TextBlock Grid.Column="2" Text="{Binding Id}" FontSize="10.5" Foreground="#8A9AB0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Id}"/>
@@ -254,10 +254,10 @@
                                 <!-- Fonte + flag de já instalado -->
                                 <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border Background="#1A2A3A" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Source}" FontSize="9" Foreground="#4CC2FF"/>
+                                        <TextBlock Text="{Binding Source}" FontSize="11" Foreground="#4CC2FF"/>
                                     </Border>
                                     <Border Background="#1A2A10" CornerRadius="4" Padding="6,2" Margin="4,0,0,0" VerticalAlignment="Center" Visibility="{Binding InstalledBadgeVisibility}" ToolTip="Este pacote já está instalado neste PC">
-                                        <TextBlock Text="&#x2713; instalado" FontSize="9" Foreground="#7FBA00"/>
+                                        <TextBlock Text="&#x2713; instalado" FontSize="11" Foreground="#7FBA00"/>
                                     </Border>
                                 </StackPanel>
                                 <!-- Ações -->
@@ -284,9 +284,9 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <ScrollViewer MaxHeight="52" VerticalScrollBarVisibility="Auto" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtLog" Text="Pronto." FontSize="10" Foreground="#6A6A6A" TextWrapping="Wrap" FontFamily="Consolas"/>
+                    <TextBlock x:Name="TxtLog" Text="Pronto." FontSize="11" Foreground="#6A6A6A" TextWrapping="Wrap" FontFamily="Consolas"/>
                 </ScrollViewer>
-                <TextBlock x:Name="TxtStatusCounts" Grid.Column="1" Text="" FontSize="10" Foreground="#8A8A8A" VerticalAlignment="Center" Margin="10,0"/>
+                <TextBlock x:Name="TxtStatusCounts" Grid.Column="1" Text="" FontSize="11" Foreground="#8A8A8A" VerticalAlignment="Center" Margin="10,0"/>
                 <Button x:Name="BtnCopyLog" Grid.Column="2" Content="Copiar" FontSize="10" Style="{StaticResource GhostBtn}" Padding="8,3" Click="BtnCopyLog_Click" ToolTip="Copiar log (também visível no log do Kit)"/>
             </Grid>
         </Border>
@@ -309,14 +309,14 @@
             <StackPanel>
                 <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock Text="&#xE9F5;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#0078D4" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="&#xE9F5;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#0078D4" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBlock x:Name="TxtInlineStatus" Grid.Column="1" Text="" FontSize="12" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock x:Name="TxtInlinePercent" Grid.Column="2" Text="" FontSize="14" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    <TextBlock x:Name="TxtInlinePercent" Grid.Column="2" Text="" FontSize="13" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </Grid>
                 <Border x:Name="InlineProgressTrack" Background="#333333" CornerRadius="3" Height="4">
                     <Border x:Name="InlineProgressFill" Background="#0078D4" CornerRadius="3" HorizontalAlignment="Left" Width="0"/>
                 </Border>
-                <TextBlock x:Name="TxtInlineDetail" Text="" FontSize="10" Foreground="#8A8A8A" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="TxtInlineDetail" Text="" FontSize="11" Foreground="#8A8A8A" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </Border>
 
@@ -344,7 +344,7 @@
                                 <TextBlock x:Name="DetailName" Text="" FontSize="20" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock x:Name="DetailPublisher" Text="" FontSize="12" Foreground="#8A9AB0" Margin="0,2,0,0"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <Border Background="#1A2A3A" CornerRadius="4" Padding="8,2"><TextBlock x:Name="DetailSource" Text="" FontSize="10" Foreground="#4CC2FF"/></Border>
+                                    <Border Background="#1A2A3A" CornerRadius="4" Padding="8,2"><TextBlock x:Name="DetailSource" Text="" FontSize="11" Foreground="#4CC2FF"/></Border>
                                     <TextBlock x:Name="DetailVersion" Text="" FontSize="11" Foreground="#6A7A90" Margin="8,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </StackPanel>
@@ -356,30 +356,30 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="ID" FontSize="10" Foreground="#5A5A5A"/>
+                                <TextBlock Text="ID" FontSize="11" Foreground="#5A5A5A"/>
                                 <TextBlock x:Name="DetailId" Text="" FontSize="11" Foreground="#9A9A9A" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="Categoria / Moniker" FontSize="10" Foreground="#5A5A5A"/>
+                                <TextBlock Text="Categoria / Moniker" FontSize="11" Foreground="#5A5A5A"/>
                                 <TextBlock x:Name="DetailCategory" Text="" FontSize="11" Foreground="#9A9A9A"/>
                             </StackPanel>
                         </Grid>
                         <Border x:Name="DetailUpdateInfo" Visibility="Collapsed" Background="#1A2A10" CornerRadius="6" Padding="12" Margin="0,0,0,16">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE7B8;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#7FBA00" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="&#xE7B8;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#7FBA00" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <StackPanel>
                                     <TextBlock Text="Atualização disponível" FontSize="11" FontWeight="SemiBold" Foreground="#7FBA00"/>
-                                    <TextBlock x:Name="DetailUpdateVersion" Text="" FontSize="10" Foreground="#6A8A6A"/>
+                                    <TextBlock x:Name="DetailUpdateVersion" Text="" FontSize="11" Foreground="#6A8A6A"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
                         <!-- Já instalado (Discover) -->
                         <Border x:Name="DetailInstalledInfo" Visibility="Collapsed" Background="#12211A" CornerRadius="6" Padding="12" Margin="0,0,0,16">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#7FBA00" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#7FBA00" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <StackPanel>
                                     <TextBlock Text="Já instalado neste PC" FontSize="11" FontWeight="SemiBold" Foreground="#7FBA00"/>
-                                    <TextBlock x:Name="DetailInstalledVersion" Text="" FontSize="10" Foreground="#6A8A6A"/>
+                                    <TextBlock x:Name="DetailInstalledVersion" Text="" FontSize="11" Foreground="#6A8A6A"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

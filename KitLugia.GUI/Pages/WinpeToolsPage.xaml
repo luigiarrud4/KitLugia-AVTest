@@ -85,7 +85,7 @@
                     <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Text="1. PREPARAR WINPE" FontSize="15" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                            <TextBlock Text="Baixa, customiza e cria entrada de boot RAMDISK sem reboot." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,8"/>
                             <WrapPanel Orientation="Horizontal">
                                 <Button x:Name="BtnPrepareWinpe" Content="PREPARAR" Click="BtnPrepareWinpe_Click"
                                         Style="{StaticResource GoldButtonStyle}" Height="36" FontSize="12" FontWeight="Bold" Width="112" Margin="0,0,8,4"/>
@@ -115,7 +115,7 @@
 
                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                                 <TextBlock Text="2. SELECIONAR PARTICAO" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="TxtPartCount" Text="" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtPartCount" Text="" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
 
                             <!-- Partition list -->
@@ -161,7 +161,7 @@
                                             <TextBlock Grid.Column="2" Text="{Binding Label}" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Grid.Column="3" Text="{Binding SizeString}" FontSize="12" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="4" Text="{Binding FreeSpaceString}" Foreground="#88FF88" FontSize="11" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="5" Text="{Binding FileSystem}" Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="5" Text="{Binding FileSystem}" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
@@ -175,8 +175,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel x:Name="PanelTargetInfo" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtTargetInfo" Text="Nenhuma particao selecionada" Foreground="{StaticResource TextMuted}" FontSize="10"/>
-                                        <TextBlock x:Name="TxtShrinkReady" Text="" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                        <TextBlock x:Name="TxtTargetInfo" Text="Nenhuma particao selecionada" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                                        <TextBlock x:Name="TxtShrinkReady" Text="" Foreground="{StaticResource TextMuted}" FontSize="11"/>
                                     </StackPanel>
                                     <Button x:Name="BtnShrinkWinpe" Grid.Column="1"
                                             Content="INICIAR SHRINK"
@@ -204,7 +204,7 @@
                                 </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="3. LOGS DO WINPE" FontSize="13" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Resultados da última execução do shrink via WinPE." Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,2,0,0"/>
+                                <TextBlock Text="Resultados da última execução do shrink via WinPE." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <Button x:Name="BtnCopyLog" Content="COPIAR LOG" Click="BtnCopyLog_Click" Style="{StaticResource GoldButtonStyle}" Height="32" FontSize="10" FontWeight="Bold" Width="100" Margin="0,0,6,0"/>
@@ -241,7 +241,7 @@
                                 <TextBlock Text="ISO" FontSize="16" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" Margin="8,0">
                                     <TextBlock Text="WINPE CUSTOMIZADO (TESTE)" FontSize="11" FontWeight="Bold" Foreground="White"/>
-                                    <TextBlock x:Name="TxtCustomIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="9" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="TxtCustomIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                                 <Button x:Name="BtnLoadCustomIso" Grid.Column="2" Content="Carregar ISO" Click="BtnLoadCustomIso_Click"
                                         Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="10" Width="100"/>
@@ -263,7 +263,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Text="Como usar" FontSize="15" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12">
                             1. Clique PREPARAR WINPE
                                Baixa + customiza + cria boot RAMDISK
                                (sem reboot)
@@ -277,13 +277,13 @@
                         </TextBlock>
                         <Separator Background="#222" Margin="0,0,0,8"/>
                         <TextBlock Text="Dicas" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" FontSize="11" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,4">
+                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4">
                             WinPE (staging C:\KL_WINPE) + config na pasta WinPE do KitLugia
                             Logs na raiz do volume alvo (KitLugia_WinPE_Log.txt)
 
                         </TextBlock>
                         <Border Background="#22332200" BorderBrush="#88FFAA44" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,0,0,4">
-                            <TextBlock FontSize="9" Foreground="#FFAA44" TextWrapping="Wrap">
+                            <TextBlock FontSize="11" Foreground="#FFAA44" TextWrapping="Wrap">
                                 <Run Text="Secure Boot: " FontWeight="Bold"/>
                                 <Run Text="pode bloquear o boot do WinPE. Se travar na tela preta, desligue no BIOS."/>
                             </TextBlock>
@@ -332,7 +332,7 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="10" FontFamily="Consolas" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"/>
                             </ScrollViewer>
                             <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="📋 Copiar log"
                                        Foreground="#555" FontSize="9" Cursor="Hand"
@@ -368,12 +368,12 @@
 
                     <Border Background="#112222" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="10" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="Particao alvo:" FontSize="10" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="Particao alvo:" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                             <TextBlock x:Name="TxtShrinkTargetInfo" Text="-" FontSize="13" FontWeight="Bold" Foreground="White"/>
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Text="QUANTIDADE A REDUZIR (MB):" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,6"/>
+                    <TextBlock Text="QUANTIDADE A REDUZIR (MB):" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,6"/>
                     <TextBox x:Name="TxtShrinkMb" Style="{StaticResource DarkTextBoxStyle}" FontSize="18" Padding="10,8" Text="0" Margin="0,0,0,10"/>
                     <UniformGrid Columns="4" Margin="0,0,0,12">
                         <Button Content="25%" Click="BtnShrinkPercent_Click" Tag="25" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,4,0" Height="30"/>
@@ -384,13 +384,13 @@
 
                     <Border Background="#112222" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="10" Margin="0,0,0,8">
                         <StackPanel>
-                            <TextBlock Text="SISTEMA PARA EXECUTAR O SHRINK:" FontSize="10" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="SISTEMA PARA EXECUTAR O SHRINK:" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                             <TextBlock Text="WinPE Padrão" FontWeight="Bold" Foreground="White" FontSize="12" Margin="0,4,0,0"/>
                         </StackPanel>
                     </Border>
                     <!-- Secure Boot warning -->
                     <Border Background="#22332200" BorderBrush="#88FF8800" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,8">
-                        <TextBlock FontSize="9" Foreground="#FFAA44" TextWrapping="Wrap">
+                        <TextBlock FontSize="11" Foreground="#FFAA44" TextWrapping="Wrap">
                             <Run Text="ATENÇÃO: " FontWeight="Bold"/>
                             <Run Text="Se travar na tela preta ao reiniciar, desligue o Secure Boot no BIOS (Secure Boot &gt; Disabled) e tente novamente."/>
                         </TextBlock>

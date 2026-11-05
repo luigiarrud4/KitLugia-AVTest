@@ -8,7 +8,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
 
-            <TextBlock Text="Tweaks Avan&#xE7;ados (EXM)" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Tweaks Avan&#xE7;ados (EXM)" Margin="0,0,0,10"/>
             <TextBlock Text="Tweaks adicionais baseados no EXM Premium que n&#xE3;o est&#xE3;o no KitLugia padr&#xE3;o. Reinicializa&#xE7;&#xE3;o necess&#xE1;ria para a maioria." Foreground="#A0A0A0" Margin="0,0,0,30"/>
 
             <Border Background="#2D2020" BorderBrush="#503030" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,20">

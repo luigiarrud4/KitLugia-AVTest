@@ -95,7 +95,7 @@
                     <TextBlock Text="🖥️ Monitor Avançado de Processos" 
                               FontSize="22" FontWeight="Bold" 
                               Foreground="White" VerticalAlignment="Center"/>
-                    <TextBlock Text="RAM: " FontSize="14" Foreground="#00FF88" VerticalAlignment="Center" Margin="20,0,0,0"/>
+                    <TextBlock Text="RAM: " FontSize="13" Foreground="#00FF88" VerticalAlignment="Center" Margin="20,0,0,0"/>
                     <TextBlock x:Name="RamUsageText" Text="0 GB / 16 GB (0%)" 
                               FontSize="14" Foreground="#00FF88" VerticalAlignment="Center"/>
                 </StackPanel>
@@ -176,10 +176,10 @@
                                                            Foreground="White" TextTrimming="CharacterEllipsis" MaxWidth="350"/>
                                                 <Border Background="{Binding CategoryColor}" CornerRadius="3" Padding="6,2" 
                                                         Margin="8,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding CategoryLabel}" FontSize="9" Foreground="White" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding CategoryLabel}" FontSize="11" Foreground="White" FontWeight="SemiBold"/>
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock FontSize="10" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0">
+                                            <TextBlock FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0">
                                                 <Run Text="PID: "/><Run Text="{Binding Id, Mode=OneWay}"/>
                                                 <Run Text=" | "/><Run Text="{Binding RamUsage, Mode=OneWay}"/>
                                             </TextBlock>
@@ -213,7 +213,7 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
-                                        <TextBlock Text="{Binding Priority}" FontSize="10" Foreground="#CCC" 
+                                        <TextBlock Text="{Binding Priority}" FontSize="11" Foreground="#CCC" 
                                                    HorizontalAlignment="Center"/>
                                     </Border>
 
@@ -231,11 +231,11 @@
                                                 </Style>
                                             </Ellipse.Style>
                                         </Ellipse>
-                                        <TextBlock Text="{Binding Status}" FontSize="10" Foreground="#AAA" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#AAA" VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <!-- Rede -->
-                                    <TextBlock Grid.Column="6" Text="{Binding NetworkUsage}" FontSize="10" 
+                                    <TextBlock Grid.Column="6" Text="{Binding NetworkUsage}" FontSize="11" 
                                                Foreground="#666" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Grid>
                             </DataTemplate>
@@ -296,7 +296,7 @@
                             <!-- Gaming Profiles -->
                             <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="🎮 Perfis de Gaming" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                                    <TextBlock Text="🎮 Perfis de Gaming" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                                     <CheckBox x:Name="SteamProfile" Content="Steam" Foreground="White" Margin="0,5" Checked="Profile_Checked"/>
                                     <CheckBox x:Name="EpicProfile" Content="Epic Games" Foreground="White" Margin="0,5" Checked="Profile_Checked"/>
                                     <CheckBox x:Name="XboxProfile" Content="Xbox Game Pass" Foreground="White" Margin="0,5" Checked="Profile_Checked"/>
@@ -307,7 +307,7 @@
                             <!-- Performance Modes -->
                             <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="⚡ Modos de Desempenho" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                                    <TextBlock Text="⚡ Modos de Desempenho" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                                     <CheckBox x:Name="UltraPerfMode" Content="🚀 Ultra Desempenho (Downloads)" Foreground="White" Margin="0,5" Checked="PerformanceMode_Checked"/>
                                     <CheckBox x:Name="GamingMode" Content="🎮 Gaming Mode" Foreground="White" Margin="0,5" Checked="PerformanceMode_Checked"/>
                                     <CheckBox x:Name="BalancedMode" Content="⚖️ Balanced Mode" Foreground="White" Margin="0,5" IsChecked="True" Checked="PerformanceMode_Checked"/>
@@ -317,7 +317,7 @@
                             <!-- Network -->
                             <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="🌐 Otimização de Rede" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                                    <TextBlock Text="🌐 Otimização de Rede" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                                     <CheckBox x:Name="HighBandwidthMode" Content="📡 Alta Prioridade de Rede" Foreground="White" Margin="0,5" Checked="NetworkOptimization_Checked"/>
                                     <CheckBox x:Name="LowLatencyMode" Content="⚡ Baixa Latência" Foreground="White" Margin="0,5" Checked="NetworkOptimization_Checked"/>
                                     <CheckBox x:Name="DownloadBoost" Content="⬇️ Boost para Downloads" Foreground="White" Margin="0,5" Checked="NetworkOptimization_Checked"/>
@@ -327,7 +327,7 @@
                             <!-- RAM -->
                             <Border Background="#2D2D30" CornerRadius="5" Padding="15" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="🧠 Otimização de RAM" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                                    <TextBlock Text="🧠 Otimização de RAM" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                                     <CheckBox x:Name="MemoryCompression" Content="🗜️ Compressão de RAM" Foreground="White" Margin="0,5" IsChecked="True" Checked="MemoryOptimization_Checked"/>
                                     <CheckBox x:Name="IntelligentCleanup" Content="🧹 Limpeza Inteligente" Foreground="White" Margin="0,5" IsChecked="True" Checked="MemoryOptimization_Checked"/>
                                     <CheckBox x:Name="StandbyListOptimization" Content="💤 Otimizar Standby List" Foreground="White" Margin="0,5" Checked="MemoryOptimization_Checked"/>
@@ -337,7 +337,7 @@
                             <!-- Auto-Detection -->
                             <Border Background="#2D2D30" CornerRadius="5" Padding="15">
                                 <StackPanel>
-                                    <TextBlock Text="🤖 Detecção Automática" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                                    <TextBlock Text="🤖 Detecção Automática" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                                     <CheckBox x:Name="AutoDetectSteam" Content="🎮 Detectar Steam (downloads/atualizações)" Foreground="White" Margin="0,5" IsChecked="True" Checked="AutoDetection_Checked"/>
                                     <CheckBox x:Name="AutoDetectEpic" Content="🎮 Detectar Epic Games (downloads/atualizações)" Foreground="White" Margin="0,5" IsChecked="True" Checked="AutoDetection_Checked"/>
                                     <CheckBox x:Name="AutoDetectHighNetwork" Content="📡 Alta atividade de rede = Ultra modo" Foreground="White" Margin="0,5" IsChecked="True" Checked="AutoDetection_Checked"/>
@@ -359,7 +359,7 @@
         <!-- STATUS BAR -->
         <Border Grid.Row="3" Background="#2D2D30" Padding="20,10" Margin="10,5,10,10" CornerRadius="0,0,8,8">
             <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="StatusText" Text="🟢 Sistema otimizado" FontSize="14" Foreground="#00FF88" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusText" Text="🟢 Sistema otimizado" FontSize="13" Foreground="#00FF88" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
     </Grid>

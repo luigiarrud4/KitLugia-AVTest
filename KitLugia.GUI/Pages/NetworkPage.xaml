@@ -186,7 +186,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30,30,30,50" MaxWidth="900">
 
-            <TextBlock Text="Rede e Lat&#xEA;ncia" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Rede e Lat&#xEA;ncia" Margin="0,0,0,10"/>
             <TextBlock Text="Otimiza&#xE7;&#xF5;es de conex&#xE3;o para jogos e navega&#xE7;&#xE3;o mais r&#xE1;pida." Foreground="#A0A0A0" Margin="0,0,0,30"/>
 
             <!-- SEÇÃO 1: DNS RÁPIDO -->
@@ -205,7 +205,7 @@
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="1.1.1.1" FontWeight="Bold" FontSize="18" Foreground="#F48120" HorizontalAlignment="Center"/>
                         <TextBlock Text="Cloudflare DNS" FontWeight="Bold" FontSize="12" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-                        <TextBlock Text="Melhor velocidade" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Melhor velocidade" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
 
@@ -213,7 +213,7 @@
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="8.8.8.8" FontWeight="Bold" FontSize="18" Foreground="#4285F4" HorizontalAlignment="Center"/>
                         <TextBlock Text="Google Public DNS" FontWeight="Bold" FontSize="12" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-                        <TextBlock Text="Maior estabilidade" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Maior estabilidade" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
 
@@ -221,7 +221,7 @@
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="AUTO" FontWeight="Bold" FontSize="18" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
                         <TextBlock Text="Padr&#xE3;o (DHCP)" FontWeight="Bold" FontSize="12" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-                        <TextBlock Text="Definido pelo roteador" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Definido pelo roteador" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </Grid>
@@ -273,11 +273,11 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="PROVEDOR" FontSize="10" FontWeight="Bold" Foreground="#777"/>
-                                <TextBlock Grid.Column="1" Text="DNS PRIMÁRIO" FontSize="10" FontWeight="Bold" Foreground="#777" Width="110" TextAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="CATEGORIA" FontSize="10" FontWeight="Bold" Foreground="#777" Width="88" TextAlignment="Center"/>
-                                <TextBlock Grid.Column="3" Text="RESOLUÇÃO" FontSize="10" FontWeight="Bold" Foreground="#777" Width="64" TextAlignment="Center" ToolTip="Tempo de resposta a uma query DNS REAL (UDP porta 53) — o ranking usa este valor"/>
-                                <TextBlock Grid.Column="4" Text="LATÊNCIA" FontSize="10" FontWeight="Bold" Foreground="#777" Width="62" TextAlignment="Center" ToolTip="Ping ICMP (melhor de 3)"/>
+                                <TextBlock Grid.Column="0" Text="PROVEDOR" FontSize="11" FontWeight="Bold" Foreground="#777"/>
+                                <TextBlock Grid.Column="1" Text="DNS PRIMÁRIO" FontSize="11" FontWeight="Bold" Foreground="#777" Width="110" TextAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="CATEGORIA" FontSize="11" FontWeight="Bold" Foreground="#777" Width="88" TextAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="RESOLUÇÃO" FontSize="11" FontWeight="Bold" Foreground="#777" Width="64" TextAlignment="Center" ToolTip="Tempo de resposta a uma query DNS REAL (UDP porta 53) — o ranking usa este valor"/>
+                                <TextBlock Grid.Column="4" Text="LATÊNCIA" FontSize="11" FontWeight="Bold" Foreground="#777" Width="62" TextAlignment="Center" ToolTip="Ping ICMP (melhor de 3)"/>
                                 <TextBlock Grid.Column="5" Text="" Width="66"/>
                             </Grid>
                             <ScrollViewer MaxHeight="230" VerticalScrollBarVisibility="Auto">
@@ -305,7 +305,7 @@
                                                         </StackPanel>
                                                     </StackPanel>
                                                     <TextBlock Grid.Column="1" Text="{Binding Primary}" FontSize="11" Foreground="#AAA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding Category}" FontSize="10" Foreground="#777" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Category}" FontSize="11" Foreground="#777" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                     <TextBlock Grid.Column="3" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
@@ -368,7 +368,7 @@
 
                     <!-- DNS Customizado -->
                     <Separator Background="{StaticResource CardBorder}" Margin="0,12,0,10"/>
-                    <TextBlock Text="DNS CUSTOMIZADO" FontSize="10" FontWeight="Bold" Foreground="#777" Margin="0,0,0,6"/>
+                    <TextBlock Text="DNS CUSTOMIZADO" FontSize="11" FontWeight="Bold" Foreground="#777" Margin="0,0,0,6"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -399,7 +399,7 @@
             <!-- SEÇÃO 1.5: CONTROLE DO ADAPTADOR (LIGAR/DESLIGAR/RESTART) -->
             <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,5,0,25">
                 <StackPanel>
-                    <TextBlock Text="&#x1F4E1; Controle do Adaptador" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="20,15,20,5"/>
+                    <TextBlock Text="&#x1F4E1; Controle do Adaptador" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="20,15,20,5"/>
                     <TextBlock Text="Ligue, desligue ou reinicie o adaptador de rede para resolver problemas de conex&#xE3;o." FontSize="12" Foreground="#808080" Margin="20,0,20,10"/>
                     <Separator Background="{StaticResource CardBorder}"/>
                     <TextBlock x:Name="TxtSelectedAdapterForControl" Text="Selecione um adaptador de rede" FontSize="13" Foreground="#808080" Margin="20,10,20,0"/>
@@ -457,7 +457,7 @@
                             </Button.Template>
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock Text="&#x25B6; Ligar" FontSize="15" FontWeight="Bold" Foreground="#6CCB5F" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Ativar adaptador" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Ativar adaptador" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button x:Name="BtnDisableAdapter" Grid.Column="2" Height="55" Cursor="Hand" Click="BtnDisableAdapter_Click">
@@ -506,7 +506,7 @@
                             </Button.Template>
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock Text="&#x25A0; Desligar" FontSize="15" FontWeight="Bold" Foreground="#F44336" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Desativar adaptador" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Desativar adaptador" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button x:Name="BtnRestartAdapter" Grid.Column="4" Height="55" Cursor="Hand" Click="BtnRestartAdapter_Click">
@@ -555,7 +555,7 @@
                             </Button.Template>
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock Text="&#x1F504; Reiniciar" FontSize="15" FontWeight="Bold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Desliga e liga (2s)" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Desliga e liga (2s)" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                     </Grid>
@@ -700,7 +700,7 @@
                     <!-- Info do Adaptador -->
                     <Border Background="#252525" CornerRadius="4" Padding="15" Margin="20,20,20,10">
                         <StackPanel>
-                            <TextBlock Text="&#x1F4E1; Adaptador de Rede" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock Text="&#x1F4E1; Adaptador de Rede" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
                             <TextBlock x:Name="TxtAdapterInfo" Text="Detectando..." FontSize="12" Foreground="#A0A0A0" Margin="0,5,0,0"/>
                             <ComboBox x:Name="CmbNetworkAdapter" Margin="0,10,0,0" Height="30" FontSize="12" SelectionChanged="CmbNetworkAdapter_SelectionChanged" Style="{StaticResource DarkComboBoxStyle}"/>
                             <!-- Status em tempo real -->
@@ -713,7 +713,7 @@
                                 </Grid.ColumnDefinitions>
                                 <Border x:Name="AdapterStatusIndicator" Grid.Column="0" Width="10" Height="10" CornerRadius="5" Background="#808080" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBlock x:Name="TxtAdapterStatus" Grid.Column="1" Text="Verificando..." FontSize="11" Foreground="#808080" VerticalAlignment="Center" Margin="0,0,15,0"/>
-                                <TextBlock x:Name="TxtRefreshStatus" Grid.Column="2" Text="" FontSize="9" Foreground="#555" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtRefreshStatus" Grid.Column="2" Text="" FontSize="11" Foreground="#555" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtAdapterMac" Grid.Column="3" Text="MAC: ---" FontSize="11" Foreground="#AAAAAA" FontFamily="Consolas"/>
                             </Grid>
                         </StackPanel>
@@ -723,7 +723,7 @@
                     <Separator Background="{StaticResource CardBorder}"/>
                     <Border Background="#1E1E2A" CornerRadius="4" Padding="15" Margin="20,10,20,15">
                         <StackPanel>
-                            <TextBlock Text="&#x1F4E1; MAC Address Spoofing" FontSize="14" FontWeight="Bold" Foreground="#F48120" Margin="0,0,0,5"/>
+                            <TextBlock Text="&#x1F4E1; MAC Address Spoofing" FontSize="13" FontWeight="Bold" Foreground="#F48120" Margin="0,0,0,5"/>
                             <TextBlock Text="Altere o endere&#xE7;o MAC da placa de rede para evitar bloqueios por hardware ou melhorar a privacidade. O primeiro byte &#xE9; definido como 02 (obrigat&#xF3;rio para WiFi funcionar)." FontSize="11" Foreground="#808080" TextWrapping="Wrap" Margin="0,0,0,12"/>
                             <Button x:Name="BtnOpenMacSpoof" Content="&#x1F513; Abrir página especializada de MAC Spoof" Margin="0,0,0,12" Padding="10,4" Style="{StaticResource GoldButtonStyle}" Click="BtnOpenMacSpoof_Click"/>
 
@@ -1007,7 +1007,7 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
-                                        <TextBlock Text="&#x1F504;  Limpeza Segura" FontSize="14" FontWeight="Bold" Foreground="#66BB6A"/>
+                                        <TextBlock Text="&#x1F504;  Limpeza Segura" FontSize="13" FontWeight="Bold" Foreground="#66BB6A"/>
                                         <TextBlock Text=" (DNS, Winsock, TCP/IP, ARP, Proxy, SSL)" FontSize="11" Foreground="#A5D6A7" Margin="5,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
@@ -1056,7 +1056,7 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
-                                        <TextBlock Text="&#x26A0;&#xFE0F;  Limpeza Completa" FontSize="14" FontWeight="Bold" Foreground="#EF5350"/>
+                                        <TextBlock Text="&#x26A0;&#xFE0F;  Limpeza Completa" FontSize="13" FontWeight="Bold" Foreground="#EF5350"/>
                                         <TextBlock Text=" (+ Reset Firewall)" FontSize="11" Foreground="#EF9A9A" Margin="5,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>

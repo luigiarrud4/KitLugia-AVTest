@@ -107,23 +107,23 @@
                                 <TextBlock x:Name="TxtVersion" Text="-" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="Windows Update (wuauserv)" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtWUStatus" Text="-" FontSize="14" Margin="0,2,0,10"/>
+                                <TextBlock x:Name="TxtWUStatus" Text="-" FontSize="13" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="USOSvc" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtUSOStatus" Text="-" FontSize="14" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtUSOStatus" Text="-" FontSize="13" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="10,0,0,0">
                                 <TextBlock Text="Insider (wisvc)" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtWisvcStatus" Text="-" FontSize="14" Margin="0,2,0,10"/>
+                                <TextBlock x:Name="TxtWisvcStatus" Text="-" FontSize="13" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="Status Insider" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtInsiderStatus" Text="-" FontSize="14" Margin="0,2,0,10"/>
+                                <TextBlock x:Name="TxtInsiderStatus" Text="-" FontSize="13" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="Channel / Branch" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtInsiderChannel" Text="-" FontSize="14" Margin="0,2,0,10"/>
+                                <TextBlock x:Name="TxtInsiderChannel" Text="-" FontSize="13" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="Flight Signing" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtFlightSigning" Text="-" FontSize="14" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtFlightSigning" Text="-" FontSize="13" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -136,17 +136,17 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,10,0">
                                 <TextBlock Text="Updates Pausados" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtPausedStatus" Text="-" FontSize="14" Margin="0,2,0,10"/>
+                                <TextBlock x:Name="TxtPausedStatus" Text="-" FontSize="13" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="Dias Restantes" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtPauseDays" Text="-" FontSize="14" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtPauseDays" Text="-" FontSize="13" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="10,0,0,0">
                                 <TextBlock Text="Target Release" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtTargetRelease" Text="-" FontSize="14" Margin="0,2,0,10"/>
+                                <TextBlock x:Name="TxtTargetRelease" Text="-" FontSize="13" Margin="0,2,0,10"/>
 
                                 <TextBlock Text="Deferral Quality (dias)" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock x:Name="TxtDeferralDays" Text="-" FontSize="14" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtDeferralDays" Text="-" FontSize="13" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>

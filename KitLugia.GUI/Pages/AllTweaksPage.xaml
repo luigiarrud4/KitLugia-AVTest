@@ -13,7 +13,7 @@
 
         <!-- TITULO -->
         <StackPanel Grid.Row="0" Margin="0,0,0,15">
-            <TextBlock Text="Todos os Tweaks" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Todos os Tweaks"/>
             <TextBlock x:Name="TxtSubtitle" Text="Navegue por todos os tweaks dispon&#xED;veis no sistema" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
         </StackPanel>
 
@@ -124,7 +124,7 @@
                                                    Foreground="White" VerticalAlignment="Center"/>
                                         <Border Grid.Column="1" Background="#222" BorderBrush="#444" BorderThickness="1" 
                                                 CornerRadius="3" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Source}" FontSize="9" Foreground="#888"/>
+                                            <TextBlock Text="{Binding Source}" FontSize="11" Foreground="#888"/>
                                         </Border>
                                     </Grid>
                                     <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{DynamicResource TextMuted}" 

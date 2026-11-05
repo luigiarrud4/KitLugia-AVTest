@@ -55,14 +55,14 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="MAC Spoof (estilo TMAC)" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="MAC Spoof (estilo TMAC)"/>
             <TextBlock Text="Alterar, randomizar, persistir e restaurar MAC de adaptadores" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
         </StackPanel>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="0,0,0,8">
                 <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="Adaptador" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Adaptador" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
                         <ComboBox x:Name="CmbAdapters" Margin="0,0,0,10" Height="32" FontSize="13" Foreground="White" Background="#1A1A1A"/>
                         <TextBlock x:Name="TxtCurrentMac" Text="MAC atual: -" Foreground="{StaticResource TextPrimary}" FontSize="13" Margin="0,2"/>
                         <TextBlock x:Name="TxtOriginalMac" Text="MAC original: -" Foreground="{StaticResource TextPrimary}" FontSize="13" Margin="0,2"/>
@@ -72,7 +72,7 @@
 
                 <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="Ações" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Ações" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
                         <TextBox x:Name="TxtNewMac" Style="{StaticResource DnsPlaceholderTextBoxStyle}" Tag="- . - . - . -" Margin="0,0,0,10" Height="32" FontSize="13"/>
                         <CheckBox x:Name="ChkUse02" Content="Usar 02: como primeiro octeto (locally administered)" Margin="0,0,0,6" Foreground="{StaticResource TextPrimary}"/>
                         <CheckBox x:Name="ChkIncludeMac" Content="Incluir MAC no nome do adaptador" Margin="0,0,0,10" Foreground="{StaticResource TextPrimary}"/>
@@ -87,7 +87,7 @@
 
                 <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="Presets" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Presets" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
                         <ItemsControl x:Name="ListPresets">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -100,7 +100,7 @@
 
                 <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="Monitor de Tráfego" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Monitor de Tráfego" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
                         <Grid Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

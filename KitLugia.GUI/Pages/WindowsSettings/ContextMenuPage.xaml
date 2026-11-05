@@ -19,7 +19,7 @@
             <!-- ================================================================ -->
             <!-- TITULO -->
             <!-- ================================================================ -->
-            <TextBlock Text="&#x1F4CB; Menu de Contexto do Windows" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="White"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="&#x1F4CB; Menu de Contexto do Windows" Margin="0,0,0,8"/>
             <TextBlock Text="Gerencie todas as entradas do menu de clique direito do Explorer. Adicione, remova ou filtre itens nativos do Windows e de terceiros." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,25" TextWrapping="Wrap"/>
 
             <!-- ================================================================ -->
@@ -185,7 +185,7 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
-                                        <TextBlock Text="{Binding OriginLabel}" FontSize="10" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding OriginLabel}" FontSize="11" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
                                     </Border>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>

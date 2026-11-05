@@ -74,7 +74,7 @@
                 <!-- Disk Selection Card -->
                 <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <TextBlock Text="💾 DISCO E PARTIÇÃO" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
+                        <TextBlock Text="💾 DISCO E PARTIÇÃO" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
 
                         <TextBlock Text="Selecione o disco físico:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
                         <Grid Margin="0,0,0,15">
@@ -118,7 +118,7 @@
                 <!-- ISO Selection Card -->
                 <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <TextBlock Text="💿 IMAGEM ISO" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
+                        <TextBlock Text="💿 IMAGEM ISO" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
                         <TextBlock Text="Selecione o arquivo ISO de instalação:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -150,14 +150,14 @@
                             <Border Background="#1A1A2E" BorderBrush="#2A2A4F" BorderThickness="1" CornerRadius="10" Padding="10">
                                 <StackPanel>
                                     <TextBlock Text="⚡ CONTROLE DIRETO DA ISO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,3"/>
-                                    <TextBlock Text="Ajuste rápido: idioma, usuário e bypass. Clique EDITAR para abrir o XML completo." FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ajuste rápido: idioma, usuário e bypass. Clique EDITAR para abrir o XML completo." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Margin="0,0,4,0">
-                                            <TextBlock Text="Idioma rápido:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                            <TextBlock Text="Idioma rápido:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                             <ComboBox x:Name="CmbQuickLanguage" Height="32" Style="{StaticResource DarkComboBoxStyle}" SelectionChanged="CmbQuickLanguage_SelectionChanged">
                                                 <ComboBoxItem Content="Português (Brasil) — pt-BR" Tag="pt-BR" IsSelected="True"/>
                                                 <ComboBoxItem Content="English (United States) — en-US" Tag="en-US"/>
@@ -174,11 +174,11 @@
                                             </ComboBox>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                            <TextBlock Text="Usuário rápido:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                            <TextBlock Text="Usuário rápido:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                             <TextBox x:Name="TxtQuickUser" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="32" VerticalContentAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
-                                    <TextBlock Text="Funções rápidas:" Foreground="{StaticResource TextMuted}" FontSize="9" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Funções rápidas:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
                                     <WrapPanel Margin="0,0,0,6">
                                         <CheckBox x:Name="ChkQuickBypass" Content="Bypass TPM" Foreground="White" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
                                         <CheckBox x:Name="ChkQuickLocal" Content="Conta Local" Foreground="White" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
@@ -254,7 +254,7 @@
                 <!-- Removal Selection Card (Inline) -->
                 <Border x:Name="CardRemovalSelection" Background="#331111" BorderBrush="#552222" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock Text="🗑️ SELEÇÃO DE REMOÇÃO" FontSize="14" FontWeight="Bold" Foreground="#FF5555" Margin="0,0,0,15"/>
+                        <TextBlock Text="🗑️ SELEÇÃO DE REMOÇÃO" FontSize="13" FontWeight="Bold" Foreground="#FF5555" Margin="0,0,0,15"/>
                         <TextBlock Text="Múltiplas partições Winboot detectadas. Selecione qual deseja remover:" Foreground="#CCCCCC" Margin="0,0,0,10"/>
                         <ComboBox x:Name="ComboRemovalCandidates" Height="40" Style="{StaticResource DarkComboBoxStyle}">
                             <ComboBox.ItemTemplate>
@@ -333,11 +333,11 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Margin="0,0,5,0">
-                                            <TextBlock Text="Nome:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                            <TextBlock Text="Nome:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                             <TextBox x:Name="TxtUserName" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                            <TextBlock Text="Senha:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                            <TextBlock Text="Senha:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                             <PasswordBox x:Name="TxtPassword" Style="{StaticResource DarkPasswordBoxStyle}" Height="30"/>
                                         </StackPanel>
                                     </Grid>
@@ -346,7 +346,7 @@
                                 <!-- Idioma do Sistema - escolha personalizável (fix: nunca iniciar em inglês por padrão) -->
                                 <StackPanel x:Name="PanelLanguageSelection" Margin="0,0,0,15">
                                     <TextBlock Text="🌍 IDIOMA DO SISTEMA" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
-                                    <TextBlock Text="Escolha o idioma do Windows instalado. Padrão: Português (Brasil) — garante que não inicie em inglês." FontSize="10" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Escolha o idioma do Windows instalado. Padrão: Português (Brasil) — garante que não inicie em inglês." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                     <ComboBox x:Name="CmbWinbootLanguage" Height="36" Style="{StaticResource DarkComboBoxStyle}">
                                         <ComboBoxItem Content="Português (Brasil) — pt-BR" Tag="pt-BR" IsSelected="True"/>
                                         <ComboBoxItem Content="English (United States) — en-US" Tag="en-US"/>
@@ -361,7 +361,7 @@
                                         <ComboBoxItem Content="Русский (Россия) — ru-RU" Tag="ru-RU"/>
                                         <ComboBoxItem Content="العربية (السعودية) — ar-SA" Tag="ar-SA"/>
                                     </ComboBox>
-                                    <TextBlock x:Name="TxtWinbootLanguageHint" Text="Padrão: pt-BR (Português BR). Teclado e fuso ajustados automaticamente." FontSize="10" Foreground="#FFD700" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="TxtWinbootLanguageHint" Text="Padrão: pt-BR (Português BR). Teclado e fuso ajustados automaticamente." FontSize="11" Foreground="#FFD700" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
 
                                 <TextBlock Text="PÓS-INSTALAÇÃO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
@@ -372,9 +372,9 @@
                                 <Border Background="#1E1E2E" BorderBrush="#3B3B4F" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,15">
                                     <StackPanel>
                                         <CheckBox x:Name="ChkDownloadDotnet" Content="📥 Baixar .NET Desktop Runtime 8.0 automaticamente" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
-                                        <TextBlock Text="Se o instalador não existir localmente, o KitLugia baixará automaticamente (~50MB) do Microsoft CDN." FontSize="10" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
-                                        <TextBlock Text="• Salvo em Resources para uso futuro" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,0,0,3"/>
-                                        <TextBlock Text="• Se desmarcado, usará winget na primeira inicialização (requer internet)" FontSize="10" Foreground="{StaticResource TextMuted}"/>
+                                        <TextBlock Text="Se o instalador não existir localmente, o KitLugia baixará automaticamente (~50MB) do Microsoft CDN." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                        <TextBlock Text="• Salvo em Resources para uso futuro" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,3"/>
+                                        <TextBlock Text="• Se desmarcado, usará winget na primeira inicialização (requer internet)" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                                     </StackPanel>
                                 </Border>
 
@@ -386,7 +386,7 @@
                                         <DataTemplate>
                                             <StackPanel>
                                                 <TextBlock x:Name="TxtFriendlyName" Text="{Binding FriendlyName}" FontWeight="Bold" Foreground="White" Padding="5,5,5,0"/>
-                                                <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{StaticResource TextMuted}" Padding="5,0,5,5"/>
+                                                <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{StaticResource TextMuted}" Padding="5,0,5,5"/>
                                             </StackPanel>
                                             <DataTemplate.Triggers>
                                                 <DataTrigger Binding="{Binding IsRecommended}" Value="True">
@@ -396,7 +396,7 @@
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
-                                <TextBlock x:Name="TxtProfileWarning" Text="" FontSize="10" Foreground="#FF5555" Margin="0,0,0,15" Visibility="Collapsed"/>
+                                <TextBlock x:Name="TxtProfileWarning" Text="" FontSize="11" Foreground="#FF5555" Margin="0,0,0,15" Visibility="Collapsed"/>
 
                                 <Grid Margin="0,0,0,20">
                                     <Grid.ColumnDefinitions>
@@ -405,7 +405,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="TxtCustomXmlInfo" Text="Usando gerador interno" Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtCustomXmlInfo" Text="Usando gerador interno" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"/>
                                     <Button Grid.Column="1" Content="⚙️" Width="40" Height="30" Margin="5,0,5,0" ToolTip="Editar autounattend.xml" Click="BtnEditAutounattend_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     <Button Grid.Column="2" Content="IMPORTAR XML" Padding="10,3" Click="BtnImportXml_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     <Button Grid.Column="3" Content="📁 CUSTOM" Padding="10,3" Margin="5,0,0,0" ToolTip="Usar arquivo autounattend.xml customizado" Click="BtnBrowseCustomAutounattend_Click" Style="{StaticResource GoldButtonStyle}"/>
@@ -415,7 +415,7 @@
                             <!-- File Injection -->
                             <StackPanel x:Name="PanelFileInjection" Margin="0,0,0,15">
                                 <TextBlock Text="INJEÇÃO DE ARQUIVOS (ADAPTATIVO)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
-                                <TextBlock Text="Selecione uma pasta para copiar automaticamente para a Área de Trabalho após a formatação. O tamanho da partição será ajustado automaticamente." FontSize="10" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                <TextBlock Text="Selecione uma pasta para copiar automaticamente para a Área de Trabalho após a formatação. O tamanho da partição será ajustado automaticamente." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -433,8 +433,8 @@
                             <Border Background="#1A1A2E" BorderBrush="#FF4444" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,15">
                                 <StackPanel>
                                     <CheckBox x:Name="ChkEmergencyPreBoot" Content="🚨 Emergency Pre-Boot (WinRE + DISM)" Foreground="#FF6666" Margin="0,0,0,8" IsChecked="False" Checked="ChkEmergencyPreBoot_Checked"/>
-                                    <TextBlock Text="Se o shrink falhar por arquivos travados, usa o Windows RE modificado via DISM para concluir a operação. O sistema reiniciará automaticamente." FontSize="10" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="22,0,0,5"/>
-                                    <TextBlock x:Name="TxtEmergencyWarning" Text="⚠️ Requer winre.wim original em C:\Windows\System32\Recovery. Usa DISM e reagentc (built-in)." FontSize="10" Foreground="#FFAA44" TextWrapping="Wrap" Margin="22,0,0,0" Visibility="Collapsed"/>
+                                    <TextBlock Text="Se o shrink falhar por arquivos travados, usa o Windows RE modificado via DISM para concluir a operação. O sistema reiniciará automaticamente." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="22,0,0,5"/>
+                                    <TextBlock x:Name="TxtEmergencyWarning" Text="⚠️ Requer winre.wim original em C:\Windows\System32\Recovery. Usa DISM e reagentc (built-in)." FontSize="11" Foreground="#FFAA44" TextWrapping="Wrap" Margin="22,0,0,0" Visibility="Collapsed"/>
                                 </StackPanel>
                             </Border>
 
@@ -526,7 +526,7 @@
                                 </EventTrigger>
                             </Ellipse.Triggers>
                         </Ellipse>
-                        <TextBlock x:Name="TxtLiveActivity" Text="..." Foreground="{StaticResource TextMuted}" FontSize="9" FontFamily="Consolas"
+                        <TextBlock x:Name="TxtLiveActivity" Text="..." Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"
                                    VerticalAlignment="Center" Opacity="0.5" TextTrimming="CharacterEllipsis" MaxWidth="350"/>
                     </StackPanel>
                 </Grid>
@@ -594,11 +594,11 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,5,0">
-                                    <TextBlock Text="Nome do usuário:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Nome do usuário:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                     <TextBox x:Name="TxtAuUserName" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                    <TextBlock Text="Senha (opcional):" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Senha (opcional):" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                     <PasswordBox x:Name="TxtAuPassword" Style="{StaticResource DarkPasswordBoxStyle}" Height="30"/>
                                 </StackPanel>
                             </Grid>
@@ -642,7 +642,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,5,0">
-                                    <TextBlock Text="Idioma:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Idioma:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                     <ComboBox x:Name="CmbAuLanguage" Height="30" Style="{StaticResource DarkComboBoxStyle}">
                                         <ComboBoxItem Content="Português (Brasil)" Tag="pt-BR" IsSelected="True"/>
                                         <ComboBoxItem Content="English (United States)" Tag="en-US"/>
@@ -650,7 +650,7 @@
                                     </ComboBox>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                    <TextBlock Text="Fuso Horário:" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Fuso Horário:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                     <ComboBox x:Name="CmbAuTimeZone" Height="30" Style="{StaticResource DarkComboBoxStyle}">
                                         <ComboBoxItem Content="Horário de Brasília (BRT)" Tag="E. South America Standard Time" IsSelected="True"/>
                                         <ComboBoxItem Content="Eastern Time (EUA)" Tag="Eastern Standard Time"/>
@@ -669,7 +669,7 @@
 
                             <!-- Comandos Pós-Instalação -->
                             <TextBlock Text="💻 COMANDOS PÓS-INSTALAÇÃO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
-                            <TextBlock Text="Comandos para executar no primeiro login (um por linha):" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,5"/>
+                            <TextBlock Text="Comandos para executar no primeiro login (um por linha):" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,5"/>
                             <TextBox x:Name="TxtAuCommands" Style="{StaticResource DarkTextBoxStyle}" Height="80" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
                                      Text="dism /online /export-driver /destination:C:\DriversBackup"/>
 

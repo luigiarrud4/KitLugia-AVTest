@@ -10,7 +10,7 @@
 
             <!-- Cabe&#xE7;alho -->
             <StackPanel Margin="0,0,0,25">
-                <TextBlock Text="Seguran&#xE7;a do Sistema" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Seguran&#xE7;a do Sistema"/>
                 <TextBlock Text="Gerencie prote&#xE7;&#xF5;es do Windows. Altera&#xE7;&#xF5;es cr&#xED;ticas exigem reinicializa&#xE7;&#xE3;o." 
                            Foreground="{StaticResource TextSecondary}" Margin="0,6,0,0"/>
             </StackPanel>
