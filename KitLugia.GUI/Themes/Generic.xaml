@@ -4,6 +4,7 @@
     <!-- Ordem importa: Brushes primeiro (outros dependem) -->
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Brushes.xaml"/>
+        <ResourceDictionary Source="Icons.xaml"/>
         <ResourceDictionary Source="Typography.xaml"/>
         <ResourceDictionary Source="BaseStyles.xaml"/>
         <ResourceDictionary Source="Menus.xaml"/>

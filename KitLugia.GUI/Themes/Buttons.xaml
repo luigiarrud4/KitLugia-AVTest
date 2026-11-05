@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="clr-namespace:KitLugia.GUI.Controls">
 
     <!-- GLOBAL: substitui o template azul padrão do WPF por um hover escuro sutil -->
     <Style TargetType="{x:Type Button}">
@@ -7,6 +8,9 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
+        <Setter Property="controls:HoverZoom.Scale" Value="1.05"/>
+        <Setter Property="controls:HoverZoom.DurationMs" Value="120"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -15,30 +19,11 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="4"
                             RenderTransformOrigin="0.5,0.5">
-                        <Border.RenderTransform>
-                            <ScaleTransform ScaleX="1" ScaleY="1"/>
-                        </Border.RenderTransform>
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                           TextElement.Foreground="{TemplateBinding Foreground}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.05" Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.05" Duration="0:0:0.12"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.12"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.ExitActions>
                             <Setter TargetName="bdr" Property="Background" Value="#15FFFFFF"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
@@ -100,30 +85,6 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.BlurRadius" To="20" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.Opacity" To="1.0" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.BlurRadius" To="10" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.Opacity" To="0.4" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.ExitActions>
                             <Setter TargetName="bdr" Property="Background" Value="#FFED4E"/>
                             <Setter TargetName="bdr" Property="Effect">
                                 <Setter.Value>
@@ -317,30 +278,6 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.BlurRadius" To="14" Duration="0:0:0.15">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.Opacity" To="0.85" Duration="0:0:0.15">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.BlurRadius" To="0" Duration="0:0:0.15">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="Effect.Opacity" To="0" Duration="0:0:0.15">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.ExitActions>
                             <Setter Property="Foreground" Value="#FFD700"/>
                             <Setter Property="BorderBrush" Value="#FFD700"/>
                         </Trigger>
@@ -358,20 +295,74 @@
         </Setter>
     </Style>
 
+    <!-- ============================================================
+         Botao de barra de acoes com ICONE VETORIAL + texto.
+
+         Tag recebe a Geometry do icone (Themes/Icons.xaml), Foreground pinta
+         icone e texto juntos, Background/BorderBrush dao a familia de cor.
+         Nada depende de fonte/emoji instalado no Windows.
+
+         <Button Style="{StaticResource IconTextButtonStyle}"
+                 Tag="{DynamicResource IconSelectAll}" Content="Selecionar Todos"
+                 Foreground="#66BB6A" BorderBrush="#4D4CAF50" Background="#1F4CAF50"/>
+         ============================================================ -->
+    <Style x:Key="IconTextButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
+        <Setter Property="controls:HoverZoom.Scale" Value="1.03"/>
+        <Setter Property="controls:HoverZoom.DurationMs" Value="120"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="bdr" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}" RenderTransformOrigin="0.5,0.5">
+                        <Grid>
+                            <!-- realce do hover: nao troca a cor da familia, so' clareia -->
+                            <Border x:Name="hl" Background="#14FFFFFF" CornerRadius="7" Visibility="Collapsed"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Fill="{TemplateBinding Foreground}"
+                                      Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                <ContentPresenter VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="hl" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bdr" Property="Opacity" Value="0.85"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="bdr" Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="SettingsCardStyle" TargetType="{x:Type Button}">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="Height" Value="75"/>
         <Setter Property="Margin" Value="0,6"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
+        <Setter Property="controls:HoverZoom.Scale" Value="1.01"/>
+        <Setter Property="controls:HoverZoom.DurationMs" Value="200"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
                     <Border x:Name="cardBorder" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5" RenderOptions.BitmapScalingMode="NearestNeighbor">
-                        <Border.RenderTransform>
-                            <ScaleTransform ScaleX="1" ScaleY="1"/>
-                        </Border.RenderTransform>
                         <Grid Margin="16,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
@@ -390,30 +381,6 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.01" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.01" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.2">
-                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.ExitActions>
                             <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource CardHover}"/>
                             <Setter TargetName="cardBorder" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                         </Trigger>

@@ -1,7 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Page x:Class="KitLugia.GUI.Pages.NetworkPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       xmlns:local="clr-namespace:KitLugia.GUI.Pages"
       Title="Rede e Internet"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
@@ -411,41 +412,14 @@
                             <ColumnDefinition Width="15"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Button x:Name="BtnEnableAdapter" Grid.Column="0" Height="55" Cursor="Hand" Click="BtnEnableAdapter_Click">
+                        <Button x:Name="BtnEnableAdapter" Grid.Column="0" Height="55" Cursor="Hand" Click="BtnEnableAdapter_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="cardBorder" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                        <Border.RenderTransform>
-                                            <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                        </Border.RenderTransform>
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
                                             <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource CardHover}"/>
                                             <Setter TargetName="cardBorder" Property="BorderBrush" Value="#6CCB5F"/>
                                         </Trigger>
@@ -460,41 +434,14 @@
                                 <TextBlock Text="Ativar adaptador" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="BtnDisableAdapter" Grid.Column="2" Height="55" Cursor="Hand" Click="BtnDisableAdapter_Click">
+                        <Button x:Name="BtnDisableAdapter" Grid.Column="2" Height="55" Cursor="Hand" Click="BtnDisableAdapter_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="cardBorder" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                        <Border.RenderTransform>
-                                            <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                        </Border.RenderTransform>
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
                                             <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource CardHover}"/>
                                             <Setter TargetName="cardBorder" Property="BorderBrush" Value="#F44336"/>
                                         </Trigger>
@@ -509,41 +456,14 @@
                                 <TextBlock Text="Desativar adaptador" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="BtnRestartAdapter" Grid.Column="4" Height="55" Cursor="Hand" Click="BtnRestartAdapter_Click">
+                        <Button x:Name="BtnRestartAdapter" Grid.Column="4" Height="55" Cursor="Hand" Click="BtnRestartAdapter_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="cardBorder" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                        <Border.RenderTransform>
-                                            <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                        </Border.RenderTransform>
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                        <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
                                             <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource CardHover}"/>
                                             <Setter TargetName="cardBorder" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                         </Trigger>
@@ -728,41 +648,14 @@
                                     <ColumnDefinition Width="10"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Button x:Name="BtnGenerateMac" Grid.Column="0" Height="40" Cursor="Hand" Click="BtnGenerateMac_Click">
+                                <Button x:Name="BtnGenerateMac" Grid.Column="0" Height="40" Cursor="Hand" Click="BtnGenerateMac_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Border x:Name="cardBorder" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                                <Border.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                                </Border.RenderTransform>
                                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Trigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.EnterActions>
-                                                    <Trigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.ExitActions>
                                                     <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource CardHover}"/>
                                                     <Setter TargetName="cardBorder" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                                 </Trigger>
@@ -776,13 +669,10 @@
                                         <TextBlock Text="&#x1F3B2;  Gerar Novo MAC" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
                                     </StackPanel>
                                 </Button>
-                                <Button x:Name="BtnApplyMac" Grid.Column="2" Height="40" Cursor="Hand" IsEnabled="False" Click="BtnApplyMac_Click">
+                                <Button x:Name="BtnApplyMac" Grid.Column="2" Height="40" Cursor="Hand" IsEnabled="False" Click="BtnApplyMac_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Border x:Name="cardBorder" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                                <Border.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                                </Border.RenderTransform>
                                                 <ContentPresenter x:Name="content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -796,30 +686,6 @@
                                                     <Setter TargetName="cardBorder" Property="BorderBrush" Value="#6CCB5F"/>
                                                 </Trigger>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Trigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.EnterActions>
-                                                    <Trigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.ExitActions>
                                                     <Setter TargetName="cardBorder" Property="Background" Value="#2A4A2A"/>
                                                     <Setter TargetName="cardBorder" Property="BorderBrush" Value="#8CEB7F"/>
                                                 </Trigger>
@@ -870,13 +736,10 @@
 
                             <!-- AUTO-DETECT MAC -->
                             <TextBlock x:Name="TxtAutoDetectProgress" Text="" FontSize="11" Foreground="#F48120" FontFamily="Consolas" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                            <Button x:Name="BtnAutoDetectMac" Height="40" Cursor="Hand" Margin="0,8,0,0" Click="BtnAutoDetectMac_Click">
+                            <Button x:Name="BtnAutoDetectMac" Height="40" Cursor="Hand" Margin="0,8,0,0" Click="BtnAutoDetectMac_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="cardBorder" Background="#1A2A3A" BorderBrush="#F48120" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                            <Border.RenderTransform>
-                                                <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                            </Border.RenderTransform>
                                             <ContentPresenter x:Name="content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <ControlTemplate.Triggers>
@@ -886,30 +749,6 @@
                                                 <Setter TargetName="content" Property="Opacity" Value="0.4"/>
                                             </Trigger>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Trigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                            <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </Trigger.EnterActions>
-                                                <Trigger.ExitActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                            <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </Trigger.ExitActions>
                                                 <Setter TargetName="cardBorder" Property="Background" Value="#2A4A4A"/>
                                                 <Setter TargetName="cardBorder" Property="BorderBrush" Value="#FFA040"/>
                                             </Trigger>
@@ -938,41 +777,14 @@
                                     <ColumnDefinition Width="15"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Button x:Name="BtnCleanNetworkSafe" Grid.Column="0" Height="45" Cursor="Hand" Click="BtnCleanNetworkSafe_Click">
+                                <Button x:Name="BtnCleanNetworkSafe" Grid.Column="0" Height="45" Cursor="Hand" Click="BtnCleanNetworkSafe_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Border x:Name="cardBorder" Background="#1A2A1A" BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                                <Border.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                                </Border.RenderTransform>
                                                 <ContentPresenter x:Name="content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Trigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.EnterActions>
-                                                    <Trigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.ExitActions>
                                                     <Setter TargetName="cardBorder" Property="Background" Value="#2A4A2A"/>
                                                     <Setter TargetName="cardBorder" Property="BorderBrush" Value="#66BB6A"/>
                                                 </Trigger>
@@ -987,41 +799,14 @@
                                         <TextBlock Text=" (DNS, Winsock, TCP/IP, ARP, Proxy, SSL)" FontSize="11" Foreground="#A5D6A7" Margin="5,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
-                                <Button x:Name="BtnCleanNetworkFull" Grid.Column="2" Height="45" Cursor="Hand" Click="BtnCleanNetworkFull_Click">
+                                <Button x:Name="BtnCleanNetworkFull" Grid.Column="2" Height="45" Cursor="Hand" Click="BtnCleanNetworkFull_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Border x:Name="cardBorder" Background="#3A1A1A" BorderBrush="#F44336" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
-                                                <Border.RenderTransform>
-                                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                                </Border.RenderTransform>
                                                 <ContentPresenter x:Name="content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Trigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.EnterActions>
-                                                    <Trigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetName="cardBorder" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15">
-                                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.ExitActions>
                                                     <Setter TargetName="cardBorder" Property="Background" Value="#4A1A1A"/>
                                                     <Setter TargetName="cardBorder" Property="BorderBrush" Value="#EF5350"/>
                                                 </Trigger>

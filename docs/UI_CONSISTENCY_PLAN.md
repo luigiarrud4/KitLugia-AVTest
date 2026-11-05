@@ -214,7 +214,16 @@ como Store Remake não é apagada. **Hook**: `.githooks/pre-commit` roda o `--ch
 
 ---
 
-## 6. Checklist
+## 5.1 Hover: o transform congelado (05/11)
+
+Devolver o storyboard de escala ao `CardStyle` não foi suficiente, e a sonda `tests/AnimCheck`
+mostrou por quê: um `ScaleTransform` criado em `Setter` de `Style` (ou no corpo de um
+`ControlTemplate`) chega ao elemento **congelado**, e animar propriedade de Freezable congelado
+não dá erro nem movimento. O hover de escala do kit estava morto em todos esses lugares.
+
+Regra a partir de agora: **escala no hover se faz com `controls:HoverZoom`** (comportamento
+danexado, transform criado por elemento), nunca com `Storyboard` apontando para um transform
+declarado no estilo. Cor por hover continua sendo `Setter` no trigger, que funciona.
 
 ### F0 — Tokens ✅
 - [x] `Surface0`/`Surface1`/`Surface2`, `BorderSubtle`/`BorderStrong`, `WarningBrush` em `Brushes.xaml`
@@ -350,6 +359,7 @@ um relatório, não uma edição:
 | `tests/ui_buttons_migrate.py` | troca um template inline por um do tema, preservando as propriedades locais do botão |
 | `tests/ui_fontsize15.py` | decide cada `FontSize="15"` (16 título / 13 corpo) com relatório antes de gravar |
 | `tests/ui_subtitle.py` | aplica `PageSubtitleStyle`, ignorando rótulo de estado e descrição de item |
+| `tests/AnimCheck` | prova o hover: aplica o estilo real, dispara `MouseEnter`/`MouseLeave` e lê o `ScaleTransform` (um PNG não mostra hover) |
 | `.githooks/pre-commit` | roda o `--check` a cada commit (habilitado com `git config core.hooksPath .githooks`) |
 
 Scripts que reescrevem XAML sempre preservam o BOM do arquivo e o CRLF. O `open(..., "w")`

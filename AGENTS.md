@@ -153,6 +153,50 @@ herda; por isso E2 e' so' promover para `Themes/Spinners.xaml`.
 **QUIRK do Python:** `open(..., "w", newline="\r\n")` sobre texto lido em modo BINARIO duplica o
 `\r` (virou `\r\r\n` em 1.188 linhas da `AppsPage`) - use `newline=""` ou grave com `"wb"`.
 
+**13-ter. ANIMACOES DE VOLTA (pedido: "devolva as animacoes que removeu ... cards do dashboardpage e do
+generalrepairpage") + icones vetoriais na AppsPage:**
+- **O que a padronizacao tinha removido:** comparando com `estavel-pre-ui-padronizacao`, so' o
+  `CardStyle` (`Cards.xaml`, 30 linhas) perdeu animacao; o resto das linhas de storyboard que
+  aparecem no diff sao o spinner (que foi para `Themes/Spinners.xaml`) e indentacao.
+- **ACHADO que o print nunca mostraria:** devolver o storyboard NAO bastava. O
+  `ScaleTransform` que vem de um `Setter` de `Style` (e tambem o que fica no corpo de um
+  `ControlTemplate`) chega ao elemento **CONGELADO** (`IsFrozen = True`); animar propriedade de
+  Freezable congelado nao lanca erro e nao move nada (`HasAnimatedProperties = False`). Ou seja:
+  o hover de escala do kit **nunca rodou** em `SettingsCardStyle` (cards do Dashboard), no estilo
+  global de `Button` (1.05), em `NavStyles` (sidebar), `StutterPage`, `NetworkPage`, `MainWindow`
+  e `UpdateNotification` - era codigo morto desde sempre.
+- **Solucao:** `KitLugia.GUI/Controls/HoverZoom.cs` (anexado): cria (ou descongela) o
+  `ScaleTransform` **por elemento** e anima ScaleX/ScaleY com CubicEase no MouseEnter/MouseLeave.
+  Uso por estilo: `<Setter Property="controls:HoverZoom.Enabled" Value="True"/>` + `Scale` +
+  `DurationMs`; para template inline sem Style, os atributos vao na tag do `Button`.
+- **Onde aplicado (escala/tempo):** `CardStyle` 1.015/180, `SubtleCardStyle` 1.01/200, estilo
+  global de Button 1.05/120, `IconTextButtonStyle` 1.03/120, `SettingsCardStyle` 1.01/200,
+  `NavStyles` 2x 1.02/150, `StutterPage` 1.05/150, `NetworkPage` 8 botoes 1.02/150,
+  `UpdateNotification` 1 botao 1.02, `MainWindow` 7 botoes 1.1/150.
+- **Ficou de fora de proposito:** `Themes/CheckBox.xaml` (8 linhas, pulso do quadradinho): o
+  alvo e' o `Border` interno, entao HoverZoom escalaria o controle inteiro com o rotulo junto -
+  precisa de comportamento proprio. Nao existe mais nenhum outro storyboard de escala no app.
+- **ICONES (pedido: "pacotes de icones padrao ... nao depender do pacote instalado no windows"):**
+  `Themes/Icons.xaml` (novo) com `PathGeometry` 24x24 do Material Design Icons (Apache 2.0) -
+  vetor, sem fonte/emoji. `IconTextButtonStyle` (Buttons.xaml) desenha `Path` (Tag = icone) +
+  texto, com cor por familia. Aplicado na barra de acoes da `AppsPage` (12 botoes, 3 abas):
+  Selecionar Todos verde (check-all), Limpar Selecao cinza (checkbox vazio), Remover Selecionados
+  vermelho (lixeira), Ponto de Restauracao azul, Hunter dourado (mira), Atualizar Lista neutro.
+  `MinWidth` saiu: o botao passou a medir o proprio conteudo (com o icone, os valores antigos
+  cortavam o rotulo - visto na captura).
+- **PROVA (`tests/AnimCheck`, novo):** carrega `Generic.xaml`, aplica o estilo num Border/Button
+  real, dispara `MouseEnter`/`MouseLeave` de verdade, bombeia o Dispatcher em prioridade
+  **Render** e LE a escala: **30/30** (CardStyle 1.0->1.015, SubtleCard 1.010, global 1.050,
+  IconText 1.030, SettingsCard 1.010, volta a 1.0 nos dois sentidos). Tem um controle interno
+  (storyboard de codigo) para separar "tema quebrado" de "ambiente de teste parado".
+  Capturas: `UiShotHarness` **52/52**, 0 falhas, 0 excecoes; AppsPage/NetworkPage/Dashboard
+  conferidas a olho.
+- **QUIRKS dos scripts desta rodada:** `<Style.Triggers>` tambem comeca com `<Style` (usar
+  `^<Style[\s>]` na pilha); `re.sub(^...)` sem `re.M` so' casa no inicio do ARQUIVO (por isso o
+  `xmlns` nao entrou no `<Page>`); tag `<Button>` multilinha exige achar o `>` final antes de
+  injetar atributo; `MouseEventArgs`/`Point` sao ambiguos com WinForms (CS0104) - qualificar
+  `System.Windows.Input`/`System.Windows.Point`.
+
 **13. NOVA ORDEM (substitui a ordem das fases, sec. 7 do plano):** E1 bugs de runtime do harness
 (BloatwarePage anima `Angle` -> InvalidOperationException; DiskConverterPage NRE na carga) ->
 E2 spinner oficial em 1 arquivo -> E3 F2 botoes em 3 lotes (NetworkPage 32, TweaksPage 96,

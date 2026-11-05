@@ -167,13 +167,10 @@
                 <Button x:Name="BtnKitTaskManager" Width="40" Height="32" Click="BtnKitTaskManager_Click"
                         Background="Transparent" BorderThickness="0" Cursor="Hand"
                         ToolTip="Gerenciador de Tarefas do Kit — fecha apps de verdade (Force Stop + drivers)"
-                        AutomationProperties.Name="Gerenciador de Tarefas do Kit">
+                        AutomationProperties.Name="Gerenciador de Tarefas do Kit" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
-                                <Border.RenderTransform>
-                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
                                 <Grid Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <!-- Ícone de gráfico de barras (Task Manager) -->
                             <Path Fill="#808080" Data="M1,14 L1,10 Q1,9 2,9 L4,9 Q5,9 5,10 L5,14 Q5,15 4,15 L2,15 Q1,15 1,14Z M6.5,14 L6.5,6 Q6.5,5 7.5,5 L9.5,5 Q10.5,5 10.5,6 L10.5,14 Q10.5,15 9.5,15 L7.5,15 Q6.5,15 6.5,14Z M12,14 L12,1 Q12,0 13,0 L15,0 Q16,0 16,1 L16,14 Q16,15 15,15 L13,15 Q12,15 12,14Z" x:Name="taskManagerIcon"/>
@@ -181,42 +178,10 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#22FFD700"/>
                                     <Setter TargetName="taskManagerIcon" Property="Fill" Value="#FFD700"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.92" Duration="0:0:0.08"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.92" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#55FFD700"/>
                                     <Setter TargetName="taskManagerIcon" Property="Fill" Value="#FFFFFF"/>
                                 </Trigger>
@@ -236,7 +201,7 @@
                 <Button x:Name="BtnGoodbyeDPI" Width="40" Height="32" Click="BtnGoodbyeDPI_Click" MouseRightButtonDown="BtnGoodbyeDPI_MouseRightButtonDown"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
                         ToolTip="GoodbyeDPI - Contorno de DPI (Cinza=Desligado, Amarelo=Ativo)&#x0a;Bot&#xE3;o direito para configura&#xE7;&#xF5;es"
-                        AutomationProperties.Name="GoodbyeDPI">
+                        AutomationProperties.Name="GoodbyeDPI" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                     <Button.ContextMenu>
                         <ContextMenu x:Name="GoodbyeDPIContextMenu">
                             <MenuItem Header="&#x1F4F6; GoodbyeDPI - Configura&#xE7;&#xF5;es" Foreground="#FFD700" FontWeight="Bold" IsEnabled="False"/>
@@ -272,9 +237,6 @@
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
-                                <Border.RenderTransform>
-                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
                                 <Grid>
                                     <TextBlock x:Name="wifiIcon" Text="&#x1F4F6;" 
                                                Foreground="#808080" FontWeight="Normal"
@@ -283,49 +245,9 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#22FFD700"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.9" Duration="0:0:0.08"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.9" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#55FFD700"/>
                                 </Trigger>
                                 <DataTrigger Binding="{Binding GoodbyeDPIActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
@@ -345,13 +267,10 @@
                 <Button x:Name="BtnBackgroundMonitor" Width="40" Height="32" Click="BtnBackgroundMonitor_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
                         ToolTip="Monitor de Tarefas em Segundo Plano"
-                        AutomationProperties.Name="Monitor de Tarefas em Segundo Plano">
+                        AutomationProperties.Name="Monitor de Tarefas em Segundo Plano" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
-                                <Border.RenderTransform>
-                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
                                 <Grid>
                                     <TextBlock x:Name="monitorIcon" Text="&#x2699;&#xFE0F;" Foreground="#FFD700" FontWeight="Bold"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14">
@@ -363,9 +282,6 @@
                                     <Border x:Name="TaskBadge" Background="#FF4444" CornerRadius="10" MinWidth="20" Height="20"
                                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
                                             Visibility="Collapsed">
-                                        <Border.RenderTransform>
-                                            <ScaleTransform x:Name="TaskBadgeScale" CenterX="10" CenterY="10" ScaleX="1" ScaleY="1"/>
-                                        </Border.RenderTransform>
                                         <TextBlock x:Name="TxtTaskCount" Text="0" Foreground="White" FontSize="11" FontWeight="Bold"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center" Padding="5,0"/>
                                     </Border>
@@ -373,49 +289,9 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#22FFD700"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.9" Duration="0:0:0.08"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.9" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#55FFD700"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -427,13 +303,10 @@
                 <Button x:Name="BtnUpdate" Width="40" Height="32" Click="BtnUpdate_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
                         ToolTip="Verificar Atualiza&#xE7;&#xF5;es"
-                        AutomationProperties.Name="Verificar Atualizações">
+                        AutomationProperties.Name="Verificar Atualizações" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
-                                <Border.RenderTransform>
-                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
                                 <TextBlock x:Name="refreshIcon" Text="&#x21BB;" Foreground="#2196F3" FontWeight="Bold" 
                                            HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18">
                                     <TextBlock.RenderTransform>
@@ -443,50 +316,10 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#222196F3"/>
                                                                         <Setter TargetName="refreshIcon" Property="Foreground" Value="#FFFFFF"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.9" Duration="0:0:0.08"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.9" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#552196F3"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -498,61 +331,18 @@
                 <Button x:Name="BtnConsole" Width="40" Height="32" Click="BtnConsole_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,0,0" Cursor="Hand"
                         ToolTip="Abrir/Fechar Terminal"
-                        AutomationProperties.Name="Terminal">
+                        AutomationProperties.Name="Terminal" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
-                                <Border.RenderTransform>
-                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
                                 <TextBlock Text=">_" Foreground="#00FF00" FontWeight="Bold" FontFamily="Consolas" 
                                            HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#2200FF00"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.9" Duration="0:0:0.08"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.9" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#5500FF00"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -564,13 +354,10 @@
                 <Button x:Name="BtnNotifications" Width="46" Height="32" Click="BtnNotifications_Click"
                         Background="Transparent" BorderThickness="0" Margin="0,0,5,0" Cursor="Hand"
                         ToolTip="Hist&#xF3;rico de Notifica&#xE7;&#xF5;es"
-                        AutomationProperties.Name="Notificações">
+                        AutomationProperties.Name="Notificações" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
-                                <Border.RenderTransform>
-                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
                                 <Grid>
                                     <TextBlock Text="&#x1F514;" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
 
@@ -586,49 +373,9 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1.1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                               To="1" Duration="0:0:0.15"/>
-                                                <DoubleAnimation Storyboard.TargetName="bdr"
-                                                               Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                               To="1" Duration="0:0:0.15"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#22FFFFFF"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Trigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.9" Duration="0:0:0.08"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.9" Duration="0:0:0.08"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.EnterActions>
-                                    <Trigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
-                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </Trigger.ExitActions>
                                     <Setter TargetName="bdr" Property="Background" Value="#55FFFFFF"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -734,42 +481,15 @@
                                 ToolTip="Configura&#xE7;&#xF5;es do Kit Lugia"
                                 AutomationProperties.Name="Configurações"
                                 Click="BtnSettings_Click"
-                                Cursor="Hand">
+                                Cursor="Hand" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8" RenderTransformOrigin="0.5,0.5">
-                                        <Border.RenderTransform>
-                                            <ScaleTransform ScaleX="1" ScaleY="1" CenterX="0.5" CenterY="0.5"/>
-                                        </Border.RenderTransform>
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 16: Hover com scale no bot&#xE3;o configura&#xE7;&#xF5;es (0.15s) - MainWindow.xaml linha ~232-261 -->
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="bdr"
-                                                                       Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                                       To="1.1" Duration="0:0:0.15"/>
-                                                        <DoubleAnimation Storyboard.TargetName="bdr"
-                                                                       Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                                       To="1.1" Duration="0:0:0.15"/>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="bdr"
-                                                                       Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                                       To="1.0" Duration="0:0:0.15"/>
-                                                        <DoubleAnimation Storyboard.TargetName="bdr"
-                                                                       Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                                       To="1.0" Duration="0:0:0.15"/>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
                                             <Setter TargetName="bdr" Property="Background" Value="#15FFFFFF"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
