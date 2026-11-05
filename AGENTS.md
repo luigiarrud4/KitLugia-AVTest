@@ -244,19 +244,29 @@ limite da borda"):**
   (so' a borda de 1 px de cada lado) - prova em `tests/AnimCheck` + `icon_button_hover.png`.
 - **`CleanupPage`:** o icone de informacao (20x20, so' com ToolTip) tinha `Cursor="Hand"` -> `Help`,
   como os outros "i" do kit.
-- **`AnimCheck` 43/43:** cases "CardStyle nao escala / sem Cursor=Hand",
+- **`AnimCheck` 44/44:** cases "CardStyle nao escala / sem Cursor=Hand",
   "InteractiveCardStyle 1.010", "realce cobre a largura e a altura do botao" e o da pagina real do
-  Dashboard (primeiro card 1,050, os outros tres sem zoom).
-- **O PRIMEIRO CARD DO DASHBOARD MANTEM O ZOOM (pedido: "no dashboardpage devolva a animacao
-  original do primeiro botao"):** pesquisado antes de mexer - a `DashboardPage` nunca teve
-  `ScaleTransform`/`Storyboard` proprio (0 ocorrencias na tag `estavel-pre-ui-padronizacao` e no
-  commit anterior a padronizacao): a animacao dela SEMPRE foi o hover do estilo global. Entao
-  "devolver" = tirar o opt-out **so'** do card "Otimizacao Inteligente"; os outros tres continuam
-  com `Enabled="False"`. Provado no `AnimCheck` (case novo que instancia a pagina de verdade):
-  **1,050** no hover do primeiro e `Enabled=False` nos cards 2-4. QUIRK: `Page` nao aceita `Grid`
-  como pai (`InvalidOperationException: Page somente pode ter Window ou Frame como pai`) - o host
-  da sonda e' um `Window` com `Content = page`.
-**Verificacao:** solucao **0 erros**; `AnimCheck` **43/43**; `UiShotHarness` **52/52**, 0 falhas;
+  Dashboard (banner `BtnPcInfo` 1,015; os quatro cards-cartao sem zoom).
+- **O "PRIMEIRO BOTAO" DO DASHBOARD ERA O BANNER, NAO O CARD VERDE (pedido: "no dashboardpage
+  devolva a animacao original do primeiro botao ... o primeiro botao que citei nao era o verde e
+  sim o que mostra as informacoes do sistema"):** o alvo e' o `Border x:Name="BtnPcInfo"`
+  (`Style=CardStyle`, `Cursor=Hand`, `MouseLeftButtonDown=BtnPcInfo_Click`) que mostra nome da
+  maquina + specs e abre o overlay "Informacoes do Sistema". A `DashboardPage` nunca teve
+  `ScaleTransform`/`Storyboard` proprio (0 ocorrencias em `estavel-pre-ui-padronizacao` e no commit
+  anterior): a animacao que ele tinha era a do `CardStyle` antigo - **escala 1,015 em 180 ms** + blur
+  5 -> 12 + borda accent. Ou seja, o zoom "original" deste card e' 1,015 (nao os 1,05 do estilo
+  global de botao). Restaurado com `controls:HoverZoom.Enabled/Scale=1.015/DurationMs=180` NA TAG do
+  Border; os quatro cards-cartao de 90 px (incluindo o verde "Otimizacao Inteligente") voltaram
+  todos a `Enabled="False"`.
+  O blur 5 -> 12 do hover antigo **nunca rodou** (era animacao em cima de `Effect.BlurRadius` vindo
+  de Setter = Freezable congelado, o mesmo motivo do zoom morto); por isso a restauracao usa so' a
+  escala + o realce de cor que o `CardStyle` atual ja' faz (BorderBrush -> accent, Background ->
+  CardHover).
+  Provado no `AnimCheck` (case que instancia a pagina de verdade e le a escala depois do
+  `MouseEnter`): **1,015** no banner, volta a **1,000**, e os 4 cards-cartao com `Enabled=False`.
+  QUIRK: `Page` nao aceita `Grid` como pai (`InvalidOperationException: Page somente pode ter Window
+  ou Frame como pai`) - o host da sonda e' um `Window` com `Content = page`.
+**Verificacao:** solucao **0 erros**; `AnimCheck` **44/44**; `UiShotHarness` **52/52**, 0 falhas;
 `ui_style_audit --check` saida **0**; capturas out14/out15 de TweaksPage, RepairsPage,
 DashboardPage e CleanupPage conferidas.
 

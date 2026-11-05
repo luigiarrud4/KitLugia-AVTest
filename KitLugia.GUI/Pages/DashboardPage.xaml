@@ -104,7 +104,9 @@
                 <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{StaticResource TextPrimary}"/>
 
                 <!-- BANNER INFORMATIVO (INFO PC) -->
-                <Border x:Name="BtnPcInfo" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}" Cursor="Hand" MouseLeftButtonDown="BtnPcInfo_Click">
+                <!-- Banner clicavel: unico card da pagina que anima no hover (escala 1,015 em 180 ms,
+                     como o CardStyle animava antes da padronizacao, mais o realce de cor do tema). -->
+                <Border x:Name="BtnPcInfo" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}" Cursor="Hand" MouseLeftButtonDown="BtnPcInfo_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.015" controls:HoverZoom.DurationMs="180">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -135,9 +137,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- BOT&#xC3;O 1: OTIMIZA&#xC7;&#xC3;O INTELIGENTE (VERDE) -->
-                    <!-- Este e' o unico card-cartao que mantem o zoom do estilo global
-                         de botao (1,05) no hover, alem do brilho verde do template. -->
-                    <Button Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personaliza&#xE7;&#xE3;o da otimiza&#xE7;&#xE3;o inteligente.">
+                    <Button controls:HoverZoom.Enabled="False" Grid.Column="0" Height="90" Click="BtnOpenQuickMenu_Click" Cursor="Hand" ToolTip="Abre o menu de personaliza&#xE7;&#xE3;o da otimiza&#xE7;&#xE3;o inteligente.">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bdr" Background="#104CAF50" BorderBrush="#334CAF50" BorderThickness="1" CornerRadius="10">
