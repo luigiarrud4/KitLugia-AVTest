@@ -1,0 +1,28 @@
+﻿<UserControl x:Class="KitLugia.GUI.Controls.EmptyStateView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Raiz"
+             HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+             IsHitTestVisible="False"
+             Visibility="Collapsed">
+
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                MaxWidth="440" Margin="24">
+        <TextBlock x:Name="TxtIcon"
+                   Text="&#x1F50D;"
+                   FontSize="28"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource TextMuted}"
+                   Margin="0,0,0,10"/>
+        <TextBlock x:Name="TxtTitle"
+                   Style="{StaticResource SectionHeaderStyle}"
+                   Text="Nada por aqui"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"/>
+        <TextBlock x:Name="TxtHint"
+                   Style="{StaticResource TextBodyMutedStyle}"
+                   Text="Ajuste os filtros ou a pesquisa."
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"/>
+    </StackPanel>
+</UserControl>

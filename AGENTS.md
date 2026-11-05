@@ -93,9 +93,26 @@ futura); `15=260` e `20/22/24/26/32` (metricas) ainda fora da escala.
 `DiskConverterPage` lanca `NullReferenceException` no load; `AllTweaksPage` com 0 itens deixa a
 area da lista em branco (o aviso fica so' no subtitulo).
 
-**Pendente do plano:** F2 (templates inline restantes), F4 (componente de estado vazio + overlay
-unico: 8 paginas com spinner inline, `Controls/LoadingOverlay` ja' existe e e' usado em 4),
-15 -> escala e foco visivel (F5), subtitulos por pagina e `PageHeader` (F1).
+**10. F4 (estado vazio) + BUG REAL que a captura entregou:** novo `Controls/EmptyStateView`
+(Icon/Title/Hint + `Update(contagem)`), adotado na `AllTweaksPage`. Ao adotar, a captura mostrou
+"0 tweaks" e area em branco: `AllTweaksPage_Loaded` fazia `await LoadTweaksAsync(); _isLoaded = true;`
+mas `LoadTweaksAsync()` chama `ApplyFilter()`, cujo guard `if (!_isLoaded || ListTweaks == null) return`
+abortava a primeira populacao - a lista so' aparecia depois que o usuario mexia num filtro.
+Agora `_isLoaded = true` vem ANTES do `await`: a captura passou a mostrar os **108 tweaks**.
+
+**11. Encoding dos arquivos novos:** `UiShotHarness`/`EmptyStateView`/`ui_style_audit.py` foram
+normalizados para BOM+CRLF com PowerShell (`ReadAllText` -> normaliza -> `UTF8Encoding($true)`);
+o script Python **preserva** o BOM que o arquivo ja' tinha (so' adiciona se existir) - um script
+anterior adicionava BOM em 30 arquivos que nao tinham e sujou o diff.
+
+**QUIRK (CS0104):** `EmptyStateView : UserControl` deu erro ambiguo com `System.Windows.Forms`
+(o projeto referencia WinForms); a classe foi declarada como `System.Windows.Controls.UserControl`
+e o `using System.Windows.Controls` removido.
+
+**Pendente do plano:** F2 (templates inline restantes: ExmTweaks 126, Tweaks 96, NetworkPage 32,
+MainWindow 28), F4 (overlay unico - 8 paginas com spinner inline, `Controls/LoadingOverlay` existe
+e e' usado em 4 - e adocao do estado vazio em Apps/Drivers/Servicos/Programas), 15 -> escala e
+foco visivel (F5), subtitulos por pagina e `PageHeader` (F1).
 
 ---
 # Sessão — recalcular contagens do filtro na IntegrityPage após alterações

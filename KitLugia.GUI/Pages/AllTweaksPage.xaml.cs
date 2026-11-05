@@ -41,8 +41,11 @@ namespace KitLugia.GUI.Pages
 
         private async void AllTweaksPage_Loaded(object sender, RoutedEventArgs e)
         {
-            await LoadTweaksAsync();
+            // Marca ANTES de carregar: LoadTweaksAsync() chama ApplyFilter(), e o guard
+            // 'if (!_isLoaded) return' deixava a lista vazia na primeira entrada (so'
+            // aparecia conteudo depois de mexer num filtro).
             _isLoaded = true;
+            await LoadTweaksAsync();
         }
 
         private async System.Threading.Tasks.Task LoadTweaksAsync()
@@ -645,6 +648,7 @@ namespace KitLugia.GUI.Pages
 
             var list = filtered.ToList();
             ListTweaks.ItemsSource = list;
+            EmptyTweaks?.Update(list.Count);
             if (TxtCount != null)
                 TxtCount.Text = $"{list.Count} tweaks";
             if (TxtSubtitle != null)

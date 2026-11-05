@@ -122,10 +122,13 @@ hover só por cor, raio 8. A animação de escala ficou isolada em `InteractiveC
 Novo `SurfacePanelStyle` (painel estático com `Surface1`/`BorderSubtle`).
 Efeitos inline dentro das páginas (sombras pontuais) seguem como estão.
 
-### F4 — Textos, badges, estados e ícones 🔴 pendente
+### F4 — Textos, badges, estados e ícones 🟡 parcial
+Novo `Controls/EmptyStateView.xaml` (ícone, título, dica + `Update(contagem)`), adotado na
+`AllTweaksPage`. Durante a adoção apareceu um **bug real**: `_isLoaded` era marcado **depois** de
+`ApplyFilter()`, então a lista só aparecia depois que o usuário mexia num filtro (a captura mostrava
+0 de 108 tweaks; agora mostra os 108 na primeira entrada).
 `Controls/LoadingOverlay.xaml` já existe (4 páginas usam) e 8 páginas ainda têm spinner inline.
-Estados vazios são por página (texto próprio em `AllTweaksPage`, `IntegrityPage`,
-`GlobalSearchPage`, `StoreRemakePage`). Falta o componente único e a adoção.
+Badges e tiles seguem por página.
 
 ### F5 — Contraste e legibilidade 🟡 parcial
 `TextMuted` `#858585` → `#8A8A8A`. **419** `FontSize` normalizados em 42 páginas
@@ -148,7 +151,7 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 - `BloatwarePage`: `InvalidOperationException` — storyboard anima a propriedade `Angle`, que não
   resolve no caminho de propriedade.
 - `DiskConverterPage`: `NullReferenceException` na carga.
-- `AllTweaksPage`: com 0 itens a área da lista fica totalmente vazia (o aviso só aparece no subtítulo).
+- `AllTweaksPage`: **corrigido** — a lista não aparecia na primeira carga (`_isLoaded` marcado depois de `ApplyFilter`); agora lista 108 tweaks e mostra o estado vazio quando o filtro zera.
 - `AppsPage`: barra de ações tinha 4 paletas; agora 1 neutra + 1 destrutiva.
 
 ---
@@ -195,8 +198,10 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 - [x] Raio unificado em 8 nos cards
 - [ ] Sombras inline pontuais dentro das páginas
 
-### F4 — Estados e ícones 🔴
-- [ ] Componente único de estado vazio + adoção (AllTweaks, Apps, Drivers…)
+### F4 — Estados e ícones 🟡
+- [x] `Controls/EmptyStateView` (ícone/título/dica + `Update`) e adoção na `AllTweaksPage`
+- [x] Bug da lista vazia na primeira carga (`_isLoaded` marcado depois do `ApplyFilter`)
+- [ ] Adotar o estado vazio em Apps, Drivers, Serviços, Programas
 - [ ] Overlay de carregamento único (8 páginas com spinner inline → `LoadingOverlay`)
 - [ ] Badges em 2 variantes / `Caption 11`
 - [ ] Tiles de ícone 32/38/44
