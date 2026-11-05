@@ -143,6 +143,84 @@
         </Style.Triggers>
     </Style>
 
+    <!-- ================= BARRA DE PESQUISA (PADRÃO DO KIT) =================
+         Um único lugar define a barra de pesquisa das páginas: lupa + placeholder
+         vindo do Tag + borda neutra do tema (#1A1A1A / #333), igual aos cards e
+         campos das páginas escuras do Kit. SEM animações: o hover e o foco trocam a
+         cor por Setter (instantâneo). Antes cada barra herdava o estilo implícito de
+         TextBox (BasedOn DarkTextBoxStyle), que animava borda e fundo por 0,2 s — era
+         o "pisca" a cada passada de mouse. SearchInputStyle é a mesma barra sem
+         borda/fundo, para quem já tem um Border próprio (ex.: com botão de limpar). -->
+    <Style x:Key="SearchBarBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="#1A1A1A"/>
+        <Setter Property="BorderBrush" Value="#333"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Height" Value="34"/>
+    </Style>
+
+    <Style x:Key="SearchTextBoxBaseStyle" TargetType="{x:Type TextBox}">
+        <Setter Property="Background" Value="#1A1A1A"/>
+        <Setter Property="BorderBrush" Value="#333"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource AccentColor}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TextBox}">
+                    <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#x1F50D;" FontSize="12" Foreground="#7A7A7A" VerticalAlignment="Center"
+                                       Margin="10,0,7,0" IsHitTestVisible="False"/>
+                            <!-- Placeholder na MESMA célula do texto: alinhamento exato do caret
+                                 (não depende de Padding, que aqui é 0 — o recuo vem da coluna da lupa). -->
+                            <Grid Grid.Column="1" Margin="0,0,6,0">
+                                <ScrollViewer x:Name="PART_ContentHost" Focusable="false"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                <TextBlock x:Name="ph" Text="{TemplateBinding Tag}" Foreground="#666"
+                                           FontSize="{TemplateBinding FontSize}" VerticalAlignment="Center"
+                                           IsHitTestVisible="False" TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="ph" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="BorderBrush" Value="#555"/>
+                        </Trigger>
+                        <!-- Último trigger vence: com o mouse em cima e o campo focado a borda é dourada. -->
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Barra de pesquisa completa (desenha a própria borda). -->
+    <Style x:Key="SearchTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource SearchTextBoxBaseStyle}">
+        <Setter Property="MinHeight" Value="34"/>
+    </Style>
+
+    <!-- Mesma barra, sem borda/fundo: para usar dentro de um Border da página. -->
+    <Style x:Key="SearchInputStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource SearchTextBoxBaseStyle}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
     <Style x:Key="ScrollBarThumb" TargetType="{x:Type Thumb}">
         <Setter Property="OverridesDefaultStyle" Value="true"/>
         <Setter Property="IsTabStop" Value="false"/>

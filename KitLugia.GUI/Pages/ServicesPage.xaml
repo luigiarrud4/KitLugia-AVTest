@@ -57,35 +57,9 @@
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                         <TextBlock Text="Aplicativos que iniciam com o Windows" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
 
-                        <Border Background="#15FFFFFF" CornerRadius="6" Height="32" Margin="10,0,0,0" BorderBrush="#404040" BorderThickness="1" Width="240">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="30"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Text="&#x1F50D;" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#888" FontSize="13"/>
-
-                                <TextBlock Text="Pesquisar..." Foreground="#606060" VerticalAlignment="Center"
-                                           IsHitTestVisible="False" FontStyle="Italic" FontSize="13" Grid.Column="1">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Text, ElementName=TxtSearchStartup}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <TextBox x:Name="TxtSearchStartup" Background="Transparent" BorderThickness="0"
-                                         Foreground="White" VerticalAlignment="Center" FontSize="13"
-                                         Padding="0,0,8,0" CaretBrush="{StaticResource AccentColor}"
-                                         TextChanged="TxtSearchStartup_TextChanged" Grid.Column="1"/>
-                            </Grid>
-                        </Border>
+                        <TextBox x:Name="TxtSearchStartup" Width="240" Height="32" MinHeight="0" Margin="10,0,0,0"
+                                 Style="{StaticResource SearchTextBoxStyle}" Tag="Pesquisar..."
+                                 TextChanged="TxtSearchStartup_TextChanged"/>
 
                         <TextBlock x:Name="TxtStartupCount" Text="0 itens" Foreground="#666" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="11"/>
                         <Button Content="Recarregar Lista" Click="BtnRefreshStartup_Click" Margin="20,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="12"/>
@@ -479,23 +453,9 @@
 
                         <!-- Busca e Contador -->
                         <StackPanel Orientation="Horizontal">
-                            <Border Background="#20FFFFFF" CornerRadius="4" Height="30" Width="250" Margin="0,0,15,0">
-                                <Grid>
-                                    <TextBlock Text="&#x1F50D; Filtrar servi&#xE7;os..." Foreground="#888" VerticalAlignment="Center" Margin="10,0" IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtSearchService}" Value="">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <TextBox x:Name="TxtSearchService" Background="Transparent" BorderThickness="0" Foreground="White" VerticalAlignment="Center" Margin="5,0" TextChanged="TxtSearchService_TextChanged"/>
-                                </Grid>
-                            </Border>
+                            <TextBox x:Name="TxtSearchService" Width="250" Height="30" MinHeight="0" Margin="0,0,15,0"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Filtrar serviços..."
+                                     TextChanged="TxtSearchService_TextChanged"/>
 
                             <!-- Contador de Servi&#xE7;os -->
                             <TextBlock x:Name="TxtServiceCount" Text="Carregando..." Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
@@ -826,23 +786,9 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal">
-                            <Border Background="#20FFFFFF" CornerRadius="4" Height="30" Width="240" Margin="0,0,10,0">
-                                <Grid>
-                                    <TextBlock Text="&#x1F50D; Filtrar drivers..." Foreground="#888" VerticalAlignment="Center" Margin="10,0" IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtDriverFilter}" Value="">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <TextBox x:Name="TxtDriverFilter" Background="Transparent" BorderThickness="0" Foreground="White" VerticalAlignment="Center" Margin="5,0" TextChanged="TxtDriverFilter_TextChanged"/>
-                                </Grid>
-                            </Border>
+                            <TextBox x:Name="TxtDriverFilter" Width="240" Height="30" MinHeight="0" Margin="0,0,10,0"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Filtrar drivers..."
+                                     TextChanged="TxtDriverFilter_TextChanged"/>
                             <CheckBox x:Name="ChkDriverThirdOnly" Content="Só terceiros" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,10,0" Click="ChkDriverThirdOnly_Click"/>
                             <CheckBox x:Name="ChkDriverEnabled" Content="Somente ligados" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,10,0" Click="ChkDriverEnabled_Click" IsChecked="True"
                                       ToolTip="Esconde drivers já desligados (Start=4)"/>

@@ -548,24 +548,11 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
                             <TextBlock Text="Gerenciador de Tarefas" FontSize="14" FontWeight="SemiBold" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,14,0"/>
-                            <Border x:Name="SearchBorder" Background="#1F2A3A" BorderBrush="#2C3A4E" BorderThickness="1" CornerRadius="6" Height="28" MinWidth="300" Padding="8,0"
+                            <Border x:Name="SearchBorder" Background="#1F2A3A" BorderBrush="#2C3A4E" BorderThickness="1" CornerRadius="6" Height="28" MinWidth="300" Padding="0"
                                     MouseLeftButtonDown="SearchBar_MouseDown" MouseLeftButtonUp="SearchBar_MouseUp" Cursor="IBeam">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="&#x1F50D;" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#888"/>
-                                    <TextBox x:Name="TxtSearch" Grid.Column="1" Background="Transparent" Foreground="White" BorderThickness="0" VerticalAlignment="Center" FontSize="12" CaretBrush="White" TextChanged="TxtSearch_TextChanged"
-                                             ToolTip="Busca por nome, PID ou caminho. Filtros por uso (podem combinar, separados por espaço): cpu:&gt;10  cpu:&lt;5  ram:&gt;500  threads:&gt;50  handles:&gt;1000  disco:&gt;1  rede:&gt;1  gpu:&gt;5  pico:&gt;1000  tempocpu:&gt;60  usuario:lugia  status:executando"/>
-                                    <TextBlock Grid.Column="1" Text="Buscar processo, PID ou caminho..." Foreground="#555" FontSize="11" VerticalAlignment="Center" IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers>
-                                                <DataTrigger Binding="{Binding Text, ElementName=TxtSearch}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger>
-                                            </Style.Triggers></Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </Grid>
+                                <TextBox x:Name="TxtSearch" Style="{StaticResource SearchInputStyle}" MinHeight="0" FontSize="12"
+                                         Tag="Buscar processo, PID ou caminho..." TextChanged="TxtSearch_TextChanged"
+                                         ToolTip="Busca por nome, PID ou caminho. Filtros por uso (podem combinar, separados por espaço): cpu:&gt;10  cpu:&lt;5  ram:&gt;500  threads:&gt;50  handles:&gt;1000  disco:&gt;1  rede:&gt;1  gpu:&gt;5  pico:&gt;1000  tempocpu:&gt;60  usuario:lugia  status:executando"/>
                             </Border>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0" MouseLeftButtonDown="WindowControls_MouseDown">
@@ -1317,7 +1304,10 @@
                         </StackPanel>
                     </Grid>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="14,0,14,6">
-                        <TextBox x:Name="TxtConnFilter" Width="280" Height="26" Background="#1F2A3A" Foreground="White" BorderBrush="#2C3A4E" BorderThickness="1" Padding="8,0" FontSize="11" VerticalContentAlignment="Center" TextChanged="TxtConnFilter_TextChanged" ToolTip="Filtrar por processo, PID, endereço ou porta"/>
+                        <TextBox x:Name="TxtConnFilter" Width="280" Height="26" MinHeight="0" FontSize="11"
+                                 Style="{StaticResource SearchTextBoxStyle}" Tag="Filtrar por processo, PID, endereço ou porta..."
+                                 Background="#1F2A3A" BorderBrush="#2C3A4E"
+                                 TextChanged="TxtConnFilter_TextChanged" ToolTip="Filtrar por processo, PID, endereço ou porta"/>
                         <CheckBox x:Name="ChkConnOnlyEstablished" Content="Apenas conexões ativas" Foreground="#CCC" FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0" Checked="ChkConnFilter_Changed" Unchecked="ChkConnFilter_Changed"/>
                         <CheckBox x:Name="ChkConnGroupProc" Content="Agrupar por processo" Foreground="#CCC" FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0" Checked="ChkConnFilter_Changed" Unchecked="ChkConnFilter_Changed"/>
                     </StackPanel>
@@ -2576,7 +2566,10 @@
                             <Button x:Name="BtnStartupWeb" Content="🔍 Web" Style="{StaticResource TmToolButton}" Click="BtnStartupSearchWeb_Click" ToolTip="Pesquisar no Google"/>
                             <Button x:Name="BtnStartupReload" Content="↻ Recarregar" Style="{StaticResource TmToolButton}" Click="BtnStartupReload_Click" ToolTip="Reler os itens de inicialização"/>
                             <Button x:Name="BtnStartupOrphans" Content="🗑️ Órfãs" Style="{StaticResource TmToolButton}" Click="BtnStartupRemoveOrphans_Click" ToolTip="Desabilitar entradas órfãs (o arquivo não existe mais)"/>
-                            <TextBox x:Name="TxtStartupSearch" Width="170" Height="26" Margin="6,0,0,0" Background="#1F2A3A" Foreground="White" BorderBrush="#2C3A4E" BorderThickness="1" Padding="6,0" FontSize="11" VerticalContentAlignment="Center" TextChanged="TxtStartupSearch_TextChanged" ToolTip="Buscar por nome ou caminho..."/>
+                            <TextBox x:Name="TxtStartupSearch" Width="170" Height="26" MinHeight="0" Margin="6,0,0,0" FontSize="11"
+                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar por nome ou caminho..."
+                                     Background="#1F2A3A" BorderBrush="#2C3A4E"
+                                     TextChanged="TxtStartupSearch_TextChanged" ToolTip="Buscar por nome ou caminho..."/>
                             <ComboBox x:Name="CmbStartupFilter" Height="26" Background="#1F2A3A" Foreground="White" BorderBrush="#2C3A4E" BorderThickness="1" FontSize="11" SelectionChanged="CmbStartupFilter_Changed" Margin="4,0,0,0">
                                 <ComboBoxItem Content="Todos" IsSelected="True"/>
                                 <ComboBoxItem Content="Habilitados"/>

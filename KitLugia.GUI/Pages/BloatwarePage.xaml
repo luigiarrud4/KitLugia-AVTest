@@ -21,8 +21,9 @@
             <TextBlock Text="Deep Uninstall ativado: Remove app, arquivos residuais e registro." Foreground="#FF6F61" FontSize="11" Margin="0,5,0,0"/>
             
             <!-- Barra de Pesquisa -->
-            <TextBox x:Name="TxtSearch" TextChanged="TxtSearch_TextChanged" 
-                     Style="{StaticResource FocusStyle}"
+            <TextBox x:Name="TxtSearch" TextChanged="TxtSearch_TextChanged"
+                     Style="{StaticResource SearchTextBoxStyle}"
+                     Tag="Buscar bloatware por nome ou pacote..."
                      Margin="0,15,0,0"/>
         </StackPanel>
 

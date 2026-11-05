@@ -127,15 +127,8 @@
                     <!-- Caixa de Pesquisa -->
                     <TextBox Grid.Column="0"
                              x:Name="TxtSearch"
-                             Text="&#x1F50D; Pesquisar configura&#xE7;&#xF5;es..."
-                             Foreground="{StaticResource TextMuted}"
-                             Background="{StaticResource CardBackground}"
-                             BorderBrush="{StaticResource CardBorder}"
-                             BorderThickness="1"
-                             Padding="12,8"
-                             FontSize="13"
-                             GotFocus="TxtSearch_GotFocus"
-                             LostFocus="TxtSearch_LostFocus"
+                             Style="{StaticResource SearchTextBoxStyle}"
+                             Tag="Pesquisar configurações..."
                              TextChanged="TxtSearch_TextChanged"
                              Margin="0,0,10,0"/>
 

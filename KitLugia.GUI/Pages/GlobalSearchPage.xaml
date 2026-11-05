@@ -5,24 +5,107 @@
       Title="Resultados da Busca"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
+    <Page.Resources>
+        <!-- Chip de filtro por tipo (RadioButton do mesmo GroupName = seleção única).
+             Seleção só por cor, sem animação. -->
+        <Style x:Key="SearchChipStyle" TargetType="{x:Type RadioButton}">
+            <Setter Property="Foreground" Value="#B0B0B0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RadioButton}">
+                        <Border x:Name="bd" Background="#10FFFFFF" BorderBrush="#333" BorderThickness="1"
+                                CornerRadius="12" Padding="12,5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#555"/>
+                            </Trigger>
+                            <!-- Por último: com o chip marcado o dourado vence o hover -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#22FFD700"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Card de resultado: hover só troca cor. Nada de ScaleTransform/DropShadow
+             do CardStyle padrão — em lista de centenas de itens o efeito por item pesa. -->
+        <Style x:Key="SearchResultCardStyle" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="#10FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#2E2E2E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                    <Setter Property="Background" Value="#1AFFFFFF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Page.Resources>
+
     <Grid Margin="30">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- Cabeçalho -->
+            <RowDefinition Height="Auto"/>
+            <!-- Busca da página -->
+            <RowDefinition Height="Auto"/>
+            <!-- Filtros por tipo -->
             <RowDefinition Height="*"/>
+            <!-- Resultados -->
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="Resultados da Pesquisa" FontSize="28" FontWeight="SemiBold" Foreground="White"/>
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Encontrados: " Foreground="#888" Margin="0,5,5,0"/>
-                <TextBlock x:Name="TxtResultCount" Text="0 itens" Foreground="{StaticResource AccentColor}" FontWeight="Bold" Margin="0,5,0,0"/>
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <TextBlock Text="Encontrados: " Foreground="#888"/>
+                <TextBlock x:Name="TxtResultCount" Text="0 itens" Foreground="{StaticResource AccentColor}" FontWeight="Bold"/>
+                <TextBlock Text="  para  " Foreground="#666"/>
+                <TextBlock x:Name="TxtSearchTerm" Text="digite um termo" Foreground="#BBB" FontStyle="Italic"/>
             </StackPanel>
         </StackPanel>
 
-        <!-- Lista VIRTUALIZADA (Recycling): suporta os 60 resultados sem
+        <!-- Busca da própria página: mesma barra padrão do Kit (lupa + placeholder no Tag,
+             sem animação). Digitar aqui filtra na hora; a barra lateral continua funcionando. -->
+        <TextBox x:Name="TxtPageSearch" Grid.Row="1" Height="38" MinHeight="0" Margin="0,0,0,12"
+                 Style="{StaticResource SearchTextBoxStyle}"
+                 Tag="Pesquisar páginas, tweaks, ações e serviços..."
+                 TextChanged="TxtPageSearch_TextChanged"
+                 KeyDown="TxtPageSearch_KeyDown"/>
+
+        <!-- Filtro por tipo, com contagem por categoria -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+            <RadioButton x:Name="ChipAll" Content="Tudo" Tag="all" GroupName="SearchType" IsChecked="True"
+                         Style="{StaticResource SearchChipStyle}" Checked="ChipFilter_Checked"/>
+            <RadioButton x:Name="ChipPages" Content="Páginas" Tag="nav" GroupName="SearchType"
+                         Style="{StaticResource SearchChipStyle}" Checked="ChipFilter_Checked"/>
+            <RadioButton x:Name="ChipTweaks" Content="Tweaks" Tag="tweak" GroupName="SearchType"
+                         Style="{StaticResource SearchChipStyle}" Checked="ChipFilter_Checked"/>
+            <RadioButton x:Name="ChipActions" Content="Ações" Tag="action" GroupName="SearchType"
+                         Style="{StaticResource SearchChipStyle}" Checked="ChipFilter_Checked"/>
+            <RadioButton x:Name="ChipServices" Content="Serviços" Tag="service" GroupName="SearchType"
+                         Style="{StaticResource SearchChipStyle}" Checked="ChipFilter_Checked"/>
+        </StackPanel>
+
+        <!-- Lista VIRTUALIZADA (Recycling): suporta centenas de resultados sem
              materializar tudo — o ItemsControl+WrapPanel antigo congelava. -->
-        <ListBox x:Name="ListResults" Grid.Row="1"
+        <ListBox x:Name="ListResults" Grid.Row="3"
                  Background="Transparent" BorderThickness="0"
+                 MouseDoubleClick="ListResults_MouseDoubleClick"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  VirtualizingStackPanel.IsVirtualizing="True"
                  VirtualizingStackPanel.VirtualizationMode="Recycling"
                  VirtualizingStackPanel.CacheLength="2,4"
@@ -49,28 +132,29 @@
 
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Border Style="{StaticResource CardStyle}" Padding="12,10">
+                    <Border Style="{StaticResource SearchResultCardStyle}"
+                            MouseLeftButtonUp="ResultCard_MouseLeftButtonUp">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="40"/>
+                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <Border Background="#15FFD700" CornerRadius="8" Width="36" Height="36"
-                                    VerticalAlignment="Top" HorizontalAlignment="Left">
+                            <Border Background="#15FFD700" CornerRadius="8" Width="38" Height="38" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Icon}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe UI Emoji"/>
                             </Border>
 
-                            <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="8,0,5,0">
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,10,0">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="Bold" FontSize="13" TextTrimming="CharacterEllipsis" MaxWidth="380"/>
+                                    <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" MaxWidth="420"/>
                                     <Border Background="#22FFD700" CornerRadius="4" Padding="6,1" Margin="8,1,0,0" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding TypeLabel}" Foreground="{StaticResource AccentColor}" FontSize="9" FontWeight="Bold"/>
                                     </Border>
                                 </StackPanel>
-                                <TextBlock Text="{Binding Description}" Foreground="#999" FontSize="10"
-                                           TextWrapping="Wrap" MaxHeight="28" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                                <TextBlock Text="{Binding Description}" Foreground="#8A8A8A" FontSize="11"
+                                           TextWrapping="Wrap" MaxHeight="30" TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding Description}" Margin="0,3,0,0"/>
                             </StackPanel>
 
                             <Grid Grid.Column="2" VerticalAlignment="Center">
@@ -107,10 +191,10 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <StackPanel x:Name="PanelNoResults" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+        <StackPanel x:Name="PanelNoResults" Grid.Row="3" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
             <TextBlock Text="🔍" FontSize="50" HorizontalAlignment="Center" Opacity="0.3" Foreground="White"/>
-            <TextBlock Text="Nenhum resultado." Foreground="#AAA" FontSize="16" Margin="0,15,0,0" HorizontalAlignment="Center"/>
-            <TextBlock Text="Tente termos como: desempenho, rede, drivers, reparos..." Foreground="#666" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="TxtNoResultsTitle" Text="Nenhum resultado." Foreground="#AAA" FontSize="16" Margin="0,15,0,0" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="TxtNoResultsHint" Text="Tente termos como: desempenho, rede, drivers, reparos..." Foreground="#666" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
         </StackPanel>
     </Grid>
 </Page>

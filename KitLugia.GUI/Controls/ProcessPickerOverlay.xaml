@@ -54,9 +54,8 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBox x:Name="TxtSearch"
-                                 Background="#252525" Foreground="White"
-                                 BorderBrush="#444" BorderThickness="1"
-                                 Padding="10,7" FontSize="12"
+                                 Style="{StaticResource SearchTextBoxStyle}"
+                                 Tag="Buscar processo ou caminho..."
                                  TextChanged="TxtSearch_TextChanged"/>
 
                         <Button Grid.Column="1" Content="&#x1F504;" Height="34" Margin="6,0,0,0"

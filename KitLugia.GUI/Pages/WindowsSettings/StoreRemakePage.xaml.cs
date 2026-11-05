@@ -580,9 +580,10 @@ namespace KitLugia.GUI.Pages.WindowsSettings
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (TxtSearchPlaceholder == null || BtnClearSearch == null) return;
+            // O placeholder agora vem do Tag (SearchInputStyle); só o botão de limpar
+            // precisa aparecer/sumir.
+            if (BtnClearSearch == null) return;
             var hasText = !string.IsNullOrEmpty(TxtSearch.Text);
-            TxtSearchPlaceholder.Visibility = hasText ? Visibility.Collapsed : Visibility.Visible;
             BtnClearSearch.Visibility = hasText ? Visibility.Visible : Visibility.Collapsed;
         }
 
