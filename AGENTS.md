@@ -234,7 +234,7 @@ limite da borda"):**
   + BorderBrush) e quem realmente clica usa `InteractiveCardStyle` (Cursor=Hand + 1,01/200).
 - **CARDS-CARTAO herdavam o zoom de BOTAO (1,05):** 8 botoes com template inline e tamanho de card
   (`RepairsPage` 460x100, `CleanupPage` 3x Height=130, `DashboardPage` 4x Height=90) recebiam a
-  escala global de botao - 1,05 num card de 460 px = 23 px de sangria. Agora levam
+  escala global de botao - 1,05 num card de 460 px = 23 px de sangria. Agora 7 deles levam
   `controls:HoverZoom.Enabled="False"`: o hover deles e' o brilho do proprio template
   (`DropShadowEffect` no trigger), que e' exatamente o que existia nas branches antigas (medido em
   `estavel-pre-ui-padronizacao`: `RepairsPage` e `CleanupPage` tinham **ZERO** `ScaleTransform`).
@@ -244,9 +244,19 @@ limite da borda"):**
   (so' a borda de 1 px de cada lado) - prova em `tests/AnimCheck` + `icon_button_hover.png`.
 - **`CleanupPage`:** o icone de informacao (20x20, so' com ToolTip) tinha `Cursor="Hand"` -> `Help`,
   como os outros "i" do kit.
-- **`AnimCheck` 36/36:** cases novos "CardStyle nao escala / sem Cursor=Hand",
-  "InteractiveCardStyle 1.010" e "realce cobre a largura e a altura do botao".
-**Verificacao:** solucao **0 erros**; `AnimCheck` **36/36**; `UiShotHarness` **52/52**, 0 falhas;
+- **`AnimCheck` 43/43:** cases "CardStyle nao escala / sem Cursor=Hand",
+  "InteractiveCardStyle 1.010", "realce cobre a largura e a altura do botao" e o da pagina real do
+  Dashboard (primeiro card 1,050, os outros tres sem zoom).
+- **O PRIMEIRO CARD DO DASHBOARD MANTEM O ZOOM (pedido: "no dashboardpage devolva a animacao
+  original do primeiro botao"):** pesquisado antes de mexer - a `DashboardPage` nunca teve
+  `ScaleTransform`/`Storyboard` proprio (0 ocorrencias na tag `estavel-pre-ui-padronizacao` e no
+  commit anterior a padronizacao): a animacao dela SEMPRE foi o hover do estilo global. Entao
+  "devolver" = tirar o opt-out **so'** do card "Otimizacao Inteligente"; os outros tres continuam
+  com `Enabled="False"`. Provado no `AnimCheck` (case novo que instancia a pagina de verdade):
+  **1,050** no hover do primeiro e `Enabled=False` nos cards 2-4. QUIRK: `Page` nao aceita `Grid`
+  como pai (`InvalidOperationException: Page somente pode ter Window ou Frame como pai`) - o host
+  da sonda e' um `Window` com `Content = page`.
+**Verificacao:** solucao **0 erros**; `AnimCheck` **43/43**; `UiShotHarness` **52/52**, 0 falhas;
 `ui_style_audit --check` saida **0**; capturas out14/out15 de TweaksPage, RepairsPage,
 DashboardPage e CleanupPage conferidas.
 
