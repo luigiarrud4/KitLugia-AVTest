@@ -265,7 +265,7 @@
                                     <TextBlock Grid.Column="4" Text="{Binding AudioIcon}"
                                                Foreground="#88CCFF" FontSize="12" HorizontalAlignment="Center"/>
                                     <TextBlock Grid.Column="5" Text="{Binding TopProcessName}"
-                                               Foreground="#666" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                                               Foreground="#666" FontSize="11" TextTrimming="CharacterEllipsis"/>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

@@ -123,6 +123,36 @@ excecao aceita** (nao e' divida): `MainWindow.LoadingOverlay` (card 300x120 com 
 `Win11MiniSpinnerTemplate` moram DENTRO de `AppsPage.xaml` (linhas 48 e 81) - nenhuma outra pagina
 herda; por isso E2 e' so' promover para `Themes/Spinners.xaml`.
 
+**13-bis. LISTA E1-E7 EXECUTADA (pedido: "continuar e completar a lista toda"):**
+- **E1:** `BloatwarePage` estourava `InvalidOperationException` porque 3 storyboards animavam
+  `Storyboard.TargetProperty="Angle"` (propriedade de `RotateTransform` sem caminho). O spinner
+  dos 3 arcos foi substituido pelo template do tema (o bug sumiu com o markup); `DiagnosticPage`
+  era o NRE de verdade: `Cleanup()` fazia `_activityLog = null!` e `Unloaded` chamava
+  `LogActivity()` depois - a lista agora so' e' limpa, nao anulada. (O NRE antes atribuido ao
+  `DiskConverterPage` era este; o harness agora imprime as 3 primeiras linhas do stack.)
+- **E2:** `Themes/Spinners.xaml` (novo) com `Win11SpinnerTemplate` 44 px + `Win11MiniSpinnerTemplate`
+  24 px, mesclado depois de `Cards.xaml`; a `AppsPage` perdeu as 65 linhas de template e
+  `ProgramsPage`/`BloatwarePage` passaram a usar o mesmo desenho.
+- **E3:** `tests/ui_button_audit.py` mostrou **175 templates inline em 14 arquivos e so' 46 grupos**;
+  **120 eram o MESMO icone-botao**. Novo `IconButtonTemplate` em `Buttons.xaml` (hover usa
+  `#15FFFFFF` do estilo global; o trigger antigo setava Opacity=1 num botao que ja' era 1) e
+  `tests/ui_buttons_migrate.py` trocou **127** ocorrencias. Restam 48 templates unicos.
+- **E4:** `EmptyStateView` em `ProgramsPage`, `AppsPage` (aba Programas), `DriversPage` (2 listas)
+  e `ServicesPage`, com `Update(contagem)` e dica que muda quando ha busca.
+- **E5:** `15` -> 258 titulos em 16 e 2 em 13 (`tests/ui_fontsize15.py`); depois 56 (`9`/`10`/`10.5`/
+  `11.5`/`12.5`) e 39 (`14`->13, `17`->16, `8`->11). Fora da escala so' metricas 20..60.
+  `KitFocusVisual` (borda dourada) em Button/TextBox/CheckBox/ComboBox - via **DynamicResource**,
+  porque `StaticResource` entre dicionarios mesclados cai em `UnsetValue` (o quirk da F0).
+- **E6:** `tests/ui_subtitle.py` converteu 7 subtitulos; ignora rotulo de estado ("Pronto.",
+  "Carregando...") e descricao do primeiro item de lista (distancia > 1200 chars do titulo).
+- **E7:** `tests/ui_style_allowlist.txt` (51 arquivos, 2.116 hex) + `--baseline`; o check so'
+  reprova quem PASSA do teto. `.githooks/pre-commit` roda o check (`core.hooksPath` configurado).
+**Verificacao final:** build **0 erros**; harness **52/52** paginas, **0 falhas e 0 excecoes**
+(antes eram 2); `ui_style_audit --check` sai **0**.
+
+**QUIRK do Python:** `open(..., "w", newline="\r\n")` sobre texto lido em modo BINARIO duplica o
+`\r` (virou `\r\r\n` em 1.188 linhas da `AppsPage`) - use `newline=""` ou grave com `"wb"`.
+
 **13. NOVA ORDEM (substitui a ordem das fases, sec. 7 do plano):** E1 bugs de runtime do harness
 (BloatwarePage anima `Angle` -> InvalidOperationException; DiskConverterPage NRE na carga) ->
 E2 spinner oficial em 1 arquivo -> E3 F2 botoes em 3 lotes (NetworkPage 32, TweaksPage 96,

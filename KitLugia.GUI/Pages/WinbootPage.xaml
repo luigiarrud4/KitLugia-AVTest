@@ -198,7 +198,7 @@
                                         <Button x:Name="BtnQuickEdit" Content="📝 XAML PURO" Height="32" Margin="0,0,5,0" Click="BtnQuickEdit_Click" Style="{StaticResource GoldButtonStyle}" ToolTip="Mostra o XAML puro do autounattend.xml"/>
                                         <Button Grid.Column="1" Content="⚙️ AVANÇADO" Height="32" Margin="5,0,0,0" Click="BtnQuickAdvanced_Click" Style="{StaticResource SecondaryButtonStyle}" ToolTip="Abre as opções completas (INICIAR CRIAÇÃO)"/>
                                     </Grid>
-                                    <TextBlock x:Name="TxtQuickHint" Text="Dica: padrão pt-BR. Alterações aqui já valem no INICIAR CRIAÇÃO." FontSize="8" Foreground="#FFD700" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="TxtQuickHint" Text="Dica: padrão pt-BR. Alterações aqui já valem no INICIAR CRIAÇÃO." FontSize="11" Foreground="#FFD700" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -290,7 +290,7 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button x:Name="BtnRemove" Content="🗑️ REMOVER BOOT" Background="#442222" Foreground="#FF8888" Margin="0,0,15,0" Width="130" Click="BtnRemove_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                     <Button x:Name="BtnUpdate" Content="🔄 ATUALIZAR" Width="130" Margin="0,0,15,0" Click="BtnUpdate_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                    <Button x:Name="BtnCreate" Content="🚀 INICIAR CRIAÇÃO" Width="180" FontSize="14" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
+                    <Button x:Name="BtnCreate" Content="🚀 INICIAR CRIAÇÃO" Width="180" FontSize="13" Click="BtnCreate_Click" Style="{StaticResource GoldButtonStyle}"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -509,7 +509,7 @@
 
                     <!-- Footer Buttons (Always at bottom, outside ScrollViewer) -->
                     <StackPanel Grid.Row="2" x:Name="PanelOpFooter" Orientation="Horizontal" HorizontalAlignment="Center" Visibility="Collapsed" Margin="0,5,0,0">
-                        <Button Content="✅ FECHAR" Click="BtnCloseOverlay_Click" Style="{StaticResource GoldButtonStyle}" Width="180" Height="42" FontWeight="Bold" FontSize="14"/>
+                        <Button Content="✅ FECHAR" Click="BtnCloseOverlay_Click" Style="{StaticResource GoldButtonStyle}" Width="180" Height="42" FontWeight="Bold" FontSize="13"/>
                     </StackPanel>
 
                     <!-- Live Aesthetic Log (Corner Pinned) -->

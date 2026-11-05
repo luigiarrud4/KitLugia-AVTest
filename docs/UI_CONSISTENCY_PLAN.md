@@ -132,12 +132,19 @@ sem verificação visual confiável na época), os títulos foram migrados **par
 `PageTitleStyle`** por script (`tests/ui_style_audit.py --apply`), com o resto do layout intacto.
 30 títulos em 30 arquivos. O `UserControl` fica para quando um cabeçalho novo for criado do zero.
 
-### F2 — Botões e controles 🟡 parcial
+### F2 — Botões e controles ✅
 Barras de ação da `AppsPage` (13 botões) migradas para `SecondaryButtonStyle`/`DeleteButtonStyle`
 com altura 32 — antes eram 4 paletas (azul, cinza, vermelho, verde) e alturas 35.
-Os ~400 templates inline (`ExmTweaksPage` 126, `TweaksPage` 96, `NetworkPage` 32,
-`MainWindow` 28, `GameBoostPage` 18) continuam: cada um é um `ControlTemplate` próprio,
-a troca é página a página com revisão de captura.
+
+O número real de templates inline não era ~400: a medição com `tests/ui_button_audit.py`
+achou **175 templates em 14 arquivos, mas só 46 grupos distintos** — e **120 deles eram
+o MESMO ícone-botão** (info/engrenagem/lixeira) copiado em `ExmTweaksPage` (63),
+`TweaksPage` (47), `GameBoostPage` (8) e `IntegrityPage` (2), mais 7 no `NetworkPage`.
+Esse grupo virou `IconButtonTemplate` em `Themes/Buttons.xaml` e **127 ocorrências**
+passaram a referenciá-lo por `Template="{StaticResource IconButtonTemplate}"`
+(`tests/ui_buttons_migrate.py`). Restam **48 templates em 11 arquivos**, todos cards
+clicáveis com paleta própria (NetworkPage 9, MainWindow 14, AdvancedRamClean 5…) —
+são casos únicos, não cópias; trocá-los seria reescrever desenho, não remover duplicata.
 
 ### F3 — Superfícies e listas ✅
 `CardStyle`/`SubtleCardStyle`/`CompactCardStyle` sem `DropShadowEffect` e sem storyboard —
@@ -145,23 +152,31 @@ hover só por cor, raio 8. A animação de escala ficou isolada em `InteractiveC
 Novo `SurfacePanelStyle` (painel estático com `Surface1`/`BorderSubtle`).
 Efeitos inline dentro das páginas (sombras pontuais) seguem como estão.
 
-### F4 — Estados e carregamento 🟡 parcial
+### F4 — Estados e carregamento ✅
 Novo `Controls/EmptyStateView.xaml` (ícone, título, dica + `Update(contagem)`), adotado na
 `AllTweaksPage`. Durante a adoção apareceu um **bug real**: `_isLoaded` era marcado **depois** de
 `ApplyFilter()`, então a lista só aparecia depois que o usuário mexia num filtro (a captura mostrava
 0 de 108 tweaks; agora mostra os 108 na primeira entrada).
 
 **Carregamento (revisado em 05/11):** não há mais busca — as duas variantes oficiais estão
-no contrato acima (overlay estilo AppsPage + toast cinza). O trabalho que sobra é **mecânico**:
-promover o spinner da `AppsPage` para `Themes/Spinners.xaml` e apontar para lá as páginas que já
-têm o mesmo desejo de overlay. Os carregamentos próprios de MainWindow, Integrity, Drivers,
-Services, Store Remake e Task Manager **ficam como estão**.
-Badges e tiles seguem por página.
+no contrato acima (overlay estilo AppsPage + toast cinza). O spinner saiu da `AppsPage` para
+`Themes/Spinners.xaml` (`Win11SpinnerTemplate` 44 px e `Win11MiniSpinnerTemplate` 24 px) e a
+`AppsPage` (3 painéis), `ProgramsPage` e `BloatwarePage` já usam a definição única. Os
+carregamentos próprios de MainWindow, Integrity, Drivers, Services, Store Remake e Task Manager
+**ficam como estão** (exceção aceita).
 
-### F5 — Contraste e legibilidade 🟡 parcial
-`TextMuted` `#858585` → `#8A8A8A`. **419** `FontSize` normalizados em 42 páginas
-(`9`/`10` → 11, `14` → 13). Restam **260** usos de `15` (sub-cabeçalhos, decisão manual
-por página: 16 seção ou 13 corpo) e o foco visível global.
+**Estados vazios:** `EmptyStateView` adotado em `ProgramsPage` (busca), `AppsPage` (aba
+Programas), `DriversPage` (drivers e drivers de inicialização) e `ServicesPage` (serviços),
+sempre com a contagem real do filtro e uma dica que muda conforme há busca ou não.
+
+### F5 — Contraste e legibilidade ✅
+`TextMuted` `#858585` → `#8A8A8A`. Normalização completa: **419** (`9`/`10` → 11,
+`14` → 13) + **260** de `15` (`tests/ui_fontsize15.py`: 258 títulos → 16, 2 corpo → 13)
++ 56 (`9`/`10`/`10.5`/`11.5`/`12.5` → 11/12) + 39 (`14`→13, `17`→16, `8`→11).
+Fora da escala sobram **apenas métricas de painel** (20 a 60), permitidas pelo contrato.
+Foco visível: `KitFocusVisual` (borda dourada, `DynamicResource` — `StaticResource` entre
+dicionários mesclados cairia em `UnsetValue`, o mesmo quirk da F0) aplicado aos estilos
+implícitos de `Button`, `TextBox`, `CheckBox` e `ComboBox`.
 
 ### F6 — Verificação por imagem ✅
 `tests/UiShotHarness` (novo): renderiza **52 páginas** fora da tela, uma PNG por página em
@@ -170,7 +185,12 @@ por página: 16 seção ou 13 corpo) e o foco visível global.
 
 ### F7 — Antirregressão ✅
 `tests/ui_style_audit.py`: `--check` relata título/subtítulo fora do estilo, `FontSize` fora
-da escala e hex hardcoded, e **sai com código 2** quando há violação; `--apply` normaliza títulos.
+da escala e hex hardcoded, e **sai com código 2** quando há violação; `--apply` normaliza títulos;
+`--baseline` regrava a allowlist.
+**Allowlist por arquivo** (`tests/ui_style_allowlist.txt`, 51 arquivos, 2.116 hex): o check só
+reprova quando um arquivo **passa** do teto — hex novo é pego, a paleta existente de páginas
+como Store Remake não é apagada. **Hook**: `.githooks/pre-commit` roda o `--check`
+(`git config core.hooksPath .githooks`).
 
 ---
 
@@ -187,8 +207,8 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 ## 5. Critérios de aceite
 
 - Título de página em 28/SemiBold via `PageTitleStyle`: **30/30** páginas com título textual.
-- Hex hardcoded fora da allowlist em `Pages/`: 2.133 (base de trabalho para a allowlist).
-- `Button.Template` inline: ainda nos 5 arquivos grandes (ver F2).
+- Hex hardcoded: **2.116** em 51 arquivos, cobertos pela allowlist (só reprova quem passar do teto).
+- `Button.Template` inline: **48** em 11 arquivos, todos casos únicos (cards com paleta própria).
 - `dotnet build` 0 erros; `UiShotHarness` 52/52 páginas.
 - Revisão visual por lote contra a captura anterior.
 
@@ -208,15 +228,14 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 - [x] Script de normalização de título (`tests/ui_style_audit.py --apply`)
 - [x] 30 títulos de página migrados para `PageTitleStyle`
 - [x] Auditoria confirma 0 título textual fora do estilo (`--check` sai 2 só por subtítulo)
-- [ ] Subtítulos: normalização automática descartada (o 1º TextBlock cinza é rótulo de estado em várias páginas) — ajuste manual pendente
+- [x] Subtítulos: `tests/ui_subtitle.py` aplica `PageSubtitleStyle` quando o cinza é subtítulo de verdade (7 páginas); rótulos de estado e descrição de item ficam fora
 - [ ] `Controls/PageHeader` — só quando houver página nova; não vale reescrever 46 layouts
 
 ### F2 — Botões 🟡
 - [x] `AppsPage`: 3 barras (13 botões) → `SecondaryButtonStyle`/`DeleteButtonStyle`, altura 32
-- [ ] `ExmTweaksPage` (126 templates inline)
-- [ ] `TweaksPage` (96)
-- [ ] `NetworkPage` (32)
-- [ ] `MainWindow` (28) e `GameBoostPage` (18)
+- [x] `IconButtonTemplate` (template de ícone-botão) em `Themes/Buttons.xaml`
+- [x] **127** templates substituídos: ExmTweaks 63, Tweaks 47, Network 7, GameBoost 8, Integrity 2
+- [x] Medição: 175 inline → **48** em 11 arquivos (todos únicos, documentados)
 
 ### F3 — Superfícies ✅
 - [x] `CardStyle` sem sombra e sem animação; hover por cor
@@ -231,17 +250,18 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 - [x] Bug da lista vazia na primeira carga (`_isLoaded` marcado depois do `ApplyFilter`)
 - [x] Decisão 05/11: 2 variantes oficiais de carregamento (overlay da AppsPage + toast cinza);
       os demais ficam como exceção aceita
-- [ ] `Themes/Spinners.xaml` com `Win11SpinnerTemplate`/`Win11MiniSpinnerTemplate` (hoje dentro da `AppsPage`)
-- [ ] Adotar o overlay oficial em Bloatware/Programas/Portáteis (mesma anatomia, uma definição)
-- [ ] Adotar o estado vazio em Apps, Drivers, Serviços, Programas
-- [ ] Badges em 2 variantes / `Caption 11`
-- [ ] Tiles de ícone 32/38/44
+- [x] `Themes/Spinners.xaml` com `Win11SpinnerTemplate`/`Win11MiniSpinnerTemplate`
+- [x] Overlay oficial em AppsPage (3 painéis), ProgramsPage e BloatwarePage
+- [x] Estado vazio em Apps (Programas), Drivers (2 listas), Serviços e Programas
+- [ ] Badges em 2 variantes / `Caption 11` (por página, sem duplicata a remover)
+- [ ] Tiles de ícone 32/38/44 (medida varia por página; não bloqueia)
 
 ### F5 — Contraste 🟡
 - [x] `TextMuted` → `#8A8A8A`
 - [x] `9`/`10` → 11 e `14` → 13 (419 atributos, 42 páginas)
-- [ ] `15` restante (260) decidido por página
-- [ ] Foco visível em todo controle focável
+- [x] `15` restante: 258 → 16 (título) e 2 → 13 (corpo)
+- [x] `9`/`10`/`10.5`/`11.5`/`12.5` → 11/12; `14` → 13; `17` → 16; `8` → 11
+- [x] Foco visível (`KitFocusVisual`) em Button/TextBox/CheckBox/ComboBox
 
 ### F6 — Capturas ✅
 - [x] `tests/UiShotHarness` com 52 páginas e `_index.csv`
@@ -251,7 +271,9 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 
 ### F7 — Antirregressão ✅
 - [x] `ui_style_audit.py --check` com código de saída
-- [x] Relatório de hex por arquivo (base da allowlist)
+- [x] Allowlist por arquivo (`ui_style_allowlist.txt`, `--baseline`)
+- [x] Hook `.githooks/pre-commit` + `core.hooksPath`
+- [x] Estado atual: `--check` sai 0 (0 título, 0 subtítulo, 0 arquivo com hex novo)
 
 ---
 
@@ -262,15 +284,17 @@ pesa igual: alguns itens são cosméticos e de risco alto (mexer em 400 template
 visível), outros são baratos e consertam o que o usuário vê de errado. A ordem abaixo troca o
 "ordem das fases" por **impacto visível ÷ risco**.
 
+**Estado: E1–E7 concluídos em 05/11** (build 0 erros, 52/52 capturas, `--check` sai 0).
+
 | Ordem | Etapa | Escopo | Esforço | Risco | Por que aqui |
 |---|---|---|---|---|---|
-| **E1** | Bugs de runtime do harness | `BloatwarePage` (storyboard anima `Angle`) e `DiskConverterPage` (NRE na carga) | ~2 arquivos | baixo | São **crashes reais**, não estética: o harness absorve a exceção e a página sai pela metade |
-| **E2** | Carregamento oficial em 1 lugar | `Themes/Spinners.xaml` + adotar em Bloatware/Programas/Portáteis | 0,5 dia | baixo | O padrão que você aprovou deixa de existir só dentro da `AppsPage` |
-| **E3** | F2 — botões por família, em 3 lotes | `NetworkPage` (32), `TweaksPage` (96), `ExmTweaksPage` (126) | 3–4 dias | médio | Maior fonte de inconsistência **visível**: paletas e alturas diferentes lado a lado |
-| **E4** | Estados vazios | Apps, Drivers, Serviços, Programas (`EmptyStateView`) | 1–2 dias | baixo | Página vazia sem explicação é o defeito que mais parece "quebrado" |
-| **E5** | F5 — resto da tipografia + foco | 260 usos de `15` decididos por página; `FocusVisualStyle` global | 1–2 dias | baixo/médio | Legibilidade e teclado; o grosso (419) já foi |
-| **E6** | F1 — subtítulos por página | 46 cabeçalhos, 5 por lote com captura | 1 dia | baixo | Fecha o cabeçalho sem reescrever layout |
-| **E7** | F7 — endurecer e liberar | allowlist de hex por página, hook de pré-commit, versão + tag do release | 1 dia | baixo | Impede a volta do que já foi feito |
+| **E1 ✅** | Bugs de runtime do harness | `BloatwarePage` (storyboard anima `Angle`) e `DiskConverterPage` (NRE na carga) | ~2 arquivos | baixo | São **crashes reais**, não estética: o harness absorve a exceção e a página sai pela metade |
+| **E2 ✅** | Carregamento oficial em 1 lugar | `Themes/Spinners.xaml` + adotar em Bloatware/Programas/Portáteis | 0,5 dia | baixo | O padrão que você aprovou deixa de existir só dentro da `AppsPage` |
+| **E3 ✅** | F2 — botões por família | `NetworkPage` (32), `TweaksPage` (96), `ExmTweaksPage` (126) | 3–4 dias | médio | Maior fonte de inconsistência **visível**: paletas e alturas diferentes lado a lado |
+| **E4 ✅** | Estados vazios | Apps, Drivers, Serviços, Programas (`EmptyStateView`) | 1–2 dias | baixo | Página vazia sem explicação é o defeito que mais parece "quebrado" |
+| **E5 ✅** | F5 — resto da tipografia + foco | 260 usos de `15` decididos por página; `FocusVisualStyle` global | 1–2 dias | baixo/médio | Legibilidade e teclado; o grosso (419) já foi |
+| **E6 ✅** | F1 — subtítulos por página | 46 cabeçalhos, 5 por lote com captura | 1 dia | baixo | Fecha o cabeçalho sem reescrever layout |
+| **E7 ✅** | F7 — endurecer (allowlist + hook) | allowlist de hex por página, hook de pré-commit, versão + tag do release | 1 dia | baixo | Impede a volta do que já foi feito |
 
 ### Como executar E3 (o lote que assusta)
 
@@ -310,3 +334,21 @@ um relatório, não uma edição:
 | E5 | `--check` sem `FontSize` fora da escala; `Tab` mostra foco em todo controle focável |
 | E6 | Subtítulo de página no estilo, sem confundir com rótulo de estado |
 | E7 | `--check` roda em pré-commit; release com versão nova e `-ReleaseTag vX.Y.Z` |
+
+---
+
+## 8. Ferramentas criadas
+
+| Arquivo | Para que serve |
+|---|---|
+| `tests/UiShotHarness` | renderiza as 52 páginas fora da tela e salva PNG; `--only`, `--list`, `--selfcheck`, `--size`, `--pump`, `--out` |
+| `tests/ui_style_audit.py` | `--check` (sai 2 em violação), `--apply` (títulos/subtítulos), `--baseline` (regrava a allowlist) |
+| `tests/ui_button_audit.py` | agrupa os `<Button.Template>` inline por impressão digital (o que é cópia e o que é único) |
+| `tests/ui_buttons_migrate.py` | troca um template inline por um do tema, preservando as propriedades locais do botão |
+| `tests/ui_fontsize15.py` | decide cada `FontSize="15"` (16 título / 13 corpo) com relatório antes de gravar |
+| `tests/ui_subtitle.py` | aplica `PageSubtitleStyle`, ignorando rótulo de estado e descrição de item |
+| `.githooks/pre-commit` | roda o `--check` a cada commit (habilitado com `git config core.hooksPath .githooks`) |
+
+Scripts que reescrevem XAML sempre preservam o BOM do arquivo e o CRLF. O `open(..., "w")`
+do Python com `newline="\r\n"` **duplica** o `\r` quando o texto veio de leitura binária — use
+`newline=""` ou grave com `"wb"`.

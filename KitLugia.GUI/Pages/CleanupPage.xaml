@@ -156,7 +156,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="&#x1F310; Cache de Navegadores" FontSize="15" FontWeight="Bold"
+                            <TextBlock Text="&#x1F310; Cache de Navegadores" FontSize="16" FontWeight="Bold"
                                        Foreground="{StaticResource AccentColor}"/>
                             <TextBlock x:Name="TxtBrowserCacheTotal" Text="Clique em 'Detectar' para verificar."
                                        FontSize="12" Foreground="#888" Margin="0,3,0,0"/>
@@ -215,7 +215,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x1F50D; Limpeza de Evid&#xEA;ncias" FontSize="15" FontWeight="Bold"
+                                <TextBlock Text="&#x1F50D; Limpeza de Evid&#xEA;ncias" FontSize="16" FontWeight="Bold"
                                            Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <TextBlock Text="Remove rastros de uso: MRU, documentos recentes, jump lists, UserAssist, Timeline, etc."
@@ -274,7 +274,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x1F4E6; Portable Apps Scanner" FontSize="15" FontWeight="Bold"
+                                <TextBlock Text="&#x1F4E6; Portable Apps Scanner" FontSize="16" FontWeight="Bold"
                                            Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <TextBlock x:Name="TxtPortableScanResult"
@@ -347,7 +347,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x1F4E1; Monitor de Instala&#xE7;&#xF5;es" FontSize="15" FontWeight="Bold"
+                                <TextBlock Text="&#x1F4E1; Monitor de Instala&#xE7;&#xF5;es" FontSize="16" FontWeight="Bold"
                                            Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
                                 <Border x:Name="MonitorStatusDot" Background="#555" CornerRadius="5"
                                         Width="10" Height="10" Margin="8,0,0,0" VerticalAlignment="Center"/>
@@ -427,7 +427,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#x1F527; Limpador de Registro" FontSize="15" FontWeight="Bold"
+                                <TextBlock Text="&#x1F527; Limpador de Registro" FontSize="16" FontWeight="Bold"
                                            Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
                                 <!-- &#xCD;cone de informa&#xE7;&#xE3;o -->
                                 <Border Background="#2A2A2A" CornerRadius="10" Width="20" Height="20"

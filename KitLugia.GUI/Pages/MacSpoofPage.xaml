@@ -56,7 +56,7 @@
         </Grid.RowDefinitions>
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="MAC Spoof (estilo TMAC)"/>
-            <TextBlock Text="Alterar, randomizar, persistir e restaurar MAC de adaptadores" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Text="Alterar, randomizar, persistir e restaurar MAC de adaptadores" Margin="0,4,0,0"/>
         </StackPanel>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="0,0,0,8">

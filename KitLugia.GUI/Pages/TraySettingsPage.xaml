@@ -425,7 +425,7 @@
                     <controls:InfoButton Grid.Column="0" ToolTipText="ISLC (Intelligent Standby List Cleaner) - WagnardSoft. Limpa a Standby List (cache do Windows) quando ela fica grande demais. Threshold automático: TotalRAM/8 (8GB=1024MB, 16GB=2048MB, 32GB=4096MB). Em jogos, a Standby List fica cheia de dados de niveis antigos. Quando o jogo precisa carregar mapa novo, o Windows precisa decidir QUEM remover - isso causa micro-stuttering e freezes. O ISLC limpa isso ANTES de acontecer. Não fecha nenhum processo. Jogos: GTA V, RDR2, Cyberpunk 2077, Tarkov, Star Citizen, CoD&#x0a;&#x0a;QUANDO AJUDA: stutter que PIORA com o tempo jogado (30+ min) + standby gigante + RAM livre baixa. Caso clássico: 16 GB de RAM. Com 32 GB+ quase nunca precisa - só em extremo.&#x0a;&#x0a;QUANDO PREJUDICA: thresholds agressivos (limpando toda hora). A própria limpeza causa stutter, apps recarregam do disco (mais lento que o cache) e o PC fora de jogos fica mais lento. Regra: se ligou e piorou, DESLIGUE - o Windows gerencia bem sozinho na maioria dos casos.&#x0a;&#x0a;COMO TESTAR: jogue 1h com desligado (anote o stutter), depois 1h com ligado. Melhorou? Mantenha. Igual ou pior? Desligue."/>
 
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="Limpeza Inteligente de Standby (ISLC)" FontSize="15" Foreground="White" TextWrapping="Wrap"/>
+                        <TextBlock Text="Limpeza Inteligente de Standby (ISLC)" FontSize="16" Foreground="White" TextWrapping="Wrap"/>
                         <TextBlock x:Name="TxtIslcDescription" Text="Threshold auto-calculado. Reduz stuttering e freezes em jogos." FontSize="12" Foreground="#808080" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
 

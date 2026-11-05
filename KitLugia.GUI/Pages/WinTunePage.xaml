@@ -121,7 +121,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -153,7 +153,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -184,7 +184,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -215,7 +215,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -246,7 +246,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -277,7 +277,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -308,7 +308,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -339,7 +339,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -370,7 +370,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -401,7 +401,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -432,7 +432,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -463,7 +463,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -494,7 +494,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -525,7 +525,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -556,7 +556,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -587,7 +587,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -618,7 +618,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -649,7 +649,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -680,7 +680,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -711,7 +711,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -742,7 +742,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -773,7 +773,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -804,7 +804,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -835,7 +835,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -866,7 +866,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -897,7 +897,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -928,7 +928,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -959,7 +959,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -990,7 +990,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1021,7 +1021,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1052,7 +1052,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1089,7 +1089,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1120,7 +1120,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1151,7 +1151,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1182,7 +1182,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1213,7 +1213,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1244,7 +1244,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1275,7 +1275,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1306,7 +1306,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1337,7 +1337,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1368,7 +1368,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1399,7 +1399,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1430,7 +1430,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1461,7 +1461,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1492,7 +1492,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1523,7 +1523,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1554,7 +1554,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1585,7 +1585,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1616,7 +1616,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1647,7 +1647,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1684,7 +1684,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1715,7 +1715,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1746,7 +1746,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1777,7 +1777,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1808,7 +1808,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1839,7 +1839,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1870,7 +1870,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1901,7 +1901,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1932,7 +1932,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1963,7 +1963,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1994,7 +1994,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2031,7 +2031,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2062,7 +2062,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2093,7 +2093,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2124,7 +2124,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2155,7 +2155,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2186,7 +2186,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2223,7 +2223,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2254,7 +2254,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2285,7 +2285,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2316,7 +2316,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2347,7 +2347,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2378,7 +2378,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2409,7 +2409,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2440,7 +2440,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2471,7 +2471,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2502,7 +2502,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2533,7 +2533,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2564,7 +2564,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2595,7 +2595,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2626,7 +2626,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2658,7 +2658,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="15" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 

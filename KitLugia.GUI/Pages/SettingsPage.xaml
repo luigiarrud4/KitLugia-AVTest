@@ -44,7 +44,7 @@
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
                     <TextBlock Text="INICIALIZA&#xC7;&#xC3;O" 
-                               FontSize="14" 
+                               FontSize="13" 
                                FontWeight="Bold" 
                                Foreground="{StaticResource AccentColor}"
                                Margin="0,0,0,15"/>
@@ -95,7 +95,7 @@
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
                     <TextBlock Text="M&#xD3;DULOS DO KIT" 
-                               FontSize="14" 
+                               FontSize="13" 
                                FontWeight="Bold" 
                                Foreground="{StaticResource AccentColor}"
                                Margin="0,0,0,15"/>
@@ -166,7 +166,7 @@
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
                     <TextBlock Text="&#xC1;UDIO"
-                               FontSize="14"
+                               FontSize="13"
                                FontWeight="Bold"
                                Foreground="{StaticResource AccentColor}"
                                Margin="0,0,0,15"/>
@@ -194,7 +194,7 @@
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
                     <TextBlock Text="MONITORAMENTO AVAN&#xC7;ADO"
-                               FontSize="14"
+                               FontSize="13"
                                FontWeight="Bold"
                                Foreground="{StaticResource AccentColor}"
                                Margin="0,0,0,15"/>
@@ -295,7 +295,7 @@
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
                     <TextBlock Text="SISTEMA" 
-                               FontSize="14" 
+                               FontSize="13" 
                                FontWeight="Bold" 
                                Foreground="{StaticResource AccentColor}"
                                Margin="0,0,0,15"/>
@@ -336,7 +336,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="&#x1F41B; MODO DESENVOLVEDOR" 
-                                       FontSize="14" 
+                                       FontSize="13" 
                                        FontWeight="Bold" 
                                        Foreground="#FF6B00"/>
                             <TextBlock Text="Mostra ferramentas de diagn&#xF3;stico e debug" FontSize="11" Foreground="#888888"/>
@@ -371,7 +371,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="&#x1F50D; TESTE DE PÁGINAS" 
-                                       FontSize="14" 
+                                       FontSize="13" 
                                        FontWeight="Bold" 
                                        Foreground="#FF6B00"/>
                             <TextBlock Text="Abre todas as páginas uma por uma para identificar crashes" FontSize="11" Foreground="#888888"/>
@@ -395,7 +395,7 @@
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
                     <TextBlock Text="DESINSTALAÇÃO" 
-                               FontSize="14" 
+                               FontSize="13" 
                                FontWeight="Bold" 
                                Foreground="{StaticResource AccentColor}"
                                Margin="0,0,0,15"/>

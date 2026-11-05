@@ -142,6 +142,13 @@ namespace KitLugia.GUI.Pages
             GridDrivers.ItemsSource = filtered;
             if (TxtCount != null) TxtCount.Text = $"{filtered.Count} Drivers";
             if (TxtStatus != null) TxtStatus.Text = "Pronto.";
+            if (EmptyDrivers != null)
+            {
+                EmptyDrivers.Hint = string.IsNullOrEmpty(query)
+                    ? "Clique em Analisar para ler os drivers instalados."
+                    : $"Nenhum driver corresponde a \"{TxtFilter.Text.Trim()}\".";
+                EmptyDrivers.Update(filtered.Count);
+            }
         }
 
         private void SetLoading(bool isLoading, string msg = "Processando...")
@@ -384,6 +391,7 @@ namespace KitLugia.GUI.Pages
 
             GridKernel.ItemsSource = filtered;
             if (TxtKernelCount != null) TxtKernelCount.Text = $"{filtered.Count} drivers";
+            EmptyKernel?.Update(filtered.Count);
         }
 
         private void TxtKernelFilter_TextChanged(object sender, TextChangedEventArgs e) => ApplyKernelFilter();

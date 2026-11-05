@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       mc:Ignorable="d" 
       d:DesignHeight="600" d:DesignWidth="1000"
       Background="#1E1E1E"
@@ -34,24 +35,17 @@
         <!-- Loading Panel -->
         <Border x:Name="LoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Ellipse Width="40" Height="40" Stroke="#FFD700" StrokeThickness="3" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="70 30">
-                    <Ellipse.RenderTransform>
-                        <RotateTransform x:Name="SpinnerRotate"/>
-                    </Ellipse.RenderTransform>
-                    <Ellipse.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                   From="0" To="360" Duration="0:0:1"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Ellipse.Triggers>
-                </Ellipse>
-                <TextBlock Text="Carregando programas..." Foreground="White" Margin="0,15,0,0" FontSize="13" FontWeight="SemiBold"/>
+                <!-- Variante A do contrato: Themes/Spinners.xaml -->
+                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
+                <TextBlock Text="Carregando programas..." Foreground="White" Margin="0,15,0,0" FontSize="16"/>
             </StackPanel>
         </Border>
+
+        <!-- Estado vazio (F4): cobre a lista quando o filtro nao devolve nada -->
+        <controls:EmptyStateView x:Name="EmptyPrograms" Grid.Row="1" Panel.ZIndex="5"
+                                 Visibility="Collapsed" Icon="&#x1F4E6;"
+                                 Title="Nenhum programa encontrado"
+                                 Hint="Ajuste a busca ou clique em Atualizar Lista."/>
 
         <!-- Programs List -->
         <Border Grid.Row="1" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="10">
@@ -121,7 +115,7 @@
                                        TextTrimming="CharacterEllipsis"/>
 
                             <!-- Bot&#xE3;o Remover -->
-                            <Button Grid.Column="4" Height="28" FontSize="10" Cursor="Hand" Click="BtnRemove_Click" Tag="{Binding}" Content="REMOVER">
+                            <Button Grid.Column="4" Height="28" FontSize="11" Cursor="Hand" Click="BtnRemove_Click" Tag="{Binding}" Content="REMOVER">
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="Background" Value="Transparent"/>

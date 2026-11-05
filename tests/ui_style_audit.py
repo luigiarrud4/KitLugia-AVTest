@@ -50,7 +50,11 @@ def sem(attrs_dict: dict, remover) -> str:
 def eh_titulo(attrs_dict: dict) -> bool:
     if attrs_dict.get("FontSize") not in TITULO_SIZES:
         return False
-    return bool(LETRA_RE.search(html.unescape(attrs_dict.get("Text", ""))))
+    texto = html.unescape(attrs_dict.get("Text", "")).strip()
+    # Rotulo de estado em tamanho grande ("Calculando..." do boot em 28) nao e' titulo.
+    if texto.endswith("...") or texto.endswith("\u2026"):
+        return False
+    return bool(LETRA_RE.search(texto))
 
 def eh_subtitulo(attrs_dict: dict) -> bool:
     if attrs_dict.get("FontSize") not in SUB_SIZES:
@@ -144,8 +148,33 @@ print(f"hex hardcoded: {sum(hexes.values())} em {len(hexes)} arquivo(s)")
 for k, v in sorted(hexes.items(), key=lambda kv: -kv[1])[:5]:
     print(f"   {k}: {v}")
 
+# Allowlist de hex (F7): um teto por arquivo. Hex novo estoura o teto e reprova o check.
+ALLOWLIST = Path(__file__).resolve().parent / "ui_style_allowlist.txt"
+if "--baseline" in sys.argv:
+    linhas_allow = [f"{k}={v}" for k, v in sorted(hexes.items())]
+    ALLOWLIST.write_text("\n".join(linhas_allow) + "\n", encoding="utf-8")
+    print(f"\nallowlist regravada: {len(linhas_allow)} arquivo(s) -> {ALLOWLIST.name}")
+    sys.exit(0)
+
+estouros = []
+if not APPLY and ALLOWLIST.exists():
+    tetos = dict(
+        (linha.split("=", 1)[0], int(linha.split("=", 1)[1]))
+        for linha in ALLOWLIST.read_text(encoding="utf-8").splitlines()
+        if "=" in linha
+    )
+    for arquivo, n in hexes.items():
+        teto = tetos.get(arquivo, 0)
+        if n > teto:
+            estouros.append(f"{arquivo}: {n} hex (allowlist {teto})")
+    if estouros:
+        print("hex acima da allowlist:")
+        for e in estouros:
+            print("   " + e)
+
 if not APPLY:
-    violacoes = total.get("titulo-off", 0) + total.get("subtitulo-off", 0)
+    violacoes = total.get("titulo-off", 0) + total.get("subtitulo-off", 0) + len(estouros)
     print()
-    print("SAIDA:", 0 if violacoes == 0 else 2, f"({violacoes} titulo(s)/subtitulo(s) fora do padrao)")
+    print("SAIDA:", 0 if violacoes == 0 else 2,
+          f"({total.get('titulo-off', 0)} titulo(s)/{total.get('subtitulo-off', 0)} subtitulo(s) fora do padrao, {len(estouros)} arquivo(s) com hex novo)")
     sys.exit(0 if violacoes == 0 else 2)

@@ -97,7 +97,7 @@
                               Foreground="White" VerticalAlignment="Center"/>
                     <TextBlock Text="RAM: " FontSize="13" Foreground="#00FF88" VerticalAlignment="Center" Margin="20,0,0,0"/>
                     <TextBlock x:Name="RamUsageText" Text="0 GB / 16 GB (0%)" 
-                              FontSize="14" Foreground="#00FF88" VerticalAlignment="Center"/>
+                              FontSize="13" Foreground="#00FF88" VerticalAlignment="Center"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Filtro:" Foreground="#AAA" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -349,7 +349,7 @@
                     <!-- Apply Button -->
                     <Border Grid.Row="2" Background="#3C3C3C" Padding="15,10" CornerRadius="0,0,8,8">
                         <Button x:Name="ApplyCustomizationButton" Content="🚀 Aplicar Customização" 
-                               Style="{StaticResource ActionBtn}" Padding="20,10" FontSize="14"
+                               Style="{StaticResource ActionBtn}" Padding="20,10" FontSize="13"
                                Background="#FF6B00" Click="ApplyCustomizationButton_Click"/>
                     </Border>
                 </Grid>

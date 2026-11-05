@@ -5,6 +5,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
       xmlns:local="clr-namespace:KitLugia.GUI.Pages"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       mc:Ignorable="d" 
       d:DesignHeight="700" d:DesignWidth="1000"
       Background="#1E1E1E"
@@ -44,71 +45,7 @@
             </Setter>
         </Style>
 
-        <!-- Rodela estilo Windows 11 (circulo de pontos girando, como no boot/shutdown) - grande -->
-        <ControlTemplate x:Key="Win11SpinnerTemplate" TargetType="ContentControl">
-            <Grid Width="44" Height="44" RenderTransformOrigin="0.5,0.5">
-                <Grid.RenderTransform>
-                    <RotateTransform x:Name="SpinnerRotate"/>
-                </Grid.RenderTransform>
-                <Grid.Triggers>
-                    <EventTrigger RoutedEvent="Loaded">
-                        <BeginStoryboard>
-                            <Storyboard RepeatBehavior="Forever">
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1.4"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
-                </Grid.Triggers>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="0" Y="-16"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="15.2" Y="-4.9"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="9.4" Y="12.9"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="-9.4" Y="12.9"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="-15.2" Y="-4.9"/></Ellipse.RenderTransform>
-                </Ellipse>
-            </Grid>
-        </ControlTemplate>
-
-        <!-- Rodela estilo Windows 11 - versao mini (placeholder de icone) -->
-        <ControlTemplate x:Key="Win11MiniSpinnerTemplate" TargetType="ContentControl">
-            <Grid Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
-                <Grid.RenderTransform>
-                    <RotateTransform x:Name="MiniSpinnerRotate"/>
-                </Grid.RenderTransform>
-                <Grid.Triggers>
-                    <EventTrigger RoutedEvent="Loaded">
-                        <BeginStoryboard>
-                            <Storyboard RepeatBehavior="Forever">
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1.4"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
-                </Grid.Triggers>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="0" Y="-9"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="8.6" Y="-2.8"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="5.3" Y="7.3"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="-5.3" Y="7.3"/></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform><TranslateTransform X="-8.6" Y="-2.8"/></Ellipse.RenderTransform>
-                </Ellipse>
-            </Grid>
-        </ControlTemplate>
+<!-- Rodela e mini rodela do KitLugia: Themes/Spinners.xaml (Win11SpinnerTemplate / Win11MiniSpinnerTemplate) -->
 
         <!-- Estilo TabItem similar ao ServicesPage -->
         <Style TargetType="TabItem">
@@ -304,6 +241,7 @@
                         </Border>
 
                         <Border Grid.Row="1" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="10">
+                            <Grid>
                             <ListView x:Name="ProgramsList" Background="Transparent" BorderThickness="0"
                                       VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                                 <ListView.ItemContainerStyle>
@@ -357,7 +295,7 @@
                                                 <TextBlock Text="{Binding Publisher}" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
                                             </StackPanel>
                                             <TextBlock Grid.Column="3" Text="{Binding DisplayVersion}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            <Button Grid.Column="4" Height="28" FontSize="10" Cursor="Hand" Click="BtnProgramRemove_Click" Tag="{Binding}" Content="REMOVER">
+                                            <Button Grid.Column="4" Height="28" FontSize="11" Cursor="Hand" Click="BtnProgramRemove_Click" Tag="{Binding}" Content="REMOVER">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
                                                         <Setter Property="Background" Value="Transparent"/>
@@ -386,6 +324,11 @@
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
+                                <controls:EmptyStateView x:Name="EmptyProgramsTab" Panel.ZIndex="10"
+                                                         Visibility="Collapsed" Icon="&#x1F4E6;"
+                                                         Title="Nenhum programa encontrado"
+                                                         Hint="Ajuste a busca ou atualize a lista."/>
+                            </Grid>
                         </Border>
 
                         <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,15,0,0">
@@ -486,7 +429,7 @@
                                             </StackPanel>
                                             <TextBlock Grid.Column="3" Text="{Binding TotalSizeFormatted}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Grid.Column="4" Text="{Binding ConfidenceLabel}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            <Button Grid.Column="5" Height="28" FontSize="10" Cursor="Hand" Click="BtnPortableRemove_Click" Tag="{Binding}" Content="DELETAR">
+                                            <Button Grid.Column="5" Height="28" FontSize="11" Cursor="Hand" Click="BtnPortableRemove_Click" Tag="{Binding}" Content="DELETAR">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
                                                         <Setter Property="Background" Value="Transparent"/>
@@ -581,7 +524,7 @@
                                                                         <TextBlock Text="{Binding DateString}" FontSize="11" Foreground="#666"/>
                                                                     </StackPanel>
                                                                     <TextBlock Grid.Column="2" Text="{Binding SelectionSummary}" FontSize="11" Foreground="#FFD700" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                                                    <Button Grid.Column="3" Content="&#x1F5D1; Limpar" Height="28" FontSize="10" Padding="10,0" Background="#C0392B" Foreground="White" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkClean_Click"/>
+                                                                    <Button Grid.Column="3" Content="&#x1F5D1; Limpar" Height="28" FontSize="11" Padding="10,0" Background="#C0392B" Foreground="White" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkClean_Click"/>
                                                                     <Button Grid.Column="4" Content="&#x2716;" Width="28" Height="28" FontSize="12" Background="Transparent" Foreground="#666" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkDismiss_Click" Margin="6,0,0,0"/>
                                                                 </Grid>
                                                             </Border>
@@ -606,7 +549,7 @@
                                                                             <ColumnDefinition Width="Auto"/>
                                                                         </Grid.ColumnDefinitions>
                                                                         <TextBlock Text="Arquivos:" FontSize="12" FontWeight="SemiBold" Foreground="#AAA"/>
-                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="9" Padding="8,0" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllFiles_Click"/>
+                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="11" Padding="8,0" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllFiles_Click"/>
                                                                     </Grid>
                                                                     <ItemsControl ItemsSource="{Binding Files}" Background="Transparent" BorderThickness="0">
                                                                         <ItemsControl.ItemTemplate>
@@ -683,7 +626,7 @@
                                                                             <ColumnDefinition Width="Auto"/>
                                                                         </Grid.ColumnDefinitions>
                                                                         <TextBlock Text="Registro:" FontSize="12" FontWeight="SemiBold" Foreground="#AAA"/>
-                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="9" Padding="8,0" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllReg_Click"/>
+                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="11" Padding="8,0" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllReg_Click"/>
                                                                     </Grid>
                                                                     <ItemsControl ItemsSource="{Binding Registry}" Background="Transparent" BorderThickness="0">
                                                                         <ItemsControl.ItemTemplate>
@@ -1053,7 +996,7 @@
                                                            FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"
                                                            ToolTip="{Binding SafetyTooltip}"/>
                                                 <TextBlock Grid.Column="2" Text="{Binding IconChar}"
-                                                           FontSize="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                           FontSize="13" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                                 <TextBlock Grid.Column="3" Text="{Binding KeepIcon}"
                                                            FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"
                                                            ToolTip="{Binding KeepTooltip}" Cursor="Hand"
@@ -1176,7 +1119,7 @@
                                                            FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"
                                                            ToolTip="{Binding SafetyTooltip}"/>
                                                 <TextBlock Grid.Column="2" Text="{Binding IconChar}"
-                                                           FontSize="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                           FontSize="13" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                                 <TextBlock Grid.Column="3" Text="{Binding KeepIcon}"
                                                            FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"
                                                            ToolTip="{Binding KeepTooltip}" Cursor="Hand"

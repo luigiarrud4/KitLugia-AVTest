@@ -13,6 +13,7 @@
         <ResourceDictionary Source="CheckBox.xaml"/>
         <ResourceDictionary Source="Buttons.xaml"/>
         <ResourceDictionary Source="Cards.xaml"/>
+        <ResourceDictionary Source="Spinners.xaml"/>
         <ResourceDictionary Source="Toggles.xaml"/>
         <ResourceDictionary Source="NavStyles.xaml"/>
         <ResourceDictionary Source="PageStyles.xaml"/>

@@ -26,7 +26,7 @@
                     <TextBlock Text="&#x1F432;" FontSize="60" VerticalAlignment="Center" Margin="0,0,30,0"/>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="KIT LUGIA" FontSize="28" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Style="{StaticResource PageTitleStyle}" Text="KIT LUGIA"/>
                         <TextBlock Text="Gold Edition (v2.0)" FontSize="16" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0"/>
                         <TextBlock Text="Otimiza&#xE7;&#xE3;o de sistema, rede e hardware para alta performance." Foreground="#AAA" Margin="0,10,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
@@ -53,7 +53,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Acessar Vers&#xE3;o Console (Legacy)" FontWeight="Bold" Foreground="#FF6F61" FontSize="15"/>
+                        <TextBlock Text="Acessar Vers&#xE3;o Console (Legacy)" FontWeight="Bold" Foreground="#FF6F61" FontSize="16"/>
                         <TextBlock Text="Interface antiga baseada em texto (Terminal)." Foreground="#999" FontSize="12" Margin="0,5,0,0"/>
                         <TextBlock Text="Requer o arquivo 'KitLugia_Legacy.exe' na pasta do programa." Foreground="#666" FontSize="11" Margin="0,2,0,0" FontStyle="Italic"/>
                     </StackPanel>

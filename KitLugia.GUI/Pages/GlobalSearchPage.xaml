@@ -159,7 +159,7 @@
 
                             <Grid Grid.Column="2" VerticalAlignment="Center">
                                 <Button Content="{Binding ButtonText}" Tag="{Binding}" Click="BtnExecute_Click"
-                                        Height="28" FontSize="10" FontWeight="Bold" Padding="10,0" Cursor="Hand" MinWidth="65">
+                                        Height="28" FontSize="11" FontWeight="Bold" Padding="10,0" Cursor="Hand" MinWidth="65">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
                                             <Style.Triggers>
