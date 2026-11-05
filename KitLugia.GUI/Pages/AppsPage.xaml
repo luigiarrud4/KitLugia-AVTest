@@ -201,12 +201,12 @@
                         </Border>
 
                         <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,15,0,0">
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="☑ Selecionar Todos" Click="BtnSelectAllBloatware_Click" Height="32" MinWidth="125" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="☐ Limpar Seleção" Click="BtnDeselectAllBloatware_Click" Height="32" MinWidth="115" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource DeleteButtonStyle}" Content="Remover Selecionados" Click="BtnRemoveBloatwareSelected_Click" Height="32" MinWidth="140" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="&#x1F6E1; Ponto de Restauração" Click="BtnCreateRestorePoint_Click" Height="32" MinWidth="150" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="&#x1F3AF; Hunter" Click="BtnHunterMode_Click" Height="32" MinWidth="90" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="Atualizar Lista" Click="BtnRefreshBloatware_Click" Height="32" MinWidth="120" Margin="0,0,0,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconSelectAll}" Content="Selecionar Todos" Foreground="#66BB6A" Background="#1F4CAF50" BorderBrush="#4D4CAF50" Click="BtnSelectAllBloatware_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconClearSelection}" Content="Limpar Seleção" Foreground="#B9B9B9" Click="BtnDeselectAllBloatware_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRemove}" Content="Remover Selecionados" Foreground="#FFFFFF" Background="#C42B1C" BorderBrush="#E04A38" Click="BtnRemoveBloatwareSelected_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRestorePoint}" Content="Ponto de Restauração" Foreground="#64B5F6" Background="#1F2196F3" BorderBrush="#4D2196F3" Click="BtnCreateRestorePoint_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconHunter}" Content="Hunter" Foreground="#FFD700" Background="#1FFFD700" BorderBrush="#4DFFD700" Click="BtnHunterMode_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRefresh}" Content="Atualizar Lista" Foreground="#D6D6D6" Click="BtnRefreshBloatware_Click" Height="32" Margin="0,0,0,8"/>
                         </WrapPanel>
                     </Grid>
                 </TabItem>
@@ -332,15 +332,15 @@
                         </Border>
 
                         <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,15,0,0">
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="☑ Selecionar Todos" Click="BtnSelectAllPrograms_Click" Height="32" MinWidth="125" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="☐ Limpar Seleção" Click="BtnDeselectAllPrograms_Click" Height="32" MinWidth="115" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource DeleteButtonStyle}" Content="Remover Selecionados" Click="BtnRemoveProgramsSelected_Click" Height="32" MinWidth="140" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="&#x1F6E1; Ponto de Restauração" Click="BtnCreateRestorePoint_Click" Height="32" MinWidth="150" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconSelectAll}" Content="Selecionar Todos" Foreground="#66BB6A" Background="#1F4CAF50" BorderBrush="#4D4CAF50" Click="BtnSelectAllPrograms_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconClearSelection}" Content="Limpar Seleção" Foreground="#B9B9B9" Click="BtnDeselectAllPrograms_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRemove}" Content="Remover Selecionados" Foreground="#FFFFFF" Background="#C42B1C" BorderBrush="#E04A38" Click="BtnRemoveProgramsSelected_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRestorePoint}" Content="Ponto de Restauração" Foreground="#64B5F6" Background="#1F2196F3" BorderBrush="#4D2196F3" Click="BtnCreateRestorePoint_Click" Height="32" Margin="0,0,10,8"/>
                             <Button Style="{StaticResource SecondaryButtonStyle}" Content="&#x2699;&#xFE0F; Config" Click="BtnDeepUninstallSettings_Click" Height="32" MinWidth="80" Margin="0,0,10,8"
                                     ToolTip="Configurações do desinstalador (Lixeira, matar processos, scan, seleção padrão, ignorar 24h)"/>
                             <Button Style="{StaticResource SecondaryButtonStyle}" Content="&#x1F558; Histórico" Click="BtnUninstallHistory_Click" Height="32" MinWidth="95" Margin="0,0,10,8"
                                     ToolTip="Undo persistente: restaurar arquivos e chaves de registro de desinstalações anteriores (sobrevive ao reboot)"/>
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="Atualizar Lista" Click="BtnRefreshPrograms_Click" Height="32" MinWidth="120" Margin="0,0,0,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRefresh}" Content="Atualizar Lista" Foreground="#D6D6D6" Click="BtnRefreshPrograms_Click" Height="32" Margin="0,0,0,8"/>
                         </WrapPanel>
                     </Grid>
                 </TabItem>
@@ -461,7 +461,7 @@
                         </Border>
 
                         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="Atualizar Lista" Click="BtnRefreshPortable_Click" Height="32" Width="120"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRefresh}" Content="Atualizar Lista" Foreground="#D6D6D6" Click="BtnRefreshPortable_Click" Height="32"/>
                         </StackPanel>
                     </Grid>
                 </TabItem>

@@ -2,7 +2,8 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="Stutter Detector"
-      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji" Loaded="StutterPage_Loaded">
+      TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji" Loaded="StutterPage_Loaded"
+                    xmlns:controls="clr-namespace:KitLugia.GUI.Controls">
 
     <Page.Resources>
         <Style x:Key="StatCard" TargetType="Border">
@@ -26,6 +27,9 @@
         </Style>
 
         <Style x:Key="StutterButtonBase" TargetType="Button">
+            <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
+            <Setter Property="controls:HoverZoom.Scale" Value="1.05"/>
+            <Setter Property="controls:HoverZoom.DurationMs" Value="120"/>
             <Setter Property="Padding" Value="16,8"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -39,38 +43,11 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}"
                                 RenderTransformOrigin="0.5,0.5">
-                            <Border.RenderTransform>
-                                <ScaleTransform ScaleX="1" ScaleY="1"/>
-                            </Border.RenderTransform>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                               RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="bdr"
-                                                Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                To="1.05" Duration="0:0:0.12"/>
-                                            <DoubleAnimation Storyboard.TargetName="bdr"
-                                                Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                To="1.05" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="bdr"
-                                                Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                To="1" Duration="0:0:0.12"/>
-                                            <DoubleAnimation Storyboard.TargetName="bdr"
-                                                Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                To="1" Duration="0:0:0.12"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
                                 <Setter TargetName="bdr" Property="Background" Value="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>

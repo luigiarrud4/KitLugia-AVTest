@@ -1,12 +1,18 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="clr-namespace:KitLugia.GUI.Controls">
 
     <!-- ============================================================
          Superficies (F3 do docs/UI_CONSISTENCY_PLAN.md).
 
-         Regra: card de LISTA nao anima nem projeta sombra - hover e' so cor.
-         A animacao de escala ficou em InteractiveCardStyle, para card clicavel
-         isolado (hub, atalho), nunca para item de lista virtualizada.
+         Hover tem ANIMACAO de escala de novo (o realce do kit estavel): a imagem
+         NAO projeta sombra - era o DropShadowEffect com BlurRadius animado que
+         custava caro, e ele continua fora. A escala roda so' no item apontado.
+
+         QUIRK: o scale NAO pode vir de um Setter de Style como ScaleTransform -
+         o WPF congela Freezables ao selar o estilo e a animacao vira no-op
+         silencioso. Por isso o zoom e' feito pelo comportamento
+         Controls/HoverZoom (transform criado por elemento).
          Raio unico: 8.
          ============================================================ -->
 
@@ -16,6 +22,9 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
+        <Setter Property="controls:HoverZoom.Scale" Value="1.015"/>
+        <Setter Property="controls:HoverZoom.DurationMs" Value="180"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
@@ -24,43 +33,9 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Card clicavel isolado: mantem o realce de escala (curto, sem sombra). -->
-    <Style x:Key="InteractiveCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource CardStyle}">
-        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-        <Setter Property="RenderTransform">
-            <Setter.Value>
-                <ScaleTransform ScaleX="1" ScaleY="1"/>
-            </Setter.Value>
-        </Setter>
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Trigger.EnterActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.015" Duration="0:0:0.15">
-                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.015" Duration="0:0:0.15">
-                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.EnterActions>
-                <Trigger.ExitActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.12">
-                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.12">
-                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.ExitActions>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
+    <!-- Alias legivel para quem quer declarar a intencao "este card e' clicavel":
+         o realce (zoom + cor) ja vem do CardStyle. -->
+    <Style x:Key="InteractiveCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource CardStyle}"/>
 
     <Style x:Key="CompactCardStyle" TargetType="{x:Type Border}">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
@@ -80,6 +55,9 @@
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="controls:HoverZoom.Enabled" Value="True"/>
+        <Setter Property="controls:HoverZoom.Scale" Value="1.01"/>
+        <Setter Property="controls:HoverZoom.DurationMs" Value="200"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
