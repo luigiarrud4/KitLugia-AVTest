@@ -153,6 +153,17 @@ herda; por isso E2 e' so' promover para `Themes/Spinners.xaml`.
 **QUIRK do Python:** `open(..., "w", newline="\r\n")` sobre texto lido em modo BINARIO duplica o
 `\r` (virou `\r\r\n` em 1.188 linhas da `AppsPage`) - use `newline=""` ou grave com `"wb"`.
 
+**RESIDUO LIMPO (05/11):** o mesmo artefato tinha ficado em 5 paginas inteiras - `TweaksPage`
+(2021 linhas), `ExmTweaksPage` (1680), `GameBoostPage` (1106), `NetworkPage` (920, com 9 linhas
+ja' certas no meio) e `IntegrityPage` (441). Normalizado em bytes: `\r\r\n` -> `\r\n`, BOM de
+cada arquivo preservado (o `ExmTweaksPage` nunca teve), texto identico conferido por canonizacao
+(`re.sub(r"\r*\n", "\n")` antes x depois). O diff e' mecanico (6177 linhas, "todas mudaram"),
+mas no INDICE ficou LF puro, como os irmaos (`AppsPage`, `Cards.xaml`) - `* text=auto` no
+`.gitattributes` cuida do checkout. **Prova de que nada visual mudou:** captura das 5 paginas
+antes x depois e' identica no layout (duas rodadas seguidas dao PNGs iguais; onde difere,
+difere tambem entre duas rodadas do MESMO codigo - o scan de tweaks/GPU ainda estava rodando).
+`Themes/Icons.xaml` e' o unico XAML em LF puro hoje (criado por script); fica como esta'.
+
 **13-ter. ANIMACOES DE VOLTA (pedido: "devolva as animacoes que removeu ... cards do dashboardpage e do
 generalrepairpage") + icones vetoriais na AppsPage:**
 - **O que a padronizacao tinha removido:** comparando com `estavel-pre-ui-padronizacao`, so' o
