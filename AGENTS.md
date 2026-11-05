@@ -3,6 +3,12 @@
 Pedido: "salve o plano e faca uma checklist para comecar a trabalhar nele, so faca um backup pelo git
 para separar o kit estavel do que voce vai trabalhar. pode comecar".
 
+**ESTADO CONSOLIDADO (leia primeiro):** `docs/UI_PROGRESS.md` - o que esta feito fase por fase,
+as pendencias reais, os comandos de verificacao e as 10 armadilhas ja' medidas. O plano/contrato
+segue em `docs/UI_CONSISTENCY_PLAN.md` e este arquivo e' o log narrativo de cada sessao. Existe
+tambem a skill `kitlugia-wpf-theming` (skill da conta, disponivel em qualquer conversa) com a
+mesma materia em forma de guia operacional.
+
 **0. BACKUP do kit estavel (o que separa o kit estavel do trabalho novo):** o trabalho de busca
 (23 campos padronizados + GlobalSearchPage refeita + bloco OUI removido) estava todo em
 working tree. Virou o commit **`f5c3961`** na branch `impeccable-polish`, com a tag

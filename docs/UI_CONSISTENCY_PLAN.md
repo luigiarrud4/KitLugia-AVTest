@@ -365,6 +365,9 @@ um relatório, não uma edição:
 
 ## 8. Ferramentas criadas
 
+> Estado consolidado (o que esta feito, o que falta, comandos e armadilhas) fica em
+> **`docs/UI_PROGRESS.md`**; este arquivo guarda o diagnostico, o contrato e o plano.
+
 | Arquivo | Para que serve |
 |---|---|
 | `tests/UiShotHarness` | renderiza as 52 páginas fora da tela e salva PNG; `--only`, `--list`, `--selfcheck`, `--size`, `--pump`, `--out` |
