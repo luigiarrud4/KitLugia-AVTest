@@ -215,7 +215,8 @@ da escala e hex hardcoded, e **sai com código 2** quando há violação; `--app
 ### F6 — Capturas ✅
 - [x] `tests/UiShotHarness` com 52 páginas e `_index.csv`
 - [x] `--selfcheck` prova que o estilo resolve `FontSize` 28
-- [x] Baselines: `out/` (antes), `out3/` (títulos), `out4/` (fontes)
+- [x] Baselines: `out/` (antes), `out3/` (títulos), `out4/` (fontes), `out6/` (52 páginas, estado atual)
+- [x] Verificação final: `52/52` páginas capturadas, `0` falhas, build `0` erros
 
 ### F7 — Antirregressão ✅
 - [x] `ui_style_audit.py --check` com código de saída
