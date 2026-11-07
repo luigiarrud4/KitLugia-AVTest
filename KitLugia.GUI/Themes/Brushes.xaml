@@ -28,6 +28,9 @@
 
     <SolidColorBrush x:Key="NotificationSuccessBrush" Color="#4CAF50"/>
     <SolidColorBrush x:Key="NotificationErrorBrush" Color="#C42B1C"/>
+    <!-- Notificação neutra (cinza): ação informativa, sem veredito de sucesso/erro -->
+    <!-- Notificacao neutra (dourada): acao em andamento, sem veredito de sucesso/erro -->
+    <SolidColorBrush x:Key="NotificationNeutralBrush" Color="#FFD700"/>
 
     <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="TextSecondary" Color="#E0E0E0"/>

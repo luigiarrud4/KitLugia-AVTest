@@ -1087,31 +1087,39 @@ namespace KitLugia.Core
         /// <summary>
         /// Obtém lista de nomes de GPUs. NÃO retorna ManagementObject para evitar memory leak.
         /// </summary>
-        public static List<string> GetAllGpuNames()
+        // Adaptadores de video virtuais/emulados nunca sao alvo de tweak: sao
+        // ignorados quando existe pelo menos uma GPU real no sistema. Drivers virtuais
+        // aparecem no Win32_VideoController (e no combo) mas nunca sao PCI fisico.
+        private static readonly string[] VirtualAdapterNameTokens =
         {
-            var names = new List<string>();
-            try
+            "virtual display", "virtual", "basic display", "basic render",
+            "indirect display", "remote display", "iddsample", "usbmmidd",
+            "spacedesk", "parsec", "splashtop", "dummy", "headless", "pseudo"
+        };
+
+        public static bool IsVirtualDisplayAdapter(string? name, string? pnpDeviceId)
+        {
+            // Id PNP fora do barramento PCI = adaptador virtual/emulado.
+            if (!string.IsNullOrEmpty(pnpDeviceId))
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_VideoController");
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    using (obj)
-                    {
-                        string? name = obj["Name"]?.ToString();
-                        if (!string.IsNullOrEmpty(name))
-                            names.Add(name);
-                    }
-                }
+                if (pnpDeviceId.StartsWith(@"ROOT\", StringComparison.OrdinalIgnoreCase)) return true;
+                if (pnpDeviceId.StartsWith(@"SWD\", StringComparison.OrdinalIgnoreCase)) return true;
+                if (pnpDeviceId.StartsWith(@"USB\", StringComparison.OrdinalIgnoreCase)) return true;
             }
-            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
-            return names;
+            if (string.IsNullOrEmpty(name)) return true;
+            foreach (var token in VirtualAdapterNameTokens)
+            {
+                if (name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            }
+            return false;
         }
 
-        public record GpuInfo(string Name, string? RegPath, string PnpDeviceId);
-
-        public static List<GpuInfo> GetAllGpuInfo()
+        // Lista crua (Name, PnpId) de Win32_VideoController, filtrada: GPUs reais
+        // (dedicadas e iGPU) primeiro, virtuais ignorados. Se TUDO for virtual
+        // (VM/headless), devolve a lista crua para nao esconder a unica GPU.
+        private static List<(string Name, string PnpId)> EnumerateRealVideoControllers()
         {
-            var result = new List<GpuInfo>();
+            var raw = new List<(string Name, string PnpId)>();
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT Name, PNPDeviceID FROM Win32_VideoController");
@@ -1120,15 +1128,43 @@ namespace KitLugia.Core
                     using (obj)
                     {
                         string? name = obj["Name"]?.ToString();
-                        string? pnpId = obj["PNPDeviceID"]?.ToString();
                         if (string.IsNullOrEmpty(name)) continue;
-
-                        string? regPath = FindGpuRegistryPathByPnpId(pnpId);
-                        result.Add(new GpuInfo(name, regPath, pnpId ?? ""));
+                        raw.Add((name, obj["PNPDeviceID"]?.ToString() ?? ""));
                     }
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            var real = new List<(string Name, string PnpId)>(raw.Count);
+            foreach (var item in raw)
+            {
+                if (IsVirtualDisplayAdapter(item.Name, item.PnpId))
+                {
+                    Logger.LogOnce($"gpu|virtualignored|{item.PnpId}", $"GPU virtual ignorada (nao e alvo de tweak): {item.Name}", heartbeatSeconds: 3600);
+                    continue;
+                }
+                real.Add(item);
+            }
+            // VM/headless so com adaptador virtual: usa tudo.
+            if (real.Count == 0 && raw.Count > 0) return raw;
+            return real;
+        }
+
+        public static List<string> GetAllGpuNames()
+        {
+            return EnumerateRealVideoControllers().Select(x => x.Name).ToList();
+        }
+
+        public record GpuInfo(string Name, string? RegPath, string PnpDeviceId);
+
+        public static List<GpuInfo> GetAllGpuInfo()
+        {
+            var result = new List<GpuInfo>();
+            foreach (var (name, pnpId) in EnumerateRealVideoControllers())
+            {
+                string? regPath = FindGpuRegistryPathByPnpId(pnpId);
+                result.Add(new GpuInfo(name, regPath, pnpId));
+            }
             return result;
         }
 
@@ -1184,9 +1220,13 @@ namespace KitLugia.Core
                 foreach (ManagementObject obj in searcher.Get())
                 {
                     string? name = obj["Name"]?.ToString();
-                    if (!string.IsNullOrEmpty(name) && !name.Contains("Microsoft Basic Display Adapter"))
-                        return obj;
-                    obj.Dispose();
+                    string? pnpId = obj["PNPDeviceID"]?.ToString();
+                    if (string.IsNullOrEmpty(name) || IsVirtualDisplayAdapter(name, pnpId))
+                    {
+                        obj.Dispose();
+                        continue;
+                    }
+                    return obj;
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }

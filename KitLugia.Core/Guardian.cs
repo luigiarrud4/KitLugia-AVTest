@@ -678,12 +678,16 @@ namespace KitLugia.Core
             Description = "O Winmgmt hospeda o WMI, usado por diagnóstico, monitoramento, inventário e por vários instaladores. Desativado, ferramentas que consultam WMI (incluindo packages de app e scripts de suporte) falham.",
             Category = "Corrupção de Sistema", Type = TweakType.Service, ServiceName = "Winmgmt", HarmfulStartMode = "Disabled", DefaultStartMode = "Auto"
         },
-        new() {
-            Name = "Restauração do Sistema (Frequência de Pontos Alterada)",
-            Description = "Frequência de criação automática de pontos de restauração. Valor 0 significa 'criar a cada oportunidade' (comportamento padrão no Windows 11).",
-            Category = "Backup e Restauração", KeyPath = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore", ValueName = "SystemRestorePointCreationFrequency", HarmfulValue = 0, DefaultValue = 1440
-        },
-
+        // REMOVIDO (06/11): check "Restauração do Sistema (Frequência de Pontos Alterada)"
+        // era falso positivo. Segundo a doc oficial da Microsoft (SRSetRestorePoint), a
+        // chave SystemRestorePointCreationFrequency NAO existe por padrao (ausente =
+        // 1440 min = 1 ponto/dia) e valor 0 significa "nao pular a criacao" = MAIS pontos
+        // de restauracao, nao menos — nenhum valor dessa chave enfraquece o sistema.
+        // O item vivia MODIFICADO porque um .bat de tweak externo (AncelsPerformanceBatch /
+        // EXMPremiumTweaker, em Downloads) gravou 0 uma vez; nada no boot reescreve isso
+        // (verificado: Run/RunOnce/tarefas agendadas/WMI/pasta Startup/TweakRegistry).
+        // O check legitimo de restauracao do sistema e' o DisableSR logo abaixo.
+        //
         // ==================================================================================
         // 11. PERFORMANCE DEGRADADA COM O TEMPO
         // ==================================================================================

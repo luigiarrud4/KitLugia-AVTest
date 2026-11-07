@@ -12,6 +12,106 @@
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Page.Resources>
+        <!-- ContextMenu dos programas como RECURSO DA PAGINA. Nunca declarar MenuItems
+             com Click dentro de Style Setter (ItemContainerStyle): o PresentationBuildTasks
+             roteia esses handlers pelo IStyleConnector e, com um AddHandler(MenuItem.Click)
+             no EmptyStateView no MESMO arquivo, gera connectionId DUPLICADO entre
+             IComponentConnector e IStyleConnector (ex.: ID 26 = Button REMOVER do
+             DataTemplate no StyleConnector e = EmptyStateView no ComponentConnector).
+             Em runtime o FrameworkTemplate despacha via IComponentConnector -> cast
+             Button -> EmptyStateView -> InvalidCastException no primeiro item renderizado
+             (AppsPage inteira morre, "Carregando programas..." infinito). -->
+        <ContextMenu x:Key="ProgramsContextMenu">
+            <MenuItem Header="📁 Abrir Local do Arquivo" Click="MenuProgramOpenFileLocation_Click"/>
+            <MenuItem Header="🚀 Executar Aplicativo" Click="MenuProgramRun_Click"/>
+            <Separator/>
+            <MenuItem Header="🔑 Abrir no Editor do Registro (Regedit)" Click="MenuProgramOpenRegedit_Click"/>
+            <MenuItem Header="🌐 Pesquisar no Google" Click="MenuProgramSearchWeb_Click"/>
+            <Separator/>
+            <MenuItem Header="📋 Copiar Informações">
+                <MenuItem Header="Nome do Aplicativo" Click="MenuProgramCopyName_Click"/>
+                <MenuItem Header="Caminho / Local" Click="MenuProgramCopyPath_Click"/>
+                <MenuItem Header="Versão" Click="MenuProgramCopyVersion_Click"/>
+                <MenuItem Header="Chave do Registro" Click="MenuProgramCopyRegistryKey_Click"/>
+            </MenuItem>
+            <Separator/>
+            <MenuItem Header="🗑️ Desinstalar Programa" Click="MenuProgramUninstall_Click"/>
+            <MenuItem Header="⚡ Desinstalação Silenciosa" Click="MenuProgramQuietUninstall_Click"/>
+        </ContextMenu>
+
+        <ContextMenu x:Key="PortableContextMenu">
+            <MenuItem Header="📁 Abrir Pasta do App" Click="MenuPortableOpenFolder_Click"/>
+            <MenuItem Header="🚀 Executar Aplicativo" Click="MenuPortableRun_Click"/>
+            <Separator/>
+            <MenuItem Header="📋 Copiar Caminho da Pasta" Click="MenuPortableCopyPath_Click"/>
+            <MenuItem Header="📋 Copiar Caminho do Executável" Click="MenuPortableCopyExe_Click"/>
+            <Separator/>
+            <MenuItem Header="🗑️ Deletar App Portátil" Click="MenuPortableRemove_Click"/>
+        </ContextMenu>
+
+        <!-- Estilo para combos escuros desta pagina (ordenacao) -->
+        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="30" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#333333" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="BorderBrush" Value="#444444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton" Template="{DynamicResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
+                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#333"/>
+                    <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#444"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    <local:WidthMinusConverter x:Key="WidthMinusConverter"/>
+
         <!-- Estilo padrão para botões desta página (remove o chrome azul do WPF) -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="#2A2A2A"/>
@@ -73,7 +173,7 @@
 
         </Page.Resources>
 
-    <Grid Margin="30">
+    <Grid Margin="0">
         <!-- NORMAL CONTENT -->
         <Grid x:Name="NormalContent">
             <Grid.RowDefinitions>
@@ -81,9 +181,9 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Aplicativos" Margin="0,0,0,20"/>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Aplicativos" Margin="12,10,12,12"/>
 
-            <TabControl x:Name="MainTabs" Grid.Row="1" Background="Transparent" BorderThickness="0">
+            <TabControl x:Name="MainTabs" Grid.Row="1" Background="Transparent" BorderThickness="0" Margin="10,0,10,10">
 
                 <!-- ABA 0: BLOATWARE (UWP) -->
                 <TabItem Header="&#x1F4E6; Bloatware (UWP)">
@@ -113,7 +213,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Background="#181818" BorderBrush="#333" BorderThickness="1" CornerRadius="8">
+                        <Border Grid.Row="1" Background="#181818" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="10">
                             <ListView x:Name="BloatwareList" Background="Transparent" BorderThickness="0" Foreground="White" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
@@ -140,7 +240,7 @@
 
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid>
+                                        <Grid Width="{Binding ActualWidth, ElementName=BloatwareList, Converter={StaticResource WidthMinusConverter}, ConverterParameter=19}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="48"/>
@@ -220,17 +320,44 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Margin="0,0,0,15">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Gerenciador de Programas" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                                <TextBlock x:Name="ProgramsIconProgressText" Text="&#xCD;cones carregados: 0/0" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
+                        <Grid Grid.Row="0" Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Gerenciador de Programas" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock x:Name="ProgramsIconProgressText" Text="&#xCD;cones carregados: 0/0" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <TextBlock Text="Programas instalados no Windows. Gerencie instala&#xE7;&#xF5;es normais." Foreground="#AAA" Margin="0,3,0,0"/>
+                                <TextBlock Text="Baseado em Bulk Crap Uninstaller (BCU) - Licen&#xE7;a Apache 2.0" Foreground="#FF6F61" FontSize="11" Margin="0,2,0,0"/>
+                                <TextBox x:Name="TxtSearchPrograms" TextChanged="TxtSearchPrograms_TextChanged"
+                                         Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar programa por nome ou fabricante..."
+                                         Margin="0,10,0,0"/>
                             </StackPanel>
-                            <TextBlock Text="Programas instalados no Windows. Gerencie instala&#xE7;&#xF5;es normais." Foreground="#AAA" Margin="0,3,0,0"/>
-                            <TextBlock Text="Baseado em Bulk Crap Uninstaller (BCU) - Licen&#xE7;a Apache 2.0" Foreground="#FF6F61" FontSize="11" Margin="0,2,0,0"/>
-                            <TextBox x:Name="TxtSearchPrograms" TextChanged="TxtSearchPrograms_TextChanged"
-                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar programa por nome ou fabricante..."
-                                     Margin="0,10,0,0"/>
-                        </StackPanel>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="16,0,0,0">
+                                <TextBlock Text="ORDENAR POR" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
+                                           HorizontalAlignment="Right" Margin="0,0,2,4"/>
+                                <ComboBox x:Name="CmbProgramSort" Height="34" Width="230"
+                                          Style="{StaticResource DarkComboBoxStyle}"
+                                          ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                                          SelectionChanged="CmbProgramSort_SelectionChanged">
+                                    <ComboBoxItem Tag="Registry" IsSelected="True">Padrão (ordem do registro)</ComboBoxItem>
+                                    <ComboBoxItem Tag="NameAsc">Nome (A → Z)</ComboBoxItem>
+                                    <ComboBoxItem Tag="NameDesc">Nome (Z → A)</ComboBoxItem>
+                                    <ComboBoxItem Tag="DateDesc">Mais recentes</ComboBoxItem>
+                                    <ComboBoxItem Tag="DateAsc">Mais antigos</ComboBoxItem>
+                                    <ComboBoxItem Tag="SizeDesc">Maior tamanho</ComboBoxItem>
+                                    <ComboBoxItem Tag="SizeAsc">Menor tamanho</ComboBoxItem>
+                                    <ComboBoxItem Tag="Publisher">Fabricante (A → Z)</ComboBoxItem>
+                                </ComboBox>
+                                <TextBlock x:Name="TxtProgramsCount" Text="" FontSize="11" Foreground="#777"
+                                           HorizontalAlignment="Right" Margin="0,8,2,0"/>
+                            </StackPanel>
+                        </Grid>
 
                         <Border x:Name="ProgramsLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -250,8 +377,10 @@
                                         <Setter Property="BorderBrush" Value="Transparent"/>
                                         <Setter Property="BorderThickness" Value="0"/>
                                         <Setter Property="Margin" Value="0,2"/>
-                                        <Setter Property="Padding" Value="8"/>
+                                        <Setter Property="Padding" Value="0"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <EventSetter Event="PreviewMouseRightButtonDown" Handler="ListViewItem_PreviewMouseRightButtonDown"/>
+                                        <Setter Property="ContextMenu" Value="{StaticResource ProgramsContextMenu}"/>
                                         <Style.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#333"/></Trigger>
                                             <Trigger Property="IsSelected" Value="True">
@@ -264,10 +393,11 @@
                                 </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid>
+                                        <Grid Width="{Binding ActualWidth, ElementName=ProgramsList, Converter={StaticResource WidthMinusConverter}, ConverterParameter=19}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="32"/>
+                                                <ColumnDefinition Width="96"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="100"/>
                                                 <ColumnDefinition Width="120"/>
@@ -291,11 +421,29 @@
                                                 </ContentControl>
                                             </Grid>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
-                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding Publisher}" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
+                                                <TextBlock Text="{Binding SortMeta}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{Binding SortMetaBrush}" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding SortMetaTooltip}"/>
+                                                <TextBlock Text="{Binding SortMetaLabel}" FontSize="9" Foreground="#666"
+                                                           Margin="0,1,0,0" ToolTip="{Binding SortMetaTooltip}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding SortMetaLabel}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
-                                            <TextBlock Grid.Column="3" Text="{Binding DisplayVersion}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            <Button Grid.Column="4" Height="28" FontSize="11" Cursor="Hand" Click="BtnProgramRemove_Click" Tag="{Binding}" Content="REMOVER">
+                                            <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}"/>
+                                                <TextBlock Text="{Binding Publisher}" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" ToolTip="{Binding Publisher}"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="4" Text="{Binding DisplayVersion}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <Button Grid.Column="5" Height="28" FontSize="11" Cursor="Hand" Click="BtnProgramRemove_Click" Tag="{Binding}" Content="REMOVER">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
                                                         <Setter Property="Background" Value="Transparent"/>
@@ -382,8 +530,10 @@
                                         <Setter Property="BorderBrush" Value="Transparent"/>
                                         <Setter Property="BorderThickness" Value="0"/>
                                         <Setter Property="Margin" Value="0,2"/>
-                                        <Setter Property="Padding" Value="8"/>
+                                        <Setter Property="Padding" Value="0"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <EventSetter Event="PreviewMouseRightButtonDown" Handler="PortableListViewItem_PreviewMouseRightButtonDown"/>
+                                        <Setter Property="ContextMenu" Value="{StaticResource PortableContextMenu}"/>
                                         <Style.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#333"/></Trigger>
                                             <Trigger Property="IsSelected" Value="True">
@@ -396,7 +546,7 @@
                                 </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid>
+                                        <Grid Width="{Binding ActualWidth, ElementName=PortableList, Converter={StaticResource WidthMinusConverter}, ConverterParameter=19}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="32"/>
@@ -882,6 +1032,96 @@
                                 Width="100" Height="32"
                                 Background="#C42B1C" Foreground="White" BorderThickness="0" Cursor="Hand"/>
                     </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- TELA DO PONTO DE RESTAURAÇÃO: overlay dourado (mesma identidade do Kit).
+             Fica ACIMA do ConfirmOverlay (ZIndex 110) e some quando o usuario fecha. -->
+        <Border x:Name="RestorePointOverlay" Grid.RowSpan="2" Panel.ZIndex="110"
+                Background="#CC000000" Visibility="Collapsed" CornerRadius="12">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Width="500" Padding="26,22,26,24" CornerRadius="12"
+                    BorderBrush="#55FFD700" BorderThickness="1.5">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#262012" Offset="0"/>
+                        <GradientStop Color="#1B1812" Offset="0.5"/>
+                        <GradientStop Color="#13110B" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Effect>
+                    <DropShadowEffect Color="#FFD700" BlurRadius="22" ShadowDepth="0" Opacity="0.28"/>
+                </Border.Effect>
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Width="70" Height="70" CornerRadius="35"
+                                Background="#14FFD700" BorderBrush="#33FFD700" BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Grid>
+                                <TextBlock Text="&#x1F6E1;&#xFE0F;" FontSize="30"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border x:Name="RestorePointSpinner" Width="30" Height="30" CornerRadius="15"
+                                        Background="#2A2414" BorderBrush="#55FFD700" BorderThickness="1"
+                                        HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                        Margin="0,0,-9,-9">
+                                    <ContentControl Template="{StaticResource Win11MiniSpinnerTemplate}"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="PONTO DE RESTAURAÇÃO" FontSize="18" FontWeight="ExtraBold"
+                                       Foreground="{StaticResource GoldGradient}"/>
+                            <TextBlock x:Name="TxtRestorePointStatus" Text="Preparando..." FontSize="13"
+                                       Foreground="{StaticResource TextSecondary}" Margin="0,5,0,0"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Height="1" Background="#22FFD700" Margin="0,16,0,0"/>
+
+                    <!-- BARRINHA DE PROGRESSO: as duas colunas em star sao rebalanceadas por
+                         codigo (SetRestoreProgress), entao nao depende de ActualWidth. -->
+                    <Border x:Name="RestorePointBarHost" Height="12" Margin="0,14,0,0" CornerRadius="6"
+                            BorderBrush="#33FFD700" BorderThickness="1" Background="#241E14"
+                            ClipToBounds="True">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="ColRestoreFill" Width="0*"/>
+                                <ColumnDefinition x:Name="ColRestoreRest" Width="100*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="RestorePointBarFill" Grid.Column="0"
+                                    Background="{StaticResource GoldGradient}"/>
+                            <Border Grid.Column="1"/>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock x:Name="TxtRestorePointPercent" Text="0%" FontSize="13" FontWeight="Bold"
+                               Foreground="{StaticResource AccentColor}"
+                               Margin="0,6,0,0" HorizontalAlignment="Right"/>
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="14" VerticalAlignment="Top" Margin="0,1,8,0"
+                                   Opacity="0.75"/>
+                        <TextBlock x:Name="TxtRestorePointHint" Grid.Column="1"
+                                   Text="O Windows pode levar alguns segundos para registrar o ponto de restauração. Não feche o KitLugia."
+                                   FontSize="12" Foreground="{StaticResource TextDescription}"
+                                   TextWrapping="Wrap"/>
+                    </Grid>
+
+                    <Button x:Name="BtnRestorePointClose" Content="Fechar" Click="BtnRestorePointClose_Click"
+                            Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False"
+                            Width="130" Height="36" HorizontalAlignment="Right"
+                            Margin="0,16,0,0" Cursor="Hand"/>
                 </StackPanel>
             </Border>
         </Border>

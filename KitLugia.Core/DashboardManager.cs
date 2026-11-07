@@ -327,7 +327,7 @@ namespace KitLugia.Core
                             {
                                 string name = item["Name"]?.ToString() ?? "";
                                 // Filtra o driver básico do Windows para tentar achar a GPU real
-                                if (!string.IsNullOrEmpty(name) && !name.Contains("Basic Display"))
+                                if (!string.IsNullOrEmpty(name) && !SystemTweaks.IsVirtualDisplayAdapter(name, null))
                                 {
                                     gpuName = name;
                                     try

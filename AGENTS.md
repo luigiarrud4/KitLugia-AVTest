@@ -1,3 +1,90 @@
+﻿# Sessao 06/11 - GPU real vs virtual: filtro + refresh imediato + visual do ponto de restauracao
+
+Pedido: "faca o kit ignorar o virtual display driver e so focar na placa de video real";
+"nessa pagina tambem e bom fazer com que as alteracoes atualizassem os dados ali mesmo";
+"ajuste o visual disso para combinar melhor com o tema" (print: tela PONTO DE RESTAURACAO + toast).
+
+**1. FILTRO DE GPU VIRTUAL (Core)**: Win32_VideoController incluia "Virtual Display Driver" (ROOT\\DISPLAY\\0000,
+Status Error) nos combos e tweaks. Novo `SystemTweaks.IsVirtualDisplayAdapter(name, pnpId)` (nome: virtual/basic/
+indirect/remote/dummy/spacedesk/parsec/splashtop; PNP fora de PCI: ROOT\\/SWD\\/USB\\) + `EnumerateRealVideoControllers()`
+comum: filtra quando existe >= 1 GPU real; lista crua quando tudo e virtual (VM headless). GetAllGpuNames/GetAllGpuInfo/
+GetPrimaryGpu passaram pelo filtro (dropdown "Adaptador de Video (GPU)", tabela VRAM, Dashboard 1-clique e
+PopulateGpuList). LatencyAnalyzer, DashboardManager e TaskManager (DXGI IsSoftwareRenderer,
+"Virtual Display") tambem ignoram. Log: `GPU virtual ignorada` via LogOnce (heartbeat 3600 s).
+
+**2. REFRESH IMEDIATO (TweaksPage)**: toggles da secao GPU & Scheduling (FrameQueueMode/Preemption/GpuIdle/
+PowerLatency/VRAM) agora re-leem o estado REAL em background (IsFrameQueueModeSet/IsPreemptionEnabled/
+IsGpuIdleDisabled/IsGpuPowerLatencySet) e reconstroem a tabela VRAM (`BuildVramRowsFromData`, dados pre-lidos
+em `Task.Run` p/ nao travar a UI). Novo `RefreshGpuSectionAsync()` — fonte unica de atualizacao; os handlers
+apenas chamam (RecordTweak mantido). Antes a UI mostrava a *intencao*, nao o resultado.
+
+**3. VISUAL PONTO DE RESTAURACAO (AppsPage + toast)**: `NotificationNeutralBrush` virou dourado #FFD700
+(neutro = acao em andamento, sem veredito); toast LugiaToast Neutral = borda/gradiente dourado quente + titulo
+dourado; o overlay do ponto de restauracao foi refeito com a identidade do Kit: card dourado-escuro com ponte
+#55FFD700, medallion de escudo + mini-rodela (Win11MiniSpinnerTemplate) como badge de atividade, barra de
+progresso em GoldGradient, percentual dourado, botao Fechar com SecondaryButtonStyle. NotificationHistory
+(Neutral) tambem passou a dourado; `tests/RestorePointVis` atualizado (borda #66FFD700, titulo #FFFFD700).
+PNGs: tests/RestorePointVis/shots/restorepoint.
+
+**Verificacao**: build **0 erros** (154 warnings = baseline nullable); WMI confirma "NVIDIA GeForce RTX 5070 Ti"
+como unica GPU no combo; RestorePointVis **15/15 PASS**; prints conferidos a olho (overlay + toast);
+WMI: Virtual Display Driver = ROOT\\DISPLAY\\0000 (Status Error), RTX = PCI\\VEN_10DE (OK).
+Adendo (mesma sessao): a barrinha do ponto de restauracao, depois de encher com ease-out ate ~92%,
+não trava mais — rasteja 0,1 por vez (a cada ~2 s, ate ~98,9%) e o resultado real salta para 100%;
+percentual agora com 1 casa decimal; icone do toast descolado da barra dourada (Margin 8 px).
+
+**4. PROGRAMAS (Registry) — ordenacao + layout que nao corta (06/11, cont.)**:
+- Topo do "Programas (Registry)" ganhou a zona de ORDEM: label "ORDENAR POR" + `CmbProgramSort`
+  (DarkComboBoxStyle/DarkComboBoxItemStyle locais na pagina) com: Nome A→Z / Z→A, Mais recentes,
+  Mais antigos, Maior tamanho, Menor tamanho, Fabricante A→Z. Padrao = Mais recentes.
+- Coluna de META logo apos o icone (SortMeta/SortMetaLabel/SortMetaTooltip): mostra a DATA de
+  instalacao (dd/MM/aaaa) ou o TAMANHO (formatado em KB/MB/GB, gold) conforme o filtro ativo;
+  tooltip traz as duas informacoes. Ordenacoes por nome/fabricante mostram a data.
+- `RefreshProgramsView()` centraliza busca + ordenacao (reaproveitada no load e na busca); os
+  pontos de refresh passam por ela (nada mais recria a colecao filtrada direto).
+- A lista NAO corta mais o REMOVER: causa = linhas medindo infinitamente (colunas `*` sob medida
+  infinita) e conteudo transbordando. Fix: `Padding="0"` no ItemContainerStyle + `Width="{Binding ActualWidth, ElementName=ProgramsList}"` no grid da linha (fit exato no viewport;
+  o overflow some em qualquer largura). Mesma troca no tab de Portateis (mesmo codigo copiado).
+- Harness descartavel (`ProgramsTabVis`) abriu a pagina real: 1101 programas listados, sort
+  por tamanho (5,3 GB em cima) e por nome (A→Z) OK; REMOVER sempre visivel.
+
+**5. PROGRAMAS (Registry) — polimento de espaco (06/11, cont.)**: contador "N programas"
+embaixo do filtro (a coluna da direita era espaco morto); apps sem dado show `-` CINZA e a
+legenda (TAMANHO/INSTALADO) some (Visibility via trigger); tamanho/data com dado real continuam
+dourados; ordenacao "Menor tamanho" empurra os desconhecidos para o FIM (0 => long.MaxValue);
+build 0 erros; PNGs conferidos.
+
+**6. GERENCIADOR DE APLICATIVOS — cards encostam nas bordas (06/11, cont.)**: raiz da
+AppsPage `<Grid Margin="30">` -> `Margin="0"`; titulo com `Margin="12,10,12,12"` e
+TabControl com `Margin="10,0,10,10"` — os cards vao de ponta a ponta (antes sobravam ~30 px
+de cada lado e os botoes do rodape quebravam em 2 linhas); mesma posicao nas outras abas do
+gerenciador (o layout e unico na raiz).
+
+**7. BLOATWARE / PROGRAMS — REMOVER cortado -> corrigido (06/11, cont.)**: o ListView
+estava medindo as linhas em largura infinita (filas `*` sem limite) -> cada item estourava
+a borda e o botao REMOVER ficava com so metade visivel. Fix nos 3 listas (Bloatware,
+Programas, Portable): `Padding="0"` no ItemContainerStyle + `Width="{Binding ActualWidth,
+ElementName=...List, Converter={StaticResource WidthMinusConverter}, ConverterParameter=19}"`
+no Grid da linha (converter novo, subtrai a largura da scrollbar do viewport). Bloatware
+tb ganhou `Padding="10"` no Border do painel (era o unico sem). Verificado: REMOVER aparece
+inteiro em todas as abas (harness: 5/5, programas 1101, captura visual confere).
+
+**8. FILTRO "Padrao (ordem do registro)" como padrao (06/11, cont.)**: pedido do usuario —
+a ordem original do registro passa a ser o filtro default (`Tag="Registry"`, `IsSelected=True`);
+os extras (Nome, Data, Tamanho, Fabricante) ficam como opcoes avancadas. Ordenacao
+desconhecidos-para-o-fim no "Menor tamanho" (0 => long.MaxValue). Contador "N programas"
+abaixo do filtro (a coluna da direita era espaco morto); apps sem dado do instalador mostram
+`-` CINZA com a legenda some.
+
+**9. INFO QUE FALTA — tamanho real via MFT (o mesmo mecanismo do Everything) (06/11, cont.)**:
+novo `KitLugia.Core/FolderSizeMft.cs` — le o `$MFT` do disco (Rust nativo + IOCTL, igual Everything
+no indexador USN) e soma o tamanho de cada pasta de instalacao em SEM(CO) enumerar o diretorio
+inteiro arquivo a arquivo. Apps cujo registro nao traz `EstimatedSize` agora exibem
+"TAMANHO" medido no disco ao ordenar por tamanho (Human: Fall Flat 5,3 GB, SDK 4,0 GB, etc.)
+— captura confere (ProgramsTabVis 5/5, 1101 programas). Fallback classico se o volume nao for
+NTFS/MFT falhar. Linux/FS case-insensitive ok (OrdinalIgnoreCase). Build **0 erros**;
+RestorePointVis **15/15 PASS**; AGENTS.md log atualizado.
+
 # Sessao 05/11 - Padronizacao visual: backup do kit estavel, plano + checklist e F0 (tokens)
 
 Pedido: "salve o plano e faca uma checklist para comecar a trabalhar nele, so faca um backup pelo git
@@ -12523,3 +12610,47 @@ revalida o scan nativo).
 memoria) e conferir: (a) o log de "Limpeza de standby" e do "RAM Limiter"
 continua igual; (b) um app com acento no nome agora e detectado pelo
 desinstalador (comportamento novo, correto).
+
+### Sessao 05-06/11 - SystemInfoPage sem freeze + toast cinza (Neutral) + tela de ponto de restauracao (branch `aaa`)
+
+**Contexto**: pagina de sistema travava ~5 s no load; criar ponto de restauracao na
+AppsPage nao tinha feedback visual alem do toast.
+
+**SystemInfoPage (o freeze de 5,3 s era o WMI)**: instrumentacao temporaria mostrou
+colecao WMI inteira = 5,3 s; grupo Rede/Perifericos = 5,1 s; isolado por query, o
+**connect() no namespace do TPM (`\\.\root\CIMV2\Security\MicrosoftTpm`) leva ~5,0 s**
+nesta maquina; todo o resto fica em 43-144 ms. Parallelizar as queries NAO ajudou
+(WMI serializa internamente). Solucao: carga estatica (`CollectStatic`) roda em
+`Task.Run` com grupos paralelos (Task.WhenAll sobre GrupoSistema/GrupoSoEDisco/
+GrupoRedeEPerifericos, cada um com sub-queries em Task.Run e checkpoints de
+CancellationToken); o **TPM roda SOLTO** (`CollectTpm` em Task.Run proprio, atualiza
+so o cartao dele via Dispatcher) e NAO segura a pagina. Resultado medido: pagina
+carregada em ~3 s. O refresh em tempo real ganhou guarda de corrida
+(`Interlocked.CompareExchange` em `_refreshBusy`: se um refresh nao terminou, o
+proximo pula em vez de empilhar). CTS novo cancela as coletas no Unload.
+
+**Toast cinza (Neutral) + barrinha de progresso**: `NotificationType.Neutral` novo
+(cinza #B0B0B0, icone escudo, borda #66B0B0B0) em `Enums.cs`/`NotificationHistory.cs`/
+`Brushes.xaml` (`NotificationNeutralBrush`). `LugiaToast` ganhou barrinha de
+progresso via 2 colunas star rebalanceadas em `SetProgress(0..100)` (nao depende de
+ActualWidth) e **bug pre-existente corrigido**: `SetContent`/`TransitionToType`
+setavam `ToastType` sem `OnPropertyChanged`, entao o binding de cor nunca atualizava
+(toast de "sucesso" ficava dourado). `MainWindow`: `ShowProgressToast(...,
+NotificationType toastType = Info)`, `UpdateProgressToastValue(taskId, percent)` novo
+e `CompleteProgressToast(..., NotificationType? finalType, string? finalTitle)` —
+com finalType=Neutral o toast fecha CINZA (sem veredito verde/vermelho).
+
+**Ponto de restauracao na AppsPage**: overlay proprio (`RestorePointOverlay` +
+spinner + status + hint + barrinha + botao Fechar desabilitado durante a operacao) +
+toast cinza de progresso (`RESTORE_POINT`): abre cinza, avanca com
+UpdateProgressToastValue e fecha cinza. Chamada real:
+`DeepUninstaller.TryCreateRestorePoint("KitLugia: Manual Restore Point")` em Task.Run
+(SRSetRestorePointW sobe o VSS na 1a chamada e pode levar segundos).
+
+**Verificacao (tudo verde na branch `aaa`)**: build Release 0 erros/0 warnings;
+AnimCheck 44/44; ui_style_audit SAIDA 0 (allowlist: AppsPage 116->117, SystemInfoPage
+45->46); `tests/RestorePointVis` (harness novo) 15/15 — toast Neutral cinza com barra
+45%, overlay visivel com status/45%/Fechar desabilitado, Fechar libera no fim, barra
+da tela em 72%; PNGs em `tests/RestorePointVis/shots/restorepoint`. Encodings: os
+pre-existentes mantiveram BOM/CRLF originais; os 2 arquivos novos do harness foram
+normalizados para BOM+CRLF (convencao UiShotHarness).

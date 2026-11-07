@@ -132,7 +132,7 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Width="30" Height="30" Cursor="Help" Margin="0,0,10,0" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" VerticalAlignment="Top" Template="{StaticResource IconButtonTemplate}">
                             <Button.ToolTip>
-                                <ToolTip Content="Seleciona qual GPU será usada como alvo para os tweaks de agendamento (FrameQueue, Preemption, Idle, Latency). A VRAM abaixo mostra todas as GPUs com toggle independente. A GPU selecionada aqui é usada como referência para o kit aplicar os tweaks corretamente."/>
+                                <ToolTip Content="Seleciona qual GPU será usada como alvo para os tweaks de agendamento (FrameQueue, Preemption, Idle, Latency). Drivers virtuais de vídeo (ex.: Virtual Display Driver) são ignorados — só GPUs físicas (dedicadas e iGPU) aparecem aqui. A GPU selecionada aqui é usada como referência para o kit aplicar os tweaks corretamente."/>
                             </Button.ToolTip>
                             <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="#AA88FF" Opacity="0.6"/>
                             
@@ -149,7 +149,7 @@
                         </StackPanel>
                         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="15,0,0,0">
                             <TextBlock Text="GPU alvo para tweaks de agendamento" Foreground="#A0A0A0" FontSize="11"/>
-                            <TextBlock Text="A VRAM abaixo mostra TODAS as GPUs com toggle individual." Foreground="#8877AA" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="A VRAM abaixo mostra as GPUs físicas (drivers virtuais ignorados)." Foreground="#8877AA" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
 

@@ -2784,7 +2784,8 @@ namespace KitLugia.GUI
         }
 
         // ⬇️ NOVO: Toast de progresso que transiciona de Info (amarelo) → Success (verde) ou Error (vermelho)
-        public void ShowProgressToast(string taskId, string title, string initialMessage)
+        // O tipo pode ser Neutral (cinza): acao informativa sem veredito de sucesso/erro.
+        public void ShowProgressToast(string taskId, string title, string initialMessage, NotificationType toastType = NotificationType.Info)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -2795,11 +2796,12 @@ namespace KitLugia.GUI
                     return;
                 }
 
-                // Cria novo toast do tipo Info (amarelo)
+                // Cria novo toast do tipo pedido (Info = amarelo, Neutral = cinza)
                 var toast = new LugiaToast();
-                toast.SetContent(title, initialMessage, NotificationType.Info);
+                toast.SetContent(title, initialMessage, toastType);
                 toast.NotificationId = $"PROGRESS|{taskId}";
                 toast.IsProgress = true;
+                toast.SetProgress(0);
 
                 _progressToasts[taskId] = toast;
 
@@ -2830,19 +2832,39 @@ namespace KitLugia.GUI
             });
         }
 
+        /// <summary>Preenchimento da barrinha de progresso do toast (0..100).</summary>
+        public void UpdateProgressToastValue(string taskId, double percent)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (_progressToasts.TryGetValue(taskId, out var toast))
+                {
+                    toast.SetProgress(percent);
+                }
+            });
+        }
+
         public void CompleteProgressToast(string taskId, bool success, string finalMessage)
+            => CompleteProgressToast(taskId, success, finalMessage, null, null);
+
+        /// <summary>
+        /// Fecha o toast de progresso. Com <paramref name="finalType"/> = Neutral o
+        /// toast continua cinza (nem verde nem vermelho) — usado nas acoes que so'
+        /// informam que o processo rodou (ex.: ponto de restauracao).
+        /// </summary>
+        public void CompleteProgressToast(string taskId, bool success, string finalMessage, NotificationType? finalType, string? finalTitle)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
                 if (!_progressToasts.TryGetValue(taskId, out var toast)) return;
 
                 // ⭐ MÁGICA: transiciona o toast para o tipo final com animação
-                var newType = success ? NotificationType.Success : NotificationType.Error;
-                string finalTitle = success ? "CONCLUÍDO" : "FALHA";
-                toast.TransitionToType(newType, finalTitle, finalMessage);
+                var newType = finalType ?? (success ? NotificationType.Success : NotificationType.Error);
+                string title = finalTitle ?? (success ? "CONCLUÍDO" : "FALHA");
+                toast.TransitionToType(newType, title, finalMessage);
 
                 // Adiciona ao histórico de notificações
-                NotificationHistoryManager.Add(finalTitle, finalMessage, newType);
+                NotificationHistoryManager.Add(title, finalMessage, newType);
 
                 // Remove do dicionário de progresso (agora é um toast normal com seu próprio ciclo de vida)
                 _progressToasts.Remove(taskId);

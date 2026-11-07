@@ -22,6 +22,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="Informações do Sistema" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
             <TextBlock Text="Monitoramento em tempo real — CPU, GPU, RAM, disco e rede" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
+            <TextBlock x:Name="TxtLoadError" Text="" FontSize="12" Foreground="{StaticResource ErrorBrush}" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
         </StackPanel>
 
         <!-- Gauges -->
@@ -178,6 +179,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock x:Name="TxtStorageRealtime" Text="" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -199,6 +201,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock x:Name="TxtNetworkRealtime" Text="" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -288,5 +291,20 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- OVERLAY DE CARREGAMENTO (variante A do contrato: Themes/Spinners.xaml).
+             A coleta de hardware (WMI + GPU + rede) roda em background; sem este
+             overlay a pagina ficava congelada, sem resposta e sem feedback. -->
+        <Grid x:Name="LoadingOverlay" Grid.RowSpan="3" Panel.ZIndex="90" Background="#CC000000" Visibility="Collapsed">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Background="{StaticResource Surface1}" BorderBrush="{StaticResource BorderSubtle}"
+                    BorderThickness="1" CornerRadius="8" Width="400" Padding="24">
+                <StackPanel>
+                    <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TxtLoadingMessage" Text="Carregando informações do sistema..." FontSize="16" Foreground="White" Margin="0,15,0,0" TextAlignment="Center"/>
+                    <TextBlock Text="Coletando dados de hardware (WMI, GPU, rede)" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" TextAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Page>

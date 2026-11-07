@@ -143,7 +143,8 @@ namespace KitLugia.Core.TaskManager
             if (string.IsNullOrEmpty(name)) return true;
             return name.Contains("Basic Render", StringComparison.OrdinalIgnoreCase)
                 || name.Contains("Remote Display", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("Indirect Display", StringComparison.OrdinalIgnoreCase);
+                || name.Contains("Indirect Display", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Virtual Display", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Tenta VRAM real via registro (chave de classe display, fonte do dxdiag).</summary>
