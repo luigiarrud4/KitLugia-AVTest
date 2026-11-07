@@ -5,6 +5,9 @@
     {
         Info,
         Success,
-        Error
+        Error,
+        // Neutro/cinza: ação informativa sem veredito (ex.: criar ponto de restauração).
+        // Não é verde nem vermelho — só informa que o processo rodou.
+        Neutral
     }
 }

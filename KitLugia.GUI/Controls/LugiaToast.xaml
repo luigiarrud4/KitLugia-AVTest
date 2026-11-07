@@ -101,6 +101,24 @@
                             </Setter.Value>
                         </Setter>
                     </DataTrigger>
+
+                    <!-- NEUTRO (Dourado): ação informativa / em andamento, sem veredito de sucesso/erro -->
+                    <DataTrigger Binding="{Binding ToastType}" Value="Neutral">
+                        <Setter Property="BorderBrush" Value="#66FFD700"/>
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                    <GradientStop Color="#CC2A2410" Offset="0"/>
+                                    <GradientStop Color="#F0100E08" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Setter.Value>
+                        </Setter>
+                        <Setter Property="Effect">
+                            <Setter.Value>
+                                <DropShadowEffect Color="#FFD700" BlurRadius="10" ShadowDepth="2" Opacity="0.25"/>
+                            </Setter.Value>
+                        </Setter>
+                    </DataTrigger>
                 </Style.Triggers>
             </Style>
         </Border.Style>
@@ -126,13 +144,16 @@
                             <DataTrigger Binding="{Binding ToastType}" Value="Error">
                                 <Setter Property="Fill" Value="{DynamicResource NotificationErrorBrush}"/>
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding ToastType}" Value="Neutral">
+                                <Setter Property="Fill" Value="{DynamicResource NotificationNeutralBrush}"/>
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Rectangle.Style>
             </Rectangle>
 
             <!-- Ícone Emoji + Spinner de Progresso (toasts de progresso) -->
-            <Grid Grid.Column="1" VerticalAlignment="Center">
+            <Grid Grid.Column="1" VerticalAlignment="Center" Margin="8,0,2,0">
                 <TextBlock FontSize="18" Margin="10,0,10,0" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -145,6 +166,9 @@
                                 <DataTrigger Binding="{Binding ToastType}" Value="Error">
                                     <Setter Property="Text" Value="&#x26A0;&#xFE0F;"/>
                                 </DataTrigger>
+                                <DataTrigger Binding="{Binding ToastType}" Value="Neutral">
+                                    <Setter Property="Text" Value="&#x1F6E1;&#xFE0F;"/>
+                                </DataTrigger>
                                 <DataTrigger Binding="{Binding IsProgress}" Value="True">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
@@ -154,13 +178,17 @@
                 </TextBlock>
 
                 <!-- Spinner girando (visível apenas em toasts de progresso) -->
-                <Ellipse x:Name="ProgressSpinner" Width="18" Height="18" Stroke="{DynamicResource AccentColor}" StrokeThickness="2.5" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="22 13" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse x:Name="ProgressSpinner" Width="18" Height="18" StrokeThickness="2.5" Fill="Transparent" RenderTransformOrigin="0.5,0.5" StrokeDashArray="22 13" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.Style>
                         <Style TargetType="Ellipse">
                             <Setter Property="Visibility" Value="Collapsed"/>
+                            <Setter Property="Stroke" Value="{DynamicResource AccentColor}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsProgress}" Value="True">
                                     <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ToastType}" Value="Neutral">
+                                    <Setter Property="Stroke" Value="{DynamicResource NotificationNeutralBrush}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -193,6 +221,9 @@
                             <DataTrigger Binding="{Binding ToastType}" Value="Error">
                                 <Setter Property="Foreground" Value="{DynamicResource NotificationErrorBrush}"/>
                                 </DataTrigger>
+                            <DataTrigger Binding="{Binding ToastType}" Value="Neutral">
+                                <Setter Property="Foreground" Value="{DynamicResource NotificationNeutralBrush}"/>
+                            </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
@@ -229,6 +260,45 @@
                     </ControlTemplate>
                 </Button.Template>
             </Button>
+
+            <!-- BARRINHA DE PROGRESSO: aparece so' em toast de progresso e "enche"
+                 enquanto a tarefa roda. As duas colunas em star sao ajustadas por
+                 codigo (SetProgress), entao nao depende de ActualWidth. -->
+            <Grid x:Name="ProgressBarHost" Grid.Column="0" Grid.ColumnSpan="5" Height="3" VerticalAlignment="Bottom">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsProgress}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="ColProgressFill" Width="0*"/>
+                    <ColumnDefinition x:Name="ColProgressRest" Width="100*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" x:Name="ProgressFill">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{DynamicResource AccentColor}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ToastType}" Value="Success">
+                                    <Setter Property="Background" Value="{DynamicResource NotificationSuccessBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ToastType}" Value="Error">
+                                    <Setter Property="Background" Value="{DynamicResource NotificationErrorBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ToastType}" Value="Neutral">
+                                    <Setter Property="Background" Value="{DynamicResource NotificationNeutralBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+                <Border Grid.Column="1" Background="#26FFFFFF"/>
+            </Grid>
 
         </Grid>
     </Border>

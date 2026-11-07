@@ -26,6 +26,7 @@ namespace KitLugia.GUI
                     NotificationType.Success => "✅",
                     NotificationType.Error => "❌",
                     NotificationType.Info => "ℹ️",
+                    NotificationType.Neutral => "🛡️",
                     _ => "📝"
                 };
             }
@@ -41,6 +42,7 @@ namespace KitLugia.GUI
                     NotificationType.Success => "#4CAF50", // Verde
                     NotificationType.Error => "#FF5555",   // Vermelho
                     NotificationType.Info => "#FFD700",    // Dourado
+                    NotificationType.Neutral => "#FFD700", // Dourado
                     _ => "#FFFFFF"
                 };
             }
@@ -56,6 +58,7 @@ namespace KitLugia.GUI
                     NotificationType.Success => "#104CAF50",
                     NotificationType.Error => "#10FF5555",
                     NotificationType.Info => "#10FFD700",
+                    NotificationType.Neutral => "#10FFD700",
                     _ => "#1F1F1F"
                 };
             }

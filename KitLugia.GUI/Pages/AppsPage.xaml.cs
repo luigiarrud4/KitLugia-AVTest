@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -12,8 +13,11 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Data;
+using System.Windows.Threading;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using Microsoft.Win32;
 using MessageBox = System.Windows.MessageBox;
 using KitLugia.Core;
 using KitLugia.Core.UninstallTools;
@@ -24,6 +28,10 @@ using KitLugia.GUI.Services;
 // --- CORREÇÃO DOS CONFLITOS DE AMBIGUIDADE ---
 using Button = System.Windows.Controls.Button;
 using TextBox = System.Windows.Controls.TextBox;
+using Clipboard = System.Windows.Clipboard;
+using ListViewItem = System.Windows.Controls.ListViewItem;
+using MenuItem = System.Windows.Controls.MenuItem;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 
 #pragma warning disable CS4014 // Chamadas async não aguardadas são intencionais para operações em background
 
@@ -41,6 +49,9 @@ namespace KitLugia.GUI.Pages
         private ObservableCollection<ProgramViewModel>? FilteredProgramsCollection;
         private CancellationTokenSource? _programsCts;
         private bool _programsLoaded = false;
+        // Contador incremental de icones carregados: substitui o Count(p => p.Icon != null)
+        // que rodava LINQ O(n) na UI thread POR ICONE (travada visivel com ~440+ apps).
+        private int _iconsLoaded;
         private bool _junkLoaded = false;
 
         // Portable
@@ -137,6 +148,9 @@ namespace KitLugia.GUI.Pages
         {
             try
             {
+                // Parar a animação da barrinha do ponto de restauração
+                StopRestoreProgressAnimation();
+
                 // Cancelar tokens ANTES de limpar collections
                 _bloatwareCts?.Cancel();
                 _programsCts?.Cancel();
@@ -461,15 +475,194 @@ namespace KitLugia.GUI.Pages
             }
         }
 
+        // ══════════════════════════════════════════════════════════════════
+        //  PONTO DE RESTAURAÇÃO — tela com barra de progresso + notificação
+        // ══════════════════════════════════════════════════════════════════
+        private const string RestorePointTaskId = "RESTORE_POINT";
+        private bool _restorePointBusy;
+        private DispatcherTimer? _restoreProgressTimer;
+        private double _restoreProgress;
+
         private async void BtnCreateRestorePoint_Click(object sender, RoutedEventArgs e)
         {
-            // SRSetRestorePointW inicializa o VSS na primeira chamada: pode levar
-            // segundos. Rodar na thread da UI travava a janela inteira.
-            bool created = await Task.Run(() => DeepUninstaller.TryCreateRestorePoint("KitLugia: Manual Restore Point"));
-            if (created)
-                MessageBox.Show("✅ Ponto de restauração criado com sucesso!", "Ponto de Restauração", MessageBoxButton.OK, MessageBoxImage.Information);
-            else
-                MessageBox.Show("⚠️ Não foi possível criar o ponto de restauração.\nVerifique se o serviço 'Volume Shadow Copy' está ativo.", "Ponto de Restauração", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (_restorePointBusy) return;
+            _restorePointBusy = true;
+
+            // 1) TELA: overlay com a barrinha enchendo
+            ShowRestorePointScreen("Preparando o ponto de restauração...");
+            StartRestoreProgressAnimation();
+
+            // 2) NOTIFICAÇÃO: toast CINZA (neutro) de progresso — não verde/vermelho
+            ShowRestorePointToast("Criando ponto de restauração...");
+
+            try
+            {
+                // SRSetRestorePointW inicializa o VSS na primeira chamada: pode levar
+                // segundos. Rodar na thread da UI travava a janela inteira.
+                bool created = await Task.Run(() => DeepUninstaller.TryCreateRestorePoint("KitLugia: Manual Restore Point"));
+
+                // 3) fecha a barra em 100% antes de mostrar o resultado
+                await FillRestoreProgressTo(100);
+
+                if (created)
+                {
+                    SetRestorePointResult(true,
+                        "Ponto de restauração criado com sucesso!",
+                        "O Windows registrou o ponto de restauração. Ele pode ser usado para desfazer alterações do sistema.");
+                    CompleteRestorePointToast(true, "Ponto de restauração criado com sucesso.");
+                }
+                else
+                {
+                    SetRestorePointResult(false,
+                        "Não foi possível criar o ponto de restauração.",
+                        "Verifique se o serviço 'Volume Shadow Copy' está ativo e se há espaço em disco suficiente.");
+                    CompleteRestorePointToast(false, "Não foi possível criar o ponto de restauração. Verifique o serviço 'Volume Shadow Copy'.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnCreateRestorePoint_Click", ex.Message);
+                await FillRestoreProgressTo(100);
+                SetRestorePointResult(false, "Falha ao criar o ponto de restauração.", ex.Message);
+                CompleteRestorePointToast(false, "Falha ao criar o ponto de restauração: " + ex.Message);
+            }
+        }
+
+        private void BtnRestorePointClose_Click(object sender, RoutedEventArgs e)
+        {
+            StopRestoreProgressAnimation();
+            if (RestorePointOverlay != null) RestorePointOverlay.Visibility = Visibility.Collapsed;
+            _restorePointBusy = false;
+        }
+
+        /// <summary>Abre a tela do ponto de restauração (overlay + barrinha zerada).</summary>
+        private void ShowRestorePointScreen(string status)
+        {
+            if (RestorePointOverlay == null) return;
+            RestorePointOverlay.Visibility = Visibility.Visible;
+            if (RestorePointSpinner != null) RestorePointSpinner.Visibility = Visibility.Visible;
+            if (TxtRestorePointStatus != null) TxtRestorePointStatus.Text = status;
+            if (TxtRestorePointHint != null)
+                TxtRestorePointHint.Text = "O Windows pode levar alguns segundos para registrar o ponto de restauração. Não feche o KitLugia.";
+            if (BtnRestorePointClose != null) BtnRestorePointClose.IsEnabled = false;
+            SetRestoreProgress(0);
+        }
+
+        /// <summary>Estado final da tela (some com o spinner e libera o botão Fechar).</summary>
+        private void SetRestorePointResult(bool success, string status, string detail)
+        {
+            try
+            {
+                if (TxtRestorePointStatus != null) TxtRestorePointStatus.Text = status;
+                if (TxtRestorePointHint != null) TxtRestorePointHint.Text = detail;
+                if (RestorePointSpinner != null) RestorePointSpinner.Visibility = Visibility.Collapsed;
+                if (BtnRestorePointClose != null) BtnRestorePointClose.IsEnabled = true;
+            }
+            catch (Exception ex) { Logger.LogError("SetRestorePointResult", ex.Message); }
+        }
+
+        /// <summary>
+        /// Animação da barrinha: enche sozinha com ease-out até ~92% (a API do Windows não
+        /// devolve progresso real). Depois, em vez de travar, o medidor rasteja 0,1 por vez
+        /// (cerca de 0,1 a cada ~2s) até ~98,9% — quando o resultado real aparece, a barra vai
+        /// direto para 100%.
+        /// </summary>
+        private void StartRestoreProgressAnimation()
+        {
+            StopRestoreProgressAnimation();
+            _restoreProgress = 0;
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            timer.Tick += (s, e) =>
+            {
+                if (_restoreProgress < 92)
+                {
+                    // enche com slowdown (ease-out) e para o encher rápido em 92%
+                    _restoreProgress += (92 - _restoreProgress) * 0.06 + 0.15;
+                    if (_restoreProgress > 92) _restoreProgress = 92;
+                }
+                else if (_restoreProgress < 98.9)
+                {
+                    // rasteja lento: 0,1 a cada ~2s (a cada 20 ticks), ate o resultado real chegar
+                    _restoreProgress += 0.005;
+                }
+                SetRestoreProgress(_restoreProgress);
+            };
+            timer.Start();
+            _restoreProgressTimer = timer;
+        }
+
+        private void StopRestoreProgressAnimation()
+        {
+            if (_restoreProgressTimer == null) return;
+            _restoreProgressTimer.Stop();
+            _restoreProgressTimer = null;
+        }
+
+        /// <summary>Corre da barra até o alvo (usado para fechar em 100%).</summary>
+        private async Task FillRestoreProgressTo(double target)
+        {
+            StopRestoreProgressAnimation();
+            double start = _restoreProgress;
+            const int steps = 12;
+            for (int i = 1; i <= steps; i++)
+            {
+                _restoreProgress = start + (target - start) * (i / (double)steps);
+                SetRestoreProgress(_restoreProgress);
+                await Task.Delay(30);
+            }
+            _restoreProgress = target;
+            SetRestoreProgress(target);
+        }
+
+        /// <summary>Atualiza a barrinha da TELA e a do TOAST ao mesmo tempo.</summary>
+        private void SetRestoreProgress(double percent)
+        {
+            double p = percent < 0 ? 0 : (percent > 100 ? 100 : percent);
+            try
+            {
+                if (ColRestoreFill != null && ColRestoreRest != null)
+                {
+                    ColRestoreFill.Width = new GridLength(p, GridUnitType.Star);
+                    ColRestoreRest.Width = new GridLength(100 - p, GridUnitType.Star);
+                }
+                if (TxtRestorePointPercent != null)
+                    TxtRestorePointPercent.Text = $"{p:F1}%";
+            }
+            catch { }
+            UpdateRestorePointToastProgress(p);
+        }
+
+        // --- Notificação (toast) do ponto de restauração ---------------------
+
+        private void ShowRestorePointToast(string message)
+        {
+            try
+            {
+                if (System.Windows.Application.Current.MainWindow is MainWindow w)
+                    w.ShowProgressToast(RestorePointTaskId, "PONTO DE RESTAURAÇÃO", message, NotificationType.Neutral);
+            }
+            catch (Exception ex) { Logger.LogError("ShowRestorePointToast", ex.Message); }
+        }
+
+        private void UpdateRestorePointToastProgress(double percent)
+        {
+            try
+            {
+                if (System.Windows.Application.Current.MainWindow is MainWindow w)
+                    w.UpdateProgressToastValue(RestorePointTaskId, percent);
+            }
+            catch { }
+        }
+
+        private void CompleteRestorePointToast(bool success, string message)
+        {
+            try
+            {
+                if (System.Windows.Application.Current.MainWindow is MainWindow w)
+                    w.CompleteProgressToast(RestorePointTaskId, success, message, NotificationType.Neutral,
+                        success ? "PONTO DE RESTAURAÇÃO CRIADO" : "PONTO DE RESTAURAÇÃO FALHOU");
+            }
+            catch (Exception ex) { Logger.LogError("CompleteRestorePointToast", ex.Message); }
         }
 
         private void BtnSelectAllBloatware_Click(object sender, RoutedEventArgs e)
@@ -730,13 +923,21 @@ namespace KitLugia.GUI.Pages
                     ProgramsCollection = new ObservableCollection<ProgramViewModel>(
                         programs.Select(p => new ProgramViewModel(p)));
 
+                    // Nova carga: zera o contador incremental de icones.
+                    _iconsLoaded = 0;
+
                     if (ProgramsIconProgressText != null)
                         ProgramsIconProgressText.Text = $"Ícones carregados: 0/{ProgramsCollection.Count}";
 
-                    // Mostra a lista
-                    FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(ProgramsCollection);
-                    if (ProgramsList != null) ProgramsList.ItemsSource = FilteredProgramsCollection;
+                    // Mostra a lista aplicando a ordenacao atual
+                    RefreshProgramsView();
                 });
+
+                // Lista já está na tela (scan rápido, só registro). Em background, completa
+                // os metadados que exigem I/O de disco (InstallLocation real, versão/
+                // fabricante do binário, data de instalação) e, ao final, mede os tamanhos
+                // que o registro não declara via MFT.
+                _ = EnrichProgramsMetadataAsync(programs, token);
 
                 // Carrega ícones em paralelo após delay para lista aparecer rápido
                 await Task.Delay(100, token);
@@ -804,12 +1005,20 @@ namespace KitLugia.GUI.Pages
                         {
                             await dispatcher.InvokeAsync(() =>
                             {
+                                // Icon agora notifica via INotifyPropertyChanged: nao precisa
+                                // de Items.Refresh() (que re-renderizava todos os containers).
                                 program.Icon = icon;
 
-                                int loadedCount = collection.Count(p => p.Icon != null);
+                                // Contador incremental O(1): a versao anterior fazia
+                                // Count(p => p.Icon != null) por icone — O(n) na UI thread
+                                // a cada conclusao, virando travada com ~440+ apps.
+                                _iconsLoaded++;
                                 if (ProgramsIconProgressText != null)
                                 {
-                                    ProgramsIconProgressText.Text = $"Ícones carregados: {loadedCount}/{collection.Count}";
+                                    // Texto do progresso so a cada 16 icones: 1100 updates
+                                    // de texto = 1100 passes de layout na UI thread.
+                                    if (_iconsLoaded % 16 == 0 || _iconsLoaded == collection.Count)
+                                        ProgramsIconProgressText.Text = $"Ícones carregados: {_iconsLoaded}/{collection.Count}";
                                 }
                             }, System.Windows.Threading.DispatcherPriority.Background);
                         }
@@ -828,9 +1037,9 @@ namespace KitLugia.GUI.Pages
 
             await dispatcher.InvokeAsync(() =>
             {
-                if (ProgramsList != null)
-                    ProgramsList.Items.Refresh();
-
+                // Sem Items.Refresh(): cada Icon raises PropertyChanged, entao os
+                // containers ja refletem o novo icone. O Refresh re-renderizava a
+                // lista inteira (1100+ itens) e era parte da travada.
                 if (ProgramsIconProgressText != null)
                 {
                     ProgramsIconProgressText.Text = "Ícones carregados!";
@@ -863,108 +1072,353 @@ namespace KitLugia.GUI.Pages
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
-        private void TxtSearchPrograms_TextChanged(object sender, TextChangedEventArgs e)
+        // Ordenacao atual da lista de programas (combobox no canto superior direito).
+        // Padrao = "Registry": mesma ordem em que o registro/Windows devolve os programas.
+        private string _programSort = "Registry";
+        private static readonly SolidColorBrush MetaValueBrush = new(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00));
+        private static readonly SolidColorBrush MetaEmptyBrush = new(System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66));
+
+        private void CmbProgramSort_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
-            if (sender is TextBox textBox && ProgramsCollection != null)
+            if (CmbProgramSort?.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+                _programSort = tag;
+            RefreshProgramsView();
+        }
+
+        private static readonly string[] DateFormats = new[]
+        {
+            "yyyyMMdd", "yyyy-MM-dd", "yyyy/MM/dd", "dd/MM/yyyy", "dd-MM-yyyy", "MM/dd/yyyy", "yyyyMMddHHmmss",
+            // Formatos que alguns instaladores gravam em InstallDate (registro):
+            // "Tue Aug 18 15:08:04 2026" (LocalDateTime do .NET serializado em ingles),
+            // "2026-08-18T15:08:04", "08/18/2026 15:08:04".
+            "ddd MMM dd HH:mm:ss yyyy", "ddd MMM d HH:mm:ss yyyy",
+            "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm:ssZ", "yyyy-MM-dd HH:mm:ss",
+            "MM/dd/yyyy HH:mm:ss", "dd/MM/yyyy HH:mm:ss"
+        };
+
+        private static bool TryParseInstallDate(string? raw, out DateTime date)
+        {
+            date = default;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            raw = raw.Trim();
+
+            // Registro as vezes grava a data ja como DateTime/DateTimeOffset em string
+            // ("Tue Aug 18 15:08:04 2026") — o parse generico do .NET entende, mas
+            // so com a cultura certa. Tenta antes dos formatos exatos.
+            if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out date))
+                return true;
+            if (DateTime.TryParse(raw, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out date))
+                return true;
+
+            foreach (var fmt in DateFormats)
             {
-                string searchText = textBox.Text.ToLower();
+                if (DateTime.TryParseExact(raw, fmt, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+                    return true;
+            }
 
-                if (string.IsNullOrWhiteSpace(searchText))
+            return false;
+        }
+
+        private static string FormatInstallDate(string? raw)
+            => TryParseInstallDate(raw, out var d) ? d.ToString("dd/MM/yyyy") : "-";
+
+        private static long EffectiveSizeBytes(ProgramViewModel p)
+        {
+            if (p.FolderSizeBytes is long b && b > 0) return b;
+            return long.TryParse(p.EstimatedSize, NumberStyles.Any, CultureInfo.InvariantCulture, out long kb) && kb > 0 ? kb * 1024 : 0;
+        }
+
+        private static string FormatSizeBytes(long bytes)
+        {
+            if (bytes <= 0) return "-";
+            double mb = bytes / (1024.0 * 1024.0);
+            if (mb >= 1024) return string.Format(CultureInfo.InvariantCulture, "{0:0.#} GB", mb / 1024.0);
+            if (mb >= 1) return string.Format(CultureInfo.InvariantCulture, "{0:0.#} MB", mb);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0.#} KB", bytes / 1024.0);
+        }
+
+        private void RefreshProgramsView()
+        {
+            if (ProgramsCollection == null) return;
+
+            // Meta dinamica: data ou tamanho conforme o filtro ativo. Sem dado valido
+            // mostra traco cinza, sem legenda e sem ruido visual.
+            bool showSize = _programSort is "SizeDesc" or "SizeAsc";
+            foreach (var p in ProgramsCollection)
+            {
+                long bytes = EffectiveSizeBytes(p);
+                string metaDate = FormatInstallDate(p.InstallDate);
+                string metaSize = bytes > 0 ? FormatSizeBytes(bytes) : "-";
+                string meta = showSize ? metaSize : metaDate;
+                bool hasMeta = meta != "-";
+
+                // App desinstalado (registro orfao): "-" sem explicacao vira "removido".
+                if (!hasMeta && p.MissingOnDisk)
                 {
-                    FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(ProgramsCollection);
-                }
-                else
-                {
-                    var filtered = ProgramsCollection.Where(p =>
-                        p.DisplayName.ToLower().Contains(searchText) ||
-                        p.Publisher.ToLower().Contains(searchText)).ToList();
-                    FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(filtered);
+                    p.SortMeta = "removido";
+                    p.SortMetaLabel = "";
+                    p.SortMetaTooltip = "Instalacao nao encontrada no disco (app removido ou pasta apagada)";
+                    p.SortMetaBrush = MetaEmptyBrush;
+                    continue;
                 }
 
-                if (ProgramsList != null)
-                {
-                    ProgramsList.ItemsSource = FilteredProgramsCollection;
-                }
+                p.SortMeta = meta;
+                p.SortMetaLabel = hasMeta ? (showSize ? "TAMANHO" : "INSTALADO") : "";
+                string src = bytes > 0 && p.SizeSource == "mft" ? " (medido no disco)" : "";
+                p.SortMetaTooltip = bytes > 0
+                    ? "Instalado em " + metaDate + "  |  Tamanho: " + FormatSizeBytes(bytes) + src
+                    : "Sem informacao registrada pelo instalador";
+                p.SortMetaBrush = hasMeta ? MetaValueBrush : MetaEmptyBrush;
+            }
 
-                if (EmptyProgramsTab != null)
-                {
-                    EmptyProgramsTab.Hint = string.IsNullOrWhiteSpace(searchText)
-                        ? "Nenhum programa instalado foi reconhecido. Clique em Atualizar."
-                        : $"Nada encontrado para \"{TxtSearchPrograms.Text.Trim()}\".";
-                    EmptyProgramsTab.Update(FilteredProgramsCollection?.Count ?? 0);
-                }
+            string searchText = TxtSearchPrograms?.Text?.Trim().ToLowerInvariant() ?? "";
+            IEnumerable<ProgramViewModel> query = ProgramsCollection;
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                query = query.Where(p =>
+                    (p.DisplayName?.ToLowerInvariant().Contains(searchText) ?? false) ||
+                    (p.Publisher?.ToLowerInvariant().Contains(searchText) ?? false));
+            }
+
+            query = _programSort switch
+            {
+                "Registry" => query,
+                "NameAsc" => query.OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase),
+                "NameDesc" => query.OrderByDescending(p => p.DisplayName, StringComparer.OrdinalIgnoreCase),
+                "Publisher" => query.OrderBy(p => p.Publisher, StringComparer.OrdinalIgnoreCase),
+                "DateAsc" => query.OrderBy(p => TryParseInstallDate(p.InstallDate, out var d) ? d : DateTime.MaxValue),
+                "SizeDesc" => query.OrderByDescending(EffectiveSizeBytes),
+                "SizeAsc" => query.OrderBy(p => EffectiveSizeBytes(p) is long kb && kb > 0 ? kb : long.MaxValue),
+                _ => query.OrderByDescending(p => TryParseInstallDate(p.InstallDate, out var d) ? d : DateTime.MinValue),
+            };
+
+            // Preserva a selecao do usuario ao recriar a colecao filtrada.
+            HashSet<string>? selected = FilteredProgramsCollection?.Where(p => p.IsSelected).Select(p => p.DisplayName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var filtered = query.ToList();
+            FilteredProgramsCollection = new ObservableCollection<ProgramViewModel>(filtered);
+            if (selected != null && selected.Count > 0)
+            {
+                foreach (var p in FilteredProgramsCollection.Where(p => selected.Contains(p.DisplayName)))
+                    p.IsSelected = true;
+            }
+            if (ProgramsList != null) ProgramsList.ItemsSource = FilteredProgramsCollection;
+            if (TxtProgramsCount != null)
+                TxtProgramsCount.Text = filtered.Count + (filtered.Count == 1 ? " programa" : " programas");
+
+            if (EmptyProgramsTab != null)
+            {
+                EmptyProgramsTab.Hint = string.IsNullOrWhiteSpace(searchText)
+                    ? "Nenhum programa instalado foi reconhecido. Clique em Atualizar."
+                    : "Nada encontrado para \"" + (TxtSearchPrograms?.Text?.Trim() ?? "") + "\".";
+                EmptyProgramsTab.Update(FilteredProgramsCollection.Count);
             }
         }
 
-        private async void BtnProgramRemove_Click(object sender, RoutedEventArgs e)
+        private void TxtSearchPrograms_TextChanged(object sender, TextChangedEventArgs e)
+            => RefreshProgramsView();
+
+        /// <summary>
+        /// Apps cujo registro não declara EstimatedSize (ficavam “-”) tem o tamanho
+        /// medido no disco via MFT — uma varredura por volume, independente de quantos
+        /// apps são medidos. Atualiza a lista preservando a seleção do usuário.
+        /// </summary>
+        private async Task ComputeMissingFolderSizesAsync()
         {
-            if (_isAppOperation) return;
-            if (sender is not Button btn || btn.Tag is not ProgramViewModel program) return;
-
-            if (_scanningPrograms.Contains(program.DisplayName))
-            {
-                MessageBox.Show($"O scan de resíduos de \"{program.DisplayName}\" ainda está em andamento em segundo plano.\nQuando terminar, a revisão será aberta automaticamente.",
-                    "Scan em andamento", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            _isAppOperation = true;
             try
             {
-                // Feedback visual IMEDIATO: botão mostra "⏳" antes de qualquer bloqueio
-                btn.Content = "⏳";
-                btn.IsEnabled = false;
-
-                // Confirmação simples
-                if (!await ShowConfirmAsync(
-                    $"Remover {program.DisplayName}?\n\n" +
-                    "O app será desinstalado e os resíduos ficarão disponíveis na revisão de limpeza posterior.",
-                    "Remover App"))
+                // Pode ser chamada de qualquer thread (a fase de enriquecimento e
+                // fire-and-forget e sua continuacao pode nao ter SynchronizationContext).
+                // TODO acesso a UI (TxtProgramsProgress, VMs com INotifyPropertyChanged)
+                // acontece DENTRO do Dispatcher — fora dele o WPF lanca
+                // "O thread de chamada nao pode acessar este objeto" e a fase morre
+                // silenciosamente (apps ficavam sem tamanho).
+                var paths = await Dispatcher.InvokeAsync(() =>
                 {
-                    btn.Content = "REMOVER";
-                    btn.IsEnabled = true;
-                    return;
-                }
+                    var candidates = ProgramsCollection?
+                        .Where(p => !HasUsableRegistrySize(p) && !string.IsNullOrWhiteSpace(p.InstallLocation))
+                        .ToList();
+                    if (candidates == null || candidates.Count == 0) return (string[]?)null;
 
-                ShowProgramsLoading();
+                    var list = candidates
+                        .Select(p => (p.InstallLocation ?? "").Trim().Trim('"', ' ').TrimEnd('\\'))
+                        .Where(s => s.Length > 6)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    if (list.Count == 0) return (string[]?)null;
 
-                IProgress<string> progress = new Progress<string>(msg =>
-                {
                     if (TxtProgramsProgress != null)
-                        TxtProgramsProgress.Text = msg;
+                        TxtProgramsProgress.Text = $"Medindo tamanhos via MFT ({list.Count} pastas)...";
+
+                    return (string[]?)list.ToArray();
                 });
 
-                progress.Report($"Desinstalando {program.DisplayName}...");
+                if (paths == null || paths.Length == 0) return;
 
-                // FASE 1 — apenas DESINSTALAÇÃO (rápida). O scan pesado roda em background.
-                var result = await Task.Run(() =>
+                var sizes = await Task.Run(() => KitLugia.Core.FolderSizeMft.Compute(paths));
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    var r = new DeepUninstaller.UninstallResult();
-                    return DeepUninstaller.RunUninstallPhaseAsync(
-                        r, program.DisplayName, program.UninstallString,
-                        program.InstallLocation, program.Publisher, program.DisplayIcon, false, progress, captureBaseline: true,
-                        quietUninstallString: program.QuietUninstallString);
+                    // Atualizacao IN-PLACE: recriar a colecao inteira (1100+ itens)
+                    // reconstroi todos os containers e congela a UI por segundos.
+                    foreach (var p in ProgramsCollection ?? Enumerable.Empty<ProgramViewModel>())
+                    {
+                        string key = (p.InstallLocation ?? "").Trim().Trim('"', ' ').TrimEnd('\\');
+                        if (sizes.TryGetValue(key, out long bytes) && bytes > 0)
+                        {
+                            p.FolderSizeBytes = bytes;
+                            p.SizeSource = "mft";
+                        }
+                    }
+                    UpdateProgramMetaOnly();
+                    if (TxtProgramsProgress != null)
+                        TxtProgramsProgress.Text = $"Tamanhos medidos via MFT ({sizes.Count} apps).";
                 });
-
-                if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
-                HideProgramsLoading();
-
-                // Libera a UI IMEDIATAMENTE (desinstalação concluída, scan em background):
-                // o usuário pode continuar desinstalando outros apps sem esperar.
-                btn.Content = "REMOVER";
-                btn.IsEnabled = true;
-                StartBackgroundScan(program, result);
             }
             catch (Exception ex)
             {
-                Logger.LogError("BtnProgramRemove_Click", ex.ToString());
-                MessageBox.Show($"Erro ao desinstalar:\n\n{ex}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
-                btn.Content = "REMOVER";
-                btn.IsEnabled = true;
+                // Stack completo: sem ele nao da para saber qual linha cruzou as threads.
+                Logger.LogWarning("AppsPage", "ComputeMissingFolderSizes: " + ex.Message + " | " + ex.StackTrace);
+            }
+        }
+
+        /// <summary>
+        /// Segunda fase do carregamento: com a lista já instantânea na tela (scan só-registro),
+        /// completa em background os metadados que exigem I/O de disco — InstallLocation real,
+        /// versão/fabricante do binário e data de instalação — copiando o resultado para os
+        /// ViewModels já exibidos. Ao final dispara a medição de tamanhos via MFT.
+        /// </summary>
+        private async Task EnrichProgramsMetadataAsync(List<RegistryProgram> programs, CancellationToken token)
+        {
+            try
+            {
+                if (programs.Count == 0) return;
+
+                if (TxtProgramsProgress != null)
+                    await Dispatcher.InvokeAsync(() => TxtProgramsProgress.Text = "Completando informações dos apps...");
+
+                await Task.Run(() =>
+                {
+                    foreach (var program in programs)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        RegistryProgramFactory.EnrichProgramMetadataFromDisk(program);
+                    }
+                }, token);
+                if (token.IsCancellationRequested) return;
+
+                // FASE FINAL DE COMPLETUDE: os apps que terminaram o enriquecimento ainda
+                // sem pasta de instalação entram aqui. A pasta é procurada pelo nome nas
+                // raízes padrão — sem ela o app fica sem data E sem tamanho para sempre.
+                // Só 40 de ~1100 apps chegam a esta etapa, então o custo é irrelevante.
+                await Task.Run(() =>
+                {
+                    foreach (var program in programs)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        if (string.IsNullOrWhiteSpace(program.InstallLocation))
+                        {
+                            if (!RegistryProgramFactory.TryResolveMissingInstallLocation(program)) continue;
+
+                            // Pasta nova => re-enriquece para preencher data (CreationTime),
+                            // versao e fabricante a partir do conteudo real da pasta.
+                            RegistryProgramFactory.EnrichProgramMetadataFromDisk(program);
+                        }
+                    }
+                }, token);
+
+                if (token.IsCancellationRequested) return;
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    // Índice por caminho de registro (único por entrada do uninstaller).
+                    var byPath = new Dictionary<string, ProgramViewModel>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var vm in ProgramsCollection ?? Enumerable.Empty<ProgramViewModel>())
+                        byPath[vm.RegistryPath] = vm;
+
+                    foreach (var program in programs)
+                    {
+                        if (!byPath.TryGetValue(program.RegistryPath, out var vm)) continue;
+                        vm.InstallLocation = program.InstallLocation;
+                        vm.Publisher = program.Publisher;
+                        vm.DisplayVersion = program.DisplayVersion;
+                        vm.InstallDate = program.InstallDate;
+                        vm.EstimatedSize = program.EstimatedSize;
+                        vm.MissingOnDisk = program.MissingOnDisk;
+                    }
+
+                    // Meta in-place (INotifyPropertyChanged): nada de recriar a coleção.
+                    UpdateProgramMetaOnly();
+
+                    if (TxtProgramsProgress != null)
+                        TxtProgramsProgress.Text = "";
+                });
+
+                await ComputeMissingFolderSizesAsync();
+            }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("AppsPage", "EnrichProgramsMetadata: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Recalcula a coluna de metadados (data ou tamanho) dos itens JÁ EXIBIDOS,
+        /// sem recriar a coleção nem trocar o ItemsSource. Usado pelas fases de
+        /// background (enriquecimento e MFT) — recriar a coleção com 1100+ itens
+        /// reconstrói todos os containers e produz a travada de alguns segundos.
+        /// </summary>
+        private void UpdateProgramMetaOnly()
+        {
+            if (ProgramsCollection == null) return;
+
+            bool showSize = _programSort is "SizeDesc" or "SizeAsc";
+            foreach (var p in ProgramsCollection)
+            {
+                long bytes = EffectiveSizeBytes(p);
+                string metaDate = FormatInstallDate(p.InstallDate);
+                string metaSize = bytes > 0 ? FormatSizeBytes(bytes) : "-";
+                string meta = showSize ? metaSize : metaDate;
+                bool hasMeta = meta != "-";
+
+                // App desinstalado (registro orfao): o "-" nao e falha de leitura, e o
+                // arquivo nao estar mais no disco. Dizemos isso em vez de deixar vazio.
+                if (!hasMeta && p.MissingOnDisk)
+                {
+                    p.SortMeta = "removido";
+                    p.SortMetaLabel = "";
+                    p.SortMetaTooltip = "Instalacao nao encontrada no disco (app removido ou pasta apagada)";
+                    p.SortMetaBrush = MetaEmptyBrush;
+                    continue;
+                }
+
+                p.SortMeta = meta;
+                p.SortMetaLabel = hasMeta ? (showSize ? "TAMANHO" : "INSTALADO") : "";
+                string src = bytes > 0 && p.SizeSource == "mft" ? " (medido no disco)" : "";
+                p.SortMetaTooltip = bytes > 0
+                    ? "Instalado em " + metaDate + "  |  Tamanho: " + FormatSizeBytes(bytes) + src
+                    : "Sem informacao registrada pelo instalador";
+                p.SortMetaBrush = hasMeta ? MetaValueBrush : MetaEmptyBrush;
+            }
+        }
+
+        private static bool HasUsableRegistrySize(ProgramViewModel p) =>
+            long.TryParse(p.EstimatedSize, NumberStyles.Any, CultureInfo.InvariantCulture, out long kb) && kb > 0;
+
+        private async void BtnProgramRemove_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not ProgramViewModel program) return;
+            btn.Content = "⏳";
+            btn.IsEnabled = false;
+            try
+            {
+                await UninstallProgramInternal(program, quiet: false);
             }
             finally
             {
-                _isAppOperation = false;
+                btn.Content = "REMOVER";
+                btn.IsEnabled = true;
             }
         }
 
@@ -2767,6 +3221,398 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
                     $"{totalSize / (1024.0 * 1024.0):N1} MB";
             }
         }
+
+        #region Context Menu & Action Handlers
+
+        private void ListViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is ListViewItem item)
+            {
+                item.IsSelected = true;
+                item.Focus();
+            }
+        }
+
+        private void PortableListViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is ListViewItem item)
+            {
+                item.IsSelected = true;
+                item.Focus();
+            }
+        }
+
+        private ProgramViewModel? GetSelectedProgram(object sender)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (menuItem.DataContext is ProgramViewModel vm) return vm;
+                if (menuItem.Tag is ProgramViewModel tagVm) return tagVm;
+                if (menuItem.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement fe && fe.DataContext is ProgramViewModel pvm)
+                    return pvm;
+            }
+            return ProgramsList?.SelectedItem as ProgramViewModel;
+        }
+
+        private PortableDetectedViewModel? GetSelectedPortable(object sender)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (menuItem.DataContext is PortableDetectedViewModel vm) return vm;
+                if (menuItem.Tag is PortableDetectedViewModel tagVm) return tagVm;
+                if (menuItem.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement fe && fe.DataContext is PortableDetectedViewModel pvm)
+                    return pvm;
+            }
+            return PortableList?.SelectedItem as PortableDetectedViewModel;
+        }
+
+        private async Task UninstallProgramInternal(ProgramViewModel program, bool quiet = false)
+        {
+            if (_isAppOperation) return;
+
+            if (_scanningPrograms.Contains(program.DisplayName))
+            {
+                MessageBox.Show($"O scan de resíduos de \"{program.DisplayName}\" ainda está em andamento em segundo plano.\nQuando terminar, a revisão será aberta automaticamente.",
+                    "Scan em andamento", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            _isAppOperation = true;
+            try
+            {
+                string actionName = quiet ? "Desinstalação Silenciosa" : "Remover App";
+                string prompt = quiet
+                    ? $"Executar desinstalação silenciosa de {program.DisplayName}?\n\nO processo tentará rodar em segundo plano sem diálogos interativos."
+                    : $"Remover {program.DisplayName}?\n\nO app será desinstalado e os resíduos ficarão disponíveis na revisão de limpeza posterior.";
+
+                if (!await ShowConfirmAsync(prompt, actionName))
+                {
+                    return;
+                }
+
+                ShowProgramsLoading();
+
+                IProgress<string> progress = new Progress<string>(msg =>
+                {
+                    if (TxtProgramsProgress != null)
+                        TxtProgramsProgress.Text = msg;
+                });
+
+                progress.Report($"Desinstalando {program.DisplayName}...");
+
+                var result = await Task.Run(() =>
+                {
+                    var r = new DeepUninstaller.UninstallResult();
+                    string uninstCmd = quiet && !string.IsNullOrWhiteSpace(program.QuietUninstallString)
+                        ? program.QuietUninstallString
+                        : program.UninstallString;
+
+                    return DeepUninstaller.RunUninstallPhaseAsync(
+                        r, program.DisplayName, uninstCmd,
+                        program.InstallLocation, program.Publisher, program.DisplayIcon, quiet, progress, captureBaseline: true,
+                        quietUninstallString: program.QuietUninstallString);
+                });
+
+                if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
+                HideProgramsLoading();
+
+                StartBackgroundScan(program, result);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("UninstallProgramInternal", ex.ToString());
+                MessageBox.Show($"Erro ao desinstalar:\n\n{ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isAppOperation = false;
+            }
+        }
+
+        private void MenuProgramOpenFileLocation_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p == null) return;
+
+            string? targetPath = null;
+            if (!string.IsNullOrWhiteSpace(p.InstallLocation) && Directory.Exists(p.InstallLocation))
+            {
+                targetPath = p.InstallLocation;
+            }
+            else if (!string.IsNullOrWhiteSpace(p.DisplayIcon))
+            {
+                string clean = RegistryProgramFactory.CleanPathString(p.DisplayIcon);
+                if (File.Exists(clean) || Directory.Exists(clean)) targetPath = clean;
+            }
+
+            if (targetPath == null && !string.IsNullOrWhiteSpace(p.UninstallString))
+            {
+                string? exe = RegistryProgramFactory.ExtractExecutablePath(p.UninstallString);
+                if (!string.IsNullOrEmpty(exe) && File.Exists(exe)) targetPath = exe;
+            }
+
+            if (!string.IsNullOrEmpty(targetPath))
+            {
+                try
+                {
+                    if (File.Exists(targetPath))
+                    {
+                        Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{targetPath}\"") { UseShellExecute = true });
+                    }
+                    else if (Directory.Exists(targetPath))
+                    {
+                        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{targetPath}\"") { UseShellExecute = true });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("MenuProgramOpenFileLocation_Click", ex.ToString());
+                    MessageBox.Show($"Não foi possível abrir o local: {ex.Message}", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            else
+            {
+                MessageBox.Show($"Não foi possível determinar a pasta de instalação de \"{p.DisplayName}\".", "Local não encontrado", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void MenuProgramRun_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p == null) return;
+
+            string? exe = null;
+            if (!string.IsNullOrWhiteSpace(p.DisplayIcon))
+            {
+                string clean = RegistryProgramFactory.CleanPathString(p.DisplayIcon);
+                if (clean.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(clean))
+                    exe = clean;
+            }
+
+            if (exe == null && !string.IsNullOrWhiteSpace(p.InstallLocation) && Directory.Exists(p.InstallLocation))
+            {
+                try
+                {
+                    var files = Directory.GetFiles(p.InstallLocation, "*.exe", SearchOption.TopDirectoryOnly);
+                    if (files.Length > 0)
+                    {
+                        exe = files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).IndexOf(p.DisplayName.Split(' ')[0], StringComparison.OrdinalIgnoreCase) >= 0) ?? files[0];
+                    }
+                }
+                catch { }
+            }
+
+            if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(exe) ?? "" });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Falha ao iniciar o aplicativo:\n{ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            else
+            {
+                MessageBox.Show($"Não foi possível localizar o executável principal de \"{p.DisplayName}\".", "Executável não encontrado", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void MenuProgramOpenRegedit_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p == null) return;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(p.RegistryPath))
+                {
+                    using (var regKey = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Applets\Regedit"))
+                    {
+                        regKey?.SetValue("LastKey", "Computer\\" + p.RegistryPath);
+                    }
+                }
+                Process.Start(new ProcessStartInfo("regedit.exe") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("MenuProgramOpenRegedit_Click", ex.ToString());
+                MessageBox.Show($"Erro ao abrir o Editor do Registro:\n{ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void MenuProgramSearchWeb_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p == null) return;
+
+            try
+            {
+                string query = Uri.EscapeDataString(p.DisplayName + " " + (p.Publisher ?? ""));
+                Process.Start(new ProcessStartInfo($"https://www.google.com/search?q={query}") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("MenuProgramSearchWeb_Click", ex.ToString());
+            }
+        }
+
+        private void MenuProgramCopyName_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p != null && !string.IsNullOrEmpty(p.DisplayName))
+                Clipboard.SetDataObject(p.DisplayName);
+        }
+
+        private void MenuProgramCopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p != null)
+            {
+                string val = !string.IsNullOrEmpty(p.InstallLocation) ? p.InstallLocation : (p.DisplayIcon ?? "");
+                if (!string.IsNullOrEmpty(val)) Clipboard.SetDataObject(val);
+            }
+        }
+
+        private void MenuProgramCopyVersion_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p != null && !string.IsNullOrEmpty(p.DisplayVersion))
+                Clipboard.SetDataObject(p.DisplayVersion);
+        }
+
+        private void MenuProgramCopyRegistryKey_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p != null && !string.IsNullOrEmpty(p.RegistryPath))
+                Clipboard.SetDataObject(p.RegistryPath);
+        }
+
+        private async void MenuProgramUninstall_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p != null)
+                await UninstallProgramInternal(p, quiet: false);
+        }
+
+        private async void MenuProgramQuietUninstall_Click(object sender, RoutedEventArgs e)
+        {
+            var p = GetSelectedProgram(sender);
+            if (p != null)
+                await UninstallProgramInternal(p, quiet: true);
+        }
+
+        private void MenuPortableOpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            var app = GetSelectedPortable(sender);
+            if (app == null) return;
+
+            try
+            {
+                if (Directory.Exists(app.FolderPath))
+                {
+                    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{app.FolderPath}\"") { UseShellExecute = true });
+                }
+                else if (File.Exists(app.MainExecutable))
+                {
+                    Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{app.MainExecutable}\"") { UseShellExecute = true });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao abrir pasta: {ex.Message}", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void MenuPortableRun_Click(object sender, RoutedEventArgs e)
+        {
+            var app = GetSelectedPortable(sender);
+            if (app == null) return;
+
+            if (File.Exists(app.MainExecutable))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(app.MainExecutable)
+                    {
+                        UseShellExecute = true,
+                        WorkingDirectory = Path.GetDirectoryName(app.MainExecutable) ?? ""
+                    });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Falha ao iniciar app portátil:\n{ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+        }
+
+        private void MenuPortableCopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            var app = GetSelectedPortable(sender);
+            if (app != null && !string.IsNullOrEmpty(app.FolderPath))
+                Clipboard.SetDataObject(app.FolderPath);
+        }
+
+        private void MenuPortableCopyExe_Click(object sender, RoutedEventArgs e)
+        {
+            var app = GetSelectedPortable(sender);
+            if (app != null && !string.IsNullOrEmpty(app.MainExecutable))
+                Clipboard.SetDataObject(app.MainExecutable);
+        }
+
+        private async void MenuPortableRemove_Click(object sender, RoutedEventArgs e)
+        {
+            var app = GetSelectedPortable(sender);
+            if (app == null || _isAppOperation) return;
+
+            _isAppOperation = true;
+            try
+            {
+                if (!await ShowConfirmAsync(
+                    $"Deletar {app.Name}?\n\n" +
+                    $"Pasta: {app.FolderPath}\n" +
+                    $"Tamanho: {app.TotalSizeFormatted}\n\n" +
+                    "A pasta irá para a Lixeira (poderá ser restaurada).",
+                    "Deletar App Portátil"))
+                {
+                    return;
+                }
+
+                var (success, message) = await Task.Run(() => PortableAppScanner.DeletePortableApp(
+                    new PortableAppEntry
+                    {
+                        Name = app.Name,
+                        FolderPath = app.FolderPath,
+                        MainExecutable = app.MainExecutable,
+                        TotalSizeBytes = app.TotalSizeBytes
+                    }));
+
+                if (success)
+                {
+                    FilteredPortableCollection?.Remove(app);
+                    PortableCollection?.Remove(app);
+                    if (PortableIconProgressText != null && PortableCollection != null)
+                        PortableIconProgressText.Text = $"Detectados: {PortableCollection.Count}";
+                    MessageBox.Show($"✅ {app.Name} removido com sucesso!", "Concluído", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"⚠️ {message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("MenuPortableRemove_Click", ex.ToString());
+                MessageBox.Show($"Erro ao remover: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isAppOperation = false;
+            }
+        }
+
+        #endregion
     }
 
     /// <summary>
@@ -2784,7 +3630,24 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
     }
 
     /// <summary>
-    /// Flat cleanup item for the review panel (no ObservableCollection — avoids Collection was modified error)
+    /// Subtrai uma constante (em dips) da largura — usado para reservar espaco da barra de rolagem.
+    /// </summary>
+    public class WidthMinusConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            double w = value is double d ? d : 0;
+            double minus = 20;
+            if (parameter is string s && double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double m))
+                minus = m;
+            return System.Math.Max(0, w - minus);
+        }
+        public object ConvertBack(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+            throw new System.NotImplementedException();
+    }
+
+    /// <summary>
+    /// Flat cleanup item for the review panel (no ObservableCollection - avoids Collection was modified error)
     /// </summary>
     public class AppCleanupItem : INotifyPropertyChanged
     {
@@ -2932,8 +3795,10 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
     }
 
-    public class ProgramViewModel
+    public class ProgramViewModel : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public ProgramViewModel(RegistryProgram program)
         {
             DisplayName = program.DisplayName;
@@ -2954,14 +3819,65 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
             Icon = null;
         }
 
+        private string _publisher = "";
+        private string _displayVersion = "";
+        private string _installLocation = "";
+        private string _installDate = "";
+        private string _estimatedSize = "";
+        private BitmapSource? _icon;
+        private string _sortMeta = "";
+        private string _sortMetaLabel = "";
+        private string _sortMetaTooltip = "";
+        private SolidColorBrush _sortMetaBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00));
+        private long? _folderSizeBytes;
+        private string _sizeSource = "";
+        private bool _missingOnDisk;
+
+        /// <summary>
+        /// Registro aponta para uma pasta que nao existe mais (app desinstalado).
+        /// A UI mostra "nao encontrado" em vez de um "-" sem explicacao.
+        /// </summary>
+        public bool MissingOnDisk
+        {
+            get => _missingOnDisk;
+            set { if (_missingOnDisk == value) return; _missingOnDisk = value; OnPropertyChanged(nameof(MissingOnDisk)); }
+        }
+
         public string DisplayName { get; set; }
-        public string Publisher { get; set; }
-        public string DisplayVersion { get; set; }
-        public string InstallLocation { get; set; }
+
+        public string Publisher
+        {
+            get => _publisher;
+            set { if (_publisher == value) return; _publisher = value; OnPropertyChanged(nameof(Publisher)); }
+        }
+
+        public string DisplayVersion
+        {
+            get => _displayVersion;
+            set { if (_displayVersion == value) return; _displayVersion = value; OnPropertyChanged(nameof(DisplayVersion)); }
+        }
+
+        public string InstallLocation
+        {
+            get => _installLocation;
+            set { if (_installLocation == value) return; _installLocation = value; OnPropertyChanged(nameof(InstallLocation)); }
+        }
+
         public string UninstallString { get; set; }
         public string QuietUninstallString { get; set; }
-        public string InstallDate { get; set; }
-        public string EstimatedSize { get; set; }
+
+        public string InstallDate
+        {
+            get => _installDate;
+            set { if (_installDate == value) return; _installDate = value; OnPropertyChanged(nameof(InstallDate)); }
+        }
+
+        public string EstimatedSize
+        {
+            get => _estimatedSize;
+            set { if (_estimatedSize == value) return; _estimatedSize = value; OnPropertyChanged(nameof(EstimatedSize)); }
+        }
+
         public string DisplayIcon { get; set; }
         public string AboutUrl { get; set; }
         public bool IsProtected { get; set; }
@@ -2969,8 +3885,55 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
         public bool Is64Bit { get; set; }
         public string RegistryPath { get; set; }
         public string RegistryKeyName { get; set; }
-        public BitmapSource? Icon { get; set; }
+
+        public BitmapSource? Icon
+        {
+            get => _icon;
+            set { if (ReferenceEquals(_icon, value)) return; _icon = value; OnPropertyChanged(nameof(Icon)); }
+        }
+
         public bool IsSelected { get; set; }
+
+        // Ordenacao atual: o valor (tamanho/data) exibido logo antes do nome.
+        public string SortMeta
+        {
+            get => _sortMeta;
+            set { if (_sortMeta == value) return; _sortMeta = value; OnPropertyChanged(nameof(SortMeta)); }
+        }
+
+        public string SortMetaLabel
+        {
+            get => _sortMetaLabel;
+            set { if (_sortMetaLabel == value) return; _sortMetaLabel = value; OnPropertyChanged(nameof(SortMetaLabel)); }
+        }
+
+        public string SortMetaTooltip
+        {
+            get => _sortMetaTooltip;
+            set { if (_sortMetaTooltip == value) return; _sortMetaTooltip = value; OnPropertyChanged(nameof(SortMetaTooltip)); }
+        }
+
+        public SolidColorBrush SortMetaBrush
+        {
+            get => _sortMetaBrush;
+            set { if (ReferenceEquals(_sortMetaBrush, value)) return; _sortMetaBrush = value; OnPropertyChanged(nameof(SortMetaBrush)); }
+        }
+
+        // Tamanho medido no disco via MFT (quando o registro nao declara EstimatedSize).
+        public long? FolderSizeBytes
+        {
+            get => _folderSizeBytes;
+            set { if (_folderSizeBytes == value) return; _folderSizeBytes = value; OnPropertyChanged(nameof(FolderSizeBytes)); }
+        }
+
+        public string SizeSource
+        {
+            get => _sizeSource;
+            set { if (_sizeSource == value) return; _sizeSource = value; OnPropertyChanged(nameof(SizeSource)); }
+        }
+
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
     public class PortableDetectedViewModel : INotifyPropertyChanged

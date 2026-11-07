@@ -194,9 +194,12 @@ namespace KitLugia.Core
                 ushort flags = ReadU16(buf, ref pos);
                 ushort nlen = ReadU16(buf, ref pos);
                 if (pos + nlen * 2 > rc) break;
-                string name = Marshal.PtrToStringUni(IntPtr.Add(buf, pos), nlen) ?? "";
+                // O nome NAO e materializado: o volume inteiro traz ~475 mil entradas e
+                // cada string custava ~40 MB de lixo no GC (pausa na UI thread = a
+                // "travada" de alguns segundos apos o loading). Quem precisa do nome
+                // usa o indice por prefixo, nao o blob cru.
                 pos += nlen * 2;
-                list.Add(new MftEntry((uint)rec, (uint)parent, size, lw, flags, name));
+                list.Add(new MftEntry((uint)rec, (uint)parent, size, lw, flags, ""));
             }
             return (list.ToArray(), prefixRecs);
         }

@@ -1264,12 +1264,48 @@ namespace KitLugia.GUI.Pages
 
         // --- HARDWARE & REDE ---
 
+        // Recarrega a secao GPU & Scheduling com os dados REAIS do registro/WMI.
+        // Chamada apos cada alteracao para a UI mostrar o estado de fato (sem recarregar a pagina).
+        private async Task RefreshGpuSectionAsync()
+        {
+            var state = await Task.Run(() => new
+            {
+                FrameQueue = SystemTweaks.IsFrameQueueModeSet(),
+                Preemption = SystemTweaks.IsPreemptionEnabled(),
+                GpuIdle = SystemTweaks.IsGpuIdleDisabled(),
+                PowerLatency = SystemTweaks.IsGpuPowerLatencySet(),
+                Gpus = SystemTweaks.GetAllGpuInfo(),
+                TotalRam = SystemUtils.GetTotalSystemRamGB()
+            });
+            int recommended = SystemTweaks.GetRecommendedVramMb(state.TotalRam);
+
+            ChkFrameQueue.IsChecked = state.FrameQueue;
+            UpdateLabel(StatusFrameQueue, state.FrameQueue, "Low Latency (0)", "Padr\u00E3o (1)");
+            InfoFrameQueue.Text = state.FrameQueue ? "FrameQueueMode=0 (Low Latency)" : "FrameQueueMode=1 (Padr\u00E3o Windows)";
+
+            ChkPreemption.IsChecked = state.Preemption;
+            UpdateLabel(StatusPreemption, state.Preemption, "Ativado", "Padr\u00E3o");
+
+            ChkGpuIdle.IsChecked = state.GpuIdle;
+            UpdateLabel(StatusGpuIdle, state.GpuIdle, "Desativado", "Ativo");
+
+            ChkPowerLatency.IsChecked = state.PowerLatency;
+            UpdateLabel(StatusPowerLatency, state.PowerLatency, "Lat\u00EAncia (1)", "Padr\u00E3o (0)");
+
+            BuildVramRowsFromData(state.Gpus, state.TotalRam, recommended);
+        }
+
         private void BuildVramRows()
         {
-            VramContainer.Children.Clear();
             var gpus = SystemTweaks.GetAllGpuInfo();
             double totalRam = SystemUtils.GetTotalSystemRamGB();
             int recommended = SystemTweaks.GetRecommendedVramMb(totalRam);
+            BuildVramRowsFromData(gpus, totalRam, recommended);
+        }
+
+        private void BuildVramRowsFromData(List<SystemTweaks.GpuInfo> gpus, double totalRam, int recommended)
+        {
+            VramContainer.Children.Clear();
 
             if (gpus.Count == 0)
             {
@@ -1482,22 +1518,8 @@ namespace KitLugia.GUI.Pages
                         }
                     });
 
-                    // Atualiza a UI inline sem recriar nada
-                    if (toggle.Parent is Grid pg && pg.Children.Count > 2)
-                    {
-                        if (pg.Children[2] is Border b && b.Child is TextBlock st)
-                        {
-                            st.Text = targetActive ? "Aplicado" : "Padr\u00E3o";
-                            st.Foreground = targetActive ? _colorActive : _colorDefault;
-                        }
-                        if (pg.Children[1] is StackPanel s && s.Children.Count > 1 && s.Children[1] is TextBlock vl)
-                        {
-                            double totalRam = SystemUtils.GetTotalSystemRamGB();
-                            int recommended = SystemTweaks.GetRecommendedVramMb(totalRam);
-                            string vramStr = targetActive ? $"{recommended} MB" : "Padr\u00E3o";
-                            vl.Text = $"VRAM: {vramStr}  |  RAM: {totalRam:F1} GB  |  Recomendado: {recommended} MB";
-                        }
-                    }
+                    // A UI e atualizada na hora com os dados REAIS do registro
+                    await RefreshGpuSectionAsync();
 
                     if (Application.Current.MainWindow is MainWindow mw)
                         mw.ShowInfo("VRAM", targetActive
@@ -1521,10 +1543,8 @@ namespace KitLugia.GUI.Pages
                     if (targetActive) SystemTweaks.ApplyLowLatencyFrameQueue();
                     else SystemTweaks.RevertFrameQueue();
                 });
-                UpdateLabel(StatusFrameQueue, targetActive, "Low Latency (0)", "Padrão (1)");
-
+                await RefreshGpuSectionAsync();
                 RecordTweak("FrameQueue", targetActive);
-                InfoFrameQueue.Text = targetActive ? "FrameQueueMode=0 (Low Latency)" : "FrameQueueMode=1 (Padrão Windows)";
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "FrameQueueMode: Low Latency" : "FrameQueueMode: Padrão");
             }
@@ -1544,8 +1564,7 @@ namespace KitLugia.GUI.Pages
                     if (targetActive) SystemTweaks.EnableGpuPreemption();
                     else SystemTweaks.RevertGpuPreemption();
                 });
-                UpdateLabel(StatusPreemption, targetActive, "Ativado", "Padrão");
-
+                await RefreshGpuSectionAsync();
                 RecordTweak("Preemption", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
                     mw.ShowInfo("GPU", targetActive ? "Preempção de GPU ativada" : "Preempção de GPU: Padrão");
@@ -1566,7 +1585,7 @@ namespace KitLugia.GUI.Pages
                     if (targetActive) SystemTweaks.DisableGpuIdleSchedule();
                     else SystemTweaks.RevertGpuIdleSchedule();
                 });
-                UpdateLabel(StatusGpuIdle, targetActive, "Desativado", "Ativo");
+                await RefreshGpuSectionAsync();
 
                 RecordTweak("GpuIdle", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)
@@ -1588,7 +1607,7 @@ namespace KitLugia.GUI.Pages
                     if (targetActive) SystemTweaks.SetGpuPowerLatency();
                     else SystemTweaks.RevertGpuPowerLatency();
                 });
-                UpdateLabel(StatusPowerLatency, targetActive, "Latência (1)", "Padrão (0)");
+                await RefreshGpuSectionAsync();
 
                 RecordTweak("PowerLatency", targetActive);
                 if (Application.Current.MainWindow is MainWindow mw)

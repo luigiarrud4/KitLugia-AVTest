@@ -617,6 +617,7 @@ namespace KitLugia.Core
                         using (obj)
                         {
                             string gpuName = obj["Name"]?.ToString() ?? "Unknown";
+                            if (SystemTweaks.IsVirtualDisplayAdapter(gpuName, null)) continue;
                             if (profile.GpuName == null)
                             {
                                 profile.GpuName = gpuName;

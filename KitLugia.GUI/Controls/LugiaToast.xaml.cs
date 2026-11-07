@@ -50,6 +50,10 @@ namespace KitLugia.GUI.Controls
             TxtTitle.Text = title.ToUpper();
             TxtMessage.Text = message;
             ToastType = type;
+            // O XAML do toast reage a ToastType por {Binding ToastType}. Sem este
+            // aviso o binding fica preso no valor antigo (Info) e o card NUNCA
+            // troca de cor — o toast de sucesso continuava dourado.
+            OnPropertyChanged(nameof(ToastType));
             SetValue(ToastTypeProperty, type);
 
             // Gera o ID. Se for apenas "Info" genérico, usa um ID fixo para agrupar todas as infos.
@@ -65,6 +69,21 @@ namespace KitLugia.GUI.Controls
         {
             TxtMessage.Text = newMessage;
             ResetTimer();
+        }
+
+        /// <summary>
+        /// Preenchimento da barrinha de progresso (0..100). As duas colunas em star
+        /// sao rebalanceadas aqui — nao depende de ActualWidth, entao funciona
+        /// mesmo antes do layout.
+        /// </summary>
+        public void SetProgress(double percent)
+        {
+            double p = percent < 0 ? 0 : (percent > 100 ? 100 : percent);
+            if (ColProgressFill != null && ColProgressRest != null)
+            {
+                ColProgressFill.Width = new GridLength(p, GridUnitType.Star);
+                ColProgressRest.Width = new GridLength(100 - p, GridUnitType.Star);
+            }
         }
 
         // LÓGICA DO CONTADOR (x2, x3...)
@@ -151,6 +170,7 @@ namespace KitLugia.GUI.Controls
 
             // Atualiza propriedades
             ToastType = newType;
+            OnPropertyChanged(nameof(ToastType));
             SetValue(ToastTypeProperty, newType);
             TxtTitle.Text = newTitle.ToUpper();
             TxtMessage.Text = newMessage;
