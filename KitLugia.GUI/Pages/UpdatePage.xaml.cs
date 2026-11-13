@@ -621,7 +621,7 @@ namespace KitLugia.GUI.Pages
                 if (newVersion.StartsWith("v"))
                     newVersion = newVersion.Substring(1);
 
-                string? batchPath = GitHubUpdater.GenerateUpdateBatch(extractDir, currentPid, currentExePath, currentVersion, newVersion);
+                string? batchPath = GitHubUpdater.GenerateUpdateBatch(extractDir, currentPid, currentExePath, currentVersion, newVersion, zipPath);
                 if (batchPath == null)
                 {
                     KitLugia.Core.Logger.Log("❌ Falha ao gerar script de atualização!");

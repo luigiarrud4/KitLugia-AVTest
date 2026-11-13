@@ -9,6 +9,9 @@
       4. Local git tags - works offline
       5. Failure (caller handles manual input)
 
+    After detection, the highest local X.Y.Z tag is used as a floor so a
+    version that already has a tag (even without a release) is never suggested.
+
     Outputs:
       - NEXT_VERSION file: just the next version string (e.g. 2.0.53)
       - VERSION_INFO file:  JSON-like structured info for rich UI display
@@ -153,17 +156,50 @@ if (-not $detected) {
 # FALLBACK 5: Total failure - write error info
 # ============================================================
 if (-not $detected) {
-    $info = @"
-{
-  "status": "error",
-  "source": "none",
-  "current": null,
-  "next": null,
-  "error": "All 4 fallbacks failed. Check: internet, gh auth, repo visibility, git tags."
-}
-"@
-    [IO.File]::WriteAllText($infoFile, $info)
+    # deploy.bat parses key=value lines. A JSON blob here used to leave
+    # status/source/current blank in the "Version Detection: FAILED" banner.
+    $infoLines = @(
+        "status=error",
+        "source=none",
+        "current=",
+        "next=",
+        "error=All fallbacks failed. Check: internet, gh auth, repo visibility, git tags."
+    )
+    [IO.File]::WriteAllLines($infoFile, $infoLines)
     exit 1
+}
+
+# ============================================================
+# TAG FLOOR: never suggest a version whose tag already exists
+# ============================================================
+# A tag may exist without a published release (orphan tag). In that case the
+# "latest release" source suggests an already-taken version, which would need
+# a force-push to retarget. Use the highest local X.Y.Z tag as a floor.
+try {
+    $highestTag = $null
+    $allTags = & git tag --sort=-v:refname 2>$null
+    foreach ($tag in $allTags) {
+        if ($tag -match '^v?(\d+\.\d+\.\d+)$') {
+            $candidate = [version]$Matches[1]
+            if ($null -eq $highestTag -or $candidate -gt $highestTag) {
+                $highestTag = $candidate
+            }
+        }
+    }
+    $currentVersion = [version]$detected.Current
+    if ($null -ne $highestTag -and $highestTag -gt $currentVersion) {
+        $floorPatch = $highestTag.Build + 1
+        $detected = @{
+            Current   = $highestTag.ToString()
+            Next      = "{0}.{1}.{2}" -f $highestTag.Major, $highestTag.Minor, $floorPatch
+            Major     = $highestTag.Major
+            Minor     = $highestTag.Minor
+            Patch     = $highestTag.Build
+            NextPatch = $floorPatch
+        }
+    }
+} catch {
+    # Tags unavailable/offline: keep the release-based detection.
 }
 
 # ============================================================

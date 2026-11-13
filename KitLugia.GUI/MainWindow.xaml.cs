@@ -701,6 +701,23 @@ namespace KitLugia.GUI
         {
             InitializeComponent();
 
+            // GARANTIA DE ELEVAÇÃO: o app.manifest declara requireAdministrator, então
+            // o Windows SÓ deixa o Kit abrir elevado (UAC no clique manual, RunLevel.Highest
+            // na task de auto-start). Este log é a prova em cada sessão — e o alerta cobre
+            // o caso improvável de o exe rodar SEM o manifesto (AV que reempacota, flag de
+            // compatibilidade): todo o Kit assume admin (registro, serviços, takeownership)
+            // e rodar de-elevado teria que ser tratado como anomalia, não como modo de uso.
+            try
+            {
+                using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                bool elevated = new System.Security.Principal.WindowsPrincipal(identity)
+                    .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+                if (elevated)
+                    KitLugia.Core.Logger.Log("🛡️ Sessão elevada (Administrador) — manifest requireAdministrator OK");
+                else
+                    KitLugia.Core.Logger.LogWarning("Elevação", "⚠️ Kit rodando SEM elevação — manifesto requireAdministrator não foi respeitado (AV/reempacotamento?). Funcionalidades de registro/serviço podem falhar.");
+            }
+            catch { }
 
             _backgroundTasksCts = new CancellationTokenSource();
 
@@ -955,6 +972,25 @@ namespace KitLugia.GUI
                 catch (NullReferenceException)
                 {
                     // Fechamento no meio da espera.
+                }
+            }, startupCts.Token);
+
+            // --- RETENÇÃO DE BACKUPS: FileBackup cresce sem limite (chegou a 13 GB —
+            // um jogo só). UMA vez por arranque, 60s depois de subir, apaga backups
+            // grandes vencidos (padrão: 7 dias) e aplica teto total (padrão 2 GB).
+            // RegBackup/.reg e backups pequenos nunca são tocados.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(60), startupCts.Token);
+                    if (!startupCts.Token.IsCancellationRequested)
+                        DeepUninstaller.CleanupBackupRetention();
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    Logger.LogError("BackupRetention", ex.ToString());
                 }
             }, startupCts.Token);
 
@@ -2294,9 +2330,35 @@ namespace KitLugia.GUI
             else if (e.Status == Services.TaskStatus.Failed)
                 _backgroundTasksHadFailure = true;
 
-            UpdateBackgroundTaskIndicator();
-            RefreshBackgroundTasksList();
+            // MARSHAL + COALESCIMENTO: este evento chega DA THREAD DE FUNDO a cada
+            // RegisterTask/UpdateTaskProgress/CompleteTask. Antes eram dois
+            // Dispatcher.Invoke SINCRONOS por evento (indicador + rebuild da lista),
+            // e durante um carregamento (icones, enriquecimento, MFT, cleanup) os
+            // eventos vinham em rajada: a thread de fundo ficava presa esperando a
+            // UI, e a UI era interrompida no meio do render/input para rearmar a
+            // lista e rodar animacoes — varias vezes por segundo.
+            //
+            // Agora: InvokeAsync (nao bloqueia o produtor) e progresso coalescido a
+            // 1 update visual por 200 ms. Eventos estruturais (registro, conclusao,
+            // falha, cancelamento) passam na hora — sao raros e mudam estado visivel.
+            bool structural = e.Status != Services.TaskStatus.ProgressUpdate;
+            if (!structural)
+            {
+                var now = DateTime.UtcNow;
+                if ((now - _lastIndicatorUiUpdate).TotalMilliseconds < IndicatorUiThrottleMs) return;
+                _lastIndicatorUiUpdate = now;
+            }
+
+            _ = Dispatcher.InvokeAsync(() =>
+            {
+                UpdateBackgroundTaskIndicator();
+                if (structural)
+                    RefreshBackgroundTasksList();
+            });
         }
+
+        private const int IndicatorUiThrottleMs = 200;
+        private DateTime _lastIndicatorUiUpdate = DateTime.MinValue;
 
         private bool IsTaskForCurrentPage(string pageName)
         {
@@ -2720,7 +2782,11 @@ namespace KitLugia.GUI
 
         public void ShowActionNotification(string title, string message, Action? onAction = null)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            // BeginInvoke, nao Invoke: este metodo e chamado de threads de fundo.
+            // O Invoke sincrono bloqueava o produtor e enfileirava trabalho na UI
+            // com prioridade de enviar — o mesmo padrao que travava a UI durante
+            // carregamentos. A ordem na fila do dispatcher preserva o resultado.
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 var notif = new Controls.UpdateNotification();
                 notif.SetContent(title, message, onAction);
@@ -2787,7 +2853,9 @@ namespace KitLugia.GUI
         // O tipo pode ser Neutral (cinza): acao informativa sem veredito de sucesso/erro.
         public void ShowProgressToast(string taskId, string title, string initialMessage, NotificationType toastType = NotificationType.Info)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            // BeginInvoke: ver ShowActionNotification — chamado de thread de fundo,
+            // o Invoke sincrono travava o produtor e martelava a UI a cada progresso.
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 // Se já existe um toast para essa tarefa, só atualiza
                 if (_progressToasts.TryGetValue(taskId, out var existing))
@@ -2823,7 +2891,7 @@ namespace KitLugia.GUI
 
         public void UpdateProgressToast(string taskId, string message)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 if (_progressToasts.TryGetValue(taskId, out var toast))
                 {
@@ -2835,7 +2903,7 @@ namespace KitLugia.GUI
         /// <summary>Preenchimento da barrinha de progresso do toast (0..100).</summary>
         public void UpdateProgressToastValue(string taskId, double percent)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 if (_progressToasts.TryGetValue(taskId, out var toast))
                 {
@@ -2854,7 +2922,9 @@ namespace KitLugia.GUI
         /// </summary>
         public void CompleteProgressToast(string taskId, bool success, string finalMessage, NotificationType? finalType, string? finalTitle)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            // BeginInvoke: mesmo padrao dos outros toasts — chamado de thread de fundo.
+            // A fila do dispatcher preserva a ordem Update -> Complete.
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 if (!_progressToasts.TryGetValue(taskId, out var toast)) return;
 

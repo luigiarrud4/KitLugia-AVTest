@@ -2154,10 +2154,18 @@ namespace KitLugia.Core
         // admin, ou maquina que nao expoe a variavel), o check tem de dizer que
         // NAO CONSEGUE VERIFICAR (NOT_FOUND, que a UI ja tem como filtro) em vez
         // de fingir que esta protegido.
+        // GUID da namespace de variaveis UEFI globais (EFI_GLOBAL_VARIABLE).
+        private const string EfiGlobalVariableGuid = "{8BE4DF61-93CA-11D2-AA0D-00E098032B8C}";
+
+        // Assinatura REAL: DWORD GetFirmwareEnvironmentVariableW(
+        //     LPCWSTR lpName, LPCWSTR lpGuid, PVOID pBuffer, DWORD nSize)
+        // A declaracao antiga omitia lpGuid: o byte[] era interpretado como GUID,
+        // o tamanho (1/8/64) como PONTEIRO de buffer e um out nao inicializado
+        // como nSize — escrita em endereco invalido. Retorno = bytes lidos (0 = falha).
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode,
             EntryPoint = "GetFirmwareEnvironmentVariableW")]
-        private static extern bool GetFirmwareEnvironmentVariableW(
-            string lpName, byte[] lpBuffer, uint dwSize, out uint pdwAttributes);
+        private static extern uint GetFirmwareEnvironmentVariableW(
+            string lpName, string lpGuid, byte[] pBuffer, uint nSize);
 
         private static string? _notaPosCorrecao;
         private static string? _avisoPosCorrecao;
@@ -2168,20 +2176,18 @@ namespace KitLugia.Core
         {
             enabled = false;
 
-            // BUG REAL (06/10/2026): o codigo pedia 1 byte e a API devolvia
-            // ERROR_INVALID_PARAMETER (87). O erro 87 era doncado como "variaveis
-            // UEFI nao acessiveis" e o Secure Boot ficava permanentemente
-            // ilegivel — a conclusao honesta estava errada por causa do TAMANHO
-            // do buffer, nao da maquina. A API quer o buffer do tamanho do valor
-            // da variavel (1 byte para SecureBoot, mas com folga), e uma
-            // segunda tentativa maior cobre implementacoes que exigem mais.
+            // CORRIGIDO (12/11/2026): a assinatura da P/Invoke estava errada
+            // (faltava lpGuid). O "fix" de 06/10 so aumentava o buffer e nao
+            // resolvia a causa raiz. SecureBoot tem 1 byte; tentamos 1/8/64
+            // porque alguns firmwares exigem folga, e retentamos em 87/122.
             foreach (int tamanho in new[] { 1, 8, 64 })
             {
                 try
                 {
                     var buf = new byte[tamanho];
-                    uint attrs;
-                    if (GetFirmwareEnvironmentVariableW("SecureBoot", buf, (uint)tamanho, out attrs))
+                    uint bytesLidos = GetFirmwareEnvironmentVariableW(
+                        "SecureBoot", EfiGlobalVariableGuid, buf, (uint)tamanho);
+                    if (bytesLidos > 0)
                     {
                         enabled = buf[0] == 1;
                         motivo = "variavel UEFI SecureBoot = " + buf[0];
@@ -2190,8 +2196,8 @@ namespace KitLugia.Core
 
                     int err = Marshal.GetLastWin32Error();
 
-                    // 87 = buffer pequeno demais: tenta o proximo tamanho
-                    if (err == 87 && tamanho < 64) continue;
+                    // 87 = ERROR_INVALID_PARAMETER, 122 = ERROR_INSUFFICIENT_BUFFER
+                    if ((err == 87 || err == 122) && tamanho < 64) continue;
 
                     // 1 = variavel inexistente (Secure Boot desligado de fato)
                     if (err == 1)
@@ -2205,6 +2211,9 @@ namespace KitLugia.Core
                     motivo = err switch
                     {
                         5 => "acesso negado (requer Administrador)",
+                        // Confirmado em maquina real (probe): sem elevacao a API
+                        // devolve 1314 (ERROR_PRIVILEGE_NOT_HELD), nao 5.
+                        1314 => "sem privilegio para ler variaveis UEFI (requer Administrador)",
                         1117 => "esta maquina nao expoe a variavel UEFI SecureBoot",
                         _ => $"GetFirmwareEnvironmentVariable falhou (erro {err})"
                     };

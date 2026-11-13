@@ -292,7 +292,12 @@ namespace KitLugia.Core.UninstallTools
                 {
                     try
                     {
-                        var exes = Directory.GetFiles(program.InstallLocation, "*.exe", SearchOption.TopDirectoryOnly);
+                        var exes = Directory.GetFiles(program.InstallLocation, "*.exe", new EnumerationOptions
+                        {
+                            IgnoreInaccessible = true,
+                            RecurseSubdirectories = false,
+                            AttributesToSkip = 0 // legado NÃO pulava .exe ocultos/de sistema
+                        });
                         if (exes.Length > 0)
                             sampleExe = exes[0];
                     }
@@ -539,19 +544,36 @@ namespace KitLugia.Core.UninstallTools
 
         private static IEnumerable<string> EnumerateCandidateFolders(string raiz)
         {
+            // 2 NÍVEIS, como sempre: raiz (ex.: "Program Files\Razer Synapse") e
+            // subpasta de vendor (ex.: "Program Files\Razer\Razer Synapse").
+            // A ordem e a profundidade importam: TryResolveMissingInstallLocation fica
+            // com a PRIMEIRA pasta cujo nome bate e que tem .exe na raiz. Uma versão
+            // recursiva aqui fazia a resolução cair em subpastas mais fundas (ou falhar
+            // por pular .exe ocultos/de sistema) e apps perdiam a data de instalação.
+            // IgnoreInaccessible apenas elimina as exceções do debugger — os resultados
+            // ficam idênticos aos do GetDirectories legado (que não pulava nada).
+            var opts = new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = false,
+                AttributesToSkip = 0 // legado NÃO pulava hidden/system/reparse
+            };
+
             string[] subpastas;
-            try { subpastas = Directory.GetDirectories(raiz); }
+            try { subpastas = Directory.GetDirectories(raiz, "*", opts); }
             catch { yield break; }
 
             foreach (var pasta in subpastas)
-            {
                 yield return pasta;
 
-                // Um nivel abaixo: a pasta do app costuma estar dentro da pasta do vendor.
+            // Um nivel abaixo: a pasta do app costuma estar dentro da pasta do vendor.
+            foreach (var pasta in subpastas)
+            {
                 string[] netas;
-                try { netas = Directory.GetDirectories(pasta); }
+                try { netas = Directory.GetDirectories(pasta, "*", opts); }
                 catch { continue; }
-                foreach (var neta in netas) yield return neta;
+                foreach (var neta in netas)
+                    yield return neta;
             }
         }
 
@@ -577,7 +599,12 @@ namespace KitLugia.Core.UninstallTools
         {
             try
             {
-                var exes = Directory.GetFiles(folder, "*.exe", SearchOption.TopDirectoryOnly);
+                var exes = Directory.GetFiles(folder, "*.exe", new EnumerationOptions
+                {
+                    IgnoreInaccessible = true,
+                    RecurseSubdirectories = false,
+                    AttributesToSkip = 0 // legado NÃO pulava .exe ocultos/de sistema
+                });
                 return exes.Length > 0 ? exes[0] : null;
             }
             catch { return null; }

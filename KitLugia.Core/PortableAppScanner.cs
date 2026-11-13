@@ -142,17 +142,26 @@ namespace KitLugia.Core
             }
         }
 
-        public static List<PortableAppEntry> Scan(Action<int, int>? progress = null, CancellationToken ct = default)
+        // includeUserProfile: pastas do usuario no drive de sistema (Desktop,
+        // Downloads, Documentos, AppData). driveRoots: raizes de disco extras a
+        // varrer ("D:\\"). driveRoots=null mantem o comportamento antigo (todos
+        // os discos fixos exceto o de sistema); array vazio = so o perfil.
+        public static List<PortableAppEntry> Scan(Action<int, int>? progress = null, CancellationToken ct = default, Action<string>? status = null, bool includeUserProfile = true, string[]? driveRoots = null)
         {
             // Cancelado ANTES de comecar (o usuario ja trocou de pagina): nao faz nem o
             // scan de MFT (na primeira vez leva ~20 s) e devolve vazio na hora.
             if (ct.IsCancellationRequested) return new List<PortableAppEntry>();
 
+            // Heap limpo antes do scan: o parse do MFT aloca centenas de MB e o
+            // primeiro GC cairia bem no meio dele. Coletar agora (background)
+            // atrasa a primeira coleta para depois do pico de alocacao.
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var installedPaths = GetInstalledProgramPaths();
-            var scanLocations = GetScanLocations();
+            var scanLocations = GetScanLocations(includeUserProfile, driveRoots);
             Logger.Log($"[Portatil] Scan iniciado: {scanLocations.Length} local(is) de scan");
-            var volumes = NativeMft.ScanAllVolumes(scanLocations);
+            var volumes = NativeMft.ScanAllVolumes(scanLocations, status);
             Logger.Log($"[Portatil] Scan MFT: {volumes?.Count ?? 0} volume(s) analisado(s) em {sw.Elapsed.TotalSeconds:N1}s");
             var scannedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var candidates = new List<Candidate>();
@@ -205,6 +214,7 @@ namespace KitLugia.Core
             if (candidates.Count == 0) return new List<PortableAppEntry>();
 
             Logger.Log($"[Portatil] {candidates.Count} candidato(s) em {sw.Elapsed.TotalSeconds:N1}s - analisando...");
+            status?.Invoke($"{candidates.Count:N0} pastas candidatas — analisando...");
             var results = new List<PortableAppEntry>();
             int total = candidates.Count;
             int done = 0;
@@ -219,9 +229,21 @@ namespace KitLugia.Core
             //   ... AppsPage.LoadPortableApps (linha 1322)
             // Agora o cancelamento devolve o que JA foi analisado (lista parcial, sem
             // excecao nenhuma) — o usuario vê o resultado em vez de um aviso de erro.
+            // A fase de analise tambem aloca muito (decode preguicoso de nomes
+            // do MftNameBlob + strings de caminho por pasta). SustainedLowLatency
+            // aqui tambem: pausas de GC curtas em vez de freezes de ~2s na UI.
+            var prevLatency = System.Runtime.GCSettings.LatencyMode;
+            System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.SustainedLowLatency;
             try
             {
-                var po = new ParallelOptions { CancellationToken = ct };
+                // Metade dos nucleos na analise: junto com os workers do MFT
+                // (que ja usam ~75%), isso deixava a UI sem CPU — a animacao de
+                // loading parava junto com a tela.
+                var po = new ParallelOptions
+                {
+                    CancellationToken = ct,
+                    MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2)
+                };
                 Parallel.ForEach(candidates, po, c =>
                 {
                     var entry = c.IsMft
@@ -241,6 +263,10 @@ namespace KitLugia.Core
             catch (OperationCanceledException)
             {
                 Logger.Log($"[Portatil] Scan cancelado pelo usuario ({results.Count} app(s) antes do cancelamento).");
+            }
+            finally
+            {
+                System.Runtime.GCSettings.LatencyMode = prevLatency;
             }
 
             Logger.Log($"[Portatil] {results.Count} app(s) detectado(s) em {sw.Elapsed.TotalSeconds:N1}s");
@@ -289,44 +315,60 @@ namespace KitLugia.Core
             }
         }
 
-        private static string[] GetScanLocations()
+        private static string[] GetScanLocations(bool includeUserProfile, string[]? driveRoots)
         {
             var locations = new List<string>();
-            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string downloads = Path.Combine(userProfile, "Downloads");
-            string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-
-            locations.Add(desktop);
-            locations.Add(downloads);
-            if (documents != desktop && documents != downloads)
-                locations.Add(documents);
-
-            string localPrograms = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
-            if (Directory.Exists(localPrograms))
-                locations.Add(localPrograms);
-
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            if (!string.IsNullOrEmpty(localAppData) && Directory.Exists(localAppData))
-                locations.Add(localAppData);
-
-            string roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            if (!string.IsNullOrEmpty(roamingAppData) && Directory.Exists(roamingAppData))
-                locations.Add(roamingAppData);
-
-            foreach (var drive in DriveInfo.GetDrives())
+            string systemDrive = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\', '/');
+            if (includeUserProfile)
             {
-                if (drive.DriveType == DriveType.Fixed && drive.IsReady)
-                {
-                    string root = drive.RootDirectory.FullName;
-                    if (!root.StartsWith(
-                        Environment.GetEnvironmentVariable("SystemDrive") ?? "C:",
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        locations.Add(root);
-                    }
-                }
+                string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string downloads = Path.Combine(userProfile, "Downloads");
+                string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+                locations.Add(desktop);
+                locations.Add(downloads);
+                if (documents != desktop && documents != downloads)
+                    locations.Add(documents);
+
+                string localPrograms = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
+                if (Directory.Exists(localPrograms))
+                    locations.Add(localPrograms);
+
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                if (!string.IsNullOrEmpty(localAppData) && Directory.Exists(localAppData))
+                    locations.Add(localAppData);
+
+                string roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                if (!string.IsNullOrEmpty(roamingAppData) && Directory.Exists(roamingAppData))
+                    locations.Add(roamingAppData);
+            }
+
+            // Raizes de disco: as escolhidas pelo usuario no dialogo, ou (null)
+            // todos os fixos prontos exceto o de sistema — comportamento antigo.
+            IEnumerable<string> roots;
+            if (driveRoots != null)
+            {
+                roots = driveRoots.Where(r => !string.IsNullOrWhiteSpace(r));
+            }
+            else
+            {
+                roots = DriveInfo.GetDrives()
+                    .Where(d => d.DriveType == DriveType.Fixed && d.IsReady)
+                    .Select(d => d.RootDirectory.FullName);
+            }
+
+            foreach (var root in roots)
+            {
+                string trimmed = root.TrimEnd('\\', '/');
+                if (trimmed.Equals(systemDrive, StringComparison.OrdinalIgnoreCase))
+                    continue; // a cobertura do drive de sistema e' o perfil do usuario
+                if (!Directory.Exists(root)) continue;
+                string full = root.EndsWith("\\") || root.EndsWith("/") ? root : root + "\\";
+                if (locations.Any(l => string.Equals(l.TrimEnd('\\', '/'), trimmed, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                locations.Add(full);
             }
 
             return locations.ToArray();

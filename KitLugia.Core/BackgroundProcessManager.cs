@@ -670,39 +670,48 @@ namespace KitLugia.Core
         /// </summary>
         public static List<ScheduledTaskInfo> GetScheduledTasksStatus(string? categoryFilter = null)
         {
-            var result = new List<ScheduledTaskInfo>();
+            var result = new List<ScheduledTaskInfo>(256);
             try
             {
+                // ENUMERAÇÃO COMPLETA (antes: só a lista curada _trackedTasks — tarefas de
+                // terceiros como Steam/Epic/NVIDIA/updaters de qualquer app eram INVISÍVEIS
+                // nesta aba). Agora percorre toda a árvore do Agendador. As descrições
+                // curadas continuam sendo usadas quando existem; senão, a descrição
+                // registrada da própria tarefa. Os presets continuam operando SÓ na lista
+                // curada (ApplyTaskPreset/DisableTelemetryTasks) — desativar "todas as
+                // Microsoft" de verdade quebraria manutenção do Windows.
                 using (var ts = new TaskService())
                 {
-                    foreach (var kvp in _trackedTasks)
+                    void Scan(TaskFolder folder)
                     {
-                        var taskPath = kvp.Key;
-                        var (desc, category) = kvp.Value;
-
-                        if (categoryFilter != null && !category.Equals(categoryFilter, StringComparison.OrdinalIgnoreCase))
-                            continue;
-
-                        var taskName = System.IO.Path.GetFileName(taskPath);
-
-                        // Suporte a wildcard '*' no path (ex: GoogleUpdateTaskUserS-1-5-21-*)
-                        Microsoft.Win32.TaskScheduler.Task? task = null;
-                        if (taskPath.EndsWith("*"))
+                        foreach (var task in folder.Tasks)
                         {
-                            string prefix = taskPath.TrimEnd('*');
-                            task = ts.AllTasks.FirstOrDefault(t =>
-                                t.Path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+                            try
+                            {
+                                string path = task.Path;
+                                string category = IsMicrosoftTaskPath(path) ? "Microsoft" : "Terceiros";
+
+                                if (categoryFilter != null && !category.Equals(categoryFilter, StringComparison.OrdinalIgnoreCase))
+                                    continue;
+
+                                string desc = _trackedTasks.TryGetValue(path, out var known)
+                                    ? known.Description
+                                    : (task.Definition?.RegistrationInfo?.Description ?? "");
+
+                                string taskName = System.IO.Path.GetFileName(path);
+                                result.Add(new ScheduledTaskInfo(path, taskName, desc, task.Enabled, category));
+                            }
+                            catch { Logger.LogWarning("GetTasks", "Tarefa ilegível ignorada"); }
                         }
-                        else
-                        {
-                            task = ts.GetTask(taskPath);
-                        }
 
-                        if (task != null)
+                        foreach (var sub in folder.SubFolders)
                         {
-                            result.Add(new ScheduledTaskInfo(taskPath, taskName, desc, task.Enabled, category));
+                            try { Scan(sub); }
+                            catch { Logger.LogWarning("GetTasks", "Pasta de tarefas inacessível ignorada"); }
                         }
                     }
+
+                    Scan(ts.RootFolder);
                 }
             }
             catch (Exception ex)
@@ -710,6 +719,18 @@ namespace KitLugia.Core
                 Logger.LogError("GetTasks", ex.Message);
             }
             return result;
+        }
+
+        /// <summary>
+        /// Heurística de categoria pelo caminho da tarefa: \Microsoft\... (incluindo
+        /// \Microsoft\OneDrive) é do próprio Windows; tudo mais (raiz, \Steam, \Adobe,
+        /// \GoogleUpdate, pastas de fabricante) é Terceiros.
+        /// </summary>
+        private static bool IsMicrosoftTaskPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return path.StartsWith(@"\Microsoft", StringComparison.OrdinalIgnoreCase)
+                || path.Contains(@"\Microsoft\", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

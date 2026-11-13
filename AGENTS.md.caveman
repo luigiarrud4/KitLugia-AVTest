@@ -1,3 +1,5 @@
+﻿> **NOTA (12/11/2026):** Este projeto foi movido para `C:\Users\Lugia\KitLugia`. Referencias a `KitLugia-master - Copia` ou `Downloads` neste arquivo sao historicas.
+
 # Sessão — recalcular contagens do filtro na IntegrityPage após alterações
 ## Problema
 - Os filtros (ComboBox) exibem contagens (ex.: "⚠️ Modificado (3)", "⚙️ Opcional (5)").

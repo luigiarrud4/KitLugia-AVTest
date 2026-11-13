@@ -1,4 +1,6 @@
-﻿# EaseUS Partition Master — Versão DESKTOP (17.9.0) vs WinPE Edition 20.8
+﻿> **NOTA (12/11/2026):** Este projeto foi movido para `C:\Users\Lugia\KitLugia`. Referencias a `KitLugia-master - Copia` ou `Downloads` neste arquivo sao historicas.
+
+# EaseUS Partition Master — Versão DESKTOP (17.9.0) vs WinPE Edition 20.8
 
 **Analisado em:** 03/10/2026
 **Alvo:** `epm_trial_ob.exe` (instalador Inno Setup 6.1.0, 77 MB) → `app\` (338 MB extraídos)

@@ -59,6 +59,7 @@ namespace KitLugia.GUI.Pages
         private ObservableCollection<PortableDetectedViewModel>? FilteredPortableCollection;
         private CancellationTokenSource? _portableCts;
         private bool _portableLoaded = false;
+        private string _portableSort = "Default";
 
         private bool _isAppOperation;
 
@@ -123,6 +124,11 @@ namespace KitLugia.GUI.Pages
                     {
                         _junkLoaded = true;
                         LoadJunkItems();
+                    }
+                    // Aba de Logs carrega lazy também
+                    if (selectedTab.Header?.ToString()?.Contains("Logs") == true && !_cleanupLogsLoaded)
+                    {
+                        LoadCleanupLogs();
                     }
                 }
             }
@@ -1823,8 +1829,85 @@ namespace KitLugia.GUI.Pages
 
         #region PORTABLE APPS (directory-detected)
 
+        // Overlay de escopo do scan (dentro da pagina, mesmo padrao do
+        // ConfirmOverlay): null = usuario cancelou.
+        private TaskCompletionSource<(bool IncludeProfile, string[] Roots)?>? _portableScopeTcs;
+        private readonly List<(System.Windows.Controls.CheckBox Box, bool IsSystem, string Root)> _portableScopeItems = new();
+        private int _portableScopeSysIndex = -1;
+
+        private Task<(bool IncludeProfile, string[] Roots)?> ShowPortableScopeAsync()
+        {
+            _portableScopeTcs = new TaskCompletionSource<(bool, string[])?>();
+            PortableScopeDrivePanels.Children.Clear();
+            _portableScopeItems.Clear();
+            _portableScopeSysIndex = -1;
+
+            string sys = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\');
+            foreach (var d in DriveInfo.GetDrives())
+            {
+                if (d.DriveType != DriveType.Fixed || !d.IsReady) continue;
+                string root = d.RootDirectory.FullName;
+                bool isSys = root.TrimEnd('\\').Equals(sys, StringComparison.OrdinalIgnoreCase);
+                var cb = new System.Windows.Controls.CheckBox
+                {
+                    IsChecked = true,
+                    Margin = new Thickness(0, 5, 0, 5),
+                    FontSize = 13,
+                    Foreground = System.Windows.Media.Brushes.White,
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Content = isSys
+                        ? $"{root} — Perfil do usuário (Desktop, Downloads, Documentos, AppData)"
+                        : $"{root} — raiz do disco",
+                };
+                if (isSys) _portableScopeSysIndex = _portableScopeItems.Count;
+                PortableScopeDrivePanels.Children.Add(cb);
+                _portableScopeItems.Add((cb, isSys, root));
+            }
+
+            PortableScopeOverlay.Visibility = Visibility.Visible;
+            return _portableScopeTcs.Task;
+        }
+
+        private void PortableScopeSetAll(bool onlySystem)
+        {
+            for (int i = 0; i < _portableScopeItems.Count; i++)
+                _portableScopeItems[i].Box.IsChecked = onlySystem ? i == _portableScopeSysIndex : true;
+        }
+
+        private void BtnScopeOnlyC_Click(object sender, RoutedEventArgs e) => PortableScopeSetAll(true);
+        private void BtnScopeAll_Click(object sender, RoutedEventArgs e) => PortableScopeSetAll(false);
+
+        private void BtnScopeCancel_Click(object sender, RoutedEventArgs e)
+        {
+            PortableScopeOverlay.Visibility = Visibility.Collapsed;
+            _portableScopeTcs?.TrySetResult(null);
+        }
+
+        private void BtnScopeScan_Click(object sender, RoutedEventArgs e)
+        {
+            bool includeProfile = _portableScopeSysIndex >= 0 &&
+                _portableScopeItems[_portableScopeSysIndex].Box.IsChecked == true;
+            var roots = new List<string>();
+            foreach (var it in _portableScopeItems)
+            {
+                if (!it.IsSystem && it.Box.IsChecked == true)
+                    roots.Add(it.Root);
+            }
+            PortableScopeOverlay.Visibility = Visibility.Collapsed;
+            _portableScopeTcs?.TrySetResult((includeProfile, roots.ToArray()));
+        }
+
         private async void LoadPortableApps()
         {
+            // Escopo do scan: overlay dentro da pagina (mesmo padrao do
+            // ConfirmOverlay). Cancelar no overlay aborta sem tocar na lista.
+            var scope = await ShowPortableScopeAsync();
+            if (scope == null)
+            {
+                if (PortableLoadingPanel != null) PortableLoadingPanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
             if (PortableLoadingPanel != null) PortableLoadingPanel.Visibility = Visibility.Visible;
             if (PortableList != null) PortableList.ItemsSource = null;
             if (TxtPortableProgress != null) TxtPortableProgress.Text = "Lendo índice MFT dos volumes (1ª vez ~15s)...";
@@ -1845,7 +1928,16 @@ namespace KitLugia.GUI.Pages
                 if (TxtPortableProgress != null)
                     TxtPortableProgress.Text = $"Varrendo pastas... {done}/{total}";
             });
-        }, token), token);
+        }, token, status: msg =>
+        {
+            // Fases do scan MFT (volume, % de registros, índice, candidatos).
+            // Vem do Core já com throttle; InvokeAsync so enfileira.
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (TxtPortableProgress != null)
+                    TxtPortableProgress.Text = msg;
+            });
+        }, scope.Value.IncludeProfile, scope.Value.Roots), token);
 
                 PortableCollection = new ObservableCollection<PortableDetectedViewModel>(
                     apps.Select(a => new PortableDetectedViewModel(a)));
@@ -1853,8 +1945,7 @@ namespace KitLugia.GUI.Pages
                 if (PortableIconProgressText != null)
                     PortableIconProgressText.Text = $"Detectados: {PortableCollection.Count}";
 
-                FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(PortableCollection);
-                if (PortableList != null) PortableList.ItemsSource = FilteredPortableCollection;
+                RefreshPortableView();
 
                 // Load icons for portable apps asynchronously
                 if (PortableCollection.Count > 0)
@@ -2010,28 +2101,58 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private void TxtSearchPortable_TextChanged(object sender, TextChangedEventArgs e)
+        private void CmbPortableSort_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
-            if (sender is TextBox textBox && PortableCollection != null)
-            {
-                string searchText = textBox.Text.ToLower();
-
-                if (string.IsNullOrWhiteSpace(searchText))
-                {
-                    FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(PortableCollection);
-                }
-                else
-                {
-                    var filtered = PortableCollection.Where(p =>
-                        p.Name.ToLower().Contains(searchText) ||
-                        p.FolderPath.ToLower().Contains(searchText)).ToList();
-                    FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(filtered);
-                }
-
-                if (PortableList != null)
-                    PortableList.ItemsSource = FilteredPortableCollection;
-            }
+            if (CmbPortableSort?.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+                _portableSort = tag;
+            RefreshPortableView();
         }
+
+        private void RefreshPortableView()
+        {
+            if (PortableCollection == null) return;
+
+            string searchText = TxtSearchPortable?.Text?.Trim().ToLowerInvariant() ?? "";
+            IEnumerable<PortableDetectedViewModel> query = PortableCollection;
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                query = query.Where(p =>
+                    (p.Name?.ToLowerInvariant().Contains(searchText) ?? false) ||
+                    (p.FolderPath?.ToLowerInvariant().Contains(searchText) ?? false));
+            }
+
+            query = _portableSort switch
+            {
+                "NameAsc" => query.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
+                "NameDesc" => query.OrderByDescending(p => p.Name, StringComparer.OrdinalIgnoreCase),
+                "SizeDesc" => query.OrderByDescending(p => p.TotalSizeBytes),
+                "SizeAsc" => query.OrderBy(p => p.TotalSizeBytes),
+                "DateDesc" => query.OrderByDescending(p => p.LastModified),
+                "DateAsc" => query.OrderBy(p => p.LastModified),
+                // "Default": mantem a ordem do scan (confianca desc, tamanho desc).
+                _ => query,
+            };
+
+            // Preserva a selecao do usuario ao recriar a colecao filtrada.
+            HashSet<string>? selected = FilteredPortableCollection?
+                .Where(p => p.IsSelected)
+                .Select(p => p.FolderPath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var filtered = query.ToList();
+            FilteredPortableCollection = new ObservableCollection<PortableDetectedViewModel>(filtered);
+            if (selected != null && selected.Count > 0)
+            {
+                foreach (var p in FilteredPortableCollection.Where(p => selected.Contains(p.FolderPath)))
+                    p.IsSelected = true;
+            }
+            if (PortableList != null) PortableList.ItemsSource = FilteredPortableCollection;
+            if (TxtPortableCount != null)
+                TxtPortableCount.Text = filtered.Count + (filtered.Count == 1 ? " app" : " apps");
+        }
+
+        private void TxtSearchPortable_TextChanged(object sender, TextChangedEventArgs e)
+            => RefreshPortableView();
 
         #endregion
 
@@ -3611,6 +3732,213 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
                 _isAppOperation = false;
             }
         }
+
+        #region Logs de Limpeza (aba Logs)
+
+        private bool _cleanupLogsLoaded;
+
+        private sealed class CleanupLogItem
+        {
+            public string FileName { get; set; } = "";
+            public string FullPath { get; set; } = "";
+            public string DateString { get; set; } = "";
+            public string SizeString { get; set; } = "";
+            public string AppSummary { get; set; } = "";
+        }
+
+        private static string CleanupLogsDir => Path.Combine(DeepUninstallSettings.PersistentRoot, "Logs");
+
+        private void LoadCleanupLogs()
+        {
+            try
+            {
+                var items = new List<CleanupLogItem>();
+                long totalBytes = 0;
+                if (Directory.Exists(CleanupLogsDir))
+                {
+                    // O nome ja e yyyyMMdd_HHmmss: ordenacao lexicografica = cronologica
+                    foreach (var path in Directory.GetFiles(CleanupLogsDir, "cleanup_*.log")
+                                                 .OrderByDescending(p => p, StringComparer.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            var fi = new FileInfo(path);
+                            totalBytes += fi.Length;
+                            items.Add(BuildCleanupLogItem(path, fi));
+                        }
+                        catch { /* arquivo sumiu no meio do listing — ignora */ }
+                    }
+                }
+
+                LogsList.ItemsSource = items;
+                TxtLogsInfo.Text = items.Count == 0
+                    ? "Nenhum log ainda — aparecem após a primeira limpeza do Deep Uninstall."
+                    : $"{items.Count} log(s) · {FormatLogBytes(totalBytes)} · {CleanupLogsDir}";
+                _cleanupLogsLoaded = true;
+
+                if (items.Count == 0)
+                {
+                    LogsList.SelectedIndex = -1;
+                    TxtLogViewerTitle.Text = "Selecione um log acima";
+                    TxtLogContent.Text = "";
+                    BtnLogsDelete.IsEnabled = false;
+                    BtnLogsCopy.IsEnabled = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LoadCleanupLogs", ex.ToString());
+                TxtLogsInfo.Text = "Erro ao listar logs: " + ex.Message;
+            }
+        }
+
+        private static CleanupLogItem BuildCleanupLogItem(string path, FileInfo fi)
+        {
+            var item = new CleanupLogItem
+            {
+                FileName = fi.Name,
+                FullPath = fi.FullName,
+                SizeString = FormatLogBytes(fi.Length)
+            };
+
+            // Data do proprio nome de arquivo (cleanup_yyyyMMdd_HHmmss.log)
+            string stem = Path.GetFileNameWithoutExtension(fi.Name);
+            if (stem.StartsWith("cleanup_", StringComparison.OrdinalIgnoreCase) &&
+                DateTime.TryParseExact(stem[8..], "yyyyMMdd_HHmmss", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var dt))
+            {
+                item.DateString = dt.ToString("dd/MM/yyyy HH:mm");
+            }
+            else
+            {
+                item.DateString = fi.LastWriteTime.ToString("dd/MM/yyyy HH:mm");
+            }
+
+            // Resumo das primeiras linhas: nome do app (novo formato) + contagem de resultados
+            try
+            {
+                using var sr = new StreamReader(fi.FullName);
+                string? appLine = null;
+                int removed = 0, failed = 0, skipped = 0, scanned = 60;
+                string? line;
+                while (scanned-- > 0 && (line = sr.ReadLine()) != null)
+                {
+                    if (appLine == null && line.StartsWith("App: ", StringComparison.Ordinal))
+                        appLine = line[5..];
+                    if (line.StartsWith("REMOVED", StringComparison.Ordinal)) removed++;
+                    else if (line.StartsWith("FAILED", StringComparison.Ordinal)) failed++;
+                    else if (line.StartsWith("SKIPPED", StringComparison.Ordinal)) skipped++;
+                }
+                string who = string.IsNullOrWhiteSpace(appLine) ? "(log antigo, sem app)" : appLine;
+                item.AppSummary = $"{who} — {removed} removido(s), {failed} falha(s), {skipped} ignorado(s)";
+            }
+            catch
+            {
+                item.AppSummary = "";
+            }
+
+            return item;
+        }
+
+        private async void LogsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (LogsList.SelectedItem is not CleanupLogItem item) return;
+
+            BtnLogsDelete.IsEnabled = true;
+            BtnLogsCopy.IsEnabled = true;
+            TxtLogViewerTitle.Text = item.FullPath;
+            TxtLogContent.Text = "Carregando...";
+
+            try
+            {
+                string path = item.FullPath;
+                string[] lines = await Task.Run(() => File.ReadAllLines(path));
+                const int maxLines = 8000;
+                if (lines.Length > maxLines)
+                {
+                    TxtLogContent.Text = string.Join(Environment.NewLine, lines.Take(maxLines)) +
+                        $"\n\n... ({lines.Length - maxLines:N0} linhas restantes — use 'Abrir Pasta' para o arquivo completo)";
+                }
+                else
+                {
+                    TxtLogContent.Text = string.Join(Environment.NewLine, lines);
+                }
+            }
+            catch (Exception ex)
+            {
+                TxtLogContent.Text = "Erro ao ler o log: " + ex.Message;
+            }
+        }
+
+        private void BtnLogsRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            LoadCleanupLogs();
+        }
+
+        private void BtnLogsOpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!Directory.Exists(CleanupLogsDir))
+                    Directory.CreateDirectory(CleanupLogsDir);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{CleanupLogsDir}\"",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnLogsOpenFolder_Click", ex.ToString());
+                MessageBox.Show($"Erro ao abrir a pasta: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnLogsDelete_Click(object sender, RoutedEventArgs e)
+        {
+            if (LogsList.SelectedItem is not CleanupLogItem item) return;
+            var confirm = MessageBox.Show(
+                $"Excluir o log \"{item.FileName}\"?\n\nO histórico de desinstalação continua intacto — isso apaga apenas este arquivo de log.",
+                "Excluir log", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+            try
+            {
+                File.Delete(item.FullPath);
+                TxtLogContent.Text = "";
+                TxtLogViewerTitle.Text = "Selecione um log acima";
+                BtnLogsDelete.IsEnabled = false;
+                BtnLogsCopy.IsEnabled = false;
+                LoadCleanupLogs();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnLogsDelete_Click", ex.ToString());
+                MessageBox.Show($"Erro ao excluir: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnLogsCopy_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(TxtLogContent.Text))
+                    Clipboard.SetText(TxtLogContent.Text);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BtnLogsCopy_Click", ex.ToString());
+            }
+        }
+
+        private static string FormatLogBytes(long bytes)
+        {
+            if (bytes < 1024) return $"{bytes} B";
+            if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+            return $"{bytes / (1024.0 * 1024.0):F1} MB";
+        }
+
+        #endregion
 
         #endregion
     }

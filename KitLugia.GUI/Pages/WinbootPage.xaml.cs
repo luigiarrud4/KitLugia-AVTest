@@ -1354,7 +1354,9 @@ namespace KitLugia.GUI.Pages
 
         private async void BtnRemove_Click(object sender, RoutedEventArgs e)
         {
-             var candidates = WinbootManager.GetRemovablePartitions();
+             // Task.Run: GetDisks pode cair no fallback WMI (segundos) — na UI thread travava
+             // o clique de Remover até a enumeração terminar.
+             var candidates = await Task.Run(() => WinbootManager.GetRemovablePartitions());
 
              if (candidates.Count == 0)
              {

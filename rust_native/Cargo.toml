@@ -26,3 +26,15 @@ regex = "1"
 sha2 = "0.10"
 blake3 = "1"
 globset = "0.4"
+
+# feather_index (referencia do indice persistente do Feather) — so'
+# compilado em Windows, junto com o modulo mft.
+[target.'cfg(windows)'.dependencies]
+crc32fast = "1"
+memmap2 = "0.9"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Memory",
+] }
