@@ -656,6 +656,7 @@ namespace KitLugia.Core
             bool Ps1Injected,
             bool StartnetInjected,
             bool ConfigInjected,
+            bool WinpeshlInjected,
             string Detail);
 
         /// <summary>
@@ -683,7 +684,7 @@ namespace KitLugia.Core
                 var (mntCode, mntOut) = await RunDism("dism.exe",
                     $"/Mount-Image /ImageFile:\"{wimPath}\" /index:1 /MountDir:\"{mountDir}\"", 180000);
                 if (mntCode != 0 && !mntOut.Contains("already mounted"))
-                    return new ShrinkPrepResult(false, false, false, false, false, $"falha ao montar WIM: {mntOut}");
+                    return new ShrinkPrepResult(false, false, false, false, false, false, $"falha ao montar WIM: {mntOut}");
                 mounted = true;
 
                 // ── VERIFICAÇÃO 1: PowerShell existe no WIM? ──
@@ -699,6 +700,21 @@ namespace KitLugia.Core
                                   Directory.EnumerateFiles(storageModule, "*.dll", SearchOption.AllDirectories).Any());
                 Log($"Verificação no WIM: módulo Storage = {(storageOk ? "PRESENTE" : "AUSENTE")}");
 
+                // ── VERIFICAÇÃO 3: cadeia de dependências do WinPE-StorageWMI ──
+                // Doc oficial (winpe-add-packages--optional-components-reference):
+                //   WinPE-StorageWMI exige WinPE-WMI > WinPE-NetFX > WinPE-Scripting > WinPE-PowerShell
+                // Sem wmiclnt.dll o PowerShell abre mas Get-Partition devolve vazio no PE.
+                bool wmiOk = File.Exists(Path.Combine(mountDir, "Windows", "System32", "wbem", "wmiclnt.dll"))
+                          || File.Exists(Path.Combine(mountDir, "Windows", "System32", "wbem", "Win32_DeviceGuard.dll"));
+                bool scriptingOk = File.Exists(Path.Combine(mountDir, "Windows", "System32", "cscript.exe"));
+                Log($"Verificação no WIM: WMI (dependência Storage) = {(wmiOk ? "PRESENTE" : "AUSENTE")}, " +
+                    $"Scripting = {(scriptingOk ? "PRESENTE" : "AUSENTE")}");
+                if (storageOk && !wmiOk)
+                {
+                    Log("AVISO: Storage presente mas WMI ausente — Get-Partition pode falhar no PE. " +
+                        "winpeshl.ini NÃO será gravado (boot seguirá pelo startnet.cmd, que tem fallback diskpart).");
+                }
+
                 // ── Injeta os 3 arquivos dentro da montagem ──
                 // startnet.cmd
                 string system32 = Path.Combine(mountDir, "Windows", "System32");
@@ -713,23 +729,80 @@ namespace KitLugia.Core
 
                 Log("startnet.cmd + shrink.ps1 + shrink_config.ini copiados para a montagem.");
 
+                // ── Fundo azul do WinPE fora (winpe.jpg ausente = fundo preto) ──
+                string winpeJpg = Path.Combine(system32, "winpe.jpg");
+                if (File.Exists(winpeJpg))
+                {
+                    try { File.Delete(winpeJpg); Log("winpe.jpg (fundo azul) removido da imagem."); }
+                    catch (Exception ex) { Log($"Aviso: não foi possível remover winpe.jpg: {ex.Message}"); }
+                }
+
+                // ── winpeshl.ini: boot direto no modo operação (estilo PreOS do EaseUS) ──
+                // Com winpeshl.ini presente, o winpeshl lança SÓ o que está no [LaunchApps]
+                // (startnet.cmd deixa de rodar) — por isso só gravamos com PowerShell + Storage
+                // garantidos. Rede de segurança: wpeutil reboot se o PS1 sair sem reiniciar.
+                bool winpeshlOk = false;
+                if (psOk && storageOk && wmiOk)
+                {
+                    // Doc oficial (winpeshlini-reference, 2021-01-18): app + ", argumentos",
+                    // limite de 250 chars por linha, apps rodam em ordem e o proximo so'
+                    // inicia quando o anterior TERMINA. [LaunchApps] NAO aceita comandos de
+                    // script -> usamos powershell.exe -File X:\shrink.ps1.
+                    //
+                    // Ordem: wpeinit (rede/PNP) -> PS1 da UI (que sempre termina em
+                    // wpeutil reboot). O PS1 tem trap/finally que garante o reboot, entao
+                    // NAO colocamos um "wpeutil reboot" aqui: se o PS1 falhar ao iniciar,
+                    // o operador ve o erro em vez de um reboot silencioso.
+                    string psLine = "\"X:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\", -NoProfile -ExecutionPolicy Bypass -File X:\\shrink.ps1";
+                    if (psLine.Length > 250)
+                    {
+                        // Linha acima do limite da doc: encurta para o formato padrao.
+                        psLine = "\"X:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\", -File X:\\shrink.ps1";
+                        Log("winpeshl.ini: linha do PowerShell encurtada para respeitar o limite de 250 chars.");
+                    }
+
+                    string winpeshlIni =
+                        "[LaunchApps]\r\n" +
+                        "X:\\Windows\\System32\\wpeinit.exe\r\n" +
+                        psLine + "\r\n";
+
+                    try
+                    {
+                        await File.WriteAllTextAsync(Path.Combine(system32, "winpeshl.ini"), winpeshlIni, Encoding.ASCII);
+                        winpeshlOk = true;
+                        Log("winpeshl.ini injetado: boot direto no modo operação (tela cheia, sem cmd, sem menu WinRE).");
+                    }
+                    catch (Exception wex)
+                    {
+                        Log($"Aviso: falha ao gravar winpeshl.ini ({wex.Message}) — boot segue pelo startnet.cmd.");
+                    }
+                }
+                else
+                {
+                    Log($"winpeshl.ini NÃO gravado (PowerShell={psOk}, Storage={storageOk}, WMI={wmiOk}) — boot segue pelo startnet.cmd.");
+                }
+
                 // ── Desmonta com commit ──
                 var (cmtCode, cmtOut) = await RunDism("dism.exe",
                     $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit", 300000);
                 mounted = false;
                 if (cmtCode != 0)
-                    return new ShrinkPrepResult(psOk, storageOk, true, true, true, $"falha ao desmontar/commit: {cmtOut}");
+                    return new ShrinkPrepResult(psOk, storageOk, true, true, true, winpeshlOk, $"falha ao desmontar/commit: {cmtOut}");
 
                 Log("WIM desmontado com sucesso (commit).");
 
                 string detail = psOk
-                    ? (storageOk ? "PowerShell + Storage OK" : "PowerShell OK mas Storage ausente — PS1 fará fallback interno")
+                    ? (storageOk
+                        ? (winpeshlOk
+                            ? "PowerShell + Storage OK; winpeshl.ini OK (boot direto no modo operação)"
+                            : "PowerShell + Storage OK; winpeshl.ini FALHOU — boot pelo startnet.cmd")
+                        : "PowerShell OK mas Storage ausente — PS1 fará fallback interno")
                     : "PowerShell ausente — usar diskpart fallback";
-                return new ShrinkPrepResult(psOk, storageOk, true, true, true, detail);
+                return new ShrinkPrepResult(psOk, storageOk, true, true, true, winpeshlOk, detail);
             }
             catch (Exception ex)
             {
-                return new ShrinkPrepResult(false, false, false, false, false, ex.Message);
+                return new ShrinkPrepResult(false, false, false, false, false, false, ex.Message);
             }
             finally
             {
@@ -1684,6 +1757,14 @@ namespace KitLugia.Core
             string escapedTmpScript = tmpScript.Contains(' ')
                 ? $"\"{tmpScript}\""
                 : tmpScript;
+
+            // Defesa: se um winpeshl.ini de shrink anterior ficou no WIM, o [LaunchApps]
+            // dele impediria este startnet.cmd de rodar (winpeshl lança SÓ o que está lá).
+            // Tenta remover primeiro; falha silenciosa se não existir.
+            var (delCode, _) = await RunProcess(wimlibExe,
+                $"update \"{wimPath}\" 1 --command=\"delete /Windows/System32/winpeshl.ini\"", 60000);
+            if (delCode == 0)
+                Log("winpeshl.ini remanescente removido do WIM (startnet.cmd volta a valer).");
 
             string args = $"update \"{wimPath}\" 1"
                 + $" --command=\"add {escapedTmpScript} {system32Path}/{scriptName}\"";

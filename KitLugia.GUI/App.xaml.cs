@@ -84,6 +84,32 @@ namespace KitLugia.GUI
             };
         }
 
+        private static async Task ResumePendingShrinkSafeAsync()
+        {
+            try
+            {
+                var (ok, msg) = await KitLugia.Core.OnlineShrinkManager.ResumePendingShrinkAsync();
+                if (!string.IsNullOrEmpty(msg))
+                {
+                    KitLugia.Core.Logger.Log($"[SHRINK-ONLINE] Resultado da retomada: {msg}");
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            System.Windows.MessageBox.Show(msg, "KitLugia — Shrink sem WinPE",
+                                System.Windows.MessageBoxButton.OK,
+                                ok ? System.Windows.MessageBoxImage.Information : System.Windows.MessageBoxImage.Warning);
+                        }
+                        catch { }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"[SHRINK-ONLINE] Retomada falhou: {ex.Message}");
+            }
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             RegisterGlobalExceptionHandlers();
@@ -118,6 +144,11 @@ namespace KitLugia.GUI
                 StartMinimized = e.Args.Contains("--tray");
                 KitLugia.Core.Logger.Log($"StartMinimized: {StartMinimized}");
             }
+
+            // Retomada de shrink online agendado (shrink profundo sem WinPE): o RunOnce
+            // reinicia o Kit com --resume-shrink, mas a checagem é idempotente — qualquer
+            // instância que subir primeiro executa (a segunda é barrada pelo mutex).
+            _ = ResumePendingShrinkSafeAsync();
 
             // Modo auto-update: baixa o ZIP e abre o updater visível, depois fecha
             if (e.Args.Contains("--update"))

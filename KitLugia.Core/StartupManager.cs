@@ -573,6 +573,134 @@ namespace KitLugia.Core
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
+            // --- 9. LOCAIS DE PERSISTÊNCIA PROFUNDA (IFEO / LSA / Print Monitors) ---
+            // Não aparecem no Gerenciador de Tarefas nem na aba Inicialização do Windows,
+            // mas EXECUTAM no boot/logon. Era buraco de detecção vs Autoruns.
+            if (!fast)
+            {
+                // 9a. IFEO Debugger: qualquer exe listado com valor "Debugger" é sequestrado
+                // na inicialização (o Windows executa o Debugger no lugar do alvo).
+                string[] ifeoRoots =
+                {
+                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options",
+                    @"SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options"
+                };
+                foreach (var ifeoRoot in ifeoRoots)
+                {
+                    try
+                    {
+                        using var ifeoKey = Registry.LocalMachine.OpenSubKey(ifeoRoot);
+                        if (ifeoKey == null) continue;
+                        foreach (var subName in ifeoKey.GetSubKeyNames())
+                        {
+                            try
+                            {
+                                using var sub = ifeoKey.OpenSubKey(subName);
+                                string? debugger = sub?.GetValue("Debugger") as string;
+                                if (string.IsNullOrWhiteSpace(debugger)) continue;
+                                ExtractCommandParts(debugger, out string? dbgExe, out _);
+                                string k = MakeKey($"IFEO: {subName}", dbgExe ?? debugger);
+                                if (apps.ContainsKey(k)) continue;
+                                var ifeoItem = new StartupAppDetails($"IFEO: {subName}", debugger, $"HKLM\\{ifeoRoot}\\{subName}", StartupStatus.Enabled)
+                                {
+                                    Description = $"Sequestrador de execução: o Windows executa o Debugger no lugar de '{subName}' quando ele é iniciado. Legítimo em ferramentas de debug; estranho aqui = malware/persistência."
+                                };
+                                apps[k] = ifeoItem;
+                            }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        }
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                }
+
+                // 9b. LSA: DLLs carregadas pelo lsass no boot (Authentication/Notification/
+                // Security Packages). Nativas do Windows são filtradas; DLL estranha aqui
+                // é o clássico robo de credenciais/persistência.
+                string[] lsaPaths =
+                {
+                    @"SYSTEM\CurrentControlSet\Control\Lsa",
+                    @"SYSTEM\CurrentControlSet\Control\Lsa\OSConfig"
+                };
+                foreach (var lsaPath in lsaPaths)
+                {
+                    try
+                    {
+                        using var lsa = Registry.LocalMachine.OpenSubKey(lsaPath);
+                        if (lsa == null) continue;
+                        foreach (var valName in new[] { "Authentication Packages", "Notification Packages", "Security Packages" })
+                        {
+                            string raw = lsa.GetValue(valName) as string ?? "";
+                            if (string.IsNullOrWhiteSpace(raw)) continue;
+                            foreach (var dll in raw.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                // Pacotes nativos do Windows — não são persistência
+                                if (dll.Equals("msv1_0", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("schannel", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("wdigest", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("kerberos", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("pku2u", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("negotiate", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("negotiateext", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("cloudap", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("tspkg", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("liveid", StringComparison.OrdinalIgnoreCase) ||
+                                    dll.Equals("wlidsvc", StringComparison.OrdinalIgnoreCase)) continue;
+                                string k = MakeKey($"LSA: {dll}", dll);
+                                if (apps.ContainsKey(k)) continue;
+                                apps[k] = new StartupAppDetails($"LSA: {dll}", dll, $"HKLM\\{lsaPath}", StartupStatus.Enabled)
+                                {
+                                    Description = "DLL carregada pelo lsass (autoridade de segurança) no boot. Pacotes desconhecidos aqui são o método clássico de roubo de credenciais/persistência."
+                                };
+                            }
+                        }
+                    }
+                    catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                }
+
+                // 9c. Print Monitors: DLL carregada pelo spooler no boot (spot clássico de
+                // persistência). Monitores nativos do Windows são filtrados.
+                try
+                {
+                    using var mon = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Print\Monitors");
+                    if (mon != null)
+                    {
+                        foreach (var subName in mon.GetSubKeyNames())
+                        {
+                            try
+                            {
+                                using var sub = mon.OpenSubKey(subName);
+                                string driver = sub?.GetValue("Driver") as string ?? "";
+                                if (string.IsNullOrWhiteSpace(driver)) continue;
+                                if (driver.Equals("localspl.dll", StringComparison.OrdinalIgnoreCase) ||
+                                    driver.Equals("usbmon.dll", StringComparison.OrdinalIgnoreCase) ||
+                                    driver.Equals("wsdmon.dll", StringComparison.OrdinalIgnoreCase) ||
+                                    driver.Equals("portpmon.dll", StringComparison.OrdinalIgnoreCase)) continue;
+
+                                // Monitores nativos conhecidos pelo NOME da chave (o Driver varia entre builds)
+                                bool isNativeMonitor =
+                                    subName.Equals("Local Port", StringComparison.OrdinalIgnoreCase) ||
+                                    subName.Equals("Standard TCP/IP Port", StringComparison.OrdinalIgnoreCase) ||
+                                    subName.Equals("USB Monitor", StringComparison.OrdinalIgnoreCase) ||
+                                    subName.Equals("WSD Port", StringComparison.OrdinalIgnoreCase) ||
+                                    subName.Equals("Microsoft Shared Fax Monitor", StringComparison.OrdinalIgnoreCase) ||
+                                    driver.Equals("tcpmon.dll", StringComparison.OrdinalIgnoreCase);
+
+                                string k = MakeKey($"PrintMon: {subName}", driver);
+                                if (apps.ContainsKey(k)) continue;
+                                apps[k] = new StartupAppDetails($"PrintMon: {subName}", driver, @"HKLM\SYSTEM\CurrentControlSet\Control\Print\Monitors", StartupStatus.Enabled)
+                                {
+                                    Description = isNativeMonitor
+                                        ? "Monitor de impressão nativo do Windows (carregado pelo spooler no boot). Seguro — não remova."
+                                        : "Monitor de impressão de terceiros carregado pelo spooler no boot. Comum em impressoras virtuais/PDF; desconhecido = suspeito."
+                                };
+                            }
+                            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+                        }
+                    }
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+
             return apps.Values.OrderBy(a => a.Name).ToList();
         }
 
@@ -678,6 +806,30 @@ namespace KitLugia.Core
                 }
             }
 
+            // CASO 1-C: Persistência profunda (IFEO / LSA / PrintMon), UWP StartupTask e
+            // Active Setup — locais que o toggle genérico (CASO 2) não sabe mexer e antes
+            // fingiam sucesso (escreviam StartupApproved inútil e retornavam "Habilitado").
+            string deepLoc = startupApp.Location ?? "";
+            if (deepLoc.StartsWith("HKLM\\", StringComparison.OrdinalIgnoreCase) &&
+                (appName.StartsWith("IFEO: ", StringComparison.OrdinalIgnoreCase) ||
+                 appName.StartsWith("LSA: ", StringComparison.OrdinalIgnoreCase) ||
+                 appName.StartsWith("PrintMon: ", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ToggleDeepPersistenceItem(startupApp, appName, enable, silentMode);
+            }
+
+            if (deepLoc.StartsWith("UWP", StringComparison.OrdinalIgnoreCase) &&
+                (startupApp.FullCommand ?? "").StartsWith("StartupTask:", StringComparison.OrdinalIgnoreCase))
+            {
+                return ToggleUwpStartupTask(startupApp, appName, enable, silentMode);
+            }
+
+            if (deepLoc.Contains("Active Setup\\Installed Components", StringComparison.OrdinalIgnoreCase) &&
+                appName.StartsWith("ActiveSetup: ", StringComparison.OrdinalIgnoreCase))
+            {
+                return ToggleActiveSetupItem(startupApp, appName, enable, silentMode);
+            }
+
             // CASO 2: Registro ou Pasta de Inicialização
             // Corrigido: detecta pastas de startup mesmo de labels WMI
             string loc = startupApp.Location ?? "";
@@ -705,7 +857,16 @@ namespace KitLugia.Core
                 int slashIdx = loc.IndexOf('\\');
                 if (slashIdx > 0)
                     resolvedRegPath = loc.Substring(slashIdx + 1);
-                resolvedValueName = appName;
+                // HKCU\Windows\Load e ...\Run: o NOME do valor é "Load"/"Run" (o appName é
+                // o exe dentro do comando). Sem isto o toggle procurava/deletava um valor
+                // com o nome errado e fingia sucesso.
+                if (resolvedRegPath != null)
+                {
+                    if (resolvedRegPath.Equals("Windows\\Load", StringComparison.OrdinalIgnoreCase)) resolvedValueName = "Load";
+                    else if (resolvedRegPath.Equals("Windows\\Run", StringComparison.OrdinalIgnoreCase)) resolvedValueName = "Run";
+                }
+                if (resolvedValueName == null)
+                    resolvedValueName = appName;
             }
 
             // Detecta WMI que na verdade referencia pasta de startup
@@ -1052,6 +1213,224 @@ namespace KitLugia.Core
             InvalidateCache();
             string actionsSummary = string.Join("; ", actionsTaken);
             return (true, silentMode ? "" : $"'{appName}' {(enable ? "Habilitado" : "Desabilitado")}. [{actionsSummary}]");
+        }
+
+        /// <summary>
+        /// Liga/desliga itens de persistência profunda (IFEO / LSA / PrintMon) de forma
+        /// REVERSÍVEL: o valor original vai para HKCU\Software\KitLugia\RemovedApps
+        /// (mesma chave de backup do resto do toggle) e a reabilitação o restaura.
+        /// </summary>
+        private static (bool Success, string Message) ToggleDeepPersistenceItem(StartupAppDetails app, string appName, bool enable, bool silentMode)
+        {
+            string loc = app.Location ?? "";
+            try
+            {
+                // ---- IFEO: Debugger do alvo ----
+                if (loc.Contains("\\Image File Execution Options\\", StringComparison.OrdinalIgnoreCase))
+                {
+                    string target = appName.Substring("IFEO: ".Length);
+                    string keyPath = (loc.Contains("WOW6432Node", StringComparison.OrdinalIgnoreCase)
+                        ? @"SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\"
+                        : @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\") + target;
+                    using var key = Registry.LocalMachine.OpenSubKey(keyPath, writable: true);
+                    if (key == null) return (false, $"Chave IFEO de '{target}' não encontrada.");
+
+                    if (!enable)
+                    {
+                        string? dbg = key.GetValue("Debugger") as string;
+                        if (dbg == null) return (false, "Entrada IFEO já está sem Debugger.");
+                        using var bk = Registry.CurrentUser.CreateSubKey(RemovedAppsBackupKey);
+                        bk.SetValue(appName + "__IfeoDebugger", dbg);
+                        key.DeleteValue("Debugger", false);
+                        InvalidateCache();
+                        return (true, silentMode ? "" : $"IFEO '{target}' desabilitado (Debugger removido — reversível).");
+                    }
+                    else
+                    {
+                        string? saved = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey)?.GetValue(appName + "__IfeoDebugger") as string;
+                        if (string.IsNullOrEmpty(saved)) return (false, "Nenhum backup do Debugger para restaurar.");
+                        key.SetValue("Debugger", saved, RegistryValueKind.String);
+                        using var bk = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey, writable: true);
+                        bk?.DeleteValue(appName + "__IfeoDebugger", false);
+                        InvalidateCache();
+                        return (true, silentMode ? "" : $"IFEO '{target}' habilitado (Debugger restaurado).");
+                    }
+                }
+
+                // ---- LSA: remove/restaura a DLL da lista (Authentication/Notification/Security Packages) ----
+                if (loc.Contains("\\Control\\Lsa", StringComparison.OrdinalIgnoreCase))
+                {
+                    string dll = appName.Substring("LSA: ".Length);
+                    string lsaPath = loc.StartsWith("HKLM\\", StringComparison.OrdinalIgnoreCase) ? loc.Substring(5) : loc.TrimStart('\\');
+                    using var key = Registry.LocalMachine.OpenSubKey(lsaPath, writable: true);
+                    if (key == null) return (false, "Chave LSA não encontrada.");
+
+                    foreach (var valName in new[] { "Authentication Packages", "Notification Packages", "Security Packages" })
+                    {
+                        string raw = key.GetValue(valName) as string ?? "";
+                        if (string.IsNullOrWhiteSpace(raw)) continue;
+                        var parts = raw.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
+                        if (!parts.Remove(dll)) continue;
+
+                        if (!enable)
+                        {
+                            using var bk = Registry.CurrentUser.CreateSubKey(RemovedAppsBackupKey);
+                            bk.SetValue(appName + "__LsaValue", valName);
+                            bk.SetValue(appName + "__LsaRaw", raw);
+                            key.SetValue(valName, string.Join(",", parts));
+                            InvalidateCache();
+                            return (true, silentMode ? "" : $"LSA '{dll}' removido de {valName} (reversível). Reinicie o Windows para aplicar.");
+                        }
+                        else
+                        {
+                            string? savedRaw = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey)?.GetValue(appName + "__LsaRaw") as string;
+                            string? savedVal = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey)?.GetValue(appName + "__LsaValue") as string;
+                            if (!string.IsNullOrEmpty(savedRaw) && !string.IsNullOrEmpty(savedVal))
+                            {
+                                key.SetValue(savedVal, savedRaw, RegistryValueKind.String);
+                                using var bk = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey, writable: true);
+                                bk?.DeleteValue(appName + "__LsaRaw", false);
+                                bk?.DeleteValue(appName + "__LsaValue", false);
+                            }
+                            else
+                            {
+                                // Sem backup: reinsere no fim da lista atual
+                                string cur = key.GetValue(valName) as string ?? "";
+                                key.SetValue(valName, string.IsNullOrWhiteSpace(cur) ? dll : cur.TrimEnd(',') + "," + dll);
+                            }
+                            InvalidateCache();
+                            return (true, silentMode ? "" : $"LSA '{dll}' restaurado. Reinicie o Windows para aplicar.");
+                        }
+                    }
+                    return (false, $"DLL '{dll}' não encontrada nos pacotes LSA.");
+                }
+
+                // ---- PrintMon: Driver do monitor ----
+                if (loc.Contains("\\Control\\Print\\Monitors", StringComparison.OrdinalIgnoreCase))
+                {
+                    string monName = appName.Substring("PrintMon: ".Length);
+                    using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Print\Monitors\" + monName, writable: true);
+                    if (key == null) return (false, $"Monitor '{monName}' não encontrado.");
+
+                    if (!enable)
+                    {
+                        string? drv = key.GetValue("Driver") as string;
+                        if (drv == null) return (false, "Monitor já está sem Driver.");
+                        using var bk = Registry.CurrentUser.CreateSubKey(RemovedAppsBackupKey);
+                        bk.SetValue(appName + "__PrintMonDriver", drv);
+                        key.DeleteValue("Driver", false);
+                        InvalidateCache();
+                        return (true, silentMode ? "" : $"Monitor '{monName}' desabilitado (reversível). Reinicie o spooler/Windows para aplicar.");
+                    }
+                    else
+                    {
+                        string? saved = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey)?.GetValue(appName + "__PrintMonDriver") as string;
+                        if (string.IsNullOrEmpty(saved)) return (false, "Nenhum backup do Driver para restaurar.");
+                        key.SetValue("Driver", saved, RegistryValueKind.String);
+                        using var bk = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey, writable: true);
+                        bk?.DeleteValue(appName + "__PrintMonDriver", false);
+                        InvalidateCache();
+                        return (true, silentMode ? "" : $"Monitor '{monName}' habilitado (Driver restaurado).");
+                    }
+                }
+
+                return (false, "Local de persistência não reconhecido.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao alterar persistência: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Liga/desliga tarefas de inicialização UWP/MSIX pelo mesmo registro que o
+        /// Gerenciador de Tarefas usa (antes: fallback criava tarefa agendada fake).
+        /// Fontes: AppModel SystemAppData (Family!TaskId, State 2=on/1=off pelo usuário)
+        /// e Explorer\StartupTasks (AUMID, State 1=on/0=off).
+        /// </summary>
+        private static (bool Success, string Message) ToggleUwpStartupTask(StartupAppDetails app, string appName, bool enable, bool silentMode)
+        {
+            try
+            {
+                string aumid = (app.FullCommand ?? "").Substring("StartupTask: ".Length).Trim();
+                if (string.IsNullOrEmpty(aumid)) return (false, "Identificador UWP vazio.");
+
+                if (aumid.Contains('!'))
+                {
+                    // AppModel SystemAppData: HKCU\...\SystemAppData\<Family>\<TaskId>
+                    int bang = aumid.IndexOf('!');
+                    string family = aumid[..bang];
+                    string taskId = aumid[(bang + 1)..];
+                    string path = $@"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData\{family}\{taskId}";
+                    using var key = Registry.CurrentUser.OpenSubKey(path, writable: true);
+                    if (key == null) return (false, $"Tarefa UWP '{aumid}' não encontrada no registro.");
+                    key.SetValue("State", enable ? 2 : 1, RegistryValueKind.DWord);
+                    InvalidateCache();
+                    return (true, silentMode ? "" : $"'{appName}' {(enable ? "habilitado" : "desabilitado")} (igual ao Gerenciador de Tarefas).");
+                }
+                else
+                {
+                    // Explorer\StartupTasks: HKCU (por usuário) ou HKLM (global — loc diz)
+                    string leaf = aumid.TrimStart('\\');
+                    if (app.Location?.Contains("(Global)", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        using var key = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupTasks\" + leaf, writable: true);
+                        if (key == null) return (false, $"Tarefa UWP '{leaf}' não encontrada (HKLM).");
+                        key.SetValue("State", enable ? 1 : 0, RegistryValueKind.DWord);
+                    }
+                    else
+                    {
+                        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupTasks\" + leaf, writable: true);
+                        if (key == null) return (false, $"Tarefa UWP '{leaf}' não encontrada (HKCU).");
+                        key.SetValue("State", enable ? 1 : 0, RegistryValueKind.DWord);
+                    }
+                    InvalidateCache();
+                    return (true, silentMode ? "" : $"'{appName}' {(enable ? "habilitado" : "desabilitado")}.");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao alterar tarefa UWP: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Liga/desliga componentes do Active Setup (StubPath) de forma reversível:
+        /// desabilitar = salva o StubPath no backup e deleta o valor; habilitar = restaura.
+        /// </summary>
+        private static (bool Success, string Message) ToggleActiveSetupItem(StartupAppDetails app, string appName, bool enable, bool silentMode)
+        {
+            try
+            {
+                string subName = appName.Substring("ActiveSetup: ".Length);
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Active Setup\Installed Components\" + subName, writable: true);
+                if (key == null) return (false, $"Componente '{subName}' não encontrado.");
+
+                if (!enable)
+                {
+                    string? stub = key.GetValue("StubPath") as string;
+                    if (stub == null) return (false, "Componente já está sem StubPath.");
+                    using var bk = Registry.CurrentUser.CreateSubKey(RemovedAppsBackupKey);
+                    bk.SetValue(appName + "__ActiveSetupStub", stub);
+                    key.DeleteValue("StubPath", false);
+                    InvalidateCache();
+                    return (true, silentMode ? "" : $"'{subName}' desabilitado (StubPath removido — reversível).");
+                }
+                else
+                {
+                    string? saved = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey)?.GetValue(appName + "__ActiveSetupStub") as string;
+                    if (string.IsNullOrEmpty(saved)) return (false, "Nenhum backup do StubPath para restaurar.");
+                    key.SetValue("StubPath", saved, RegistryValueKind.String);
+                    using var bk = Registry.CurrentUser.OpenSubKey(RemovedAppsBackupKey, writable: true);
+                    bk?.DeleteValue(appName + "__ActiveSetupStub", false);
+                    InvalidateCache();
+                    return (true, silentMode ? "" : $"'{subName}' habilitado (StubPath restaurado).");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao alterar Active Setup: {ex.Message}");
+            }
         }
 
         private static void BruteForceDisableStartup(string appName)

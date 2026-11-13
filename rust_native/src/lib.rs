@@ -191,6 +191,14 @@ fn ci_starts_with(a: &str, b: &str) -> bool {
 #[cfg(windows)]
 pub mod mft;
 
+// ── Indice MFT persistente em disco (USN-journal freshness) ──────
+#[cfg(windows)]
+pub mod mft_index;
+
+// ── Feather persistent index (reference, dead code for now) ─────
+#[cfg(windows)]
+pub mod feather_index;
+
 // ── Ultra-fast process scanner ────────────────────────────────
 pub mod task_scan;
 

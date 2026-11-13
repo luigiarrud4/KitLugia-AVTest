@@ -209,48 +209,92 @@ namespace KitLugia.Core
                 }
 
                 var tempDir = Path.GetTempPath();
+
+                // Limpeza de restos de atualizações anteriores: cada update deixava para
+                // sempre um KitLugia_Update_<ticks>.zip + um KitLugia_Extract_<ticks>\ com
+                // uma cópia COMPLETA do app em %TEMP% (dezenas de MB por atualização).
+                try
+                {
+                    foreach (var stale in Directory.EnumerateFileSystemEntries(tempDir))
+                    {
+                        try
+                        {
+                            string staleName = Path.GetFileName(stale);
+                            bool isOurs = staleName.StartsWith("KitLugia_Update_", StringComparison.OrdinalIgnoreCase)
+                                      || staleName.StartsWith("KitLugia_Extract_", StringComparison.OrdinalIgnoreCase);
+                            if (!isOurs) continue;
+                            var writeTime = Directory.Exists(stale)
+                                ? Directory.GetLastWriteTime(stale)
+                                : File.GetLastWriteTime(stale);
+                            if (DateTime.Now - writeTime > TimeSpan.FromDays(3))
+                            {
+                                if (Directory.Exists(stale)) Directory.Delete(stale, recursive: true);
+                                else File.Delete(stale);
+                                Logger.Log($"🧹 Temp de update antigo removido: {staleName}");
+                            }
+                        }
+                        catch { /* arquivo em uso/sumiu — segue */ }
+                    }
+                }
+                catch { }
+
                 var updatePath = Path.Combine(tempDir, $"KitLugia_Update_{DateTime.Now.Ticks}.zip");
-                var hashPath = updatePath + ".sha256";
 
                 Logger.Log($"📥 Baixando {asset.Name} ({asset.Size / 1024 / 1024}MB)...");
 
                 using var downloadClient = KitHttp.CreateClient(TimeSpan.FromMinutes(30));
                 downloadClient.DefaultRequestHeaders.Add("User-Agent", "KitLugia-Updater");
-                var downloadResponse = await downloadClient.GetAsync(asset.BrowserDownloadUrl);
-                await using (var fileStream = File.Create(updatePath))
+                using (var downloadResponse = await downloadClient.GetAsync(asset.BrowserDownloadUrl))
                 {
-                    await downloadResponse.Content.CopyToAsync(fileStream);
+                    downloadResponse.EnsureSuccessStatusCode();
+                    await using (var fileStream = File.Create(updatePath))
+                    {
+                        await downloadResponse.Content.CopyToAsync(fileStream);
+                    }
                 }
 
                 Logger.Log("✅ Download concluído!");
 
-                // Try to download SHA256 hash file
-                string expectedHash = "";
+                // FAIL-CLOSED: sem o .sha256 (ou com um hash invalido) o binario
+                // NAO pode ser extraido/executado. Antes a falha do download era
+                // engolida e a verificacao inteira era pulada silenciosamente.
+                string expectedHash;
                 try
                 {
                     var hashUrl = asset.BrowserDownloadUrl.Replace(".zip", ".zip.sha256");
-                    var hashContent = await _httpClient.GetStringAsync(hashUrl);
-                    expectedHash = hashContent.Trim();
+                    using var hashResponse = await _httpClient.GetAsync(hashUrl);
+                    hashResponse.EnsureSuccessStatusCode();
+                    var hashContent = (await hashResponse.Content.ReadAsStringAsync()).Trim();
+                    // Formato sha256sum ("<hash>  <arquivo>") quebrava a comparação:
+                    // fica só com o primeiro token (o hash em si).
+                    var firstToken = hashContent.Split(new[] { ' ', '\t', '\r', '\n' },
+                        StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    expectedHash = firstToken ?? "";
                     Logger.Log($"🔐 SHA256 baixado: {expectedHash}");
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Logger.Log("⚠️ Arquivo .sha256 não encontrado no release — pulando verificação de hash");
+                    Logger.LogError("Updater", "Nao foi possivel baixar o SHA256: " + ex.Message);
+                    File.Delete(updatePath);
+                    return false;
                 }
 
-                // Verify hash if available
-                if (!string.IsNullOrEmpty(expectedHash))
+                if (expectedHash.Length != 64 || !expectedHash.All(Uri.IsHexDigit))
                 {
-                    string actualHash = ComputeSha256(updatePath);
-                    Logger.Log($"🔐 Hash calculado: {actualHash}");
-                    if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Logger.Log($"❌ Hash mismatch! Esperado: {expectedHash}, Calculado: {actualHash}");
-                        File.Delete(updatePath);
-                        return false;
-                    }
-                    Logger.Log("✅ Hash verificado com sucesso!");
+                    Logger.LogError("Updater", "SHA256 do release invalido - atualizacao abortada.");
+                    File.Delete(updatePath);
+                    return false;
                 }
+
+                string actualHash = ComputeSha256(updatePath);
+                Logger.Log($"🔐 Hash calculado: {actualHash}");
+                if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    Logger.Log($"❌ Hash mismatch! Esperado: {expectedHash}, Calculado: {actualHash}");
+                    File.Delete(updatePath);
+                    return false;
+                }
+                Logger.Log("✅ Hash verificado com sucesso!");
 
                 // Extract ZIP in C# so the batch doesn't need PowerShell
                 var extractDir = Path.Combine(tempDir, $"KitLugia_Extract_{DateTime.Now.Ticks}");
@@ -278,7 +322,7 @@ namespace KitLugia.Core
                 string currentVersion = GetCurrentVersion().ToString();
                 string newVersion = ParseVersion(release.TagName).ToString();
 
-                string? batchPath = GenerateUpdateBatch(extractDir, currentPid, currentExePath, currentVersion, newVersion);
+                string? batchPath = GenerateUpdateBatch(extractDir, currentPid, currentExePath, currentVersion, newVersion, updatePath);
                 if (batchPath == null)
                 {
                     Logger.Log("❌ Falha ao gerar script de atualização!");
@@ -398,12 +442,20 @@ namespace KitLugia.Core
             }
         }
 
-        public static string? GenerateUpdateBatch(string extractDir, int pid, string exePath, string oldVersion, string newVersion)
+        public static string? GenerateUpdateBatch(string extractDir, int pid, string exePath, string oldVersion, string newVersion, string? zipPath = null)
         {
             try
             {
                 string appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
                 string batchPath = Path.Combine(appDir, "KitLugia_Update.cmd");
+
+                // Limpeza dos temporários DEPOIS da instalação bem-sucedida (o zip
+                // baixado e a extração completa do app não precisam sobreviver).
+                string cleanup = string.IsNullOrEmpty(zipPath) ? "" : $@"echo Limpando temporarios...
+rd /s /q ""{extractDir}"" >nul 2>&1
+del /q ""{zipPath}"" >nul 2>&1
+echo.
+";
 
                 string batch = $@"@echo off
 title KitLugia - Atualizando...
@@ -414,29 +466,38 @@ echo          KIT LUGIA - ATUALIZACAO
 echo ================================================
 echo.
 echo [1/3] Aguardando fechamento do KitLugia...
+set /a KL_TRIES=0
 :wait
 tasklist /fi ""PID eq {pid}"" 2>nul | findstr /i ""{pid}"" >nul
-if not errorlevel 1 (
-    timeout /t 1 /nobreak >nul
-    goto wait
-)
+if errorlevel 1 goto closed
+set /a KL_TRIES+=1
+if %KL_TRIES% GEQ 120 goto waittimeout
+timeout /t 1 /nobreak >nul
+goto wait
+:waittimeout
+echo  AVISO - KitLugia nao fechou em 120 s. NADA foi alterado; abortando.
+timeout /t 10 >nul
+exit /b 2
+:closed
 echo  OK - KitLugia fechado.
 echo.
 echo [2/3] Instalando arquivos...
 xcopy ""{extractDir}"" ""{appDir}"" /E /Y /Q
 if errorlevel 1 (
-    echo  ERRO - Falha ao copiar arquivos.
-    pause
+    echo  ERRO - Falha ao copiar arquivos. A versao antiga continua intacta.
+    timeout /t 10 >nul
     exit /b 1
 )
 echo  OK - Arquivos instalados.
 echo.
-echo [3/3] Iniciando nova versao...
+{cleanup}echo [3/3] Iniciando nova versao...
 start """" ""{exePath}""
 echo.
 echo ================================================
 echo     ATUALIZACAO CONCLUIDA!
 echo ================================================
+timeout /t 5 >nul
+exit /b 0
 ";
 
                 File.WriteAllText(batchPath, batch);

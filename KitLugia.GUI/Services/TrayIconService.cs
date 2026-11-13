@@ -1404,16 +1404,23 @@ namespace KitLugia.GUI.Services
                 SetStartWithWindowsPref(true);
                 CleanupOldTask();
 
-                // ===== MÉTODO 1 (universal): HKCU Run — funciona com ou sem admin =====
+                // ===== MÉTODO 1: HKCU Run =====
+                // VERDADE sobre este método (o comentário antigo dizia "universal, funciona
+                // com ou sem admin" — mentira): o app.manifest exige requireAdministrator,
+                // e o Windows PULA entradas de Run key cujo alvo exige elevação (UAC não
+                // pergunta no logon). Ou seja: com UAC ativo, esta entrada NÃO inicia o Kit.
+                // Ela só é útil em setups com UAC desligado (EnableLUA=0). O mecanismo REAL
+                // de auto-start é a Task Scheduler abaixo (RunLevel.Highest = inicia elevado
+                // sem UAC). Mantemos a escrita por robustez, mas ela é coadjuvante.
                 bool regOk = SetRegistryEntry(true, path);
                 KitLugia.Core.Logger.Log(regOk
                     ? $"✅ Auto-start via Registry Run: {path} --tray"
                     : "⚠️ Registry Run falhou");
 
-                // ===== MÉTODO 2: .lnk na pasta Startup — SO como fallback =====
-                // Registry OK = remove o .lnk (senao o Gerenciador do Windows mostra o Kit
-                // DUAS vezes na aba Inicializacao). Registry falhou = cria o .lnk para o
-                // Kit continuar subindo no boot por outra via.
+                // ===== MÉTODO 2: .lnk na pasta Startup — coadjuvante (mesma limitação do
+                // Run key: .lnk para exe requireAdministrator é pulado no logon com UAC
+                // ativo). Só ajuda em setups sem UAC. Registry OK = remove o .lnk (senao o
+                // Gerenciador do Windows mostra o Kit DUAS vezes na aba Inicializacao).
                 bool lnkOk;
                 if (regOk)
                 {
@@ -1609,6 +1616,23 @@ namespace KitLugia.GUI.Services
                             KitLugia.Core.Logger.Log("ℹ️ Auto-start desativado pelo usuário — respeitando a preferência.");
                         return;
                     }
+                    // RECONFIGURAÇÃO CONDICIONAL: só reescreve as vias de auto-start quando
+                    // algo diverge do executável atual — update manual (exe novo em pasta
+                    // nova), entrada apagada por cleaner/AV, task sem BootTrigger, .lnk
+                    // duplicado. No boot normal, em que TUDO já aponta para este exe,
+                    // NENHUMA escrita é feita. Escrita em Run key é o padrão de persistência
+                    // que os AVs mais vigiam (T1060) — reescrever 1× por sessão era ruído
+                    // de graça, e a garantia pós-update fica intacta (caminho novo = diverge
+                    // = reescreve).
+                    if (AutoStartAlreadyUpToDate())
+                    {
+                        // Normaliza a preferência só se NUNCA foi gravada (entradas existem,
+                        // chave de preferências não) — escrita única, não por boot.
+                        if (!HasStartWithWindowsPref())
+                            SetStartWithWindowsPref(true);
+                        KitLugia.Core.Logger.Log("✅ Auto-start já aponta para este executável — verificado, nada reescrito (Run/Startup/Task).");
+                        return;
+                    }
                     KitLugia.Core.Logger.Log("🔁 Reconfigurando auto-start em todos os métodos com o executável atual...");
                     SetAutoStart(true);
                 }
@@ -1651,6 +1675,71 @@ namespace KitLugia.GUI.Services
                 catch { /* Task Scheduler indisponível — as outras 2 vias bastam */ }
 
                 return false;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// As 3 vias de auto-start já apontam para o executável ATUAL, sem nada a corrigir?
+        /// Verifica (somente leitura): Registry Run com o caminho atual + --tray, sem .lnk
+        /// duplicado na Startup e — quando o app roda elevado — task habilitada com o
+        /// caminho atual, --tray e trigger de Boot. Qualquer divergência => false e o
+        /// EnsureAutoStartMethods reconfigura de verdade (comporta update manual, entrada
+        /// apagada por cleaner, task recriada etc.).
+        /// </summary>
+        private static bool AutoStartAlreadyUpToDate()
+        {
+            try
+            {
+                string path = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(path)) return false;
+
+                // 1) Registry Run: valor esperado exato, ou mesmo alvo com --tray (variação de aspas)
+                string regValue = "";
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
+                    regValue = key?.GetValue("KitLugia") as string ?? "";
+                if (string.IsNullOrWhiteSpace(regValue)) return false; // entrada apagada -> reescreve
+                string expected = $"\"{path}\" --tray";
+                bool regOk = string.Equals(regValue.Trim(), expected, StringComparison.OrdinalIgnoreCase)
+                          || (regValue.IndexOf(path, StringComparison.OrdinalIgnoreCase) >= 0
+                              && regValue.IndexOf("--tray", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (!regOk) return false; // caminho antigo (pós-update) -> reescreve
+
+                // 2) Sem .lnk duplicado na Startup (Registry ativo = .lnk não deve existir)
+                string startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                if (!string.IsNullOrEmpty(startup) && File.Exists(Path.Combine(startup, "KitLugia.lnk")))
+                    return false;
+
+                // 3) Task Scheduler: só é EXIGIDO quando o app roda elevado (é a única
+                // situação em que SetAutoStart cria/ajusta a task). Sem elevação a task
+                // pode nem existir — e o SetAutoStart também não a criaria.
+                if (IsRunningElevated())
+                {
+                    try
+                    {
+                        using var ts = new TaskService();
+                        var t = ts.GetTask("KitLugia");
+                        if (t == null || !t.Enabled) return false; // apagada/desabilitada -> reescreve
+                        bool actionOk = false;
+                        foreach (var action in t.Definition.Actions)
+                        {
+                            if (action is ExecAction exec &&
+                                string.Equals(exec.Path, path, StringComparison.OrdinalIgnoreCase) &&
+                                (exec.Arguments ?? "").IndexOf("--tray", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                actionOk = true;
+                                break;
+                            }
+                        }
+                        if (!actionOk || !TaskHasBootTrigger(t)) return false;
+                    }
+                    catch
+                    {
+                        return false; // Task Scheduler indisponível -> não dá para confirmar -> reconfigura
+                    }
+                }
+
+                return true;
             }
             catch { return false; }
         }
@@ -5886,7 +5975,10 @@ private static void RescueOrphanedBoostState()
 
                         if (!ok)
                         {
-                            IslcLastSkipReason = ntStatus == 0xC0000061 || ntStatus == -1
+                            // 0xC0000061 nao cabe em int: a comparacao com a
+                            // literal era SEMPRE falsa (CS0652). O cast explicito
+                            // reproduz o valor que a API devolve como int negativo.
+                            IslcLastSkipReason = ntStatus == unchecked((int)0xC0000061) || ntStatus == -1
                                 ? "falhou: precisa rodar como administrador"
                                 : $"falhou (NTSTATUS 0x{ntStatus:X8})";
                             KitLugia.Core.Logger.Log($"[STANDBY] Purge recusado: {IslcLastSkipReason}");

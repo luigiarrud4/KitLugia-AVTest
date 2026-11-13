@@ -502,16 +502,40 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Margin="0,0,0,15">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Aplicativos Portáteis Detectados" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                                <TextBlock x:Name="PortableIconProgressText" Text="" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
+                        <Grid Grid.Row="0" Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Aplicativos Portáteis Detectados" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock x:Name="PortableIconProgressText" Text="" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <TextBlock Text="Apps em pastas locais sem registro no Windows. Podem ser removidos manualmente." Foreground="#AAA" Margin="0,3,0,0"/>
+                                <TextBox x:Name="TxtSearchPortable" TextChanged="TxtSearchPortable_TextChanged"
+                                         Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar app portátil por nome ou pasta..."
+                                         Margin="0,10,0,0"/>
                             </StackPanel>
-                            <TextBlock Text="Apps em pastas locais sem registro no Windows. Podem ser removidos manualmente." Foreground="#AAA" Margin="0,3,0,0"/>
-                            <TextBox x:Name="TxtSearchPortable" TextChanged="TxtSearchPortable_TextChanged"
-                                     Style="{StaticResource SearchTextBoxStyle}" Tag="Buscar app portátil por nome ou pasta..."
-                                     Margin="0,10,0,0"/>
-                        </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16,0,0,0">
+                                <TextBlock Text="ORDENAR POR" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
+                                           HorizontalAlignment="Right" Margin="0,0,2,4"/>
+                                <ComboBox x:Name="CmbPortableSort" Height="34" Width="200"
+                                          Style="{StaticResource DarkComboBoxStyle}"
+                                          ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                                          SelectionChanged="CmbPortableSort_SelectionChanged">
+                                    <ComboBoxItem Tag="Default" IsSelected="True">Padrão (confiança)</ComboBoxItem>
+                                    <ComboBoxItem Tag="NameAsc">Nome (A → Z)</ComboBoxItem>
+                                    <ComboBoxItem Tag="NameDesc">Nome (Z → A)</ComboBoxItem>
+                                    <ComboBoxItem Tag="SizeDesc">Maior tamanho</ComboBoxItem>
+                                    <ComboBoxItem Tag="SizeAsc">Menor tamanho</ComboBoxItem>
+                                    <ComboBoxItem Tag="DateDesc">Mais recentes</ComboBoxItem>
+                                    <ComboBoxItem Tag="DateAsc">Mais antigos</ComboBoxItem>
+                                </ComboBox>
+                                <TextBlock x:Name="TxtPortableCount" Text="" FontSize="11" Foreground="#777"
+                                           HorizontalAlignment="Right" Margin="0,8,2,0"/>
+                            </StackPanel>
+                        </Grid>
 
                         <Border x:Name="PortableLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -868,6 +892,80 @@
                         </Border>
                     </Grid>
                 </TabItem>
+
+                <!-- ABA: LOGS (logs de limpeza do Deep Uninstall, persistem em %LocalAppData%\KitLugia\Logs) -->
+                <TabItem Header="&#x1F4DC; Logs">
+                    <Grid Margin="0,15,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="Logs de Limpeza" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Registro de cada limpeza do Deep Uninstall: o que foi removido, backups e falhas. Os arquivos ficam em %LocalAppData%\KitLugia\Logs e sobrevivem ao reboot." Foreground="#AAA" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Background="#252525" CornerRadius="5" Padding="12,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtLogsInfo" Text="Nenhum log carregado" FontSize="12" Foreground="#888" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                <Button Grid.Column="1" Content="Atualizar" Height="30" Padding="10,0" Background="#333" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,6,0" Click="BtnLogsRefresh_Click"/>
+                                <Button Grid.Column="2" Content="&#x1F4C2; Abrir Pasta" Height="30" Padding="10,0" Background="#2C3E50" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,6,0" Click="BtnLogsOpenFolder_Click"/>
+                                <Button Grid.Column="3" x:Name="BtnLogsDelete" Content="&#x1F5D1; Excluir Log" Height="30" Padding="10,0" Background="#C0392B" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" IsEnabled="False" Click="BtnLogsDelete_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <ListBox x:Name="LogsList" Grid.Row="2" Height="170" Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" Foreground="White" SelectionChanged="LogsList_SelectionChanged"
+                                 ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Vertical">
+                                            <TextBlock Text="{Binding FileName}" FontSize="12" Foreground="White"/>
+                                            <TextBlock Text="{Binding AppSummary}" FontSize="11" Foreground="#FFD700" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DateString}" FontSize="11" Foreground="#888" Margin="0,0,10,0"/>
+                                            <TextBlock Text="{Binding SizeString}" FontSize="11" Foreground="#888"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Border Grid.Row="3" Background="#151515" BorderBrush="#333" BorderThickness="1" CornerRadius="5" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0" Background="#202020" Padding="10,6" CornerRadius="5,5,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="TxtLogViewerTitle" Text="Selecione um log acima" FontSize="12" Foreground="#AAA" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                        <Button Grid.Column="1" x:Name="BtnLogsCopy" Content="&#x1F4CB; Copiar" Height="26" Padding="10,0" Background="#333" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" IsEnabled="False" Click="BtnLogsCopy_Click"/>
+                                    </Grid>
+                                </Border>
+                                <TextBox x:Name="TxtLogContent" Grid.Row="1" IsReadOnly="True" Background="Transparent" Foreground="#CCC" BorderThickness="0" FontFamily="Consolas" FontSize="12" Padding="10" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Visible" TextWrapping="NoWrap"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
                 <TabItem Header="&#x1F9F0; Extensões" Visibility="Collapsed">
                     <Grid Margin="0,8,0,0">
                         <Grid.RowDefinitions>
@@ -1031,6 +1129,43 @@
                         <Button x:Name="BtnConfirmYes" Content="Sim" Click="BtnConfirmYes_Click"
                                 Width="100" Height="32"
                                 Background="#C42B1C" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Seletor de escopo do scan de portáteis: overlay dentro da página
+             (mesmo padrão do ConfirmOverlay), ZIndex entre confirm e restore. -->
+        <Border x:Name="PortableScopeOverlay" Grid.RowSpan="2" Panel.ZIndex="105"
+                Background="#CC000000" Visibility="Collapsed" CornerRadius="8">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Background="#2A2A2A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8"
+                    Width="540" Padding="20">
+                <StackPanel>
+                    <TextBlock Text="Escopo do Scan de Portáteis" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Selecione os discos que o scan deve analisar. O perfil do usuário (C:) cobre Desktop, Downloads, Documentos e AppData — a raiz do C: não é varrida por ser grande demais."
+                               FontSize="12" Foreground="#999" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                    <Border Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" CornerRadius="6"
+                            Padding="12,8,12,8" Margin="0,12,0,0" MaxHeight="240">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="PortableScopeDrivePanels"/>
+                        </ScrollViewer>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="BtnScopeOnlyC" Content="Somente C:" Width="110" Height="30" Margin="0,0,8,0"
+                                Background="#444" Foreground="#CCC" BorderThickness="0" Cursor="Hand"
+                                FontSize="12" FontWeight="SemiBold" Click="BtnScopeOnlyC_Click"/>
+                        <Button x:Name="BtnScopeAll" Content="Todos os discos" Width="130" Height="30"
+                                Background="#444" Foreground="#CCC" BorderThickness="0" Cursor="Hand"
+                                FontSize="12" FontWeight="SemiBold" Click="BtnScopeAll_Click"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                        <Button x:Name="BtnScopeCancel" Content="Cancelar" Click="BtnScopeCancel_Click"
+                                Width="100" Height="32" Margin="0,0,10,0"
+                                Background="#444" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                        <Button x:Name="BtnScopeScan" Content="Escanear" Click="BtnScopeScan_Click"
+                                Width="100" Height="32"
+                                Background="{StaticResource AccentColor}" Foreground="#1A1405" BorderThickness="0" Cursor="Hand"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

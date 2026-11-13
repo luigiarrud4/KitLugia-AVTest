@@ -299,6 +299,8 @@
         </Border>
 
         <!-- BUSY OVERLAY WITH REAL PROGRESS BAR (igual ao UpdatePage) -->
+
+
         <Grid x:Name="OverlayBusy" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
             <Border Background="#1A1A1A" CornerRadius="12" Padding="30" Width="520"
                     BorderBrush="#FFD700" BorderThickness="1"
@@ -401,6 +403,8 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
+
+
         </Grid>
     </Grid>
 </Page>

@@ -98,7 +98,7 @@ namespace KitLugia.Core
                 Logger.LogOnce("disk|getalldisks|nativo",
                     $"[DISK] GetAllDisks: caminho NATIVO (IOCTL) - {disks.Count} disco(s) em {sw.ElapsedMilliseconds} ms",
                     heartbeatSeconds: 300);
-                return disks;
+                return EnrichDiskHealth(disks);
             }
             catch (Exception ex)
             {
@@ -120,9 +120,9 @@ namespace KitLugia.Core
                     var legacy = GetAllDisksLegacy();
                     sw.Stop();
                     Logger.Log($"[DISK] GetAllDisks: caminho LEGADO (Win32_*) - {legacy.Count} disco(s) em {sw.ElapsedMilliseconds} ms");
-                    return legacy;
+                    return EnrichDiskHealth(legacy);
                 }
-                return disks;
+                return EnrichDiskHealth(disks);
             }
             catch (Exception ex)
             {
@@ -130,9 +130,95 @@ namespace KitLugia.Core
                 var disks = GetAllDisksLegacy();
                 sw.Stop();
                 Logger.Log($"[DISK] GetAllDisks: caminho LEGADO (Win32_*) - {disks.Count} disco(s) em {sw.ElapsedMilliseconds} ms");
-                return disks;
+                return EnrichDiskHealth(disks);
             }
         }
+
+        /// <summary>
+        /// Preenche DiskInfoEx.Health (e MediaType SSD/HDD quando vazio) via MSFT_PhysicalDisk
+        /// (HealthStatus = leitura SMART consolidada do Windows). Match por DeviceId == Index.
+        /// Falha silenciosamente: Health fica "" = desconhecido e a UI não exibe nada.
+        /// </summary>
+        private static List<DiskInfoEx> EnrichDiskHealth(List<DiskInfoEx> disks)
+        {
+            if (disks == null || disks.Count == 0) return disks ?? new();
+            try
+            {
+                var devices = KitLugia.Core.TaskManager.StorageDiagnostics.GetDevices();
+                if (devices.Count == 0) return disks;
+                foreach (var d in disks)
+                {
+                    var match = devices.FirstOrDefault(x => x.Index == d.Index);
+                    if (match == null) continue;
+                    d.Health = match.Health ?? "";
+                    if (string.IsNullOrWhiteSpace(d.MediaType) && !string.IsNullOrWhiteSpace(match.Media))
+                        d.MediaType = match.Media;
+                    d.Interface = string.IsNullOrWhiteSpace(d.Interface) ? match.Bus : d.Interface;
+                }
+            }
+            catch { /* Storage API indisponível — saúde fica desconhecida */ }
+
+            // Avaliação estilo Hard Disk Sentinel (algoritmo REado do HDSentinel.exe):
+            // percentual 0-100 + lista de problemas, por disco, falha silenciosa.
+            foreach (var d in disks)
+            {
+                if (d.HealthPercent.HasValue) continue;
+                try
+                {
+                    var r = DiskHealthEvaluator.Evaluate(d.Index, d.Model, d.MediaType, d.Interface);
+                    if (r.Determined)
+                    {
+                        d.HealthPercent = r.Percent;
+                        d.HealthDetail = r.Detail;
+                        d.HealthSource = r.Source;
+                    }
+                }
+                catch { /* avaliador é best-effort */ }
+            }
+            return disks;
+        }
+
+        /// <summary>
+        /// Verifica o dirty bit do volume (fsutil dirty query). Retorno:
+        /// true = volume SUJO (chkdsk recomendado), false = limpo, null = não deu para saber.
+        /// Parse agnóstico de idioma ("is dirty"/"está sujo", com negação detectada antes).
+        /// </summary>
+        public static async Task<bool?> IsVolumeDirtyAsync(string driveLetter)
+        {
+            try
+            {
+                string letter = driveLetter.Replace(":", "").Trim();
+                if (letter.Length != 1) return null;
+                var (_, output) = await RunProcess("fsutil.exe", $"dirty query {letter}:");
+                bool negated = Regex.IsMatch(output, @"(?:is\s+not\s+dirty|n[aã]o\s+est[aá]\s+sujo)", RegexOptions.IgnoreCase);
+                if (negated) return false;
+                bool dirty = Regex.IsMatch(output, @"(?:is\s+dirty|est[aá]\s+sujo)", RegexOptions.IgnoreCase);
+                return dirty ? true : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Renomeia o volume (label) via SetVolumeLabelW — sem spawn de processo, sem
+        /// desmontar nada. Funciona em qualquer volume com letra, inclusive sem formatação.
+        /// </summary>
+        public static async Task<bool> SetVolumeLabelAsync(string driveLetter, string newLabel)
+        {
+            try
+            {
+                string letter = driveLetter.Replace(":", "").Trim();
+                if (letter.Length != 1) return false;
+                return await Task.Run(() => SetVolumeLabelW($"{letter}:\\", newLabel));
+            }
+            catch (Exception ex)
+            {
+                Log($"SetVolumeLabel falhou: {ex.Message}");
+                return false;
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        private static extern bool SetVolumeLabelW(string rootPathName, string? volumeName);
 
         /// <summary>
         /// Enumera discos via DeviceIoControl direto (winioctl.h): IOCTL_DISK_GET_DRIVE_LAYOUT_EX
@@ -2264,6 +2350,21 @@ namespace KitLugia.Core
         public string PartitionStyle { get; set; } = "Desconhecido"; // GPT or MBR
         public bool IsSystemDisk { get; set; }
         public bool IsBootDisk { get; set; }
+
+        /// <summary>Saúde REAL do disco (SMART via MSFT_PhysicalDisk.HealthStatus):
+        /// "Saudável", "Atenção", "Não saudável" ou "" (desconhecido — Storage API indisponível).
+        /// O Win32_DiskDrive.Status "OK" não é SMART — é só o driver respondendo.</summary>
+        public string Health { get; set; } = "";
+        public bool HealthIsBad => Health is "Atenção" or "Não saudável";
+
+        /// <summary>Saúde calculada estilo Hard Disk Sentinel (0-100) pelo
+        /// DiskHealthEvaluator — null = não determinada (SMART indisponível).</summary>
+        public int? HealthPercent { get; set; }
+        /// <summary>Detalhe dos problemas encontrados (atributos SMART degradados).</summary>
+        public string HealthDetail { get; set; } = "";
+        /// <summary>Fonte do cálculo ("SMART (modelo HDS)", "Desgaste SSD...", ...).</summary>
+        public string HealthSource { get; set; } = "";
+
         public List<PartitionInfoEx> Partitions { get; set; } = new();
 
         public string SizeString => $"{(Size / (1024.0 * 1024 * 1024)):F1} GB";

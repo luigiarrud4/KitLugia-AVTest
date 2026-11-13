@@ -148,8 +148,8 @@ if not exist "!IFILE!" (
 set "INFO_CURRENT="
 set "INFO_NEXT="
 
-for /f "tokens=2 delims=:, " %%A in ('findstr /C:"current" "!IFILE!"') do set "INFO_CURRENT=%%~A"
-for /f "tokens=2 delims=:, " %%A in ('findstr /C:"next" "!IFILE!"') do set "INFO_NEXT=%%~A"
+for /f "tokens=1,2 delims==" %%A in ('findstr /C:"current=" "!IFILE!"') do set "INFO_CURRENT=%%~B"
+for /f "tokens=1,2 delims==" %%A in ('findstr /C:"next=" "!IFILE!"') do set "INFO_NEXT=%%~B"
 
 set "INFO_CURRENT=!INFO_CURRENT:"=!"
 set "INFO_NEXT=!INFO_NEXT:"=!"
@@ -187,7 +187,7 @@ if not exist "!IFILE!" (
 )
 
 set "INFO_SOURCE="
-for /f "tokens=2 delims=:, " %%A in ('findstr /C:"source" "!IFILE!"') do set "INFO_SOURCE=%%~A"
+for /f "tokens=1,2 delims==" %%A in ('findstr /C:"source=" "!IFILE!"') do set "INFO_SOURCE=%%~B"
 set "INFO_SOURCE=!INFO_SOURCE:"=!"
 
 set "SOURCE_OK=0"
@@ -216,7 +216,7 @@ if not exist "!VFILE!" (
 )
 
 set "BATCH_VER="
-set /p "BATCH_VER=<"!VFILE!""
+set /p BATCH_VER=<"!VFILE!"
 
 if defined BATCH_VER (
     echo    PASS: deploy.bat can read NEXT = "!BATCH_VER!"

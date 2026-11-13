@@ -563,3 +563,58 @@ mangled MSVC que dão a API limpa. (`IGNORE_EXPORTS = ^(\?|__)` zera o mapa inte
 3. **Não escrever BCD direto.** O `bcdedit` da Microsoft é o caminho suportado; a biblioteca
    binária do EPM é proprietária porque eles precisam funcionar onde o `bcdedit` não está.
 4. **Não prometer 4K alignment** onde só há diagnóstico (o item 7 da §11.2 é real work).
+
+---
+
+## 13. APÊNDICE — EPM DESKTOP: como funciona o "1 reboot" (RE no install local, 2025)
+
+> Alvo: `C:\Program Files\EaseUS\EaseUS Partition Master` (v20.8 desktop instalado).
+> Complementa o mapa do WinPE acima. Pergunta que motivou: "como o EPM encolhe C:
+> com 1 reboot, sem WinPE?" — **Resposta: ele usa WinPE sim, o próprio.**
+
+### 13.1 O mecanismo do PreOS (✅ CONFIRMADO por strings + estrutura de arquivos)
+
+Fluxo completo do `CPreOsPEBcdProc::Install`
+(fonte vazada: `D:\EPM\Main\code\EPM20.11_Release_20260923_FreeMoreCharge\EPMLogic\mod.CloneModule\PreOsPEAndBcdProc.cpp`):
+
+1. **Baixa o PE** na primeira necessidade: `https://download.easeus.com/winpe/boot.wim`
+   + `tools.zip` (MD5 verificado) — pasta `BUILDPE/DownloadFileList.json`.
+2. **Injeta o app inteiro** no WIM: o `FileList.ini` lista PartitionManager.dll,
+   MainModule.dll, ToolBox.dll, Qt5, EPMUI etc. — o PE roda o **mesmo app desktop**.
+3. **Staging**: `C:\PeBoot\EASEUSEPMPE.WIM` + `EASEUSEPMPE.SDI`.
+4. **BCD via biblioteca binária própria** (`Win32Bcd.dll`, não bcdedit), com GUIDs FIXOS:
+   - `{B40D316B-B159-4229-8D1B-4A388A093C5B}` = device ramdisk
+     (`ramdisksdidevice partition=C:`, `ramdisksdipath \peboot\EASEUSEPMPE.SDI`)
+   - `{1941F361-6968-4258-BA93-44E099AF5E55}` = loader
+     (`device`/`osdevice` = `ramdisk=[C:]\peboot\EASEUSEPMPE.WIM,{B40D...}`,
+     `path \Windows\system32\boot\winload.exe`, `systemroot \Windows`)
+   - GUIDs legados `{77128171-...}`/`{DC6EAD74-...}` = mesmo esquema em `\boot\` (versões antigas).
+5. **Operações pendentes**: grava `C:\EPMPEBatch.ept` — o PE lê o batch e executa.
+6. `winpeshl.ini` com `[LaunchApps]` real (ChangeRes → launch.exe → PELetterAdjust.exe)
+   — confirma a lição do KitLugia_PREOS_GAPS.md: LaunchApps vazio é o bug.
+7. Reboot → PE executa → apaga `PeBoot` + entrada BCD (`CPreOsPEBcdProc::DelBcdEntry`,
+   `IsAlreadyDone`) → reboot de volta.
+
+`CBoot::GetPreOSTypeEx` + `CEditBootItemLinux`/`CEditBootItemPe` (Boot.dll) = suporte aos
+dois tipos; o menu grub4dos `LINUX.LST` (`EASLINUX.KNL` + `EASLINUX.IRD`, `easeus_mode=1`)
+é resquício da **mídia bootável** — zero referências a EASLINUX no app instalado.
+
+### 13.2 Por que o shrink do EPM vai além do Windows
+
+O PE não é o segredo — **o motor é**: `ResizeMoveByRebuildingMFT.cpp` reconstrói o `$MFT`
+e reescreve os data runs de cada arquivo, movendo clusters de verdade. No PE nada está
+travado (nem pagefile), e arquivos "unmovable" simplesmente não existem lá.
+O `Resize-Partition` do Windows (online ou em WinPE) só trunca o fim — nunca move dados.
+
+### 13.3 Consequências para o KitLugia
+
+| Achado EPM | Status no Kit |
+|---|---|
+| BCD ramdisk + WIM próprio + bootsequence | ✅ já implementado (WinbootManager) — mecanismo idêntico |
+| Limpar bloqueios antes do shrink (sombras VSS, pagefile, hiberfil) | ✅ `OnlineShrinkManager` — e sem reboot nenhum |
+| Motor que move dados (rebuild MFT) | ❌ impossível em WinPE+PowerShell; caminho real = Alpine + `ntfsresize` (equivalente Linux do ResizeMoveByRebuildingMFT) |
+| Batch de operações pendentes (`.ept`) | equivalente: `shrink_resume.json` + RunOnce |
+
+**Conclusão prática:** o caso "1 reboot e encolhe" do EaseUS = PE próprio + motor que move
+dados. O Kit resolve o caso comum (bloqueios VSS/pagefile/hiberfil) SEM reboot; para igualar
+o poder total, o caminho é ntfsresize no Alpine, não mais PowerShell no WinPE.

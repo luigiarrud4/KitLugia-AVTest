@@ -1,0 +1,225 @@
+=== ScanAllVolumes ===
+  [status] Indexando volume C:...
+  [status] Lendo MFT de C: - 0%
+  [status] Lendo MFT de C: - 9%
+  [status] Lendo MFT de C: - 21%
+  [status] Lendo MFT de C: - 32%
+  [status] Lendo MFT de C: - 43%
+  [status] Lendo MFT de C: - 55%
+  [status] Lendo MFT de C: - 66%
+  [status] Lendo MFT de C: - 77%
+  [status] Lendo MFT de C: - 90%
+  [status] Montando ¡ndice de C:...
+  [status] Lendo MFT de C: - 0%
+  [status] Lendo MFT de C: - 9%
+  [status] Lendo MFT de C: - 20%
+  [status] Lendo MFT de C: - 32%
+  [status] Lendo MFT de C: - 44%
+  [status] Lendo MFT de C: - 55%
+  [status] Lendo MFT de C: - 67%
+  [status] Lendo MFT de C: - 78%
+  [status] Lendo MFT de C: - 91%
+  [status] Volume C:: 1.647.853 entradas indexadas
+  [status] Indexando volume D:...
+  [status] Lendo MFT de D: - 0%
+  [status] Lendo MFT de D: - 2%
+  [status] Lendo MFT de D: - 4%
+  [status] Lendo MFT de D: - 8%
+  [status] Lendo MFT de D: - 12%
+  [status] Lendo MFT de D: - 14%
+  [status] Lendo MFT de D: - 18%
+  [status] Lendo MFT de D: - 19%
+  [status] Lendo MFT de D: - 23%
+  [status] Lendo MFT de D: - 26%
+  [status] Lendo MFT de D: - 29%
+  [status] Lendo MFT de D: - 32%
+  [status] Lendo MFT de D: - 33%
+  [status] Lendo MFT de D: - 36%
+  [status] Lendo MFT de D: - 39%
+  [status] Lendo MFT de D: - 41%
+  [status] Lendo MFT de D: - 42%
+  [status] Lendo MFT de D: - 44%
+  [status] Lendo MFT de D: - 46%
+  [status] Lendo MFT de D: - 49%
+  [status] Lendo MFT de D: - 52%
+  [status] Lendo MFT de D: - 55%
+  [status] Lendo MFT de D: - 58%
+  [status] Lendo MFT de D: - 63%
+  [status] Lendo MFT de D: - 65%
+  [status] Lendo MFT de D: - 66%
+  [status] Lendo MFT de D: - 69%
+  [status] Lendo MFT de D: - 72%
+  [status] Lendo MFT de D: - 75%
+  [status] Lendo MFT de D: - 78%
+  [status] Lendo MFT de D: - 81%
+  [status] Lendo MFT de D: - 86%
+  [status] Lendo MFT de D: - 89%
+  [status] Lendo MFT de D: - 93%
+  [status] Lendo MFT de D: - 96%
+  [status] Montando ¡ndice de D:...
+  [status] Lendo MFT de D: - 0%
+  [status] Lendo MFT de D: - 2%
+  [status] Lendo MFT de D: - 6%
+  [status] Lendo MFT de D: - 10%
+  [status] Lendo MFT de D: - 14%
+  [status] Lendo MFT de D: - 18%
+  [status] Lendo MFT de D: - 19%
+  [status] Lendo MFT de D: - 22%
+  [status] Lendo MFT de D: - 24%
+  [status] Lendo MFT de D: - 29%
+  [status] Lendo MFT de D: - 32%
+  [status] Lendo MFT de D: - 35%
+  [status] Lendo MFT de D: - 38%
+  [status] Lendo MFT de D: - 41%
+  [status] Lendo MFT de D: - 46%
+  [status] Lendo MFT de D: - 47%
+  [status] Lendo MFT de D: - 51%
+  [status] Lendo MFT de D: - 55%
+  [status] Lendo MFT de D: - 58%
+  [status] Lendo MFT de D: - 58%
+  [status] Lendo MFT de D: - 62%
+  [status] Lendo MFT de D: - 62%
+  [status] Lendo MFT de D: - 65%
+  [status] Lendo MFT de D: - 67%
+  [status] Lendo MFT de D: - 67%
+  [status] Lendo MFT de D: - 71%
+  [status] Lendo MFT de D: - 76%
+  [status] Lendo MFT de D: - 79%
+  [status] Lendo MFT de D: - 82%
+  [status] Lendo MFT de D: - 86%
+  [status] Lendo MFT de D: - 87%
+  [status] Lendo MFT de D: - 93%
+  [status] Lendo MFT de D: - 97%
+  [status] Montando ¡ndice de D:...
+  [status] Volume D:: 772.912 entradas indexadas
+C: failed=False rc=0 entries=1647853 comNome=1647853 prefixos=[5651257,5651216,5651255]
+   rec=18509 'EBWebView' parent=96 size=0 flags=1
+   rec=1189 'HID' parent=118 size=0 flags=1
+   rec=2965 'FileVault2' parent=118 size=0 flags=1
+   rec=4858 'FileSystem' parent=118 size=0 flags=1
+   rec=15929 'MemoryFix' parent=118 size=0 flags=1
+   rec=17926 'Other' parent=118 size=0 flags=1
+   rec=281 'Untitled 1' parent=121 size=0 flags=1
+   rec=1846 'tab_1' parent=121 size=0 flags=1
+D: failed=False rc=0 entries=772912 comNome=772912 prefixos=[5]
+   rec=36 'System Volume Information' parent=5 size=0 flags=5
+   rec=50 'MapData' parent=5 size=0 flags=1
+   rec=68 'Program Files' parent=5 size=0 flags=1
+   rec=87 'Pack de Optimizacion' parent=5 size=0 flags=1
+   rec=97 '.GamingRoot' parent=5 size=0 flags=4
+   rec=126 'OMAGAAAAAAAAAAAA' parent=5 size=0 flags=1
+   rec=183 'python-3.12.1-amd64.exe' parent=5 size=26589696 flags=0
+   rec=187 'scoped_dir6924_1119463754' parent=5 size=0 flags=1
+=== PortableAppScanner.Scan ===
+  [status] Indexando volume C:...
+  [status] Lendo MFT de C: - 0%
+  [status] Lendo MFT de C: - 5%
+  [status] Lendo MFT de C: - 12%
+  [status] Lendo MFT de C: - 22%
+  [status] Lendo MFT de C: - 32%
+  [status] Lendo MFT de C: - 42%
+  [status] Lendo MFT de C: - 51%
+  [status] Lendo MFT de C: - 61%
+  [status] Lendo MFT de C: - 66%
+  [status] Lendo MFT de C: - 77%
+  [status] Lendo MFT de C: - 88%
+  [status] Montando ¡ndice de C:...
+  [status] Lendo MFT de C: - 0%
+  [status] Lendo MFT de C: - 10%
+  [status] Lendo MFT de C: - 21%
+  [status] Lendo MFT de C: - 33%
+  [status] Lendo MFT de C: - 44%
+  [status] Lendo MFT de C: - 55%
+  [status] Lendo MFT de C: - 67%
+  [status] Lendo MFT de C: - 73%
+  [status] Lendo MFT de C: - 88%
+  [status] Montando ¡ndice de C:...
+  [status] Volume C:: 4.068.431 entradas indexadas
+  [status] Indexando volume D:...
+  [status] Lendo MFT de D: - 0%
+  [status] Lendo MFT de D: - 2%
+  [status] Lendo MFT de D: - 6%
+  [status] Lendo MFT de D: - 11%
+  [status] Lendo MFT de D: - 13%
+  [status] Lendo MFT de D: - 15%
+  [status] Lendo MFT de D: - 17%
+  [status] Lendo MFT de D: - 20%
+  [status] Lendo MFT de D: - 22%
+  [status] Lendo MFT de D: - 24%
+  [status] Lendo MFT de D: - 26%
+  [status] Lendo MFT de D: - 27%
+  [status] Lendo MFT de D: - 30%
+  [status] Lendo MFT de D: - 32%
+  [status] Lendo MFT de D: - 35%
+  [status] Lendo MFT de D: - 36%
+  [status] Lendo MFT de D: - 39%
+  [status] Lendo MFT de D: - 42%
+  [status] Lendo MFT de D: - 45%
+  [status] Lendo MFT de D: - 49%
+  [status] Lendo MFT de D: - 53%
+  [status] Lendo MFT de D: - 56%
+  [status] Lendo MFT de D: - 61%
+  [status] Lendo MFT de D: - 65%
+  [status] Lendo MFT de D: - 66%
+  [status] Lendo MFT de D: - 67%
+  [status] Lendo MFT de D: - 70%
+  [status] Lendo MFT de D: - 71%
+  [status] Lendo MFT de D: - 76%
+  [status] Lendo MFT de D: - 79%
+  [status] Lendo MFT de D: - 80%
+  [status] Lendo MFT de D: - 85%
+  [status] Lendo MFT de D: - 88%
+  [status] Lendo MFT de D: - 92%
+  [status] Lendo MFT de D: - 96%
+  [status] Lendo MFT de D: - 100%
+  [status] Lendo MFT de D: - 0%
+  [status] Lendo MFT de D: - 4%
+  [status] Lendo MFT de D: - 9%
+  [status] Lendo MFT de D: - 11%
+  [status] Lendo MFT de D: - 15%
+  [status] Lendo MFT de D: - 19%
+  [status] Lendo MFT de D: - 22%
+  [status] Lendo MFT de D: - 23%
+  [status] Lendo MFT de D: - 25%
+  [status] Lendo MFT de D: - 29%
+  [status] Lendo MFT de D: - 31%
+  [status] Lendo MFT de D: - 34%
+  [status] Lendo MFT de D: - 35%
+  [status] Lendo MFT de D: - 38%
+  [status] Lendo MFT de D: - 42%
+  [status] Lendo MFT de D: - 43%
+  [status] Lendo MFT de D: - 46%
+  [status] Lendo MFT de D: - 51%
+  [status] Lendo MFT de D: - 53%
+  [status] Lendo MFT de D: - 57%
+  [status] Lendo MFT de D: - 62%
+  [status] Lendo MFT de D: - 65%
+  [status] Lendo MFT de D: - 65%
+  [status] Lendo MFT de D: - 68%
+  [status] Lendo MFT de D: - 70%
+  [status] Lendo MFT de D: - 72%
+  [status] Lendo MFT de D: - 77%
+  [status] Lendo MFT de D: - 83%
+  [status] Lendo MFT de D: - 87%
+  [status] Lendo MFT de D: - 88%
+  [status] Lendo MFT de D: - 93%
+  [status] Lendo MFT de D: - 97%
+  [status] Montando ¡ndice de D:...
+  [status] Volume D:: 772.912 entradas indexadas
+  [status] 4.364 pastas candidatas - analisando...
+apps detectados: 65
+  KitLugia.GUI | C:\Users\Lugia\Downloads\KITLUGIA2 (9) | 85% | 43,0 MB
+  RobloxStudioBeta | C:\Users\Lugia\AppData\Local\Fishstrap | 75% | 2,2 GB
+  LAGOIAaaaa | C:\Users\Lugia\Downloads\LAGOIAaaaa | 75% | 524,7 MB
+  GitHubDesktop | C:\Users\Lugia\AppData\Local\GitHubDesktop | 75% | 345,2 MB
+  erto3e4rortoergn | C:\Users\Lugia\Downloads\net8.0-windows10.0.26100.0 | 75% | 257,8 MB
+  opera_autoupdate | C:\Users\Lugia\AppData\Local\Programs\Opera GX | 75% | 202,4 MB
+  LosslessCut | C:\Users\Lugia\Downloads\LosslessCut-win-x64 | 75% | 200,7 MB
+  citron | C:\Users\Lugia\Downloads\Citron-windows-nightly-0237a9b88-x64-clangtron | 75% | 152,4 MB
+  siteserverui | C:\Users\Lugia\Downloads\WorkshopDLv2.0.1 | 75% | 122,9 MB
+  Real | C:\Users\Lugia\AppData\Local\Real | 75% | 107,9 MB
+  zmodeler3_x64 | C:\Users\Lugia\Downloads\zmodeler3_x64 | 75% | 103,9 MB
+  Citron-windows-nightly-0237a9b88-x64-msvc | C:\Users\Lugia\Downloads\Citron-windows-nightly-0237a9b88-x64-msvc | 75% | 36,0 MB
+  visual | C:\Users\Lugia\Downloads\2222222 | 75% | 21,8 MB
+  Sonar BootStrapper | C:\Users\Lugia\Downloads\Sonar BootStrapper | 70% | 7,2 MB
+  Bootstrapper | C:\Users\Lugia\Downloads\RONNNIX | 70% | 6,5 MB

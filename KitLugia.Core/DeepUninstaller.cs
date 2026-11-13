@@ -1080,11 +1080,21 @@ namespace KitLugia.Core
                 else
                 {
                     results.Add(installLocation);
+                    // IgnoreInaccessible: o overload legado com SearchOption.AllDirectories
+                    // ABORTAVA a varredura inteira na primeira subpasta protegida — resíduos
+                    // em subpastas com ACL restrito ficavam fora do scan (e o debugger
+                    // enchia de UnauthorizedAccessException).
+                    var walkOpts = new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = FileAttributes.ReparsePoint // junction: não duplicar/loopar
+                    };
                     try
                     {
-                        foreach (var f in Directory.EnumerateFiles(installLocation, "*", System.IO.SearchOption.AllDirectories))
+                        foreach (var f in Directory.EnumerateFiles(installLocation, "*", walkOpts))
                             results.Add(f);
-                        foreach (var d in Directory.EnumerateDirectories(installLocation, "*", System.IO.SearchOption.AllDirectories))
+                        foreach (var d in Directory.EnumerateDirectories(installLocation, "*", walkOpts))
                             results.Add(d);
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -1256,7 +1266,12 @@ namespace KitLugia.Core
                 if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
                 try
                 {
-                    foreach (var dir in Directory.EnumerateDirectories(root))
+                    foreach (var dir in Directory.EnumerateDirectories(root, "*", new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = false,
+                        AttributesToSkip = 0 // legado não pulava hidden/system
+                    }))
                     {
                         string leaf = Path.GetFileName(dir) ?? "";
                         if (string.IsNullOrEmpty(leaf) || leaf.Length < 3) continue;
@@ -1967,7 +1982,13 @@ namespace KitLugia.Core
                 if (!Directory.Exists(dir)) continue;
                 try
                 {
-                    foreach (var f in Directory.GetFiles(dir, "*.lnk", System.IO.SearchOption.AllDirectories))
+                    // IgnoreInaccessible: não abortar o scan do menu inteiro por 1 subpasta restrita
+                    foreach (var f in Directory.GetFiles(dir, "*.lnk", new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = FileAttributes.ReparsePoint
+                    }))
                     {
                         string name = Path.GetFileNameWithoutExtension(f);
                         if (string.IsNullOrEmpty(name) || name.Length < 3) continue;
@@ -3220,6 +3241,9 @@ namespace KitLugia.Core
                 {
                     var logEntries = new List<string>();
                     logEntries.Add($"=== KitLugia Deletion Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+                    // Nome do app no cabecalho: sem isso o log nao diz de qual limpeza ele e,
+                    // e o visualizador da aba Logs nao teria como rotular a entrada.
+                    logEntries.Add(string.IsNullOrWhiteSpace(displayName) ? "App: (desconhecido)" : $"App: {displayName}");
                     logEntries.Add("");
 
                     // Limpeza MANUAL (usuario clicou em limpar) sempre vai para a LIXEIRA,
@@ -3424,11 +3448,22 @@ namespace KitLugia.Core
                 {
                     if (!Directory.Exists(dest))
                         Directory.CreateDirectory(dest);
-                    foreach (var srcDir in Directory.GetDirectories(fullPath, "*", System.IO.SearchOption.AllDirectories))
-                        Directory.CreateDirectory(srcDir.Replace(fullPath, dest));
-                    foreach (var srcFile in Directory.GetFiles(fullPath, "*", System.IO.SearchOption.AllDirectories))
+                    // IgnoreInaccessible: backup PARCIAL era pior que inútil — a enumeração
+                    // abortava na 1ª subpasta protegida, o catch devolvia null e o
+                    // PerformCleanup cancelava a remoção do item inteiro.
+                    var backupOpts = new System.IO.EnumerationOptions
                     {
-                        string rel = srcFile.Replace(fullPath, "");
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = FileAttributes.ReparsePoint
+                    };
+                    foreach (var srcDir in Directory.GetDirectories(fullPath, "*", backupOpts))
+                        Directory.CreateDirectory(Path.Combine(dest, srcDir[fullPath.Length..].TrimStart('\\')));
+                    foreach (var srcFile in Directory.GetFiles(fullPath, "*", backupOpts))
+                    {
+                        // Substring, não Replace: se o caminho da pasta aparece 2x no caminho
+                        // do arquivo (ex.: C:\App\App\...), o Replace estragava o caminho relativo.
+                        string rel = srcFile[fullPath.Length..].TrimStart('\\');
                         string targetFile = dest + rel;
                         Directory.CreateDirectory(Path.GetDirectoryName(targetFile)!);
                         File.Copy(srcFile, targetFile, true);
@@ -3476,7 +3511,12 @@ namespace KitLugia.Core
                 {
                     if (!Directory.Exists(originalPath))
                         Directory.CreateDirectory(originalPath);
-                    foreach (var srcFile in Directory.GetFiles(backupPath, "*", System.IO.SearchOption.AllDirectories))
+                    foreach (var srcFile in Directory.GetFiles(backupPath, "*", new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = FileAttributes.ReparsePoint
+                    }))
                     {
                         string rel = srcFile[backupPath.Length..].TrimStart('\\');
                         string target = Path.Combine(originalPath, rel);
@@ -5260,8 +5300,12 @@ namespace KitLugia.Core
             if (lower.Contains("/s") || exeIsUninstaller || lower.Contains("insthelper"))
                 return $"{trimmed} /S /SD";
 
-            // InstallShield: -s /s /sms
-            if (lower.Contains("isuninst.exe") || lower.Contains("-s") ||
+            // InstallShield: -s /s /sms. O teste de "-s" olha só os ARGUMENTOS do
+            // comando: olhar a string inteira casava caminhos como "C:\...\Some-Soft\..."
+            // e mandava desinstaladores não-InstallShield para o ramo com -f1"...iss".
+            var (isExe, isArgs) = ParseCommandLine(uninstallString);
+            bool hasDashSArg = isArgs != null && isArgs.Contains("-s", StringComparison.OrdinalIgnoreCase);
+            if (lower.Contains("isuninst.exe") || hasDashSArg ||
                 lower.Contains("setup.exe"))
                 return $"{trimmed} -s -f1\"{installLocation}\\uninstall.iss\"";
 
@@ -5399,6 +5443,126 @@ namespace KitLugia.Core
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             return list;
+        }
+
+        // -- Retenção automática de backups de arquivos ---------------------------
+
+        /// <summary>
+        /// Backup grande o bastante para valer a política de retenção. Abaixo disso
+        /// a entrada é minúscula (atalhos, configs) e fica salva para sempre.
+        /// </summary>
+        public const long LargeBackupThresholdBytes = 100L * 1024 * 1024; // 100 MB
+
+        /// <summary>
+        /// Roda UMA vez por arranque (chamado do MainWindow, 60s depois de subir):
+        /// apaga backups GRANDES de FileBackup que passaram do prazo de retenção e
+        /// aplica um teto total, sempre do mais antigo para o mais novo.
+        ///
+        /// Regras:
+        /// - Só toca em FileBackup. RegBackup e arquivos .reg NUNCA são apagados
+        ///   (registro não tem Lixeira — o .reg é a única via de restauração).
+        /// - Backups pequenos ficam salvo permanentemente (custo irrisório).
+        /// - A idade vem do sufixo _yyyyMMddHHmmss do nome (fallback: LastWriteTime).
+        /// </summary>
+        public static void CleanupBackupRetention()
+        {
+            try
+            {
+                if (!Directory.Exists(FileBackupDir)) return;
+
+                int retentionDays = Math.Max(1, DeepUninstallSettings.BackupRetentionDays);
+                long capBytes = (long)Math.Max(0, DeepUninstallSettings.BackupMaxTotalMb) * 1024 * 1024;
+
+                var entries = new List<(string Path, DateTime Age, long Bytes)>();
+                long total = 0;
+                foreach (var path in Directory.EnumerateFileSystemEntries(FileBackupDir))
+                {
+                    try
+                    {
+                        long bytes = GetBackupEntrySize(path);
+                        total += bytes;
+                        entries.Add((path, GetBackupEntryAge(path), bytes));
+                    }
+                    catch { /* entrada sumiu no meio do inventário — segue */ }
+                }
+                if (entries.Count == 0) return;
+
+                long freed = 0;
+                int removedCount = 0;
+                var cutoff = DateTime.Now.AddDays(-retentionDays);
+
+                // 1) Grandes + vencidos (o caso do jogo de 11 GB esquecido)
+                foreach (var e in entries.Where(e => e.Bytes >= LargeBackupThresholdBytes && e.Age < cutoff)
+                                         .OrderBy(e => e.Age).ToList())
+                {
+                    if (DeleteBackupEntry(e.Path))
+                    {
+                        freed += e.Bytes; total -= e.Bytes; removedCount++;
+                        entries.Remove(e);
+                    }
+                }
+
+                // 2) Teto total — também só entre os grandes, para respeitar "pequenos ficam"
+                foreach (var e in entries.Where(e => e.Bytes >= LargeBackupThresholdBytes).OrderBy(e => e.Age))
+                {
+                    if (total <= capBytes) break;
+                    if (DeleteBackupEntry(e.Path))
+                    {
+                        freed += e.Bytes; total -= e.Bytes; removedCount++;
+                    }
+                }
+
+                if (freed > 0)
+                    Logger.Log($"[DeepUninstall] Retenção de backups: {removedCount} entrada(s) grande(s) vencida(s) apagada(s) — {freed / (1024.0 * 1024.0):F0} MB liberados em FileBackup (restou {total / (1024.0 * 1024.0):F0} MB)");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Unknown", $"Backup retention failed: {ex.Message}");
+            }
+        }
+
+        private static long GetBackupEntrySize(string path)
+        {
+            var fi = new FileInfo(path);
+            if (fi.Exists) return fi.Length;
+            long sum = 0;
+            var di = new DirectoryInfo(path);
+            foreach (var f in di.EnumerateFiles("*", new System.IO.EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            }))
+                sum += f.Length;
+            return sum;
+        }
+
+        private static DateTime GetBackupEntryAge(string path)
+        {
+            // Nome termina com _yyyyMMddHHmmss (gravado pelo BackupFileItem)
+            string name = Path.GetFileName(path);
+            int idx = name.LastIndexOf('_');
+            if (idx > 0 && name.Length - idx - 1 == 14 &&
+                DateTime.TryParseExact(name[(idx + 1)..], "yyyyMMddHHmmss",
+                    System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dt))
+                return dt;
+            try { return File.GetLastWriteTime(path); } catch { return DateTime.Now; }
+        }
+
+        private static bool DeleteBackupEntry(string path)
+        {
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+                else if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+                else return false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Unknown", $"Backup retention: falha ao apagar {path}: {ex.Message}");
+                return false;
+            }
         }
     }
 

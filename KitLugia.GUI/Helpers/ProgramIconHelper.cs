@@ -150,6 +150,27 @@ namespace KitLugia.GUI.Helpers
         }
 
         /// <summary>
+        /// Enumeração que NUNCA lança UnauthorizedAccessException/DirectoryNotFoundException:
+        /// o overload legado com SearchOption.AllDirectories aborta TUDO na primeira
+        /// subpasta protegida (centenas de exceções no load dos 1100+ apps — o ruído
+        /// no debugger desde a v1 — e apps ficando sem ícone à toa). Com
+        /// IgnoreInaccessible a enumeração continua pastando as pastas protegidas.
+        /// </summary>
+        private static EnumerationOptions SafeRecurse { get; } = new()
+        {
+            IgnoreInaccessible = true,
+            RecurseSubdirectories = true,
+            AttributesToSkip = FileAttributes.ReparsePoint // junction: não duplicar/loopar
+        };
+
+        private static EnumerationOptions SafeTopOnly { get; } = new()
+        {
+            IgnoreInaccessible = true,
+            RecurseSubdirectories = false,
+            AttributesToSkip = 0 // legado NÃO pulava hidden/system/reparse (sem risco de loop: sem recursão)
+        };
+
+        /// <summary>
         /// Procura ícone em um diretório (recursivamente) e arredores
         /// </summary>
         public static BitmapSource? GetIconFromDirectory(string? installDir)
@@ -159,7 +180,7 @@ namespace KitLugia.GUI.Helpers
             try
             {
                 // .exe na raiz
-                var exes = Directory.GetFiles(installDir, "*.exe", SearchOption.TopDirectoryOnly);
+                var exes = Directory.GetFiles(installDir, "*.exe", SafeTopOnly);
                 if (exes.Length > 0)
                 {
                     var icon = GetIconFromFile(exes[0]);
@@ -172,7 +193,7 @@ namespace KitLugia.GUI.Helpers
                     string subDir = Path.Combine(installDir, sub);
                     if (Directory.Exists(subDir))
                     {
-                        exes = Directory.GetFiles(subDir, "*.exe", SearchOption.TopDirectoryOnly);
+                        exes = Directory.GetFiles(subDir, "*.exe", SafeTopOnly);
                         if (exes.Length > 0)
                         {
                             var icon = GetIconFromFile(exes[0]);
@@ -182,7 +203,7 @@ namespace KitLugia.GUI.Helpers
                 }
 
                 // .ico no diretório
-                var icos = Directory.GetFiles(installDir, "*.ico", SearchOption.AllDirectories);
+                var icos = Directory.GetFiles(installDir, "*.ico", SafeRecurse);
                 if (icos.Length > 0)
                 {
                     var icon = GetIconFromFile(icos[0]);
@@ -190,7 +211,7 @@ namespace KitLugia.GUI.Helpers
                 }
 
                 // .exe em qualquer subnível
-                exes = Directory.GetFiles(installDir, "*.exe", SearchOption.AllDirectories);
+                exes = Directory.GetFiles(installDir, "*.exe", SafeRecurse);
                 if (exes.Length > 0)
                 {
                     var icon = GetIconFromFile(exes[0]);

@@ -337,6 +337,7 @@
                             <Button x:Name="BtnExtend" Content="🚀 ESTENDER VOLUME" Click="BtnExtend_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" IsEnabled="False"/>
                             <Button x:Name="BtnDelete" Content="❌ DELETAR" Click="BtnDelete_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" IsEnabled="False"/>
                             <Button x:Name="BtnAssignLetter" Content="🔠 ALTERAR LETRA" Click="BtnAssignLetter_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" IsEnabled="False"/>
+                            <Button x:Name="BtnRename" Content="🏷️ RENOMEAR VOLUME" Click="BtnRename_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" IsEnabled="False"/>
                             <Button x:Name="BtnCheckFS" Content="🛡️ VERIFICAR ERROS" Click="BtnCheckFS_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" IsEnabled="False"/>
                             <Button x:Name="BtnSetActive" Content="🏁 MARCAR ATIVA" Click="BtnSetActive_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,15" Height="36" IsEnabled="False" Visibility="Collapsed"/>
 
@@ -347,6 +348,82 @@
                             <Button x:Name="BtnCleanDisk" Content="🧹 LIMPAR DISCO" Click="BtnCleanDisk_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" BorderBrush="#44FF0000" Foreground="#FFFF5555"/>
                             <Button x:Name="BtnConvert" Content="🔄 CONVERTER GPT/MBR" Click="BtnConvert_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36"/>
                             <Button x:Name="BtnDiskDetail" Content="📄 DETALHES DO DISCO" Click="BtnDiskDetail_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,15" Height="36"/>
+
+                            <Separator Background="#222" Margin="0,5,0,15"/>
+
+                            <!-- ═══ DIAGNÓSTICO DE SHRINK (somente leitura) ═══ -->
+                            <TextBlock Text="ANÁLISE DE SHRINK" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,8"/>
+                            <Button x:Name="BtnShrinkDiag" Content="🔍 DIAGNOSTICAR BLOQUEIO" Click="BtnShrinkDiag_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36"
+                                    ToolTip="Descobre qual arquivo impede o shrink. Somente leitura — não altera nada."/>
+                            <Button x:Name="BtnSaveShrinkReport" Content="💾 SALVAR RELATÓRIO" Click="BtnSaveShrinkReport_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" IsEnabled="False"
+                                    ToolTip="Grava o diagnóstico na Área de Trabalho para enviar no chat"/>
+                            <Button x:Name="BtnCopyShrinkReport" Content="📋 COPIAR RELATÓRIO" Click="BtnCopyShrinkReport_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,12" Height="36" IsEnabled="False"/>
+
+                            <!-- DEEP SHRINK (metodo hop) -->
+                            <TextBlock Text="DEEP SHRINK" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,8"/>
+                            <Button x:Name="BtnDeepShrink" Content="&#x26A0; DEEP SHRINK (1 REBOOT)" Click="BtnDeepShrink_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36"
+                                    BorderBrush="#44FF8800" Foreground="#FFFFAA55"
+                                    ToolTip="Metodo do hop: desliga hibernacao, remove pagefile/journal/VSS, defrag + retry. ALTERA O SISTEMA - use em VM com snapshot."/>
+                            <Button x:Name="BtnDeepShrinkDefragOnly" Content="&#x1F527; SO DEFRAG + RETRY" Click="BtnDeepShrinkDefragOnly_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36"
+                                    ToolTip="Nao apaga nada: roda defrag C: /X e reconsulta o limite. Seguro."/>
+                            <Button x:Name="BtnSaveDeepReport" Content="&#x1F4BE; SALVAR RESULTADO" Click="BtnSaveDeepReport_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,12" Height="36" IsEnabled="False"/>
+
+                            <Border Background="#0D0D0D" BorderBrush="#2A2A2A" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,12">
+                                <TextBox x:Name="TxtDeepLog" IsReadOnly="True" AcceptsReturn="True"
+                                         FontFamily="Consolas" FontSize="10" Background="Transparent"
+                                         Foreground="#9CD89C" BorderThickness="0" TextWrapping="Wrap"
+                                         MinHeight="70" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                                         Text="(Deep Shrink nao executado)"/>
+                            </Border>
+
+                            <!-- LAB HOP (teste em VM) -->
+                            <TextBlock Text="LAB HOP (VM)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,8"/>
+                            <Button x:Name="BtnHopDiag" Content="1 DIAGNOSTICAR" Click="BtnHopDiag_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="32"
+                                    ToolTip="Evento 259: qual arquivo bloqueia. S&#243; leitura."/>
+                            <Button x:Name="BtnHopDefrag" Content="2 DEFRAG + RETRY" Click="BtnHopDefrag_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="32"
+                                    ToolTip="defrag /X, 4 tentativas em 900s. N&#227;o apaga nada."/>
+                            <Button x:Name="BtnHopHiber" Content="3 HIBERNA&#199;&#195;O OFF" Click="BtnHopHiber_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="32"
+                                    ToolTip="powercfg /h off. Revers&#237;vel."/>
+                            <Button x:Name="BtnHopPagefile" Content="4 PAGEFILE OFF" Click="BtnHopPagefile_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="32"
+                                    ToolTip="Remove do registro PagingFiles. Revers&#237;vel."/>
+                            <Button x:Name="BtnHopVss" Content="5 VSS DELETE" Click="BtnHopVss_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="32"
+                                    BorderBrush="#44FF4444" Foreground="#FFFF6666"
+                                    ToolTip="APAGA pontos de restaura&#231;&#227;o. IRREVERS&#205;VEL."/>
+                            <Button x:Name="BtnHopUsn" Content="6 USN DELETE" Click="BtnHopUsn_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="32"
+                                    ToolTip="fsutil usn deletejournal. Windows recria."/>
+                            <Button x:Name="BtnHopNuclear" Content="&#9762; NUCLEAR $Mft" Click="BtnHopNuclear_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="40"
+                                    BorderBrush="#88FF2222" Foreground="#FFFF5555" FontWeight="Bold"
+                                    ToolTip="Move clusters de $Mft::$BITMAP com FSCTL_MOVE_FILE (porta do hop). Risco de volume inmont&#225;vel. S&#211; EM VM."/>
+                            <Button x:Name="BtnHopSave" Content="&#128190; SALVAR LOG HOP" Click="BtnHopSave_Click"
+                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="32"/>
+                            <Border Background="#0D0D0D" BorderBrush="#2A2A2A" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,12">
+                                <TextBox x:Name="TxtHopLog" IsReadOnly="True" AcceptsReturn="True"
+                                         FontFamily="Consolas" FontSize="10" Background="Transparent"
+                                         Foreground="#9CD89C" BorderThickness="0" TextWrapping="Wrap"
+                                         MinHeight="60" MaxHeight="140" VerticalScrollBarVisibility="Auto"
+                                         Text="(lab hop: nada executado)"/>
+                            </Border>
+
+                            <!-- resultado compacto -->
+                            <Border Background="#0D0D0D" BorderBrush="#2A2A2A" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock x:Name="TxtShrinkBlockerLabel" Text="Bloqueador: (não analisado)" FontSize="11" Foreground="#999" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="TxtShrinkMaxLabel" Text="Máx. encolhível: --" FontSize="11" Foreground="#999" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
 
                             <Border Background="#11D4AF37" BorderBrush="#33D4AF37" BorderThickness="1" CornerRadius="8" Padding="12">
                                 <StackPanel>

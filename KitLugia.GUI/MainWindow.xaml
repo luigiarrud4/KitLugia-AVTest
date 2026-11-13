@@ -607,7 +607,6 @@
                                      Foreground="{StaticResource AccentColor}"
                                      Click="NavButton_Click"
                                      ToolTip="GameBoost Inteligente - Algoritmo ProBalance Style"/>
-                        
                         <!-- BOT&#xC3;O DIAGN&#xD3;STICO -->
                         <RadioButton x:Name="BtnDiagnostic" GroupName="Menu" Tag="&#x1F52C;" Content="Diagn&#xF3;stico (Debug)" 
                                      Style="{StaticResource NavButtonStyle}" 

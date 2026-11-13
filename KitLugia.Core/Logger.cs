@@ -26,6 +26,7 @@ namespace KitLugia.Core
             {
                 lock (LogLock)
                 {
+                    TryRotateIfNeeded();
                     var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}";
                     File.AppendAllText(LogFilePath, line + Environment.NewLine);
                 }
@@ -33,6 +34,29 @@ namespace KitLugia.Core
             catch
             {
                 // Se falhar ao escrever no arquivo, não podemos fazer nada
+            }
+        }
+
+        // Rotação: sem isso o KitLugia.log cresce sem limite (chegou a 214 MB em uma
+        // instalação — o kit loga MUITO). Ao passar do teto, o arquivo vira .old e um
+        // novo começa zerado. Mesmo padrão do LogStore (64 MB).
+        private const long MaxLogBytes = 32L * 1024 * 1024;
+
+        private static void TryRotateIfNeeded()
+        {
+            try
+            {
+                var fi = new FileInfo(LogFilePath);
+                if (fi.Exists && fi.Length > MaxLogBytes)
+                {
+                    var old = LogFilePath + ".old";
+                    if (File.Exists(old)) File.Delete(old);
+                    File.Move(LogFilePath, old);
+                }
+            }
+            catch
+            {
+                // rotação é best-effort
             }
         }
 

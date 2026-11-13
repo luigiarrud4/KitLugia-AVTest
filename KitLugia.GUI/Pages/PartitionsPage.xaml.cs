@@ -132,13 +132,29 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        /// <summary>Rótulo do combo: identifica o disco (tipo de bus + espaço livre é o que diferencia NVMe de USB).</summary>
+        /// <summary>Rótulo do combo: identifica o disco (tipo de bus + espaço livre é o que diferencia NVMe de USB).
+        /// Inclui saúde REAL (SMART via MSFT_PhysicalDisk) e o tipo de mídia (SSD/HDD) quando conhecidos.</summary>
         private static string DiskComboLabel(DiskInfoEx disk)
         {
             decimal unalloc = disk.Partitions.Where(p => p.IsUnallocated).Sum(p => (decimal)p.Size);
             string unallocTxt = unalloc > 0 ? $" • {(double)unalloc / (1024.0 * 1024 * 1024):F1} GB livres" : "";
             string sys = disk.IsSystemDisk ? " • SISTEMA" : "";
-            return $"{disk.DisplayName} • {disk.Interface}{unallocTxt}{sys}";
+            string media = string.IsNullOrWhiteSpace(disk.MediaType) ? "" : $" • {disk.MediaType}";
+            // Percentual estilo HDS tem prioridade sobre o veredito grosseiro do Windows
+            string health;
+            if (disk.HealthPercent.HasValue)
+            {
+                int hp = disk.HealthPercent.Value;
+                health = hp >= 90 ? $" • 🟢 {hp}%"
+                       : hp >= 50 ? $" • 🟡 {hp}%"
+                       : $" • 🔴 {hp}% SAÚDE BAIXA";
+            }
+            else
+            {
+                health = string.IsNullOrWhiteSpace(disk.Health) ? ""
+                    : disk.HealthIsBad ? $" • ⚠️ SAÚDE: {disk.Health.ToUpper()}" : " • 🟢 Saudável";
+            }
+            return $"{disk.DisplayName} • {disk.Interface}{media}{unallocTxt}{sys}{health}";
         }
 
         private void CmbDisk_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -148,10 +164,29 @@ namespace KitLugia.GUI.Pages
 
             decimal unalloc = disk.Partitions.Where(p => p.IsUnallocated).Sum(p => (decimal)p.Size);
             int parts = disk.Partitions.Count(p => !p.IsUnallocated);
+            string healthTxt;
+            if (disk.HealthPercent.HasValue)
+            {
+                int hp = disk.HealthPercent.Value;
+                string emoji = hp >= 90 ? "🟢" : hp >= 50 ? "🟡" : "🔴";
+                healthTxt = $"\n{emoji} Saúde do disco: {hp}% ({disk.HealthSource})";
+                if (!string.IsNullOrWhiteSpace(disk.HealthDetail))
+                    healthTxt += $"\n   ├─ Problemas: {disk.HealthDetail}";
+                if (hp < 90)
+                    healthTxt += "\n   └─ Recomendado: backup dos dados importantes e teste de superfície antes de qualquer operação destrutiva.";
+            }
+            else
+            {
+                healthTxt = string.IsNullOrWhiteSpace(disk.Health) ? ""
+                    : $"\n{(!disk.HealthIsBad ? "🟢" : "🔴")} Saúde do disco: {disk.Health}"
+                      + (disk.HealthIsBad ? " — faça backup AGORA e rode um diagnóstico SMART antes de qualquer operação destrutiva neste disco." : " (SMART sem alertas)");
+            }
             TxtDiskInfo.Text = $"{disk.Model} - {disk.SizeString} - {disk.PartitionStyle} - Interface: {disk.Interface}"
+                             + (string.IsNullOrWhiteSpace(disk.MediaType) ? "" : $" - {disk.MediaType}")
                              + $" • {parts} partição(ões)"
                              + $" • {(double)unalloc / (1024.0 * 1024 * 1024):F1} GB não alocados"
-                             + (disk.IsSystemDisk ? "  [DISCO DO SISTEMA — não use Excluir/Limpar]" : "");
+                             + (disk.IsSystemDisk ? "  [DISCO DO SISTEMA — não use Excluir/Limpar]" : "")
+                             + healthTxt;
 
             GridPartitions.ItemsSource = disk.Partitions;
             _selectedPartition = null;
@@ -257,6 +292,24 @@ namespace KitLugia.GUI.Pages
             _selectedPartition = GridPartitions.SelectedItem as PartitionInfoEx;
             UpdateButtons();
             if (CmbDisk.SelectedIndex >= 0) RenderPartitionBar(_disks[CmbDisk.SelectedIndex], null, _selectedPartition);
+            CheckDirtyBitAsync(_selectedPartition);
+        }
+
+        /// <summary>
+        /// Checa o dirty bit do volume selecionado (fsutil) e acrescenta o resultado à linha
+        /// de info. Antes o Status de toda partição era "Saudável" HARDCODED — nunca dizia
+        /// nada real. Volume sujo = Windows detectou inconsistência; chkdsk é recomendado.
+        /// </summary>
+        private async void CheckDirtyBitAsync(PartitionInfoEx? part)
+        {
+            if (part == null || part.IsUnallocated || string.IsNullOrEmpty(part.DriveLetter)) return;
+            bool? dirty = await PartitionManager.IsVolumeDirtyAsync(part.DriveLetter);
+            // O usuário pode ter trocado de seleção enquanto o fsutil rodava
+            if (dirty == null || part != _selectedPartition) return;
+            if (dirty == true)
+            {
+                TxtDiskInfo.Text += $"\n⚠️ Volume {part.DriveLetter} está SUJO (dirty bit marcado) — rode 🛡️ VERIFICAR ERROS para reparar.";
+            }
         }
 
         private void UpdateButtons()
@@ -272,6 +325,7 @@ namespace KitLugia.GUI.Pages
             BtnExtend.IsEnabled = hasSel && !isUnallocated;
             BtnDelete.IsEnabled = hasSel && !isProtected && !isUnallocated;
             BtnAssignLetter.IsEnabled = hasSel && !isUnallocated;
+            BtnRename.IsEnabled = hasSel && !isUnallocated && !string.IsNullOrEmpty(_selectedPartition?.DriveLetter);
             BtnCheckFS.IsEnabled = hasSel && !isUnallocated && !string.IsNullOrEmpty(_selectedPartition?.FileSystem);
             BtnMove.IsEnabled = hasSel && !isUnallocated;
 
@@ -916,6 +970,20 @@ namespace KitLugia.GUI.Pages
             LoadDisks();
         }
 
+        private async void BtnRename_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPartition == null || string.IsNullOrEmpty(_selectedPartition.DriveLetter)) return;
+            string? newName = await ShowInputOverlay("RENOMEAR VOLUME", $"Novo nome do volume {_selectedPartition.DriveLetter}:", _selectedPartition.Label);
+            if (string.IsNullOrWhiteSpace(newName)) return;
+            newName = newName.Trim();
+            if (newName.Length > 32) { ShowError("Nome Muito Longo", "O rótulo do volume aceita no máximo 32 caracteres."); return; }
+            SetActionBusy(true, "Renomeando...");
+            bool ok = await PartitionManager.SetVolumeLabelAsync(_selectedPartition.DriveLetter, newName);
+            SetActionBusy(false);
+            if (ok) { ShowSuccess("Sucesso", $"Volume {_selectedPartition.DriveLetter} renomeado para '{newName}'."); LoadDisks(); }
+            else ShowOpError($"Não foi possível renomear {_selectedPartition?.DriveLetter}.");
+        }
+
         private async void BtnCheckFS_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedPartition == null) return;
@@ -1013,5 +1081,421 @@ namespace KitLugia.GUI.Pages
         private void BtnConfirmInput_Click(object sender, RoutedEventArgs e) { if (_inputCompletionSource != null) { _inputCompletionSource.SetResult(TxtInputField.Text); _inputCompletionSource = null; } OverlayInput.Visibility = Visibility.Collapsed; }
         private void BtnCancelInput_Click(object sender, RoutedEventArgs e) { if (_inputCompletionSource != null) { _inputCompletionSource.SetResult(null); _inputCompletionSource = null; } OverlayInput.Visibility = Visibility.Collapsed; }
         private void TxtInputField_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) BtnConfirmInput_Click(sender, e); else if (e.Key == Key.Escape) BtnCancelInput_Click(sender, e); }
+
+        // ══════════════════════════════════════════════════════════════════
+        // ANÁLISE DE SHRINK — somente leitura (técnica do evento 259)
+        // Não altera nada: só consulta o limite e lê o Event Log.
+        // ══════════════════════════════════════════════════════════════════
+        private string _lastShrinkReport = "";
+        private char _shrinkDiagDrive = 'C';
+        private bool _shrinkDiagBusy;
+
+        private async void BtnShrinkDiag_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shrinkDiagBusy) return;
+
+            // Usa a partição selecionada se for um volume com letra
+            char drive = 'C';
+            if (GridPartitions.SelectedItem != null)
+            {
+                var prop = GridPartitions.SelectedItem.GetType().GetProperty("DriveLetter");
+                var raw = prop?.GetValue(GridPartitions.SelectedItem)?.ToString() ?? "";
+                raw = raw.Trim().TrimEnd(':');
+                if (raw.Length == 1 && char.IsLetter(raw[0])) drive = char.ToUpperInvariant(raw[0]);
+            }
+            _shrinkDiagDrive = drive;
+
+            _shrinkDiagBusy = true;
+            BtnShrinkDiag.IsEnabled = false;
+            BtnShrinkDiag.Content = "🔍 ANALISANDO...";
+            TxtShrinkBlockerLabel.Text = "Bloqueador: analisando...";
+            TxtShrinkMaxLabel.Text = "Máx. encolhível: analisando...";
+            TxtStatusBar.Text = $"Analisando bloqueios do shrink em {drive}: (somente leitura)...";
+
+            try
+            {
+                var rep = await Task.Run(() => ShrinkDiagnostics.AnalyzeAsync(drive));
+                _lastShrinkReport = rep.ToText();
+
+                if (!rep.Ok)
+                {
+                    TxtShrinkBlockerLabel.Text = "Bloqueador: análise falhou";
+                    TxtShrinkMaxLabel.Text = rep.Error.Length > 60 ? rep.Error.Substring(0, 60) + "..." : rep.Error;
+                    TxtStatusBar.Text = $"Análise falhou: {rep.Error}";
+                    return;
+                }
+
+                string blk = rep.Blocker == null || string.IsNullOrEmpty(rep.Blocker.FilePath)
+                    ? "nenhum arquivo bloqueador reportado"
+                    : $"{rep.Blocker.FilePath}  ({rep.Blocker.Kind}{(rep.Blocker.ClearableOnline ? "" : " — só offline")})";
+                TxtShrinkBlockerLabel.Text = "Bloqueador: " + blk;
+                TxtShrinkMaxLabel.Text = $"Máx. encolhível: {rep.MaxShrinkMb:N0} MB   |   Livre: {rep.FreePercent}";
+
+                BtnSaveShrinkReport.IsEnabled = true;
+                BtnCopyShrinkReport.IsEnabled = true;
+                TxtStatusBar.Text = $"Análise de {drive}: concluída — máx. encolhível {rep.MaxShrinkMb:N0} MB.";
+                Logger.Log($"[SHRINK-DIAG] {drive}: bloqueador={blk} maxMb={rep.MaxShrinkMb} " +
+                           $"hiberfil={rep.HiberfilBytes} pagefile={rep.PagefileBytes}");
+            }
+            catch (Exception ex)
+            {
+                TxtShrinkBlockerLabel.Text = "Bloqueador: erro";
+                TxtShrinkMaxLabel.Text = ex.Message.Length > 60 ? ex.Message.Substring(0, 60) + "..." : ex.Message;
+                Logger.Log($"[SHRINK-DIAG] Exceção: {ex}");
+            }
+            finally
+            {
+                _shrinkDiagBusy = false;
+                BtnShrinkDiag.IsEnabled = true;
+                BtnShrinkDiag.Content = "🔍 DIAGNOSTICAR BLOQUEIO";
+            }
+        }
+
+        private void BtnSaveShrinkReport_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_lastShrinkReport)) return;
+            try
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                string file = Path.Combine(desktop,
+                    $"diagnostico-shrink-{_shrinkDiagDrive}-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+                File.WriteAllText(file, _lastShrinkReport, new System.Text.UTF8Encoding(true));
+                TxtStatusBar.Text = $"Relatório salvo em: {file}";
+                Logger.Log($"[SHRINK-DIAG] Relatório salvo: {file}");
+            }
+            catch (Exception ex)
+            {
+                TxtStatusBar.Text = $"Não foi possível salvar: {ex.Message}";
+            }
+        }
+
+        private void BtnCopyShrinkReport_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_lastShrinkReport)) return;
+            try
+            {
+                System.Windows.Clipboard.SetText(_lastShrinkReport);
+                TxtStatusBar.Text = "Relatório copiado para a área de transferência.";
+            }
+            catch (Exception ex)
+            {
+                TxtStatusBar.Text = $"Não foi possível copiar: {ex.Message}";
+            }
+        }
+
+
+        // ══════════════════════════════════════════════════════════════════
+        // DEEP SHRINK — método do hop (defrag + retry, ou cascata completa)
+        // ⚠️ O modo completo ALTERA o sistema. O modo "só defrag" não apaga nada.
+        // ══════════════════════════════════════════════════════════════════
+        private string _lastDeepReport = "";
+        private bool _deepBusy;
+
+        private async void BtnDeepShrink_Click(object sender, RoutedEventArgs e)
+        {
+            var r = MessageBox.Show(
+                "DEEP SHRINK (método hop)\n\n" +
+                "Este fluxo ALTERA o sistema:\n" +
+                "  • desliga a hibernação (powercfg /h off)\n" +
+                "  • remove o pagefile da configuração\n" +
+                "  • PODE APAGAR os pontos de restauração (vssadmin delete shadows)\n" +
+                "  • remove o journal USN\n" +
+                "  • roda defrag com até 4 tentativas (15 min)\n\n" +
+                "Os pontos de restauração NÃO voltam. Use numa VM com snapshot.\n\n" +
+                "Continuar?",
+                "Deep Shrink — confirmação",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (r != MessageBoxResult.Yes) return;
+            await RunDeepShrinkAsync(allowDestructive: true, defragOnly: false);
+        }
+
+        private async void BtnDeepShrinkDefragOnly_Click(object sender, RoutedEventArgs e)
+        {
+            await RunDeepShrinkAsync(allowDestructive: false, defragOnly: true);
+        }
+
+        private async Task RunDeepShrinkAsync(bool allowDestructive, bool defragOnly)
+        {
+            if (_deepBusy) return;
+            _deepBusy = true;
+            BtnDeepShrink.IsEnabled = false;
+            BtnDeepShrinkDefragOnly.IsEnabled = false;
+            TxtDeepLog.Text = "";
+            char drive = _shrinkDiagDrive;
+
+            IProgress<string> progress = new Progress<string>(msg =>
+            {
+                TxtDeepLog.Text += msg + "\n";
+                TxtDeepLog.ScrollToEnd();
+                TxtStatusBar.Text = msg;
+            });
+
+            try
+            {
+                DeepShrink.RunResult result;
+                if (defragOnly)
+                {
+                    progress.Report($"Só defrag em {drive}: (não apaga nada)...");
+                    var (ok, before) = await DeepShrink.TryGetMaxShrinkMbAsync(drive);
+                    var step = await DeepShrink.InvokeDefragAsync(drive, before, progress);
+                    result = new DeepShrink.RunResult
+                    {
+                        Drive = drive,
+                        MaxShrinkMbStart = before,
+                        MaxShrinkMbEnd = step.MaxShrinkMbAfter
+                    };
+                    result.Steps.Add(step);
+                    result.BlockerAtEnd = (await ShrinkDiagnostics.AnalyzeAsync(drive)).Blocker?.FilePath ?? "";
+                    progress.Report(step.ToString());
+                }
+                else
+                {
+                    result = await DeepShrink.RunAsync(drive, allowDestructive, progress);
+                }
+
+                _lastDeepReport = result.ToText();
+                TxtDeepLog.Text += "\n" + result.ToText();
+                TxtDeepLog.ScrollToEnd();
+                BtnSaveDeepReport.IsEnabled = true;
+                TxtStatusBar.Text = $"Deep Shrink concluído: {result.MaxShrinkMbStart:N0} → {result.MaxShrinkMbEnd:N0} MB";
+                Logger.Log($"[DEEP-SHRINK] {drive}: {result.MaxShrinkMbStart} -> {result.MaxShrinkMbEnd} MB, " +
+                           $"bloqueador final={result.BlockerAtEnd}, offline={result.NeedsOffline}");
+            }
+            catch (Exception ex)
+            {
+                TxtDeepLog.Text += $"\nERRO: {ex.Message}\n";
+                TxtStatusBar.Text = $"Deep Shrink falhou: {ex.Message}";
+                Logger.Log($"[DEEP-SHRINK] Exceção: {ex}");
+            }
+            finally
+            {
+                _deepBusy = false;
+                BtnDeepShrink.IsEnabled = true;
+                BtnDeepShrinkDefragOnly.IsEnabled = true;
+            }
+        }
+
+        private void BtnSaveDeepReport_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_lastDeepReport)) return;
+            try
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                string file = Path.Combine(desktop, $"deep-shrink-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+                File.WriteAllText(file, _lastDeepReport, new System.Text.UTF8Encoding(true));
+                TxtStatusBar.Text = $"Resultado salvo em: {file}";
+            }
+            catch (Exception ex) { TxtStatusBar.Text = $"Não foi possível salvar: {ex.Message}"; }
+        }
+
+        // ================================================================
+        // LAB HOP - metodos do repo hop (github.com/Arjun-Ingole/hop, MIT)
+        // Operam na PARTICAO SELECIONADA. Testar em VM com snapshot.
+        // ================================================================
+        private readonly System.Text.StringBuilder _hopLog = new();
+        private bool _hopBusy;
+
+        /// <summary>Letra do volume da particao selecionada; cai para o drive do sistema.</summary>
+        private char HopDrive()
+        {
+            if (GridPartitions.SelectedItem != null)
+            {
+                var raw = GridPartitions.SelectedItem.GetType()
+                    .GetProperty("DriveLetter")?.GetValue(GridPartitions.SelectedItem)?.ToString() ?? "";
+                raw = raw.Trim().TrimEnd(':');
+                if (raw.Length == 1 && char.IsLetter(raw[0])) return char.ToUpperInvariant(raw[0]);
+            }
+            var sys = (Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\").TrimEnd('\\', ':');
+            return string.IsNullOrEmpty(sys) ? 'C' : sys[0];
+        }
+
+        private void HopLog(string msg)
+        {
+            _hopLog.AppendLine("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + msg);
+            TxtHopLog.Text = _hopLog.ToString();
+            TxtHopLog.ScrollToEnd();
+        }
+
+        private async void BtnHopDiag_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopBusy) { HopLog("ocupado"); return; }
+            _hopBusy = true;
+            char d = HopDrive();
+            HopLog("Diagnostico (so leitura) em " + d + ": ...");
+            try { HopLog((await Task.Run(() => ShrinkDiagnostics.AnalyzeAsync(d))).ToText()); }
+            catch (Exception ex) { HopLog("ERRO: " + ex.Message); }
+            finally { _hopBusy = false; }
+        }
+
+        private async void BtnHopDefrag_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopBusy) { HopLog("ocupado"); return; }
+            _hopBusy = true;
+            char d = HopDrive();
+            HopLog("DEFRAG + RETRY em " + d + ": (nao apaga nada; ate 4 tentativas em 900s)...");
+            try
+            {
+                var (_, before) = await DeepShrink.TryGetMaxShrinkMbAsync(d);
+                HopLog("Limite antes: " + before.ToString("N0") + " MB");
+                var step = await DeepShrink.InvokeDefragAsync(d, before, new Progress<string>(HopLog));
+                HopLog(step.ToString());
+                var diag = await ShrinkDiagnostics.AnalyzeAsync(d);
+                HopLog("Bloqueador depois: " + (diag.Blocker?.FilePath ?? "(nenhum)"));
+            }
+            catch (Exception ex) { HopLog("ERRO: " + ex.Message); }
+            finally { _hopBusy = false; }
+        }
+
+        private async void BtnHopHiber_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopBusy) { HopLog("ocupado"); return; }
+            if (System.Windows.MessageBox.Show("Desligar a hibernacao? (reversivel com powercfg /h on)",
+                "Hibernacao", System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question) != System.Windows.MessageBoxResult.Yes) return;
+            _hopBusy = true;
+            try
+            {
+                var (rc, outp) = await Task.Run(() => RunHopCmd("powercfg.exe", "/h off"));
+                HopLog("powercfg /h off -> rc=" + rc + " " + outp.Trim());
+            }
+            catch (Exception ex) { HopLog("ERRO: " + ex.Message); }
+            finally { _hopBusy = false; }
+        }
+
+        private async void BtnHopPagefile_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopBusy) { HopLog("ocupado"); return; }
+            char d = HopDrive();
+            if (System.Windows.MessageBox.Show("Remover o pagefile de " + d + ": do registro PagingFiles?\n" +
+                "(efetivo apos reboot; reversivel - o valor ANTES fica no log)",
+                "Pagefile", System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.Yes) return;
+            _hopBusy = true;
+            try
+            {
+                var raw = typeof(OnlineShrinkManager)
+                    .GetMethod("ReadPagingFilesRaw", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)?
+                    .Invoke(null, null) as List<string>;
+                HopLog("PagingFiles ANTES: " + string.Join(" | ", raw ?? new List<string>()));
+                var ok = typeof(OnlineShrinkManager)
+                    .GetMethod("DisablePagefile", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)?
+                    .Invoke(null, new object[] { d.ToString() });
+                HopLog(ok is true ? "Pagefile removido do registro." : "Falhou - ver o log do Kit.");
+            }
+            catch (Exception ex) { HopLog("ERRO: " + ex.Message); }
+            finally { _hopBusy = false; }
+        }
+
+        private async void BtnHopVss_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopBusy) { HopLog("ocupado"); return; }
+            char d = HopDrive();
+            if (System.Windows.MessageBox.Show(
+                "APAGAR TODOS os pontos de restauracao de " + d + ":?\n\n" +
+                "ISSO E IRREVERSIVEL. So continue numa VM com snapshot.",
+                "VSS - irreversivel", System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Stop, System.Windows.MessageBoxResult.No)
+                != System.Windows.MessageBoxResult.Yes) return;
+            _hopBusy = true;
+            try
+            {
+                var (rc, outp) = await Task.Run(() => RunHopCmd("vssadmin.exe", "delete shadows /for=" + d + ": /all /quiet"));
+                HopLog("vssadmin delete shadows -> rc=" + rc + "\n" + outp.Trim());
+            }
+            catch (Exception ex) { HopLog("ERRO: " + ex.Message); }
+            finally { _hopBusy = false; }
+        }
+
+        private async void BtnHopUsn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopBusy) { HopLog("ocupado"); return; }
+            char d = HopDrive();
+            if (System.Windows.MessageBox.Show("Remover o journal USN de " + d + ":? (o Windows recria sozinho)",
+                "USN Journal", System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question) != System.Windows.MessageBoxResult.Yes) return;
+            _hopBusy = true;
+            try
+            {
+                var (rc, outp) = await Task.Run(() => RunHopCmd("fsutil.exe", "usn deletejournal /d " + d + ":"));
+                HopLog("fsutil usn deletejournal -> rc=" + rc + " " + outp.Trim());
+            }
+            catch (Exception ex) { HopLog("ERRO: " + ex.Message); }
+            finally { _hopBusy = false; }
+        }
+
+        // NUCLEAR: NtfsMover.MoveDown (FSCTL_MOVE_FILE). Risco de volume inmontavel.
+        private async void BtnHopNuclear_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopBusy) { HopLog("ocupado"); return; }
+            char d = HopDrive();
+            if (System.Windows.MessageBox.Show(
+                "METODO NUCLEAR - NtfsMove::MoveDown\n\n" +
+                "Move os clusters de $Mft::$BITMAP (metadado NTFS) do fim do disco\n" +
+                "para o inicio, via FSCTL_MOVE_FILE - escrita direta em clusters.\n\n" +
+                "SE FALHAR NO MEIO, O VOLUME PODE FICAR INMONTAVEL.\n" +
+                "Nao ha chkdsk que garanta recuperacao.\n\n" +
+                "Confirme que esta numa VM com snapshot tirado AGORA.",
+                "NUCLEAR - confirmacao 1/2", System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Stop, System.Windows.MessageBoxResult.No)
+                != System.Windows.MessageBoxResult.Yes) return;
+            if (System.Windows.MessageBox.Show("Ultima chance.\n\nExecutar mesmo assim?",
+                "NUCLEAR - confirmacao 2/2", System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Stop, System.Windows.MessageBoxResult.No)
+                != System.Windows.MessageBoxResult.Yes) return;
+
+            _hopBusy = true;
+            BtnHopNuclear.IsEnabled = false;
+            try
+            {
+                var (_, before) = await DeepShrink.TryGetMaxShrinkMbAsync(d);
+                HopLog("NUCLEAR em " + d + ": - limite antes: " + before.ToString("N0") + " MB");
+                string stream = "\\$Mft::$BITMAP";
+                HopLog("Movendo " + stream + " para o inicio do disco...");
+                long moved = await Task.Run(() => NtfsMover.MoveDown(d + ":", stream, 0.98, 600));
+                HopLog("Clusters movidos: " + moved);
+                if (!string.IsNullOrEmpty(NtfsMover.LastFailure))
+                    HopLog("Falhas parciais: " + NtfsMover.LastFailure);
+                var (_, after) = await DeepShrink.TryGetMaxShrinkMbAsync(d);
+                HopLog("Limite depois: " + after.ToString("N0") + " MB");
+            }
+            catch (Exception ex)
+            {
+                HopLog("ERRO NUCLEAR: " + ex.Message);
+                Logger.Log("[HOP-NUCLEAR] " + ex);
+            }
+            finally
+            {
+                _hopBusy = false;
+                BtnHopNuclear.IsEnabled = true;
+            }
+        }
+
+        private void BtnHopSave_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hopLog.Length == 0) { HopLog("nada para salvar"); return; }
+            try
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                string file = Path.Combine(desktop, "hop-lab-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt");
+                File.WriteAllText(file, _hopLog.ToString(), new System.Text.UTF8Encoding(true));
+                HopLog("Salvo em: " + file);
+            }
+            catch (Exception ex) { HopLog("Nao foi possivel salvar: " + ex.Message); }
+        }
+
+        private static (int rc, string output) RunHopCmd(string file, string args)
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(file, args)
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            using var p = System.Diagnostics.Process.Start(psi);
+            if (p == null) return (-1, "");
+            string o = p.StandardOutput.ReadToEnd(), er = p.StandardError.ReadToEnd();
+            p.WaitForExit(120000);
+            return (p.ExitCode, o + (string.IsNullOrWhiteSpace(er) ? "" : "\n" + er));
+        }
+
     }
 }

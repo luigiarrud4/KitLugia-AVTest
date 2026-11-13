@@ -1603,11 +1603,26 @@ namespace KitLugia.Core
             }
         }
 
+        /// <summary>
+        /// Caminho do snapshot de privacidade. ANTES ficava na pasta do exe
+        /// (BaseDirectory): falava em Program Files sem admin e era apagado a cada
+        /// instalação nova. Agora vive em %LocalAppData%\KitLugia como o resto das
+        /// configurações do Kit. O local antigo continua sendo LIDO como fallback
+        /// para não perder o snapshot de quem já tinha salvo.
+        /// </summary>
+        private static string GetUserConfigPath()
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KitLugia");
+            try { if (!Directory.Exists(dir)) Directory.CreateDirectory(dir); } catch { }
+            return Path.Combine(dir, "privacy_config.json");
+        }
+
         public static (bool Success, string Message) SaveUserConfig()
         {
             try
             {
-                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "privacy_config.json");
+                string configPath = GetUserConfigPath();
                 var config = new Dictionary<string, bool>();
 
                 foreach (var setting in PrivacySettings)
@@ -1632,11 +1647,13 @@ namespace KitLugia.Core
         {
             try
             {
-                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "privacy_config.json");
+                string configPath = GetUserConfigPath();
 
+                // Fallback: snapshot salvo no local antigo (pasta do exe)
                 if (!File.Exists(configPath))
                 {
-                    return (false, "Nenhuma configuração salva encontrada.");
+                    string legacy = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "privacy_config.json");
+                    if (File.Exists(legacy)) configPath = legacy;
                 }
 
                 string json = File.ReadAllText(configPath);

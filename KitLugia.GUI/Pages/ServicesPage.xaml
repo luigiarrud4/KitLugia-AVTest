@@ -74,6 +74,8 @@
                                         <Style TargetType="TextBlock">
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                                             <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <!-- Descrição (IFEO/LSA/PrintMon/UWP): nome + o que é; sem descrição, só o nome -->
+                                            <Setter Property="ToolTip" Value="{Binding DisplayToolTip}"/>
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>

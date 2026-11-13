@@ -61,6 +61,12 @@ namespace KitLugia.Core
                     }
                     result[kv.Value[i]] = SumFolder(res.Index, res.Entries, rec, ct);
                 }
+
+                // LIBERA o array de entradas deste volume ANTES de passar ao próximo:
+                // é a maior alocação do scan (~40 bytes × nº de arquivos do volume).
+                // Reter todos os volumes até o fim multiplicava o pico de RAM.
+                res.Entries = Array.Empty<MftEntry>();
+                res.Index = null;
             }
             return result;
         }

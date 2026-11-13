@@ -54,6 +54,13 @@ namespace KitLugia.Core
         public string Location { get; set; }
         public StartupStatus Status { get; set; }
 
+        /// <summary>Explica o que o item é / de onde vem (ex.: "Monitor de impressão nativo do Windows").
+        /// Vazia para itens comuns — só os especiais (IFEO/LSA/PrintMon/UWP) a preenchem.</summary>
+        public string Description { get; set; } = "";
+
+        /// <summary>Tooltip da coluna Nome: nome + descrição quando existe.</summary>
+        public string DisplayToolTip => string.IsNullOrWhiteSpace(Description) ? Name : $"{Name}\n\n{Description}";
+
         /// <summary>Hex color for status pill (green for enabled, red for disabled)</summary>
         public string StatusColor => Status switch
         {

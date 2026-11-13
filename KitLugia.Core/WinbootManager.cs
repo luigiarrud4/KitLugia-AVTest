@@ -1392,8 +1392,13 @@ namespace KitLugia.Core
                         string sdi = $"{drive}:\\boot\\boot.sdi";
                         if (!File.Exists(sdi))
                         {
-                            // Try to find any .sdi
-                            var sdiFiles = Directory.GetFiles($"{drive}:\\", "*.sdi", SearchOption.AllDirectories);
+                            // Try to find any .sdi (enumeração resiliente: não aborta na 1ª pasta protegida)
+                            var sdiFiles = Directory.GetFiles($"{drive}:\\", "*.sdi", new System.IO.EnumerationOptions
+                            {
+                                IgnoreInaccessible = true,
+                                RecurseSubdirectories = true,
+                                AttributesToSkip = System.IO.FileAttributes.ReparsePoint
+                            });
                             sdi = sdiFiles.FirstOrDefault() ?? "";
                         }
 
@@ -2240,10 +2245,18 @@ namespace KitLugia.Core
                     
                     // 1. GRUB.CFG Patching
                     // Procura em locais comuns: /boot/grub/, /EFI/BOOT/, /EFI/ubuntu/, /
-                    var grubFiles = Directory.GetFiles($"{drive}:\\", "grub.cfg", SearchOption.AllDirectories);
+                    // (enumeração resiliente: não aborta na 1ª pasta protegida)
+                    var grubFiles = Directory.GetFiles($"{drive}:\\", "grub.cfg", new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = System.IO.FileAttributes.ReparsePoint
+                    });
                     
                     foreach (var grub in grubFiles)
                     {
+                        try
+                        {
                         // Limpar atributo somente leitura se existir
                         File.SetAttributes(grub, FileAttributes.Normal);
                         
@@ -2286,14 +2299,27 @@ namespace KitLugia.Core
                             File.WriteAllText(grub, content);
                             patchedCount++;
                         }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Um .cfg travado/somente-leitura não pode abortar o patch dos demais
+                            Log($"⚠️ grub.cfg ilegível/inválido ignorado: {grub} ({ex.Message})");
+                        }
                     }
 
-                    // 2. ISOLINUX / SYSLINUX Patching
-                    var syslinuxFiles = Directory.GetFiles($"{drive}:\\", "*.cfg", SearchOption.AllDirectories)
-                                        .Where(f => f.EndsWith("isolinux.cfg") || f.EndsWith("syslinux.cfg"));
+                    // 2. ISOLINUX / SYSLINUX Patching (enumeração resiliente)
+                    var syslinuxFiles = Directory.GetFiles($"{drive}:\\", "*.cfg", new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = System.IO.FileAttributes.ReparsePoint
+                    })
+                                        .Where(f => f.EndsWith("isolinux.cfg", StringComparison.OrdinalIgnoreCase) || f.EndsWith("syslinux.cfg", StringComparison.OrdinalIgnoreCase));
                     
                     foreach (var cfg in syslinuxFiles)
                     {
+                        try
+                        {
                         File.SetAttributes(cfg, FileAttributes.Normal);
                         string content = File.ReadAllText(cfg);
                         bool changed = false;
@@ -2311,6 +2337,12 @@ namespace KitLugia.Core
                             File.SetAttributes(cfg, FileAttributes.Normal);
                             File.WriteAllText(cfg, content);
                             patchedCount++;
+                        }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Um .cfg travado/somente-leitura não pode abortar o patch dos demais
+                            Log($"⚠️ cfg isolinux/syslinux ilegível ignorado: {cfg} ({ex.Message})");
                         }
                     }
 
@@ -3702,7 +3734,12 @@ namespace KitLugia.Core
             try
             {
                 if (!Directory.Exists(directory)) return null;
-                foreach (var f in Directory.GetFiles(directory, "*.wim", SearchOption.AllDirectories))
+                foreach (var f in Directory.GetFiles(directory, "*.wim", new System.IO.EnumerationOptions
+                {
+                    IgnoreInaccessible = true,
+                    RecurseSubdirectories = true,
+                    AttributesToSkip = System.IO.FileAttributes.ReparsePoint
+                }))
                     if (new FileInfo(f).Length > 10 * 1024 * 1024) return f;
             }
             catch { }
@@ -3982,7 +4019,12 @@ namespace KitLugia.Core
                 foreach (var dir in new[] { winTemp, userTemp })
                 {
                     if (!Directory.Exists(dir)) continue;
-                    foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+                    foreach (var file in Directory.EnumerateFiles(dir, "*", new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = System.IO.FileAttributes.ReparsePoint
+                    }))
                     {
                         try { var fi = new FileInfo(file); tempFreed += fi.Length; File.Delete(file); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
@@ -4006,7 +4048,12 @@ namespace KitLugia.Core
                 if (Directory.Exists(wuCache))
                 {
                     long wuFreed = 0;
-                    foreach (var file in Directory.EnumerateFiles(wuCache, "*", SearchOption.AllDirectories))
+                    foreach (var file in Directory.EnumerateFiles(wuCache, "*", new System.IO.EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = true,
+                        AttributesToSkip = System.IO.FileAttributes.ReparsePoint
+                    }))
                     {
                         try { var fi = new FileInfo(file); wuFreed += fi.Length; File.Delete(file); } catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                     }
@@ -4377,114 +4424,202 @@ sb.AppendLine("set SHRINK_MB=" + shrinkMb);
         /// </summary>
         private static string GenerateShrinkPs1(int embedDiskN, int embedPartN, long embedShrinkMB)
         {
+            // PS1 com UI em tela cheia (estilo PreOS do EaseUS): tela preta, cabecalho do Kit
+            // no topo, painel de informacoes, etapas com status e log ao vivo.
+            // Roda via winpeshl.ini [LaunchApps] - sem cmd, sem shell, sem menu WinRE.
+            // TUDO em ASCII (o arquivo e gravado com Encoding.ASCII) e SEM aspas duplas
+            // no PS1 (aspas simples do PowerShell) para nao precisar de escape no C#.
             var sb = new StringBuilder();
-            sb.Append(@"#Requires -RunAsAdministrator
-# ============================================================
-#  KitLugia WinPE Shrink — PowerShell Storage module
-#  Mais confiavel que diskpart: objetos estruturados, erros claros,
-#  querymax real (Get-PartitionSupportedSize), sem parsing de texto.
+            sb.Append(@"# ============================================================
+#  KitLugia WinPE Shrink - UI em tela cheia (estilo PreOS)
 # ============================================================
 $ErrorActionPreference = 'Stop'
 $LogFile = 'C:\KitLugia_WinPE_Log.txt'
-$Result  = [ordered]@{
+try { $Host.UI.RawUI.WindowTitle = 'KitLugia - Operacao de Disco' } catch { }
+try { mode con: cols=110 lines=40 | Out-Null } catch { }
+
+$script:Info = [ordered]@{
+    Alvo       = 'procurando...'
+    Tamanho    = '-'
+    Pedido     = '-'
+    Encolhivel = '-'
+    Resultado  = '-'
+}
+$script:Steps = New-Object System.Collections.Generic.List[object]
+$script:Logs  = New-Object System.Collections.Generic.List[string]
+$script:FinalMsg  = ''
+$script:FinalOk   = $false
+$script:Countdown = ''
+
+$Result = [ordered]@{
     Tool = 'powershell-storage'; Status = 'STARTED';
     Disk = $null; Part = $null; RequestedMB = $null; ActualMB = $null;
     Error = $null; Timestamp = (Get-Date -Format s)
 }
 
-function Write-Log([string]$m) {
-    $line = ""[$(Get-Date -Format HH:mm:ss)] $m""
-    Write-Host $line
-    Add-Content -Path $LogFile -Value $line -ErrorAction SilentlyContinue
+function Add-Step([string]$t) {
+    $script:Steps.Add([pscustomobject]@{ T = $t; S = ' '; D = '' }) | Out-Null
 }
-
+function Set-Step([int]$i, [string]$s, [string]$d) {
+    $script:Steps[$i].S = $s
+    if ($d) { $script:Steps[$i].D = $d }
+    Draw
+}
+function Write-Log([string]$m) {
+    $line = ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m)
+    $script:Logs.Add($line)
+    while ($script:Logs.Count -gt 10) { $script:Logs.RemoveAt(0) }
+    try { Add-Content -Path $LogFile -Value $line -ErrorAction SilentlyContinue } catch { }
+    Draw
+}
+function Draw {
+    try { Clear-Host } catch { }
+    $w = 100
+    $r = '=' * $w
+    Write-Host ''
+    Write-Host $r -ForegroundColor DarkCyan
+    Write-Host ('   KITLUGIA  -  OPERACAO DE DISCO  (WinPE)').PadRight($w) -ForegroundColor White
+    Write-Host $r -ForegroundColor DarkCyan
+    Write-Host ''
+    foreach ($k in $script:Info.Keys) {
+        Write-Host ('   {0}: {1}' -f ('' + $k).PadRight(11), $script:Info[$k]).PadRight($w) -ForegroundColor Gray
+    }
+    Write-Host ''
+    foreach ($s in $script:Steps) {
+        $tag = ('[' + $s.S + ']').PadRight(8)
+        $c = 'Gray'
+        if ($s.S -eq 'OK')   { $c = 'Green' }
+        if ($s.S -eq 'ERRO') { $c = 'Red' }
+        if ($s.S -eq '..')   { $c = 'Yellow' }
+        $txt = ('   {0}{1}' -f $tag, $s.T)
+        if ($s.D) { $txt = $txt + '  -  ' + $s.D }
+        Write-Host $txt.PadRight($w) -ForegroundColor $c
+    }
+    Write-Host ''
+    Write-Host ('   log:').PadRight($w) -ForegroundColor DarkGray
+    foreach ($l in $script:Logs) {
+        Write-Host ('   ' + $l).PadRight($w) -ForegroundColor DarkGray
+    }
+    if ($script:FinalMsg) {
+        Write-Host ''
+        $c = 'Yellow'; if ($script:FinalOk) { $c = 'Green' }
+        Write-Host ('   ' + $script:FinalMsg).PadRight($w) -ForegroundColor $c
+    }
+    if ($script:Countdown) {
+        Write-Host ('   ' + $script:Countdown).PadRight($w) -ForegroundColor Cyan
+    }
+}
 function Save-And-Reboot([bool]$ok) {
     try {
         $Result.Timestamp = (Get-Date -Format s)
         $Result | ConvertTo-Json | Set-Content -Path 'C:\KitLugia_Shrink_Result.json' -Force
-        # Espelha para a particao Windows se acessivel (o Kit le depois do reboot)
         $winVol = Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.Path -and (Test-Path (Join-Path $_.Path 'Windows\System32\config\SOFTWARE')) }
         if ($winVol) {
             $Result | ConvertTo-Json | Set-Content -Path (Join-Path $winVol.Path 'KitLugia_Shrink_Result.json') -Force
             Remove-Item -Force (Join-Path $winVol.Path 'KL_SHRINK_TARGET.dat') -ErrorAction SilentlyContinue
         }
-    } catch { Write-Log ""Aviso ao salvar resultado: $_"" }
-    Write-Log ""Concluido (ok=$ok). Reiniciando em 8s...""
-    Start-Sleep 8
+    } catch { Write-Log ('Aviso ao salvar resultado: ' + $_) }
+    Set-Step 5 'OK'
+    Set-Step 6 '..'
+    for ($i = 10; $i -ge 1; $i--) {
+        $script:Countdown = ('reiniciando em {0}s...' -f $i)
+        Draw
+        Start-Sleep 1
+    }
     wpeutil reboot
 }
 
+# ---- etapas fixas (0..6) ----
+Add-Step 'wpeinit / ambiente WinPE'
+Add-Step 'Modulo Storage'
+Add-Step 'Alvo (disco / particao)'
+Add-Step 'Espaco encolhivel (querymax)'
+Add-Step 'Encolhendo particao'
+Add-Step 'Gravando resultado'
+Add-Step 'Reiniciando'
+Set-Step 0 'OK'
+
 try {
     Import-Module Storage -ErrorAction Stop
+    Set-Step 1 'OK'
     Write-Log 'Modulo Storage carregado.'
 } catch {
-    Write-Log ""FATAL: modulo Storage indisponivel: $_""
-    $Result.Status = 'NO_STORAGE_MODULE'; $Result.Error = ""$_""
+    Set-Step 1 'ERRO'
+    Write-Log ('FATAL: modulo Storage indisponivel: ' + $_)
+    $Result.Status = 'NO_STORAGE_MODULE'; $Result.Error = ('' + $_)
+    $script:FinalOk = $false
+    $script:FinalMsg = 'ERRO: modulo Storage ausente neste WinPE. Nada foi alterado.'
     Save-And-Reboot $false
     exit 1
 }
 
 # ---- 1. Resolver alvo: embed > X:\shrink_config.ini > marcador > scan Windows ----
+Set-Step 2 '..'
 $diskN = {embedDisk}; $partN = {embedPart}; $shrinkMb = {embedMb}
 $source = 'embedded'
 
 if ($partN -le 0 -or $shrinkMb -le 0) {
-    Write-Log 'Valores embed incompletos — lendo X:\shrink_config.ini...'
+    Write-Log 'Valores embed incompletos - lendo X:\shrink_config.ini...'
     if (Test-Path 'X:\shrink_config.ini') {
-        Get-Content 'X:\shrink_config.ini' | ForEach-Object {{
+        Get-Content 'X:\shrink_config.ini' | ForEach-Object {
             $k,$v = $_ -split '=',2
-            switch ($k) {{
-                'DISK_N'   {{ if ([int]$v -ge 0) {{ $diskN = [int]$v }} }}
-                'PART_N'   {{ if ([int]$v -gt 0) {{ $partN = [int]$v }} }}
-                'SHRINK_MB' {{ if ([long]$v -gt 0) {{ $shrinkMb = [long]$v }} }}
-            }}
-        }}
+            switch ($k) {
+                'DISK_N'    { if ([int]$v -ge 0) { $diskN = [int]$v } }
+                'PART_N'    { if ([int]$v -gt 0) { $partN = [int]$v } }
+                'SHRINK_MB' { if ([long]$v -gt 0) { $shrinkMb = [long]$v } }
+            }
+        }
         $source = 'config-ini'
     }
 }
 
 if ($partN -le 0) {
-    Write-Log 'Ainda sem alvo — procurando KL_SHRINK_TARGET.dat nos volumes...'
+    Write-Log 'Ainda sem alvo - procurando KL_SHRINK_TARGET.dat nos volumes...'
     foreach ($vol in (Get-Volume -ErrorAction SilentlyContinue | Where-Object DriveLetter)) {
-        $marker = ""$($vol.DriveLetter):\KL_SHRINK_TARGET.dat""
-        if (Test-Path $marker) {{
+        $marker = ('{0}:\KL_SHRINK_TARGET.dat' -f $vol.DriveLetter)
+        if (Test-Path $marker) {
             $p = Get-Partition -DriveLetter $vol.DriveLetter -ErrorAction SilentlyContinue
-            if ($p) {{ $diskN = $p.DiskNumber; $partN = $p.PartitionNumber }}
-            Get-Content $marker | ForEach-Object {{
+            if ($p) { $diskN = $p.DiskNumber; $partN = $p.PartitionNumber }
+            Get-Content $marker | ForEach-Object {
                 $k,$v = $_ -split '=',2
-                if ($k -eq 'SHRINK_MB') {{ $shrinkMb = [long]$v }}
-            }}
+                if ($k -eq 'SHRINK_MB') { $shrinkMb = [long]$v }
+            }
             $source = 'marker'
             break
-        }}
+        }
     }
 }
 
 if ($partN -le 0) {
     Write-Log 'Ultimo recurso: escaneando por particao Windows...'
     foreach ($p in (Get-Partition -ErrorAction SilentlyContinue)) {
-        try {{
+        try {
             $vol = $p | Get-Volume -ErrorAction SilentlyContinue
-            if ($vol -and (Test-Path (Join-Path $vol.Path 'Windows\System32\config\SOFTWARE'))) {{
+            if ($vol -and (Test-Path (Join-Path $vol.Path 'Windows\System32\config\SOFTWARE'))) {
                 $diskN = $p.DiskNumber; $partN = $p.PartitionNumber; $source = 'scan-windows'
                 break
-            }}
-        }} catch {{ }}
+            }
+        } catch { }
     }
 }
 
 $Result.Disk = $diskN; $Result.Part = $partN; $Result.RequestedMB = $shrinkMb
-Write-Log ""Alvo resolvido via $source : disco=$diskN part=$partN shrink=${shrinkMb}MB""
+Write-Log ('Alvo resolvido via ' + $source + ' : disco=' + $diskN + ' part=' + $partN + ' shrink=' + $shrinkMb + 'MB')
 
-if ($partN -le 0) {{
-    Write-Log 'FATAL: nenhuma particao alvo encontrada.'
+if ($partN -le 0) {
+    Set-Step 2 'ERRO' 'nenhuma particao alvo encontrada'
     $Result.Status = 'NO_TARGET'; $Result.Error = 'nenhuma particao alvo encontrada'
+    $script:FinalOk = $false
+    $script:FinalMsg = 'ERRO: nenhuma particao alvo encontrada. Nada foi alterado.'
     Save-And-Reboot $false
     exit 1
-}}
+}
 
-# ---- 2. Validar com querymax REAL (estruturado, nao texto) ----
-try {{
+$script:Info['Alvo'] = ('Disco {0}, Particao {1}' -f $diskN, $partN)
+Set-Step 2 'OK'
+# ---- 2. Validar com querymax REAL ----
+Set-Step 3 '..'
+try {
     $partition = Get-Partition -DiskNumber $diskN -PartitionNumber $partN -ErrorAction Stop
     $supported = $partition | Get-PartitionSupportedSize -ErrorAction Stop
     $curSize   = [long]$partition.Size
@@ -4492,48 +4627,85 @@ try {{
     $maxShrinkBytes = $curSize - $sizeMin
     $maxShrinkMb     = [math]::Floor($maxShrinkBytes / 1MB)
 
-    Write-Log ""Particao: $([math]::Round($curSize/1GB,1)) GB | Minimo pos-shrink: $([math]::Round($sizeMin/1GB,1)) GB | Encolhivel: ${maxShrinkMb} MB""
-
-    if ($maxShrinkMb -lt 100) {{
-        Write-Log 'FATAL: espaco encolhivel insuficiente (<100 MB). Fragmentacao ou paginafile ativo.'
-        $Result.Status = 'INSUFFICIENT_SPACE'; $Result.Error = ""encolhivel=${{maxShrinkMb}}MB < 100MB""
-        Save-And-Reboot $false
-        exit 1
-    }}
-
-    $actualShrinkMb = [math]::Min($shrinkMb, $maxShrinkMb)
-    if ($actualShrinkMb -lt $shrinkMb) {{
-        Write-Log ""AVISO: pediu ${{shrinkMb}}MB mas so da ${{actualShrinkMb}}MB. Encolhendo o maximo possivel.""
-    }}
-
-    $newSizeBytes = $curSize - ($actualShrinkMb * 1MB)
-
-    # ---- 3. Executar o shrink ----
-    Write-Log ""Encolhendo para $([math]::Round($newSizeBytes/1GB,1)) GB (reducao de ${actualShrinkMb} MB)...""
-    Resize-Partition -DiskNumber $diskN -PartitionNumber $partN -Size $newSizeBytes -ErrorAction Stop
-
-    # ---- 4. Verificar resultado ----
-    $after = Get-Partition -DiskNumber $diskN -PartitionNumber $partN
-    $delta = [math]::Round(($curSize - [long]$after.Size) / 1MB)
-    Write-Log ""SUCESSO: particao reduziu ${delta} MB (pedido: ${{shrinkMb}}MB).""
-
-    $Result.Status  = 'OK'
-    $Result.ActualMB = $delta
-    Save-And-Reboot $true
-}}
-catch {{
-    Write-Log ""FATAL: $_""
-    $Result.Status = 'ERROR'; $Result.Error = ""$_""
+    $script:Info['Tamanho']    = ('{0:N1} GB' -f ($curSize / 1GB))
+    $script:Info['Encolhivel'] = ('{0} MB' -f $maxShrinkMb)
+    $script:Info['Pedido']     = ('{0} MB' -f $shrinkMb)
+    Write-Log ('Particao: ' + [math]::Round($curSize/1GB,1) + ' GB | Minimo pos-shrink: ' + [math]::Round($sizeMin/1GB,1) + ' GB | Encolhivel: ' + $maxShrinkMb + ' MB')
+    Set-Step 3 'OK'
+} catch {
+    Set-Step 3 'ERRO'
+    Write-Log ('FATAL ao consultar particao: ' + $_)
+    $Result.Status = 'QUERY_FAIL'; $Result.Error = ('' + $_)
+    $script:FinalOk = $false
+    $script:FinalMsg = 'ERRO ao consultar a particao. Nada foi alterado.'
     Save-And-Reboot $false
     exit 1
-}}
+}
+
+if ($maxShrinkMb -lt 100) {
+    Write-Log 'FATAL: espaco encolhivel insuficiente (<100 MB).'
+    $Result.Status = 'INSUFFICIENT_SPACE'; $Result.Error = ('encolhivel=' + $maxShrinkMb + 'MB < 100MB')
+    $script:FinalOk = $false
+    $script:FinalMsg = ('ERRO: espaco encolhivel insuficiente (' + $maxShrinkMb + ' MB). Nada foi alterado.')
+    Save-And-Reboot $false
+    exit 1
+}
+
+$actualShrinkMb = [math]::Min($shrinkMb, $maxShrinkMb)
+if ($actualShrinkMb -lt $shrinkMb) {
+    Write-Log ('AVISO: pediu ' + $shrinkMb + 'MB mas so da ' + $actualShrinkMb + 'MB. Encolhendo o maximo possivel.')
+}
+$script:Info['Pedido'] = ('{0} MB (maximo real: {1} MB)' -f $shrinkMb, $actualShrinkMb)
+
+$newSizeBytes = $curSize - ($actualShrinkMb * 1MB)
+
+# ---- 3. Executar o shrink ----
+Set-Step 4 '..' ('encolhendo para {0:N1} GB...' -f ($newSizeBytes / 1GB))
+try {
+    Resize-Partition -DiskNumber $diskN -PartitionNumber $partN -Size $newSizeBytes -ErrorAction Stop
+} catch {
+    Set-Step 4 'ERRO'
+    Write-Log ('FATAL no Resize-Partition: ' + $_)
+    $Result.Status = 'RESIZE_FAIL'; $Result.Error = ('' + $_)
+    $script:FinalOk = $false
+    $script:FinalMsg = 'ERRO ao encolher a particao. Verifique o log.'
+    Save-And-Reboot $false
+    exit 1
+}
+
+# ---- 4. Verificar resultado ----
+$after = Get-Partition -DiskNumber $diskN -PartitionNumber $partN
+$delta = [math]::Round(($curSize - [long]$after.Size) / 1MB)
+Write-Log ('SUCESSO: particao reduziu ' + $delta + ' MB (pedido: ' + $shrinkMb + 'MB).')
+Set-Step 4 'OK' ('reduziu ' + $delta + ' MB')
+
+$Result.Status = 'OK'; $Result.ActualMB = $delta
+$script:Info['Resultado'] = ('-{0} MB (pedido: {1} MB)' -f $delta, $shrinkMb)
+$script:FinalOk = $true
+$script:FinalMsg = ('CONCLUIDO: particao reduziu ' + $delta + ' MB.')
+
+# ---- 5. Gravar resultado + reboot ----
+Set-Step 5 '..'
+Save-And-Reboot $true
+");
+            // Rede de seguranca definitiva: se o script sair por QUALQUER caminho que nao
+            // passou por Save-And-Reboot (ex.: excecao fora do try, Ctrl+C, host matando),
+            // o finally garante o reboot. Sem isso o PE ficaria na tela cheia para sempre
+            // (winpeshl so' continua quando o processo termina - doc oficial).
+            sb.Append(@"
+finally {
+    if (-not $script:FinalOk) {
+        Write-Log 'finalizacao de emergencia: reiniciando para nao deixar o PE parado.'
+    }
+    Start-Sleep 3
+    wpeutil reboot
+}
 ");
             return sb.ToString()
                 .Replace("{embedDisk}", embedDiskN.ToString())
                 .Replace("{embedPart}", embedPartN.ToString())
                 .Replace("{embedMb}", embedShrinkMB.ToString());
         }
-
 
         /// <summary>
         /// Fase 2 (dentro do WinPE): Continua o shrink com a partição offline
@@ -5049,7 +5221,8 @@ catch {{
 
                 Log($"Preparação completa: PowerShell={prepResult.PowerShellAvailable}, " +
                     $"Storage={prepResult.StorageModuleAvailable}, PS1 injetado={prepResult.Ps1Injected}, " +
-                    $"startnet={prepResult.StartnetInjected}, config={prepResult.ConfigInjected}.");
+                    $"startnet={prepResult.StartnetInjected}, config={prepResult.ConfigInjected}, " +
+                    $"winpeshl={prepResult.WinpeshlInjected}.");
 
                 // 4. Configurar bootsequence via BCD ramdisk
                 string? shrinkBcdGuid = null;

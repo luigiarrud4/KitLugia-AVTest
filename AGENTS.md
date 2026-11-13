@@ -1,4 +1,6 @@
-﻿# Sessao 06/11 - GPU real vs virtual: filtro + refresh imediato + visual do ponto de restauracao
+﻿> **NOTA (12/11/2026):** Este projeto foi movido para `C:\Users\Lugia\KitLugia`. Referencias a `KitLugia-master - Copia` ou `Downloads` neste arquivo sao historicas.
+
+# Sessao 06/11 - GPU real vs virtual: filtro + refresh imediato + visual do ponto de restauracao
 
 Pedido: "faca o kit ignorar o virtual display driver e so focar na placa de video real";
 "nessa pagina tambem e bom fazer com que as alteracoes atualizassem os dados ali mesmo";

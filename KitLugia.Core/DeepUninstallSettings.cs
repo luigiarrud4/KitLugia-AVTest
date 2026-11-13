@@ -22,6 +22,8 @@ namespace KitLugia.Core
         private static bool _selectLeftoversByDefault = true;
         private static bool _autoCleanConfirmed = true;
         private static bool _ignoreRecent24H;
+        private static int _backupRetentionDays = 7;
+        private static int _backupMaxTotalMb = 2048;
 
         private static void EnsureLoaded()
         {
@@ -37,6 +39,8 @@ namespace KitLugia.Core
                 _selectLeftoversByDefault = ReadFlag(key, "SelectLeftovers", true);
             _autoCleanConfirmed = ReadFlag(key, "AutoCleanConfirmed", true);
                 _ignoreRecent24H = ReadFlag(key, "IgnoreRecent24H", false);
+                _backupRetentionDays = ReadInt(key, "BackupRetentionDays", 7);
+                _backupMaxTotalMb = ReadInt(key, "BackupMaxTotalMb", 2048);
             }
             catch { }
         }
@@ -62,6 +66,50 @@ namespace KitLugia.Core
                 key?.SetValue(name, value ? 1 : 0, RegistryValueKind.DWord);
             }
             catch { }
+        }
+
+        private static int ReadInt(RegistryKey key, string name, int def)
+        {
+            var v = key.GetValue(name);
+            return v switch
+            {
+                int i => i,
+                long l => (int)l,
+                string s when int.TryParse(s, out var n) => n,
+                _ => def
+            };
+        }
+
+        private static void SetInt(string name, int value, ref int field)
+        {
+            field = Math.Max(0, value);
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(RegPath);
+                key?.SetValue(name, field, RegistryValueKind.DWord);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Backups GRANDES (>= 100 MB) de FileBackup mais velhos que este prazo
+        /// (em dias) são apagados no arranque. Padrão 7. Não afeta backups pequenos
+        /// nem RegBackup/.reg (esses ficam para sempre).
+        /// </summary>
+        public static int BackupRetentionDays
+        {
+            get { EnsureLoaded(); return _backupRetentionDays; }
+            set { SetInt("BackupRetentionDays", value, ref _backupRetentionDays); }
+        }
+
+        /// <summary>
+        /// Teto total de FileBackup em MB (aplica-se só a backups grandes;
+        /// o mais antigo é apagado primeiro até caber). Padrão 2048 (2 GB).
+        /// </summary>
+        public static int BackupMaxTotalMb
+        {
+            get { EnsureLoaded(); return _backupMaxTotalMb; }
+            set { SetInt("BackupMaxTotalMb", value, ref _backupMaxTotalMb); }
         }
 
         /// <summary>Enviar arquivos/pastas para a Lixeira em vez de apagar permanentemente (DelToBin).</summary>

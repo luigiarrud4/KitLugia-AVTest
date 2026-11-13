@@ -403,3 +403,6 @@ deploy.bat.bak
 tests/UiShotHarness/out*/
 tests/UiShotHarness/tmp/
 tests/WindowShot/shots/
+
+# dados internos do workspace (nao devem ir para o GitHub via git add -A)
+.workbuddy-ai/
