@@ -206,7 +206,7 @@ Processos passou a reusar `TmDarkMenu`/`TmMenuItem`.
 
 O combo abria com o popup do tema global do Kit (borda `#FFD700`, item destacado amarelo) e a
 barra de rolagem ficava dourada no hover. `TmComboBox`/`TmComboBoxItem`/`TmScrollBar`
-(implícitos no `Window.Resources` do TM) trazem o azul-escuro do TM e valem para todos os
+(implícitos no `Window.Resources` do TM) trazem o visual clássico do TMOG e valem para todos os
 combos da janela, sem mexer no tema do resto do Kit.
 
 ### 8.3 Congelar + agir na lista do Resumo

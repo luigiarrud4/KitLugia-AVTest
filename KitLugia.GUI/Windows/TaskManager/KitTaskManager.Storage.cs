@@ -68,11 +68,11 @@ namespace KitLugia.GUI.Windows.TaskManager
         private readonly Queue<float> _stQueueHist = new(61);
         private readonly Queue<float> _stLatHist = new(61);
 
-        private static readonly SolidColorBrush StOk = StBrush(0x4C, 0xAF, 0x50);
-        private static readonly SolidColorBrush StWarn = StBrush(0xFF, 0xB7, 0x4D);
-        private static readonly SolidColorBrush StBad = StBrush(0xF4, 0x43, 0x36);
-        private static readonly SolidColorBrush StIdle = StBrush(0x88, 0x88, 0x88);
-        private static readonly SolidColorBrush StAccent = StBrush(0x4F, 0xC3, 0xF7);
+        private static readonly SolidColorBrush StOk = StBrush(0x00, 0x80, 0x00);
+        private static readonly SolidColorBrush StWarn = StBrush(0xB8, 0x86, 0x0B);
+        private static readonly SolidColorBrush StBad = StBrush(0xC0, 0x00, 0x00);
+        private static readonly SolidColorBrush StIdle = StBrush(0x60, 0x60, 0x60);
+        private static readonly SolidColorBrush StAccent = StBrush(0x00, 0x00, 0x80);
 
         private static SolidColorBrush StBrush(byte r, byte g, byte b)
         {
@@ -223,7 +223,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             BtnStToggle.Content = "⏸ PAUSAR";
             BtnStToggle.ToolTip = "Pausa a medição (a aba continua aberta)";
             StState.Text = "MONITORANDO";
-            StStateBadge.Background = StBrush(0x1B, 0x3A, 0x24);
+            StStateBadge.Background = StBrush(0xD4, 0xED, 0xDA);
             StState.Foreground = StOk;
             StorageTick();
         }
@@ -237,7 +237,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 BtnStToggle.Content = "▶ ESCUTAR";
                 BtnStToggle.ToolTip = "Começa a medir os discos e ranquear quem está fazendo E/S";
                 StState.Text = "PAUSADO";
-                StStateBadge.Background = StBrush(0x33, 0x33, 0x33);
+                StStateBadge.Background = StBrush(0xD4, 0xD0, 0xC8);
                 StState.Foreground = StIdle;
             }
         }
@@ -520,10 +520,10 @@ namespace KitLugia.GUI.Windows.TaskManager
             EnqueueFloat(_stActHist, (float)focus.ActivityPct);
             EnqueueFloat(_stQueueHist, (float)focus.Queue);
             EnqueueFloat(_stLatHist, (float)focus.LatencyMs);
-            DrawLineChart(StChartActivity, _stActHist, Color.FromRgb(0x4F, 0xC3, 0xF7), 100f);
-            DrawLineChart(StChartQueue, _stQueueHist, Color.FromRgb(0xFF, 0xB7, 0x4D),
+            DrawLineChart(StChartActivity, _stActHist, Color.FromRgb(0x00, 0x00, 0x80), 100f);
+            DrawLineChart(StChartQueue, _stQueueHist, Color.FromRgb(0xB8, 0x86, 0x0B),
                 Math.Max(6f, _stQueueHist.Count > 0 ? _stQueueHist.Max() : 6f));
-            DrawLineChart(StChartLatency, _stLatHist, Color.FromRgb(0xE5, 0x73, 0x73),
+            DrawLineChart(StChartLatency, _stLatHist, Color.FromRgb(0xC0, 0x00, 0x00),
                 Math.Max(40f, _stLatHist.Count > 0 ? _stLatHist.Max() : 40f));
 
             BuildStorageDiagnosis(snap, focus);
@@ -691,8 +691,8 @@ namespace KitLugia.GUI.Windows.TaskManager
             StDiagTitle.Foreground = color;
             StDiagBadgeText.Text = badge;
             StDiagBadgeText.Foreground = color;
-            StDiagBadge.Background = color == StOk ? StBrush(0x1B, 0x3A, 0x24)
-                : color == StBad ? StBrush(0x3A, 0x1B, 0x1B) : StBrush(0x3A, 0x30, 0x12);
+            StDiagBadge.Background = color == StOk ? StBrush(0xD4, 0xED, 0xDA)
+                : color == StBad ? StBrush(0x3A, 0x1B, 0x1B) : StBrush(0xFF, 0xF3, 0xCD);
             _ = title;
         }
 

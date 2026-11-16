@@ -45,9 +45,9 @@ namespace KitLugia.GUI.Windows.TaskManager
 
         // Totalmente qualificado: "Brush" é ambíguo neste projeto (System.Drawing × Media).
         private static readonly System.Windows.Media.Brush LoadStepOn =
-            Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4F, 0xC3, 0xF7)));
+            Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x00, 0x80)));
         private static readonly System.Windows.Media.Brush LoadStepOff =
-            Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x24, 0x30, 0x40)));
+            Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x80, 0x80, 0x80)));
 
         /// <summary>Liga o véu. Chamado UMA vez, do Loaded (primeira exibição da janela).</summary>
         private void BeginLoadingOverlay()

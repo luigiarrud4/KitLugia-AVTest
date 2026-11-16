@@ -1068,9 +1068,9 @@ namespace KitLugia.GUI.Windows.TaskManager
             SetLatencyTabActive(TabLatency.Visibility == Visibility.Visible);
         }
 
-        private static readonly SolidColorBrush _accentBrush = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4F, 0xC3, 0xF7))); // ciano — identidade própria do TM
-        private static readonly SolidColorBrush _grayBrush = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)));
-        private static readonly SolidColorBrush _bgActive = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x28, 0x28, 0x28)));
+        private static readonly SolidColorBrush _accentBrush = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xFF, 0xFF))); // item ativo da sidebar — TMOG clássico (navy + tinta clara)
+        private static readonly SolidColorBrush _grayBrush = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x40, 0x40, 0x40)));
+        private static readonly SolidColorBrush _bgActive = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x00, 0x80)));
         private static readonly SolidColorBrush _bgInactive = Freeze(new SolidColorBrush(Colors.Transparent));
 
         private static SolidColorBrush Freeze(SolidColorBrush b)
@@ -3781,14 +3781,14 @@ private void ApplyFilter(string query)
         }
 
         // Frozen brush cache — created once, shared across all calls (thread-safe, zero GC)
-        private static readonly SolidColorBrush _brushRed = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE8, 0x11, 0x23)));
-        private static readonly SolidColorBrush _brushOrange = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x98, 0x00)));
-        // Ambar do TM (era #FFD700 = o DOURADO do tema global do Kit, que destoava do azul
-        // do Gerenciador de Tarefas em todo valor em atencao: CPU/RAM ~50-60%, temperatura,
+        private static readonly SolidColorBrush _brushRed = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC0, 0x00, 0x00)));
+        private static readonly SolidColorBrush _brushOrange = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x80, 0x00)));
+        // Ambar classico do TMOG (era #FFD700 = o DOURADO do tema global do Kit, que destoava do
+        // azul do Gerenciador de Tarefas em todo valor em atencao: CPU/RAM ~50-60%, temperatura,
         // potencia. Mesmo tom do icone de "fixado" no Resumo.)
-        private static readonly SolidColorBrush _brushYellow = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD5, 0x4F)));
-        private static readonly SolidColorBrush _brushGreen = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50)));
-        private static readonly SolidColorBrush _brushGray = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)));
+        private static readonly SolidColorBrush _brushYellow = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE6, 0xA8, 0x00)));
+        private static readonly SolidColorBrush _brushGreen = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x80, 0x00)));
+        private static readonly SolidColorBrush _brushGray = FreezeBrush(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60)));
         private static readonly SolidColorBrush _brushTransparent = FreezeBrush(Brushes.Transparent);
 
         private static SolidColorBrush FreezeBrush(SolidColorBrush b)

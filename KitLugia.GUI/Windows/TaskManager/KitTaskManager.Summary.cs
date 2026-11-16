@@ -143,7 +143,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             {
                 PnlCores.Children.Clear();
                 _coreBars.Clear();
-                var trackBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x15, 0x15, 0x15)));
+                var trackBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x00, 0x00, 0x00)));
                 for (int i = 0; i < cores; i++)
                 {
                     var col = new StackPanel { Orientation = Orientation.Vertical, Width = 26, Margin = new Thickness(0, 0, 4, 0) };
@@ -175,7 +175,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     {
                         Text = i.ToString(),
                         FontSize = 8,
-                        Foreground = Freeze(new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66))),
+                        Foreground = Freeze(new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80))),
                         HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                     };
                     track.ToolTip = $"Núcleo lógico {i}";
@@ -274,10 +274,10 @@ namespace KitLugia.GUI.Windows.TaskManager
             // Redesenho por amostra: o canvas é redesenhado no tick (~1s), como era antes.
             var cpuSeries = new List<(Queue<float> data, Color color)>
             {
-                (_sumCpuHist, Color.FromRgb(0x4C, 0xAF, 0x50)),
-                (_sumKernelHist, Color.FromRgb(0xF4, 0x43, 0x36)),
+                (_sumCpuHist, Color.FromRgb(0x00, 0x80, 0x00)),
+                (_sumKernelHist, Color.FromRgb(0xC0, 0x00, 0x00)),
             };
-            if (_sumTempHist.Count > 1) cpuSeries.Add((_sumTempHist, Color.FromRgb(0xFF, 0x98, 0x00)));
+            if (_sumTempHist.Count > 1) cpuSeries.Add((_sumTempHist, Color.FromRgb(0xB8, 0x86, 0x0B)));
             DrawMultiSeriesChart(SumCpuCanvas, 100f, true, cpuSeries);
 
             SetText(TxtSumCpuBig, $"{cpu:F0}%", GetHeatColor(cpu, 80, 95));
@@ -305,7 +305,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             if (freq > 0 && freqPeak > freqBase)
                 clockFrac = Math.Clamp((freq - freqBase) / (freqPeak - freqBase), 0, 1);
             SetVital(TxtSumClock, BarSumClock, freq > 0 ? $"{(freq / 1000.0):F2} GHz" : "—",
-                clockFrac, Freeze(new SolidColorBrush(Color.FromRgb(0x7E, 0x57, 0xC2))));
+                clockFrac, Freeze(new SolidColorBrush(Color.FromRgb(0x80, 0x00, 0x80))));
             // Detalhe: base + pico (o número sozinho não diz se é turbo ou clock base)
             SetText(TxtSumClockDetail, freq > 0 && freqBase > 0
                 ? $"base {(freqBase / 1000.0):F2} GHz · pico {(freqPeak / 1000.0):F2} GHz"
@@ -392,7 +392,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                                 ? "ESTADO: uso alto, mas ainda dentro do normal para muitas abas/jogos abertos. Observe se o disco começa a trabalhar sozinho."
                                 : "ESTADO: tranquilo. Há RAM de sobra para o que está rodando agora."));
                 }
-                DrawMultiSeriesChart(SumMemCanvas, 100f, true, new List<(Queue<float>, Color)> { (_sumMemHist, Color.FromRgb(0xB3, 0x6A, 0xE2)) });
+                DrawMultiSeriesChart(SumMemCanvas, 100f, true, new List<(Queue<float>, Color)> { (_sumMemHist, Color.FromRgb(0x80, 0x00, 0x80)) });
             }
             catch { }
 
@@ -413,7 +413,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     SetText(TxtSumNet, "—");
                     SetText(TxtSumNetDetail, $"lendo {net.Interfaces} interfaces…");
                 }
-                DrawMultiSeriesChart(SumNetCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumNetHist, Color.FromRgb(0x9C, 0x27, 0xB0)) });
+                DrawMultiSeriesChart(SumNetCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumNetHist, Color.FromRgb(0x80, 0x00, 0x80)) });
             }
             catch { }
 
@@ -423,7 +423,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 Enqueue(_sumDiskHist, diskMB);
                 SetText(TxtSumDisk, FormatBytesSpeed(diskMB * 1048576.0));
                 SetText(TxtSumDiskDetail, $"R {FormatBytesSpeed(_lastDiskReadMBps * 1048576.0)} · W {FormatBytesSpeed(_lastDiskWriteMBps * 1048576.0)}");
-                DrawMultiSeriesChart(SumDiskCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumDiskHist, Color.FromRgb(0xFF, 0x98, 0x00)) });
+                DrawMultiSeriesChart(SumDiskCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumDiskHist, Color.FromRgb(0xB8, 0x86, 0x0B)) });
             }
             catch { }
 
@@ -433,7 +433,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 string topGpu;
                 lock (_lock) topGpu = _allRows.Where(r => r.GpuValue > 0).OrderByDescending(r => r.GpuValue).FirstOrDefault()?.Name ?? "";
                 SetText(TxtSumGpuDetail, topGpu.Length > 0 ? $"maior: {topGpu}" : "sem uso de GPU");
-                DrawMultiSeriesChart(SumGpuCanvas, 100f, true, new List<(Queue<float>, Color)> { (_sumGpuHist, Color.FromRgb(0x21, 0x96, 0xF3)) });
+                DrawMultiSeriesChart(SumGpuCanvas, 100f, true, new List<(Queue<float>, Color)> { (_sumGpuHist, Color.FromRgb(0x00, 0x00, 0x80)) });
             }
             catch { }
 
@@ -441,7 +441,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             {
                 SetText(TxtSumPowerTile, power >= 0 ? $"{power:F1} W" : "—");
                 SetText(TxtSumPowerDetail, power >= 0 ? "pacote da CPU (PDH)" : "sensor indisponível");
-                DrawMultiSeriesChart(SumPowerCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumPowerHist, Color.FromRgb(0xF4, 0x43, 0x36)) });
+                DrawMultiSeriesChart(SumPowerCanvas, 0f, true, new List<(Queue<float>, Color)> { (_sumPowerHist, Color.FromRgb(0xC0, 0x00, 0x00)) });
             }
             catch { }
 
@@ -971,7 +971,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     var poly = new System.Windows.Shapes.Polyline
                     {
                         Points = kernelPoints,
-                        Stroke = new SolidColorBrush(Color.FromRgb(0xF4, 0x43, 0x36)),
+                        Stroke = new SolidColorBrush(Color.FromRgb(0xC0, 0x00, 0x00)),
                         StrokeThickness = 1.2,
                         Opacity = 0.9
                     };
@@ -986,7 +986,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 {
                     X1 = x0 + sel * barW + barW / 2, X2 = x0 + sel * barW + barW / 2,
                     Y1 = 0, Y2 = baseY,
-                    Stroke = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)),
+                    Stroke = new SolidColorBrush(Color.FromRgb(0x00, 0x00, 0x80)),
                     StrokeThickness = 1,
                     Opacity = 0.9
                 };
@@ -1009,7 +1009,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     var nome = new TextBlock
                     {
                         Text = t.Name, FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis,
-                        Foreground = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE)),
+                        Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
                         ToolTip = $"{t.Name} (PID {t.Pid}) · {t.RamMb:F0} MB de RAM"
                     };
                     var pct = new TextBlock
@@ -1085,7 +1085,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 }
 
                 // Grade horizontal (quartos) — dá a leitura de escala do TMOG
-                var gridBrush = Freeze(new SolidColorBrush(Color.FromArgb(60, 0x44, 0x44, 0x44)));
+                var gridBrush = Freeze(new SolidColorBrush(Color.FromArgb(60, 0x80, 0x80, 0x80)));
                 for (int i = 1; i < 4; i++)
                 {
                     canvas.Children.Add(new System.Windows.Shapes.Line

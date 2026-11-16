@@ -341,7 +341,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     LatAudioCard.BorderBrush = LatOk;
                     LatAudioBadgeText.Text = mon.GlitchCount > 0 ? "PARADO (COM HISTÓRICO)" : "DESLIGADO";
                     LatAudioBadgeText.Foreground = LatIdle;
-                    LatAudioBadge.Background = LatBrush(0x33, 0x33, 0x33);
+                    LatAudioBadge.Background = LatBrush(0xD4, 0xD0, 0xC8);
                     LatAudioState.Text = mon.GlitchCount > 0
                         ? $"Escuta parada, mas a lista tem {mon.GlitchCount} evento(s) — você ainda pode copiar o relatório."
                         : "Ligue a escuta do áudio. O Kit pergunta ao motor de áudio do Windows quando ele perdeu quadros " +
@@ -359,7 +359,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     LatAudioCard.BorderBrush = LatOk;
                     LatAudioBadgeText.Text = mon.AudioActive ? "ESCUTANDO — SOM TOCANDO" : "ESCUTANDO";
                     LatAudioBadgeText.Foreground = LatOk;
-                    LatAudioBadge.Background = LatBrush(0x1B, 0x3A, 0x24);
+                    LatAudioBadge.Background = LatBrush(0xD4, 0xED, 0xDA);
                     LatAudioState.Text = "Nenhuma travada de áudio até agora. " +
                         (mon.AudioActive
                             ? "Há som tocando: deixe rodando enquanto o problema acontece."
@@ -371,7 +371,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     LatAudioCard.BorderBrush = bad ? LatBad : confirmed > 0 ? LatWarn : LatIdle;
                     LatAudioBadgeText.Text = confirmed > 0 ? confirmed + " CONFIRMADA(S)" : total + " INDÍCIO(S)";
                     LatAudioBadgeText.Foreground = confirmed > 0 ? (bad ? LatBad : LatWarn) : LatIdle;
-                    LatAudioBadge.Background = confirmed > 0 ? LatBrush(0x3A, 0x30, 0x12) : LatBrush(0x33, 0x33, 0x33);
+                    LatAudioBadge.Background = confirmed > 0 ? LatBrush(0xFF, 0xF3, 0xCD) : LatBrush(0xD4, 0xD0, 0xC8);
 
                     var snap = mon.BuildConclusion();
                     LatAudioState.Text = snap.Title + "\n" + snap.Text.Split('\n')

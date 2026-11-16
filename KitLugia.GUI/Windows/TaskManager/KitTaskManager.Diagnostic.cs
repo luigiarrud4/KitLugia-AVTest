@@ -518,9 +518,9 @@ namespace KitLugia.GUI.Windows.TaskManager
 
             public System.Windows.Media.Brush AccentBrush => Model.Severity switch
             {
-                DiagnosticSeverity.Critical => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x52, 0x52)),
-                DiagnosticSeverity.Warning => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xB3, 0x00)),
-                _ => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4F, 0xC3, 0xF7))
+                DiagnosticSeverity.Critical => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC0, 0x00, 0x00)),
+                DiagnosticSeverity.Warning => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xB8, 0x86, 0x0B)),
+                _ => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x00, 0x80))
             };
 
             public Visibility EvidenceVisibility => Model.Evidence.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
